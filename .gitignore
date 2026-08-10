@@ -1,0 +1,8 @@
+**/graphify-out/
+**/dist/
+**/node_modules/
+.pnpm-store/
+.claude/
+.codex/
+.pnpm-debug.log
+.pnpm-store/*

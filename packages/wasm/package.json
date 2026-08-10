@@ -1,0 +1,19 @@
+{
+  "name": "@migai/wasm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "files": ["src", "rust"],
+  "exports": {
+    ".": {
+      "types": "./src/wasm_provider.d.ts",
+      "default": "./src/wasm_provider.js"
+    }
+  },
+  "scripts": {
+    "build": "cd rust && wasm-pack build --target web --release --out-dir ../src",
+    "test:rust": "cd rust && cargo test",
+    "test": "pnpm run test:rust",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

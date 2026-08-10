@@ -1,0 +1,33 @@
+{
+	// Whole-package dev typecheck (source + tests together) — the equivalent
+	// of the app's own `tsconfig.app.json`. Includes DOM lib because the
+	// web-worker adapter needs it; `tsconfig.core.json`/`tsconfig.node-adapter.json`
+	// are the separate, narrower configs that prove parts of this package
+	// don't actually need it. `"types": ["vite/client"]` is here only for
+	// `architecture.test.ts`'s `import.meta.glob` — a devDependency-time
+	// convenience for this package's own tests, not something the shipped
+	// library code relies on (`tsconfig.build.json` excludes tests entirely).
+	"compilerOptions": {
+		"tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tsbuildinfo",
+		"target": "es2023",
+		"lib": ["ES2023", "DOM"],
+		"module": "esnext",
+		"types": ["vite/client"],
+		"skipLibCheck": true,
+		"moduleResolution": "bundler",
+		"allowImportingTsExtensions": true,
+		"verbatimModuleSyntax": true,
+		"moduleDetection": "force",
+		"noEmit": true,
+		"strict": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"erasableSyntaxOnly": true,
+		"noFallthroughCasesInSwitch": true
+	},
+	"include": ["src/index.ts", "src/typing.ts", "src/errors.ts", "src/transport.ts", "src/wire.ts", "src/factory.ts", "src/endpoint.ts", "src/middleware", "src/internal/runtime.ts", "src/internal/pending.ts", "src/internal/peers.ts", "src/internal/provider.ts", "src/adapters"],
+	// Redeclares AbortController/AbortSignal/etc. globally — collides with the
+	// real ones from `lib.dom.d.ts` in this config (unlike `tsconfig.core.json`/
+	// `tsconfig.node-adapter.json`, which have no DOM lib to collide with).
+	"exclude": ["src/ambient.d.ts"]
+}

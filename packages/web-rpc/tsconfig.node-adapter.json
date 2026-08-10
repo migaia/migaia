@@ -1,0 +1,26 @@
+{
+	// Standalone check, same idea as `tsconfig.core.json`: the Node
+	// MessagePort adapter is written with deliberately structural types (see
+	// `adapters/message-port.ts`'s own doc comment) instead of importing
+	// `node:worker_threads`, specifically so it never needs Node's ambient
+	// types either. This proves that claim — no DOM lib, no `"types": ["node"]`.
+	// Run via `npm run typecheck:rpc`.
+	"compilerOptions": {
+		"target": "es2023",
+		"lib": ["ES2023"],
+		"types": [],
+		"module": "esnext",
+		"moduleResolution": "bundler",
+		"allowImportingTsExtensions": true,
+		"verbatimModuleSyntax": true,
+		"moduleDetection": "force",
+		"noEmit": true,
+		"strict": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"erasableSyntaxOnly": true,
+		"noFallthroughCasesInSwitch": true,
+		"skipLibCheck": true
+	},
+	"include": ["src/ambient.d.ts", "src/transport.ts", "src/adapters/message-port.ts"]
+}

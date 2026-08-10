@@ -1,0 +1,38 @@
+{
+  "capturedAt": "2026-08-09",
+  "purpose": "Phase 0 migration baseline; removals require an explicit compatibility decision.",
+  "packages": {
+    "@migai/store": {
+      ".": [],
+      "./async": ["AsyncAtom", "asyncAtom", "resource", "resourceFamily"],
+      "./atom": ["atom", "atomDef", "atomDefFactory", "createAtomStore", "defaultAtomStore", "derivedAtom", "derivedDef", "dynamicAtom", "focusAtom", "focusDef", "opticAtom", "opticDef", "primitiveAtom", "selectAtom", "selectDef", "splitAtom", "splitDef", "writableAtom", "writableDef"],
+      "./benchmarks": ["* from ./scenarios"],
+      "./capability": ["createCapabilityHost"],
+      "./collections": ["* from ../core/collections"],
+      "./core": [],
+      "./devtools": ["* from ../core/devtools"],
+      "./family": ["atomFamily", "computedFamily", "createFamily", "derivedFamilyDef", "familyDef"],
+      "./flow": ["* from ../core/flow"],
+      "./global": ["batch", "computed", "currentVersion", "defaultRuntime", "effect", "flush", "flushSync", "memo", "setScheduler", "signal", "untracked"],
+      "./kernel": ["assertSingleRuntimeCopy", "createObserverBinding", "createRuntime", "LifecycleScopeImpl", "ObjectLeaseRegistry", "RequestControllerImpl", "runtimeCopyCount", "TerminalControllerImpl"],
+      "./middleware": ["* from ../core/middleware"],
+      "./persist": ["* from ../core/persist"],
+      "./react": ["* from ./provider", "* from ./useAtom", "* from ./useStore", "useAtomDefinition", "useNodeValue", "useSetAtomDefinition"],
+      "./serialize": ["createSerializeRegistry", "createSerializeWorkerHandler", "decodeStream", "encodeStream", "jsonParser", "jsonPlugin", "wasmMsgpackParser", "wasmMsgpackPlugin", "workerParser", "workerPlugin"],
+      "./shared": ["SharedInt32Array", "SharedInt32Signal", "sharedInt32", "sharedInt32Array"],
+      "./ssr": ["* from ../core/ssr"],
+      "./store": ["createAsyncStore", "createStore", "createStoreResource", "createStoreResourceScope", "FIELD_BUILDER", "isFieldBuilder", "isRaw", "raw"],
+      "./wasm": ["* from ../core/wasm"],
+      "./worker": ["* from ../core/worker"]
+    },
+    "@migai/web-rpc": {
+      ".": ["RpcClient", "RpcServer", "createMemoryTransportPair", "validateRpcPayload"],
+      "./memory": ["createMemoryTransportPair"],
+      "./message-port": ["createNodeMessagePortTransport"],
+      "./web-worker": ["createWebWorkerTransport"]
+    },
+    "@migai/store-web": {
+      ".": ["indexedDbStorage", "localStorageAdapter", "readSSRStateFromDocument", "readSSRStateFromDocumentWith"]
+    }
+  }
+}
