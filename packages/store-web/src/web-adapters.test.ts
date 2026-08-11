@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { jsonPlugin, createSerializeRegistry } from '@migai/store/serialize'
+import { jsonPlugin, createSerializeRegistry } from '@migaia/store/serialize'
 import {
   localStorageAdapter,
   readSSRStateFromDocument,
   readSSRStateFromDocumentWith
 } from './index'
 
-describe('@migai/store-web adapters', () => {
+describe('@migaia/store-web adapters', () => {
   it('wraps injected Web Storage without touching ambient globals', () => {
     const values = new Map<string, string>()
     const storage = {

@@ -2,7 +2,7 @@
 
 - 状态：Proposed
 - 范围：`packages/plugin-host`
-- 所有者：`@migai/plugin-host`
+- 所有者：`@migaia/plugin-host`
 - 更新：2026-08-10
 
 ## 1. 目标与边界
@@ -63,6 +63,9 @@ static batch use 先在临时 Map 校验后一次提交；disabled 是 Map entry
 - registration name snapshot 是唯一身份；插件运行时 name 变化不影响已登记身份，卸载仍按快照名称执行。
 - shared/config 所有权统一读取当前 scope owner，不通过 Proxy 特判绕过。
 - plugin name 必须为非空字符串。
+- Host public config 只允许通过 `plugin.key` 或 `plugin.[index].key` 读取嵌套值；直接读取插件根配置或全量配置不提供支持。
+- 配置读取只做一层浅拷贝，嵌套对象/数组保持原引用；配置不可变性由调用方负责，不由 PluginHost 承担深拷贝成本。
+- `host.config` facade 在重复访问时复用同一对象；Host 进入 disposing/disposed 后，读取与更新统一拒绝。
 - `shared()` 与 `install()` 必须返回 object；`install()` 可返回 Promise 或其他 awaitable 值。
 - disposer 与 pipeline stage 必须是 function。
 
@@ -73,10 +76,13 @@ static batch use 先在临时 Map 校验后一次提交；disabled 是 Map entry
 - generator 只把最后一个 yield 或 return 值传给下游；`return undefined` 表示中止；中间 yield 不对外暴露。
 - async stage 在 `next()` 后抛错时必须 observe 已启动的 downstream；两者失败抛 `AggregateError`。
 - late/duplicate next 按既有稳定错误语义处理。
+- sync、async、generator 在嵌套执行和 await/yield 期间均禁止注册新 stage；owner 只允许在 install 生命周期注册 stage/resource。
 
 ## 7. 验收边界
 
-必须覆盖：并发 use 隔离、lifecycle mutation 拒绝、update/dispose 资源所有权、LIFO 全路径 cleanup 与聚合、async pipeline 双失败、non-configurable extension、dispose 后所有入口拒绝、连续 use 的 shared 类型、全量 runtime import purity、bundle 无 external import，以及 Node/Bun/Deno/Browser/Worker/Electron/mini-program consumer fixtures。
+必须覆盖：并发 use 隔离、lifecycle mutation 拒绝、update/dispose 资源所有权、LIFO 全路径 cleanup 与聚合、async pipeline 双失败、non-configurable extension、dispose 后所有入口拒绝、连续 use 的 shared 类型、配置路径/浅拷贝/facade 生命周期、三种 pipeline 交叉注册、原型污染键、全量 runtime import purity、bundle 无 external import，以及 Node/Bun/Deno/Browser/Worker/Electron/mini-program consumer fixtures。
+
+安装失败且回滚清理失败时使用独立 `PLUGIN_INSTALL_ROLLBACK_FAILED` 错误码；原始安装与清理错误保留在 `cause` 的 `AggregateError` 中。
 
 验证命令：
 

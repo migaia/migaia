@@ -1,6 +1,6 @@
 import { MessageChannel } from 'node:worker_threads'
-import { createNodeMessagePortTransport } from '@migai/web-rpc/message-port'
-import { Logger, type ILogEntry, type ISink } from '@migai/logger'
+import { createNodeMessagePortTransport } from '@migaia/web-rpc/message-port'
+import { Logger, type ILogEntry, type ISink } from '@migaia/logger'
 
 const sink: ISink = (entry: ILogEntry) => {
   void entry.message

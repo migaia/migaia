@@ -1,4 +1,4 @@
-import { createMemoryTransportPair } from '@migai/web-rpc/memory'
+import { createMemoryTransportPair } from '@migaia/web-rpc/memory'
 
 const [client, server] = createMemoryTransportPair()
 const unsubscribe = server.subscribe(() => undefined)

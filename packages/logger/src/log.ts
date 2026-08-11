@@ -1,5 +1,5 @@
-import { PluginHost } from '@migai/plugin-host';
-import type { IPluginHostOptions, IPipelineMode, ISyncPipelineStage } from '@migai/plugin-host';
+import { PluginHost } from '@migaia/plugin-host';
+import type { IPluginHostOptions, IPipelineMode, ISyncPipelineStage } from '@migaia/plugin-host';
 import type {
   IFlusher,
   ILogFailureHook,
@@ -20,6 +20,11 @@ import type {
   ISink,
   IStaticLoggerCtor
 } from './typing';
+
+type ILoggerExtendsTarget<TMode extends IPipelineMode> = Omit<
+  ILoggerCore<TMode>,
+  'config' | 'onDispose'
+>;
 import { getLoggerRuntimeManager } from './runtime-manager';
 
 /**
@@ -52,7 +57,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   #flushPromise: Promise<void> | undefined;
   #shutdownPromise: Promise<void> | undefined;
   /** Extends() 注册的转发目标 */
-  #extendTargets: ILoggerCore<IPipelineMode>[] = [];
+  #extendTargets: ILoggerExtendsTarget<IPipelineMode>[] = [];
   constructor(
     userOptions: Readonly<Record<string, unknown>>,
     path: string[],
@@ -303,7 +308,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     else write();
   }
 
-  extends(...others: readonly ILoggerCore<IPipelineMode>[]): this {
+  extends(...others: readonly ILoggerExtendsTarget<IPipelineMode>[]): this {
     for (const other of others) {
       if (this.#extendTargets.some((target) => target.ctx.id === other.ctx.id)) continue;
       if (other === (this as unknown as ILoggerCore)) {

@@ -1,4 +1,28 @@
 export type IWebRpcVariation = 'abort' | 'ping' | 'pong';
+export type IWebRpcDiscoveryQuery = {
+  readonly kind: 'discovery-query';
+  readonly taskId: string;
+  readonly senderId: string;
+  readonly targetId: string;
+  readonly sentAt: number;
+  readonly data?: unknown;
+  readonly manual?: boolean;
+};
+export type IWebRpcDiscoveryResponse = {
+  readonly kind: 'discovery-response';
+  readonly taskId: string;
+  readonly senderId: string;
+  readonly targetId: string;
+  readonly resolvedTargetId: string;
+  readonly sentAt: number;
+  readonly platform?: string;
+  readonly data?: unknown;
+  readonly receiverId?: string;
+  readonly manual?: boolean;
+  readonly accepted?: boolean;
+  readonly message?: string;
+  readonly operation?: 'unregister';
+};
 export type IWebRpcChunkFrame = {
   readonly kind: 'chunk';
   readonly messageId: string;
@@ -7,12 +31,7 @@ export type IWebRpcChunkFrame = {
   readonly data: string;
   readonly senderId: string;
   readonly targetId: string;
-};
-export type IWebRpcChunkAck = {
-  readonly kind: 'chunk-ack';
-  readonly messageId: string;
-  readonly senderId: string;
-  readonly targetId: string;
+  readonly receiverId?: string;
 };
 export type IWebRpcRequest = {
   readonly kind: 'request';
@@ -20,6 +39,7 @@ export type IWebRpcRequest = {
   readonly taskId: string;
   readonly senderId: string;
   readonly targetId: string;
+  readonly receiverId?: string;
   readonly method: string;
   readonly data: unknown;
   readonly dispatchOnly?: boolean;
@@ -31,6 +51,7 @@ export type IWebRpcResponse = {
   readonly taskId: string;
   readonly senderId: string;
   readonly targetId: string;
+  readonly receiverId?: string;
   readonly method: string;
   readonly ok: boolean;
   readonly data?: unknown;
@@ -41,29 +62,254 @@ export type IWebRpcResponse = {
 export type IWebRpcEnvelope =
   | IWebRpcRequest
   | IWebRpcResponse
+  | IWebRpcDiscoveryQuery
+  | IWebRpcDiscoveryResponse
   | {
       readonly kind: 'variation';
       readonly variation: IWebRpcVariation;
-      readonly taskId?: string;
+      readonly taskId: string;
       readonly senderId: string;
       readonly targetId: string;
+      readonly receiverId?: string;
+      readonly sentAt: number;
     }
-  | IWebRpcChunkFrame
-  | IWebRpcChunkAck;
-export const isWebRpcEnvelope = (value: unknown): value is IWebRpcEnvelope => {
-  if (!value || typeof value !== 'object') return false;
-  const record = value as Record<string, unknown>;
-  if (record.kind === 'request')
+  | IWebRpcChunkFrame;
+import { safeRead } from './internal/safe-value';
+import { WebRpcError, WebRpcErrorCode } from './errors';
+
+/** Reads and freezes one canonical wire snapshot before protocol routing. */
+export function normalizeWebRpcEnvelope(value: unknown): IWebRpcEnvelope | undefined {
+  if (!value || (typeof value !== 'object' && typeof value !== 'function')) return undefined;
+  const kind = safeRead<unknown>(value, 'kind');
+  if (kind === 'discovery-query') {
+    const taskId = safeRead<unknown>(value, 'taskId');
+    const senderId = safeRead<unknown>(value, 'senderId');
+    const targetId = safeRead<unknown>(value, 'targetId');
+    const sentAt = safeRead<unknown>(value, 'sentAt');
+    if (
+      typeof taskId !== 'string' ||
+      typeof senderId !== 'string' ||
+      typeof targetId !== 'string' ||
+      !Number.isSafeInteger(sentAt)
+    )
+      return undefined;
+    const manual = safeRead<unknown>(value, 'manual');
+    if (manual !== undefined && typeof manual !== 'boolean') return undefined;
+    return Object.freeze({
+      kind,
+      taskId,
+      senderId,
+      targetId,
+      sentAt: sentAt as number,
+      data: safeRead(value, 'data'),
+      ...(manual === true ? { manual } : {})
+    });
+  }
+  if (kind === 'discovery-response') {
+    const taskId = safeRead<unknown>(value, 'taskId');
+    const senderId = safeRead<unknown>(value, 'senderId');
+    const targetId = safeRead<unknown>(value, 'targetId');
+    const resolvedTargetId = safeRead<unknown>(value, 'resolvedTargetId');
+    const sentAt = safeRead<unknown>(value, 'sentAt');
+    const platform = safeRead<unknown>(value, 'platform');
+    const receiverId = safeRead<unknown>(value, 'receiverId');
+    const manual = safeRead<unknown>(value, 'manual');
+    const accepted = safeRead<unknown>(value, 'accepted');
+    const message = safeRead<unknown>(value, 'message');
+    const operation = safeRead<unknown>(value, 'operation');
+    if (
+      typeof taskId !== 'string' ||
+      typeof senderId !== 'string' ||
+      typeof targetId !== 'string' ||
+      typeof resolvedTargetId !== 'string' ||
+      !Number.isSafeInteger(sentAt) ||
+      (platform !== undefined && typeof platform !== 'string') ||
+      (receiverId !== undefined && typeof receiverId !== 'string') ||
+      (manual !== undefined && typeof manual !== 'boolean') ||
+      (accepted !== undefined && typeof accepted !== 'boolean') ||
+      (message !== undefined && typeof message !== 'string') ||
+      (operation !== undefined && operation !== 'unregister')
+    )
+      return undefined;
+    return Object.freeze({
+      kind,
+      taskId,
+      senderId,
+      targetId,
+      resolvedTargetId,
+      sentAt,
+      ...(platform === undefined ? {} : { platform }),
+      data: safeRead(value, 'data'),
+      ...(receiverId === undefined ? {} : { receiverId }),
+      ...(manual === true ? { manual } : {}),
+      ...(accepted === undefined ? {} : { accepted }),
+      ...(message === undefined ? {} : { message }),
+      ...(operation === undefined ? {} : { operation })
+    }) as IWebRpcDiscoveryResponse;
+  }
+  if (kind === 'request') {
+    const version = safeRead<unknown>(value, 'version');
+    const taskId = safeRead<unknown>(value, 'taskId');
+    const senderId = safeRead<unknown>(value, 'senderId');
+    const targetId = safeRead<unknown>(value, 'targetId');
+    const receiverId = safeRead<unknown>(value, 'receiverId');
+    const method = safeRead<unknown>(value, 'method');
+    const sentAt = safeRead<unknown>(value, 'sentAt');
+    const data = safeRead<unknown>(value, 'data');
+    const dispatchOnly = safeRead<unknown>(value, 'dispatchOnly');
+    if (
+      typeof version !== 'string' ||
+      typeof taskId !== 'string' ||
+      typeof senderId !== 'string' ||
+      typeof targetId !== 'string' ||
+      typeof method !== 'string' ||
+      !Number.isSafeInteger(sentAt) ||
+      (sentAt as number) < 0 ||
+      (dispatchOnly !== undefined && typeof dispatchOnly !== 'boolean') ||
+      (receiverId !== undefined && typeof receiverId !== 'string')
+    )
+      return undefined;
+    return Object.freeze({
+      kind,
+      version,
+      taskId,
+      senderId,
+      targetId,
+      method,
+      data,
+      ...(dispatchOnly === undefined ? {} : { dispatchOnly }),
+      sentAt,
+      ...(receiverId === undefined ? {} : { receiverId })
+    }) as IWebRpcRequest;
+  }
+  if (kind === 'response') {
+    const version = safeRead<unknown>(value, 'version');
+    const taskId = safeRead<unknown>(value, 'taskId');
+    const senderId = safeRead<unknown>(value, 'senderId');
+    const targetId = safeRead<unknown>(value, 'targetId');
+    const method = safeRead<unknown>(value, 'method');
+    const ok = safeRead<unknown>(value, 'ok');
+    const sentAt = safeRead<unknown>(value, 'sentAt');
+    const message = safeRead<unknown>(value, 'message');
+    const code = safeRead<unknown>(value, 'code');
+    const receiverId = safeRead<unknown>(value, 'receiverId');
+    if (
+      typeof version !== 'string' ||
+      typeof taskId !== 'string' ||
+      typeof senderId !== 'string' ||
+      typeof targetId !== 'string' ||
+      typeof method !== 'string' ||
+      typeof ok !== 'boolean' ||
+      (message !== undefined && typeof message !== 'string') ||
+      (code !== undefined && typeof code !== 'string') ||
+      (receiverId !== undefined && typeof receiverId !== 'string') ||
+      !Number.isSafeInteger(sentAt) ||
+      (sentAt as number) < 0
+    )
+      return undefined;
+    return Object.freeze({
+      kind,
+      version,
+      taskId,
+      senderId,
+      targetId,
+      method,
+      ok,
+      data: safeRead(value, 'data'),
+      message,
+      code,
+      sentAt,
+      ...(receiverId === undefined ? {} : { receiverId })
+    }) as IWebRpcResponse;
+  }
+  if (kind === 'variation') {
+    const variation = safeRead<unknown>(value, 'variation');
+    const taskId = safeRead<unknown>(value, 'taskId');
+    const senderId = safeRead<unknown>(value, 'senderId');
+    const targetId = safeRead<unknown>(value, 'targetId');
+    const receiverId = safeRead<unknown>(value, 'receiverId');
+    const sentAt = safeRead<unknown>(value, 'sentAt');
+    if (
+      (variation !== 'abort' && variation !== 'ping' && variation !== 'pong') ||
+      typeof senderId !== 'string' ||
+      typeof targetId !== 'string' ||
+      typeof taskId !== 'string' ||
+      !Number.isSafeInteger(sentAt) ||
+      (receiverId !== undefined && typeof receiverId !== 'string')
+    )
+      return undefined;
+    return Object.freeze({
+      kind,
+      variation: variation as IWebRpcVariation,
+      taskId,
+      senderId,
+      targetId,
+      ...(receiverId === undefined ? {} : { receiverId }),
+      sentAt: sentAt as number
+    });
+  }
+  if (kind === 'chunk') {
+    const messageId = safeRead<unknown>(value, 'messageId');
+    const index = safeRead<unknown>(value, 'index');
+    const total = safeRead<unknown>(value, 'total');
+    const data = safeRead<unknown>(value, 'data');
+    const senderId = safeRead<unknown>(value, 'senderId');
+    const targetId = safeRead<unknown>(value, 'targetId');
+    const receiverId = safeRead<unknown>(value, 'receiverId');
+    if (
+      typeof messageId !== 'string' ||
+      !Number.isSafeInteger(index) ||
+      !Number.isSafeInteger(total) ||
+      (index as number) < 0 ||
+      (total as number) <= 0 ||
+      typeof data !== 'string' ||
+      typeof senderId !== 'string' ||
+      typeof targetId !== 'string' ||
+      (receiverId !== undefined && typeof receiverId !== 'string')
+    )
+      return undefined;
+    return Object.freeze({
+      kind,
+      messageId,
+      index: index as number,
+      total: total as number,
+      data,
+      senderId,
+      targetId,
+      ...(receiverId === undefined ? {} : { receiverId })
+    });
+  }
+  return undefined;
+}
+const isWebRpcEnvelopeUnsafe = (value: unknown): value is IWebRpcEnvelope => {
+  const normalized = normalizeWebRpcEnvelope(value);
+  if (!normalized) return false;
+  const record = normalized as unknown as Record<string, unknown>;
+  const kind = record.kind;
+  if (kind === 'discovery-query')
+    return (
+      typeof record.taskId === 'string' &&
+      typeof record.senderId === 'string' &&
+      typeof record.targetId === 'string'
+    );
+  if (kind === 'discovery-response')
+    return (
+      typeof record.taskId === 'string' &&
+      typeof record.senderId === 'string' &&
+      typeof record.targetId === 'string' &&
+      typeof record.resolvedTargetId === 'string'
+    );
+  if (kind === 'request')
     return (
       typeof record.version === 'string' &&
       typeof record.taskId === 'string' &&
       typeof record.senderId === 'string' &&
       typeof record.targetId === 'string' &&
       typeof record.method === 'string' &&
-      typeof record.sentAt === 'number' &&
+      Number.isSafeInteger(record.sentAt) &&
       'data' in record
     );
-  if (record.kind === 'response')
+  if (kind === 'response')
     return (
       typeof record.version === 'string' &&
       typeof record.taskId === 'string' &&
@@ -71,33 +317,35 @@ export const isWebRpcEnvelope = (value: unknown): value is IWebRpcEnvelope => {
       typeof record.targetId === 'string' &&
       typeof record.method === 'string' &&
       typeof record.ok === 'boolean' &&
-      typeof record.sentAt === 'number'
+      Number.isSafeInteger(record.sentAt)
     );
-  if (record.kind === 'variation')
+  if (kind === 'variation')
     return (
       typeof record.senderId === 'string' &&
       typeof record.targetId === 'string' &&
       ['abort', 'ping', 'pong'].includes(record.variation as string)
     );
-  if (record.kind === 'chunk')
+  if (kind === 'chunk')
     return (
       typeof record.messageId === 'string' &&
-      typeof record.index === 'number' &&
-      typeof record.total === 'number' &&
+      Number.isSafeInteger(record.index) &&
+      Number.isSafeInteger(record.total) &&
       typeof record.data === 'string' &&
-      typeof record.senderId === 'string' &&
-      typeof record.targetId === 'string'
-    );
-  if (record.kind === 'chunk-ack')
-    return (
-      typeof record.messageId === 'string' &&
       typeof record.senderId === 'string' &&
       typeof record.targetId === 'string'
     );
   return false;
 };
+/** Reads an untrusted wire value without allowing getters/proxies to escape. */
+export const isWebRpcEnvelope = (value: unknown): value is IWebRpcEnvelope => {
+  try {
+    return isWebRpcEnvelopeUnsafe(value);
+  } catch {
+    return false;
+  }
+};
 export const assertMethod = (method: string): string => {
   if (typeof method !== 'string' || method.length === 0)
-    throw new TypeError('method must be a non-empty string');
+    throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'method must be a non-empty string');
   return method;
 };

@@ -22,7 +22,7 @@ const accumulatedContract = async (): Promise<void> => {
   appAB.getShared('optional-plugin-feature');
   await appAB.config.update('a', (previous) => ({ aConfig: previous.aConfig + 1 }));
   await appAB.config.update('b', (previous) => ({ bConfig: previous.bConfig.toUpperCase() }));
-  appAB.config.get();
+  appAB.config.get('a.aConfig');
   // @ts-expect-error onDispose belongs only to plugin lifecycle core.
   appAB.onDispose(() => undefined);
 };

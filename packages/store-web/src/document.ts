@@ -3,8 +3,8 @@ import {
   readSSRStateFromDocumentWith as readInjectedSSRStateWith,
   type ISSRReadOptions as IInjectedSSRReadOptions,
   type ISSRState
-} from '@migai/store/ssr'
-import type { ISerializeRegistry } from '@migai/store/serialize'
+} from '@migaia/store/ssr'
+import type { ISerializeRegistry } from '@migaia/store/serialize'
 
 /** Reads the default serialized SSR payload from a browser document. */
 export function readSSRStateFromDocument(

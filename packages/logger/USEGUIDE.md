@@ -1,10 +1,10 @@
-# @migai/logger 使用指南
+# @migaia/logger 使用指南
 
 ## 1. 导入与运行时
 
 ```ts
-import { Logger, setLoggerRuntimeManager } from '@migai/logger';
-import { batch, color, http, level, process, reasoning, uuid } from '@migai/logger/plugins';
+import { Logger, setLoggerRuntimeManager } from '@migaia/logger';
+import { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins';
 ```
 
 Logger 可用于 Node、Bun、Deno、浏览器、Worker、小程序和 Electron。核心只经 runtime manager 使用 `process`、调度、stdout 与 HTTP transport；浏览器没有 `process` 时，`raw()` 回退到 `console.log`，`process()` 插件不注册监听器。
@@ -49,7 +49,7 @@ const log = new Logger({
 | `use(...plugins)`                                           | `plugins: ILoggerPlugin[]`                                                                               | 至少 1 个插件，必填                                          | `Promise<logger & Extensions>`     | 动态安装插件。                                                 |
 | `unUse(name)`                                               | `name: string`                                                                                           | `name` 必填                                                  | `Promise<void>`                    | 卸载按 name 定位的插件。                                       |
 | `config.update(name, recipe)`                               | `name: string`；`recipe(previous) => Partial<config>`                                                    | 两项都必填                                                   | `Promise<void>`                    | 更新插件配置；浅合并且 update 成功后提交。                     |
-| `config.get(name?)`                                         | 可选插件名；省略时读取全部配置                                                                           | 无                                                           | `Readonly<config>                  | undefined`，或 `Readonly<Record<string, config>>`              | 返回深拷贝快照。省略 name 时返回无原型对象（`Object.create(null)`）；请用 `Object.keys` / `in` 访问，不要调用 `hasOwnProperty` 或依赖 `toString`。 |
+| `config.get(path)`                                          | `plugin.key` 或 `plugin.[index].key`                                                                    | 必填                                                         | `unknown \| undefined`                                                | 读取嵌套配置值；直接读取插件根配置不合法。对象/数组只做一层浅拷贝。 |
 | `getShared(key)`                                            | `key: string`                                                                                            | `key` 必填                                                   | `T \| undefined`                   | 获取已安装插件提供的 shared 能力。                             |
 | `hook(name, fn)`                                            | `name: string`；`fn: (entry) => void \| Promise<void>`                                                   | 两项都必填                                                   | `() => void`                       | 注册 hook；返回 off 函数。                                     |
 | `fireHook(name, entry)`                                     | `name: string`；`entry: ILogEntry`                                                                       | 两项都必填                                                   | `void`                             | 立即运行该名称的 hook。                                        |
@@ -62,6 +62,36 @@ const log = new Logger({
 | `onDispose(resource)`                                       | disposer function 或 disposable object                                                                   | `resource` 必填                                              | `void`                             | 仅插件 `install()` 期间登记资源；应用代码不应调用。            |
 
 `shutdown` 完成后，`log`、`dispatchRaw` 和 `raw` 都不再输出。日志管线内失败默认不会从业务 `log()` 调用抛出；用 `onFailure` 连接监控或错误报告。
+
+### Pipeline mode 与 stage
+
+`pipeline.mode` 在构造时确定，之后不能切换：
+
+- `sync` 使用 `usePipeline`，stage 必须同步完成。
+- `async` 使用 `useAsyncPipeline`，stage 可以等待异步工作。
+- `generator` 使用 `useGeneratorPipeline`，通过 generator 组合处理流程。
+
+内置同步插件会由 Logger 适配到当前 mode，因此 `level`、filter 和 `uuid` 在三种 mode 下都会生效。直接注册自定义 stage 时，注册方法必须与 mode 匹配；不匹配会立即抛错。pipeline 执行期间禁止新增 stage，避免修改正在执行的处理链。
+
+每个 stage 最多调用一次 `next()`。重复调用会抛出 `PIPELINE_NEXT_DUPLICATE`；stage 返回后再延迟调用会产生 `PIPELINE_NEXT_LATE` diagnostic。三种 mode 使用相同的违规检测。完全不调用 `next()` 表示主动拦截该 entry。
+
+### 配置边界
+
+应用侧 `log.config` 是宿主配置门面：`get('plugin.key')` 读取指定嵌套值，`get('plugin.[index].key')` 读取数组项，`update(name, recipe)` 更新指定插件。配置读取只做一层浅拷贝，嵌套值由调用方负责不可变性。
+
+插件在 `install(core)` 中拿到的 `core.config` 刻意更窄：它只有无参 `get()`，且只能读取当前插件自己的配置快照。插件不能通过该门面读取或更新其他插件配置，异步 lifecycle 也不应通过配置 mutation 等待自身完成。
+
+### 插件安装与实例所有权
+
+构造参数中的插件按顺序同步安装。任一插件安装失败，构造函数直接抛出并启动已登记资源的回滚；返回 Promise 或 thenable 的 `install()` 也会被拒绝。需要异步安装时，在 Logger 构造完成后使用 `await log.use(plugin)`，并处理 rejected Promise。
+
+一个插件对象只归一次安装所有。不要把同一个 `http()`、`reasoning()`、`color()` 或其他有状态插件实例装到多个 Logger；每次安装都重新调用工厂。否则 controller、buffer、配置快照或 disposer 可能在实例间串联。
+
+### Flush 与 shutdown
+
+`flush()` 等待本 Logger 已观察到的 deferred task、异步 sink、flush handler、batch 和 extends 下游。drain 最多执行 100 轮或 3 秒，不会因并发持续产生新日志而无限追赶；达到边界时会通过 `onFailure` 报告，剩余工作可由后续 flush 继续等待。
+
+`shutdown(reason)` 先进入关闭流程并执行 shutdown handler；handler 仍可通过 `log()` / `dispatchRaw()` 写收尾日志，这些日志会在随后 drain。`raw()` 在关闭期间不再直接写 stdout。之后插件按生命周期清理，Logger 进入终态，新日志被忽略。并发 shutdown 共用同一个 Promise，首个 reason 生效。
 
 ## 4. Entry、hook 与 sink
 

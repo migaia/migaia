@@ -7,10 +7,18 @@
     "typecheck": "pnpm -r run typecheck",
     "typecheck:consumers": "tsc --noEmit -p fixtures/consumers/tsconfig.node.json && tsc --noEmit -p fixtures/consumers/tsconfig.bun.json && tsc --noEmit -p fixtures/consumers/tsconfig.deno.json && tsc --noEmit -p fixtures/consumers/tsconfig.browser.json && tsc --noEmit -p fixtures/consumers/tsconfig.worker.json && tsc --noEmit -p fixtures/consumers/tsconfig.electron-main.json && tsc --noEmit -p fixtures/consumers/tsconfig.electron-renderer.json && tsc --noEmit -p fixtures/consumers/tsconfig.mini-program.json",
     "test": "pnpm run build && pnpm -r run test",
-    "lint": "pnpm -r --if-present run lint"
+    "lint": "pnpm -r --if-present run lint",
+    "@logger": "pnpm --filter ./packages/logger run",
+    "@web-rpc": "pnpm --filter ./packages/web-rpc run",
+    "@plugin-host": "pnpm --filter ./packages/plugin-host run",
+    "@store": "pnpm --filter ./packages/store run",
+    "@store-web": "pnpm --filter ./packages/store-web run"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "24.13.2",
+    "@vitest/coverage-v8": "^4.1.10",
+    "fast-check": "4.9.0",
     "oxfmt": "^0.62.0",
     "oxlint": "^1.77.0",
     "typescript": "6.0.2",

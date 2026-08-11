@@ -35,7 +35,8 @@ export const PluginHostErrorCode = {
   pipelineModeMismatch: 'PIPELINE_MODE_MISMATCH',
   pipelineNextDuplicate: 'PIPELINE_NEXT_DUPLICATE',
   pipelineNextLate: 'PIPELINE_NEXT_LATE',
-  pipelineExecuting: 'PIPELINE_EXECUTING'
+  pipelineExecuting: 'PIPELINE_EXECUTING',
+  pluginInstallRollbackFailed: 'PLUGIN_INSTALL_ROLLBACK_FAILED'
 } as const;
 
 export type IPluginHostErrorCode = (typeof PluginHostErrorCode)[keyof typeof PluginHostErrorCode];
@@ -123,10 +124,7 @@ type IPluginByName<TPlugins extends readonly unknown[], TName extends string> = 
 >;
 
 export type IPluginHostConfigFor<TPlugins extends readonly unknown[]> = {
-  get<TName extends Extract<TPlugins[number], { readonly name: string }>['name']>(
-    name: TName
-  ): Readonly<IExtractPluginConfig<IPluginByName<TPlugins, TName>>> | undefined;
-  get(): Readonly<Record<string, IPluginConfig>>;
+  get(path: string): unknown | undefined;
   update<TName extends Extract<TPlugins[number], { readonly name: string }>['name']>(
     name: TName,
     recipe: (

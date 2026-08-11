@@ -1,29 +1,29 @@
-# @migai/plugin-host
+# @migaia/plugin-host
 
 运行时中立的 TypeScript 插件宿主。它管理插件安装、配置、共享能力、管线和清理；不依赖 Node、Bun、Deno、DOM 或任意框架运行时。
 
 ## 安装与最小用法
 
 ```ts
-import { PluginHost, type IPlugin } from '@migai/plugin-host'
+import { PluginHost, type IPlugin } from '@migaia/plugin-host';
 
-type ICore = { emit(value: string): void }
+type ICore = { emit(value: string): void };
 
 class Host extends PluginHost<ICore, string> {
   protected createPluginDomainCore(): ICore {
-    return { emit: (value) => console.log(value) }
+    return { emit: (value) => console.log(value) };
   }
 }
 
 const upper: IPlugin<ICore, { upper(value: string): string }> = {
   name: 'upper',
   install: () => ({ upper: (value) => value.toUpperCase() })
-}
+};
 
-const host = await new Host().use(upper)
-host.upper('migai')
-await host.unUse('upper')
-await host.dispose()
+const host = await new Host().use(upper);
+host.upper('migai');
+await host.unUse('upper');
+await host.dispose();
 ```
 
 `use(...plugins)` 返回 Promise。同步插件会在当前调用栈完成挂载，但仍应 `await`，以处理异步插件的安装和失败。
@@ -57,7 +57,7 @@ await host.dispose()
 
 `HOST_DISPOSED`、`HOST_DISPOSING`、`PLUGIN_DUPLICATE`、`PLUGIN_NOT_INSTALLED`、
 `EXTENSION_DUPLICATE`、`EXTENSION_OBJECT_PROTOTYPE`、`EXTENSION_RESERVED`、
-`PLUGIN_INSTALL_FAILED`、`PLUGIN_DISPOSE_FAILED`、`HOST_DISPOSE_FAILED`、`SHARED_DUPLICATE`、
+`PLUGIN_INSTALL_FAILED`、`PLUGIN_INSTALL_ROLLBACK_FAILED`、`PLUGIN_DISPOSE_FAILED`、`HOST_DISPOSE_FAILED`、`SHARED_DUPLICATE`、
 `RESOURCE_OUTSIDE_INSTALL`、`LIFECYCLE_MUTATION`、
-`INVALID_PIPELINE_MODE`、`PIPELINE_EXECUTING`、`PIPELINE_NEXT_DUPLICATE`、
+`INVALID_PIPELINE_MODE`、`PIPELINE_MODE_MISMATCH`、`PIPELINE_EXECUTING`、`PIPELINE_NEXT_DUPLICATE`、
 `PIPELINE_NEXT_LATE`。

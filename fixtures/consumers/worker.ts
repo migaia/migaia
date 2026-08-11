@@ -1,4 +1,4 @@
-import { createWebWorkerTransport } from '@migai/web-rpc/web-worker'
+import { createWebWorkerTransport } from '@migaia/web-rpc/web-worker'
 
 declare const self: DedicatedWorkerGlobalScope
 

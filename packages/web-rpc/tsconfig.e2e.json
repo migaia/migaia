@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "WebWorker"],
+    "noEmit": true,
+    "types": ["vite/client", "@playwright/test"]
+  },
+  "include": ["src", "e2e"]
+}

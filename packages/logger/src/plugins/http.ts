@@ -1,6 +1,6 @@
 import type { IEmptyPluginExt, ILogEntry, ILoggerPluginCore, ILoggerPlugin } from '../typing';
 import type { IBatchShared } from './batch';
-import type { IPipelineMode } from '@migai/plugin-host';
+import type { IPipelineMode } from '@migaia/plugin-host';
 import { getLoggerRuntimeManager } from '../runtime-manager';
 
 export type IHttpPluginConfig = {

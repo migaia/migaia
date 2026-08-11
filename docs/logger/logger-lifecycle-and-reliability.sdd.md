@@ -7,7 +7,7 @@
 
 ## 1. 摘要
 
-当前 `@migai/logger` 采用薄核心 + 插件架构：`LoggerCore` 负责 entry、pipeline、sink、hook、flush、shutdown 和 logger 组合；level、color、batch、http、process 等语义由插件提供。该方向正确，但生命周期状态、异步 drain、entry 可变性和失败传播仍存在可靠性风险。
+当前 `@migaia/logger` 采用薄核心 + 插件架构：`LoggerCore` 负责 entry、pipeline、sink、hook、flush、shutdown 和 logger 组合；level、color、batch、http、process 等语义由插件提供。该方向正确，但生命周期状态、异步 drain、entry 可变性和失败传播仍存在可靠性风险。
 
 本设计将 logger 的核心边界明确为：
 
@@ -20,7 +20,7 @@
 ## 2. 现状与已有正确边界
 
 - 核心不理解 level、颜色、批量和 HTTP，插件通过 `ILoggerPluginCore` 注入能力。
-- `@migai/plugin-host` 负责插件安装、shared 能力、配置更新和资源撤销。
+- `@migaia/plugin-host` 负责插件安装、shared 能力、配置更新和资源撤销。
 - `runtime-manager.ts` 隔离 Node/Bun/浏览器环境，避免核心直接依赖完整 Node API。
 - batch 与 http 通过 shared factory 协作，没有直接 import 对方运行时实现。
 - `extends()` 通过 logger id 和运行时路径检测循环。
