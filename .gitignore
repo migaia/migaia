@@ -12,3 +12,5 @@
 .npmrc.local
 .vscode/
 docs/
+**/coverage/
+**/test-results/
