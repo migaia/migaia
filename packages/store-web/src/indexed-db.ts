@@ -1,7 +1,7 @@
 import type {
 	IBinaryStorageAdapter,
 	IPersistOperationContext
-} from '@migai/store/persist'
+} from '@migaia/store/persist'
 
 /**
  * IndexedDB 后端。

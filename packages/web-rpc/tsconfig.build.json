@@ -1,27 +1,36 @@
 {
-	// The actual independent-publish artifact: real ESM `.js` + `.d.ts` output
-	// under `dist/`, source only (no tests, no `ambient.d.ts` — that file's
-	// global redeclarations must never ship in a consumer-facing `.d.ts`).
-	// Run via `npm run build` (from this directory) or `npx tsc -p
-	// packages/web-rpc/tsconfig.build.json` (from the repo root).
-	"compilerOptions": {
-		"target": "es2023",
-		"lib": ["ES2023", "DOM"],
-		"module": "esnext",
-		"moduleResolution": "bundler",
-		"declaration": true,
-		"declarationMap": true,
-		"outDir": "./dist",
-		"rootDir": "./src",
-		"verbatimModuleSyntax": true,
-		"moduleDetection": "force",
-		"strict": true,
-		"noUnusedLocals": true,
-		"noUnusedParameters": true,
-		"erasableSyntaxOnly": true,
-		"noFallthroughCasesInSwitch": true,
-		"skipLibCheck": true
-	},
-	"include": ["src"],
-	"exclude": ["src/ambient.d.ts", "src/**/*.test.ts", "src/client.ts", "src/server.ts", "src/protocol.ts", "src/internal/id-allocator.ts", "src/internal/request-registry.ts", "src/rpc.test.ts"]
+  // The actual independent-publish artifact: real ESM `.js` + `.d.ts` output
+  // under `dist/`, source only (no tests, no `ambient.d.ts` — that file's
+  // global redeclarations must never ship in a consumer-facing `.d.ts`).
+  // Run via `npm run build` (from this directory) or `npx tsc -p
+  // packages/web-rpc/tsconfig.build.json` (from the repo root).
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"],
+  "exclude": [
+    "src/ambient.d.ts",
+    "src/**/*.test.ts",
+    "src/client.ts",
+    "src/server.ts",
+    "src/protocol.ts",
+    "src/internal/id-allocator.ts",
+    "src/internal/request-registry.ts",
+    "src/rpc.test.ts"
+  ]
 }

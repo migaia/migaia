@@ -2,7 +2,7 @@
   "capturedAt": "2026-08-09",
   "purpose": "Phase 0 migration baseline; removals require an explicit compatibility decision.",
   "packages": {
-    "@migai/store": {
+    "@migaia/store": {
       ".": [],
       "./async": ["AsyncAtom", "asyncAtom", "resource", "resourceFamily"],
       "./atom": ["atom", "atomDef", "atomDefFactory", "createAtomStore", "defaultAtomStore", "derivedAtom", "derivedDef", "dynamicAtom", "focusAtom", "focusDef", "opticAtom", "opticDef", "primitiveAtom", "selectAtom", "selectDef", "splitAtom", "splitDef", "writableAtom", "writableDef"],
@@ -25,13 +25,13 @@
       "./wasm": ["* from ../core/wasm"],
       "./worker": ["* from ../core/worker"]
     },
-    "@migai/web-rpc": {
+    "@migaia/web-rpc": {
       ".": ["RpcClient", "RpcServer", "createMemoryTransportPair", "validateRpcPayload"],
       "./memory": ["createMemoryTransportPair"],
       "./message-port": ["createNodeMessagePortTransport"],
       "./web-worker": ["createWebWorkerTransport"]
     },
-    "@migai/store-web": {
+    "@migaia/store-web": {
       ".": ["indexedDbStorage", "localStorageAdapter", "readSSRStateFromDocument", "readSSRStateFromDocumentWith"]
     }
   }

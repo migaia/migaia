@@ -4,11 +4,11 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "paths": {
-      "@migai/plugin-host": ["../../packages/plugin-host/dist/index.d.ts"],
-      "@migai/logger": ["../../packages/logger/dist/index.d.ts"],
-      "@migai/web-rpc": ["../../packages/web-rpc/dist/index.d.ts"],
-      "@migai/web-rpc/*": ["../../packages/web-rpc/dist/adapters/*.d.ts"],
-      "@migai/store/*": ["../../packages/store/src/*/index.ts"]
+      "@migaia/plugin-host": ["../../packages/plugin-host/dist/index.d.ts"],
+      "@migaia/logger": ["../../packages/logger/dist/index.d.ts"],
+      "@migaia/web-rpc": ["../../packages/web-rpc/dist/index.d.ts"],
+      "@migaia/web-rpc/*": ["../../packages/web-rpc/dist/adapters/*.d.ts"],
+      "@migaia/store/*": ["../../packages/store/src/*/index.ts"]
     },
     "skipLibCheck": false,
     "verbatimModuleSyntax": true

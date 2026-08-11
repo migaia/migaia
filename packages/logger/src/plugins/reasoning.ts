@@ -1,5 +1,5 @@
 import type { IDimFn, ILoggerPluginCore, ILoggerPlugin, IPaintFn } from '../typing';
-import type { IPipelineMode } from '@migai/plugin-host';
+import type { IPipelineMode } from '@migaia/plugin-host';
 import type { IColorShared } from './color';
 
 export type IReasoningPluginConfig = {

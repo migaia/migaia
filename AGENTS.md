@@ -12,6 +12,7 @@
 - At the end of every implementation task, run formatting before lint and tests: `fmt → lint → test`.
 - Use the repository/package formatter when one is configured. If no formatter or `fmt` script exists, report that explicitly instead of claiming formatting passed.
 - Report the result of all three gates in the final response.
+- Store all test files under the owning package's `test/` directory (for example, `packages/foo/test/`); do not mix test files with main source files.
 
 ## TypeScript Type Conventions
 

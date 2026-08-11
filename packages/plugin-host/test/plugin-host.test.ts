@@ -41,14 +41,14 @@ describe('PluginHost', () => {
     expect(host.run(1)).toBe(4);
   });
 
-  it('isolates nested objects when committing config patches', async () => {
+  it('keeps nested objects shared when committing config patches', async () => {
     const host = new Host();
     const shared = { retries: 3 };
     await host.use(plugin('config-owned', () => ({}), { config: {} }));
     await host.config.update('config-owned', () => ({ opts: shared }));
     shared.retries = 99;
     await host.config.update('config-owned', (previous) => {
-      expect((previous.opts as { retries: number }).retries).toBe(3);
+      expect((previous.opts as { retries: number }).retries).toBe(99);
       return {};
     });
   });
@@ -144,6 +144,41 @@ describe('PluginHost', () => {
     expect(host.run(1)).toBe(1);
   });
 
+  it.each(['sync', 'async', 'generator'] as const)(
+    'keeps stage/resource ownership aligned across %s lifecycle',
+    async (mode) => {
+      const host = new Host({ pipeline: { mode } });
+      let core: IExt | undefined;
+      await host.use(
+        plugin(
+          `lifecycle-${mode}`,
+          (received) => {
+            core = received;
+            received.usePipeline((_value, next) => next(1));
+            received.onDispose(() => undefined);
+            return {};
+          },
+          {
+            config: { enabled: true },
+            update: () => {
+              expect(() => core?.usePipeline((_value, next) => next(1))).toThrow('install');
+              expect(() => core?.onDispose(() => undefined)).toThrow('install');
+            },
+            dispose: () => {
+              expect(() => core?.usePipeline((_value, next) => next(1))).toThrow('install');
+              expect(() => core?.onDispose(() => undefined)).toThrow('install');
+            }
+          }
+        )
+      );
+      await host.config.update(`lifecycle-${mode}`, () => ({ enabled: false }));
+      await expect(host.unUse(`lifecycle-${mode}`)).resolves.toBeUndefined();
+      const result = host.run(1);
+      if (mode === 'async') await expect(result).resolves.toBe(1);
+      else expect(result).toBe(1);
+    }
+  );
+
   it('rejects stage registration during sync pipeline execution', () => {
     const host = new Host();
     expect(() =>
@@ -154,6 +189,32 @@ describe('PluginHost', () => {
     ).not.toThrow();
     expect(host.run(1)).toBe(1);
   });
+
+  it.each(['async', 'generator'] as const)(
+    'rejects nested stage registration during %s pipeline execution',
+    async (mode) => {
+      const host = new Host({ pipeline: { mode } });
+      if (mode === 'async') {
+        host.useAsyncPipeline(async (value, next) => {
+          expect(() =>
+            host.useAsyncPipeline(async (_nextValue, nextValue) => nextValue(1))
+          ).toThrow(PluginHostError);
+          await next(value);
+        });
+        await expect(host.run(1)).resolves.toBe(1);
+      } else {
+        host.useGeneratorPipeline(function* (value) {
+          expect(() =>
+            host.useGeneratorPipeline(function* (nextValue) {
+              return nextValue;
+            })
+          ).toThrow(PluginHostError);
+          return value;
+        });
+        expect(host.run(1)).toBe(1);
+      }
+    }
+  );
 
   it('throws nested mutations from synchronous lifecycle callbacks', async () => {
     const host = new Host();
@@ -339,6 +400,61 @@ describe('PluginHost', () => {
     );
     await host.config.update('config', (previous) => ({ enabled: !previous.enabled }));
     expect(updates).toEqual([{ enabled: true }]);
+  });
+
+  it('reads nested config paths with shallow snapshots only', async () => {
+    const nested = { retries: 3 };
+    const host = new Host();
+    await host.use(
+      plugin('config-paths', () => ({}), {
+        config: { options: nested, records: [{ enabled: true }] }
+      })
+    );
+    expect(host.config.get('config-paths.options.retries')).toBe(3);
+    expect(host.config.get('config-paths.records.[0].enabled')).toBe(true);
+    const options = host.config.get('config-paths.options') as { retries: number };
+    expect(options).not.toBe(nested);
+    expect(options.retries).toBe(3);
+    expect(() => host.config.get('config-paths')).toThrow(TypeError);
+    expect(host.config.get('missing.value')).toBeUndefined();
+  });
+
+  it('keeps special plugin names and config paths isolated from prototypes', async () => {
+    const host = new Host();
+    await host.use(plugin('proto', () => ({}), { config: { safe: { enabled: true } } }));
+    expect(host.config.get('proto.safe.enabled')).toBe(true);
+    expect(host.config.get('__proto__.safe')).toBeUndefined();
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(() => host.config.get('proto.[-1].safe')).toThrow(TypeError);
+  });
+
+  it('reuses the config facade and rejects it after disposal', async () => {
+    const host = new Host();
+    await host.use(plugin('config-facade', () => ({}), { config: { enabled: true } }));
+    expect(host.config).toBe(host.config);
+    expect(host.config.get('config-facade.enabled')).toBe(true);
+    await host.dispose();
+    expect(() => host.config.get('config-facade.enabled')).toThrow(PluginHostError);
+  });
+
+  it('uses a distinct error code when install rollback also fails', async () => {
+    const host = new Host();
+    await expect(
+      host.use(
+        plugin('rollback-resource', (core) => {
+          core.onDispose(() => {
+            throw new Error('rollback dispose');
+          });
+          return {};
+        }),
+        plugin('rollback-failure', () => {
+          throw new Error('install failure');
+        })
+      )
+    ).rejects.toMatchObject({
+      code: 'PLUGIN_INSTALL_ROLLBACK_FAILED',
+      cause: expect.any(AggregateError)
+    });
   });
 
   it('cleans extensions when plugin dispose fails', async () => {
@@ -752,7 +868,7 @@ describe('PluginHost', () => {
     await disposeStarted;
     expect(() => host.getShared('value')).toThrow(PluginHostError);
     expect(() => host.run(1)).toThrow(PluginHostError);
-    expect(() => host.config.get()).toThrow(PluginHostError);
+    expect(() => host.config.get('closing-read.value')).toThrow(PluginHostError);
     expect((core as { config: { get: () => unknown } }).config.get()).toEqual({});
     release?.();
     await closing;
@@ -848,7 +964,7 @@ describe('PluginHost', () => {
     expect(received).toEqual({ enabled: 'plugin-local-mutation' });
   });
 
-  it('preserves cycles and shared nested references while cloning config', async () => {
+  it('preserves nested references without cloning config recursively', async () => {
     const nested: Record<string, unknown> = { value: 1 };
     const config: Record<string, unknown> = { nested, alias: nested };
     config.self = config;
@@ -866,9 +982,9 @@ describe('PluginHost', () => {
         { config }
       )
     );
-    expect(observed?.self).toBe(observed);
+    expect(observed?.self).toBe(config);
+    expect(observed?.nested).toBe(nested);
     expect(observed?.nested).toBe(observed?.alias);
-    expect(observed?.nested).not.toBe(nested);
   });
 
   it('does not admit non-enumerable config properties', async () => {
@@ -891,7 +1007,7 @@ describe('PluginHost', () => {
     expect(observed).not.toHaveProperty('hidden');
   });
 
-  it('rejects nested config accessors instead of silently dropping them', async () => {
+  it('preserves nested config values without inspecting them', async () => {
     const nested = {};
     Object.defineProperty(nested, 'value', {
       configurable: true,
@@ -899,9 +1015,9 @@ describe('PluginHost', () => {
       get: () => 1
     });
     const host = new Host();
-    expect(() =>
+    await expect(
       host.use(plugin('nested-config-getter', () => ({}), { config: { nested } }))
-    ).toThrow('config nested properties must be data properties');
+    ).resolves.toBe(host);
   });
 
   it('applies top-level config patches and preserves undefined keys', async () => {

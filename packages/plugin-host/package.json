@@ -1,8 +1,13 @@
 {
-  "name": "@migai/plugin-host",
-  "version": "0.1.0",
+  "name": "@migaia/plugin-host",
+  "version": "0.0.1",
   "private": true,
   "description": "Runtime-neutral plugin lifecycle, extension and pipeline host for Node.js, Bun, browsers and workers.",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:kimboyeme-maker/migai.git",
+    "directory": "packages/plugin-host"
+  },
   "files": [
     "dist",
     "README.md"
@@ -14,12 +19,19 @@
       "default": "./dist/index.js"
     }
   },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "scripts": {
     "fmt": "oxfmt src test",
     "build": "vite build && tsc -p tsconfig.json --emitDeclarationOnly",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
     "lint": "oxlint src test",
-    "test": "pnpm run build && vitest run"
+    "test": "pnpm run build && vitest run",
+    "test:coverage": "pnpm run build && vitest run --coverage",
+    "release:patch": "npm version patch --no-git-tag-version --ignore-scripts",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "npm publish --access restricted --ignore-scripts"
   }
 }

@@ -1,5 +1,5 @@
 import ERROR_TEXT, { PluginHostError, setErrorLocale, type ILocaleKey } from './error-text';
-import { copyConfig, readPlainDataRecord } from './config';
+import { copyConfig, parseConfigPath, readConfigPath, readPlainDataRecord } from './config';
 import { aggregateErrors, asyncDisposeKey, resolveDisposer } from './disposal';
 import {
   adaptSyncStageToAsync,
@@ -450,8 +450,8 @@ export abstract class PluginHost<
           .join('; ')}`
       );
       throw new PluginHostError(
-        'PLUGIN_INSTALL_FAILED',
-        ERROR_TEXT.PLUGIN_INSTALL_FAILED(failedName),
+        'PLUGIN_INSTALL_ROLLBACK_FAILED',
+        ERROR_TEXT.PLUGIN_ROLLBACK_FAILED(failedName),
         { cause: rollbackCause }
       );
     }
@@ -606,20 +606,15 @@ export abstract class PluginHost<
   get config(): IPluginHostConfigFor<TInstalled> {
     if (this.#configApi) return this.#configApi;
     this.#configApi = {
-      get: <T extends IPluginConfig>(name?: string) => {
+      get: (path: string) => {
         this.#assertActive();
-        if (name === undefined) {
-          const configs: Record<string, IPluginConfig> = Object.create(null) as Record<
-            string,
-            IPluginConfig
-          >;
-          for (const [pluginName, registration] of this.#registrations) {
-            configs[pluginName] = copyConfig(registration.config);
-          }
-          return configs as Readonly<Record<string, Readonly<T>>>;
-        }
-        const registration = this.#registrations.get(name);
-        return registration ? (copyConfig(registration.config) as Readonly<T>) : undefined;
+        if (typeof path !== 'string' || path.length === 0)
+          throw new TypeError('config path must be a non-empty string');
+        const registration = [...this.#registrations.entries()]
+          .sort(([left], [right]) => right.length - left.length)
+          .find(([name]) => path === name || path.startsWith(`${name}.`))?.[1];
+        if (!registration) return undefined;
+        return readConfigPath(registration.config, parseConfigPath(path));
       },
       update: <T extends IPluginConfig>(
         name: string,

@@ -1,5 +1,5 @@
-import { createRuntime } from '@migai/store/kernel'
-import { createStore } from '@migai/store/store'
+import { createRuntime } from '@migaia/store/kernel'
+import { createStore } from '@migaia/store/store'
 
 const runtime = createRuntime()
 const state = createStore({ count: 0 }, { runtime })

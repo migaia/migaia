@@ -6,3 +6,7 @@
 .codex/
 .pnpm-debug.log
 .pnpm-store/*
+**/.env
+**/.env.*
+!.env.example
+.npmrc.local

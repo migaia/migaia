@@ -1,6 +1,6 @@
-import type { RpcTransport } from '../transport.js';
+import type { IWebRpcTransport } from '../transport';
 
-export type MemoryTransport = RpcTransport & {
+export type IMemoryTransport = IWebRpcTransport & {
   /**
    * Tears down the whole pair — closing either side closes both; after this, `send()` on either
    * throws.
@@ -15,9 +15,9 @@ export type MemoryTransport = RpcTransport & {
  * real async transport: code that assumes "the other side hasn't seen this yet" immediately after
  * `send()` returns stays correct.
  */
-export function createMemoryTransportPair(): readonly [MemoryTransport, MemoryTransport] {
-  const listenersA = new Set<(message: unknown) => void>();
-  const listenersB = new Set<(message: unknown) => void>();
+export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemoryTransport] {
+  const listenersA = new Set<(message: { data: unknown }) => void>();
+  const listenersB = new Set<(message: { data: unknown }) => void>();
   let closed = false;
   const errorsA = new Set<(error: unknown) => void>(),
     errorsB = new Set<(error: unknown) => void>();
@@ -25,22 +25,26 @@ export function createMemoryTransportPair(): readonly [MemoryTransport, MemoryTr
     listenerErrorsB = new Set<(error: unknown) => void>();
 
   const makeSide = (
-    outgoing: Set<(message: unknown) => void>,
-    incoming: Set<(message: unknown) => void>,
+    outgoing: Set<(message: { data: unknown }) => void>,
+    incoming: Set<(message: { data: unknown }) => void>,
     errors: Set<(error: unknown) => void>,
-    listenerErrors: Set<(error: unknown) => void>
-  ): MemoryTransport => ({
+    listenerErrors: Set<(error: unknown) => void>,
+    remoteListenerErrors: Set<(error: unknown) => void>
+  ): IMemoryTransport => ({
+    platform: 'Memory',
+    topology: 'exclusive',
+    ownership: 'borrowed',
     send(message) {
       if (closed) throw new Error('[rpc] memory transport is closed');
       queueMicrotask(() => {
         // Closed between send() and delivery — the other side is gone,
         // there is nobody left to deliver to.
         if (closed) return;
-        for (const listener of [...outgoing]) {
+        for (const listener of Array.from(outgoing)) {
           try {
-            listener(message);
+            listener({ data: message });
           } catch (error) {
-            for (const report of [...listenerErrors]) {
+            for (const report of Array.from(remoteListenerErrors)) {
               try {
                 report(error);
               } catch {}
@@ -78,7 +82,7 @@ export function createMemoryTransportPair(): readonly [MemoryTransport, MemoryTr
   });
 
   return [
-    makeSide(listenersB, listenersA, errorsA, listenerErrorsB),
-    makeSide(listenersA, listenersB, errorsB, listenerErrorsA)
+    makeSide(listenersB, listenersA, errorsA, listenerErrorsA, listenerErrorsB),
+    makeSide(listenersA, listenersB, errorsB, listenerErrorsB, listenerErrorsA)
   ];
 }

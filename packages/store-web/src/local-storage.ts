@@ -1,4 +1,4 @@
-import type { IStorageAdapter } from '@migai/store/persist'
+import type { IStorageAdapter } from '@migaia/store/persist'
 
 /** Creates a browser LocalStorage adapter without introducing a fallback shared across SSR requests. */
 export function localStorageAdapter(

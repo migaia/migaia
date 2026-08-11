@@ -10,7 +10,7 @@ import { http } from './src/plugins/http';
 import { uuid } from './src/plugins/uuid';
 import { setLoggerRuntimeManager } from './src/runtime-manager';
 import type { ILogEntry, ILoggerPlugin } from './src/typing';
-import { GENERATOR_CONTINUE, type IPipelineMode } from '@migai/plugin-host';
+import { GENERATOR_CONTINUE, type IPipelineMode } from '@migaia/plugin-host';
 
 describe('logger plugin host integration', () => {
   it('runs without process through the runtime manager', () => {
@@ -122,10 +122,9 @@ describe('logger plugin host integration', () => {
 
   it('exposes isolated plugin config snapshots on the logger facade', async () => {
     const logger = new Logger({ plugins: [level({ level: 'warn' })] });
-    expect(logger.config.get('level')).toEqual({ level: 'warn' });
-    expect(logger.config.get()).toEqual({ level: { level: 'warn' } });
+    expect(logger.config.get('level.level')).toBe('warn');
     await logger.config.update('level', () => ({ level: 'error' }));
-    expect(logger.config.get('level')).toEqual({ level: 'error' });
+    expect(logger.config.get('level.level')).toBe('error');
   });
 
   it.each(['async', 'generator'] as const)(

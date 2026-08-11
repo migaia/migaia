@@ -1,9 +1,9 @@
 import { IDBFactory } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
-import { createStore } from '@migai/store/store'
-import { createRuntime } from '@migai/store/kernel'
+import { createStore } from '@migaia/store/store'
+import { createRuntime } from '@migaia/store/kernel'
 import { setScheduler } from '../../store/src/core/kernel'
-import { persist } from '@migai/store/persist'
+import { persist } from '@migaia/store/persist'
 import { indexedDbStorage } from './indexed-db'
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0))

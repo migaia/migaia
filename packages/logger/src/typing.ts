@@ -9,7 +9,7 @@ import type {
   IPluginHostOptions,
   IPipelineConfig,
   IPipelineMode
-} from '@migai/plugin-host';
+} from '@migaia/plugin-host';
 
 /**
  * 全局约定：能用 `type` 就不用 `interface`；所有类型别名以 `I` 开头， 用来在阅读代码时一眼区分"这是一个类型"还是"这是一个变量/类/函数"。 泛型参数（如
@@ -103,10 +103,9 @@ export type ILoggerPluginConfig = {
   get<T extends IPluginConfig = IPluginConfig>(): Readonly<T>;
 };
 
-/** Public logger config facade. It can inspect plugin configs and update them by name. */
+/** Public logger config facade. It reads nested plugin config paths and updates plugins by name. */
 export type ILoggerConfig = {
-  get<T extends IPluginConfig = IPluginConfig>(): Readonly<Record<string, Readonly<T>>>;
-  get<T extends IPluginConfig = IPluginConfig>(name: string): Readonly<T> | undefined;
+  get(path: string): unknown | undefined;
   update<T extends IPluginConfig = IPluginConfig>(
     name: string,
     recipe: (previous: Readonly<T>) => Partial<T>
@@ -231,7 +230,9 @@ export type ILoggerCore<
    * 注意这只组合"运行时行为"（转发 + topic 链路展示），不会让 log1 的 TypeScript 类型反过来获得 log2 独有的方法——如果需要拿到合并后的类型，
    * 接住返回值使用：`const combined = log1.extends(log2)`。
    */
-  extends(...others: readonly ILoggerCore<TMode, TShared>[]): ILoggerCore<TMode, TShared>;
+  extends(
+    ...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]
+  ): ILoggerCore<TMode, TShared>;
 
   /**
    * 给一个已经构造好的 logger 实例动态追加插件（不需要重新 new）。 和构造时传 `plugins` 数组走的是同一套冲突检测（重名插件、重名扩展方法
@@ -290,7 +291,7 @@ export type ILoggerPluginCore<
   TMode extends IPipelineConfig['mode'] = IPipelineMode,
   TShared extends Record<string, unknown> = Record<string, never>
 > = Omit<ILoggerCore<TMode, TShared>, 'use' | 'unUse' | 'onDispose'> & {
-  onDispose(resource: import('@migai/plugin-host').IPluginResource): void;
+  onDispose(resource: import('@migaia/plugin-host').IPluginResource): void;
 };
 
 export type IResolvedPluginShared<TPlugins extends readonly unknown[]> =

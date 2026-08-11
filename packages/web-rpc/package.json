@@ -1,35 +1,86 @@
 {
-  "name": "@migai/web-rpc",
-	"version": "0.1.0",
-	"private": true,
-	"license": "MIT",
-	"files": ["dist"],
-	"sideEffects": false,
-	"dependencies": { "@migai/plugin-host": "workspace:^" },
-	"engines": {"node": ">=18"},
-	"type": "module",
-	"description": "Type-safe RPC — schema-typed method/params/result, transport-agnostic (Worker/MessagePort/memory), full Client/Server lifecycle. No dependency on Store, React, WASM, or any specific host (DOM/Node).",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"default": "./dist/index.js"
-		},
-		"./adapters/window": {"types":"./dist/adapters/window.d.ts", "default":"./dist/adapters/window.js"},
-		"./adapters/message-port": {"types":"./dist/adapters/message-port.d.ts", "default":"./dist/adapters/message-port.js"},
-		"./adapters/web-worker": {"types":"./dist/adapters/web-worker.d.ts", "default":"./dist/adapters/web-worker.js"},
-		"./adapters/broadcast-channel": {"types":"./dist/adapters/broadcast-channel.d.ts", "default":"./dist/adapters/broadcast-channel.js"}
-	},
-	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
-		"typecheck": "tsc -p tsconfig.json --noEmit",
-		"typecheck:core": "tsc --noEmit -p tsconfig.core.json",
-		"typecheck:node-adapter": "tsc --noEmit -p tsconfig.node-adapter.json",
-		"test": "vitest run src"
-	},
-	"devDependencies": {
-		"typescript": "~6.0.2",
-		"vitest": "^4.1.10"
-	}
+  "name": "@migaia/web-rpc",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Type-safe bidirectional RPC — schema-typed method/params/result with transport-agnostic endpoints. No dependency on Store, React, WASM, or any specific host (DOM/Node).",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:kimboyeme-maker/migai.git",
+    "directory": "packages/web-rpc"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./adapters/window": {
+      "types": "./dist/adapters/window.d.ts",
+      "default": "./dist/adapters/window.js"
+    },
+    "./adapters/message-port": {
+      "types": "./dist/adapters/message-port.d.ts",
+      "default": "./dist/adapters/message-port.js"
+    },
+    "./adapters/web-worker": {
+      "types": "./dist/adapters/web-worker.d.ts",
+      "default": "./dist/adapters/web-worker.js"
+    },
+    "./adapters/broadcast-channel": {
+      "types": "./dist/adapters/broadcast-channel.d.ts",
+      "default": "./dist/adapters/broadcast-channel.js"
+    },
+    "./adapters/memory": {
+      "types": "./dist/adapters/memory.d.ts",
+      "default": "./dist/adapters/memory.js"
+    },
+    "./adapters/shared-worker": {
+      "types": "./dist/adapters/shared-worker.d.ts",
+      "default": "./dist/adapters/shared-worker.js"
+    },
+    "./adapters/service-worker": {
+      "types": "./dist/adapters/service-worker.d.ts",
+      "default": "./dist/adapters/service-worker.js"
+    },
+    "./adapters/rtc-data-channel": {
+      "types": "./dist/adapters/rtc-data-channel.d.ts",
+      "default": "./dist/adapters/rtc-data-channel.js"
+    },
+    "./adapters/web-transport": {
+      "types": "./dist/adapters/web-transport.d.ts",
+      "default": "./dist/adapters/web-transport.js"
+    }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "fmt": "oxfmt src test e2e",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:core": "tsc --noEmit -p tsconfig.core.json",
+    "typecheck:node-adapter": "tsc --noEmit -p tsconfig.node-adapter.json",
+    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
+    "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
+    "lint": "oxlint src test e2e",
+    "test": "vitest run test --coverage",
+    "test:e2e": "playwright test --config=e2e/playwright.config.ts",
+    "release:patch": "npm version patch --no-git-tag-version --ignore-scripts",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "npm publish --access restricted --ignore-scripts"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=18"
+  }
 }

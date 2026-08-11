@@ -1,7 +1,12 @@
 {
-  "name": "@migai/logger",
-  "version": "0.1.0",
+  "name": "@migaia/logger",
+  "version": "0.0.1",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:kimboyeme-maker/migai.git",
+    "directory": "packages/logger"
+  },
   "files": [
     "dist"
   ],
@@ -16,16 +21,25 @@
       "default": "./dist/plugins/index.js"
     }
   },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "fmt": "oxfmt src logger.test.ts",
+    "fmt": "oxfmt src test e2e logger.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
     "typecheck:browser": "tsc --noEmit -p tsconfig.browser.json",
-    "lint": "oxlint src logger.test.ts",
-    "test": "pnpm run build && vitest run"
+    "lint": "oxlint src test e2e logger.test.ts",
+    "test": "pnpm run build && vitest run test logger.test.ts",
+    "test:coverage": "pnpm run build && vitest run --coverage test logger.test.ts",
+    "test:e2e": "playwright test --config=e2e/playwright.config.ts",
+    "release:patch": "npm version patch --no-git-tag-version --ignore-scripts",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "npm publish --access restricted --ignore-scripts"
   },
   "dependencies": {
-    "@migai/plugin-host": "workspace:^",
+    "@migaia/plugin-host": "workspace:^",
     "ansis": "4.3.1"
   },
   "engines": {

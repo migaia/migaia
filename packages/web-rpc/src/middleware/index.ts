@@ -2,6 +2,7 @@ export { connect } from './connect';
 export { uuid } from './uuid';
 export { contract } from './contract';
 export { protocol } from './protocol';
+export { authentication } from './authentication';
 export { chunk } from './chunk';
 export { ping } from './ping';
 export { abort } from './abort';

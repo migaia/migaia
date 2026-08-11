@@ -1,4 +1,4 @@
-# @migai/plugin-host 使用指南
+# @migaia/plugin-host 使用指南
 
 ## 1. 适用范围
 
@@ -20,13 +20,12 @@ class Host extends PluginHost<ICore, string> {
 | `host.use(...plugins)`             | `plugins: IPlugin[]`，按顺序安装                               | 至少 1 个，必填 | `Promise<Host & Extensions>`       | 安装插件。同步安装会立刻挂载 extension；仍应 await 以处理异步安装或失败。                                                                                    |
 | `host.unUse(name)`                 | `name: string`，插件唯一名称                                   | `name` 必填     | `Promise<void>`                    | 卸载该插件及其 extension、shared、stage、登记资源；未知名称无操作。                                                                                          |
 | `host.dispose()`                   | 无                                                             | 无参数          | `Promise<void>`                    | 卸载所有插件并永久关闭 Host；重复调用复用同一 Promise。                                                                                                      |
-| `host.config.get(name?)` | 可选插件名；省略时读取全部配置 | 无 | 配置快照 | 省略 name 时返回无原型对象（`Object.create(null)`）；请用 `Object.keys` / `in` 访问，不要调用 `hasOwnProperty` 或依赖 `toString`。 |
+| `host.config.get(path)`            | `plugin.key` 或 `plugin.[index].key`                           | 必填            | 目标值或 `undefined`               | 只能读取嵌套配置值；直接传插件名是非法的。对象/数组目标只做一层浅拷贝，嵌套值保持原引用。                                                                    |
 | `host.config.update(name, recipe)` | `name: string`；`recipe(previous) => patch`，同步 plain record | 两项都必填      | `Promise<void>`                    | 浅合并 patch，执行 `plugin.update(next, core)` 后提交；失败不提交；提交配置与 patch 完全隔离。                                                               |
-| `host.config.get(name)`            | `name: string`                                                | `name` 可选      | `Readonly<T> \| undefined`         | 返回指定已安装插件的深拷贝配置；未知插件返回 `undefined`。                                                               |
-| `host.config.get()`                | 无                                                           | 无参数          | `Readonly<Record<string, IPluginConfig>>` | 返回所有已安装插件配置的深拷贝快照；包含配置内容与插件名。                                                               |
+| `host.config.get(path)`            | `plugin.key`、`plugin.[index].key`                             | 必填            | `unknown \| undefined`             | 返回目标路径值；未知插件或缺失路径返回 `undefined`。直接读取插件根配置非法。对象/数组只做浅拷贝。                                                            |
 | `host.getShared(key)`              | `key: PropertyKey`                                             | `key` 必填      | `T \| undefined`                   | 读取已安装 provider 的 shared 值。                                                                                                                           |
 | `host.pipelineMode`                | 无                                                             | 无参数          | `'sync' \| 'async' \| 'generator'` | 构造时由 `new Host({ pipeline?: { mode?: ... } })` 固定；`pipeline`、`mode` 都可选。                                                                         |
-| `host.usePipeline(stage)`          | `stage: (value, next) => void`                                 | `stage` 必填    | `this`                             | 按当前 mode 注册；async/generator mode 自动适配。`next(value)` 必须在函数返回前调用。                                                                          |
+| `host.usePipeline(stage)`          | `stage: (value, next) => void`                                 | `stage` 必填    | `this`                             | 按当前 mode 注册；async/generator mode 自动适配。`next(value)` 必须在函数返回前调用。                                                                        |
 | `host.useAsyncPipeline(stage)`     | `stage: (value, next) => void \| Promise<void>`                | `stage` 必填    | `this`                             | 注册 async stage；`next(value)` 返回 Promise，通常应 await。                                                                                                 |
 | `host.useGeneratorPipeline(stage)` | `stage: (value) => Generator<value, value \| control signal>`  | `stage` 必填    | `this`                             | 注册 generator stage；使用 `GENERATOR_HALT` 终止、`GENERATOR_CONTINUE` 采用最后一次 yield；只有 `TValue` 包含 `undefined` 时才能使用 `GENERATOR_UNDEFINED`。 |
 | `PluginHost.setLocale(locale)`     | `locale: ILocaleKey`                                           | `locale` 必填   | `void`                             | 修改后续 Host 错误的本地化文本。                                                                                                                             |
@@ -40,7 +39,7 @@ class Host extends PluginHost<ICore, string> {
 ## 3. 插件对象 API
 
 ```ts
-import type { IPlugin } from '@migai/plugin-host';
+import type { IPlugin } from '@migaia/plugin-host';
 
 type IPluginConfig = { prefix?: string };
 type IPluginCore = { emit(value: string): void };
@@ -73,14 +72,14 @@ extension 的可枚举 data property 会挂载到 host。`then` 被保留，不�
 
 安装时获得的 `core` 是稳定 facade。它包含子类提供的领域方法，加上下面的通用能力。
 
-| API / 签名                         | 参数                                            | 必填性          | 返回值           | 作用                                                                                                       |
-| ---------------------------------- | ----------------------------------------------- | --------------- | ---------------- | ---------------------------------------------------------------------------------------------------------- |
-| `core.config.get<T>()`             | 可选泛型 `T`，通常由插件 config 推导            | 无运行时参数    | `Readonly<T>`    | 当前插件的已提交配置快照；plain object 嵌套值会深拷贝隔离，Date/Map/Set/RegExp 等非 plain 对象按引用共享。 |
-| `core.getShared<T>(key)`           | `key: PropertyKey`                              | `key` 必填      | `T \| undefined` | 读取安装顺序中更早 provider 的 shared 值。                                                                 |
-| `core.onDispose(resource)`         | disposer function 或 disposable object          | `resource` 必填 | `void`           | 仅 `install()` 期间可调用；卸载时按逆序执行。                                                              |
-| `core.usePipeline(stage)`          | `stage: (value, next) => void`                  | `stage` 必填    | `core`           | 按当前 mode 注册；pipeline stage 执行期间不得注册 stage。                                                   |
-| `core.useAsyncPipeline(stage)`     | `stage: (value, next) => void \| Promise<void>` | `stage` 必填    | `core`           | 仅 install 期间注册 async stage。                                                                          |
-| `core.useGeneratorPipeline(stage)` | `stage: (value) => Generator`                   | `stage` 必填    | `core`           | 仅 install 期间注册 generator stage。                                                                      |
+| API / 签名                         | 参数                                            | 必填性          | 返回值           | 作用                                                                          |
+| ---------------------------------- | ----------------------------------------------- | --------------- | ---------------- | ----------------------------------------------------------------------------- |
+| `core.config.get<T>()`             | 可选泛型 `T`，通常由插件 config 推导            | 无运行时参数    | `Readonly<T>`    | 当前插件的已提交配置浅快照；嵌套对象/数组按引用共享，由插件自行负责不可变性。 |
+| `core.getShared<T>(key)`           | `key: PropertyKey`                              | `key` 必填      | `T \| undefined` | 读取安装顺序中更早 provider 的 shared 值。                                    |
+| `core.onDispose(resource)`         | disposer function 或 disposable object          | `resource` 必填 | `void`           | 仅 `install()` 期间可调用；卸载时按逆序执行。                                 |
+| `core.usePipeline(stage)`          | `stage: (value, next) => void`                  | `stage` 必填    | `core`           | 按当前 mode 注册；pipeline stage 执行期间不得注册 stage。                     |
+| `core.useAsyncPipeline(stage)`     | `stage: (value, next) => void \| Promise<void>` | `stage` 必填    | `core`           | 仅 install 期间注册 async stage。                                             |
+| `core.useGeneratorPipeline(stage)` | `stage: (value) => Generator`                   | `stage` 必填    | `core`           | 仅 install 期间注册 generator stage。                                         |
 
 `onDispose` 接受函数、`{ [Symbol.dispose]() }` 或 `{ [Symbol.asyncDispose]() }`。资源、shared、pipeline stage 和 extension 都由安装记录拥有；`unUse()` 时会撤销它们。
 
@@ -98,7 +97,7 @@ await host.config.update('prefix', (previous) => ({
 
 `recipe` 必须同步返回 plain record。Host 对 patch 做浅合并；嵌套对象应视为不可变值。`update()` 失败时旧配置保持不变。插件在 `update(next)` 中通过 `next` 读取候选配置，`core.config.get()` 仍是已提交配置。
 
-`host.config.get()` 与 `host.config.update()` 都要求 Host 处于 active 状态；Host 开始卸载或卸载完成后会抛出 `HOST_DISPOSING` 或 `HOST_DISPOSED`。`get(name)` 对不存在的插件返回 `undefined`，而 `update(name, ...)` 对不存在的插件抛出 `PLUGIN_NOT_INSTALLED`。配置读取每次返回隔离快照；`host.config` facade 本身在重复访问时保持同一引用。
+`host.config.get(path)` 与 `host.config.update()` 都要求 Host 处于 active 状态；Host 开始卸载或卸载完成后会抛出 `HOST_DISPOSING` 或 `HOST_DISPOSED`。`get(path)` 对不存在的插件或缺失路径返回 `undefined`，而 `update(name, ...)` 对不存在的插件抛出 `PLUGIN_NOT_INSTALLED`。配置 API 只提供浅拷贝：顶层返回值与目标对象隔离，嵌套对象/数组由调用方自行保证不可变性。`host.config` facade 本身在重复访问时保持同一引用。
 
 ## 6. shared 能力
 
@@ -153,23 +152,24 @@ Host 侧注册 stage 后，应由子类在其领域入口调用受保护的 `run
 
 错误码通过 `PluginHostErrorCode` 导出：
 
-| code | 含义 |
-| --- | --- |
-| `HOST_DISPOSED` | Host 已完成卸载，不能再访问或变更。 |
-| `HOST_DISPOSING` | Host 正在卸载，不能开始新的变更。 |
-| `PLUGIN_DUPLICATE` | 插件已安装或同一批次中重复。 |
-| `PLUGIN_NOT_INSTALLED` | 目标插件未安装。 |
-| `PLUGIN_INSTALL_FAILED` | 插件安装失败；原始错误位于 `cause`。 |
-| `PLUGIN_DISPOSE_FAILED` | 单个插件卸载失败；原始错误位于 `cause`。 |
-| `HOST_DISPOSE_FAILED` | Host 整体卸载失败；原始错误位于 `cause`。 |
-| `EXTENSION_DUPLICATE` | extension key 与已有成员冲突。 |
-| `EXTENSION_OBJECT_PROTOTYPE` | extension key 与 `Object.prototype` 成员冲突。 |
-| `EXTENSION_RESERVED` | extension key 为 Host 保留成员。 |
-| `SHARED_DUPLICATE` | shared key 已被占用。 |
-| `RESOURCE_OUTSIDE_INSTALL` | 在允许的插件生命周期外注册资源或 stage。 |
-| `LIFECYCLE_MUTATION` | 插件 lifecycle hook 内尝试变更 Host。 |
-| `INVALID_PIPELINE_MODE` | pipeline mode 无效或与当前模式不匹配。 |
-| `PIPELINE_MODE_MISMATCH` | Host mode 合法，但调用了与当前 mode 不匹配的 stage 注册方法。 |
-| `PIPELINE_EXECUTING` | pipeline 执行期间尝试注册 stage。 |
-| `PIPELINE_NEXT_DUPLICATE` | 同一 stage 重复调用 `next`。 |
-| `PIPELINE_NEXT_LATE` | stage 返回后调用 `next`。 |
+| code                             | 含义                                                                            |
+| -------------------------------- | ------------------------------------------------------------------------------- |
+| `HOST_DISPOSED`                  | Host 已完成卸载，不能再访问或变更。                                             |
+| `HOST_DISPOSING`                 | Host 正在卸载，不能开始新的变更。                                               |
+| `PLUGIN_DUPLICATE`               | 插件已安装或同一批次中重复。                                                    |
+| `PLUGIN_NOT_INSTALLED`           | 目标插件未安装。                                                                |
+| `PLUGIN_INSTALL_FAILED`          | 插件安装失败；原始错误位于 `cause`。                                            |
+| `PLUGIN_INSTALL_ROLLBACK_FAILED` | 插件安装失败且回滚清理也失败；`cause` 为包含安装与回滚错误的 `AggregateError`。 |
+| `PLUGIN_DISPOSE_FAILED`          | 单个插件卸载失败；原始错误位于 `cause`。                                        |
+| `HOST_DISPOSE_FAILED`            | Host 整体卸载失败；原始错误位于 `cause`。                                       |
+| `EXTENSION_DUPLICATE`            | extension key 与已有成员冲突。                                                  |
+| `EXTENSION_OBJECT_PROTOTYPE`     | extension key 与 `Object.prototype` 成员冲突。                                  |
+| `EXTENSION_RESERVED`             | extension key 为 Host 保留成员。                                                |
+| `SHARED_DUPLICATE`               | shared key 已被占用。                                                           |
+| `RESOURCE_OUTSIDE_INSTALL`       | 在允许的插件生命周期外注册资源或 stage。                                        |
+| `LIFECYCLE_MUTATION`             | 插件 lifecycle hook 内尝试变更 Host。                                           |
+| `INVALID_PIPELINE_MODE`          | pipeline mode 无效或与当前模式不匹配。                                          |
+| `PIPELINE_MODE_MISMATCH`         | Host mode 合法，但调用了与当前 mode 不匹配的 stage 注册方法。                   |
+| `PIPELINE_EXECUTING`             | pipeline 执行期间尝试注册 stage。                                               |
+| `PIPELINE_NEXT_DUPLICATE`        | 同一 stage 重复调用 `next`。                                                    |
+| `PIPELINE_NEXT_LATE`             | stage 返回后调用 `next`。                                                       |

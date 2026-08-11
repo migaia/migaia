@@ -1,4 +1,4 @@
-import { PluginHost } from '@migai/plugin-host'
+import { PluginHost } from '@migaia/plugin-host'
 
 class MiniProgramHost extends PluginHost<Record<string, never>> {}
 
