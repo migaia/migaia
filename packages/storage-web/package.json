@@ -1,0 +1,46 @@
+{
+  "name": "@migaia/storage-web",
+  "version": "0.0.1",
+  "description": "Independent web storage library: localStorage, sessionStorage, cookies, IndexedDB CRUD with entity, schema and serialize extension points.",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:kimboyeme-maker/migai.git",
+    "directory": "packages/storage-web"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "USEGUIDE.md"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "fmt": "oxfmt src test e2e",
+    "build": "vite build && tsc -p tsconfig.json --emitDeclarationOnly",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:test": "tsc -p tsconfig.test.json",
+    "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
+    "typecheck:interop": "tsc --noEmit -p tsconfig.interop.json",
+    "lint": "oxlint src test e2e",
+    "test": "pnpm run build && vitest run --coverage",
+    "test:e2e": "playwright test --config=e2e/playwright.config.ts",
+    "release:patch": "npm version patch --no-git-tag-version --ignore-scripts",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@migaia/store-persist": "workspace:^",
+    "@vitest/coverage-v8": "4.1.10",
+    "fake-indexeddb": "6.2.5",
+    "jsdom": "29.1.1"
+  }
+}
