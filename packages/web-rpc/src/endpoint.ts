@@ -202,6 +202,12 @@ export class WebRpcEndpoint<
   #disposed = false;
   #receiveGeneration = 0;
   #disposePromise: Promise<void> | undefined;
+  /**
+   * 是否已经把 disposal 的清理失败报告给过第一个调用方。第一次 `dispose()` 仍然照常 reject——
+   * 调用方需要知道这次调用本身失败了；但对象客观上已经进入终态，没有新工作可做，重复调用 不该无限期重新抛出同一个已经报告过的错误（同 logger
+   * `shutdown()`/plugin-host `dispose()` 已经修过的同一类反模式）。
+   */
+  #disposeReported = false;
   readonly #closing = new AbortController();
   readonly #discovery = new DiscoveryRegistry({
     retain: (token) => this.#resourceManager.retainPeer(token),
@@ -1227,11 +1233,29 @@ export class WebRpcEndpoint<
     });
     return { fulfilled, rejected };
   }
-  async dispose(): Promise<void> {
-    if (this.#disposePromise) return this.#disposePromise;
+  // 故意不写成 `async function`——async 函数会自动把 return 的值再包一层新 Promise，
+  // 那层自动生成的外层 Promise 不会被下面手动挂的 `.then()` 标记为"已处理"，调用方哪怕
+  // 完全不 await/不 catch，也会撞上这层看不见的 Promise 触发未捕获拒绝。直接返回内部
+  // `promise` 本身，才能让下面的 `.then()` 真正保护到调用方拿到的这同一个对象。
+  dispose(): Promise<void> {
+    if (this.#disposePromise) {
+      // 已经报告过一次失败：对象已处于终态，没有新工作可做，不再重放同一个错误。
+      if (this.#disposeReported) return Promise.resolve();
+      return this.#disposePromise;
+    }
     this.#disposed = true;
-    this.#disposePromise = this.#disposeInternal();
-    return this.#disposePromise;
+    const promise = this.#disposeInternal();
+    this.#disposePromise = promise;
+    // 无论调用方是否 await/catch 这次返回值，都要静默观察一次——防止 fire-and-forget 调用
+    // （比如 unload 钩子里的 `endpoint.dispose()`，不 await 也不 .catch()）触发进程级未捕获拒绝。
+    // 真正 await/catch 这个返回值的调用方仍然会看到原始 reject——这里只是多挂一个观察者。
+    promise.then(
+      () => undefined,
+      () => {
+        this.#disposeReported = true;
+      }
+    );
+    return promise;
   }
   async #disposeInternal(): Promise<void> {
     this.#receiveGeneration += 1;

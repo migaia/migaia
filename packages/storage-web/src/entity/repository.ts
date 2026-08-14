@@ -966,6 +966,7 @@ export const createRepository = <TDomain, TStored>(
       return recordStore.transaction(async (tx) => {
         const scope: IEntityTransactionScope<TDomain> = {
           get: async (id) => {
+            assertStorageKey(id, store.backend, `entity "${name}" id`);
             let raw = await tx.get(composeRepositoryKey(name, id));
             if (raw === undefined) raw = await tx.get(composeStructuredKey(name, id));
             if (raw === undefined) return undefined;
@@ -980,6 +981,7 @@ export const createRepository = <TDomain, TStored>(
             return id;
           },
           remove: async (id) => {
+            assertStorageKey(id, store.backend, `entity "${name}" id`);
             await tx.delete(composeRepositoryKey(name, id));
             await tx.delete(composeStructuredKey(name, id));
           }

@@ -1066,6 +1066,24 @@ describe('entity key and invalid-record boundaries', () => {
     }
   });
 
+  it('batch() 内的 tx.get()/tx.remove() 对非法 key 报的错误码要跟顶层 get()/remove() 一致', async () => {
+    // 顶层 get()/remove() 在进入 key composition 前先 assertStorageKey；batch() 作用域内的
+    // scope.get/scope.remove 曾经跳过这一步，让同一个非法输入在 batch 里被误分类成
+    // TRANSACTION_FAILED（暗示"可重试"）而不是 INVALID_KEY（永久性、重试无意义）。
+    const repo = defineEntity<{ id: IStorageKey; value: string }>({
+      name: 'batch-key-guard',
+      key: 'id'
+    }).connect(memoryStorage());
+    for (const id of [true, {}, 42n] as unknown[]) {
+      await expect(repo.batch((tx) => tx.get(id as IStorageKey))).rejects.toMatchObject({
+        code: 'INVALID_KEY'
+      });
+      await expect(repo.batch((tx) => tx.remove(id as IStorageKey))).rejects.toMatchObject({
+        code: 'INVALID_KEY'
+      });
+    }
+  });
+
   it('rejects invalid list limits before reading', async () => {
     const repo = defineEntity<{ id: string }>({ name: 'limit-guard', key: 'id' }).connect(
       memoryStorage()
