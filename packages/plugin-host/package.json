@@ -1,6 +1,6 @@
 {
   "name": "@migaia/plugin-host",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": true,
   "description": "Runtime-neutral plugin lifecycle, extension and pipeline host for Node.js, Bun, browsers and workers.",
   "repository": {
