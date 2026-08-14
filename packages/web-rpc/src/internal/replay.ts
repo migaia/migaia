@@ -1,6 +1,5 @@
 /** Owns bounded task tombstones and recently reserved outbound identifiers. */
 export class ReplayWindow {
-  readonly #completed = new Map<string, number>();
   readonly #reservedIds = new Map<string, number>();
   readonly #maxEntries: number;
   readonly #ttlMs: number;
@@ -17,17 +16,6 @@ export class ReplayWindow {
     this.#ttlMs = ttlMs;
   }
 
-  /** Tests whether a completed task remains inside the replay window. */
-  hasCompleted(key: string): boolean {
-    this.#purge(this.#completed);
-    return this.#completed.has(key);
-  }
-
-  /** Records a completed task without evicting a fresh tombstone. */
-  rememberCompleted(key: string): boolean {
-    return this.#remember(this.#completed, key);
-  }
-
   /** Tests whether an outbound identifier remains reserved. */
   hasReservedId(id: string): boolean {
     this.#purge(this.#reservedIds);
@@ -39,9 +27,13 @@ export class ReplayWindow {
     return this.#remember(this.#reservedIds, id);
   }
 
+  /** Releases an outbound identifier after its operation has settled. */
+  releaseId(id: string): void {
+    this.#reservedIds.delete(id);
+  }
+
   /** Releases all replay state during endpoint disposal. */
   clear(): void {
-    this.#completed.clear();
     this.#reservedIds.clear();
   }
 

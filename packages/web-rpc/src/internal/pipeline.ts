@@ -24,6 +24,8 @@ export class WebRpcOutboundPipeline<TTargetId extends string> {
   readonly chunk: IWebRpcChunkCapability;
   readonly authentication: IWebRpcAuthenticationCapability | undefined;
   readonly onVariationFailure: (code: string, error: unknown) => void;
+  /** Releases a chunk message id after every frame has settled. */
+  readonly #releaseMessageId: (id: string) => void;
   /** Captures the validated transport send callable to prevent descriptor TOCTOU. */
   readonly #transportSend: IWebRpcTransport['send'];
   /** Captures the validated transport payload discriminant for every outbound frame. */
@@ -36,7 +38,8 @@ export class WebRpcOutboundPipeline<TTargetId extends string> {
     chunk: IWebRpcChunkCapability,
     onVariationFailure: (code: string, error: unknown) => void,
     authentication?: IWebRpcAuthenticationCapability,
-    platform: IWebRpcPlatform = transport.platform
+    platform: IWebRpcPlatform = transport.platform,
+    releaseMessageId: (id: string) => void = () => undefined
   ) {
     this.transport = transport;
     this.id = id;
@@ -44,6 +47,7 @@ export class WebRpcOutboundPipeline<TTargetId extends string> {
     this.chunk = chunk;
     this.authentication = authentication;
     this.onVariationFailure = onVariationFailure;
+    this.#releaseMessageId = releaseMessageId;
     this.#transportSend = transport.send;
     this.#transportEncodedType = transport.encodedType;
     this.#authenticationContext = Object.freeze({
@@ -125,7 +129,9 @@ export class WebRpcOutboundPipeline<TTargetId extends string> {
               options?.transfer
             )
           )
-        ).then(() => undefined);
+        )
+          .then(() => undefined)
+          .finally(() => this.#releaseMessageId(messageId));
       }
       return this.#sendTransport(encoded, options?.transfer);
     } catch (cause) {

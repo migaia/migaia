@@ -59,6 +59,11 @@ publish: check-package auth-check
 	@set -eu; \
 	package="$(PACKAGE)"; \
 	version=$$(node -p "require('./packages/$$package/package.json').version"); \
+	tag="$$package-v$$version"; \
+	if git rev-parse "$$tag" >/dev/null 2>&1; then \
+		echo "Git tag already exists: $$tag" >&2; \
+		exit 1; \
+	fi; \
 	package_json="packages/$$package/package.json"; \
 	backup=$$(mktemp); \
 	cp "$$package_json" "$$backup"; \
@@ -69,7 +74,10 @@ publish: check-package auth-check
 	echo "==> publishing @migaia/$$package@$$version"; \
 	pnpm @$$package release:publish; \
 	restore; \
-		trap - EXIT INT TERM
+	trap - EXIT INT TERM; \
+	echo "==> tagging $$tag"; \
+	git tag "$$tag"; \
+	git push origin "$$tag"
 
 plugin-host: PACKAGE := plugin-host
 plugin-host: release-check auth-check patch publish

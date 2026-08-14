@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@migaia/reactive": ["../reactive/dist/index.d.ts"],
+      "@migaia/reactive/*": ["../reactive/dist/*"],
+      "@migaia/resource": ["../resource/dist/index.d.ts"],
+      "@migaia/serialize": ["../serialize/dist/index.d.ts"],
+      "@migaia/web-rpc": ["../web-rpc/dist/index.d.ts"],
+      "@migaia/web-rpc/*": ["../web-rpc/dist/adapters/*.d.ts"]
+    }
+  },
+  "include": ["src", "test"]
+}

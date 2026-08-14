@@ -1,0 +1,243 @@
+import {
+  SerializeError,
+  isChunkShape,
+  type ISerializeChunk,
+  type ISerializeContext,
+  type ISerializeParser,
+  type ISerializePhase,
+  type ISerializePlugin
+} from '@migaia/serialize';
+import {
+  abort,
+  connect,
+  createEndpoint,
+  protocol,
+  timeout,
+  type IWebRpcAbortSignal
+} from '@migaia/web-rpc';
+import {
+  createWebWorkerTransport,
+  type IWebWorkerLikePort
+} from '@migaia/web-rpc/adapters/web-worker';
+import { toManagedRpcHandler, type ManagedRpcHandler } from '../managed-rpc-handler';
+
+/** Worker 出事的三种途径，全都得监听，否则请求会永久悬挂。 */
+export type IWorkerFailureEvent = 'error' | 'messageerror';
+
+export type IWorkerLike = IWebWorkerLikePort & {
+  terminate?(): void;
+};
+
+/**
+ * 字节过界的所有权语义。
+ *
+ * Transfer 是**破坏性**的：底层 ArrayBuffer 连同指向它的所有别名视图一起被 detach。调用方交出去之后，一旦 worker 崩溃或请求被取消，就既没有结果、
+ * 也失去了输入——原地数据丢失。所以默认是 copy，转移必须显式要求。
+ */
+export type IByteOwnership = 'copy' | 'transfer';
+
+export type IWorkerPluginOptions = {
+  readonly worker: IWorkerLike;
+  /** 注册到 registry 的格式标签，需与 worker 侧实际使用的编码一致。 */
+  readonly type?: string;
+  /** 卸载时是否顺带终止 worker。外部传入的 worker 默认归调用方所有。 */
+  readonly terminateOnDispose?: boolean;
+  /** 默认 'copy'：安全但要复制一遍。只有当调用方确认这段字节独占、且交出去之后 不再使用时，才该选 'transfer' 换取零拷贝。 */
+  readonly ownership?: IByteOwnership;
+  /** Overrides the default client id (a fixed value rather than a factory — see `src/rpc`). */
+  readonly clientId?: string;
+};
+
+/**
+ * 只有当视图恰好覆盖整个 buffer 时，转移才不会波及别人。
+ *
+ * `subarray()` 出来的视图与原 buffer 共享底层内存，转移它会把整个 buffer 连同 所有其他视图一起 detach —— 调用方只想交出一小段，结果整块没了。这种情况必须
+ * 退回复制。
+ */
+function exclusiveBuffer(bytes: Uint8Array): ArrayBuffer | undefined {
+  if (bytes.byteOffset !== 0) return undefined;
+  if (bytes.byteLength !== bytes.buffer.byteLength) return undefined;
+  return bytes.buffer as ArrayBuffer;
+}
+
+const transferablesOf = (chunk: ISerializeChunk, ownership: IByteOwnership): Transferable[] => {
+  if (ownership !== 'transfer' || chunk[0] !== 'bytes') return [];
+  const buffer = exclusiveBuffer(chunk[1]);
+  return buffer ? [buffer as Transferable] : [];
+};
+
+/**
+ * 把编解码放到 worker 里做。
+ *
+ * 实测结论决定了它的正确用法（1M 条 / 71.5MB，主线程阻塞时长）： - 字节进、字节出，结果不还原成主线程对象图 → 主线程 1.4ms，比主线程直接做 JSON 的 65ms 少约
+ * 46 倍，墙钟基本持平。这是唯一真正划算的形态。 - 把对象图 postMessage 进 worker → 主线程 126ms，比直接在主线程做还慢一倍。
+ * 结构化克隆是在调用方线程同步完成的，成本只是从 stringify 换成 clone。 所以：用它承接落盘/传输这类「拿到字节就结束」的活，不要用它加速 hydrate。
+ */
+export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
+  const { worker, terminateOnDispose = false, ownership = 'copy' } = options;
+  const transport = createWebWorkerTransport(worker, { peerId: 'worker' });
+  const client = createEndpoint<'worker'>({
+    id: options.clientId ?? 'main',
+    targetIds: ['worker'],
+    transport,
+    middlewares: [connect({ transport }), protocol(), abort()]
+  });
+
+  const request = async (
+    phase: ISerializePhase,
+    chunk: ISerializeChunk,
+    context: ISerializeContext
+  ): Promise<ISerializeChunk> => {
+    try {
+      const endpoint = await client;
+      const result = await endpoint.send<ISerializeChunk>(
+        'worker',
+        'call',
+        { phase, chunk },
+        { signal: context.signal, transfer: transferablesOf(chunk, ownership) }
+      );
+      if (!isChunkShape(result)) {
+        throw new Error('[store] serialize worker returned an invalid chunk');
+      }
+      return result;
+    } catch (error) {
+      // Endpoint's abort rejection is generic; re-throw it as the
+      // SerializeError shape this parser's callers rely on for diagnostics
+      // (chunk index / bytes consumed / which format), and to flag when
+      // ownership: 'transfer' means the input is now unrecoverably detached.
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new SerializeError(
+          `[store] serialize worker request aborted${ownership === 'transfer' ? '; transferred input is detached and cannot be retried' : ''}`,
+          {
+            type: options.type ?? 'worker',
+            phase,
+            source: context.source,
+            chunkIndex: 0,
+            bytesConsumed: chunk[0] === 'bytes' ? chunk[1].byteLength : 0
+          }
+        );
+      }
+      throw error;
+    }
+  };
+
+  return {
+    name: 'worker',
+    encode: (value, context) =>
+      // 已经是字节就按 bytes 段送：只有这一种形态能进 transferList 走零拷贝。
+      // 包成 value 段的话会退化成结构化克隆，把整份数据在主线程上复制一遍——
+      // 实测里这正是「丢给 worker 反而更慢」的成因。
+      request('encode', value instanceof Uint8Array ? ['bytes', value] : ['value', value], context),
+    decode: async (chunk, context) => {
+      // 回包可能是 value 段（对象图，结构化克隆回来）也可能是 bytes 段
+      // （parser 配了 decodeTo: 'jsonBytes'，走 transfer 回来）。两种情况
+      // 要的都是段里的负载本身。
+      const result = await request('decode', chunk, context);
+      return result[1];
+    },
+    dispose() {
+      void client.then((endpoint) => endpoint.dispose()).catch(() => undefined);
+      if (terminateOnDispose) worker.terminate?.();
+    }
+  };
+}
+
+export const workerPlugin = (options: IWorkerPluginOptions): ISerializePlugin => ({
+  type: options.type ?? 'worker',
+  parser: workerParser(options)
+});
+
+/**
+ * Worker 侧的对端。把一个普通 parser 装进 worker，按上面的报文协议应答。
+ *
+ * 与 core/worker.ts 里的 createWorkerHandler 同一手法：错误一律转成回包，绝不让 异常逃逸成 worker 的 unhandled
+ * error——那会静默吞掉请求方的 Promise。
+ */
+export function createSerializeWorkerHandler(
+  parser: ISerializeParser,
+  post: (message: unknown, transfer?: readonly Transferable[]) => void
+): ManagedRpcHandler {
+  let deliver: (message: unknown) => void = () => undefined;
+  const transport = {
+    platform: 'Worker' as const,
+    peerId: 'main' as const,
+    send: (message: unknown, sendOptions?: { transfer?: readonly Transferable[] }) =>
+      post(message, sendOptions?.transfer),
+    subscribe: (listener: (message: { data: unknown }) => void) => {
+      deliver = (message) => listener({ data: message });
+      return () => {
+        deliver = () => undefined;
+      };
+    }
+  };
+  const endpoint = createEndpoint({
+    id: 'worker',
+    transport,
+    provider: {
+      call: async (context) => {
+        const { phase, chunk } = context.data as { phase: ISerializePhase; chunk: ISerializeChunk };
+        if (!isChunkShape(chunk)) throw new Error('[store] invalid serialize worker request chunk');
+        const serializeContext: ISerializeContext = {
+          signal: context.signal,
+          source: 'serialize-worker'
+        };
+        if (phase === 'encode') {
+          // 无论对面用 value 段还是 bytes 段送来，要编码的都是段里的负载，
+          // 不是段本身。之前把整个 bytes 段当值交给 parser，字节快路直接失效。
+          const output = await parser.encode(chunk[1], serializeContext);
+          // 单段本身也是数组，必须先消歧再决定要不要走拼装
+          const result = isChunkShape(output)
+            ? output
+            : ((Symbol.asyncIterator in Object(output) || Symbol.iterator in Object(output)
+                ? await collectInWorker(output as Iterable<ISerializeChunk>, context.signal)
+                : await output) as ISerializeChunk);
+          return context.success(result, { transfer: transferablesOf(result, 'transfer') });
+        }
+        const value = await parser.decode(chunk, serializeContext);
+        // 解出来还是字节时（parser 配了 decodeTo: 'jsonBytes'）按 bytes 段回，
+        // 才能走 transfer；包成 value 段就退化成结构化克隆，把整份复制回主线程。
+        const result: ISerializeChunk =
+          value instanceof Uint8Array ? ['bytes', value] : ['value', value];
+        return context.success(result, { transfer: transferablesOf(result, 'transfer') });
+      }
+    },
+    middlewares: [connect({ transport }), protocol(), abort(), timeout()]
+  });
+  return toManagedRpcHandler(endpoint, (message) => deliver(message));
+}
+
+/** Worker 侧不引 registry，就地把分段拼一次，避免把整个注册表打进 worker 包。 */
+async function collectInWorker(
+  output: Iterable<ISerializeChunk> | AsyncIterable<ISerializeChunk>,
+  signal?: IWebRpcAbortSignal
+): Promise<ISerializeChunk> {
+  const chunks: ISerializeChunk[] = [];
+  if (Symbol.asyncIterator in Object(output)) {
+    for await (const chunk of output as AsyncIterable<ISerializeChunk>) {
+      signal?.throwIfAborted?.();
+      chunks.push(chunk);
+    }
+  } else {
+    for (const chunk of output as Iterable<ISerializeChunk>) {
+      signal?.throwIfAborted?.();
+      chunks.push(chunk);
+    }
+  }
+  if (chunks.length === 1) return chunks[0];
+  if (chunks.every((chunk) => chunk[0] === 'text')) {
+    return ['text', chunks.map((chunk) => chunk[1] as string).join('')];
+  }
+  const encoder = new TextEncoder();
+  const parts = chunks.map((chunk) =>
+    chunk[0] === 'bytes' ? chunk[1] : encoder.encode(String(chunk[1]))
+  );
+  let total = 0;
+  for (const part of parts) total += part.byteLength;
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    merged.set(part, offset);
+    offset += part.byteLength;
+  }
+  return ['bytes', merged];
+}

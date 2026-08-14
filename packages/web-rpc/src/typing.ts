@@ -303,6 +303,11 @@ export type IWebRpcFactoryConfig<
   readonly targetIds?: readonly TTargetId[];
   readonly transport?: IWebRpcTransport;
   readonly provider?: Readonly<Record<string, IWebRpcProvider>>;
+  /** Bounds outbound identifier replay reservations for this endpoint. */
+  readonly replay?: {
+    readonly maxEntries?: number;
+    readonly ttlMs?: number;
+  };
   readonly middlewares: TMiddlewares;
   readonly construction?: {
     readonly signal?: IWebRpcAbortSignal;
@@ -321,15 +326,19 @@ export type IFactoryPingCapability<TMiddlewares extends readonly IWebRpcMiddlewa
   : true;
 export type IWebRpcPingEndpointSurface<TPing extends boolean> = boolean extends TPing
   ? {
-      ping(targetId: string): Promise<boolean>;
+      ping(targetId: string, receiverId?: string, options?: IWebRpcPingOptions): Promise<boolean>;
       pingAll(): Promise<IWebRpcFanoutResult<boolean>>;
     }
   : TPing extends true
     ? {
-        ping(targetId: string): Promise<boolean>;
+        ping(targetId: string, receiverId?: string, options?: IWebRpcPingOptions): Promise<boolean>;
         pingAll(): Promise<IWebRpcFanoutResult<boolean>>;
       }
     : {};
+export type IWebRpcPingOptions = {
+  readonly timeoutMs?: number;
+  readonly signal?: IWebRpcAbortSignal;
+};
 export type IWebRpcEndpoint<
   TTargetId extends string = string,
   TMode extends IWebRpcDiscoveryMode = 'automatic',

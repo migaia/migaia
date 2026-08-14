@@ -47,7 +47,6 @@ import type {
   IWebRpcTransportTopology
 } from './transport';
 import { WebRpcCapabilityRegistry, WebRpcRuntime } from './internal/runtime';
-import type { PendingRegistry } from './internal/pending';
 import type { PeerRegistry } from './internal/peers';
 import { splitUtf8, utf8ByteLength } from './internal/chunk';
 import { validateContractData } from './internal/contract';
@@ -66,6 +65,7 @@ import { ProviderAdmissionRegistry } from './internal/provider-admission';
 import { ControlTaskRegistry } from './internal/control-task-registry';
 import { OperationScope } from './internal/operation-scope';
 import { DiscoveryRegistry } from './internal/discovery-registry';
+import { EndpointResourceManager } from './internal/endpoint-resource-manager';
 import {
   registerEndpointDebugSnapshot,
   type IWebRpcEndpointDebugSnapshot
@@ -74,6 +74,7 @@ import {
   assertMethod,
   normalizeWebRpcEnvelope,
   type IWebRpcChunkFrame,
+  type IWebRpcEnvelope,
   type IWebRpcRequest,
   type IWebRpcResponse,
   type IWebRpcDiscoveryQuery,
@@ -146,6 +147,7 @@ type IWebRpcEndpointOptions<TTargetId extends string> = {
   connect?: IWebRpcConnectConfig | IWebRpcConnectCapability;
   features?: IWebRpcFeatureConfig;
   initialHookEvents?: readonly IWebRpcHookEvent[];
+  replay?: { readonly maxEntries?: number; readonly ttlMs?: number };
 };
 
 export class WebRpcEndpoint<
@@ -156,7 +158,7 @@ export class WebRpcEndpoint<
   readonly #transportPlatform: IWebRpcPlatform;
   readonly #transportTopology: IWebRpcTransportTopology | undefined;
   readonly #transportOrigin: string | undefined;
-  readonly #runtime: WebRpcRuntime<TTargetId, IPendingTask>;
+  readonly #runtime: WebRpcRuntime<TTargetId>;
   readonly #contract: IWebRpcContractCapability;
   readonly #version: string;
   readonly #acceptedVersions: readonly string[];
@@ -175,34 +177,19 @@ export class WebRpcEndpoint<
   readonly #pipeline: WebRpcOutboundPipeline<TTargetId>;
   readonly #providerExecutor: ProviderExecutor<TTargetId>;
   readonly #sourceTokens = new WeakMap<object, string>();
-  readonly #verifiedPeers = new VerifiedPeerRegistry();
-  readonly #replay = new ReplayWindow();
   readonly #requestReplay = new RequestReplayLedger(4096, 1024, 310_000, {
-    retain: (peerKey) => {
-      this.#verifiedPeers.retain(peerKey);
-    },
-    release: (peerKey) => {
-      this.#verifiedPeers.release(peerKey);
-    }
+    retain: (peerKey) => this.#resourceManager.retainPeer(peerKey),
+    release: (peerKey) => this.#resourceManager.releasePeer(peerKey)
   });
   /** Owns discovery/control completion tombstones and their verified identity leases. */
   readonly #discoveryReplay = new RequestReplayLedger(4096, 1024, 310_000, {
-    retain: (peerKey) => {
-      this.#verifiedPeers.retain(peerKey);
-    },
-    release: (peerKey) => {
-      this.#verifiedPeers.release(peerKey);
-    }
+    retain: (peerKey) => this.#resourceManager.retainPeer(peerKey),
+    release: (peerKey) => this.#resourceManager.releasePeer(peerKey)
   });
-  readonly #providerAdmission = new ProviderAdmissionRegistry();
   /** Owns variation replay and unordered abort state. */
   readonly #controlTasks = new ControlTaskRegistry({
-    retain: (peerKey) => {
-      this.#verifiedPeers.retain(peerKey);
-    },
-    release: (peerKey) => {
-      this.#verifiedPeers.release(peerKey);
-    }
+    retain: (peerKey) => this.#resourceManager.retainPeer(peerKey),
+    release: (peerKey) => this.#resourceManager.releasePeer(peerKey)
   });
   readonly #maxClockSkewMs = 300_000;
   #nextSourceToken = 0;
@@ -210,13 +197,15 @@ export class WebRpcEndpoint<
   readonly #unsubscribeTransportError: (() => void) | undefined;
   readonly #unsubscribeListenerError: (() => void) | undefined;
   readonly #resources = new ResourceScope();
+  /** Central owner for outbound operation identifiers and lifecycle scopes. */
+  readonly #resourceManager: EndpointResourceManager;
   #disposed = false;
   #receiveGeneration = 0;
   #disposePromise: Promise<void> | undefined;
   readonly #closing = new AbortController();
   readonly #discovery = new DiscoveryRegistry({
-    retain: (token) => this.#verifiedPeers.retain(token),
-    release: (token) => this.#verifiedPeers.release(token)
+    retain: (token) => this.#resourceManager.retainPeer(token),
+    release: (token) => this.#resourceManager.releasePeer(token)
   });
   readonly #multipleReceiverSnapshots = new Map<TTargetId, string>();
   readonly #receiverStaleAfterMs = 300_000;
@@ -255,22 +244,13 @@ export class WebRpcEndpoint<
   #connectControl: IWebRpcConnectControl<TTargetId> | undefined;
   #discoveryControl: IWebRpcDiscoveryControl<TTargetId> | undefined;
   #nextReceiverId = 0;
-  get #pending(): PendingRegistry<IPendingTask> {
-    return this.#runtime.pending;
-  }
-  get #pingPending(): WebRpcRuntime<TTargetId, IPendingTask>['pingPending'] {
-    return this.#runtime.pingPending;
-  }
-  get #activeControllers(): WebRpcRuntime<TTargetId, IPendingTask>['activeControllers'] {
-    return this.#runtime.activeControllers;
-  }
-  get #chunks(): WebRpcRuntime<TTargetId, IPendingTask>['chunks'] {
-    return this.#runtime.chunks;
+  get #activeControllers(): Map<string, AbortController> {
+    return this.#resourceManager.activeControllers;
   }
   get #peers(): PeerRegistry<TTargetId> {
     return this.#runtime.peers;
   }
-  get #hooks(): WebRpcRuntime<TTargetId, IPendingTask>['hooks'] {
+  get #hooks(): WebRpcRuntime<TTargetId>['hooks'] {
     return this.#runtime.hooks;
   }
 
@@ -337,6 +317,41 @@ export class WebRpcEndpoint<
     assertConfigObject(options.chunk, 'chunk');
     assertConfigObject(providers, 'provider');
     assertConfigObject(options.features, 'features');
+    assertConfigObject(options.replay, 'replay');
+    if (
+      options.replay?.maxEntries !== undefined &&
+      (!Number.isSafeInteger(options.replay.maxEntries) || options.replay.maxEntries < 1)
+    )
+      throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'replay.maxEntries must be positive');
+    if (
+      options.replay?.ttlMs !== undefined &&
+      (!Number.isSafeInteger(options.replay.ttlMs) || options.replay.ttlMs < 1)
+    )
+      throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'replay.ttlMs must be positive');
+    const replay = new ReplayWindow(options.replay?.maxEntries, options.replay?.ttlMs);
+    const verifiedPeers = new VerifiedPeerRegistry();
+    const providerAdmission = new ProviderAdmissionRegistry();
+    this.#resourceManager = new EndpointResourceManager(replay, this.#resources, verifiedPeers);
+    this.#resourceManager.attachRuntime(this.#runtime.chunks, providerAdmission);
+    this.#resourceManager.attachCallerSettlement(() => {
+      const disposalError = new WebRpcLifecycleError('Endpoint disposed');
+      for (const pending of this.#resourceManager.pending.values())
+        (pending as IPendingTask).settleReject(disposalError);
+      for (const taskId of this.#resourceManager.pingPending.keys())
+        this.#resourceManager.getPingPending(taskId)?.settle(false);
+    });
+    this.#resourceManager.attachProviderRegistry(this.#runtime.provider);
+    this.#resourceManager.attachDiscoveryRegistry(() =>
+      this.#discovery.close(new WebRpcLifecycleError('endpoint disposed'))
+    );
+    this.#resourceManager.registerReplayOwner(this.#requestReplay);
+    this.#resourceManager.registerReplayOwner(this.#discoveryReplay);
+    this.#resourceManager.registerReplayOwner(this.#controlTasks);
+    this.#resourceManager.registerMaintenanceOwner({
+      purge: (now) =>
+        this.#discovery.purgeAdmissions(now - this.#automaticDiscoveryAdmissionWindowMs),
+      clear: () => this.#discovery.clearAdmissions()
+    });
     const contractConfig = options.contract ?? {};
     if ('validateData' in contractConfig && typeof contractConfig.validateData !== 'function')
       throw new WebRpcError(
@@ -615,17 +630,22 @@ export class WebRpcEndpoint<
       chunk,
       (code, error) => this.#emit({ name: 'variation.failure', code, error }),
       authentication,
-      this.#transportPlatform
+      this.#transportPlatform,
+      (messageId) => this.#resourceManager.releaseId(messageId)
     );
     this.#runtime.chunks.configure(chunk);
-    this.#runtime.chunks.observe((name) => this.#emit({ name, code: WebRpcErrorCode.internal }));
+    this.#runtime.chunks.observe((name, messageId, peerKey) => {
+      if (name === 'chunk.expired' && messageId !== undefined && peerKey !== undefined)
+        this.#resourceManager.releaseChunk(messageId, peerKey);
+      this.#emit({ name, code: WebRpcErrorCode.internal });
+    });
     this.#providerExecutor = new ProviderExecutor({
       id,
       registry: this.#runtime.provider,
-      controllers: this.#activeControllers,
-      admission: this.#providerAdmission,
-      retainBinding: (verifiedPeerKey) => this.#verifiedPeers.retain(verifiedPeerKey),
-      releaseBinding: (verifiedPeerKey) => this.#verifiedPeers.release(verifiedPeerKey),
+      controllers: this.#resourceManager,
+      admission: this.#resourceManager,
+      retainBinding: (verifiedPeerKey) => this.#resourceManager.retainPeer(verifiedPeerKey),
+      releaseBinding: (verifiedPeerKey) => this.#resourceManager.releasePeer(verifiedPeerKey),
       peers: this.#peers,
       dispatch: (targetId, method, data) => this.dispatch(targetId, method, data),
       send: (response, transfer) => Promise.resolve().then(() => this.#send(response, transfer)),
@@ -700,8 +720,8 @@ export class WebRpcEndpoint<
   #debugSnapshot(): IWebRpcEndpointDebugSnapshot {
     return {
       phase: this.#disposed ? 'disposed' : 'active',
-      pending: this.#pending.tasks.size,
-      pingPending: this.#pingPending.size,
+      pending: this.#resourceManager.pendingSize,
+      pingPending: this.#resourceManager.pingPendingSize,
       activeControllers: this.#activeControllers.size,
       chunks: this.#runtime.chunks.size,
       providers: this.#runtime.provider.providers.size,
@@ -710,7 +730,7 @@ export class WebRpcEndpoint<
         0
       ),
       hooks: this.#hooks.size,
-      resources: this.#resources.size,
+      resources: this.#resourceManager.size,
       discovery: this.#discovery.debugSnapshot()
     };
   }
@@ -982,18 +1002,39 @@ export class WebRpcEndpoint<
       })
       .then((selectedReceiver) => {
         this.#assertOperationActive(operationGeneration);
-        return this.#send({
-          kind: 'request',
-          version: this.#version,
-          taskId: this.#makeId('message', targetId),
-          senderId: this.#id,
-          targetId,
-          method,
-          data,
-          dispatchOnly: true,
-          sentAt: Date.now(),
-          receiverId: selectedReceiver.receiverId
-        });
+        const taskId = this.#makeId('message', targetId);
+        const operation = this.#resourceManager.begin('dispatch', taskId);
+        // dispatch-only ids never correlate to a future response — unlike a regular request's
+        // taskId, which must stay reserved for the replay TTL so a late/duplicate response can't
+        // be matched against a reused id, there is nothing to protect here once the frame has
+        // actually been handed to the transport. Releasing right after send settles (success or
+        // failure) frees the outbound id budget instead of holding it for the full TTL — see
+        // WR-R3-3 in docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
+        //
+        // #send() can throw synchronously (protocol encode failure, oversized payload, an
+        // invalid chunk split) — see WR-R5-1. Evaluating it inside this .then() callback,
+        // rather than as an eager argument to Promise.resolve(), converts that synchronous
+        // throw into a normal promise rejection so the .finally() below always runs and the
+        // operation scope / outbound id are never left leaked.
+        return Promise.resolve()
+          .then(() =>
+            this.#send({
+              kind: 'request',
+              version: this.#version,
+              taskId,
+              senderId: this.#id,
+              targetId,
+              method,
+              data,
+              dispatchOnly: true,
+              sentAt: Date.now(),
+              receiverId: selectedReceiver.receiverId
+            })
+          )
+          .finally(() => {
+            operation.release();
+            this.#resourceManager.releaseId(taskId);
+          });
       })
       .catch((error: unknown) =>
         this.#emit({ name: 'dispatch.failure', code: WebRpcErrorCode.transport, error })
@@ -1039,6 +1080,7 @@ export class WebRpcEndpoint<
         new WebRpcError(WebRpcErrorCode.overloaded, 'discovery waiter limit exceeded')
       );
     const taskId = this.#makeId('variation', targetId);
+    const operation = this.#resourceManager.begin('ping', taskId, true);
     const deadline =
       timeoutMs === false || timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
     const remaining = (): number | false | undefined =>
@@ -1051,7 +1093,7 @@ export class WebRpcEndpoint<
     );
     const abortOperation = (): void => {
       operationAbort.abort();
-      this.#pingPending.get(taskId)?.settle(false);
+      this.#resourceManager.getPingPending(taskId)?.settle(false);
     };
     options?.signal?.addEventListener('abort', abortOperation, { once: true });
     this.#closing.signal.addEventListener('abort', abortOperation, { once: true });
@@ -1072,7 +1114,8 @@ export class WebRpcEndpoint<
       };
       const settlement = createSettlement<boolean>({
         cleanup: () => {
-          this.#pingPending.delete(taskId);
+          this.#resourceManager.deletePingPending(taskId);
+          operation.release();
           operationAbort.abort();
           options?.signal?.removeEventListener('abort', abortOperation);
           this.#closing.signal.removeEventListener('abort', abortOperation);
@@ -1084,7 +1127,7 @@ export class WebRpcEndpoint<
         reject: () => resolve(false)
       });
       pending.settle = settlement.resolve;
-      this.#pingPending.set(taskId, pending);
+      this.#resourceManager.setPingPending(taskId, pending);
       if (operationAbort.signal.aborted) pending.settle(false);
       if (timeoutMs !== false) {
         void raceWithAsyncControl({
@@ -1094,7 +1137,7 @@ export class WebRpcEndpoint<
           createTimeoutError: () => new WebRpcTimeoutError(),
           createAbortError: () => new WebRpcAbortError(),
           onTimeout: () => {
-            const current = this.#pingPending.get(taskId);
+            const current = this.#resourceManager.getPingPending(taskId);
             if (!current) return;
             operationAbort.abort();
             current.settle(false);
@@ -1102,7 +1145,7 @@ export class WebRpcEndpoint<
           onDiagnostic: (error) =>
             this.#emit({ name: 'failure', code: WebRpcErrorCode.internal, error })
         }).catch(() => {
-          this.#pingPending.get(taskId)?.settle(false);
+          this.#resourceManager.getPingPending(taskId)?.settle(false);
         });
       }
       void (
@@ -1122,7 +1165,8 @@ export class WebRpcEndpoint<
         )
         .then((selectedReceiver) => {
           this.#assertOperationActive(operationGeneration);
-          if (operationAbort.signal.aborted || !this.#pingPending.has(taskId)) return;
+          if (operationAbort.signal.aborted || !this.#resourceManager.getPingPending(taskId))
+            return;
           pending.receiverId = selectedReceiver.receiverId;
           pending.verifiedPeerKey = selectedReceiver.verifiedPeerKey;
           return this.#sendVariation(
@@ -1139,7 +1183,7 @@ export class WebRpcEndpoint<
           );
         })
         .catch(() => {
-          const pending = this.#pingPending.get(taskId);
+          const pending = this.#resourceManager.getPingPending(taskId);
           if (!pending) return;
           pending.settle(false);
         });
@@ -1204,30 +1248,9 @@ export class WebRpcEndpoint<
         });
       }
     }
-    try {
-      this.#discovery.close(new WebRpcLifecycleError('endpoint disposed'));
-    } catch (error) {
-      releaseErrors.push({ resource: 'manual discovery abort listener', error });
-    }
-    for (const pending of this.#pending.values()) {
-      pending.settleReject(new WebRpcLifecycleError('Endpoint disposed'));
-    }
-    for (const pending of this.#pingPending.values()) {
-      pending.settle(false);
-    }
-    for (const controller of this.#activeControllers.values()) controller.abort();
-    this.#activeControllers.clear();
-    this.#chunks.clear();
-    this.#verifiedPeers.clear();
     this.#peers.clear();
-    this.#replay.clear();
-    this.#discoveryReplay.clear();
-    this.#requestReplay.clear();
-    this.#providerAdmission.clear();
-    this.#controlTasks.clear();
-    this.#runtime.provider.clear();
     this.#multipleReceiverSnapshots.clear();
-    const resourceErrors = await this.#resources.releaseAll();
+    const resourceErrors = await this.#resourceManager.dispose();
     for (const entry of resourceErrors) {
       releaseErrors.push(entry);
       this.#emit({
@@ -1248,6 +1271,7 @@ export class WebRpcEndpoint<
   }
   #assertActive(): void {
     if (this.#disposed) throw new WebRpcLifecycleError('Endpoint disposed');
+    this.#resourceManager.purgeReplay();
   }
   #assertOperationActive(generation: number | undefined): void {
     if (generation !== undefined && generation !== this.#receiveGeneration)
@@ -1377,26 +1401,17 @@ export class WebRpcEndpoint<
   #failTransport(error: unknown): void {
     if (this.#disposed) return;
     const failure = new WebRpcTransportError('Transport failure', error);
-    for (const pending of this.#pending.values()) {
+    for (const pending of this.#resourceManager.pending.values() as Iterable<IPendingTask>) {
       pending.settleReject(failure);
     }
-    for (const pending of this.#pingPending.values()) {
-      pending.settle(false);
-    }
+    for (const taskId of this.#resourceManager.pingPending.keys())
+      this.#resourceManager.getPingPending(taskId)?.settle(false);
     if (safeRead<unknown>(this.#transport, 'closed') === true) {
       // A terminal transport event closes endpoint admission as well as pending work.
       this.#disposed = true;
       this.#receiveGeneration += 1;
       this.#closing.abort();
-      for (const controller of this.#activeControllers.values()) controller.abort();
-      this.#activeControllers.clear();
-      this.#chunks.clear();
-      this.#verifiedPeers.clear();
       this.#peers.clear();
-      this.#replay.clear();
-      this.#discoveryReplay.clear();
-      this.#requestReplay.clear();
-      this.#providerAdmission.clear();
       void this.dispose().catch((disposeError: unknown) => {
         try {
           this.#emit({
@@ -1469,9 +1484,7 @@ export class WebRpcEndpoint<
 
   /** Admits a fresh automatic discovery query within bounded global and peer budgets. */
   #admitAutomaticDiscovery(peerKey: string, taskKey: string): boolean {
-    const cutoff = Date.now() - this.#automaticDiscoveryAdmissionWindowMs;
-    for (const [key, entry] of this.#discovery.admissionSnapshot())
-      if (entry.at < cutoff) this.#discovery.deleteAdmission(key);
+    this.#resourceManager.purgeReplay();
     if (this.#discovery.admissionSize() >= this.#maxAutomaticDiscoveryAdmissions) return false;
     let peerAdmissions = 0;
     for (const [, entry] of this.#discovery.admissionSnapshot())
@@ -1584,11 +1597,11 @@ export class WebRpcEndpoint<
       if (waiter.references > 0 || waiter.settled) return;
       const key = String(targetId);
       if (this.#discovery.getWaiter<IDiscoveryWaiter>(key) !== waiter) return;
-      this.#discovery.deleteWaiter(key);
+      this.#deleteDiscoveryWaiter(key);
       if (waiter.taskId) this.#discovery.deleteTask(waiter.taskId);
       if (waiter.taskId) this.#discovery.deleteResponseCount(waiter.taskId);
       waiter.timer?.clear();
-      if (waiter.taskId) this.#discovery.deleteTimer(waiter.taskId);
+      if (waiter.taskId) this.#deleteDiscoveryTimer(waiter.taskId);
     });
   }
   /** Resolves an unknown target once, then lets the normal routing path use its DNS snapshot. */
@@ -1620,8 +1633,8 @@ export class WebRpcEndpoint<
           const remaining = Math.max(0, deadline - Date.now());
           existing.timer = createRuntimeTimer(() => {
             existing.timer = undefined;
-            if (existing.taskId) this.#discovery.deleteTimer(existing.taskId);
-            this.#discovery.deleteWaiter(String(targetId));
+            if (existing.taskId) this.#deleteDiscoveryTimer(existing.taskId);
+            this.#deleteDiscoveryWaiter(String(targetId));
             if (existing.taskId) {
               this.#discovery.deleteTask(existing.taskId);
               this.#discovery.deleteResponseCount(existing.taskId);
@@ -1631,7 +1644,7 @@ export class WebRpcEndpoint<
             );
           }, remaining);
           if (existing.taskId && existing.timer)
-            this.#discovery.setTimer(existing.taskId, existing.timer);
+            this.#setDiscoveryTimer(existing.taskId, existing.timer);
         }
       }
       return this.#joinDiscoveryWaiter(targetId, existing, timeoutMs, signal);
@@ -1658,20 +1671,27 @@ export class WebRpcEndpoint<
         waiter.settled = true;
       }
     );
-    if (!this.#discovery.setWaiter(String(targetId), waiter))
+    if (!this.#discovery.setWaiter(String(targetId), waiter)) {
+      this.#resourceManager.releaseId(taskId);
       return Promise.reject(
         new WebRpcError(WebRpcErrorCode.overloaded, 'discovery waiter limit exceeded')
       );
+    }
+    const operation = this.#resourceManager.begin('discovery', taskId, true);
+    this.#resourceManager.trackWaiter(String(targetId), () => {
+      this.#discovery.deleteWaiter(String(targetId));
+      if (waiter.taskId) this.#deleteDiscoveryTimer(waiter.taskId);
+    });
     this.#discovery.setTask(taskId, String(targetId));
     waiter.taskId = taskId;
     this.#discovery.setResponseCount(taskId, 0);
     const sessionTimeoutMs = timeoutMs === false ? this.#discoverySessionTtlMs : timeoutMs;
     const timer = createRuntimeTimer(() => {
-      this.#discovery.deleteTimer(taskId);
+      this.#deleteDiscoveryTimer(taskId);
       waiter.timer = undefined;
       this.#discovery.deleteResponseCount(taskId);
       if (this.#discovery.deleteTask(taskId)) {
-        this.#discovery.deleteWaiter(String(targetId));
+        this.#deleteDiscoveryWaiter(String(targetId));
         rejectDiscovery(
           new WebRpcError(WebRpcErrorCode.targetUnknown, `Unknown target: ${targetId}`)
         );
@@ -1679,7 +1699,7 @@ export class WebRpcEndpoint<
     }, sessionTimeoutMs);
     waiter.sessionDeadlineAt = Date.now() + sessionTimeoutMs;
     waiter.timer = timer;
-    if (timer) this.#discovery.setTimer(taskId, timer);
+    if (timer) this.#setDiscoveryTimer(taskId, timer);
     void Promise.resolve()
       .then(() =>
         this.#send({
@@ -1695,21 +1715,23 @@ export class WebRpcEndpoint<
       )
       .catch((error: unknown) => {
         timer?.clear();
-        this.#discovery.deleteTimer(taskId);
+        this.#deleteDiscoveryTimer(taskId);
         this.#discovery.deleteResponseCount(taskId);
         if (this.#discovery.deleteTask(taskId)) {
-          this.#discovery.deleteWaiter(String(targetId));
+          this.#deleteDiscoveryWaiter(String(targetId));
           rejectDiscovery(error);
         }
       });
     promise.then(
       () => {
+        operation.release();
         // Keep collection timer alive briefly so broadcast-group responses can all
         // enrich the DNS snapshot after the first response releases the request.
       },
       () => {
+        operation.release();
         timer?.clear();
-        this.#discovery.deleteTimer(taskId);
+        this.#deleteDiscoveryTimer(taskId);
         this.#discovery.deleteResponseCount(taskId);
       }
     );
@@ -1746,7 +1768,6 @@ export class WebRpcEndpoint<
   ): Promise<readonly IWebRpcDiscoveryCandidate<TTargetId>[]> {
     this.#assertActive();
     this.#validateIdentifier(targetId, 'targetId');
-    const taskId = this.#makeId('variation', targetId);
     const timeoutMs = options?.timeoutMs ?? 1000;
     if (!Number.isFinite(timeoutMs) || timeoutMs < 0)
       throw new WebRpcError(
@@ -1755,14 +1776,25 @@ export class WebRpcEndpoint<
       );
     if (options?.signal?.aborted)
       throw new WebRpcError(WebRpcErrorCode.cancelled, 'Discovery aborted');
+    const taskId = this.#makeId('variation', targetId);
+    const operation = this.#resourceManager.begin('discovery', taskId, true);
     return new Promise((resolve, reject) => {
+      const release = (): void => operation.release();
+      const settleResolve = (value: readonly IWebRpcDiscoveryCandidate<TTargetId>[]): void => {
+        release();
+        resolve(value);
+      };
+      const settleReject = (error: unknown): void => {
+        release();
+        reject(error);
+      };
       const timer = createRuntimeTimer(() => {
         this.#discovery.resolveManualWaiter(taskId);
       }, timeoutMs);
       const waiter: IManualDiscoveryWaiter<TTargetId> = {
         targetId,
-        resolve,
-        reject,
+        resolve: settleResolve,
+        reject: settleReject,
         candidates: [],
         candidateKeys: new Set(),
         candidatePeerCounts: new Map(),
@@ -1783,7 +1815,7 @@ export class WebRpcEndpoint<
         } catch (error) {
           this.#discovery.deleteManualWaiter(taskId);
           timer?.clear();
-          reject(error);
+          settleReject(error);
           return;
         }
       }
@@ -2044,6 +2076,7 @@ export class WebRpcEndpoint<
         );
         return;
       }
+      const operation = this.#resourceManager.begin('request', request.taskId, true);
       const pending: IPendingTask = {
         method: request.method,
         targetId: request.targetId,
@@ -2057,7 +2090,8 @@ export class WebRpcEndpoint<
       let releaseTimeoutControl = (): void => undefined;
       const settlement = createSettlement<unknown>({
         cleanup: () => {
-          this.#pending.delete(request.taskId);
+          this.#resourceManager.deletePending(request.taskId);
+          operation.release();
           pending.abort?.();
           releaseTimeoutControl();
         },
@@ -2128,7 +2162,10 @@ export class WebRpcEndpoint<
         }).catch(() => undefined);
       }
       if (settlement.isSettled()) return;
-      if (!this.#pending.commit(request.taskId, pending, () => !settlement.isSettled())) return;
+      if (
+        !this.#resourceManager.commitPending(request.taskId, pending, () => !settlement.isSettled())
+      )
+        return;
       Promise.resolve()
         .then(() => {
           if (settlement.isSettled()) return;
@@ -2206,7 +2243,7 @@ export class WebRpcEndpoint<
       if (!this.#validIdentifiers(frame)) return;
       const verifiedPeerKey = await this.#verifySource(frame, source, false, generation);
       if (!verifiedPeerKey || generation !== this.#receiveGeneration || this.#disposed) return;
-      const assembled = this.#chunks.accept(frame, verifiedPeerKey);
+      const assembled = this.#resourceManager.acceptChunk(frame, verifiedPeerKey);
       if (assembled === undefined) return;
       try {
         decoded = this.#protocol.decode(assembled);
@@ -2242,7 +2279,7 @@ export class WebRpcEndpoint<
       !(
         envelope.kind === 'variation' &&
         envelope.variation === 'pong' &&
-        this.#pingPending.get(envelope.taskId)?.receiverId === receiverId
+        this.#resourceManager.getPingPending(envelope.taskId)?.receiverId === receiverId
       )
     )
       return;
@@ -2259,10 +2296,12 @@ export class WebRpcEndpoint<
     if (envelope.kind === 'variation' && !this.#validIdentifiers(envelope)) return;
     if (envelope.targetId !== this.#id) return;
     const pendingResponse =
-      envelope.kind === 'response' ? this.#pending.get(envelope.taskId) : undefined;
+      envelope.kind === 'response'
+        ? this.#resourceManager.getPending<IPendingTask>(envelope.taskId)
+        : undefined;
     const pendingPong =
       envelope.kind === 'variation' && envelope.variation === 'pong'
-        ? this.#pingPending.get(envelope.taskId)
+        ? this.#resourceManager.getPingPending(envelope.taskId)
         : undefined;
     const requiresExistingUniqueBinding =
       this.#transportPlatform === 'BroadcastChannel' &&
@@ -2336,10 +2375,10 @@ export class WebRpcEndpoint<
           platform: this.#transportPlatform,
           origin: source?.origin
         });
-        this.#discovery.setInboundTimer(
+        this.#setInboundDiscoveryTimer(
           queryKey,
           createRuntimeTimer(() => {
-            this.#discovery.deleteInboundTimer(queryKey);
+            this.#deleteInboundDiscoveryTimer(queryKey);
             if (!this.#discovery.deleteInboundQuery(queryKey)) return;
             this.#rememberCompletedTask(replayKey, verifiedPeerKey);
             this.#emit({
@@ -2620,6 +2659,22 @@ export class WebRpcEndpoint<
       return;
     }
     if (envelope.kind === 'variation') {
+      return this.#handleVariation(envelope, verifiedPeerKey);
+    }
+    await this.#handleRequest(envelope, verifiedPeerKey);
+  }
+
+  /** Handles one inbound control variation under a manager-owned terminal scope. */
+  async #handleVariation(
+    envelope: Extract<IWebRpcEnvelope, { kind: 'variation' }>,
+    verifiedPeerKey: string
+  ): Promise<void> {
+    const operation = this.#resourceManager.begin(
+      'variation',
+      tupleKey(verifiedPeerKey, envelope.senderId, envelope.taskId, envelope.variation),
+      true
+    );
+    try {
       if (envelope.variation === 'ping' || envelope.variation === 'abort') {
         const variationReplayKey = tupleKey(
           'variation',
@@ -2653,7 +2708,7 @@ export class WebRpcEndpoint<
           ...(envelope.receiverId === undefined ? {} : { receiverId: envelope.receiverId })
         });
       if (envelope.variation === 'pong' && envelope.taskId) {
-        const pending = this.#pingPending.get(envelope.taskId);
+        const pending = this.#resourceManager.getPingPending(envelope.taskId);
         if (
           pending &&
           pending.targetId === envelope.senderId &&
@@ -2665,9 +2720,9 @@ export class WebRpcEndpoint<
         } else if (pending)
           this.#emit({ name: 'variation.unmatched', code: WebRpcErrorCode.internal });
       }
-      return;
+    } finally {
+      operation.release();
     }
-    await this.#handleRequest(envelope, verifiedPeerKey);
   }
   async #verifySource(
     envelope: { senderId: string; targetId: string; data?: unknown },
@@ -2701,11 +2756,13 @@ export class WebRpcEndpoint<
       }
     }
     if (requireExisting) {
-      if (!this.#verifiedPeers.has(envelope.senderId, bindingPeerId, bindingOrigin, sourceToken)) {
+      if (
+        !this.#resourceManager.hasPeer(envelope.senderId, bindingPeerId, bindingOrigin, sourceToken)
+      ) {
         this.#emit({ name: 'authentication.rejected', code: 'UNAUTHENTICATED' });
         return false;
       }
-      const existingToken = this.#verifiedPeers.register(
+      const existingToken = this.#resourceManager.registerPeer(
         envelope.senderId,
         bindingPeerId,
         bindingOrigin,
@@ -2717,7 +2774,7 @@ export class WebRpcEndpoint<
     }
     if (!this.#connect) {
       if (!this.#commitExclusiveSender(envelope.senderId)) return false;
-      const token = this.#verifiedPeers.register(
+      const token = this.#resourceManager.registerPeer(
         envelope.senderId,
         bindingPeerId,
         bindingOrigin,
@@ -2744,7 +2801,7 @@ export class WebRpcEndpoint<
       if (generation !== this.#receiveGeneration || this.#disposed) return false;
       if (!verified) return false;
       if (!this.#commitExclusiveSender(envelope.senderId)) return false;
-      const token = this.#verifiedPeers.register(
+      const token = this.#resourceManager.registerPeer(
         envelope.senderId,
         bindingPeerId,
         bindingOrigin,
@@ -2787,7 +2844,7 @@ export class WebRpcEndpoint<
     return true;
   }
   #settle(response: IWebRpcResponse, verifiedPeerKey: string): void {
-    const pending = this.#pending.get(response.taskId);
+    const pending = this.#resourceManager.getPending<IPendingTask>(response.taskId);
     if (!pending) return;
     if (
       response.method !== pending.method ||
@@ -2825,7 +2882,16 @@ export class WebRpcEndpoint<
       );
   }
   async #handleRequest(request: IWebRpcRequest, verifiedPeerKey = ''): Promise<void> {
-    return this.#providerExecutor.execute(request, verifiedPeerKey);
+    const operation = this.#resourceManager.begin(
+      'provider',
+      tupleKey(verifiedPeerKey, request.senderId, request.taskId),
+      true
+    );
+    try {
+      await this.#providerExecutor.execute(request, verifiedPeerKey);
+    } finally {
+      operation.release();
+    }
   }
   #validateData(method: string, side: 'params' | 'result', data: unknown): void {
     this.#contract.validateData(method, side, data);
@@ -2874,6 +2940,26 @@ export class WebRpcEndpoint<
     if (typeof value !== 'string' || value.length === 0 || value.length > this.#maxIdentifierLength)
       throw new WebRpcContractError(`${label} must be a non-empty identifier within the limit`);
   }
+  #setDiscoveryTimer(key: string, timer: { readonly clear: () => void }): void {
+    this.#resourceManager.trackTimer(key, timer);
+    this.#discovery.setTimer(key, timer);
+  }
+  #deleteDiscoveryTimer(key: string): void {
+    this.#resourceManager.releaseTimer(key);
+    this.#discovery.deleteTimer(key);
+  }
+  #setInboundDiscoveryTimer(key: string, timer: { readonly clear: () => void }): void {
+    this.#resourceManager.trackTimer(key, timer);
+    this.#discovery.setInboundTimer(key, timer);
+  }
+  #deleteInboundDiscoveryTimer(key: string): void {
+    this.#resourceManager.releaseTimer(key);
+    this.#discovery.deleteInboundTimer(key);
+  }
+  #deleteDiscoveryWaiter(key: string): void {
+    this.#resourceManager.releaseWaiter(key);
+    this.#discovery.deleteWaiter(key);
+  }
   #assertValidTimeout(timeoutMs: number | false | undefined): void {
     if (
       timeoutMs !== undefined &&
@@ -2897,10 +2983,13 @@ export class WebRpcEndpoint<
       variation,
       this.#id,
       String(targetId),
-      (id) => this.#pending.has(id) || this.#pingPending.has(id) || this.#replay.hasReservedId(id)
+      (id) =>
+        this.#resourceManager.getPending<IPendingTask>(id) !== undefined ||
+        this.#resourceManager.getPingPending(id) !== undefined ||
+        this.#resourceManager.hasReservedId(id)
     );
     this.#validateIdentifier(id, `${variation} id`);
-    if (!this.#replay.reserveId(id))
+    if (!this.#resourceManager.reserveId(id))
       throw new WebRpcError(WebRpcErrorCode.overloaded, 'Outbound identifier ledger is full');
     return id;
   }

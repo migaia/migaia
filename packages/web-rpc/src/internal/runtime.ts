@@ -1,5 +1,4 @@
 import { PeerRegistry } from './peers';
-import { PendingRegistry } from './pending';
 import { ProviderRegistry } from './provider';
 import { HookRegistry } from './hooks';
 import { ChunkAssembler } from './chunk';
@@ -113,24 +112,11 @@ function isPlainObject(value: object): boolean {
   return prototype === Object.prototype || prototype === null;
 }
 
-export class WebRpcRuntime<TTargetId extends string, TPending> {
+export class WebRpcRuntime<TTargetId extends string> {
   readonly capabilities: WebRpcCapabilityRegistry;
   readonly peers = new PeerRegistry<TTargetId>();
-  readonly pending = new PendingRegistry<TPending>();
   readonly provider = new ProviderRegistry();
   readonly hooks = new HookRegistry();
-  readonly pingPending = new Map<
-    string,
-    {
-      targetId: string;
-      receiverId?: string;
-      verifiedPeerKey?: string;
-      resolve: (value: boolean) => void;
-      release?: () => void;
-      settle: (value: boolean) => boolean;
-    }
-  >();
-  readonly activeControllers = new Map<string, AbortController>();
   readonly chunks: ChunkAssembler;
 
   constructor(capabilities = new WebRpcCapabilityRegistry()) {

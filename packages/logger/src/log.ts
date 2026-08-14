@@ -25,7 +25,21 @@ type ILoggerExtendsTarget<TMode extends IPipelineMode> = Omit<
   ILoggerCore<TMode>,
   'config' | 'onDispose'
 >;
+const loggerInternalState = Symbol('logger.internal.state');
+type ILoggerInternalState = { extendPath: string[]; topicChain: string[] };
 import { getLoggerRuntimeManager } from './runtime-manager';
+import { waitUntil } from './bounded-wait';
+
+/**
+ * Cross-realm-safe check for "awaitable", so a Promise constructed in another realm (an iframe, a
+ * VM context) or a plain thenable object still gets tracked. `instanceof Promise` only matches the
+ * current realm's Promise constructor — see LG-R3-2 in
+ * docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
+ */
+const isPromiseLike = (value: unknown): value is PromiseLike<unknown> =>
+  (typeof value === 'object' || typeof value === 'function') &&
+  value !== null &&
+  typeof (value as { then?: unknown }).then === 'function';
 
 /**
  * 一个插件通过 install() 注册的所有东西的登记簿，unUse() 靠这个精确撤销， 不需要每种注册类型各自发明一套"怎么撤销"的逻辑——集中记录、集中回滚。
@@ -66,9 +80,8 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     plugins: readonly ILoggerPluginConstraint[] = []
   ) {
     super(hostOptions);
-    // 逐层冻结：顶层对象、options、path 数组、env 对象都单独 freeze，
-    // 保证插件在任何一层写入都会在严格模式下抛出，而不是被 Object.freeze
-    // 的"只冻结第一层"这个常见陷阱漏掉。
+    // Freeze the top-level context containers. Nested option values and Date remain
+    // identity-preserving and mutable by contract; callers own that trade-off.
     const runtime = getLoggerRuntimeManager();
     const env = Object.freeze({
       isTTY: Boolean(runtime.process?.stdout.isTTY),
@@ -196,14 +209,18 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     else runtime.write(`[logger] ${labels[source]}: ${String(error)}`);
   }
 
+  /**
+   * Fires hooks against the live hook list: hooks registered during dispatch participate in the
+   * current pass, while an off() call replaces the list and does not mutate the active iterator.
+   */
   fireHook(name: string, entry: ILogEntry): void {
     const list = this.#hooks.get(name);
     if (!list || list.length === 0) return;
     for (const fn of list) {
       try {
         const result = fn(entry);
-        if (result instanceof Promise) {
-          this.#track('hook', result);
+        if (isPromiseLike(result)) {
+          this.#track('hook', Promise.resolve(result));
         }
       } catch (err) {
         this.#reportFailure('hook', err);
@@ -216,8 +233,8 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
       getLoggerRuntimeManager().defer(() => {
         try {
           const result = task();
-          if (result instanceof Promise) {
-            result.then(resolve, reject);
+          if (isPromiseLike(result)) {
+            Promise.resolve(result).then(resolve, reject);
           } else {
             resolve();
           }
@@ -236,37 +253,50 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     return off;
   }
 
-  flush(): Promise<void> {
+  /**
+   * `deadlineAt` defaults to a fresh 3s budget for a standalone `flush()` call, but shutdown()
+   * passes in the same absolute deadline it already used for the shutdown-handler loop — see
+   * LG-R5-1 — so a single shutdown() invocation spends at most one 3s budget total instead of
+   * handlers and flush each getting their own independent window.
+   */
+  flush(deadlineAt: number = Date.now() + 3000): Promise<void> {
     if (this.#status === 'closed') return Promise.resolve();
     if (this.#flushPromise) return this.#flushPromise;
     const restoreActive = this.#status === 'active';
     if (restoreActive) this.#status = 'flushing';
-    this.#flushPromise = this.#flush().finally(() => {
+    this.#flushPromise = this.#flush(deadlineAt).finally(() => {
       this.#flushPromise = undefined;
       if (restoreActive && this.#status === 'flushing') this.#status = 'active';
     });
     return this.#flushPromise;
   }
 
-  async #flush(): Promise<void> {
-    const deadline = Date.now() + 3000;
-    let rounds = 0;
-    let repeat: boolean;
-    do {
-      await this.#drain();
-      for (const flusher of this.#flushers.slice()) {
-        try {
-          await flusher();
-        } catch (error) {
-          this.#reportFailure('flush', error);
+  async #flush(deadlineAt: number): Promise<void> {
+    await this.#drain(deadlineAt);
+    for (const flusher of this.#flushers.slice()) {
+      try {
+        if (!(await waitUntil(Promise.resolve(flusher()), deadlineAt))) {
+          this.#reportFailure('flush', new Error('flush deadline reached'));
+          break;
         }
+      } catch (error) {
+        this.#reportFailure('flush', error);
       }
-      repeat = this.#pending.size > 0;
-      await this.#drain();
-      await Promise.all(this.#extendTargets.map((target) => target.flush()));
-      await this.#drain();
-    } while (repeat && rounds++ < 100 && Date.now() < deadline);
-    if (repeat) this.#reportFailure('flush', new Error('flush deadline or round limit reached'));
+    }
+    await this.#drain(deadlineAt);
+    for (const target of this.#extendTargets) {
+      try {
+        if (!(await waitUntil(target.flush(), deadlineAt))) {
+          this.#reportFailure('forward', new Error('extends flush deadline reached'));
+          break;
+        }
+      } catch (error) {
+        this.#reportFailure('forward', error);
+      }
+    }
+    await this.#drain(deadlineAt);
+    if (this.#pending.size > 0)
+      this.#reportFailure('flush', new Error('flush deadline reached with pending work remaining'));
   }
 
   onShutdown(fn: IShutdownHandler): () => void {
@@ -280,18 +310,56 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     if (this.#shutdownPromise) return this.#shutdownPromise;
     if (this.#status === 'closed') return Promise.resolve();
     this.#status = 'shutting-down';
-    this.#shutdownPromise = (async () => {
+    // Publish #shutdownPromise synchronously, before any handler runs. An async IIFE's body
+    // starts executing immediately up to its first await — if the first shutdown handler is a
+    // plain sync function that itself calls shutdown() (reentrant), that call happens before
+    // `this.#shutdownPromise = (async () => {...})()` would otherwise have assigned anything,
+    // so the early-return guards above see #shutdownPromise still undefined and #status already
+    // 'shutting-down' (not 'closed') — neither guard fires, and a second shutdown pass starts,
+    // running every handler a second time. Creating the deferred first closes that window.
+    let settle: (() => void) | undefined;
+    let fail: ((error: unknown) => void) | undefined;
+    this.#shutdownPromise = new Promise<void>((resolve, reject) => {
+      settle = resolve;
+      fail = reject;
+    });
+    // One absolute deadline covers the entire shutdown sequence: shutdown handlers first, then the
+    // flush phases they may have queued work for. #drain()/flusher/extends-target waits inside
+    // flush() were already bounded by a deadline (LG-R3-1, LG-R4-2/3); the handler loop itself was
+    // still a raw, unbounded `await handler(reason)` with no protection at all — a handler shaped
+    // like "flush a client, then resolve" that has a bug and never settles hung shutdown() forever.
+    // Reusing this single budget for the subsequent flush() call (instead of a fresh 3s window)
+    // also keeps total shutdown latency bounded to ~3s instead of handlers-plus-flush stacking two
+    // independent windows. See LG-R5-1 in
+    // docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
+    const deadlineAt = Date.now() + 3000;
+    (async () => {
       for (const handler of this.#shutdownHandlers.slice()) {
         try {
-          await handler(reason);
+          // Every handler is still invoked (unlike the flusher/extends-target loops, which `break`
+          // on timeout) — onShutdown() never promised handlers would be skipped once a prior one is
+          // slow, and changing that would be a public-behavior change this round must not make.
+          // Only the *wait* for each handler is capped at the shared remaining budget.
+          if (!(await waitUntil(Promise.resolve(handler(reason)), deadlineAt))) {
+            this.#reportFailure('shutdown', new Error('shutdown handler deadline reached'));
+          }
         } catch (error) {
           this.#reportFailure('shutdown', error);
         }
       }
-      await this.flush();
+      await this.flush(deadlineAt);
       await super.dispose();
       this.#status = 'closed';
-    })();
+    })().then(
+      () => settle?.(),
+      (error) => {
+        // PluginHost disposal is terminal even when one disposer fails. Keep Logger
+        // terminal too; accepting new entries would route them into a disposed host.
+        this.#status = 'closed';
+        this.#shutdownPromise = undefined;
+        fail?.(error);
+      }
+    );
     return this.#shutdownPromise;
   }
 
@@ -300,7 +368,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   }
 
   raw(text: string, options: ILogDispatchOptions = {}): void {
-    if (this.#status === 'shutting-down' || this.#status === 'closed') return;
+    if (this.#status === 'closed') return;
     const write = () => {
       getLoggerRuntimeManager().write(text);
     };
@@ -344,30 +412,56 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     void observed.finally(() => this.#pending.delete(observed));
   }
 
-  async #drain(): Promise<void> {
-    const deadline = Date.now() + 3000;
+  /**
+   * `await Promise.all(this.#pending)` alone cannot enforce a deadline: if any tracked promise
+   * never settles (a sink/hook/defer task that hangs), the surrounding while-loop's deadline check
+   * is never reached again — control stays stuck inside that one await forever, and so does every
+   * caller of #drain() (flush(), and shutdown() via flush()). Race each round against the remaining
+   * budget so a stuck promise can only block for the time left, not indefinitely.
+   */
+  async #drain(deadlineAt: number): Promise<void> {
     let rounds = 0;
-    while (this.#pending.size > 0 && rounds++ < 100 && Date.now() < deadline) {
-      await Promise.all(this.#pending);
+    while (this.#pending.size > 0 && rounds++ < 100) {
+      const remainingMs = deadlineAt - Date.now();
+      if (remainingMs <= 0) return;
+      const settled = Symbol('drain-settled');
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const winner = await Promise.race([
+          Promise.all(this.#pending).then(() => settled),
+          new Promise<undefined>((resolve) => {
+            timer = setTimeout(() => resolve(undefined), remainingMs);
+            (timer as { unref?: () => void }).unref?.();
+          })
+        ]);
+        if (winner !== settled) return; // deadline hit while something in #pending is still stuck
+      } finally {
+        // Same timer-leak hazard as waitUntil() (LG-R5-2): without this, every round that resolves
+        // via #pending settling first — the common, happy-path case — leaves its deadline timer
+        // dangling until it fires on its own up to `remainingMs` later.
+        if (timer !== undefined) clearTimeout(timer);
+      }
     }
   }
 
   #process(entry: ILogEntry): void {
+    // Pipeline and hooks intentionally share the live entry; sinks receive a shallow snapshot,
+    // but after hooks may update the value that extends() forwards.
     this.fireHook('before', entry);
     this.fireHook(`before:${entry.tag}`, entry);
 
     try {
       const pipeline = this.runPipeline(entry, (finalEntry) => {
-        for (const sink of this.#sinks) {
+        for (const sink of this.#sinks.slice()) {
           try {
             const result = sink(this.#snapshotEntry(finalEntry));
-            if (result instanceof Promise) {
+            if (isPromiseLike(result)) {
               // 关键修复：sink 返回的 Promise 现在会被纳入 #pending 追踪，
               // flush()/shutdown() 会真正等它完成，不再是单纯 fire-and-forget。
               // 这直接关系到 http 插件没接 batch 时，进程退出前有没有可能把
               // 还在飞行中的请求弄丢——之前这里只 .catch() 不追踪，
               // flush() 完全不知道这个请求还没发完就已经"完成"了。
-              this.#track('sink', result);
+              this.#track('sink', Promise.resolve(result));
             }
           } catch (err) {
             this.#reportFailure('sink', err);
@@ -377,8 +471,8 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
         this.fireHook(`after:${finalEntry.tag}`, finalEntry);
         this.#forwardToExtendTargets(finalEntry);
       });
-      if (pipeline instanceof Promise) {
-        this.#track('pipeline', pipeline);
+      if (isPromiseLike(pipeline)) {
+        this.#track('pipeline', Promise.resolve(pipeline));
       }
     } catch (err) {
       this.#reportFailure('pipeline', err);
@@ -394,8 +488,18 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   #forwardToExtendTargets(entry: ILogEntry): void {
     if (this.#extendTargets.length === 0) return;
 
-    const existingPath = (entry.data.extendPath as string[] | undefined) ?? [this.ctx.id];
-    const existingTopicChain = (entry.data.topicChain as string[] | undefined) ?? [];
+    // Loop-detection state is written into `entry.data[loggerInternalState]` below (that is
+    // where it survives the dispatchRaw() -> #buildEntry() round trip via `data: {...input.data}`
+    // — a plain object spread copies symbol keys too). It must be read from that same location:
+    // reading from the entry root (as an earlier version of this method did) always sees
+    // undefined past the first hop, silently resetting the accumulated path and defeating the
+    // cycle guard on every hop after the first — see LG-R3-4 in
+    // docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
+    const internal = (
+      entry.data as Record<PropertyKey, unknown> & { [loggerInternalState]?: ILoggerInternalState }
+    )[loggerInternalState];
+    const existingPath = internal?.extendPath ?? [this.ctx.id];
+    const existingTopicChain = internal?.topicChain ?? [];
     const currentTopicChain =
       existingTopicChain.length > 0 || !this.ctx.topic ? existingTopicChain : [this.ctx.topic];
 
@@ -414,11 +518,15 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
           context: entry.context,
           meta: entry.meta,
           error: entry.error,
-          data: {
-            ...entry.data,
-            topicChain: nextTopicChain,
-            extendPath: [...existingPath, target.ctx.id]
-          }
+          data: Object.assign(
+            { ...entry.data },
+            {
+              [loggerInternalState]: {
+                extendPath: [...existingPath, target.ctx.id],
+                topicChain: nextTopicChain
+              }
+            }
+          )
         });
       } catch (error) {
         this.#reportFailure('forward', error);
@@ -448,9 +556,14 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
 
   /**
    * A sink receives a private top-level snapshot; nested user values stay reference-based by
-   * contract.
+   * contract. `data` is spread rather than passed by reference — but a plain spread also copies the
+   * internal `loggerInternalState` symbol key (extends() loop-detection bookkeeping, see
+   * #forwardToExtendTargets), which is not part of the public entry contract and must not reach
+   * sink code even as an enumerable-but-easy-to-miss symbol property.
    */
   #snapshotEntry(entry: ILogEntry): ILogEntry {
+    const data: Record<PropertyKey, unknown> = { ...entry.data };
+    delete data[loggerInternalState as unknown as string];
     return {
       ...entry,
       time: new Date(entry.time.getTime()),
@@ -458,7 +571,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
       meta: entry.meta ? { ...entry.meta } : undefined,
       context: [...entry.context],
       error: entry.error ? { ...entry.error } : undefined,
-      data: { ...entry.data }
+      data
     };
   }
 }

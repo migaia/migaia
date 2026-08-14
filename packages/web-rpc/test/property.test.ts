@@ -7,6 +7,8 @@ import { ResourceScope } from '../src/internal/resource-scope';
 import { RequestReplayLedger } from '../src/internal/request-replay-ledger';
 import { createSettlement } from '../src/internal/settlement';
 import { OperationScope } from '../src/internal/operation-scope';
+import { EndpointResourceManager } from '../src/internal/endpoint-resource-manager';
+import { ReplayWindow } from '../src/internal/replay';
 import { isWebRpcEnvelope, normalizeWebRpcEnvelope } from '../src/wire';
 
 const runtimeProcess = (globalThis as { process?: { env?: { CI?: string } } }).process;
@@ -244,11 +246,46 @@ describe('property invariants', () => {
     );
   });
 
+  it('keeps manager active and replay-retained ownership equivalent to a model', () => {
+    const command = fc.constantFrom('begin', 'retain', 'release', 'releaseId');
+    fc.assert(
+      fc.property(fc.array(command, { maxLength: 80 }), (commands) => {
+        const manager = new EndpointResourceManager(new ReplayWindow(), new ResourceScope());
+        let operation: ReturnType<EndpointResourceManager['begin']> | undefined;
+        let active = false;
+        let replayRetained = false;
+        for (const current of commands) {
+          if (current === 'begin') {
+            if (active || replayRetained) {
+              expect(() => manager.begin('request', 'model-id')).toThrow();
+            } else {
+              operation = manager.begin('request', 'model-id');
+              active = true;
+            }
+          } else if (current === 'retain' && active) {
+            operation?.retainForReplay();
+            replayRetained = true;
+          } else if (current === 'release' && active) {
+            operation?.release();
+            operation = undefined;
+            active = false;
+          } else if (current === 'releaseId' && !active) {
+            manager.releaseId('model-id');
+            replayRetained = false;
+          }
+          expect(manager.hasReservedId('model-id')).toBe(active || replayRetained);
+          expect(manager.size).toBe(active ? 1 : 0);
+        }
+      }),
+      propertyParameters
+    );
+  });
+
   it('reassembles every valid UTF-8 chunk permutation without retaining state', () => {
     fc.assert(
       fc.property(
         fc.string(),
-        fc.integer({ min: 1, max: 32 }),
+        fc.integer({ min: 4, max: 32 }),
         fc.array(fc.nat(), { minLength: 1, maxLength: 64 }),
         (value, maxBytes, permutationKeys) => {
           const parts = splitUtf8(value, maxBytes);

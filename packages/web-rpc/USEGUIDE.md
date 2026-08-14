@@ -1,141 +1,759 @@
-# Usage guide
+# 使用手册
+
+本文是 `@migaia/web-rpc` 的完整参考手册，面向已经读过 [README.md](./README.md) 五分钟上手部分、需要深入了解具体配置项和边界行为的开发者。README 讲"是什么、能干什么、怎么快速上手"，本文讲"每一个配置项、每一种错误、每一个坑的具体细节"。
+
+## 目录
+
+1. [核心概念详解](#1-核心概念详解)
+2. [`createEndpoint` 完整配置参考](#2-createendpoint-完整配置参考)
+3. [中间件详细参考](#3-中间件详细参考)
+4. [传输适配器详细参考](#4-传输适配器详细参考)
+5. [自定义传输适配器](#5-自定义传输适配器)
+6. [Endpoint 公开 API 参考](#6-endpoint-公开-api-参考)
+7. [服务发现：自动模式与手动模式](#7-服务发现自动模式与手动模式)
+8. [错误处理](#8-错误处理)
+9. [生命周期与资源释放](#9-生命周期与资源释放)
+10. [可观测性：hooks 事件参考](#10-可观测性hooks-事件参考)
+11. [安全注意事项](#11-安全注意事项)
+12. [性能特征与内置限制](#12-性能特征与内置限制)
+13. [完整场景示例](#13-完整场景示例)
+14. [常见问题排查](#14-常见问题排查)
+
+---
+
+## 1. 核心概念详解
+
+### 1.1 Endpoint（端点）
+
+`createEndpoint()` 返回一个 `endpoint` 对象，代表通信链路里"我方"这一端。一个 endpoint 同时具备两种身份：
+
+- **调用方**：通过 `endpoint.send(targetId, method, data)` 调用别人的方法。
+- **被调用方**：通过 `endpoint.provide(method, handler)` 暴露自己的方法给别人调用。
+
+这两种身份不互斥——一个 endpoint 完全可以既 `provide()` 若干方法，又 `send()` 调用别人的方法。这是"双向 RPC"的含义：不存在严格的客户端/服务端角色划分，只有"我是谁（`id`）"和"我认识谁（`targetIds` / 服务发现）"。
+
+### 1.2 Transport（传输）
+
+Transport 是最底层的抽象，只关心"把一个消息对象发出去"和"收到消息对象时通知我"，完全不理解 RPC 语义（不知道什么是请求、响应、超时）。它的最小接口只有两个必需方法：
 
 ```ts
+type IWebRpcTransport = {
+  send(message: unknown, options?: { transfer?: readonly unknown[] }): void | Promise<void>;
+  subscribe(listener: (message: { data: unknown; peerId?: string; origin?: string; source?: unknown }) => void): () => void;
+  // 以下都是可选的能力声明
+  close?(): void | Promise<void>;
+  onTransportError?(listener: (error: unknown) => void): () => void;
+  onListenerError?(listener: (error: unknown) => void): () => void;
+  readonly peerId?: string;
+  readonly origin?: string;
+  readonly platform: 'Worker' | 'Iframe' | 'BroadcastChannel' | 'MessagePort' | 'Memory' | 'WebTransport' | 'RTCDataChannel';
+  readonly topology?: 'exclusive' | 'multiplexed' | 'broadcast';
+  readonly encodedType?: 'any' | 'string' | 'uint8array';
+  readonly ownership?: 'owned' | 'borrowed';
+  readonly sourceProof?: (source: unknown, origin?: string) => boolean;
+  readonly closed?: boolean;
+};
+```
+
+**`topology` 字段决定框架如何信任这条通道**，是整个安全模型里最重要的一个字段：
+
+| topology | 含义 | 信任假设 |
+| --- | --- | --- |
+| `exclusive` | 这条通道从始至终只有唯一的一对发送方/接收方（如 dedicated Worker、`MessagePort`） | 第一个观察到的发送方可以被直接信任为唯一对端，无需额外身份校验 |
+| `multiplexed` | 这条通道上可能有多个不同的逻辑发送方（如 SharedWorker 的多个连接端口） | **绝不**当作独占通道信任；必须提供 peer/source 身份或显式 `identifier` 校验，否则任何一端都可能被冒充 |
+| `broadcast` | 一对多广播（如 BroadcastChannel） | 默认是"诚实节点路由"模型，不是身份边界，见 [§11 安全注意事项](#11-安全注意事项) |
+
+自定义传输**必须**如实声明 `topology`；声明错误（比如把实际上多路复用的通道声明成 `exclusive`）会直接破坏框架的身份信任假设。
+
+### 1.3 Middleware（中间件）
+
+中间件在 `createEndpoint()` 时按顺序安装，每个中间件给 endpoint 装配一种能力（如"能编解码协议""能验证来源""能分片大消息"）。中间件之间通过声明的"能力"互相协作（比如 `chunk()` 需要 `protocol()` 提供的编码结果），但配置上彼此独立、可选，你只需要引入自己场景需要的那几个。完整参考见 [§3](#3-中间件详细参考)。
+
+### 1.4 Provider（提供者）与 Contract（契约）
+
+`provider` 是通过 `endpoint.provide(method, fn)` 注册的函数，签名固定为：
+
+```ts
+type IWebRpcProvider = (context: IWebRpcContext) => IWebRpcProviderResult | Promise<IWebRpcProviderResult>;
+
+type IWebRpcContext = {
+  readonly data: unknown;               // 调用方传入的参数（已经过 contract() 的 schema 校验，如果配置了的话）
+  readonly signal: IWebRpcAbortSignal;  // 调用方取消时会触发
+  success(data?: unknown, options?: { transfer?: readonly unknown[] }): IWebRpcProviderResult;
+  failed(message: string, code: string): IWebRpcProviderResult;
+  dispatchTo(input: { id?: string; method: string; data: unknown }): void; // 主动向调用方推一条单向消息
+};
+```
+
+`contract()` 中间件负责声明协议版本号，以及（可选）每个方法的 `params`/`result` schema——`IWebRpcSchema` 只要求一个 `parse(value): T` 方法，所以 zod、valibot、arktype 等任何实现了这个最小接口的校验库都能直接用：
+
+```ts
+contract({
+  version: '1',
+  schemas: {
+    add: {
+      params: z.object({ a: z.number(), b: z.number() }),
+      result: z.number()
+    }
+  }
+})
+```
+
+配置了 schema 后，参数和返回值在跨越网络边界时都会被强校验，校验失败抛 `WebRpcSchemaValidationError`（`code: 'SCHEMA_INVALID'`），而不是让格式错误的数据静默流入业务逻辑。
+
+### 1.5 Adapter（适配器）
+
+适配器是"某个具体宿主 API"和 `IWebRpcTransport` 接口之间的胶水代码，比如 `createWebWorkerTransport(worker)` 把一个 `Worker` 实例包装成 `IWebRpcTransport`。适配器不在包的主入口导出（避免把浏览器专属代码打进不需要它们的 bundle），需要按需从子路径引入，完整参考见 [§4](#4-传输适配器详细参考)。
+
+---
+
+## 2. `createEndpoint` 完整配置参考
+
+```ts
+type IWebRpcFactoryConfig<TTargetId extends string = string> = {
+  readonly id: string;                                   // 必需：本端在整个通信拓扑里的唯一标识
+  readonly targetIds?: readonly TTargetId[];              // 已知的对端 id 列表（自动发现模式下可省略，首次 send 会懒查询）
+  readonly transport?: IWebRpcTransport;                  // 实际收发消息用的传输适配器
+  readonly provider?: Readonly<Record<string, IWebRpcProvider>>; // 构造时就注册好的方法集合，等价于逐个调用 provide()
+  readonly middlewares: readonly IWebRpcMiddleware[];     // 必需：至少要有 contract/protocol/connect 中的必要项
+  readonly replay?: { readonly maxEntries?: number; readonly ttlMs?: number }; // 出站请求 id 的重放保护窗口容量与 TTL
+  readonly construction?: {
+    readonly signal?: IWebRpcAbortSignal;                 // 构造期取消
+    readonly timeoutMs?: number | false;                  // 构造期超时，false 表示不限时
+  };
+};
+```
+
+- **`id`**：整个通信拓扑里必须唯一。它出现在每一条消息的 `senderId` 字段里，但**不是身份凭证**——见 [§11](#11-安全注意事项)。
+- **`targetIds`**：只是"我已知这些 id"的预声明，不是必需的。自动发现模式下，第一次对未知 `targetId` 调用 `send`/`dispatch`/`ping` 会触发一次懒查询并缓存结果；`endpoint.discovery` 暴露的远端快照永远不包含 endpoint 自己。
+- **`provider`**：等价于在 `createEndpoint` 返回前，对每一项调用一次 `endpoint.provide(method, fn)`；纯粹是"少写几行"的便利写法。
+- **`replay`**：出站请求/消息 id 会在一个有界窗口内保留，防止重放攻击复用同一个 id 让已完成的请求再跑一次 provider。普通请求的 id 在整个 TTL 内都不释放（哪怕响应已经收到）——这是有意为之，防止晚到的重复响应复活一个"看起来还在等"的旧请求；dispatch-only（单向通知）的 id 在发送结算后立即释放，因为它天生不会有响应需要防重放。默认容量 4096、TTL 310 秒；高频单向通知场景一般不需要调大，持续的双向请求量很大时可以按需调整。
+- **`construction.signal` / `construction.timeoutMs`**：构造 `createEndpoint()` 本身也是异步的（要跑完全部中间件的 `install()`），可以用这两个字段取消或限时。取消会 reject 构造过程，并且仍然会清理已经安装成功的中间件（不会留下半初始化的资源）。中间件的 `install(context)` 会收到同一个 `signal`，如果中间件自己的初始化工作是可取消的，应该监听它。
+
+---
+
+## 3. 中间件详细参考
+
+### 3.1 `contract(config?)`
+
+```ts
+contract({
+  version?: string;               // 本端使用的协议版本号
+  acceptVersions?: string[];      // 接受的对端版本号列表（默认只接受自己声明的 version）
+  maxIdentifierLength?: number;   // senderId/targetId/method 等标识符的最大长度
+  schemas?: Record<string, { params: IWebRpcSchema; result: IWebRpcSchema }>;
+})
+```
+
+版本不匹配时对端请求会被拒绝（`CONTRACT_VERSION_UNSUPPORTED`）。`schemas` 未覆盖的方法名不做参数/返回值校验——按方法名精确匹配，没有通配符。
+
+### 3.2 `protocol(config?)`
+
+```ts
+protocol({
+  encode?: (value: unknown) => unknown;   // 默认恒等
+  decode?: (value: unknown) => unknown;   // 默认恒等
+  encodedType?: 'any' | 'string' | 'uint8array';
+})
+```
+
+决定信封（wire envelope）在发送前/接收后如何编解码。默认不做任何转换（适合传输本身就能传递结构化对象的场景，比如 `postMessage`）。需要自定义序列化格式（MessagePack、Protobuf 等）时在这里接入；`encodedType` 用于和传输层的编码要求做一致性校验，不一致会在构造期直接报错，而不是等到真正发送时才失败。
+
+### 3.3 `connect(config)`
+
+**几乎所有场景都需要这个中间件**——它同时负责来源校验和服务发现。
+
+```ts
+connect({
+  transport?: IWebRpcTransport;   // 工厂层已经提供 transport 时可省略
+  useBaseIdVerifyOnly?: boolean;  // 默认 true：只用适配器提供的 peerId/origin 做基础校验
+  identifier?: (context: IWebRpcConnectContext) => boolean | Promise<boolean>; // useBaseIdVerifyOnly: false 时必须提供
+  uniqueTargetId?: string | ((context) => string | Promise<string>); // 见下方说明，不是凭证
+  discoveryMode?: 'automatic' | 'manual';  // 默认 automatic
+  receiverSelector?: (serverList, context) => string | undefined | Promise<string | undefined>; // 自定义多接收端选路
+})
+```
+
+- **`useBaseIdVerifyOnly: true`（默认）**：只用适配器提供的 `peerId`/`origin` 元数据做基础一致性检查，不执行自定义 `identifier`。
+- **`useBaseIdVerifyOnly: false`**：`identifier` 变为必需，且只在适配器提供的基础身份先通过之后才会被调用——单独一个 `source` 对象不构成"基础身份"，必须配合匹配的 `peerId` 或 `origin`，或者显式切换到 `identifier` 模式。`identifier` 收到的 `context` 包含 `senderId`、`targetId`、适配器提供的 `peerId`/`origin`/`source`、`platform`、`topology`。
+- **`uniqueTargetId`**：给同一个 `targetId` 下的多个接收端（比如同一个 BroadcastChannel 上跑着好几个 tab）加一个更细粒度的路由标识。**它是路由标识，不是身份凭证**——不要用它做鉴权判断。
+- **`discoveryMode`**：`automatic`（默认）下 `endpoint.connect` 只暴露 `getServerList`/`pinReceiver`/`unpinReceiver` 三个只读控制；`manual` 下额外暴露 `query`/`onQuery`/`register`/`unregister`/`ping` 完整控制集，见 [§7](#7-服务发现自动模式与手动模式)。
+
+### 3.4 `authentication(config)`
+
+```ts
+authentication({
+  encrypt?: (value, context) => unknown | Promise<unknown>;
+  decrypt?: (value, context) => unknown | Promise<unknown>;
+  sign?: (value, context) => unknown | Promise<unknown>;
+  verify?: (value, context) => unknown | Promise<unknown>;
+  encodedType?: 'any' | 'string' | 'uint8array';
+})
+```
+
+对**每一帧**（包括分片帧和 ping/pong/abort 这类控制帧）做保护，不是只保护业务请求/响应。`context` 里的 `direction: 'outbound' | 'inbound'` 告诉你当前是在处理发送还是接收方向。通道本身不可信（比如匿名 BroadcastChannel、未加密的 WebRTC 通道）时应当配置这个中间件；启用后，`Transfer` 列表（如 `ArrayBuffer` 的零拷贝转移）不再受支持，因为加密/签名要求先拿到序列化后的字节。
+
+### 3.5 `chunk(config?)`
+
+```ts
+chunk({
+  chunkSize?: number;                 // 单帧最大字节数，超过则自动分片
+  maxMessageBytes?: number;           // 单条消息（分片前）允许的最大总字节数
+  maxConcurrentMessages?: number;     // 端点级别同时进行中的分片重组数量上限
+  maxConcurrentMessagesPerPeer?: number; // 单个 peer 的重组数量上限
+  maxBufferedBytes?: number;          // 分片重组缓冲区总字节上限
+  maxChunksPerMessage?: number;       // 单条消息允许的最大分片数
+  maxChunkBytes?: number;             // 单个分片帧允许的最大字节数
+  assemblyTimeoutMs?: number;         // 重组超时，超时未收全则丢弃并报错
+  byteLength?: (value: string) => number; // 自定义字节长度测量（默认按 UTF-8）
+  split?: (value: string, maxBytes: number) => readonly string[]; // 自定义切分算法
+})
+```
+
+超过 `chunkSize` 的字符串消息才会被切分；已经是 `Uint8Array` 的消息不支持分片（必须走能整体传输大二进制的传输通道）。六个容量维度（并发消息数、单 peer 消息数、分片数、分片字节、总缓冲、重组超时）任意一个超限都会拒绝或丢弃对应的重组任务，防止异常/恶意大消息把内存占满。分片是尽力而为的传递——框架不提供分片级别的确认应答或重试状态机，需要"确认送达"语义时应在 RPC 层（业务方法本身的请求/响应）做超时重试，而不是依赖分片层。
+
+### 3.6 `timeout(config?)`
+
+```ts
+timeout({
+  timeoutMs?: number | false;    // 默认超时时长，false 表示不限时
+  retry?: {
+    maxAttempts?: number;
+    shouldRetry?: (context: IWebRpcRetryContext) => boolean | Promise<boolean>;
+    delay?: (context: IWebRpcRetryContext) => number | false | null | Promise<number | false | null>;
+  };
+})
+```
+
+`send()` 调用时可以在 `options.timeoutMs` 里覆盖这个默认值。重试策略的 `shouldRetry`/`delay` 回调会在请求信号中止或 endpoint 释放时被自动取消——一个永不 settle 的异步 `delay` 回调不会让 `send()` 在信号已经触发之后还继续挂起。
+
+### 3.7 `ping()`
+
+安装后 endpoint 获得 `ping(targetId, receiverId?, options?)`/`pingAll()` 方法（类型层面：不装这个中间件时调用 `ping` 会在编译期就报错）。`options` 支持 `timeoutMs` 与 `signal`。`ping()` 对超时、传输失败、endpoint 已释放这几种情况统一返回 `false`，**不会抛错**，不需要 try/catch。
+
+### 3.8 `abort()`
+
+让 `send()`/`sendAll()` 支持通过 `options.signal` 传入的 `AbortSignal` 取消进行中的请求。
+
+### 3.9 `hooks(config?)`
+
+```ts
+hooks({
+  listeners?: IWebRpcHook | readonly IWebRpcHook[];
+  onHookError?: (error: unknown, event: IWebRpcHookEvent) => void;
+})
+```
+
+订阅框架内部生命周期事件用于日志、监控、调试；`endpoint.hooks.on(listener)` 是运行时动态订阅的等价方式，两者可以同时使用。完整事件列表见 [§10](#10-可观测性hooks-事件参考)。
+
+### 3.10 `uuid(config?)`
+
+自定义请求/消息 id 的生成策略，默认使用内置的安全随机生成器。需要和外部系统的 trace id 体系对齐时可以在这里接入自定义生成函数。
+
+---
+
+## 4. 传输适配器详细参考
+
+### 4.1 `createWindowMessageTransport(options)` — `@migaia/web-rpc/adapters/window`
+
+```ts
+createWindowMessageTransport({
+  receiver?: IWindowMessageReceiver;   // 默认当前 window
+  targetOrigin?: string;               // 默认 window.location.origin；跨源必须显式传
+  allowUnsafeTargetOrigin?: boolean;   // 显式опт-in 通配符投递
+})
+```
+
+同源场景下 `receiver`/`targetOrigin` 都可以省略，走默认值。跨源场景必须显式传 `targetOrigin`，否则框架会拒绝以通配符 `*` 方式发送——这是刻意的默认拒绝，需要通配符投递必须显式 `allowUnsafeTargetOrigin: true` 才能启用（这个开关只影响**出站**的 origin 过滤，**入站**消息的 `source` 校验不受影响，依然会被验证）。`postMessage` 无法可靠感知对方窗口/iframe 被关闭，请依赖有限的操作超时（`timeout()` 中间件的默认行为）或显式的宿主生命周期信号，`timeoutMs: false` 只是显式允许无限等待，不代表框架能检测到对方关闭。
+
+### 4.2 `createBrowserMessagePortTransport(port, options?)` — `@migaia/web-rpc/adapters/message-port`
+
+```ts
+createBrowserMessagePortTransport(port, { ownership?: 'owned' | 'borrowed' })
+```
+
+默认 `ownership: 'owned'`——`dispose()` 时框架会关闭传入的 `port`。调用方需要自己保留端口控制权（比如这个 port 还要给别的地方用）时传 `{ ownership: 'borrowed' }`，此时清理阶段只移除框架自己挂的监听器，不关闭底层端口。
+
+另有 `createNodeMessagePortTransport(port)` 适配 Node.js 的 `worker_threads` MessagePort，接口形状略有差异（`INodeMessagePortLike`），用法一致。
+
+### 4.3 `createWebWorkerTransport(worker)` — `@migaia/web-rpc/adapters/web-worker`
+
+包装 `Worker`/`MessagePort` 一类对象。`error`（脚本执行失败）和 `messageerror`（结构化克隆失败）这两类原生事件本身不带消息 payload，无法映射成"哪个请求失败了"，框架统一通过 `onTransportError` 上报，效果是让**当前全部**挂起请求立即失败，而不是让它们各自等到超时才发现出了问题。
+
+### 4.4 `createSharedWorkerTransport(port)` — `@migaia/web-rpc/adapters/shared-worker`
+
+包装 `SharedWorker` 的 `port`。类型定义不依赖 DOM 或 Worker 全局类型，即使在既不是浏览器也不是 Worker 的 `lib` 编译目标下也能正常类型检查（适合跨运行时共享的类型定义文件）。SharedWorker 天生是 `multiplexed` 拓扑（多个标签页共享同一个 worker 实例），务必配合 `connect()` 的身份校验使用。
+
+### 4.5 `createServiceWorkerTransport(options)` — `@migaia/web-rpc/adapters/service-worker`
+
+```ts
+createServiceWorkerTransport({ target, receiver, peerId? })
+```
+
+ServiceWorker 场景发送方和接收方是两个独立的宿主对象（页面 `postMessage` 给 controller，接收走 `navigator.serviceWorker` 的 `message` 事件），因此需要分别传入 `target`（发送目标）和 `receiver`（接收来源）。
+
+### 4.6 `createBroadcastChannelTransport(channel)` — `@migaia/web-rpc/adapters/broadcast-channel`
+
+包装一个原生 `BroadcastChannel` 实例。**这是匿名广播路由，不是身份边界**——同源的任何脚本都能打开同名 `BroadcastChannel` 观察和伪造帧。真正需要防伪造/防窃听时必须叠加 `authentication()` 中间件，或者改用需要显式握手的传输。详见 [§11](#11-安全注意事项)。
+
+### 4.7 `createRtcDataChannelTransport(channel)` — `@migaia/web-rpc/adapters/rtc-data-channel`
+
+包装一个 WebRTC `RTCDataChannel`。要求使用可靠有序模式（创建时 `ordered: true`，默认就是），框架依赖消息按发送顺序到达。
+
+### 4.8 `createWebTransportDatagramTransport(datagrams)` — `@migaia/web-rpc/adapters/web-transport`
+
+```ts
+createWebTransportDatagramTransport({ writable: WritableStream<Uint8Array>; readable: ReadableStream<Uint8Array> })
+```
+
+包装 HTTP/3 WebTransport 的 datagram 读写流。datagram 是无连接、无内建分帧的字节流，协议编解码（`protocol()` 中间件）需要自行处理好帧边界；适配器内部维护一个贯穿整个传输生命周期的持久 reader——取消订阅（移除所有 RPC 监听器）不会连带取消这个 reader，只有调用 `close()` 才会真正取消 reader、释放读锁、关闭 writer；第二次调用 `close()` 会复用第一次的 close 结果，不会重复执行清理。
+
+### 4.9 `createMemoryTransportPair()` — `@migaia/web-rpc/adapters/memory`
+
+```ts
+const [transportA, transportB] = createMemoryTransportPair();
+```
+
+不依赖任何浏览器/Node 特有 API，两端就是同一个 JS 堆里的一对互相连通的传输，投递通过 `queueMicrotask` 模拟真实异步传输的时序（不是同步回调），因此依赖"调用 `send()` 之后对方还没立即收到"这个假设的代码在这个适配器上依然成立。**仅供单元测试和本地联调使用**，不代表生产可用的进程间/跨端通信方案。
+
+---
+
+## 5. 自定义传输适配器
+
+只需要实现 `IWebRpcTransport` 接口（完整字段见 [§1.2](#12-transport传输)），最小实现只有两个必需方法：
+
+```ts
+import type { IWebRpcTransport } from '@migaia/web-rpc';
+
+function createMyTransport(socket: MyRawSocket): IWebRpcTransport {
+  return {
+    platform: 'Memory', // 没有贴切的内置值时可以选一个语义最接近的
+    topology: 'exclusive', // 如实声明拓扑，见 §1.2
+    send(message) {
+      socket.write(JSON.stringify(message));
+    },
+    subscribe(listener) {
+      const onData = (raw: string) => listener({ data: JSON.parse(raw) });
+      socket.on('data', onData);
+      return () => socket.off('data', onData);
+    },
+    close() {
+      socket.close();
+    },
+    onTransportError(listener) {
+      socket.on('error', listener);
+      return () => socket.off('error', listener);
+    }
+  };
+}
+```
+
+要点：
+
+- `topology` 必须如实反映这条通道的复用情况，声明错误会破坏框架的身份信任假设（见 §1.2 表格）。
+- `platform` 只是一个描述性标签（用于 hooks 事件、日志），选一个语义最接近的内置值即可，不影响功能。
+- `close`/`onTransportError`/`onListenerError` 都是可选的，但强烈建议实现：没有 `onTransportError` 时，底层连接异常断开不会让挂起请求主动失败，只能干等超时。
+- 所有传给你的回调（中间件 `install`、`provider`、`verifier`）都以裸函数形式调用，不依赖 `this`，请用箭头函数或闭包捕获状态。
+
+---
+
+## 6. Endpoint 公开 API 参考
+
+```ts
+type IWebRpcEndpoint<TTargetId extends string = string> = {
+  provide(method: string, provider: IWebRpcProvider): IWebRpcEndpoint<TTargetId>;
+  on(event: string, listener: IWebRpcEventListener): () => void;
+  send<T>(targetId: TTargetId, method: string, data: unknown, options?: ISendOptions): Promise<T>;
+  sendAll<T>(method: string, data: unknown, options?: ISendOptions): Promise<IWebRpcFanoutResult<T>>;
+  dispatch(targetId: TTargetId, method: string, data: unknown): void;
+  dispatchAll(method: string, data: unknown): void;
+  ping(targetId: TTargetId, receiverId?: string, options?: IWebRpcPingOptions): Promise<boolean>; // 仅安装了 ping() 中间件时可用
+  pingAll(): Promise<IWebRpcFanoutResult<boolean>>;  // 仅安装了 ping() 中间件时可用
+  readonly connect: IWebRpcConnectControlForMode<TTargetId, TMode>;
+  readonly discovery: IWebRpcDiscoveryControl<TTargetId>;
+  readonly hooks: { on(listener: IWebRpcHook): () => void };
+  dispose(): Promise<void>;
+};
+```
+
+| 方法 | 参数类型 | 同步/异步 | 说明 |
+| --- | --- | --- | --- |
+| `provide(method, fn)` | `method: string`；`fn: IWebRpcProvider`（即 `(context: IWebRpcContext) => IWebRpcProviderResult \| Promise<IWebRpcProviderResult>`） | 同步（直接返回 `this`） | 注册一个方法处理函数，返回 `this` 以支持链式调用；`method` 重复注册会抛错 |
+| `on(event, listener)` | `event: string`；`listener: IWebRpcEventListener`（即 `(context: IWebRpcContext) => void \| Promise<void>`） | 同步（直接返回取消订阅函数） | 监听对端通过 `dispatch()`/`dispatchAll()` 发来的单向通知，返回取消订阅函数 |
+| `send<T>(targetId, method, data, options?)` | `targetId: TTargetId`；`method: string`；`data: unknown`；`options?: ISendOptions`（`{ signal?: IWebRpcAbortSignal; timeoutMs?: number \| false; transfer?: readonly unknown[] }`） | 异步（返回 `Promise<T>`） | 发起一次双向调用并等待结果；`options` 支持 `signal`（需要 `abort()` 中间件）、`timeoutMs`（覆盖默认超时）、`transfer`（零拷贝转移列表） |
+| `sendAll<T>(method, data, options?)` | `method: string`；`data: unknown`；`options?: ISendOptions` | 异步（返回 `Promise<IWebRpcFanoutResult<T>>`） | 向当前全部已知/存活的对端发起同一次调用，返回按目标聚合的结果集，见下方 `IWebRpcFanoutResult` |
+| `dispatch(targetId, method, data)` | `targetId: TTargetId`；`method: string`；`data: unknown` | 同步（返回 `void`） | 单向通知，不等待、不产生响应，同步返回（内部异步执行） |
+| `dispatchAll(method, data)` | `method: string`；`data: unknown` | 同步（返回 `void`） | 单向广播给全部已知/存活对端 |
+| `ping(targetId, receiverId?, options?)` / `pingAll()` | `targetId: string`；`receiverId?: string`；`options?: IWebRpcPingOptions`（`{ timeoutMs?: number; signal?: IWebRpcAbortSignal }`）；`pingAll()` 无参数 | 异步（分别返回 `Promise<boolean>` / `Promise<IWebRpcFanoutResult<boolean>>`） | 存活探测，可指定 receiver/timeout/signal，失败/超时统一返回 `false`，不抛错 |
+| `connect` | 不适用（只读属性，非函数；其下各方法各自的参数见 §7） | 视情况（`getServerList`/`pinReceiver`/`unpinReceiver`/`onQuery`/`register` 是同步方法，`query`/`unregister`/`ping` 返回 `Promise`，见 §7） | 服务发现的读写控制，自动模式下只读（`getServerList`/`pinReceiver`/`unpinReceiver`），手动模式下额外有查询/注册控制，见 §7 |
+| `discovery` | 不适用（只读属性，非函数） | 同步（暴露的 `getServerList`/`pinReceiver`/`unpinReceiver` 均为同步方法，不返回 `Promise`） | 只读的远端服务发现快照，等价于 `connect` 的只读子集，命名上更强调"这是给调试/观测用的" |
+| `hooks.on(listener)` | `listener: IWebRpcHook`（即 `(event: IWebRpcHookEvent) => void \| Promise<void>`） | 同步（直接返回取消订阅函数） | 运行时动态订阅生命周期事件，等价于 `hooks()` 中间件的 `listeners` 配置项 |
+| `dispose()` | 无参数 | 异步（返回 `Promise<void>`） | 释放 endpoint，见 [§9](#9-生命周期与资源释放) |
+
+`IWebRpcFanoutResult<T>`：
+
+```ts
+type IWebRpcFanoutResult<T> = {
+  readonly fulfilled: Partial<Record<string, T>>;      // key → 成功结果
+  readonly rejected: Partial<Record<string, unknown>>; // key → 失败原因
+};
+```
+
+`fulfilled`/`rejected` 使用**空原型对象**（`Object.create(null)`），因为 key 来自不可信的 `targetId`/`receiverId` 字符串——检查一个特定 key 是否存在时用 `Object.hasOwn(result.fulfilled, key)`，不要用 `key in result.fulfilled` 或直接假设它是普通对象（`__proto__` 这类字符串作为合法 target id 时，普通对象会把它解释成原型链操作而不是一个数据 key）。key 本身也不是裸的 `targetId` 字符串，而是打了标签的 `JSON.stringify(...)` 元组，两种形态并存：匿名投递（没有具体接收端信息）用 `JSON.stringify(['target', targetId])`；已识别到具体接收端的投递用 `JSON.stringify(['receiver', targetId, receiverId])`——避免不同 `targetId` 下相同 `receiverId` 互相覆盖，也避免和匿名投递的 key 撞在一起。查找结果时同样要用这个格式构造 key，不能直接用 `targetId` 去查。`sendAll`/`pingAll` 在取"当前有哪些对端"的快照之前会先检查 endpoint 是否已释放，因此哪怕当前一个已知对端都没有，对一个已释放的 endpoint 调用 `sendAll` 依然会稳定地失败，而不是返回一个空结果集。
+
+---
+
+## 7. 服务发现：自动模式与手动模式
+
+`connect()` 中间件的 `discoveryMode` 决定 endpoint 如何知道"某个 `targetId` 背后现在有哪些接收端存活"，两种模式互斥。
+
+### 7.1 自动模式（默认）
+
+首次对一个未预先声明在 `targetIds` 里的 `targetId` 调用 `send`/`dispatch`/`ping` 时，框架自动发起一次发现查询，并把结果透明缓存下来；之后同一个 `targetId` 的调用直接复用缓存，不会重复查询。`endpoint.connect`（等价于 `endpoint.discovery`）只暴露只读控制：
+
+```ts
+endpoint.connect.getServerList(targetId?); // 查看当前已知的接收端快照（不含 endpoint 自己）
+endpoint.connect.pinReceiver(targetId, receiverId); // 固定路由到某个具体接收端
+endpoint.connect.unpinReceiver(targetId); // 取消固定
+```
+
+没有 pin 的情况下，一次 `send`/`ping` 可能被投递给某个 `targetId` 下**全部**当前存活的接收端，第一个有效响应（无论成功还是失败）就会结算这次调用；`sendAll`/`pingAll` 则会在有发现元数据的情况下为每个接收端各保留一条独立结果。已经 pin 住的接收端如果后续注销，不会静默切换到另一个接收端继续工作——这是有意的：pin 意味着调用方明确要求"就是这一个"，切走反而可能是错误行为。
+
+### 7.2 手动模式（`discoveryMode: 'manual'`）
+
+```ts
+endpoint.connect.query(targetId, options?);           // 主动发起一次发现查询
+endpoint.connect.onQuery(listener);                   // 监听别人发来的发现查询
+endpoint.connect.register(candidate);                 // 把一个候选接收端注册进本地路由表
+endpoint.connect.unregister(targetId, receiverId?);    // 从本地路由表移除
+endpoint.connect.ping(candidate, options?);            // 对某个候选做纯粹的存活探测
+```
+
+手动模式下**没有隐式的自动查询**，`query()` 只返回候选列表，不会自动帮你 `register()`——需要某个接收端变得可路由，必须显式 `register()`。`ping()` 在手动模式下只做 ping/pong 探测，不会附带发现或修改路由表这类副作用。收到的、还没被 `accept`/`reject` 的入站查询会在一个有限的时间窗口后自动过期，过期不会永久占用"待处理查询"的配额上限。
+
+### 7.3 发现相关的生命周期事件
+
+`connect.receiver-registered`、`connect.server-unregistered`、`connect.receiver-pinned`、`connect.receiver-unpinned`、`connect.pinned-receiver-lost`、`connect.multiple-receivers` 这几个 hook 事件覆盖了接收端的注册/注销/固定/多接收端并存等情况；`connect.multiple-receivers` 事件带有 `requesterId` 和一份冻结的 `receiverIds` 快照，方便在日志里定位"这次调用当时到底看到了哪几个候选"。**接收端的注册/注销通知本身只是发现层的元数据**，不代表安全边界——真正的 RPC 请求/响应依然要经过 `connect()` 的身份校验，注册一个假的候选并不能绕过这层校验。
+
+---
+
+## 8. 错误处理
+
+所有对外抛出的失败都是 `WebRpcError`（或其子类）的实例，带一个稳定、不本地化的 `code` 字符串字段。**请始终按 `error.code` 分支，不要依赖 `error.message`（可能变化）或具体的 `error instanceof SomeSubclass`（子类是实现细节）。**
+
+```ts
+import { isWebRpcError, WebRpcErrorCode } from '@migaia/web-rpc';
+
+try {
+  await endpoint.send('server', 'add', { a: 1, b: 2 });
+} catch (error) {
+  if (isWebRpcError(error)) {
+    switch (error.code) {
+      case WebRpcErrorCode.deadlineExceeded:
+        // 超时，可能需要重试或提示用户
+        break;
+      case WebRpcErrorCode.authenticationFailed:
+        // 鉴权失败，通常不应该重试
+        break;
+      default:
+        // 兜底处理
+    }
+  }
+}
+```
+
+### 错误码完整参考
+
+| Code | 触发场景 | 建议处理 |
+| --- | --- | --- |
+| `MIDDLEWARE_DUPLICATED` | 同一个中间件被重复安装 | 检查 `middlewares` 数组，构造期问题，修配置 |
+| `MIDDLEWARE_MISSING` | 调用了需要某个中间件（如 `ping`）但没安装它的方法 | 补齐对应中间件 |
+| `INVALID_CONFIG` | `createEndpoint()` 配置本身不合法（含读取配置字段时抛出的异常） | 修配置；这类错误在任何中间件产生副作用**之前**抛出 |
+| `PROVIDER_DUPLICATED` | 同一个方法名被 `provide()` 注册了两次 | 检查方法名是否冲突 |
+| `UUID_UNAVAILABLE` / `UUID_INVALID` / `UUID_CONFLICT` | 自定义 `uuid()` 中间件生成的 id 不合法或冲突 | 检查自定义生成函数的实现 |
+| `PROTOCOL_INVALID` | 协议编解码失败 | 检查 `protocol()` 的 `encode`/`decode` 实现或对端协议是否一致 |
+| `PROTOCOL_UNSUPPORTED` | 协议输出类型和传输要求的 `encodedType` 不匹配 | 调整 `protocol()`/`encodedType` 配置 |
+| `PROTOCOL_DECRYPT_FAILED` | `authentication()` 的解密/验签失败 | 通常代表消息被篡改或密钥不匹配，不建议重试 |
+| `CONTRACT_INVALID` | 契约配置本身不合法 | 检查 `contract()` 配置 |
+| `CONTRACT_VERSION_UNSUPPORTED` | 对端协议版本不在可接受范围 | 升级/降级到兼容版本 |
+| `PAYLOAD_INVALID` | 序列化/反序列化失败，或分片校验失败 | 检查发送的数据是否可序列化 |
+| `PAYLOAD_TOO_LARGE` | 消息超过 `chunk()` 配置的大小上限 | 调大限制或减小消息体积 |
+| `METHOD_NOT_FOUND` | 调用了对端没有 `provide()` 的方法名 | 检查方法名拼写、确认对端已注册 |
+| `PROVIDER_NOT_SETTLED` | provider 函数没有正确返回 `success()`/`failed()` 结果 | 检查 provider 实现 |
+| `INTERNAL` | 框架内部未分类错误 | 附带原始 `cause`，需要具体排查 |
+| `TARGET_UNKNOWN` | 目标 `targetId` 未知且发现失败 | 确认目标 id 正确、对端在线 |
+| `TARGET_NOT_IDENTIFIABLE` | 目标存在但无法唯一定位到具体接收端 | 检查是否需要 `uniqueTargetId`/`pinReceiver` |
+| `ENDPOINT_DISPOSED` | 在 `dispose()` 之后继续使用 endpoint | 检查生命周期管理，不要在释放后调用 |
+| `CANCELLED` | 请求被 `AbortSignal` 主动取消 | 业务预期内的取消，通常不需要当作异常处理 |
+| `DEADLINE_EXCEEDED` | 请求超时 | 可考虑重试（配合 `timeout()` 的 `retry` 配置）或提示用户 |
+| `PROVIDER_CONTEXT_EXPIRED` | provider 在其 `context` 已过期后才尝试结算 | 检查 provider 是否有异步逻辑跑得太久 |
+| `TRANSPORT` | 底层传输发送/接收失败 | 传输层问题，检查连接状态 |
+| `AUTHENTICATION_FAILED` | `authentication()`/`connect()` 校验未通过 | 安全相关，不建议自动重试 |
+| `UNAUTHENTICATED` / `FORBIDDEN` | 权限相关拒绝 | 检查鉴权配置或用户权限 |
+| `UNAVAILABLE` | 依赖的能力当前不可用 | 检查前置条件 |
+| `SCHEMA_INVALID` | `contract()` 配置的 schema 校验未通过 | 检查参数/返回值是否符合约定的 schema |
+| `CAPABILITY_CONFLICT` | 多个中间件/配置之间的能力声明冲突 | 检查中间件组合是否合理 |
+| `OVERLOADED` | 出站 id 账本、并发限制等资源预算耗尽 | 降低发送频率或调大对应限制（如 `replay.maxEntries`） |
+| `CHUNK_INVALID` | 分片帧不合法 | 检查 `chunk()` 自定义 `split`/`byteLength` 实现 |
+| `CHUNK_TOO_LARGE` | 单条消息或单个分片超过配置上限 | 调整 `chunk()` 限制 |
+| `CHUNK_CAPACITY_EXCEEDED` | 并发重组数量/缓冲区超限 | 降低并发大消息发送量或调大限制 |
+| `CHUNK_RECEIVE_TIMEOUT` | 分片重组在 `assemblyTimeoutMs` 内未收全 | 检查网络稳定性，或调大超时 |
+| `CHUNK_ACK_TIMEOUT` | 分片确认超时（预留字段，当前分片层不做确认应答） | 见 `chunk()` 说明——分片层是尽力而为传递 |
+
+`WebRpcRemoteError` 专门代表"对端 provider 主动调用 `ctx.failed(message, code)` 返回的业务失败"，其 `data` 字段携带 provider 传回的附加数据；和上表这些"框架/传输层"错误是两个不同的来源，处理时可以分开判断。
+
+`WebRpcConstructionError`/`WebRpcLifecycleError`/`WebRpcAbortError`/`WebRpcTimeoutError` 这几个子类在特定场景下会额外携带 `cleanupErrors`（构造/释放过程中，各个资源各自的清理失败详情，见 [§9](#9-生命周期与资源释放)）或 `cleanupPromise`（清理仍在进行中时可以 await 的句柄）。
+
+---
+
+## 9. 生命周期与资源释放
+
+`dispose()` 保证：
+
+1. **立即结算全部进行中的请求**——不会让调用方永远挂起等一个再也不会有结果的 Promise。
+2. **立即让入站的 provider 执行上下文失效**——释放过程中新到达的请求不会被处理。
+3. **按预期顺序清理**：中间件卸载、传输连接关闭、发现注册表清理等，任何一步失败都会被收集而不是让后续清理中断，最终如果有失败会以 `WebRpcLifecycleError` reject，其 `cleanupErrors` 是一个数组，每一项都保留了具体是哪个资源清理失败（`{ resource: string; error: unknown }`），方便定位到底是中间件、订阅、接收端注销通知，还是自己拥有的传输释放出了问题。
+4. **幂等**：`dispose()` 可以安全地调用多次，后续调用复用第一次的清理结果，不会重复执行清理逻辑或产生新的副作用。
+
+```ts
+try {
+  await endpoint.dispose();
+} catch (error) {
+  if (error instanceof WebRpcLifecycleError) {
+    for (const { resource, error: cause } of error.cleanupErrors ?? []) {
+      console.error(`清理 ${resource} 失败：`, cause);
+    }
+  }
+}
+```
+
+构造期的取消/失败（`WebRpcConstructionError`/`WebRpcAbortError`）同样携带清理信息——即便构造还没完成就被取消，已经安装成功的那部分中间件依然会被正确回滚，不会留下半初始化的资源。
+
+---
+
+## 10. 可观测性：hooks 事件参考
+
+通过 `hooks()` 中间件的 `listeners` 或 `endpoint.hooks.on(listener)` 订阅。每个事件都是 `IWebRpcHookEvent`：
+
+```ts
+type IWebRpcHookEvent = {
+  readonly name: string;
+  readonly at: number;              // 事件发生时间戳
+  readonly localId: string;         // 本端 id
+  readonly code?: string;
+  readonly error?: unknown;
+  readonly contract?: unknown;
+  readonly variation?: unknown;
+  readonly targetId?: string;
+  readonly receiverId?: string;
+  readonly requesterId?: string;
+  readonly receiverIds?: readonly string[];
+  readonly ambiguous?: boolean;
+  readonly responseCount?: number;
+};
+```
+
+常见事件一览：
+
+| 事件名 | 何时触发 |
+| --- | --- |
+| `receive.failure` | 收到一条无法处理的入站消息（格式错误、校验失败等） |
+| `authentication.rejected` | `authentication()`/`connect()` 的身份或完整性校验未通过 |
+| `response.unmatched` | 收到一条响应，但找不到匹配的挂起请求（可能是重复响应或超时后晚到） |
+| `transport.failure` | 传输层报告的错误（通过 `onTransportError`） |
+| `transport.listener.failure` | 某个 `subscribe` 监听器自身抛出异常 |
+| `dispatch.failure` | `dispatch()`/`dispatchAll()` 发送失败 |
+| `dispose.failure` | 释放过程中某个资源清理失败（对应 `cleanupErrors` 里的一项） |
+| `variation.failure` / `variation.unmatched` | ping/pong/abort 这类控制帧发送失败，或收到的控制帧找不到匹配的挂起状态 |
+| `connect.receiver-registered` | 一个新的接收端被发现并注册进路由表 |
+| `connect.server-unregistered` | 一个接收端注销（比如所在的 endpoint 被 dispose） |
+| `connect.receiver-pinned` / `connect.receiver-unpinned` | `pinReceiver`/`unpinReceiver` 被调用 |
+| `connect.pinned-receiver-lost` | 已经 pin 住的接收端注销了（不会自动切换到其他接收端，见 §7.1） |
+| `connect.multiple-receivers` | 一次调用同时看到了多个候选接收端；`ambiguous`/`receiverIds` 字段说明具体情况 |
+| `connect.receiver-announcement.failure` | 接收端注册/注销的广播通知发送失败，或超出配额被拒绝 |
+
+`hooks()` 的 `onHookError` 回调专门捕获监听器自身抛出的异常，防止一个写错的日志监听器影响框架主流程。
+
+---
+
+## 11. 安全注意事项
+
+1. **`senderId` 不是身份凭证**。它只是消息里的一个字符串字段，任何拿到消息的代码都能自己伪造一条 `senderId` 是别人的消息。真正的身份校验必须依赖传输适配器提供的、无法从消息内容里伪造的元数据（`peerId`、`origin`、`source`），通过 `connect()` 的 `identifier` 回调来判断。
+
+2. **匿名 BroadcastChannel 是"诚实节点"路由模型，不是身份边界**。同源的任意脚本都可以打开同名频道，观察全部任务 id 和消息内容，也可以伪造发现帧或业务帧。这不是这个包的实现缺陷——`BroadcastChannel` 这个浏览器 API 本身就没有内建身份机制。需要防伪造/防窃听时，必须叠加 `authentication()` 中间件（保护每一帧，包括控制帧），不要把 `uniqueTargetId` 当凭证使用——它只是一个路由标识，没有任何防伪造设计。
+
+3. **`multiplexed` 拓扑的传输必须要有身份校验**。声明为 `multiplexed` 的自定义传输，框架不会把"第一个观察到的发送方"当成唯一可信对端——这类通道必须提供 peer/source 身份，或者显式配置 `identifier` 校验，否则任何后来的发送方都可能冒充之前的对端。
+
+4. **入站分片帧要求 `connect` 校验已经成功**。没有成功完成 connect 校验时，框架会拒绝接收分片帧，防止未认证的一方通过分片通道绕过校验、耗尽重组资源。
+
+5. **`Fan-out` 结果的 key 来自不可信字符串**，务必用 `Object.hasOwn()` 检查，不要用 `in` 操作符或假设普通对象语义，见 [§6](#6-endpoint-公开-api-参考)。
+
+6. **`authentication()` 保护每一帧，不只是业务请求/响应**。ping/pong、abort、分片帧、发现查询/响应帧都会经过同样的保护，这样对手无法通过伪造一条"看起来只是控制帧"的消息绕过鉴权。
+
+---
+
+## 12. 性能特征与内置限制
+
+以下是框架内置的、影响资源占用与吞吐的默认限制维度（多数可通过对应中间件的配置项调整）：
+
+| 维度 | 归属 | 默认值/说明 |
+| --- | --- | --- |
+| 出站请求 id 重放窗口容量 | `replay.maxEntries` | 4096 |
+| 出站请求 id 重放窗口 TTL | `replay.ttlMs` | 310 秒 |
+| 分片并发消息数（端点级） | `chunk()` | 按配置，未设默认不限 |
+| 分片并发消息数（单 peer） | `chunk()` | 按配置 |
+| 单条消息最大分片数 | `chunk()` | 按配置 |
+| 单个分片最大字节数 | `chunk()` | 按配置 |
+| 分片重组总缓冲字节数 | `chunk()` | 按配置 |
+| 分片重组超时 | `chunk()` | 按配置 |
+| 自动发现的入站查询并发/单 peer 限制 | `connect()` 自动模式内部 | 有界，超限时新查询被拒绝而不是无限排队 |
+| 手动模式待处理入站查询配额 | `connect()` 手动模式内部 | 有界 + 超时自动过期，不会永久占用配额 |
+
+这些限制存在的目的是**防止单个异常/恶意对端把内存或 CPU 打满**，不是随意设定的性能上限——生产环境一般不需要调整，除非你的场景本身就有超出默认假设的高并发/大消息需求。
+
+分片传递是尽力而为（best-effort），不提供分片级确认应答和重试状态机；需要"确实送达"保证的场景，应该依赖 RPC 层本身的请求/响应加超时重试（`timeout()` 中间件），而不是指望分片层提供可靠传输语义。
+
+---
+
+## 13. 完整场景示例
+
+### 13.1 主线程调度 Web Worker
+
+```ts
+// worker.ts
+import { createEndpoint, contract, protocol, connect } from '@migaia/web-rpc';
+import { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker';
+
+const transport = createWebWorkerTransport(self as unknown as Worker);
 const endpoint = await createEndpoint({
-  id: 'client',
+  id: 'worker',
+  transport,
+  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]
+});
+endpoint.provide('heavyCompute', (ctx) => {
+  const result = doHeavyWork(ctx.data as number[]);
+  return ctx.success(result);
+});
+```
+
+```ts
+// main.ts
+import { createEndpoint, contract, protocol, connect, timeout } from '@migaia/web-rpc';
+import { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker';
+
+const worker = new Worker(new URL('./worker.ts', import.meta.url));
+const transport = createWebWorkerTransport(worker);
+const endpoint = await createEndpoint({
+  id: 'main',
+  transport,
+  targetIds: ['worker'],
+  middlewares: [
+    contract({ version: '1' }),
+    protocol(),
+    connect({ transport }),
+    timeout({ timeoutMs: 30_000 })
+  ]
+});
+
+const result = await endpoint.send<number[]>('worker', 'heavyCompute', [1, 2, 3]);
+```
+
+### 13.2 iframe 白名单鉴权通信
+
+```ts
+import { createEndpoint, contract, protocol, connect } from '@migaia/web-rpc';
+import { createWindowMessageTransport } from '@migaia/web-rpc/adapters/window';
+
+const ALLOWED_ORIGINS = new Set(['https://trusted-partner.example']);
+
+const iframe = document.querySelector('iframe')!;
+const transport = createWindowMessageTransport({
+  receiver: window,
+  targetOrigin: 'https://trusted-partner.example'
+});
+
+const endpoint = await createEndpoint({
+  id: 'host',
   transport,
   middlewares: [
     contract({ version: '1' }),
     protocol(),
     connect({
       transport,
-      identifier: ({ senderId, origin, source }) => allow(senderId, origin, source)
-    }),
-    chunk({ chunkSize: 16_384, maxMessageBytes: 4 * 1024 * 1024 })
+      useBaseIdVerifyOnly: false,
+      identifier: (ctx) => Boolean(ctx.origin && ALLOWED_ORIGINS.has(ctx.origin))
+    })
   ]
 });
 ```
 
-For `createWindowMessageTransport`, same-origin usage may omit `receiver` and `targetOrigin`; they
-default to the current window and `window.location.origin`. Cross-origin usage must pass an
-explicit `targetOrigin`. Wildcard delivery is rejected unless `{ allowUnsafeTargetOrigin: true }`
-is also passed; that opt-in only affects outbound origin filtering, while the adapter still
-preserves and verifies `source` for inbound messages.
+### 13.3 标签页广播通知（不需要响应）
 
-Window `postMessage` cannot reliably observe that a remote window or iframe was closed. Use a
-finite operation deadline (the default) or an explicit host lifecycle signal when the peer may
-disappear; `timeoutMs: false` intentionally permits an indefinite wait and does not imply remote
-close detection.
+```ts
+import { createEndpoint, contract, protocol, connect } from '@migaia/web-rpc';
+import { createBroadcastChannelTransport } from '@migaia/web-rpc/adapters/broadcast-channel';
 
-Dedicated worker and other exclusive channels bind the first logical sender observed on that
-adapter connection; the adapter cannot infer a peer ID from a generic `Worker`/`MessagePort`.
+const transport = createBroadcastChannelTransport(new BroadcastChannel('app-sync'));
+const endpoint = await createEndpoint({
+  id: `tab-${crypto.randomUUID()}`,
+  transport,
+  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]
+});
 
-`createBrowserMessagePortTransport(port)` is `owned` by default and closes the supplied port during
-transport cleanup. When the caller retains ownership, pass `{ ownership: 'borrowed' }`; cleanup then
-removes the adapter listeners without closing the underlying port.
+endpoint.on('cache-invalidated', (ctx) => {
+  console.log('缓存失效通知：', ctx.data);
+});
 
-Custom transports should declare `topology: 'exclusive'`, `'multiplexed'`, or `'broadcast'`.
-Multiplexed transports must provide peer/source identity or use explicit identifier verification;
-they must not rely on exclusive first-sender binding. Broadcast transports use the documented
-anonymous-group semantics unless a verified unique target identity is configured.
+// 任意一个标签页广播，其余全部标签页都会收到
+endpoint.dispatchAll('cache-invalidated', { key: 'user-profile' });
+```
 
-Anonymous BroadcastChannel is an honest-peer routing mode, not an authenticity boundary: a same-origin
-participant can observe task IDs and wire payloads and may forge discovery or business frames. Do not
-use `uniqueTargetId` as a credential. Configure the `authentication()` middleware when forged response,
-variation, or discovery rejection is a security requirement; authentication protects each final frame,
-including chunk and control frames.
+### 13.4 大文件跨端传输
 
-`ping()` resolves `false` on timeout, transport failure, or disposal. Requests and pings are settled
-at most once. A response with an unknown or mismatched task identity is ignored and emits
-`response.unmatched` without consuming the legitimate pending request.
+```ts
+import { createEndpoint, contract, protocol, connect, chunk } from '@migaia/web-rpc';
 
-Transport errors are diagnostic notifications unless the adapter also exposes `closed: true`.
-Only a proven terminal transition closes endpoint admission and rejects later transport work;
-events such as `messageerror` must not be treated as terminal without platform-level proof.
-Adapters that cannot observe a remote close must rely on the operation deadline or an explicit
-host lifecycle signal rather than claiming immediate terminal detection.
+const endpoint = await createEndpoint({
+  id: 'sender',
+  transport,
+  middlewares: [
+    contract({ version: '1' }),
+    protocol(),
+    connect({ transport }),
+    chunk({
+      chunkSize: 16_384,                // 单帧 16KB
+      maxMessageBytes: 50 * 1024 * 1024, // 单条消息最大 50MB
+      assemblyTimeoutMs: 30_000
+    })
+  ]
+});
 
-`dispose()` always completes endpoint state cleanup before resolving or rejecting. If a middleware,
-subscription, receiver announcement, or owned transport release fails, it rejects with a lifecycle
-error containing `cleanupErrors`; each entry retains its resource name, while later cleanup steps
-still run.
+// 业务代码完全不用关心分片，正常发一个大 payload 即可
+await endpoint.send('receiver', 'uploadFile', { name: 'video.mp4', bytes: largeUint8Array });
+```
 
-All public failures are `WebRpcError` values and can be dispatched by `error.code`. Construction
-uses `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, or `INVALID_CONFIG`; protocol, contract,
-payload, and chunk failures use their corresponding `PROTOCOL_*`, `CONTRACT_*`, `PAYLOAD_*`, and
-`CHUNK_*` codes. Do not branch on localized messages or runtime-specific error classes.
+---
 
-The endpoint rejects inbound chunk frames unless connect verification is installed and successful.
-Partial assemblies are bounded and expire automatically. Hook events include `receive.failure`,
-`authentication.rejected`, `response.unmatched`, `transport.failure`, and
-`middleware.dispose.failure`.
+## 14. 常见问题排查
 
-Chunking is best-effort delivery; the endpoint does not emit chunk acknowledgements or expose a
-reliable chunk retry state machine. Use request timeout/retry at the RPC layer when delivery
-confirmation is required.
+**Q：`send()` 一直不 resolve 也不 reject。**
+检查是否装了 `timeout()` 中间件——默认没有超时限制的场景下，对端确实没有响应就会一直挂起。同时确认 `connect()` 配置正确，否则请求可能在对端因身份校验失败被静默丢弃（可以订阅 `authentication.rejected`/`receive.failure` hook 事件确认）。
 
-Connect uses base identity verification by default and ignores `identifier` unless
-`useBaseIdVerifyOnly: false` is explicitly set. In that mode `identifier` is required and runs only
-after the adapter-provided peer metadata passes the base check. A source object alone is not a base
-identity; configure a matching `peerId` or `origin`, or explicitly use `identifier` mode.
+**Q：调用报 `TARGET_UNKNOWN`，但对端明明在线。**
+自动发现模式下确认对端确实 `provide()` 了对应方法、`id` 拼写一致；跨源场景确认 `targetOrigin`/`connect` 的身份校验没有把合法请求也拒绝了。手动模式下确认调用方已经 `register()` 过这个接收端。
 
-Fan-out result records use tagged keys: anonymous deliveries use
-`JSON.stringify(['target', targetId])`, while receiver deliveries use
-`JSON.stringify(['receiver', targetId, receiverId])`.
+**Q：大消息发送失败，报 `PAYLOAD_TOO_LARGE` 或 `CHUNK_TOO_LARGE`。**
+检查是否装了 `chunk()` 中间件，以及 `chunkSize`/`maxMessageBytes` 是否够用；已经是 `Uint8Array` 的消息不支持自动分片，需要传输通道本身能处理大二进制，或者在业务层手动切分。
 
-Every `ping`, `pong`, and `abort` variation carries a task ID; malformed variations without one are
-discarded before routing or hook emission.
+**Q：`dispose()` reject 了，应用要怎么继续？**
+`dispose()` 的清理是尽力而为——即使 reject，能清理的部分也已经清理完了，`cleanupErrors` 只是告诉你哪些具体资源没清理干净（通常需要人工介入，比如某个外部连接对象自己的 `close()` 抛了异常）。不需要重试 `dispose()`（幂等，重试也只会拿到同一个结果），根据 `cleanupErrors` 里列出的资源名针对性排查即可。
 
-`hooks` is always present on the endpoint; `ping` and abort behavior require their corresponding
-middleware/feature and throw a contract error when unavailable.
+**Q：TypeScript 提示 `endpoint.ping` 不存在。**
+`ping`/`pingAll` 只有在 `middlewares` 里包含 `ping()` 时，类型层面才会出现在 `endpoint` 上——这是有意的编译期约束，避免调用一个实际没装对应能力的方法。同理 `endpoint.connect` 的手动模式方法（`query`/`register`/...）只有 `discoveryMode: 'manual'` 时才存在。
 
-Custom transport, middleware `install`, verifier, provider, and pipeline callbacks are invoked as
-context-free functions. Do not depend on `this`; prefer arrow functions or closures. The runtime
-snapshots the callback before invocation and deliberately does not use `bind`, `call`, or `apply`.
+**Q：想知道某条消息为什么被拒绝，去哪里看？**
+装上 `hooks()` 中间件，订阅全部事件打日志，[§10](#10-可观测性hooks-事件参考) 的事件表基本覆盖了所有"消息被拒绝/丢弃"的原因分类。生产环境建议至少常驻订阅 `receive.failure`、`authentication.rejected`、`transport.failure`、`dispose.failure` 这几个和"东西坏了"直接相关的事件。
 
-Factory construction may be cancelled with `construction.signal` or bounded with
-`construction.timeoutMs`. Cancellation rejects construction and still observes cleanup for
-middleware that has already installed. Middleware `install` receives the same construction
-`signal` and should stop its own pending work when it aborts. An async middleware or unique-target
-factory should not be assumed to receive a receiver-bound `this` context.
+---
 
-Request and dispatch task IDs are not reusable during the replay window. A completed request frame
-is treated as a duplicate and does not run the provider again. Retry policy callbacks are cancelled
-by the request signal or endpoint disposal; an async policy that never settles cannot keep `send()`
-alive after either signal fires.
-
-`sendAll()` and `pingAll()` return null-prototype records because target IDs and receiver IDs are
-untrusted strings. Anonymous broadcast groups use the target ID as their result key; identified
-receivers use a canonical JSON tuple key `[targetId, receiverId]`, preventing equal receiver IDs
-under different targets from overwriting one another.
-The fan-out methods perform the endpoint active check before taking their peer snapshot, so a
-disposed endpoint rejects consistently even when it has no known peers.
-
-Receiver discovery is automatic by default. The first `send`, `dispatch`, or `ping` to an unknown
-target starts a lazy query and transparently caches its response; endpoint IDs are also the only
-IDs they accept, so there is no separate target registration API in automatic mode.
-`endpoint.discovery` exposes a remote-DNS snapshot for debugging and pinning, but never includes
-the current endpoint itself. Set `discoveryMode: 'manual'` in connect configuration to install the
-manual `endpoint.connect` query/accept/reject/register/unregister/ping controls; automatic and
-manual discovery are mutually exclusive. Manual `ping()` performs only a ping/pong probe: it does
-not discover, register, or alter the persistent DNS snapshot; use `query()` followed by explicit
-`register()` when a receiver should become routable. Undecided inbound manual queries expire after
-a bounded interval and do not permanently consume the pending-query budget.
-
-Receiver announcements and lease controls are not part of the runtime. DNS entries are created only
-by authenticated discovery responses; manual unregister changes the requester's local snapshot and
-does not send an ownership-changing announcement to a remote endpoint.
-
-Without a pin, a request or ping may be delivered to every active receiver for the target and the
-first valid response settles the operation, whether it succeeds or fails. `sendAll()` and `pingAll()` preserve one result
-per receiver when discovery metadata is available. Receiver lifecycle events include
-`connect.receiver-registered`, `connect.server-unregistered`, `connect.receiver-pinned`,
-`connect.receiver-unpinned`, `connect.pinned-receiver-lost`, and
-`connect.multiple-receivers`. That hook exposes `requesterId` and a frozen `receiverIds` snapshot;
-the console diagnostic includes the same ids and pin/unregister guidance. Receiver announcements
-are discovery metadata only; normal connect verification still authenticates RPC traffic.
-
-The WebTransport datagram adapter owns one persistent reader for the transport lifetime.
-Unsubscribing the last RPC listener does not cancel the underlying reader; `close()` cancels and
-awaits the read loop, releases the reader lock, and closes the writer. A second `close()` shares
-the first close promise.
+如果本文没有回答你的问题，欢迎查看 `packages/web-rpc/src` 下对应模块的源码注释——每一处非显而易见的行为都在代码里留了说明该行为存在的原因。

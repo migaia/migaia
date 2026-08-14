@@ -1,0 +1,95 @@
+import { StorageError, StorageErrorCode } from '../types/errors';
+import {
+  assertOperationContext,
+  readAbortReason,
+  subscribeToAbort,
+  throwIfAborted
+} from '../core/operation';
+
+export type IMigrationContext = {
+  readonly fromVersion: number;
+  readonly toVersion: number;
+  /** Optional operation signal for cooperative migration cancellation. */
+  readonly signal?: AbortSignal;
+};
+
+/** 迁移函数一律 async，允许迁移过程中读取其他存储或发请求。 */
+export type IMigration = (previous: unknown, ctx: IMigrationContext) => Promise<unknown>;
+
+/**
+ * 按序执行 `fromVersion → toVersion` 之间声明的迁移。缺失某一版本的迁移函数 视为该版本没有数据形状变化（no-op），不是错误。单条记录迁移失败不影响
+ * 其他记录——调用方负责逐条捕获，这里只保证单次调用内的错误归一化。
+ */
+export const runMigrations = async (
+  value: unknown,
+  fromVersion: number,
+  toVersion: number,
+  migrations: Record<number, IMigration> | undefined,
+  signal?: AbortSignal
+): Promise<unknown> => {
+  if (!Number.isSafeInteger(fromVersion) || fromVersion < 0)
+    throw new StorageError(StorageErrorCode.invalidArgument, {
+      cause: new RangeError('migration fromVersion must be a non-negative safe integer')
+    });
+  if (!Number.isSafeInteger(toVersion) || toVersion < 0)
+    throw new StorageError(StorageErrorCode.invalidArgument, {
+      cause: new RangeError('migration toVersion must be a non-negative safe integer')
+    });
+  if (
+    migrations !== undefined &&
+    (typeof migrations !== 'object' || migrations === null || Array.isArray(migrations))
+  )
+    throw new StorageError(StorageErrorCode.invalidArgument, {
+      cause: new TypeError('migrations must be an object')
+    });
+  assertOperationContext(signal === undefined ? undefined : { signal });
+  throwIfAborted(signal);
+  if (fromVersion >= toVersion) return value;
+  let current = value;
+  for (let version = fromVersion + 1; version <= toVersion; version += 1) {
+    let migration: IMigration | undefined;
+    try {
+      migration =
+        migrations !== undefined && Object.hasOwn(migrations, version)
+          ? migrations[version]
+          : undefined;
+    } catch (cause) {
+      throw new StorageError(StorageErrorCode.invalidArgument, { cause });
+    }
+    if (migration === undefined) continue;
+    if (typeof migration !== 'function')
+      throw new StorageError(StorageErrorCode.invalidArgument, {
+        cause: new TypeError(`migration ${version} must be a function`)
+      });
+    try {
+      const migrationContext = signal
+        ? { fromVersion: version - 1, toVersion: version, signal }
+        : { fromVersion: version - 1, toVersion: version };
+      const result = Promise.resolve().then(() => migration(current, migrationContext));
+      if (!signal) {
+        current = await result;
+        continue;
+      }
+      /** Owns the shared race-safe abort subscription until this migration settles. */
+      let disposeAbort = (): void => {};
+      const aborted = new Promise<never>((_, reject) => {
+        disposeAbort = subscribeToAbort(signal, () => {
+          reject(new StorageError(StorageErrorCode.aborted, { cause: readAbortReason(signal) }));
+        });
+      });
+      try {
+        current = await Promise.race([result, aborted]);
+      } finally {
+        disposeAbort();
+      }
+    } catch (cause) {
+      if (
+        cause instanceof StorageError &&
+        (cause.code === StorageErrorCode.aborted || cause.code === StorageErrorCode.invalidArgument)
+      )
+        throw cause;
+      throw new StorageError(StorageErrorCode.migrationFailed, { cause });
+    }
+  }
+  return current;
+};

@@ -6,10 +6,12 @@ const scenarios: Record<string, () => Promise<unknown>> = {
   'broadcast-channel': () => import('./broadcast-channel'),
   'dedicated-worker': () => import('./dedicated-worker'),
   'message-port': () => import('./message-port'),
+  'manual-discovery': () => import('./manual-discovery'),
   'rtc-data-channel': () => import('./rtc-data-channel'),
   'service-worker': () => import('./service-worker'),
   'shared-worker': () => import('./shared-worker'),
-  'window-iframe': () => import('./window-iframe')
+  'window-iframe': () => import('./window-iframe'),
+  'web-transport': () => import('./web-transport')
 };
 
 const load = scenarios[scenario];

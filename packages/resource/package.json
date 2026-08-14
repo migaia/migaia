@@ -1,0 +1,32 @@
+{
+  "name": "@migaia/resource",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Store-neutral cancellable asynchronous reactive resources.",
+  "license": "MIT",
+  "type": "module",
+  "files": ["dist", "README.md", "USEGUIDE.md"],
+  "main": "./dist/resource.class.js",
+  "types": "./dist/resource.class.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "fmt": "oxfmt src test",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "oxlint src test",
+    "test": "vitest run test"
+  },
+  "dependencies": {
+    "@migaia/reactive": "workspace:^"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vitest": "4.1.10"
+  }
+}

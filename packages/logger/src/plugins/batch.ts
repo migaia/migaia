@@ -1,5 +1,6 @@
 import type { IEmptyPluginExt, ILoggerPluginCore, ILoggerPlugin } from '../typing';
 import type { IPipelineMode } from '@migaia/plugin-host';
+import { waitUntil } from '../bounded-wait';
 
 export type IBatchPluginConfig = {
   maxSize?: number;
@@ -73,15 +74,10 @@ class BatchPlugin implements ILoggerPlugin<
       if (flushing) return flushing;
       flushing = (async () => {
         const deadline = Date.now() + 3000;
-        let rounds = 0;
         do {
           await flushBatch();
-          await Promise.all(inFlight);
-        } while (
-          (buffer.length > 0 || inFlight.size > 0) &&
-          rounds++ < 100 &&
-          Date.now() < deadline
-        );
+          if (!(await waitUntil(Promise.all(inFlight), deadline))) return;
+        } while ((buffer.length > 0 || inFlight.size > 0) && Date.now() < deadline);
       })();
       try {
         await flushing;
@@ -98,18 +94,17 @@ class BatchPlugin implements ILoggerPlugin<
       if (buffer.length === 0) return;
       const batch = buffer;
       buffer = [];
-      await runBatch(batch);
+      runBatch(batch);
     };
 
     /** 执行一个已从 buffer 摘出的批次，并让 flush() 可观察其生命周期。 */
-    const runBatch = async (batch: T[]): Promise<void> => {
+    const runBatch = (batch: T[]): void => {
       const task = Promise.resolve(onBatch(batch));
       inFlight.add(task);
-      try {
-        await task;
-      } finally {
-        inFlight.delete(task);
-      }
+      void task.then(
+        () => inFlight.delete(task),
+        () => inFlight.delete(task)
+      );
     };
 
     /** 先同步摘出满批次，避免 defer 窗口内后续 push 把多个批次意外合并。 */

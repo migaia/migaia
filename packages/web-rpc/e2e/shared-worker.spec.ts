@@ -48,6 +48,23 @@ test('two pages isolate same sender/task through one SharedWorker', async ({ con
   await expect(pageC.evaluate(() => globalThis.sendSharedWorker('after-reconnect'))).resolves.toBe(
     'after-reconnect'
   );
+  await expect(pageC.evaluate(() => globalThis.sendSharedWorkerTerminal())).resolves.toEqual({
+    chunkedRequest: 'shared-worker-chunked-request-😀',
+    chunkedTimeout: 'DEADLINE_EXCEEDED',
+    dispatchPayload: 'shared-worker-chunked-dispatch-😀',
+    remoteError: 'REMOTE_FAILURE',
+    aborted: 'CANCELLED',
+    schemaError: 'SCHEMA_INVALID',
+    pingSuccess: true,
+    pingTimeout: false,
+    pingAborted: false,
+    activePageSnapshot: expect.objectContaining({
+      phase: 'active',
+      pending: 0,
+      chunks: 0,
+      activeControllers: 0
+    })
+  });
   expect(await pageC.evaluate(() => globalThis.disposeSharedWorker())).toEqual([]);
   await pageC.close();
   await expect(pageB.evaluate(() => globalThis.sendSharedWorker('still-B'))).resolves.toBe(

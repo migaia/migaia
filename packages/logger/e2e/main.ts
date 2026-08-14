@@ -10,10 +10,12 @@ import { uuid } from '../src/plugins/uuid';
 declare global {
   interface Window {
     runLoggerScenario(): Promise<void>;
+    runLoggerDeadlineScenario(): Promise<void>;
     loggerScenarioResult?: {
       readonly requests: readonly string[];
       readonly requestHeaders: readonly Record<string, string>[];
     };
+    loggerDeadlineElapsedMs?: number;
   }
 }
 
@@ -74,4 +76,13 @@ window.runLoggerScenario = async (): Promise<void> => {
   await logger.shutdown('manual');
   restoreRuntime();
   window.loggerScenarioResult = { requests, requestHeaders };
+};
+
+window.runLoggerDeadlineScenario = async (): Promise<void> => {
+  const logger = new Logger();
+  logger.useSink(() => new Promise<void>(() => undefined));
+  logger.log('deadline', 'never-settling');
+  const startedAt = performance.now();
+  await logger.flush();
+  window.loggerDeadlineElapsedMs = performance.now() - startedAt;
 };

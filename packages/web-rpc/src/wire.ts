@@ -23,6 +23,11 @@ export type IWebRpcDiscoveryResponse = {
   readonly message?: string;
   readonly operation?: 'unregister';
 };
+/**
+ * Chunk frames intentionally omit an independent timestamp: freshness is inherited from the
+ * request/response task that owns the chunk stream, so accepting a late chunk cannot revive a
+ * completed task.
+ */
 export type IWebRpcChunkFrame = {
   readonly kind: 'chunk';
   readonly messageId: string;
@@ -90,7 +95,8 @@ export function normalizeWebRpcEnvelope(value: unknown): IWebRpcEnvelope | undef
       typeof taskId !== 'string' ||
       typeof senderId !== 'string' ||
       typeof targetId !== 'string' ||
-      !Number.isSafeInteger(sentAt)
+      !Number.isSafeInteger(sentAt) ||
+      (sentAt as number) < 0
     )
       return undefined;
     const manual = safeRead<unknown>(value, 'manual');
@@ -123,6 +129,7 @@ export function normalizeWebRpcEnvelope(value: unknown): IWebRpcEnvelope | undef
       typeof targetId !== 'string' ||
       typeof resolvedTargetId !== 'string' ||
       !Number.isSafeInteger(sentAt) ||
+      (sentAt as number) < 0 ||
       (platform !== undefined && typeof platform !== 'string') ||
       (receiverId !== undefined && typeof receiverId !== 'string') ||
       (manual !== undefined && typeof manual !== 'boolean') ||
@@ -235,6 +242,7 @@ export function normalizeWebRpcEnvelope(value: unknown): IWebRpcEnvelope | undef
       typeof targetId !== 'string' ||
       typeof taskId !== 'string' ||
       !Number.isSafeInteger(sentAt) ||
+      (sentAt as number) < 0 ||
       (receiverId !== undefined && typeof receiverId !== 'string')
     )
       return undefined;
@@ -336,7 +344,12 @@ const isWebRpcEnvelopeUnsafe = (value: unknown): value is IWebRpcEnvelope => {
     );
   return false;
 };
-/** Reads an untrusted wire value without allowing getters/proxies to escape. */
+/**
+ * Re-validates a normalized envelope's shape and returns a boolean. Internal-only (not exported
+ * from index.ts): the TOCTOU risk this shape would have as a public "check then re-read raw" guard
+ * does not apply here because nothing outside this package can reach it — see WR8 in
+ * docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md, round 2.
+ */
 export const isWebRpcEnvelope = (value: unknown): value is IWebRpcEnvelope => {
   try {
     return isWebRpcEnvelopeUnsafe(value);

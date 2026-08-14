@@ -70,6 +70,11 @@ export class RequestReplayLedger {
     this.#rejected.clear();
   }
 
+  /** Purges expired tombstones under the endpoint resource owner. */
+  purge(now = Date.now()): void {
+    this.#purge(now);
+  }
+
   #purge(now: number): void {
     for (const [key, entry] of this.#completed) {
       if (now - entry.at >= this.#ttlMs) {

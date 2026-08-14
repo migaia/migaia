@@ -11,8 +11,7 @@
     "@logger": "pnpm --filter ./packages/logger run",
     "@web-rpc": "pnpm --filter ./packages/web-rpc run",
     "@plugin-host": "pnpm --filter ./packages/plugin-host run",
-    "@store": "pnpm --filter ./packages/store run",
-    "@store-web": "pnpm --filter ./packages/store-web run"
+    "@storage-web": "pnpm --filter ./packages/storage-web run"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

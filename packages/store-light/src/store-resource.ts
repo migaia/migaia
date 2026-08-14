@@ -1,0 +1,581 @@
+import { ResourceCachePolicy } from './store-resource-cache-policy';
+import { ResourceOwnershipRegistry } from './store-resource-ownership';
+import type { StoreResourceLoadContext } from './store-resource-request';
+import { GenerationController } from '@migaia/reactive/runtime/generation-controller';
+import { ResourceStateController } from './store-resource-state';
+import type { ResourceVersion } from './store-resource-state';
+import { ResourceVersionRegistry } from './store-resource-versions';
+import { ResourceCaptureRegistry, type IResourceCapture } from './store-resource-captures';
+import type { VersionToken } from '@migaia/reactive/runtime/lifecycle-primitives';
+
+export type { StoreResourceLoadContext } from './store-resource-request';
+export type { IResourceCapture } from './store-resource-captures';
+
+export type IStoreResourceSnapshot<T> = {
+  readonly value: T;
+  readonly version: number;
+  readonly token: VersionToken;
+};
+
+/** Readable async value with separate resource and rendered-version leases. */
+export type IStoreResource<T> = {
+  read(): T;
+  preload(): void;
+  retry(): void;
+  /** @deprecated Use retainResource() or retainVersion(). */
+  retain(version?: number | VersionToken): () => void;
+  retainResource(): () => void;
+  retainVersion(version: number | VersionToken): () => void;
+  /** Internal React bridge: protect version during render, then commit in layout. */
+  captureVersion(version: number): IResourceCapture;
+  commitCapture(capture: IResourceCapture): () => void;
+  dispose(): void;
+  forceDispose(): void;
+  /** Resolves once this resource reaches its terminal state. Never depends on GC. */
+  whenTerminal(): Promise<void>;
+  subscribe(listener: () => void): () => void;
+  getSnapshot(): number;
+  readSnapshot(): IStoreResourceSnapshot<T>;
+  captureSnapshot(existingLease?: object): {
+    snapshot: IStoreResourceSnapshot<T>;
+    capture?: IResourceCapture;
+  };
+};
+
+export type StoreResourceErrorPhase = 'load' | 'dispose' | 'listener';
+export type StoreResourceOptions<T> = {
+  /** Cache TTL only; React render safety comes from capture/commit leases. */
+  keepAliveMs?: number;
+  dispose?: (value: T) => void;
+  onError?: (error: unknown, phase: StoreResourceErrorPhase) => void;
+  onTerminal?: () => void;
+};
+export type StoreResourceFactory<T> = (context: StoreResourceLoadContext) => Promise<T> | T;
+export type IStoreResourceScope = {
+  resource<T>(
+    factory:
+      | StoreResourceFactory<T>
+      | { load: StoreResourceFactory<T>; dispose?: (value: T) => void },
+    options?: StoreResourceOptions<T>
+  ): IStoreResource<T>;
+  dispose(): void;
+};
+
+export function createStoreResourceScope(): IStoreResourceScope {
+  const resources = new Set<IStoreResource<unknown>>();
+  return {
+    resource(factory, options) {
+      let registered!: IStoreResource<unknown>;
+      const terminal = () => {
+        try {
+          options?.onTerminal?.();
+        } finally {
+          resources.delete(registered);
+        }
+      };
+      const resource =
+        typeof factory === 'function'
+          ? createStoreResource(factory, { ...options, onTerminal: terminal })
+          : createStoreResource({ ...factory, ...options, onTerminal: terminal });
+      registered = resource;
+      resources.add(resource);
+      const dispose = resource.dispose;
+      const forceDispose = resource.forceDispose;
+      resource.dispose = () => {
+        dispose();
+      };
+      resource.forceDispose = () => {
+        forceDispose();
+        resources.delete(resource);
+      };
+      return resource;
+    },
+    dispose() {
+      for (const resource of resources) resource.forceDispose();
+      resources.clear();
+    }
+  };
+}
+
+/**
+ * Suspense-safe owned async value. Factories transfer ownership to this resource; values with
+ * explicit disposers must have reference identity.
+ */
+export function createStoreResource<T>(
+  factory:
+    | StoreResourceFactory<T>
+    | {
+        load: StoreResourceFactory<T>;
+        dispose?: (value: T) => void;
+        keepAliveMs?: number;
+        onError?: (error: unknown, phase: StoreResourceErrorPhase) => void;
+        onTerminal?: () => void;
+      },
+  options?: StoreResourceOptions<T>
+): IStoreResource<T> {
+  const load = typeof factory === 'function' ? factory : factory.load;
+  const config = typeof factory === 'function' ? (options ?? {}) : { ...factory, ...options };
+  const requests = new GenerationController();
+  const state = new ResourceStateController<T>();
+  const ownership = new ResourceOwnershipRegistry<T>();
+  const versions = new ResourceVersionRegistry<T>();
+  const captures = new ResourceCaptureRegistry(() => {
+    queueMicrotask(() => {
+      for (const id of versions.retiredIds()) releaseRetired(id);
+      onOwnersChanged();
+    });
+  });
+  const cachePolicy = new ResourceCachePolicy(config.keepAliveMs ?? 1000);
+  let version = 0;
+  const versionTokens = new Map<number, VersionToken>();
+  const tokenVersions = new WeakMap<object, number>();
+  const versionToken = (id: number): VersionToken => {
+    let token = versionTokens.get(id);
+    if (!token) {
+      token = {};
+      versionTokens.set(id, token);
+      tokenVersions.set(token, id);
+    }
+    return token;
+  };
+  let revision = 0;
+  const listeners = new Set<() => void>();
+  const activeLeaseTokens = new WeakMap<object, number>();
+  const report = (error: unknown, phase: StoreResourceErrorPhase) => {
+    try {
+      config.onError?.(error, phase);
+    } catch {
+      /* reporter cannot affect state */
+    }
+  };
+  const notify = () => {
+    revision++;
+    for (const listener of Array.from(listeners)) {
+      try {
+        listener();
+      } catch (error) {
+        report(error, 'listener');
+      }
+    }
+  };
+  // Pending observations are excluded by ResourceCaptureRegistry.hasAny();
+  // only a resolved version reservation can bridge render → layout. This keeps
+  // initial Suspense renders safe without letting a never-settling operation
+  // keep a closing resource alive forever.
+  const hasOwners = () => ownership.hasOwners || captures.hasAny();
+  const hasCommittedOwners = () => ownership.hasOwners;
+  const hasVersionReservations = () => captures.hasAny();
+  const assertDisposableValue = (value: T) => {
+    if (
+      config.dispose &&
+      (value == null || (typeof value !== 'object' && typeof value !== 'function'))
+    )
+      throw new TypeError('[store] disposable resource values must use reference identity');
+  };
+  const resolveDisposer = (value: T): (() => void | PromiseLike<void>) | undefined => {
+    if (config.dispose) return () => config.dispose?.(value);
+    if (value == null || (typeof value !== 'object' && typeof value !== 'function'))
+      return undefined;
+    try {
+      const dispose = (value as { $dispose?: unknown }).$dispose;
+      return typeof dispose === 'function' ? () => dispose.call(value) : undefined;
+    } catch (error) {
+      report(error, 'dispose');
+      return undefined;
+    }
+  };
+  const heldElsewhere = (value: T) =>
+    versions.holds(value) ||
+    ((state.current.kind === 'ready' || state.current.kind === 'closing') &&
+      state.current.current !== undefined &&
+      Object.is(state.current.current.value, value));
+  const cleanupOnce = (value: T) => {
+    if (ownership.isDisposed(value)) return;
+    const disposer = resolveDisposer(value);
+    if (!disposer) return;
+    ownership.markDisposed(value);
+    try {
+      // Callers of cleanupOnce run in fire-and-forget contexts (dispose
+      // paths declared sync, .then() settlement handlers); an async
+      // disposer's rejection has nobody positioned to await it, but must
+      // still be reported instead of becoming an unhandled rejection.
+      const result = disposer();
+      if (result && typeof (result as PromiseLike<void>).then === 'function') {
+        Promise.resolve(result).catch((error: unknown) => report(error, 'dispose'));
+      }
+    } catch (error) {
+      report(error, 'dispose');
+    }
+  };
+  const cleanupUnique = (values: T[]) => {
+    const seen: T[] = [];
+    for (const value of values) {
+      if (seen.some((item) => Object.is(item, value)) || heldElsewhere(value)) continue;
+      seen.push(value);
+      cleanupOnce(value);
+    }
+  };
+  const cancelEviction = () => cachePolicy.cancelEviction();
+  const releaseRetired = (id: number) => {
+    // Peek, don't mint: `versionToken(id)` creates one on a miss, which would
+    // silently revive an already-pruned entry just to ask whether it has
+    // owners (it never does, having just been minted) — self-correcting but
+    // pointless, and it defeats the point of asking in the first place.
+    const existingToken = versionTokens.get(id);
+    if (
+      (existingToken && ownership.versionOwnerCountToken(existingToken) !== 0) ||
+      captures.has(id)
+    )
+      return;
+    const retired = versions.takeRetired(id) ?? versions.takeClosing(id);
+    if (retired) cleanupUnique([retired.value]);
+    pruneVersionToken(id);
+  };
+  /**
+   * Release the token minted for a version once nothing can reach it anymore.
+   *
+   * `version` (the monotonic counter) only tracks the _last produced_ id, not the _currently
+   * visible_ one — after the ready value at that id is evicted to idle, `version` still equals it,
+   * so a plain `id !== version` guard would refuse to prune the very token that just became
+   * unreachable. Check the actual current state instead, plus the version registry (stale/
+   * retired/closing) and any live ownership lease. `.get` only peeks: `versionToken(id)` itself
+   * mints on miss, which would be wrong inside a "can we forget this" check.
+   */
+  const pruneVersionToken = (id: number) => {
+    const stillVisible = state.current.kind === 'ready' && state.current.current.id === id;
+    if (stillVisible || versions.has(id)) return;
+    const token = versionTokens.get(id);
+    if (token && ownership.versionOwnerCountToken(token) > 0) return;
+    versionTokens.delete(id);
+  };
+  const retire = (retiredVersion: number, value: T) => {
+    versions.retire({ id: retiredVersion, token: versionToken(retiredVersion), value });
+    releaseRetired(retiredVersion);
+  };
+  const scheduleEviction = () =>
+    cachePolicy.scheduleEviction(() => {
+      if (hasOwners()) return;
+      // A first-load dispose can leave a value in `closing` after its
+      // provisional resource owner releases before settlement. That value has
+      // no version lease, so TTL must terminate the closing resource too.
+      if (state.current.kind === 'closing') {
+        forceDisposeResource();
+        return;
+      }
+      const stale = versions.takeStale();
+      if (stale) {
+        cleanupUnique([stale.value]);
+        pruneVersionToken(stale.id);
+      }
+      if (state.current.kind === 'ready') {
+        const evicted = state.current.current;
+        state.idle();
+        notify();
+        cleanupUnique([evicted.value]);
+        pruneVersionToken(evicted.id);
+      }
+    });
+  const forceDisposeResource = () => {
+    const wasDisposed = state.current.kind === 'disposed';
+    cachePolicy.dispose();
+    requests.dispose();
+    ownership.forceReset();
+    captures.clear();
+    const visible = state.current;
+    const values = [
+      ...versions.clear(),
+      ...(visible.kind === 'ready' ? [visible.current.value] : []),
+      ...(visible.kind === 'closing' && visible.current ? [visible.current.value] : [])
+    ];
+    state.dispose();
+    if (!wasDisposed) notify();
+    listeners.clear();
+    cleanupUnique(values);
+    versionTokens.clear();
+    try {
+      config.onTerminal?.();
+    } catch (error) {
+      report(error, 'dispose');
+    }
+  };
+  const finalizeClosingFailure = (error: unknown, superseded: T[], stale?: ResourceVersion<T>) => {
+    // Closing has no legal failed state. Transition to terminal first so
+    // observers cannot see a half-closed resource, then report the original
+    // load failure and release every value that was waiting on settlement.
+    // Never call failed()/ready() here: both reject a closing controller. Keep
+    // cleanup/report in finally-style guards so a notification or disposer
+    // failure cannot strand the resource in an empty closing state.
+    try {
+      state.dispose();
+      notify();
+    } catch (transitionError) {
+      report(transitionError, 'load');
+    }
+    try {
+      cleanupUnique([...superseded, ...(stale ? [stale.value] : [])]);
+    } finally {
+      report(error, 'load');
+      forceDisposeResource();
+    }
+  };
+  const onOwnersChanged = () => {
+    if (hasCommittedOwners()) return;
+    if (
+      (state.current.kind === 'closing' && !hasVersionReservations()) ||
+      (state.current.kind === 'disposed' && versions.hasPending)
+    ) {
+      forceDisposeResource();
+      return;
+    }
+    if (state.current.kind === 'ready') scheduleEviction();
+  };
+  const start = () => {
+    if (state.current.kind === 'disposed' || state.current.kind === 'closing')
+      throw new Error('[store] resource is disposed');
+    if (state.current.kind !== 'idle') return;
+    const context = requests.begin();
+    const operation = Promise.resolve()
+      .then(() => load(context))
+      .then((next) => {
+        assertDisposableValue(next);
+        if (state.current.kind === 'disposed') {
+          if (!heldElsewhere(next)) cleanupUnique([next]);
+          return next;
+        }
+        if (!requests.isCurrentToken(context.token)) {
+          captures.discard(context.generation);
+          if (state.current.kind === 'loading') versions.addSuperseded(next);
+          else cleanupUnique([next]);
+          return next;
+        }
+        if (ownership.isDisposed(next))
+          throw new Error('[store] resource factory returned a disposed value');
+        const stale = versions.takeStale();
+        const sameIdentity = stale !== undefined && Object.is(next, stale.value);
+        if (stale && !sameIdentity) retire(version, stale.value);
+        if (!sameIdentity) version++;
+        captures.resolve(context.generation, version);
+        const published = { id: version, token: versionToken(version), value: next };
+        if (state.current.kind === 'closing') state.close(published);
+        else state.ready(published);
+        notify();
+        cleanupUnique(versions.takeSuperseded());
+        if (!hasOwners()) scheduleEviction();
+        return next;
+      })
+      .catch((error) => {
+        if (requests.isCurrentToken(context.token)) {
+          captures.discard(context.generation);
+          const superseded = versions.takeSuperseded();
+          const stale = versions.takeStale();
+          if (state.current.kind === 'closing') {
+            finalizeClosingFailure(error, superseded, stale);
+            throw error;
+          }
+          if (stale) {
+            state.ready(stale);
+            notify();
+            cleanupUnique(superseded);
+            if (!hasOwners()) scheduleEviction();
+          } else {
+            state.failed(error);
+            notify();
+            cleanupUnique(superseded);
+          }
+          report(error, 'load');
+        }
+        throw error;
+      });
+    captures.bind(context.generation, operation);
+    state.loading(operation, versions.stale);
+    void operation.catch(() => undefined);
+  };
+  const snapshot = (value: T, id: number): IStoreResourceSnapshot<T> => ({
+    value,
+    version: id,
+    token: versionToken(id)
+  });
+  const readSnapshot = (): IStoreResourceSnapshot<T> => {
+    const current = state.current;
+    if (current.kind === 'ready') return snapshot(current.current.value, current.current.id);
+    if (current.kind === 'closing') {
+      if (current.current && ownership.hasResourceOwners)
+        return snapshot(current.current.value, current.current.id);
+      throw new Error('[store] resource is disposed');
+    }
+    if (current.kind === 'failed') throw current.error;
+    if (current.kind === 'loading' && current.previous)
+      return snapshot(current.previous.value, current.previous.id);
+    start();
+    const loading = state.current;
+    if (loading.kind === 'loading') throw loading.operation;
+    throw new Error('[store] resource is disposed');
+  };
+  const captureSnapshot = (existingLease?: object) => {
+    const current = state.current;
+    if (current.kind === 'ready') {
+      const rendered = snapshot(current.current.value, current.current.id);
+      if (
+        existingLease !== undefined &&
+        activeLeaseTokens.get(existingLease) === current.current.id
+      )
+        return { snapshot: rendered, capture: undefined };
+      return {
+        snapshot: rendered,
+        capture: captures.capture(current.current.id) as IResourceCapture
+      };
+    }
+    if (current.kind === 'closing' && current.current) {
+      if (
+        existingLease === undefined ||
+        activeLeaseTokens.get(existingLease) !== current.current.id
+      )
+        throw new Error('[store] resource is disposed');
+      return { snapshot: snapshot(current.current.value, current.current.id), capture: undefined };
+    }
+    if (current.kind === 'failed') throw current.error;
+    if (current.kind === 'loading') {
+      if (current.previous) {
+        const rendered = snapshot(current.previous.value, current.previous.id);
+        if (
+          existingLease !== undefined &&
+          activeLeaseTokens.get(existingLease) === current.previous.id
+        )
+          return { snapshot: rendered, capture: undefined };
+        return {
+          snapshot: rendered,
+          capture: captures.capture(current.previous.id) as IResourceCapture
+        };
+      }
+      captures.capturePending(requests.generation, current.operation);
+      throw current.operation;
+    }
+    captures.capture();
+    start();
+    const loading = state.current;
+    if (loading.kind === 'loading') throw loading.operation;
+    throw new Error('[store] resource is disposed');
+  };
+  const retainResourceLease = () => {
+    if (state.current.kind === 'disposed' || state.current.kind === 'closing')
+      throw new Error('[store] resource is disposed');
+    cancelEviction();
+    start();
+    return ownership.retainResource(() => onOwnersChanged());
+  };
+  const releaseVersionLease = (id: number) => {
+    releaseRetired(id);
+    onOwnersChanged();
+  };
+  const createVersionLease = (id: number) => {
+    const releaseOwnership = ownership.retainVersionToken(versionToken(id), () =>
+      releaseVersionLease(id)
+    );
+    let active = true;
+    const token = () => {
+      if (!active) return;
+      active = false;
+      activeLeaseTokens.delete(token);
+      releaseOwnership();
+    };
+    activeLeaseTokens.set(token, id);
+    return token;
+  };
+  const retainVersionLease = (versionInput: number | VersionToken) => {
+    const id = typeof versionInput === 'number' ? versionInput : tokenVersions.get(versionInput);
+    if (id === undefined) throw new Error('[store] unknown resource version');
+    if (state.current.kind === 'disposed' || state.current.kind === 'closing')
+      throw new Error('[store] resource is disposed');
+    if (id !== version && !versions.hasRetired(id) && versions.stale?.id !== id)
+      throw new Error('[store] unknown resource version');
+    cancelEviction();
+    start();
+    return createVersionLease(id);
+  };
+  const captureVersion = (id: number) => {
+    if (state.current.kind === 'disposed' || state.current.kind === 'closing')
+      throw new Error('[store] resource is disposed');
+    if (id !== version && !versions.hasRetired(id) && versions.stale?.id !== id)
+      throw new Error('[store] unknown resource version');
+    return captures.capture(id);
+  };
+  const commitCapture = (capture: IResourceCapture) => {
+    const id = captures.inspect(capture);
+    if (state.current.kind === 'disposed') throw new Error('[store] resource is disposed');
+    if (
+      id !== version &&
+      !versions.hasRetired(id) &&
+      versions.stale?.id !== id &&
+      !versions.hasClosing(id)
+    )
+      throw new Error('[store] unknown resource version');
+    captures.commit(capture);
+    cancelEviction();
+    return createVersionLease(id);
+  };
+  const api: IStoreResource<T> = {
+    read: () => readSnapshot().value,
+    readSnapshot,
+    captureSnapshot,
+    preload() {
+      if (state.current.kind === 'closing') throw new Error('[store] resource is disposed');
+      start();
+    },
+    retry() {
+      const previous = state.current;
+      if (previous.kind === 'disposed' || previous.kind === 'closing')
+        throw new Error('[store] resource is disposed');
+      cancelEviction();
+      requests.supersede();
+      if (previous.kind === 'ready') versions.setStale(previous.current);
+      state.idle();
+      notify();
+      start();
+    },
+    retain(leaseVersion?: number) {
+      return leaseVersion === undefined ? retainResourceLease() : retainVersionLease(leaseVersion);
+    },
+    retainResource: retainResourceLease,
+    retainVersion: retainVersionLease,
+    captureVersion: (id) => captureVersion(id) as IResourceCapture,
+    commitCapture,
+    dispose() {
+      const previous = state.current;
+      if (previous.kind === 'disposed' || previous.kind === 'closing') return;
+      cancelEviction();
+      const keepPendingLoad = previous.kind === 'loading' && ownership.hasResourceOwners;
+      if (!keepPendingLoad) requests.supersede();
+      const moved = versions.moveToClosing();
+      if (previous.kind === 'ready') moved.versions.push(previous.current);
+      versions.beginClosing(moved.versions);
+      cleanupUnique(moved.superseded);
+      if (previous.kind === 'ready' && (hasCommittedOwners() || hasVersionReservations())) {
+        state.close(previous.current);
+        return;
+      }
+      if (previous.kind === 'loading' && previous.previous && hasCommittedOwners()) {
+        state.close(previous.previous);
+        return;
+      }
+      if (previous.kind === 'loading' && keepPendingLoad) {
+        state.close();
+        return;
+      }
+      state.dispose();
+      notify();
+      if (!hasOwners() && !ownership.hasVersionOwners) forceDisposeResource();
+    },
+    forceDispose() {
+      if (state.current.kind === 'disposed' && !hasOwners() && !versions.hasPending) return;
+      forceDisposeResource();
+    },
+    whenTerminal: () => state.whenTerminal(),
+    getSnapshot: () => revision,
+    subscribe(listener) {
+      if (state.current.kind === 'disposed') return () => {};
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    }
+  };
+  return api;
+}

@@ -1,5 +1,5 @@
 import { createWindowMessageTransport } from '../../src/adapters/window';
-import { createRpc, echoProvider } from './rpc';
+import { createRpc, echoProvider, terminalProviders } from './rpc';
 
 const parentOrigin = new URL(document.referrer).origin;
 const transport = createWindowMessageTransport({
@@ -7,10 +7,26 @@ const transport = createWindowMessageTransport({
   receiver: window,
   targetOrigin: parentOrigin
 });
-const endpoint = await createRpc('child', ['parent'], transport, {
-  echo: echoProvider,
-  never: async () => new Promise(() => undefined)
-});
+const endpoint = await createRpc(
+  'child',
+  ['parent'],
+  transport,
+  {
+    echo: echoProvider,
+    never: async () => new Promise(() => undefined),
+    fail: terminalProviders.fail,
+    hang: terminalProviders.hang,
+    notify: (context) => {
+      parent.postMessage({ e2e: 'dispatch-result', value: context.data }, parentOrigin);
+      return context.success(undefined);
+    }
+  },
+  undefined,
+  undefined,
+  false,
+  undefined,
+  { chunkSize: 4 }
+);
 
 addEventListener('message', (event) => {
   if (event.data?.e2e === 'call-parent') {

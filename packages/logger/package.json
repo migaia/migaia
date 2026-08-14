@@ -1,6 +1,6 @@
 {
   "name": "@migaia/logger",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "private": true,
   "repository": {
     "type": "git",
@@ -36,7 +36,7 @@
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",
     "release:patch": "npm version patch --no-git-tag-version --ignore-scripts",
     "release:pack": "pnpm pack --pack-destination /tmp",
-    "release:publish": "npm publish --access restricted --ignore-scripts"
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
   "dependencies": {
     "@migaia/plugin-host": "workspace:^",

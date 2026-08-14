@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { VerifiedPeerRegistry } from '../../src/internal/identity';
 
 describe('VerifiedPeerRegistry', () => {
@@ -52,5 +52,33 @@ describe('VerifiedPeerRegistry', () => {
         resolve();
       }, 10)
     );
+  });
+
+  it('retain() does not purge the exact token it is about to retain (round-2 regression)', () => {
+    vi.useFakeTimers();
+    try {
+      const registry = new VerifiedPeerRegistry(4, 4, 1); // maxBindingAgeMs=1: any elapsed tick is "expired"
+      const token = registry.register('peer');
+      vi.advanceTimersByTime(5); // idle past maxBindingAgeMs before the binding is ever retained
+      // A naive purge-then-lookup retain() would delete this binding here and return false.
+      expect(registry.retain(token as string)).toBe(true);
+      expect(registry.has('peer')).toBe(true); // refs>0 keeps it alive past the idle TTL
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('force-expires a retained binding after its hard lifetime', () => {
+    vi.useFakeTimers();
+    try {
+      const registry = new VerifiedPeerRegistry(10, 2, 10);
+      const token = registry.register('retained');
+      expect(registry.retain(token as string)).toBe(true);
+      vi.advanceTimersByTime(1_001);
+      expect(registry.has('retained')).toBe(false);
+      expect(registry.retain(token as string)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

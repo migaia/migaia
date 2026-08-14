@@ -21,6 +21,7 @@ test('repeated Window realm creation and disposal leaves no page errors or resou
         phase: string;
         pending: number;
         activeControllers: number;
+        providers: number;
         resources: number;
         discovery: { remote: number; waiters: number; tasks: number; timers: number };
       };
@@ -31,6 +32,7 @@ test('repeated Window realm creation and disposal leaves no page errors or resou
       phase: 'disposed',
       pending: 0,
       activeControllers: 0,
+      providers: 0,
       resources: 0,
       discovery: { remote: 0, waiters: 0, tasks: 0, timers: 0 }
     });

@@ -3,12 +3,20 @@ import type { IWebRpcProviderResult } from '../typing';
 import type { IWebRpcRequest } from '../wire';
 import type { ProviderRegistry } from './provider';
 import { safeRead, safeString, tupleKey } from './safe-value';
-import { ProviderAdmissionRegistry } from './provider-admission';
+type IProviderAdmission = {
+  acquire(taskKey: string, peerKey: string): boolean;
+  release(taskKey: string): void;
+};
+type IControllerRegistry = {
+  has(key: string): boolean;
+  set(key: string, controller: AbortController): void;
+  delete(key: string): void;
+};
 
 type IProviderExecutorOptions<TTargetId extends string> = {
   readonly id: string;
   readonly registry: ProviderRegistry;
-  readonly controllers: Map<string, AbortController>;
+  readonly controllers: IControllerRegistry;
   readonly peers: Iterable<TTargetId>;
   readonly dispatch: (targetId: TTargetId, method: string, data: unknown) => void;
   readonly send: (response: unknown, transfer?: readonly unknown[]) => Promise<void>;
@@ -18,7 +26,7 @@ type IProviderExecutorOptions<TTargetId extends string> = {
   readonly admitReplay?: (request: IWebRpcRequest, verifiedPeerKey: string) => boolean;
   readonly markCompleted?: (request: IWebRpcRequest, verifiedPeerKey: string) => void;
   readonly consumePendingAbort?: (key: string) => boolean;
-  readonly admission: ProviderAdmissionRegistry;
+  readonly admission: IProviderAdmission;
   readonly retainBinding?: (verifiedPeerKey: string) => boolean;
   readonly releaseBinding?: (verifiedPeerKey: string) => void;
 };

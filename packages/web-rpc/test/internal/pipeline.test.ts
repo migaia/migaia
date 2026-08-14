@@ -138,6 +138,44 @@ describe('outbound pipeline encoded type boundary', () => {
       code: 'TRANSPORT'
     });
   });
+  it('releases a chunk message id when any frame send fails', async () => {
+    let released: string | undefined;
+    const pipeline = new WebRpcOutboundPipeline(
+      {
+        platform: 'Memory' as const,
+        encodedType: 'string',
+        send: () => Promise.reject(new Error('frame send failed')),
+        subscribe: () => () => undefined
+      },
+      'a',
+      {
+        encodedType: 'string',
+        encode: (value) => JSON.stringify(value),
+        decode: (value) => value
+      },
+      {
+        chunkSize: 4,
+        byteLength: (value) => value.length,
+        split: (value) => {
+          const parts: string[] = [];
+          for (let index = 0; index < value.length; index += 4)
+            parts.push(value.slice(index, index + 4));
+          return parts;
+        }
+      },
+      () => undefined,
+      undefined,
+      undefined,
+      (messageId) => {
+        released = messageId;
+      }
+    );
+    await expect(
+      pipeline.send({ targetId: 'b', data: 'payload' }, () => 'message')
+    ).rejects.toMatchObject({ code: 'TRANSPORT' });
+    expect(released).toBe('message');
+  });
+
   it('rejects a splitter result above the configured frame budget', () => {
     const pipeline = new WebRpcOutboundPipeline(
       {

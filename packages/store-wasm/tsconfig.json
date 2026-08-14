@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@migaia/reactive": ["../reactive/dist/index.d.ts"],
+      "@migaia/store-light": ["../store-light/dist/index.d.ts"],
+      "@migaia/wasm": ["../wasm/src/wasm_provider.d.ts"]
+    }
+  },
+  "include": ["src", "test"]
+}

@@ -1,6 +1,6 @@
 import { createSharedWorkerTransport } from '../../src/adapters/shared-worker';
 import { readEndpointDebugSnapshot } from '../../src/internal/test-observer';
-import { createRpc, echoProvider } from './rpc';
+import { createRpc, terminalProviders } from './rpc';
 
 const endpoints = new Map<MessagePort, { dispose(): Promise<void> }>();
 let connection = 0;
@@ -22,9 +22,18 @@ globalThis.addEventListener('connect', (event: Event) => {
     'shared-service',
     ['client'],
     createSharedWorkerTransport(port),
-    { echo: echoProvider },
+    {
+      ...terminalProviders,
+      notify: (context) => {
+        port.postMessage({ e2e: 'dispatch-result', value: context.data });
+        return context.success(undefined);
+      }
+    },
     { uniqueTargetId: `shared-${index}` },
-    'same-task'
+    'same-task',
+    false,
+    undefined,
+    { chunkSize: 4 }
   )
     .then((endpoint) => {
       endpoints.set(port, endpoint);
