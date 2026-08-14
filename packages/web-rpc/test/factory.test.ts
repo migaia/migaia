@@ -387,6 +387,25 @@ describe('factory', () => {
       createEndpoint({ id: 'x', middlewares: middlewares as never })
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' });
   });
+  it('rejects a hostile replay getter before any middleware installs (WR-R3-2)', async () => {
+    let installed = false;
+    const spy = {
+      name: 'spy',
+      install: () => {
+        installed = true;
+        return {};
+      }
+    };
+    const config = {
+      id: 'x',
+      middlewares: [connect({ transport: transport() }), spy],
+      get replay(): never {
+        throw new Error('replay getter');
+      }
+    };
+    await expect(createEndpoint(config as never)).rejects.toMatchObject({ code: 'INVALID_CONFIG' });
+    expect(installed).toBe(false); // the hostile field must be read before any install() runs
+  });
   it('rejects an incomplete canonical transport before middleware install', async () => {
     await expect(
       createEndpoint({
@@ -517,6 +536,37 @@ describe('factory', () => {
                 decode: (value: unknown) => value,
                 encodedType: 'any'
               })
+          }
+        ]
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_CONFIG' });
+  });
+  it('rejects chunking with Uint8Array protocol output before endpoint creation', async () => {
+    const channel = {
+      platform: 'WebTransport' as const,
+      encodedType: 'uint8array' as const,
+      send() {},
+      subscribe() {
+        return () => undefined;
+      }
+    };
+    await expect(
+      createEndpoint({
+        id: 'chunked-uint8array',
+        middlewares: [
+          connect({ transport: channel }),
+          {
+            name: 'protocol',
+            install: ({ capabilities }) =>
+              capabilities.set('protocolCapability', {
+                encode: (value: unknown) => new Uint8Array([Number(value) || 0]),
+                decode: (value: unknown) => value,
+                encodedType: 'uint8array'
+              })
+          },
+          {
+            name: 'chunk',
+            install: ({ capabilities }) => capabilities.set('chunkCapability', { chunkSize: 4 })
           }
         ]
       })

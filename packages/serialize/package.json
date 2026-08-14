@@ -1,0 +1,29 @@
+{
+  "name": "@migaia/serialize",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Store-neutral chunked serialization and codec registry.",
+  "license": "MIT",
+  "type": "module",
+  "files": ["dist", "README.md", "USEGUIDE.md"],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "fmt": "oxfmt src test",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "oxlint src test",
+    "test": "vitest run test"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vitest": "4.1.10"
+  }
+}

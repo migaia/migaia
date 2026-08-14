@@ -8,7 +8,22 @@
       "@migaia/logger": ["../../packages/logger/dist/index.d.ts"],
       "@migaia/web-rpc": ["../../packages/web-rpc/dist/index.d.ts"],
       "@migaia/web-rpc/*": ["../../packages/web-rpc/dist/adapters/*.d.ts"],
-      "@migaia/store/*": ["../../packages/store/src/*/index.ts"]
+      "@migaia/capability": ["../../packages/capability/dist/index.d.ts"],
+      "@migaia/reactive": ["../../packages/reactive/dist/index.d.ts"],
+      "@migaia/resource": ["../../packages/resource/dist/index.d.ts"],
+      "@migaia/store-light": ["../../packages/store-light/dist/index.d.ts"],
+      "@migaia/store-indexed": ["../../packages/store-indexed/dist/index.d.ts"],
+      "@migaia/store-keyed": ["../../packages/store-keyed/dist/index.d.ts"],
+      "@migaia/store-persist": ["../../packages/store-persist/dist/index.d.ts"],
+      "@migaia/store-react": ["../../packages/store-react/dist/index.d.ts"],
+      "@migaia/store-worker": ["../../packages/store-worker/dist/index.d.ts"],
+      "@migaia/store-wasm": ["../../packages/store-wasm/dist/index.d.ts"],
+      "@migaia/store-shared": ["../../packages/store-shared/dist/index.d.ts"],
+      "@migaia/store-middleware": ["../../packages/store-middleware/dist/index.d.ts"],
+      "@migaia/store-devtools": ["../../packages/store-devtools/dist/index.d.ts"],
+      "@migaia/store-ssr": ["../../packages/store-ssr/dist/index.d.ts"],
+      "@migaia/serialize": ["../../packages/serialize/dist/index.d.ts"],
+      "@migaia/storage-web": ["../../packages/storage-web/dist/index.d.ts"]
     },
     "skipLibCheck": false,
     "verbatimModuleSyntax": true

@@ -36,7 +36,10 @@ export const PluginHostErrorCode = {
   pipelineNextDuplicate: 'PIPELINE_NEXT_DUPLICATE',
   pipelineNextLate: 'PIPELINE_NEXT_LATE',
   pipelineExecuting: 'PIPELINE_EXECUTING',
-  pluginInstallRollbackFailed: 'PLUGIN_INSTALL_ROLLBACK_FAILED'
+  pluginInstallRollbackFailed: 'PLUGIN_INSTALL_ROLLBACK_FAILED',
+  extensionNonEnumerableIgnored: 'EXTENSION_NON_ENUMERABLE_IGNORED',
+  mutationQueueTimeout: 'MUTATION_QUEUE_TIMEOUT',
+  disposeStepTimeout: 'DISPOSE_STEP_TIMEOUT'
 } as const;
 
 export type IPluginHostErrorCode = (typeof PluginHostErrorCode)[keyof typeof PluginHostErrorCode];

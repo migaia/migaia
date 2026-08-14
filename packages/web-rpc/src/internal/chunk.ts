@@ -12,6 +12,8 @@ export function utf8ByteLength(value: string): number {
 
 /** Splits text without cutting a Unicode code point or exceeding a byte budget. */
 export function splitUtf8(value: string, maxBytes: number): readonly string[] {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 4)
+    throw new RangeError('maxBytes must be at least 4 bytes');
   const parts: string[] = [];
   let part = '';
   let bytes = 0;
@@ -53,7 +55,9 @@ export class ChunkAssembler {
   #maxChunksPerMessage = 4096;
   #maxChunkBytes = 4 * 1024 * 1024;
   #assemblyTimeoutMs = 30_000;
-  #observe: ((event: 'chunk.rejected' | 'chunk.expired') => void) | undefined;
+  #observe:
+    | ((event: 'chunk.rejected' | 'chunk.expired', messageId?: string, peerKey?: string) => void)
+    | undefined;
   #bufferedBytes = 0;
   readonly #peerCounts = new Map<string, number>();
 
@@ -104,8 +108,19 @@ export class ChunkAssembler {
   }
 
   /** Installs a non-throwing observer for rejected and expired assemblies. */
-  observe(observer: (event: 'chunk.rejected' | 'chunk.expired') => void): void {
+  observe(
+    observer: (
+      event: 'chunk.rejected' | 'chunk.expired',
+      messageId?: string,
+      peerKey?: string
+    ) => void
+  ): void {
     this.#observe = observer;
+  }
+
+  /** Reports whether a peer still owns an incomplete message assembly. */
+  hasAssembly(messageId: string, peerKey = 'unknown'): boolean {
+    return this.#chunks.has(chunkTupleKey(peerKey, messageId));
   }
 
   /** Accepts one frame and returns a complete payload only when all parts arrive. */
@@ -146,7 +161,7 @@ export class ChunkAssembler {
       parts: new Map<number, string>(),
       bytes: 0,
       timer: createRuntimeTimer(() => {
-        this.#observe?.('chunk.expired');
+        this.#observe?.('chunk.expired', frame.messageId, peerKey);
         this.#remove(key);
       }, this.#assemblyTimeoutMs)
     };

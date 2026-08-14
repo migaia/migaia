@@ -1,0 +1,41 @@
+{
+  "name": "@migaia/reactive",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Store-neutral reactive runtime, signals, computed values, and effects.",
+  "license": "MIT",
+  "type": "module",
+  "files": ["dist", "README.md", "USEGUIDE.md"],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime/index.d.ts",
+      "default": "./dist/runtime/index.js"
+    },
+    "./runtime/*": {
+      "types": "./dist/runtime/*.d.ts",
+      "default": "./dist/runtime/*.js"
+    },
+    "./reactive/*": {
+      "types": "./dist/reactive/*.d.ts",
+      "default": "./dist/reactive/*.js"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "fmt": "oxfmt src test",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "oxlint src test",
+    "test": "vitest run test"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vitest": "4.1.10"
+  }
+}

@@ -4,6 +4,10 @@ import { createEndpoint } from '../../src/factory';
 import { connect } from '../../src/middleware/connect';
 import { protocol } from '../../src/middleware/protocol';
 import { timeout } from '../../src/middleware/timeout';
+import { abort } from '../../src/middleware/abort';
+import { contract } from '../../src/middleware/contract';
+import { ping } from '../../src/middleware/ping';
+import { chunk } from '../../src/middleware/chunk';
 import { installErrorGuards } from './rpc';
 
 const errors = installErrorGuards();
@@ -110,6 +114,7 @@ const linkPeers = async () => {
 };
 
 globalThis.runRtcScenario = async () => {
+  let dispatchPayload: unknown;
   const peers = await linkPeers();
   const codec = protocol({
     encodedType: 'string',
@@ -121,26 +126,140 @@ globalThis.runRtcScenario = async () => {
   const left = await createEndpoint({
     id: 'left',
     targetIds: ['right'],
-    middlewares: [connect({ transport: leftTransport }), codec, timeout({ timeoutMs: 500 })]
+    middlewares: [
+      connect({ transport: leftTransport }),
+      codec,
+      timeout({ timeoutMs: 500 }),
+      abort(),
+      ping(),
+      contract({
+        schemas: {
+          schema: {
+            params: {
+              parse: () => {
+                throw new Error('schema rejected');
+              }
+            },
+            result: { parse: (value) => value }
+          }
+        }
+      }),
+      chunk({ chunkSize: 4 })
+    ]
   });
   const right = await createEndpoint({
     id: 'right',
     targetIds: ['left'],
-    provider: { echo: (context) => context.success(context.data) },
-    middlewares: [connect({ transport: rightTransport }), codec, timeout({ timeoutMs: 500 })]
+    provider: {
+      echo: (context) => context.success(context.data),
+      notify: (context) => {
+        dispatchPayload = context.data;
+        return context.success(undefined);
+      },
+      fail: (context) => context.failed('remote failure', 'REMOTE_FAILURE'),
+      hang: async () => await new Promise<never>(() => undefined)
+    },
+    middlewares: [
+      connect({ transport: rightTransport }),
+      codec,
+      timeout({ timeoutMs: 500 }),
+      abort(),
+      ping(),
+      chunk({ chunkSize: 4 })
+    ]
   });
   const result = await left.send('right', 'echo', 'rtc-ok');
+  const chunkedRequest = await left.send('right', 'echo', 'rtc-chunked-request-😀');
+  const chunkedRemoteError = await left.send('right', 'fail', 'rtc-chunked-error-😀').then(
+    () => 'resolved',
+    (error: { readonly code?: string }) => error.code ?? 'error'
+  );
+  const chunkedTimeout = await left
+    .send('right', 'hang', 'rtc-chunked-timeout-😀', {
+      timeoutMs: 40
+    })
+    .then(
+      () => 'resolved',
+      (error: { readonly code?: string }) => error.code ?? 'error'
+    );
+  const chunkedAbortController = new AbortController();
+  const chunkedAbortPending = left.send('right', 'hang', 'rtc-chunked-abort-😀', {
+    signal: chunkedAbortController.signal
+  });
+  chunkedAbortController.abort();
+  const chunkedAbort = await chunkedAbortPending.then(
+    () => 'resolved',
+    (error: { readonly code?: string }) => error.code ?? 'error'
+  );
+  const chunkedSchemaError = await left.send('right', 'schema', 'rtc-chunked-schema-😀').then(
+    () => 'resolved',
+    (error: { readonly code?: string }) => error.code ?? 'error'
+  );
+  left.dispatch('right', 'notify', 'rtc-chunked-dispatch-😀');
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const remoteError = await left.send('right', 'fail', null).then(
+    () => 'resolved',
+    (error: { readonly code?: string }) => error.code ?? 'error'
+  );
+  const timeoutResult = await left.send('right', 'hang', null, { timeoutMs: 40 }).then(
+    () => 'resolved',
+    (error: { readonly code?: string }) => error.code ?? 'error'
+  );
+  const controller = new AbortController();
+  const abortPending = left.send('right', 'hang', null, { signal: controller.signal });
+  controller.abort();
+  const aborted = await abortPending.then(
+    () => 'resolved',
+    (error: { readonly code?: string }) => error.code ?? 'error'
+  );
+  const schemaError = await left.send('right', 'schema', null).then(
+    () => 'resolved',
+    (error: { readonly code?: string }) => error.code ?? 'error'
+  );
+  const pingEndpoint = left as typeof left & {
+    ping(
+      targetId: string,
+      receiverId?: string,
+      options?: { readonly timeoutMs?: number; readonly signal?: AbortSignal }
+    ): Promise<boolean>;
+  };
+  const pingSuccess = await pingEndpoint.ping('right');
+  const pingTimeout = await pingEndpoint.ping('missing', undefined, { timeoutMs: 40 });
+  const pingController = new AbortController();
+  const pingAbortedPending = pingEndpoint.ping('right', undefined, {
+    signal: pingController.signal
+  });
+  pingController.abort();
+  const pingAborted = await pingAbortedPending;
   peers.leftChannel.close();
   const terminal = await left.send('right', 'echo', 'late').then(
     () => 'unexpected',
     (error: { code?: string }) => error.code ?? 'error'
   );
+  const activeSnapshots = {
+    left: readEndpointDebugSnapshot(left),
+    right: readEndpointDebugSnapshot(right)
+  };
   await Promise.allSettled([left.dispose(), right.dispose()]);
   peers.left.close();
   peers.right.close();
   return {
     result,
+    chunkedRequest,
+    chunkedRemoteError,
+    chunkedTimeout,
+    chunkedAbort,
+    chunkedSchemaError,
+    dispatchPayload: String(dispatchPayload),
+    remoteError,
+    timeoutResult,
+    aborted,
+    schemaError,
+    pingSuccess,
+    pingTimeout,
+    pingAborted,
     terminal,
+    activeSnapshots,
     errors,
     snapshots: {
       left: readEndpointDebugSnapshot(left),

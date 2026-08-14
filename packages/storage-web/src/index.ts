@@ -69,6 +69,3 @@ export type {
   IRecordComparator,
   IRepository
 } from './entity';
-
-// 互操作
-export { toStoreAdapter, toBinaryStoreAdapter } from './interop/store-adapter';

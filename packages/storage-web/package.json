@@ -28,7 +28,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
     "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
-    "typecheck:interop": "tsc --noEmit -p tsconfig.interop.json",
     "lint": "oxlint src test e2e",
     "test": "pnpm run build && vitest run --coverage",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",
@@ -38,7 +37,6 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@migaia/store-persist": "workspace:^",
     "@vitest/coverage-v8": "4.1.10",
     "fake-indexeddb": "6.2.5",
     "jsdom": "29.1.1"

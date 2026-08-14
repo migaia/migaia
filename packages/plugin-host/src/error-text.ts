@@ -122,6 +122,40 @@ const ERROR_TEXT = {
         `插件 "${name}" 扩展属性 "${String(key)}" 是保留键`,
         `plugin "${name}" extension "${String(key)}" is reserved`
       );
+  },
+  /** 正式 SLA：mutation 在 FIFO 队列中等待超过阈值。 */
+  get MUTATION_QUEUE_TIMEOUT() {
+    return (waitedMs: number) =>
+      localize(
+        `mutation 在队列中等待超过 ${waitedMs}ms，已拒绝执行`,
+        `mutation waited in the queue for more than ${waitedMs}ms and was rejected`
+      );
+  },
+  /** 诊断：install() 返回值上一个非枚举键被跳过挂载（不是错误，是有意的行为，但必须可观测）。 */
+  get EXTENSION_NON_ENUMERABLE_IGNORED() {
+    return (name: string, key: PropertyKey) =>
+      localize(
+        `插件 "${name}" 的非枚举扩展属性 "${String(key)}" 未挂载到 host——` +
+          `非枚举键被有意忽略，如需暴露请改成枚举属性`,
+        `plugin "${name}"'s non-enumerable extension property "${String(key)}" was not mounted ` +
+          `on the host — non-enumerable keys are intentionally ignored; make it enumerable to ` +
+          `expose it`
+      );
+  },
+  /**
+   * 正式 SLA：单个 disposer（pipeline disposer / 插件 dispose 钩子 / resource disposer） 等待超过阈值仍未 settle，包括该
+   * disposer 反过来 await 了同一次 dispose() 调用自身这种 循环等待。不会中断 disposer 的执行（JS 无法安全撤销已经在跑的 Promise 链），只是停止
+   * 等待并把这一步计为失败，让整个 dispose 事务仍能收敛到 disposed。
+   */
+  get DISPOSE_STEP_TIMEOUT() {
+    return (phase: string, waitedMs: number) =>
+      localize(
+        `${phase} 等待超过 ${waitedMs}ms 仍未完成，已放弃等待并计为失败——如果该 disposer ` +
+          `反过来 await 了触发它的这次 host.dispose() 调用，这个等待永远无法完成`,
+        `${phase} did not settle within ${waitedMs}ms and was abandoned as a failure — if that ` +
+          `disposer awaits the very host.dispose() call that triggered it, this wait can never ` +
+          `complete on its own`
+      );
   }
 } as const;
 

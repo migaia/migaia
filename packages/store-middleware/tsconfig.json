@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@migaia/plugin-host": ["../plugin-host/dist/index.d.ts"],
+      "@migaia/reactive": ["../reactive/dist/index.d.ts"],
+      "@migaia/reactive/*": ["../reactive/dist/*"],
+      "@migaia/store-light": ["../store-light/dist/index.d.ts"]
+    }
+  },
+  "include": ["src", "test"]
+}

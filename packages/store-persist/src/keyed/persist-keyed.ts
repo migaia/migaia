@@ -1,0 +1,77 @@
+import type { IAtomStore, IWritableAtomDefinition } from '@migaia/store-keyed';
+import { persistUnit } from '../core/persist-unit';
+import type { IPersistCodec, IPersistKeyValueStore, IPersistUnit } from '../core/types';
+
+export type IPersistKeyedOptions<T> = {
+  /** Storage key 前缀，格式 `${namespace}:${id}`——必填，clearFamily() 靠它过滤。 */
+  namespace: string;
+  storage: IPersistKeyValueStore;
+  codec?: IPersistCodec;
+  version?: number;
+  debounceMs?: number;
+  partialize?: (value: T) => Partial<T>;
+  merge?: (persisted: Partial<T>, current: T) => T;
+};
+
+export type IPersistKeyedHandle<T> = {
+  readonly value: T;
+  dispose(): void;
+};
+
+function storageKey(namespace: string, id: string): string {
+  return `${namespace}:${id}`;
+}
+
+function toPersistUnit<T>(atomStore: IAtomStore, def: IWritableAtomDefinition<T>): IPersistUnit<T> {
+  return {
+    snapshot: () => atomStore.peek(def),
+    restore: (state) => {
+      atomStore.set(def, state as never);
+    },
+    subscribe: (onChange) => atomStore.sub(def, onChange)
+  };
+}
+
+/**
+ * 给 `AtomStore` 里某一个 key 接上持久化。`AtomStore`/`familyDef` 本身不知道"当前存在哪些 key" （刻意的设计，见 SDD
+ * §3.4），所以持久化单位是"这一个 key 自己"，不是整个 family——每次调用各自 创建一个独立的 `persistUnit()` 实例，`dispose()` 只影响这一个
+ * key。
+ */
+export function persistKeyed<T>(
+  atomStore: IAtomStore,
+  def: IWritableAtomDefinition<T>,
+  id: string,
+  options: IPersistKeyedOptions<T>
+): IPersistKeyedHandle<T> {
+  const value = atomStore.get(def);
+  const handle = persistUnit(toPersistUnit(atomStore, def), {
+    key: storageKey(options.namespace, id),
+    runtime: atomStore.runtime,
+    storage: options.storage,
+    codec: options.codec,
+    version: options.version,
+    partialize: options.partialize,
+    merge: options.merge,
+    debounceMs: options.debounceMs
+  });
+  return {
+    value,
+    dispose: () => handle.dispose()
+  };
+}
+
+/**
+ * 批量清空某个 namespace 下的全部持久化记录。刻意绕开 `AtomStore`——它不知道"这些 key 现在是否还 有内存中的实例"，也不负责清理内存状态；只删 storage 里以
+ * `${namespace}:` 为前缀的记录。 若调用方同时持有若干个还没 dispose 的 `persistKeyed()` handle，它们各自的内存值不受影响，也不会
+ * 因为存档被删掉就重新触发一次写回（下一次它们自己的 subscribe 触发时才会覆盖写回一条新记录）。
+ */
+export async function clearFamily(
+  storage: IPersistKeyValueStore,
+  namespace: string
+): Promise<number> {
+  const prefix = `${namespace}:`;
+  const allKeys = await storage.keys();
+  const matching = allKeys.filter((k) => k.startsWith(prefix));
+  for (const key of matching) await storage.remove(key);
+  return matching.length;
+}

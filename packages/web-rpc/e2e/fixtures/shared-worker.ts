@@ -27,12 +27,92 @@ globalThis.connectSharedWorker = async (clientUniqueId: string) => {
     createSharedWorkerTransport(worker.port),
     {},
     { uniqueTargetId: clientUniqueId },
-    () => (++generatedIds === 1 ? 'same-task' : crypto.randomUUID())
+    () => (++generatedIds === 1 ? 'same-task' : crypto.randomUUID()),
+    false,
+    {
+      schemas: {
+        schema: {
+          params: {
+            parse: () => {
+              throw new Error('schema rejected');
+            }
+          },
+          result: { parse: (value) => value }
+        }
+      }
+    },
+    { chunkSize: 4 }
   );
   return ready;
 };
 
 globalThis.sendSharedWorker = (value: unknown) => endpoint!.send('shared-service', 'echo', value);
+globalThis.sendSharedWorkerTerminal = async () => {
+  const chunkedRequest = await endpoint!.send(
+    'shared-service',
+    'echo',
+    'shared-worker-chunked-request-😀'
+  );
+  const chunkedTimeout = await endpoint!
+    .send('shared-service', 'hang', 'shared-worker-chunked-timeout-😀', { timeoutMs: 40 })
+    .then(
+      () => 'resolved',
+      (error: { readonly code?: string }) => error.code ?? 'error'
+    );
+  const dispatchResult = new Promise<unknown>((resolve) => {
+    worker!.port.addEventListener('message', function onDispatch(event) {
+      if (event.data?.e2e === 'dispatch-result') {
+        worker!.port.removeEventListener('message', onDispatch);
+        resolve(event.data.value);
+      }
+    });
+  });
+  endpoint!.dispatch('shared-service', 'notify', 'shared-worker-chunked-dispatch-😀');
+  const dispatchPayload = String(await dispatchResult);
+  const remoteError = await endpoint!
+    .send('shared-service', 'fail', 'shared-worker-chunked-error-😀')
+    .then(
+      () => 'resolved',
+      (error: { readonly code?: string }) => error.code ?? 'error'
+    );
+  const controller = new AbortController();
+  const pending = endpoint!.send('shared-service', 'hang', 'shared-worker-chunked-abort-😀', {
+    signal: controller.signal
+  });
+  controller.abort();
+  const aborted = await pending.then(
+    () => 'resolved',
+    (error: { readonly code?: string }) => error.code ?? 'error'
+  );
+  const schemaError = await endpoint!
+    .send('shared-service', 'schema', 'shared-worker-chunked-schema-😀')
+    .then(
+      () => 'resolved',
+      (error: { readonly code?: string }) => error.code ?? 'error'
+    );
+  const pingSuccess = await endpoint!.ping('shared-service');
+  const pingTimeout = await endpoint!.ping('missing', undefined, { timeoutMs: 40 });
+  const pingController = new AbortController();
+  const pingAbortedPending = endpoint!.ping('shared-service', undefined, {
+    signal: pingController.signal
+  });
+  pingController.abort();
+  const pingAborted = await pingAbortedPending;
+  const activePageSnapshot = readEndpointDebugSnapshot(endpoint!);
+  if (activePageSnapshot === undefined) throw new Error('missing endpoint snapshot');
+  return {
+    chunkedRequest,
+    chunkedTimeout,
+    dispatchPayload,
+    remoteError,
+    aborted,
+    schemaError,
+    pingSuccess,
+    pingTimeout,
+    pingAborted,
+    activePageSnapshot
+  };
+};
 globalThis.injectSharedWorkerSpoof = (): void => {
   worker?.port.postMessage({
     kind: 'request',
@@ -74,6 +154,23 @@ globalThis.sharedWorkerSnapshots = () => ({
 declare global {
   var connectSharedWorker: (clientUniqueId: string) => Promise<number>;
   var sendSharedWorker: (value: unknown) => Promise<unknown>;
+  var sendSharedWorkerTerminal: () => Promise<{
+    chunkedRequest: unknown;
+    chunkedTimeout: string;
+    dispatchPayload: string;
+    remoteError: string;
+    aborted: string;
+    schemaError: string;
+    pingSuccess: boolean;
+    pingTimeout: boolean;
+    pingAborted: boolean;
+    activePageSnapshot: {
+      phase: string;
+      pending: number;
+      chunks: number;
+      activeControllers: number;
+    };
+  }>;
   var injectSharedWorkerSpoof: () => void;
   var disposeSharedWorker: () => Promise<string[]>;
   var sharedWorkerSnapshots: () => unknown;

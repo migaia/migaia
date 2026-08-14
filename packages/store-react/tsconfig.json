@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@migaia/reactive": ["../reactive/dist/index.d.ts"],
+      "@migaia/reactive/*": ["../reactive/dist/*"],
+      "@migaia/resource": ["../resource/dist/index.d.ts"],
+      "@migaia/store-keyed": ["../store-keyed/dist/index.d.ts"],
+      "@migaia/store-keyed/*": ["../store-keyed/dist/*"],
+      "@migaia/store-light": ["../store-light/dist/index.d.ts"],
+    }
+  },
+  "include": ["src", "test"]
+}

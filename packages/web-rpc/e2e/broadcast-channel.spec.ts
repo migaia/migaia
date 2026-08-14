@@ -32,6 +32,21 @@ test('BroadcastChannel discovers identified receivers and pins one safely', asyn
     label: 'B',
     value: 'pinned'
   });
+  await expect(client.evaluate(() => globalThis.sendBroadcastTerminal())).resolves.toEqual({
+    chunkedRequest: 'broadcast-chunked-request-😀',
+    chunkedRemoteError: 'REMOTE_FAILURE',
+    chunkedTimeout: 'DEADLINE_EXCEEDED',
+    remoteError: 'REMOTE_FAILURE',
+    timeout: 'DEADLINE_EXCEEDED',
+    aborted: 'CANCELLED',
+    schemaError: 'SCHEMA_INVALID',
+    activeSnapshot: expect.objectContaining({
+      phase: 'active',
+      pending: 0,
+      chunks: 0,
+      activeControllers: 0
+    })
+  });
   await client.evaluate(() => globalThis.unpinBroadcast());
   expect(await client.evaluate(() => globalThis.disposeBroadcast())).toEqual([]);
   await Promise.all([
@@ -64,6 +79,14 @@ test('authenticated BroadcastChannel rejects an observed forged response', async
   });
   expect(await server.evaluate(() => globalThis.broadcastProviderCalls())).toBe(1);
   await expect(client.evaluate(() => globalThis.pingBroadcast())).resolves.toBe(true);
+  await expect(client.evaluate(() => globalThis.dispatchBroadcast())).resolves.toBe(
+    'broadcast-chunked-dispatch-😀'
+  );
+  await expect(client.evaluate(() => globalThis.pingBroadcastTerminal())).resolves.toEqual({
+    success: true,
+    timeout: false,
+    aborted: false
+  });
   expect(await client.evaluate(() => globalThis.disposeBroadcast())).toEqual([]);
   expect(await client.evaluate(() => globalThis.broadcastSnapshot())).toMatchObject({
     phase: 'disposed',

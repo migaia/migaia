@@ -44,12 +44,93 @@ globalThis.connectServiceWorker = async (uniqueId: string) => {
       peerId: 'service'
     }),
     {},
-    { uniqueTargetId: uniqueId }
+    { uniqueTargetId: uniqueId },
+    undefined,
+    false,
+    {
+      schemas: {
+        schema: {
+          params: {
+            parse: () => {
+              throw new Error('schema rejected');
+            }
+          },
+          result: { parse: (value) => value }
+        }
+      }
+    },
+    { chunkSize: 4 }
   );
   return clientId;
 };
 
 globalThis.sendServiceWorker = (value: unknown) => endpoint!.send('service', 'echo', value);
+globalThis.sendServiceWorkerTerminal = async () => {
+  const chunkedRequest = await endpoint!.send(
+    'service',
+    'echo',
+    'service-worker-chunked-request-😀'
+  );
+  const dispatchResult = new Promise<unknown>((resolve) => {
+    navigator.serviceWorker.addEventListener('message', function onDispatch(event) {
+      if (event.data?.e2e === 'dispatch-result') {
+        navigator.serviceWorker.removeEventListener('message', onDispatch);
+        resolve(event.data.value);
+      }
+    });
+  });
+  endpoint!.dispatch('service', 'notify', 'service-worker-chunked-dispatch-😀');
+  const dispatchPayload = String(await dispatchResult);
+  const remoteError = await endpoint!
+    .send('service', 'fail', 'service-worker-chunked-error-😀')
+    .then(
+      () => 'resolved',
+      (error: { readonly code?: string }) => error.code ?? 'error'
+    );
+  const timeout = await endpoint!
+    .send('service', 'hang', 'service-worker-chunked-timeout-😀', { timeoutMs: 40 })
+    .then(
+      () => 'resolved',
+      (error: { readonly code?: string }) => error.code ?? 'error'
+    );
+  const controller = new AbortController();
+  const pending = endpoint!.send('service', 'hang', 'service-worker-chunked-abort-😀', {
+    signal: controller.signal
+  });
+  controller.abort();
+  const aborted = await pending.then(
+    () => 'resolved',
+    (error: { readonly code?: string }) => error.code ?? 'error'
+  );
+  const schemaError = await endpoint!
+    .send('service', 'schema', 'service-worker-chunked-schema-😀')
+    .then(
+      () => 'resolved',
+      (error: { readonly code?: string }) => error.code ?? 'error'
+    );
+  const pingSuccess = await endpoint!.ping('service');
+  const pingTimeout = await endpoint!.ping('missing', undefined, { timeoutMs: 40 });
+  const pingController = new AbortController();
+  const pingAbortedPending = endpoint!.ping('service', undefined, {
+    signal: pingController.signal
+  });
+  pingController.abort();
+  const pingAborted = await pingAbortedPending;
+  const activePageSnapshot = readEndpointDebugSnapshot(endpoint!);
+  if (activePageSnapshot === undefined) throw new Error('missing endpoint snapshot');
+  return {
+    chunkedRequest,
+    dispatchPayload,
+    remoteError,
+    timeout,
+    aborted,
+    schemaError,
+    pingSuccess,
+    pingTimeout,
+    pingAborted,
+    activePageSnapshot
+  };
+};
 globalThis.injectServiceWorkerSpoof = (): void => {
   navigator.serviceWorker.controller?.postMessage({
     kind: 'request',
@@ -90,6 +171,23 @@ globalThis.serviceWorkerControllerChanges = () => controllerChanges;
 declare global {
   var connectServiceWorker: (uniqueId: string) => Promise<string>;
   var sendServiceWorker: (value: unknown) => Promise<unknown>;
+  var sendServiceWorkerTerminal: () => Promise<{
+    chunkedRequest: unknown;
+    activePageSnapshot: {
+      phase: string;
+      pending: number;
+      chunks: number;
+      activeControllers: number;
+    };
+    dispatchPayload: string;
+    remoteError: string;
+    timeout: string;
+    aborted: string;
+    schemaError: string;
+    pingSuccess: boolean;
+    pingTimeout: boolean;
+    pingAborted: boolean;
+  }>;
   var injectServiceWorkerSpoof: () => void;
   var disposeServiceWorker: () => Promise<string[]>;
   var serviceWorkerSnapshots: () => unknown;

@@ -389,6 +389,17 @@ export class DiscoveryRegistry {
     return this.#automaticAdmissions.delete(key);
   }
 
+  /** Purges automatic discovery admission records older than the supplied cutoff. */
+  purgeAdmissions(cutoff: number): void {
+    for (const [key, entry] of this.#automaticAdmissions)
+      if (entry.at < cutoff) this.#automaticAdmissions.delete(key);
+  }
+
+  /** Clears automatic discovery admission state during endpoint disposal. */
+  clearAdmissions(): void {
+    this.#automaticAdmissions.clear();
+  }
+
   /** Releases an automatic waiter on first response and owns its collection timer. */
   resolveAutomatic(
     targetId: string,

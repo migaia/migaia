@@ -1,0 +1,345 @@
+# 使用手册
+
+本文是 `@migaia/store-persist` 的完整参考手册。先看 [README.md](./README.md#5-最小可跑示例) 的最小示例，跑起来之后再回来查这里的细节——README 讲"是什么、适合什么场景、怎么跑起来"，本文讲每一层的精确语义。
+
+## 目录
+
+1. [核心引擎：`IPersistUnit` / `persistUnit()`](#1-核心引擎ipersistunit--persistunit)
+2. [`persist()` 完整参考（store-light）](#2-persist-完整参考store-light)
+3. [`persistCollection()` 完整参考（store-indexed）](#3-persistcollection-完整参考store-indexed)
+4. [`persistKeyed()` + `clearFamily()` 完整参考（store-keyed）](#4-persistkeyed--clearfamily-完整参考store-keyed)
+5. [存档格式与版本迁移](#5-存档格式与版本迁移)
+6. [`IPersistHandle` 完整 API 参考](#6-ipersisthandle-完整-api-参考)
+7. [与 storage-web 的 codec 集成](#7-与-storage-web-的-codec-集成)
+8. [错误参考](#8-错误参考)
+9. [生产环境完整示例](#9-生产环境完整示例)
+10. [常见问题排查](#10-常见问题排查)
+
+---
+
+## 1. 核心引擎：`IPersistUnit` / `persistUnit()`
+
+```ts
+type IPersistUnit<TState> = {
+  snapshot(): TState;                          // 同步读当前可持久化状态
+  restore(state: TState): void;                // 同步写回一份状态（hydrate 用）
+  subscribe(onChange: () => void): IDisposer;   // 注册变化通知
+};
+
+function persistUnit<TState>(unit: IPersistUnit<TState>, options: IPersistUnitOptions<TState>): IPersistHandle;
+```
+
+`persist()`/`persistCollection()`/`persistKeyed()` 内部各自把自己的原生 API 适配成 `IPersistUnit<TState>`，然后统一调 `persistUnit()`——hydrate 竞态、防抖写回、dispose 清理只在这一个函数里实现一遍，三条路径不重复代码，行为也因此完全一致。一般不需要直接调用 `persistUnit()`，除非你要接入一种全新的 store 形状（第四种，本包目前没有内置适配）。
+
+`IPersistUnitOptions<TState>` 完整字段：
+
+| 选项 | 类型 | 必填性 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| `key` | `string` | 必填 | 无 | 存档在 storage 里的键 |
+| `runtime` | `IRuntime` | 必填 | 无 | `status`/`error`/`hydrated` 等信号挂在哪个 Runtime 上；三条适配路径都会自动传底层 store/collection/AtomStore 自己的 runtime |
+| `storage` | `IPersistKeyValueStore` | 必填 | 无 | storage-web 的 `IKeyValueStore`（或具备 `getBytes`/`setBytes` 的 `IRecordStore`） |
+| `codec` | `IPersistCodec` | 可选 | `defaultJsonCodec` | 见 [§7](#7-与-storage-web-的-codec-集成) |
+| `version` | `number` | 可选 | `0` | schema 版本，必须是安全非负整数 |
+| `migrate` | `(persisted: TState, fromVersion: number) => TState` | 可选 | 无 | 见 [§5](#5-存档格式与版本迁移) |
+| `partialize` | `(state: TState) => Partial<TState>` | 可选 | 恒等函数 | 写入前裁剪 |
+| `merge` | `(persisted: Partial<TState>, current: TState) => TState` | 可选 | `(persisted) => persisted as TState` | 读取后合并回内存，见下方"默认 merge 的语义" |
+| `debounceMs` | `number` | 可选 | `0`（不防抖） | 变化后延迟多久发起写入 |
+
+### 默认 `merge` 的语义（容易踩的坑）
+
+默认 `merge` 是**"持久化状态整份替换当前状态"**（`(persisted) => persisted`），**不是**逐字段合并——早期设计想用 `{ ...current, ...persisted }` 当默认值，但这对 `Map`/`Set`（对象展开会丢光内容）和 `Array`（对象展开产出带数字字符串键的普通对象）都是错误结果，实现阶段改成了整份替换。
+
+- `partialize` 保持默认（恒等函数）时，"替换"和"合并"是同一件事，行为符合直觉。
+- 一旦你自定义 `partialize` 只持久化状态的一部分（比如 `persistKeyed()` 里"只存 refreshToken"这种场景），**必须**同时提供匹配的 `merge`，否则读回来的状态会用这个"子集"整份替换掉当前状态，未持久化的字段会变成 `undefined`。
+
+`persist()`（store-light）是个例外：它的 `restore()` 最终调用 `store.$hydrate()`，那本身就是"宽松写回、未知字段跳过"的部分合并语义，跟这里的 `merge` 默认值互不影响——即使只 `partialize` 出一部分字段，`$hydrate()` 也只会覆盖这些字段，不会动其余字段。
+
+---
+
+## 2. `persist()` 完整参考（store-light）
+
+```ts
+function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle;
+
+type IPersistableStore = {
+  readonly $runtime: IRuntime;
+  $plain(): Record<string, unknown>;
+  $subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean }): IDisposer;
+  $hydrate(partial: Record<string, unknown>, options?: { unknown?: 'ignore' | 'report' | 'strict'; onUnknown?: (key: string) => void }): void;
+};
+
+type IPersistOptions = {
+  key: string;
+  storage: IPersistKeyValueStore;
+  codec?: IPersistCodec;
+  version?: number;
+  migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;
+  partialize?: (state: Record<string, unknown>) => Record<string, unknown>;
+  debounceMs?: number;
+};
+```
+
+`IPersistableStore` 是结构类型，不 import `@migaia/store-light` 的具体类型——`createStore()` 的返回值天然满足这个接口，传进来不需要任何改动。适配表：
+
+| `IPersistUnit` 成员 | 对应 store-light API |
+| --- | --- |
+| `snapshot()` | `store.$plain()`（只含 signal 支撑的标量字段，排除 computed/wasm/方法） |
+| `restore(state)` | `store.$hydrate(state)`（宽松写回，未知字段跳过） |
+| `subscribe(fn)` | `store.$subscribe(fn, { fireImmediately: false })` |
+
+```ts
+import { createStore } from '@migaia/store-light';
+import { indexedDb } from '@migaia/storage-web';
+import { persist } from '@migaia/store-persist';
+
+const store = createStore({ theme: 'light', fontSize: 14 });
+const handle = persist(store, {
+  key: 'settings:v1',
+  storage: indexedDb({ dbName: 'app' }),
+  version: 1,
+  partialize: (state) => ({ theme: state.theme }) // 只存 theme，fontSize 只留内存
+});
+```
+
+---
+
+## 3. `persistCollection()` 完整参考（store-indexed）
+
+```ts
+function persistCollection<TState>(collection: IPersistableCollection<TState>, options: IPersistCollectionOptions<TState>): IPersistHandle;
+
+type IPersistableCollection<TState> = {
+  readonly runtime: IRuntime;
+  snapshot(): TState;
+  replace(state: TState): void;
+};
+
+type IPersistCollectionOptions<TState> = {
+  key: string;
+  storage: IPersistKeyValueStore;
+  codec?: IPersistCodec;
+  version?: number;
+  migrate?: (persisted: TState, fromVersion: number) => TState;
+  partialize?: (state: TState) => Partial<TState>;
+  merge?: (persisted: Partial<TState>, current: TState) => TState;
+  debounceMs?: number;
+};
+```
+
+支持 `@migaia/store-indexed` 的四种集合：`ObservableObject`、`ObservableArray`、`ObservableMap`、`ObservableSet`——全部有 `snapshot()`（tracked 读）和 `replace(state)`（原子整体替换，`ObservableMap`/`ObservableSet` 的 `replace()` 是跟本包这一版一起补的，之前只有 Object/Array 有）。不用泛型重载区分四种集合——直接把 collection 传进去，TypeScript 从参数结构推导 `TState`。
+
+变化订阅的实现方式（跟 `persist()`/`persistKeyed()` 不同）：四种集合都**没有**现成的 `subscribe()` 方法，`toPersistUnit()` 内部用 `collection.runtime.effect(() => { collection.snapshot(); ... })` 包一层——`snapshot()` 内部读了一个 tracked 的内部结构 Signal，包进 Effect 就能感知任何结构变化；Effect 构造自带的首次同步执行会被跳过，不当成一次真正的变化。
+
+```ts
+import { observableMap } from '@migaia/store-indexed';
+import { localStorage } from '@migaia/storage-web';
+import { persistCollection } from '@migaia/store-persist';
+
+const cart = observableMap<string, number>(); // sku -> 数量
+const handle = persistCollection(cart, {
+  key: 'cart:v1',
+  storage: localStorage()
+});
+
+cart.set('sku-123', 2); // 防抖写回（默认 debounceMs: 0，下一次写队列排空即写）
+```
+
+### 原子 hydrate 的保证
+
+四种集合的 `replace()` 都是"一次性整体替换，只触发一次结构变化通知"——hydrate 失败（存档损坏、版本不匹配无 migrate）不会让 collection 停在"部分写入"的中间态：要么整份替换成功，要么 `restore()` 根本不被调用、collection 保持 hydrate 前的状态。
+
+---
+
+## 4. `persistKeyed()` + `clearFamily()` 完整参考（store-keyed）
+
+```ts
+function persistKeyed<T>(atomStore: IAtomStore, def: IWritableAtomDefinition<T>, id: string, options: IPersistKeyedOptions<T>): IPersistKeyedHandle<T>;
+function clearFamily(storage: IPersistKeyValueStore, namespace: string): Promise<number>;
+
+type IPersistKeyedOptions<T> = {
+  namespace: string; // 必填——storage key 格式 `${namespace}:${id}`
+  storage: IPersistKeyValueStore;
+  codec?: IPersistCodec;
+  version?: number;
+  debounceMs?: number;
+  partialize?: (value: T) => Partial<T>;
+  merge?: (persisted: Partial<T>, current: T) => T;
+};
+
+type IPersistKeyedHandle<T> = { readonly value: T; dispose(): void };
+```
+
+### 为什么持久化单位是"一个 key"，不是"整个 family"
+
+`AtomStore`/`familyDef` 都不能回答"当前存在哪些 key"——这是 `@migaia/store-keyed` 刻意的设计（缓存策略是私事，不该被外部依赖）。所以 `persistKeyed()` 不是"给整个 family 接一份持久化"，是**每次调用各自创建一个独立的持久化单位**，`dispose()` 只影响这一个 key：
+
+```ts
+import { createAtomStore, familyDef } from '@migaia/store-keyed';
+import { indexedDb } from '@migaia/storage-web';
+import { persistKeyed, clearFamily } from '@migaia/store-persist';
+
+type Session = { accessToken: string; refreshToken: string };
+const session = familyDef((): Session => ({ accessToken: '', refreshToken: '' }));
+const storage = indexedDb({ dbName: 'app' });
+const atomStore = createAtomStore(runtime);
+
+// 每个 session id 首次使用时调用一次
+function getSession(id: string) {
+  return persistKeyed(atomStore, session(id), id, {
+    namespace: 'sessions',
+    storage,
+    partialize: (v) => ({ refreshToken: v.refreshToken }), // 只存 refreshToken
+    merge: (persisted, current) => ({ ...current, ...persisted }) // 其余字段保留内存值
+  });
+}
+
+const { value, dispose } = getSession('u1');
+// ... 使用完毕
+dispose();
+```
+
+### `clearFamily()`：批量清空
+
+`clearFamily(storage, namespace)` **绕开** `AtomStore`——直接问 storage-web 要该 storage 下全部 key（`await storage.keys()`），过滤出 `${namespace}:` 前缀的，逐个删除，返回删掉的条数。它**不会**、也不能顺带清理内存里已经实例化的 `AtomStore` 状态：调用方如果还持有对应的 `persistKeyed()` handle，那些 handle 的内存值不受影响，只是失去了持久化落地；下次这些 key 的值再变化，会重新写回一条新记录（因为它们各自的 `subscribe` 还挂着，跟 `clearFamily()` 无关）。需要连内存也清空，需要调用方自己对每个还持有的 handle 调用 `dispose()`。
+
+```ts
+async function logout(userId: string) {
+  await clearFamily(storage, 'sessions'); // 清空全部用户的持久化 session
+  currentSessionHandle?.dispose(); // 清理当前用户还留在内存里的 handle
+}
+```
+
+---
+
+## 5. 存档格式与版本迁移
+
+```text
+{ "version": <number>, "state": <任意 JSON 兼容值> }
+```
+
+- `version`：调用方传入的 schema 版本，`migrate(persisted, fromVersion)` 处理跨版本转换。
+- `state`：`partialize(unit.snapshot())` 的结果——对 `persist()` 是（裁剪后的）`Record<string,unknown>`；对 `persistCollection()` 是（裁剪后的）collection 快照；对 `persistKeyed()` 是（裁剪后的）单个 key 的 value。
+
+`version` 与配置的当前版本不一致、且没有提供 `migrate`：hydrate 直接失败（`ready` reject，`status` 变 `error`），不会把未迁移的旧数据当成已迁移的新数据用。
+
+---
+
+## 6. `IPersistHandle` 完整 API 参考
+
+`persist()`/`persistCollection()` 返回完整的 `IPersistHandle`；`persistKeyed()` 只返回 `{ value, dispose() }`（单 key 场景不需要 `status`/`flush()` 这么重的门面）。
+
+| 成员 | 类型 | 同步/异步 | 说明 |
+| --- | --- | --- | --- |
+| `status` | `IComputedValue<'loading' \| 'ready' \| 'error' \| 'disposed'>` | — | 整体状态机 |
+| `error` | `IComputedValue<unknown>` | — | hydration/write 任一失败时的错误；两者都失败返回 `AggregateError` |
+| `hydrated` | `IComputedValue<boolean>` | — | 等价于 `hydrationStatus.value === 'success'` |
+| `hydrationStatus` / `hydrationError` | `IReadonlyPersistValue<...>` | — | 首次读取的结果，只变化一次 |
+| `writeStatus` / `writeError` | `IReadonlyPersistValue<...>` | — | 最近一次写操作的结果，会反复变化 |
+| `ready` | `Promise<void>` | 异步 | hydrate 成功 resolve，失败 reject |
+| `settled` | `Promise<void>` | 异步 | 不管成功失败都 resolve |
+| `flush()` | `() => Promise<void>` | 异步 | 立即写并等待完成；这次写入失败会 reject 给调用方 |
+| `clear()` | `() => Promise<void>` | 异步 | 删除存档，不重置内存状态 |
+| `disposed` | `boolean` | 同步 | 是否已 `dispose()` |
+| `dispose()` | `() => void` | 同步 | 退订、清防抖 timer、abort 在途 I/O |
+
+`dispose()` 之后再调用 `flush()`/`clear()` 会立即 reject，错误是 `name === 'AbortError'` 的 `Error`。
+
+---
+
+## 7. 与 storage-web 的 codec 集成
+
+`storage: IPersistKeyValueStore` 就是 storage-web 的 `IKeyValueStore`（或带 `getBytes`/`setBytes` 的 `IRecordStore`）——不需要任何适配层，直接传 `memoryStorage()`/`localStorage()`/`indexedDb()` 的返回值。
+
+`codec` 默认是本包自带的 `defaultJsonCodec`（`output: 'text'`，结构等价于 storage-web 的 `jsonCodec`，本包不 import 它的具体值，只按结构复刻，避免多一条运行时依赖）。这个默认 codec 额外处理了 `JSON.stringify` 原生不支持的两种形状：
+
+- `Map` → 编码成 `{ "__migaia_persist_map__": [[key, value], ...] }`，解码时还原成真正的 `Map` 实例。
+- `Set` → 编码成 `{ "__migaia_persist_set__": [value, ...] }`，解码时还原成真正的 `Set` 实例。
+
+这不是可选的锦上添花——`JSON.stringify(new Map(...))` 产出 `"{}"`，**静默丢光内容而不报错**，`persistCollection()` 接的 `ObservableMap`/`ObservableSet` 的 `snapshot()` 就是真实的 `Map`/`Set` 实例，不处理这个坑会导致 keyed/indexed 场景下的 Map/Set 数据悄悄消失。
+
+传自定义 codec（比如要走 IndexedDB 的结构化直存、二进制压缩）：
+
+```ts
+import { structuredCodec, selectCodec } from '@migaia/storage-web';
+
+const handle = persistCollection(bigDataset, {
+  key: 'big',
+  storage: indexedDb({ dbName: 'app' }),
+  codec: structuredCodec // Map/Set/Date/Blob 原生存，不经过 JSON 往返
+});
+```
+
+`codec.output === 'structured'` 要求后端 `capabilities.records === true`（IndexedDB 满足，localStorage/cookie 不满足）；`output === 'binary'` 遇到不支持字节通道的后端会抛错（本包目前不做自动 base64 降级，需要降级请用 storage-web 自己的 `selectCodec()` 包一层再传进来）。
+
+---
+
+## 8. 错误参考
+
+| 触发条件 | 错误类型 | 说明 |
+| --- | --- | --- |
+| `version` 不是安全非负整数 | `TypeError` | 构造时同步抛出 |
+| 存档不是合法信封（不是对象/缺 `version`/缺 `state`） | `PersistEnvelopeError`（继承 `TypeError`） | hydrate 阶段，反映在 `hydrationError`/`ready` reject |
+| `version` 与存档不一致且未提供 `migrate` | `Error` | 消息含 `provide migrate()` |
+| codec 编码失败（比如值包含循环引用） | 取决于 codec 实现 | `defaultJsonCodec` 透传 `JSON.stringify` 的原生错误 |
+| `codec.output === 'structured'` 但存储不支持 | `TypeError` | 见 [§7](#7-与-storage-web-的-codec-集成) |
+| `codec.output === 'binary'` 但存储没有 `getBytes`/`setBytes` | `TypeError` | 同上 |
+| `persistKeyed()` 未传 `namespace` | TypeScript 编译期错误 | `namespace` 是必填字段，不是运行时校验 |
+| `dispose()` 后调用 `flush()`/`clear()` | `Error`（`name: 'AbortError'`） | 消息为 `[store] persist operation was aborted by dispose` |
+
+---
+
+## 9. 生产环境完整示例
+
+```ts
+import { createStore } from '@migaia/store-light';
+import { createAtomStore, familyDef } from '@migaia/store-keyed';
+import { observableSet } from '@migaia/store-indexed';
+import { indexedDb } from '@migaia/storage-web';
+import { persist, persistCollection, persistKeyed, clearFamily } from '@migaia/store-persist';
+import { createRuntime } from '@migaia/reactive';
+
+const runtime = createRuntime();
+const storage = indexedDb({ dbName: 'app' });
+
+// 1. 扁平设置
+const settings = createStore({ theme: 'light' });
+const settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });
+
+// 2. 最近浏览过的商品（indexed）
+const recentlyViewed = observableSet<string>(undefined, {}, runtime);
+const recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });
+
+// 3. 按用户的 session（keyed，只存 refreshToken）
+const atomStore = createAtomStore(runtime);
+const session = familyDef(() => ({ accessToken: '', refreshToken: '' }));
+function getSession(userId: string) {
+  return persistKeyed(atomStore, session(userId), userId, {
+    namespace: 'sessions',
+    storage,
+    partialize: (v) => ({ refreshToken: v.refreshToken }),
+    merge: (persisted, current) => ({ ...current, ...persisted })
+  });
+}
+
+async function logout(userId: string, activeHandle: { dispose(): void }) {
+  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);
+  await clearFamily(storage, 'sessions');
+  activeHandle.dispose();
+}
+```
+
+---
+
+## 10. 常见问题排查
+
+**Q: hydrate 完成之后，我改的字段没有被存进去？**
+检查 `debounceMs`——如果设置了防抖，需要等待或调用 `handle.flush()`；也检查 `partialize` 是不是把这个字段裁掉了。
+
+**Q: 用了 `partialize` 之后，其他字段刷新页面变成 `undefined` 了？**
+`persistKeyed()`/`persistCollection()` 的默认 `merge` 是整份替换，只 `partialize` 不配 `merge` 会丢字段——见 [§1](#1-核心引擎ipersistunit--persistunit)。`persist()`（store-light）不受影响。
+
+**Q: `persistCollection()` 存的 Map 读回来变成普通对象了？**
+确认没有传自定义 `codec` 覆盖掉默认的 `defaultJsonCodec`——自定义 codec 需要自己处理 Map/Set 往返，或者继续用默认 codec。
+
+**Q: `clearFamily()` 之后，页面上还显示着旧数据？**
+`clearFamily()` 只删 storage，不清内存——见 [§4](#4-persistkeyed--clearfamily-完整参考store-keyed)，需要调用方自己 `dispose()` 还持有的 handle。

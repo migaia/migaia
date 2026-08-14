@@ -1,6 +1,6 @@
 import { createBroadcastChannelTransport } from '../../src/adapters/broadcast-channel';
 import { readEndpointDebugSnapshot } from '../../src/internal/test-observer';
-import { createRpc, installErrorGuards } from './rpc';
+import { createRpc, installErrorGuards, terminalProviders } from './rpc';
 
 const errors = installErrorGuards();
 let endpoint: Awaited<ReturnType<typeof createRpc>> | undefined;
@@ -18,7 +18,10 @@ globalThis.startBroadcastServer = async (uniqueId: string, label: string) => {
     'service',
     ['client'],
     createBroadcastChannelTransport(channel),
-    { who: (context) => context.success({ label, value: context.data }) },
+    {
+      ...terminalProviders,
+      who: (context) => context.success({ label, value: context.data })
+    },
     { uniqueTargetId: uniqueId, identifier: allowedIdentity(['client-id']) }
   );
 };
@@ -33,6 +36,20 @@ globalThis.startBroadcastClient = async () => {
     {
       uniqueTargetId: 'client-id',
       identifier: allowedIdentity(['server-a', 'server-b'])
+    },
+    undefined,
+    false,
+    {
+      schemas: {
+        schema: {
+          params: {
+            parse: () => {
+              throw new Error('schema rejected');
+            }
+          },
+          result: { parse: (value) => value }
+        }
+      }
     }
   );
 };
@@ -85,11 +102,17 @@ globalThis.startAuthenticatedBroadcastServer = async () => {
       who: (context) => {
         providerCalls += 1;
         return context.success({ value: context.data, trusted: true });
+      },
+      notify: (context) => {
+        channel!.postMessage({ e2e: 'dispatch-result', value: context.data });
+        return context.success(undefined);
       }
     },
     { uniqueTargetId: 'auth-server', identifier: allowedIdentity(['auth-client']) },
     undefined,
-    true
+    true,
+    undefined,
+    { chunkSize: 4 }
   );
 };
 
@@ -102,7 +125,9 @@ globalThis.startAuthenticatedBroadcastClient = async () => {
     {},
     { uniqueTargetId: 'auth-client', identifier: allowedIdentity(['auth-server']) },
     undefined,
-    true
+    true,
+    undefined,
+    { chunkSize: 4 }
   );
 };
 
@@ -133,7 +158,76 @@ globalThis.startAuthenticatedBroadcastAttacker = () => {
 };
 
 globalThis.sendBroadcast = (value: unknown) => endpoint!.send('service', 'who', value);
+globalThis.dispatchBroadcast = async () => {
+  const dispatchResult = new Promise<unknown>((resolve) => {
+    channel!.addEventListener('message', function onDispatch(event) {
+      if (event.data?.e2e === 'dispatch-result') {
+        channel!.removeEventListener('message', onDispatch);
+        resolve(event.data.value);
+      }
+    });
+  });
+  endpoint!.dispatch('service', 'notify', 'broadcast-chunked-dispatch-😀');
+  return String(await dispatchResult);
+};
+globalThis.sendBroadcastTerminal = async () => {
+  const chunkedRequest = await endpoint!.send('service', 'who', 'broadcast-chunked-request-😀');
+  const chunkedRemoteError = await endpoint!
+    .send('service', 'fail', 'broadcast-chunked-error-😀')
+    .then(
+      () => 'resolved',
+      (error: { readonly code?: string }) => error.code ?? 'error'
+    );
+  const chunkedTimeout = await endpoint!
+    .send('service', 'hang', 'broadcast-chunked-timeout-😀', { timeoutMs: 40 })
+    .then(
+      () => 'resolved',
+      (error: { readonly code?: string }) => error.code ?? 'error'
+    );
+  const remoteError = await endpoint!.send('service', 'fail', null).then(
+    () => 'resolved',
+    (error: { readonly code?: string }) => error.code ?? 'error'
+  );
+  const timeout = await endpoint!.send('service', 'hang', null, { timeoutMs: 40 }).then(
+    () => 'resolved',
+    (error: { readonly code?: string }) => error.code ?? 'error'
+  );
+  const controller = new AbortController();
+  const pending = endpoint!.send('service', 'hang', 'broadcast-chunked-abort-😀', {
+    signal: controller.signal
+  });
+  controller.abort();
+  const aborted = await pending.then(
+    () => 'resolved',
+    (error: { readonly code?: string }) => error.code ?? 'error'
+  );
+  const schemaError = await endpoint!.send('service', 'schema', 'broadcast-chunked-schema-😀').then(
+    () => 'resolved',
+    (error: { readonly code?: string }) => error.code ?? 'error'
+  );
+  const activeSnapshot = readEndpointDebugSnapshot(endpoint!);
+  if (activeSnapshot === undefined) throw new Error('missing endpoint snapshot');
+  return {
+    chunkedRequest: (chunkedRequest as { readonly value: string }).value,
+    chunkedRemoteError,
+    chunkedTimeout,
+    remoteError,
+    timeout,
+    aborted,
+    schemaError,
+    activeSnapshot
+  };
+};
 globalThis.pingBroadcast = () => endpoint!.ping('service');
+globalThis.pingBroadcastTerminal = async () => {
+  const success = await endpoint!.ping('service');
+  const timeout = await endpoint!.ping('missing', undefined, { timeoutMs: 40 });
+  const controller = new AbortController();
+  const pending = endpoint!.ping('service', undefined, { signal: controller.signal });
+  controller.abort();
+  const aborted = await pending;
+  return { success, timeout, aborted };
+};
 globalThis.broadcastServers = () => endpoint!.connect.getServerList('service');
 globalThis.pinBroadcast = (receiverId: string) =>
   endpoint!.connect.pinReceiver('service', receiverId);
@@ -153,7 +247,26 @@ declare global {
   var startAnonymousBroadcastServer: () => Promise<void>;
   var startAnonymousBroadcastClient: () => Promise<void>;
   var sendBroadcast: (value: unknown) => Promise<unknown>;
+  var dispatchBroadcast: () => Promise<string>;
+  var sendBroadcastTerminal: () => Promise<{
+    chunkedRequest: string;
+    remoteError: string;
+    timeout: string;
+    aborted: string;
+    schemaError: string;
+    activeSnapshot: {
+      phase: string;
+      pending: number;
+      chunks: number;
+      activeControllers: number;
+    };
+  }>;
   var pingBroadcast: () => Promise<boolean>;
+  var pingBroadcastTerminal: () => Promise<{
+    success: boolean;
+    timeout: boolean;
+    aborted: boolean;
+  }>;
   var broadcastServers: () => readonly { receiverId: string; uniqueTargetId?: string }[];
   var pinBroadcast: (receiverId: string) => void;
   var unpinBroadcast: () => void;

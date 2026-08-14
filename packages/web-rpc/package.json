@@ -74,7 +74,7 @@
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",
     "release:patch": "npm version patch --no-git-tag-version --ignore-scripts",
     "release:pack": "pnpm pack --pack-destination /tmp",
-    "release:publish": "npm publish --access restricted --ignore-scripts"
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
   "devDependencies": {
     "typescript": "~6.0.2",

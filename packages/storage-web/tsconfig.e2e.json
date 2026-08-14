@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "types": ["vite/client", "@playwright/test"],
+    "paths": {
+      "@migaia/store-light": ["../store-light/dist/index.d.ts"],
+      "@migaia/store-persist": ["../store-persist/dist/index.d.ts"]
+    }
+  },
+  "include": ["src", "e2e"],
+  "exclude": []
+}

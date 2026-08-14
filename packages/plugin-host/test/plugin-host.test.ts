@@ -415,7 +415,10 @@ describe('PluginHost', () => {
     const options = host.config.get('config-paths.options') as { retries: number };
     expect(options).not.toBe(nested);
     expect(options.retries).toBe(3);
-    expect(() => host.config.get('config-paths')).toThrow(TypeError);
+    expect(host.config.get('config-paths')).toEqual({
+      options: { retries: 3 },
+      records: [{ enabled: true }]
+    });
     expect(host.config.get('missing.value')).toBeUndefined();
   });
 

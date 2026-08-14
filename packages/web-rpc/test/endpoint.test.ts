@@ -237,6 +237,75 @@ describe('WebRpcEndpoint', () => {
     await a.dispose();
     await b.dispose();
   });
+  it('WR-R3-3 fixed: dispatch-only ids are released after send settles, so repeated dispatch() never exhausts a small replay budget', async () => {
+    const [aTransport, bTransport] = pair();
+    const failures: unknown[] = [];
+    const a = new WebRpcEndpoint<'b'>('a', aTransport, undefined, {
+      // Deliberately tiny: a request's taskId is intentionally NOT released on settlement (it
+      // must survive for the replay TTL so a late/duplicate response can't be replayed against
+      // a reused id) — only dispatch-only ids are released right after send. If that release
+      // did not happen, the 6th of these dispatch() calls would exceed maxEntries and surface
+      // as a 'dispatch.failure' hook event.
+      replay: { maxEntries: 2, ttlMs: 60_000 },
+      hooks: {
+        listeners: (event) => {
+          if (event.name === 'dispatch.failure') failures.push(event);
+        }
+      }
+    });
+    const b = new WebRpcEndpoint<'a'>('b', bTransport);
+    const events: unknown[] = [];
+    b.on('notify', (ctx) => {
+      events.push(ctx.data);
+    });
+
+    // Spaced out rather than fired in one synchronous burst: release happens once #send's own
+    // promise chain settles (a few microtasks in), not synchronously within dispatch() itself,
+    // so back-to-back calls with no yield between them would still transiently exhaust a
+    // 2-entry budget regardless of the fix. What this proves is that the budget recovers between
+    // sends instead of being held forever like a regular request's taskId would be.
+    for (let index = 0; index < 6; index += 1) {
+      a.dispatch('b', 'notify', index);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+
+    expect(failures).toEqual([]);
+    expect(events).toEqual([0, 1, 2, 3, 4, 5]);
+    await a.dispose();
+    await b.dispose();
+  });
+  it('releases chunk message ids after chunked dispatch settles', async () => {
+    const [aTransport, bTransport] = pair();
+    const failures: unknown[] = [];
+    const a = new WebRpcEndpoint<'b'>('a', aTransport, undefined, {
+      chunk: { chunkSize: 4 },
+      // One slot is occupied by the dispatch task while its chunk message is in flight.
+      replay: { maxEntries: 2, ttlMs: 60_000 },
+      hooks: {
+        listeners: (event) => {
+          if (event.name === 'dispatch.failure') failures.push(event);
+        }
+      }
+    });
+    const b = new WebRpcEndpoint<'a'>('b', bTransport, undefined, {
+      chunk: { chunkSize: 4 }
+    });
+    const events: unknown[] = [];
+    b.on('notify', (context) => {
+      events.push(context.data);
+    });
+    try {
+      for (let index = 0; index < 4; index += 1) {
+        a.dispatch('b', 'notify', `dispatch-${index}`);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      expect(failures).toEqual([]);
+      expect(events).toEqual(['dispatch-0', 'dispatch-1', 'dispatch-2', 'dispatch-3']);
+    } finally {
+      await a.dispose();
+      await b.dispose();
+    }
+  });
   it('discovers endpoint ids lazily before the first request', async () => {
     const [aTransport, bTransport] = pair();
     const a = new WebRpcEndpoint<'b'>('a', aTransport);
@@ -513,6 +582,11 @@ describe('WebRpcEndpoint', () => {
     expect(manual.unregister).toBeTypeOf('function');
     expect(manual.ping).toBeTypeOf('function');
     expect(client.discovery.getServerList('server')).toEqual([]);
+    const aborted = new AbortController();
+    aborted.abort();
+    await expect(manual.query?.('server', { signal: aborted.signal })).rejects.toThrow(
+      'Discovery aborted'
+    );
     expect(() => serverManual.onQuery?.(true as never)).toThrow(
       'query listener must be a function'
     );
@@ -1275,6 +1349,27 @@ describe('WebRpcEndpoint', () => {
         new WebRpcEndpoint('a', transport, undefined, {
           chunk: { chunkSize: 1 }
         })
+    ).toThrowError(expect.objectContaining({ code: WebRpcErrorCode.invalidConfig }));
+  });
+  it('accepts configurable replay limits and rejects invalid limits', async () => {
+    const [transport] = pair();
+    const endpoint = new WebRpcEndpoint('a', transport, undefined, {
+      replay: { maxEntries: 8, ttlMs: 1_000 }
+    });
+    await endpoint.dispose();
+    const maxOnly = new WebRpcEndpoint('a', pair()[0], undefined, {
+      replay: { maxEntries: 8 }
+    });
+    const ttlOnly = new WebRpcEndpoint('a', pair()[0], undefined, {
+      replay: { ttlMs: 1_000 }
+    });
+    await maxOnly.dispose();
+    await ttlOnly.dispose();
+    expect(
+      () => new WebRpcEndpoint('a', pair()[0], undefined, { replay: { maxEntries: 0 } })
+    ).toThrowError(expect.objectContaining({ code: WebRpcErrorCode.invalidConfig }));
+    expect(
+      () => new WebRpcEndpoint('a', pair()[0], undefined, { replay: { ttlMs: 0 } })
     ).toThrowError(expect.objectContaining({ code: WebRpcErrorCode.invalidConfig }));
   });
 

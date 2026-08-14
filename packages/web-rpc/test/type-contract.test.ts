@@ -2,6 +2,7 @@ import { describe, expectTypeOf, it } from 'vitest';
 import { createEndpoint } from '../src/factory';
 import { connect } from '../src/middleware/connect';
 import { ping } from '../src/middleware/ping';
+import type { IWebRpcPingOptions } from '../src/typing';
 
 type IAutomaticMiddlewareList = readonly [ReturnType<typeof connect>];
 type IManualMiddlewareList = readonly [
@@ -41,5 +42,8 @@ describe('factory type contract', () => {
     >().toEqualTypeOf<true>();
     expectTypeOf<'ping' extends keyof IAutomaticEndpoint ? true : false>().toEqualTypeOf<false>();
     expectTypeOf<'ping' extends keyof IManualEndpoint ? true : false>().toEqualTypeOf<true>();
+    expectTypeOf<IManualEndpoint['ping']>().toEqualTypeOf<
+      (targetId: string, receiverId?: string, options?: IWebRpcPingOptions) => Promise<boolean>
+    >();
   });
 });

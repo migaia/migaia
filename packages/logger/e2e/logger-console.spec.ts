@@ -79,3 +79,11 @@ test('renders logger entries through the browser console', async ({ page }) => {
     entries.every((entry: { data: { uuid?: string } }) => typeof entry.data.uuid === 'string')
   ).toBe(true);
 });
+
+test('flush deadline converges with a never-settling browser sink', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => window.runLoggerDeadlineScenario());
+  const elapsed = await page.evaluate(() => window.loggerDeadlineElapsedMs);
+  expect(elapsed).toBeGreaterThanOrEqual(2_900);
+  expect(elapsed).toBeLessThan(4_500);
+});

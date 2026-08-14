@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { createServiceWorkerTransport } from '../../src/adapters/service-worker';
 import { readEndpointDebugSnapshot } from '../../src/internal/test-observer';
-import { createRpc, echoProvider } from './rpc';
+import { createRpc, echoProvider, terminalProviders } from './rpc';
 
 const scope = globalThis as unknown as ServiceWorkerGlobalScope;
 const endpoints = new Map<string, Awaited<ReturnType<typeof createRpc>>>();
@@ -38,8 +38,19 @@ scope.addEventListener('message', (event) => {
       'service',
       ['page'],
       createServiceWorkerTransport({ target: client, receiver: scope, peerId: client.id }),
-      { echo: countedEcho },
-      { uniqueTargetId: `service-${client.id}` }
+      {
+        ...terminalProviders,
+        echo: countedEcho,
+        notify: (context) => {
+          client.postMessage({ e2e: 'dispatch-result', value: context.data });
+          return context.success(undefined);
+        }
+      },
+      { uniqueTargetId: `service-${client.id}` },
+      undefined,
+      false,
+      undefined,
+      { chunkSize: 4 }
     )
       .then((endpoint) => {
         endpoints.set(client.id, endpoint);

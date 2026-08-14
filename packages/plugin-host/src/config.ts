@@ -47,7 +47,6 @@ export const parseConfigPath = (path: string): string[] => {
       throw new TypeError(`config path segment "${segment}" is invalid`);
     segments.push(segment);
   }
-  if (segments.length < 2) throw new TypeError('config path must target a nested value');
   return segments;
 };
 
@@ -60,7 +59,12 @@ export const readConfigPath = (config: IPluginConfig, segments: readonly string[
     if (!Object.prototype.hasOwnProperty.call(current, segment)) return undefined;
     current = (current as Record<string, unknown>)[segment];
   }
-  if (current !== null && typeof current === 'object' && !Array.isArray(current))
+  if (
+    current !== null &&
+    typeof current === 'object' &&
+    !Array.isArray(current) &&
+    (Object.getPrototypeOf(current) === Object.prototype || Object.getPrototypeOf(current) === null)
+  )
     return readPlainDataRecord(current, 'config value', false, false);
   if (Array.isArray(current)) return current.slice();
   return current;

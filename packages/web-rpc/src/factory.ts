@@ -43,6 +43,7 @@ export async function createEndpoint<
   let factoryTransport: unknown;
   let factoryProvider: unknown;
   let construction: IWebRpcFactoryConfig['construction'];
+  let factoryReplay: IWebRpcFactoryConfig['replay'];
   try {
     if (!config || typeof config !== 'object' || Array.isArray(config))
       throw new Error('factory descriptor is invalid');
@@ -52,6 +53,12 @@ export async function createEndpoint<
     factoryTransport = config.transport;
     factoryProvider = config.provider;
     construction = config.construction;
+    // Snapshotted here with everything else, not read again later at endpoint-construction
+    // time: reading it late (past middleware install) means a hostile `replay` getter would
+    // surface its error only after side effects already ran, instead of being rejected
+    // upfront like every other config field — see WR-R3-2 in
+    // docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
+    factoryReplay = config.replay;
   } catch (error) {
     throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'factory descriptor is unreadable', error);
   }
@@ -352,7 +359,8 @@ export async function createEndpoint<
             ?.enabled,
           ping: capabilities.get<IWebRpcPingCapability>(WebRpcCapabilityKey.pingCapability)?.enabled
         },
-        initialHookEvents: installHookEvents
+        initialHookEvents: installHookEvents,
+        replay: factoryReplay
       }
     );
     endpoint.addDisposer(disposeMiddlewares);

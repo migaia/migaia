@@ -79,6 +79,12 @@ export class ControlTaskRegistry {
     this.#variationAdmissionTotal = 0;
   }
 
+  /** Purges replay and pending-abort TTL state under the endpoint resource owner. */
+  purge(now = Date.now()): void {
+    this.#purge(now);
+    this.#replay.purge(now);
+  }
+
   #purge(now: number): void {
     for (const [key, expiresAt] of this.#pendingAborts)
       if (expiresAt <= now) this.#pendingAborts.delete(key);

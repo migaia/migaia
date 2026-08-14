@@ -5,9 +5,25 @@ test('Window iframe proves source/origin and rejects sibling spoof', async ({ pa
   await page.evaluate(() => globalThis.e2eReady);
   const result = (await page.evaluate(() => globalThis.runWindowIframeScenario())) as {
     echo: string;
+    chunkedRequest: string;
+    chunkedTimeout: string;
+    dispatchPayload: string;
+    remoteError: string;
+    aborted: string;
+    schemaError: string;
+    pingSuccess: boolean;
+    pingTimeout: boolean;
+    pingAborted: boolean;
     parentResult: number;
     providerCalls: number;
     removedResult: string;
+    activeSnapshot: {
+      phase: string;
+      pending: number;
+      pingPending: number;
+      activeControllers: number;
+      chunks: number;
+    };
     errors: string[];
     listenerAdds: number;
     listenerRemoves: number;
@@ -25,9 +41,25 @@ test('Window iframe proves source/origin and rejects sibling spoof', async ({ pa
     };
   };
   expect(result.echo).toBe('window-ok');
+  expect(result.chunkedRequest).toBe('window-chunked-request-😀');
+  expect(result.chunkedTimeout).toBe('DEADLINE_EXCEEDED');
+  expect(result.dispatchPayload).toBe('window-chunked-dispatch-😀');
+  expect(result.remoteError).toBe('REMOTE_FAILURE');
+  expect(result.aborted).toBe('CANCELLED');
+  expect(result.schemaError).toBe('SCHEMA_INVALID');
+  expect(result.pingSuccess).toBe(true);
+  expect(result.pingTimeout).toBe(false);
+  expect(result.pingAborted).toBe(false);
   expect(result.parentResult).toBe(1);
   expect(result.providerCalls).toBe(1);
   expect(result.removedResult).toBe('DEADLINE_EXCEEDED');
+  expect(result.activeSnapshot).toMatchObject({
+    phase: 'active',
+    pending: 0,
+    pingPending: 0,
+    activeControllers: 0,
+    chunks: 0
+  });
   expect(result.errors).toEqual([]);
   expect(result.listenerAdds).toBe(1);
   expect(result.listenerRemoves).toBe(1);

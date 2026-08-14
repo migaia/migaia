@@ -44,6 +44,23 @@ test('two controlled pages keep ServiceWorker Client identities isolated', async
   await expect(pageC.evaluate(() => globalThis.sendServiceWorker('after-reconnect'))).resolves.toBe(
     'after-reconnect'
   );
+  await expect(pageC.evaluate(() => globalThis.sendServiceWorkerTerminal())).resolves.toEqual({
+    chunkedRequest: 'service-worker-chunked-request-😀',
+    activePageSnapshot: expect.objectContaining({
+      phase: 'active',
+      pending: 0,
+      chunks: 0,
+      activeControllers: 0
+    }),
+    dispatchPayload: 'service-worker-chunked-dispatch-😀',
+    remoteError: 'REMOTE_FAILURE',
+    timeout: 'DEADLINE_EXCEEDED',
+    aborted: 'CANCELLED',
+    schemaError: 'SCHEMA_INVALID',
+    pingSuccess: true,
+    pingTimeout: false,
+    pingAborted: false
+  });
   expect(await pageC.evaluate(() => globalThis.disposeServiceWorker())).toEqual([]);
   await pageC.close();
   expect(await pageB.evaluate(() => globalThis.disposeServiceWorker())).toEqual([]);
@@ -53,7 +70,7 @@ test('two controlled pages keep ServiceWorker Client identities isolated', async
       phase: 'disposed',
       pending: 0,
       resources: 0,
-      providerCalls: 5
+      providerCalls: 6
     }),
     serverErrors: []
   });
