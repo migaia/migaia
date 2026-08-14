@@ -1,13 +1,13 @@
 SHELL := /bin/sh
 export CI := true
 
-RELEASE_PACKAGES := plugin-host logger web-rpc
+RELEASE_PACKAGES := plugin-host logger web-rpc storage-web
 GITHUB_PACKAGES_REGISTRY := https://npm.pkg.github.com
 
-.PHONY: plugin-host logger web-rpc \
-	plugin-host-check logger-check web-rpc-check \
-	plugin-host-patch logger-patch web-rpc-patch \
-	plugin-host-publish logger-publish web-rpc-publish \
+.PHONY: plugin-host logger web-rpc storage-web \
+	plugin-host-check logger-check web-rpc-check storage-web-check \
+	plugin-host-patch logger-patch web-rpc-patch storage-web-patch \
+	plugin-host-publish logger-publish web-rpc-publish storage-web-publish \
 	check-package release-check auth-check patch publish
 
 check-package:
@@ -16,7 +16,7 @@ check-package:
 		exit 2; \
 	fi; \
 	case "$(PACKAGE)" in \
-		plugin-host|logger|web-rpc) ;; \
+		plugin-host|logger|web-rpc|storage-web) ;; \
 		*) echo "Unsupported PACKAGE=$(PACKAGE)" >&2; exit 2 ;; \
 	esac
 
@@ -38,8 +38,12 @@ release-check: check-package
 		pnpm @$$package typecheck:test; \
 		pnpm @$$package typecheck:e2e; \
 	fi; \
+	if [ "$$package" = "storage-web" ]; then \
+		pnpm @$$package typecheck:test; \
+		pnpm @$$package typecheck:e2e; \
+	fi; \
 	pnpm @$$package test; \
-	if [ "$$package" = "logger" ] || [ "$$package" = "web-rpc" ]; then \
+	if [ "$$package" = "logger" ] || [ "$$package" = "web-rpc" ] || [ "$$package" = "storage-web" ]; then \
 		pnpm @$$package test:e2e; \
 	fi; \
 	pnpm @$$package build
@@ -88,6 +92,9 @@ logger: release-check auth-check patch publish
 web-rpc: PACKAGE := web-rpc
 web-rpc: release-check auth-check patch publish
 
+storage-web: PACKAGE := storage-web
+storage-web: release-check auth-check patch publish
+
 plugin-host-check: PACKAGE := plugin-host
 plugin-host-check: release-check
 
@@ -96,6 +103,9 @@ logger-check: release-check
 
 web-rpc-check: PACKAGE := web-rpc
 web-rpc-check: release-check
+
+storage-web-check: PACKAGE := storage-web
+storage-web-check: release-check
 
 plugin-host-patch: PACKAGE := plugin-host
 plugin-host-patch: patch
@@ -106,6 +116,9 @@ logger-patch: patch
 web-rpc-patch: PACKAGE := web-rpc
 web-rpc-patch: patch
 
+storage-web-patch: PACKAGE := storage-web
+storage-web-patch: patch
+
 plugin-host-publish: PACKAGE := plugin-host
 plugin-host-publish: publish
 
@@ -114,3 +127,6 @@ logger-publish: publish
 
 web-rpc-publish: PACKAGE := web-rpc
 web-rpc-publish: publish
+
+storage-web-publish: PACKAGE := storage-web
+storage-web-publish: publish

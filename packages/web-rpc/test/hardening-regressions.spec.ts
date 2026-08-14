@@ -7,6 +7,8 @@ import { splitUtf8 } from '../src/internal/chunk';
 import { ReplayWindow } from '../src/internal/replay';
 import { VerifiedPeerRegistry } from '../src/internal/identity';
 import { normalizeWebRpcEnvelope } from '../src/wire';
+import { WebRpcEndpoint } from '../src/endpoint';
+import { createMemoryTransportPair } from '../src/adapters/memory';
 
 describe('#1 splitUtf8 会产出超过 maxBytes 的分片，接收端必然拒收', () => {
   it('chunk budget 小于最大 UTF-8 code point 时拒绝配置', () => {
@@ -215,5 +217,43 @@ describe('second adversarial pass (R3, fixed)', () => {
     await expect(createEndpoint(config as any)).rejects.toMatchObject({ code: 'INVALID_CONFIG' });
     expect(installed).toBe(false); // middleware install() must never run once the descriptor is unreadable
     expect(disposed).toBe(false);
+  });
+});
+
+describe('第六轮强对抗：WebRpcEndpoint.dispose() 的 reject 缓存与未捕获拒绝', () => {
+  it('清理失败后重复调用 dispose() 不应永远重新抛出同一个错误', async () => {
+    const [clientTransport] = createMemoryTransportPair();
+    const client = new WebRpcEndpoint('client', clientTransport);
+    client.addDisposer(() => {
+      throw new Error('boom');
+    });
+
+    await expect(client.dispose()).rejects.toMatchObject({
+      message: 'Endpoint disposal completed with cleanup errors'
+    });
+    // 后续调用没有新工作要做，对象已经处于终态——不应该无限期重放同一个已经报告过的错误。
+    await expect(client.dispose()).resolves.toBeUndefined();
+    await expect(client.dispose()).resolves.toBeUndefined();
+  });
+
+  it('fire-and-forget 的 dispose()（不 await、不 catch）不产生未捕获拒绝', async () => {
+    const [clientTransport] = createMemoryTransportPair();
+    const client = new WebRpcEndpoint('client', clientTransport);
+    client.addDisposer(() => {
+      throw new Error('boom');
+    });
+
+    let unhandled: unknown;
+    const onUnhandledRejection = (reason: unknown) => {
+      unhandled = reason;
+    };
+    process.on('unhandledRejection', onUnhandledRejection);
+    try {
+      client.dispose(); // 故意不 await、不 .catch()——常见的"卸载时尽力清理"写法
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(unhandled).toBeUndefined();
+    } finally {
+      process.off('unhandledRejection', onUnhandledRejection);
+    }
   });
 });
