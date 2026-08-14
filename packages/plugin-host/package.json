@@ -30,7 +30,7 @@
     "lint": "oxlint src test",
     "test": "pnpm run build && vitest run",
     "test:coverage": "pnpm run build && vitest run --coverage",
-    "release:patch": "npm version patch --no-git-tag-version --ignore-scripts",
+    "release:patch": "pnpm version patch --no-git-tag-version",
     "release:pack": "pnpm pack --pack-destination /tmp",
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   }
