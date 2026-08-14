@@ -49,8 +49,12 @@ release-check: check-package
 	pnpm @$$package build
 
 patch: check-package
-	@echo "==> patching @migaia/$(PACKAGE)"; \
-	pnpm @$(PACKAGE) release:patch
+	@set -eu; \
+	echo "==> patching @migaia/$(PACKAGE)"; \
+	pnpm @$(PACKAGE) release:patch; \
+	version=$$(node -p "require('./packages/$(PACKAGE)/package.json').version"); \
+	git add "packages/$(PACKAGE)/package.json"; \
+	git commit -m "chore(release): $(PACKAGE) v$$version"
 
 auth-check:
 	@set -eu; \
@@ -79,6 +83,9 @@ publish: check-package auth-check
 	pnpm @$$package release:publish; \
 	restore; \
 	trap - EXIT INT TERM; \
+	branch=$$(git rev-parse --abbrev-ref HEAD); \
+	echo "==> pushing $$branch"; \
+	git push origin "HEAD:$$branch"; \
 	echo "==> tagging $$tag"; \
 	git tag "$$tag"; \
 	git push origin "$$tag"
