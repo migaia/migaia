@@ -45,9 +45,9 @@ export const LogLevel = {
   debug: 'debug',
   info: 'info',
   error: 'error'
-} as const
+} as const;
 
-export type LogLevel = keyof typeof LogLevel
+export type LogLevel = keyof typeof LogLevel;
 ```
 
 - New and modified code must follow these rules. Pre-existing violations are migration debt: fix them when their owning API is intentionally changed, but do not perform unrelated mass renames inside a scoped task.
@@ -96,9 +96,9 @@ export const FooErrorCode = {
    * instead of reviving this one. Enforces the two-phase contract.
    */
   scopeClosed: 'SCOPE_CLOSED'
-} as const
+} as const;
 
-export type IFooErrorCode = (typeof FooErrorCode)[keyof typeof FooErrorCode]
+export type IFooErrorCode = (typeof FooErrorCode)[keyof typeof FooErrorCode];
 ```
 
 - Packages whose code table is not finalized yet still obey the structural and traceability rules above: register the code in `docs/contracts/error-codes.md` and declare it in `src/error-code.ts` first, then use it.
@@ -106,3 +106,11 @@ export type IFooErrorCode = (typeof FooErrorCode)[keyof typeof FooErrorCode]
 ## Function Context Rules
 
 - Do not use `bind`, `apply`, or `call` anywhere in project code or tests. Use arrow functions that capture the required context instead.
+
+## String Contract Ownership
+
+- Unless a string is truly local, one-off data, do not scatter string literals through source files. Public messages, diagnostics, protocol/state values, event names, storage keys, command names, error text, and any string compared across modules are maintained by one canonical package-owned file such as `text.ts`, `error-text.ts`, `state-constants.ts`, or another explicitly named contract file.
+- Call sites must reference the canonical constant or text factory. Repeating the same literal at multiple call sites, or introducing a local constant that duplicates the canonical value, is a defect. Enum-like domains continue to use the single runtime constant object required by the TypeScript conventions above.
+- Never write `throw new Error('...')`, `throw new TypeError('...')`, `throw new RangeError('...')`, `new AggregateError(errors, '...')`, or an equivalent inline error-message literal. Construct the native error with text imported from the owning package's canonical text file, then apply the package error-code contract without replacing the native error type.
+- Every maintained string constant or text factory must have adjacent JSDoc that explains why the string is stable, the behavior or contract it represents, and its principal consumer or reference location. JSDoc must not merely restate the literal.
+- Tests may use one-off fixture payloads and may spell an expected public string literally when the purpose is to detect an accidental contract-text change. Test helpers, repeated fixtures, protocol values, and strings shared with production code remain subject to canonical ownership.
