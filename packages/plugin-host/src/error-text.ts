@@ -89,6 +89,14 @@ const ERROR_TEXT = {
       'pipeline stages cannot be registered during pipeline execution'
     );
   },
+  /** `pipeline.ts#registerStage` 拒绝非函数 stage 时使用，保持公开 INVALID_OPTION 文案集中可追踪。 */
+  get PIPELINE_STAGE_MUST_BE_FUNCTION() {
+    return 'pipeline stage must be a function';
+  },
+  /** `pipeline.ts#runAsyncPipeline` 同时观测到 stage 与 downstream 失败时使用。 */
+  get PIPELINE_STAGE_AND_DOWNSTREAM_FAILED() {
+    return 'pipeline stage and downstream failed';
+  },
   /** 插件不存在。 */
   get PLUGIN_NOT_INSTALLED() {
     return (name: string) => localize(`插件 "${name}" 未安装`, `plugin "${name}" is not installed`);

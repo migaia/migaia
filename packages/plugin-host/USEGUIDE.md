@@ -23,6 +23,8 @@
 
 `PluginHost<TDomainCore, TValue>` 是一个抽象基类，本身不知道任何业务领域概念——它不实现日志、网络、状态管理，也不替你决定插件应该长什么样。它只负责"插件系统"这一层通用机制：安装顺序、生命周期、配置、资源清理、共享能力、处理管线。
 
+管线执行算法已经抽到 `@migaia/middleware-pipeline`；本包只负责把插件注册的 stage 接入执行器，并提供 plugin-host 的 violation、active 和错误策略。不要从 plugin-host 的内部 wrapper 复制 runner 实现。
+
 ```ts
 type ICore = { publish(value: string): void };
 

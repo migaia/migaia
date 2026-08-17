@@ -1,10 +1,11 @@
 SHELL := /bin/sh
 export CI := true
 
-RELEASE_PACKAGES := plugin-host logger web-rpc storage-web
+RELEASE_PACKAGES := middleware-pipeline plugin-host logger web-rpc storage-web
 GITHUB_PACKAGES_REGISTRY := https://npm.pkg.github.com
 
-.PHONY: plugin-host logger web-rpc storage-web \
+.PHONY: middleware-pipeline plugin-host logger web-rpc storage-web \
+	middleware-pipeline-check middleware-pipeline-patch middleware-pipeline-publish \
 	plugin-host-check logger-check web-rpc-check storage-web-check \
 	plugin-host-patch logger-patch web-rpc-patch storage-web-patch \
 	plugin-host-publish logger-publish web-rpc-publish storage-web-publish \
@@ -16,7 +17,7 @@ check-package:
 		exit 2; \
 	fi; \
 	case "$(PACKAGE)" in \
-		plugin-host|logger|web-rpc|storage-web) ;; \
+		middleware-pipeline|plugin-host|logger|web-rpc|storage-web) ;; \
 		*) echo "Unsupported PACKAGE=$(PACKAGE)" >&2; exit 2 ;; \
 	esac
 
@@ -26,7 +27,7 @@ release-check: check-package
 	echo "==> checking @migaia/$$package"; \
 	pnpm @$$package lint; \
 	pnpm @$$package typecheck; \
-	if [ "$$package" = "plugin-host" ] || [ "$$package" = "logger" ]; then \
+	if [ "$$package" = "middleware-pipeline" ] || [ "$$package" = "plugin-host" ] || [ "$$package" = "logger" ]; then \
 		pnpm @$$package typecheck:test; \
 	fi; \
 	if [ "$$package" = "logger" ]; then \
@@ -102,6 +103,9 @@ web-rpc: release-check auth-check patch publish
 storage-web: PACKAGE := storage-web
 storage-web: release-check auth-check patch publish
 
+middleware-pipeline: PACKAGE := middleware-pipeline
+middleware-pipeline: release-check auth-check patch publish
+
 plugin-host-check: PACKAGE := plugin-host
 plugin-host-check: release-check
 
@@ -113,6 +117,9 @@ web-rpc-check: release-check
 
 storage-web-check: PACKAGE := storage-web
 storage-web-check: release-check
+
+middleware-pipeline-check: PACKAGE := middleware-pipeline
+middleware-pipeline-check: release-check
 
 plugin-host-patch: PACKAGE := plugin-host
 plugin-host-patch: patch
@@ -126,6 +133,9 @@ web-rpc-patch: patch
 storage-web-patch: PACKAGE := storage-web
 storage-web-patch: patch
 
+middleware-pipeline-patch: PACKAGE := middleware-pipeline
+middleware-pipeline-patch: patch
+
 plugin-host-publish: PACKAGE := plugin-host
 plugin-host-publish: publish
 
@@ -137,3 +147,6 @@ web-rpc-publish: publish
 
 storage-web-publish: PACKAGE := storage-web
 storage-web-publish: publish
+
+middleware-pipeline-publish: PACKAGE := middleware-pipeline
+middleware-pipeline-publish: publish
