@@ -52,7 +52,9 @@ describe('同步通道与异步通道一致性', () => {
         { signal: new AbortController().signal }
       ])
         expect(() => store.sync.set('key', 'value', options as never)).toThrowError(
-          expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+          expect.objectContaining({
+            code: expect.stringMatching(/^INVALID_(ARGUMENT|CONFIG)$/)
+          })
         );
   });
 

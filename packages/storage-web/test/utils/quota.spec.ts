@@ -4,7 +4,7 @@ import { StorageError, StorageErrorCode } from '../../src/types/errors';
 
 describe('normalizeStorageException', () => {
   it('已经是 StorageError 时原样返回', () => {
-    const original = new StorageError(StorageErrorCode.aborted);
+    const original = new StorageError(StorageErrorCode.invalidConfig);
     expect(normalizeStorageException(original, 'local')).toBe(original);
   });
 

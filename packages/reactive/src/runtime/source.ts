@@ -1,6 +1,8 @@
-import { internalsOf } from './internals';
-import { claimOwnership } from './ownership';
-import type { IObservable, IObserver, IRuntime } from './types';
+import { internalsOf } from './internals.js';
+import { claimOwnership } from './ownership.js';
+import type { IObservable, IObserver, IRuntime } from './types.js';
+import { createReactiveError } from '../errors.js';
+import { ReactiveErrorCode } from '../error-code.js';
 
 type IRuntimeFieldSource = {
   track(): void;
@@ -28,7 +30,11 @@ export function createFieldSource(runtime: IRuntime, debugName?: string): IRunti
   let disposed = false;
 
   const assertActive = (): void => {
-    if (disposed) throw new Error('[store] reactive field source is disposed');
+    if (disposed)
+      throw createReactiveError(
+        ReactiveErrorCode.nodeDisposed,
+        '[store] reactive field source is disposed'
+      );
   };
 
   return {

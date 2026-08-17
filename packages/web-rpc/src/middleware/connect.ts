@@ -3,11 +3,11 @@ import type {
   IWebRpcMiddleware,
   IWebRpcConnectConfig,
   IWebRpcDiscoveryMode
-} from '../typing';
-import type { IWebRpcTransport } from '../transport';
-import { WebRpcCapabilityKey } from '../internal/runtime';
-import { WebRpcError, WebRpcErrorCode } from '../errors';
-import { safeRead } from '../internal/safe-value';
+} from '../typing.js';
+import type { IWebRpcTransport } from '../transport.js';
+import { WebRpcCapabilityKey } from '../internal/runtime.js';
+import { WebRpcError, WebRpcErrorCode } from '../errors.js';
+import { safeRead } from '../internal/safe-value.js';
 export type IConnectConfig = IWebRpcConnectConfig;
 export type IConnectMiddleware<TMode extends IWebRpcDiscoveryMode> = IWebRpcMiddleware & {
   readonly discoveryMode: TMode;

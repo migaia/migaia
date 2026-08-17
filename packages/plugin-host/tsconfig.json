@@ -3,10 +3,10 @@
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2024", "ESNext.Disposable"],
+    "lib": ["ES2024"],
     "rootDir": "src",
     "outDir": "dist",
-    "types": ["node", "vitest/globals"]
+    "types": []
   },
   "include": ["src"]
 }

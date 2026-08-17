@@ -1,4 +1,4 @@
-import type { IWebRpcEventListener, IWebRpcProvider } from '../typing';
+import type { IWebRpcEventListener, IWebRpcProvider } from '../typing.js';
 
 /** Owns provider and event routing tables for one endpoint. */
 export class ProviderRegistry {

@@ -1,6 +1,10 @@
-import type { IWebRpcMiddleware, IWebRpcTimeoutCapability, IWebRpcTimeoutConfig } from '../typing';
-import { WebRpcCapabilityKey } from '../internal/runtime';
-import { WebRpcError, WebRpcErrorCode } from '../errors';
+import type {
+  IWebRpcMiddleware,
+  IWebRpcTimeoutCapability,
+  IWebRpcTimeoutConfig
+} from '../typing.js';
+import { WebRpcCapabilityKey } from '../internal/runtime.js';
+import { WebRpcError, WebRpcErrorCode } from '../errors.js';
 export const timeout = (config: IWebRpcTimeoutConfig = {}): IWebRpcMiddleware => ({
   name: 'timeout',
   install: ({ capabilities }) => {

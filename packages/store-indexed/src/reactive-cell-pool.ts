@@ -1,5 +1,5 @@
 import type { Signal } from '@migaia/reactive/reactive/signal.class';
-import { KeyedCellRegistry, scheduleLazyCellRelease } from './keyed-cell-registry';
+import { KeyedCellRegistry, scheduleLazyCellRelease } from './keyed-cell-registry.js';
 
 /**
  * Shared getOrCreate / speculative-lease / tombstone lifecycle for a keyed map of lazily

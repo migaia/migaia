@@ -1,9 +1,19 @@
-import type { IObservable, IObserver, IRuntimeTraceEvent } from '@migaia/reactive/runtime/types';
+import {
+  ReactiveErrorPhase,
+  ReactiveTracePhase,
+  ReactiveTraceType,
+  type IObservable,
+  type IObserver,
+  type IRuntimeTraceEvent
+} from '@migaia/reactive/runtime';
 import type { IReactiveStore } from '@migaia/store-light';
 import { ClonePolicy } from '@migaia/store-middleware/tolerant-clone';
+import { createStoreDevtoolsError, createStoreDevtoolsRangeError } from './errors.js';
+import { StoreDevtoolsErrorCode } from './error-code.js';
+import { StoreDevtoolsLabel, StoreDevtoolsNodeKind } from './devtools-constants.js';
 
 export type IDependencyTreeNode = {
-  kind: 'observable' | 'observer';
+  kind: (typeof StoreDevtoolsNodeKind)[keyof typeof StoreDevtoolsNodeKind];
   label: string;
   version?: number;
   children: IDependencyTreeNode[];
@@ -45,7 +55,9 @@ export type IStoreDevTools = {
 };
 
 const nodeLabel = (node: object): string =>
-  (node as { debugName?: string }).debugName ?? node.constructor?.name ?? 'AnonymousReactiveNode';
+  (node as { debugName?: string }).debugName ??
+  node.constructor?.name ??
+  StoreDevtoolsLabel.anonymousReactiveNode;
 
 // 环判定按「当前这条路径」，不是全局访问集：菱形里的共享节点会被两条路径各展开一次——
 // 那是共享，不是环。只有重新踩到仍在当前路径上的节点才是环，因此进入时入栈、返回时出栈。
@@ -53,7 +65,7 @@ export function getDependencyTree(observer: IObserver, maxDepth = 20): IDependen
   const path = new Set<object>();
   const visitObservable = (current: IObservable, depth: number): IDependencyTreeNode => {
     const node: IDependencyTreeNode = {
-      kind: 'observable',
+      kind: StoreDevtoolsNodeKind.observable,
       label: nodeLabel(current),
       version: current.version,
       children: []
@@ -76,7 +88,7 @@ export function getDependencyTree(observer: IObserver, maxDepth = 20): IDependen
   };
   path.add(observer);
   return {
-    kind: 'observer',
+    kind: StoreDevtoolsNodeKind.observer,
     label: nodeLabel(observer),
     children: depth0Exceeds(0, maxDepth)
       ? []
@@ -88,7 +100,7 @@ export function getObserverTree(observable: IObservable, maxDepth = 20): IDepend
   const path = new Set<object>();
   const visitObserver = (current: IObserver, depth: number): IDependencyTreeNode => {
     const node: IDependencyTreeNode = {
-      kind: 'observer',
+      kind: StoreDevtoolsNodeKind.observer,
       label: nodeLabel(current),
       children: []
     };
@@ -109,7 +121,7 @@ export function getObserverTree(observable: IObservable, maxDepth = 20): IDepend
   };
   path.add(observable);
   return {
-    kind: 'observable',
+    kind: StoreDevtoolsNodeKind.observable,
     label: nodeLabel(observable),
     version: observable.version,
     children: depth0Exceeds(0, maxDepth)
@@ -139,9 +151,13 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
   let disposed = false;
 
   const assertActive = () => {
-    if (disposed) throw new Error('[store] DevTools session is disposed');
+    if (disposed)
+      throw createStoreDevtoolsError(
+        StoreDevtoolsErrorCode.sessionDisposed,
+        '[store] DevTools session is disposed'
+      );
   };
-  const record = (label = 'state change'): IStoreHistoryEntry => {
+  const record = (label: string = StoreDevtoolsLabel.stateChange): IStoreHistoryEntry => {
     assertActive();
     const entry: IStoreHistoryEntry = {
       id: nextId++,
@@ -156,11 +172,11 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
   const recordAction = (action: Omit<IActionTrace, 'timestamp'>): void => {
     assertActive();
     actions.push({ ...action, timestamp: now() });
-    if (actions.length > maxHistory) {
-      actions.splice(0, actions.length - maxHistory);
+    if (actions.length > maxTrace) {
+      actions.splice(0, actions.length - maxTrace);
     }
   };
-  record('initial');
+  record(StoreDevtoolsLabel.initial);
   const unsubscribe = store.$subscribe(() => {
     if (replayDepth > 0) return;
     try {
@@ -168,7 +184,7 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
     } catch (error) {
       // 诊断工具坏掉不能让业务写入跟着失败：快照/克隆异常在这里就地上报，
       // 绝不冒泡进 store 的 flush（那会让一次普通赋值抛错）。
-      store.$runtime.reportError(error, { phase: 'trace-listener' });
+      store.$runtime.reportError(error, { phase: ReactiveErrorPhase.traceListener });
     }
   });
   const unsubscribeTrace =
@@ -180,11 +196,11 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
           if (trace.length > maxTrace) {
             trace.splice(0, trace.length - maxTrace);
           }
-          if (event.type === 'action' && event.phase !== 'start') {
+          if (event.type === ReactiveTraceType.action && event.phase !== ReactiveTracePhase.start) {
             recordAction({
               name: event.name,
               durationMs: event.durationMs,
-              error: event.phase === 'error' ? event.error : undefined
+              error: event.phase === ReactiveTracePhase.error ? event.error : undefined
             });
           }
         });
@@ -204,7 +220,11 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
     jumpTo(id) {
       assertActive();
       const entry = history.find((candidate) => candidate.id === id);
-      if (!entry) throw new RangeError(`[store] unknown history entry: ${id}`);
+      if (!entry)
+        throw createStoreDevtoolsRangeError(
+          StoreDevtoolsErrorCode.unknownHistoryEntry,
+          `[store] unknown history entry: ${id}`
+        );
       replayDepth++;
       try {
         store.$hydrate(clone(entry.state));
@@ -217,7 +237,7 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
       history.length = 0;
       actions.length = 0;
       trace.length = 0;
-      record('initial');
+      record(StoreDevtoolsLabel.initial);
     },
     dispose() {
       if (disposed) return;

@@ -1,6 +1,7 @@
-import type { IWebRpcSendOptions, IWebRpcTransport } from '../transport';
-import { safeString } from '../internal/safe-value';
-import { registerListeners, releaseListeners } from '../internal/listener-safety';
+import type { IWebRpcSendOptions, IWebRpcTransport } from '../transport.js';
+import { safeString } from '../internal/safe-value.js';
+import { registerListeners, releaseListeners } from '../internal/listener-safety.js';
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js';
 
 /**
  * Minimal event-listener worker/port surface — a real `Worker`, `MessagePort`, or
@@ -101,9 +102,9 @@ export function createWebWorkerTransport(
   const onMessageError = onFailure('could not deserialize a message');
 
   return {
-    platform: 'Worker',
+    platform: WebRpcPlatform.worker,
     topology: 'exclusive',
-    ownership: 'borrowed',
+    ownership: WebRpcTransportOwnership.borrowed,
     peerId: options.peerId,
     origin: options.origin,
     send(message, options?: IWebRpcSendOptions<Transferable>) {

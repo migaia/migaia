@@ -1,3 +1,5 @@
+import { tagWebRpcError, WebRpcErrorCode } from '../errors.js';
+
 /** Minimal cancellation signal shape shared by browser, worker and Node consumers. */
 export type IAbortSignal = {
   readonly aborted: boolean;
@@ -38,7 +40,11 @@ export function waitWithSignal(
   createAbortError: () => Error,
   onDiagnostic?: (error: unknown) => void
 ): Promise<void> {
-  if (!Number.isFinite(delayMs) || delayMs < 0) throw new TypeError('delay must be non-negative');
+  if (!Number.isFinite(delayMs) || delayMs < 0)
+    throw tagWebRpcError(
+      new TypeError('delay must be non-negative'),
+      WebRpcErrorCode.invalidConfig
+    );
   return new Promise((resolve, reject) => {
     try {
       if (signals.some((signal) => signal.aborted)) {
@@ -113,7 +119,12 @@ export function raceWithAsyncControl<T>(options: {
     options.timeoutMs !== false &&
     (!Number.isFinite(options.timeoutMs) || options.timeoutMs < 0)
   )
-    return Promise.reject(new TypeError('timeout must be false or a non-negative finite number'));
+    return Promise.reject(
+      tagWebRpcError(
+        new TypeError('timeout must be false or a non-negative finite number'),
+        WebRpcErrorCode.invalidConfig
+      )
+    );
   return new Promise<T>((resolve, reject) => {
     let settled = false;
     let timer: { readonly clear: () => void } | undefined;

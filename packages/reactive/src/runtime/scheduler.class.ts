@@ -1,4 +1,32 @@
-import type { IFlushable, IFlushResult, ISchedulerStrategy } from './types';
+import type { IFlushable, IFlushResult, ISchedulerStrategy } from './types.js';
+import { createReactiveError, tagReactiveError } from '../errors.js';
+import { ReactiveErrorCode } from '../error-code.js';
+import { defaultRuntimeAdapter } from './default-runtime-adapter.js';
+import { ReactiveErrorPhase } from './trace-constants.js';
+
+/** 只读 `cause`，hostile getter 抛错时按 `undefined` 处理（诊断通道不反向破坏结果）。 */
+const readCauseSafely = (error: Error): unknown => {
+  try {
+    return error.cause;
+  } catch {
+    return undefined;
+  }
+};
+
+/** 用 `defineProperty` 安全附加 `cause`；失败（frozen / non-extensible）返回 false。 */
+const attachCauseSafely = (error: Error, cause: unknown): boolean => {
+  try {
+    Object.defineProperty(error, 'cause', {
+      value: cause,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 // 调度器：待冲刷队列、批处理深度、冲刷状态、可插拔触发策略全部收在这一个类里。
 export class Scheduler {
@@ -13,24 +41,25 @@ export class Scheduler {
   #flushing = false;
   #scheduled = false;
   #queued = new Set<IFlushable>();
-  #strategy: ISchedulerStrategy = (flush) => queueMicrotask(flush);
+  #strategy: ISchedulerStrategy;
   #onAsyncError: (error: unknown) => void;
 
   constructor(
-    onAsyncError: (error: unknown) => void = (error) => {
-      try {
-        console.error('[store] async scheduler error', error);
-      } catch {
-        // 默认诊断不得制造第二个异常。
-      }
-    },
-    maxFlushPasses = 100
+    onAsyncError: (error: unknown) => void = (error) =>
+      defaultRuntimeAdapter.reportError(error, { phase: ReactiveErrorPhase.asyncFlush }),
+    maxFlushPasses = 100,
+    scheduleMicrotask: (task: () => void) => void = defaultRuntimeAdapter.scheduleMicrotask
   ) {
     if (!Number.isSafeInteger(maxFlushPasses) || maxFlushPasses < 1) {
-      throw new RangeError('[store] maxFlushPasses must be a positive integer');
+      throw tagReactiveError(
+        new RangeError('[store] maxFlushPasses must be a positive integer'),
+        ReactiveErrorCode.invalidOption
+      );
     }
     this.#onAsyncError = onAsyncError;
     this.#maxFlushPasses = maxFlushPasses;
+    // 默认冲刷走注入的微任务调度入口，不直接 queueMicrotask。
+    this.#strategy = (flush) => scheduleMicrotask(flush);
   }
 
   /** 替换触发策略：默认微任务合并，可换 rAF/idle/优先级队列/自定义分片 */
@@ -96,7 +125,8 @@ export class Scheduler {
           const dropped = [...this.#queued];
           this.#queued.clear();
           const names = dropped.map((item) => item.debugName ?? '<anonymous>').slice(0, 8);
-          const loopError = new Error(
+          const loopError = createReactiveError(
+            ReactiveErrorCode.flushLoop,
             '[store] possible infinite effect loop: exceeded ' +
               this.#maxFlushPasses +
               ' flush passes; dropped ' +
@@ -106,9 +136,12 @@ export class Scheduler {
               (dropped.length > names.length ? ', …' : '')
           );
           if (errors.length === 0) throw loopError;
-          throw new AggregateError(
-            [...errors, loopError],
-            '[store] observers failed before the flush-loop guard fired'
+          throw tagReactiveError(
+            new AggregateError(
+              [...errors, loopError],
+              '[store] observers failed before the flush-loop guard fired'
+            ),
+            ReactiveErrorCode.observerFailed
           );
         }
         const batch = [...this.#queued];
@@ -124,7 +157,10 @@ export class Scheduler {
       }
       if (errors.length === 1) throw errors[0];
       if (errors.length > 1) {
-        throw new AggregateError(errors, '[store] multiple observers failed during flush');
+        throw tagReactiveError(
+          new AggregateError(errors, '[store] multiple observers failed during flush'),
+          ReactiveErrorCode.observerFailed
+        );
       }
       return 'completed';
     } finally {
@@ -154,19 +190,28 @@ export class Scheduler {
         if (!hasFnError) throw flushError; // 只有 flush 出错 → 抛 flush 错误
         // Error 对象保持身份/类型；flush 错误挂到 cause。非 Error throw 值无法安全附加元数据。
         if (fnError instanceof Error) {
-          const previousCause = fnError.cause;
-          fnError.cause =
+          const previousCause = readCauseSafely(fnError);
+          const mergedCause =
             previousCause === undefined
               ? flushError
-              : new AggregateError(
-                  [previousCause, flushError],
-                  '[store] action cause and subsequent flush both failed'
+              : tagReactiveError(
+                  new AggregateError(
+                    [previousCause, flushError],
+                    '[store] action cause and subsequent flush both failed'
+                  ),
+                  ReactiveErrorCode.actionFlushFailed
                 );
-          throw fnError;
+          // Attach, don't replace — but a frozen / non-extensible business Error cannot be safely
+          // mutated. Fall through to the AggregateError wrapper so both errors stay `===` reachable.
+          if (attachCauseSafely(fnError, mergedCause)) throw fnError;
         }
-        throw new Error('[store] action failed; a subsequent flush also failed', {
-          cause: { action: fnError, flush: flushError }
-        });
+        throw tagReactiveError(
+          new AggregateError(
+            [fnError, flushError],
+            '[store] action failed; a subsequent flush also failed'
+          ),
+          ReactiveErrorCode.actionFlushFailed
+        );
       }
     }
     // 在 observer tick 内结束的 batch 由当前最外层 flush 的 while 接管。

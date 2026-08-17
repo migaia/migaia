@@ -9,7 +9,7 @@
 3. [Computed 完整参考](#3-computed-完整参考)
 4. [Effect 完整参考](#4-effect-完整参考)
 5. [Runtime 完整参考](#5-runtime-完整参考)
-6. [Scope：集中释放资源](#6-scope集中释放资源)
+6. [资源的集中释放：迁到 `@migaia/lifecycle`](#6-资源的集中释放迁到-migaialifecycle)
 7. [调度、批处理与 flush 精确语义](#7-调度批处理与-flush-精确语义)
 8. [错误处理](#8-错误处理)
 9. [诊断与 trace](#9-诊断与-trace)
@@ -148,7 +148,6 @@ type IRuntimeOptions = {
 | `effect(fn, options?)` | `(fn, options?) => IDisposer` | 同步 | 等价于 `new Effect(fn, runtime, options)`，但**只返回一个 `() => void` 的 dispose 函数**，不返回 `Effect` 实例本身——拿不到 `run()`、`deps` 等成员。需要完整实例时用 `new Effect(...)`。 |
 | `batch(fn)` | `<T>(fn: () => T) => T` | 同步 | 见 [§7](#7-调度批处理与-flush-精确语义)。 |
 | `untracked(fn)` | `<T>(fn: () => T) => T` | 同步 | 在 `fn` 执行期间关闭依赖收集——`fn` 内读取任何 `Signal`/`Computed` 都不会给当前正在求值的 `Computed`/`Effect` 建立依赖边。 |
-| `createScope()` | `() => Scope` | 同步 | 见 [§6](#6-scope集中释放资源)。 |
 | `flush()` | `() => 'completed' \| 'deferred'` | 同步 | 同步冲刷当前待处理队列。在另一次 `flush()` 内部重入调用会返回 `'deferred'`（外层的 `while` 循环仍会处理新加入的项）；正常情况下排空队列后返回 `'completed'`。 |
 | `setSchedulerStrategy(strategy)` | `(flush: () => void) => void` | 同步 | 替换"什么时候真正执行冲刷"的策略。默认是 `(flush) => queueMicrotask(flush)`；可以换成 `requestAnimationFrame`、`requestIdleCallback`、优先级队列或任意自定义调度。只影响**触发时机**，不改变冲刷本身的执行逻辑。 |
 | `currentVersion()` | `() => number` | 同步 | 只读查看当前版本时钟位置，不消耗版本号。 |
@@ -160,26 +159,30 @@ type IRuntimeOptions = {
 
 ---
 
-## 6. Scope：集中释放资源
+## 6. 资源的集中释放：迁到 `@migaia/lifecycle`
+
+本包不再提供通用的"一组资源集中释放"容器（原 `Scope`/`createScope()`）。理由见
+`docs/tray/tray.sdd.md` §2 与 `docs/lifecycle/migration.sdd.md` §4：`reactive` 是纯内存依赖图，节点的
+"释放"本质是从图上摘边，那是图操作，不是通用资源释放；而 wasm 字段、I/O 资源这类**真正持有外部资源**
+的场景，需要的是两阶段 `close()`/`dispose()`、descriptor 化的释放策略、构造失败回滚——这些能力现在
+统一由 `@migaia/lifecycle` 的 `LifecycleScope`/`SyncLifecycleScope` 提供：
 
 ```ts
-const scope = runtime.createScope();
-const a = scope.own(new Signal(1, runtime));
-const b = scope.own(new Computed(() => a.value * 2, runtime));
+import { createLifecycleScope } from '@migaia/lifecycle';
 
-scope.release(a); // 解除登记但不释放——比如 a 已经被单独 dispose 了
-scope.dispose(); // 按登记的逆序（后进先出）依次调用剩余资源的 dispose()
+const scope = createLifecycleScope();
+const a = new Signal(1, runtime);
+scope.own(a, { syncSafe: true, force: () => a.dispose() });
+const b = new Computed(() => a.value * 2, runtime);
+scope.own(b, { syncSafe: true, force: () => b.dispose() });
+
+// 页面卸载 / 请求结束
+await scope.dispose(); // 按登记逆序依次执行每个 descriptor 的释放策略
 ```
 
-| 成员 | 参数类型 | 同步/异步 | 行为 |
-| --- | --- | --- | --- |
-| `own(resource)` | `resource: IDisposable` | 同步 | 登记一个 `IDisposable`（`Signal`/`Computed`/`Effect`/其它 `Scope` 都满足）；`Scope` 已经 `disposed` 时调用会抛 `[store] cannot add resource to a disposed scope`。 |
-| `release(resource)` | `resource: IDisposable` | 同步 | 从登记表移除但**不触发**该资源的 `dispose()`——用于"这个资源已经被单独释放，避免 `Scope` 之后重复释放"的场景，返回是否真的移除了。 |
-| `dispose()` | 无参数 | 同步 | 同步、按登记顺序的**逆序**依次释放；某个资源的 `dispose()` 抛错不会中断其它资源的释放，全部完成后如果收集到异常会统一抛出（多个异常合并成 `AggregateError`）。幂等——重复调用是 no-op。 |
-| `disposeAsync()` | 无参数 | 异步 | 异步版本：逐个等待（如果资源实现了 `disposeAsync`则优先调用它，否则退化为 `dispose()`）。并发调用 `dispose()`/`disposeAsync()` 会被拦截并报错（避免同一批资源被释放两次），必须等第一次调用完成。 |
-| `disposed` | 无参数（只读属性） | 同步 | 只读；进入终态后为 `true`。 |
-
-`Scope` 不会自动持有你创建的节点——`new Signal(...)` 不会自动挂进任何 `Scope`，必须显式 `scope.own(...)`。这是有意的：`Scope` 是"资源所有权工具"，不是节点注册表。
+只装纯 `Signal`/`Computed`/`Effect`（不含 wasm 字段、I/O 资源）的容器可以改用同步的
+`createSyncLifecycleScope()`，避免把释放路径变成异步——具体取舍见 `@migaia/lifecycle` 自己的
+USEGUIDE。
 
 ---
 
@@ -206,7 +209,26 @@ runtime.batch(() => {
 
 ## 8. 错误处理
 
-`@migaia/reactive` 没有独立的错误码枚举，但有一套明确的**错误上下文分类**（`IRuntimeErrorPhase`），配合 `onError` 回调统一接收：
+`@migaia/reactive` 的每一个抛出物都携带 `(source, code)` 二元组：`source` 恒为 `'@migaia/reactive'`，`code` 取自 `src/error-code.ts` 的 `ReactiveErrorCode`（16 个码，逐条带三段式 JSDoc）。全仓契约见 `docs/contracts/error-codes.md`，本包码表的权威定义见 `docs/lifecycle/migration.sdd.md` §3.7.1。
+
+```ts
+import { ReactiveErrorCode } from '@migaia/reactive';
+
+try {
+  disposedSignal.value;
+} catch (error) {
+  if ((error as { code?: string }).code === ReactiveErrorCode.nodeDisposed) {
+    // 节点已释放，换一个新实例
+  }
+}
+```
+
+两条使用要点：
+
+- **码是附加字段，不替换错误类型。** 选项校验类错误仍然是 `RangeError`/`TypeError`，多错聚合仍然是 `AggregateError`，依赖 `instanceof` 判断的调用方不受影响。
+- **单个错误原样抛出，不被重新标记。** 例如一次冲刷里只有一个 observer 失败时，抛出的就是它自己的那个错误（不带本包的 `code`）；只有本包**自己构造**的聚合外壳才携带 `OBSERVER_FAILED`，原始错误在 `errors[]` 里按引用可达。
+
+除了码之外，还有一套正交的**错误上下文分类**（`IRuntimeErrorPhase`），配合 `onError` 回调统一接收——码回答「是什么错」，phase 回答「在哪个阶段被观测到」：
 
 ```ts
 const runtime = createRuntime({
@@ -225,7 +247,7 @@ const runtime = createRuntime({
 | `subscription-listener` | 面向自定义订阅/监听场景的错误上报通道（供扩展层复用）。 |
 | `trace-listener` | `subscribeTrace`/`onTrace` 注册的监听器自身抛错，或返回的 Promise reject。 |
 
-默认 `onError`（不传时）是 `console.error('[store] reactive ${phase} error', error)`——错误不会被吞掉、也不会中断 Runtime，但**只会打印，不会自动上报到你的监控系统**，生产环境建议显式传 `onError`。
+默认 `onError`（不传时）把原始错误包进一个携带 `SCHEDULER_FAILED` 码的诊断错误再打印：`console.error('[store] reactive ${phase} error', tagged)`，原始错误挂在 `tagged.cause` 上按引用可达。错误不会被吞掉、也不会中断 Runtime，但**只会打印，不会自动上报到你的监控系统**，生产环境建议显式传 `onError`——传了之后拿到的就是**未经包装的原始错误**加一个 `context`，这条包装只发生在默认实现里。
 
 **同步路径 vs 异步路径的关键区别**：直接调用 `runtime.flush()`、`runtime.batch(fn)` 触发的冲刷，如果其中的 `Effect` 抛错，错误会**同步向上抛给调用方**（可以用 `try/catch` 直接捕获）；而由 `Signal` 写入自动触发的微任务冲刷，错误只会通过 `onError` 回调报告，不会变成一个未处理的 Promise 拒绝或全局异常——这是两条独立的路径，写业务代码时需要清楚当前的错误是从哪条路径来的。
 
@@ -293,19 +315,31 @@ const result = binding.commit(capture); // 'committed' | 'stale' | 'no-observer'
 
 `capture()` 不修改依赖图，被丢弃的渲染因此不会留下泄漏的订阅；`commit()` 把捕获到的依赖装到内部持有的 `Effect` 上，返回三态结果——`stale` 表示提交时依赖已经变化，调用方必须重新捕获求值，而不是把陈旧结果当最新值提交。
 
-### `@migaia/reactive/runtime/source` → `createFieldSource(runtime, debugName?)`
+### `@migaia/reactive/source` → `createFieldSource(runtime, debugName?)`
 
 为扩展层创建一条受控的自定义响应式来源，只暴露 `track()`/`notify()`/`commit(write)`/`observed`/`disposed`/`dispose()`，拿不到节点、订阅集合或 tracker——用于给"不是 `Signal` 但需要参与依赖图"的状态（比如某个 wasm 内存字段）接入通知管线。
 
-### `@migaia/reactive/runtime/node-factories` → `internalRuntimeOf(runtime)`
+### `@migaia/reactive/node-factories` → `internalRuntimeOf(runtime)`
 
 返回一个 `signal()`/`computed()` 返回**具体 `Signal`/`Computed` 类**（而不是公共窄接口 `ISignal`/`IComputedValue`）的 Runtime 视图，供需要调用 `.dispose()`、访问完整实例成员的上层实现使用。同模块的 `isRuntimeTracking(runtime)`/`isAnyRuntimeTracking()` 可用于判断当前是否处于依赖收集帧内。
 
-### `@migaia/reactive/runtime/copy-check` → `assertSingleRuntimeCopy()`
+### `@migaia/reactive/ownership` → `claimOwnership(value, runtime)` / `ownerOf(value)` / `assertOwnedBy(value, runtime, what)` / `assertReactiveOwnedBy(value, runtime, what)`
+
+「某个对象属于哪个 `Runtime`」的登记表与断言。`assertReactiveOwnedBy` 是内核图边界用的严格版本——未登记的对象直接拒绝；`assertOwnedBy` 对未登记对象放行，只拒绝"登记过但归属不符"的情形，供上层 Registry 类结构做更宽松的校验。
+
+### `@migaia/reactive/internals` → `internalsOf(runtime)` / `registerInternals(runtime, internals)`
+
+内核内部面（`clock`/`tracker`/`scheduler`/`notify`/`commitSource`/`deferIdle`），能绕过所有权校验、`observed`/`unobserved` 生命周期与调度原子性——只给"自己就是图的实现者"的节点实现层用（比如需要复用同一条通知管线的 wasm 字段），不是给普通业务代码或增强层的。
+
+### `@migaia/reactive/node-internals` → `registerDeps` / `registerDepVersions` / `registerSubs` / `mutableDeps` / `mutableDepVersions` / `mutableSubs` / `setVersion`
+
+比 `internals` 更底层：直接读写节点的依赖边/订阅集合/版本号。只给需要实现自己的 `IObservable`/`IObserver` 具体类的包用（`resource`、`store-*` 的字段/集合类型）；普通消费端不应该出现在依赖树上。
+
+### `@migaia/reactive/copy-check` → `assertSingleRuntimeCopy()`
 
 检测同一进程里是否被打包进了多份 `@migaia/reactive`（常见于依赖没有正确去重、或微前端各自打包）。库内部的所有权表和依赖追踪上下文都是**模块级、每份副本各一份**——出现第二份副本时，跨副本的节点会互相认成"不是本库创建的 Runtime"，跨副本依赖读取也检测不到，会静默拿到陈旧数据。多副本共存时控制台会自动打印一次告警；需要"宁可启动失败也不要有这个风险"的应用可以显式调用 `assertSingleRuntimeCopy()`，检测到多副本时立即抛错。
 
-> 除以上四个入口外，`@migaia/reactive/runtime/*` 下还能路径命中一些纯内部实现文件（依赖追踪器、调度器等具体类）。它们没有在这里列出，是因为它们是内核自身的实现细节，不构成稳定的公开契约，不建议依赖。
+> 以上每个入口都是 `package.json` `exports` 里的具名子路径，不再有 `@migaia/reactive/runtime/*` 通配（`docs/lifecycle/migration.sdd.md` §4.3）——依赖追踪器、调度器具体类等纯内部实现文件不对外可达，不构成稳定契约。
 
 ---
 
@@ -313,29 +347,33 @@ const result = binding.commit(capture); // 'committed' | 'stale' | 'no-observer'
 
 ```ts
 import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive';
+import { createSyncLifecycleScope } from '@migaia/lifecycle';
 
 const runtime = createRuntime({
   onError: (error, context) => reportToMonitoring(context.phase, error),
   maxFlushPasses: 200 // 有意设计了很深的派生链，调大失控保护的阈值
 });
 
-const scope = runtime.createScope();
+// 全部是纯 reactive 节点、没有 wasm 字段/I/O 资源，可以用同步的 SyncLifecycleScope。
+const scope = createSyncLifecycleScope();
 
-const query = scope.own(new Signal('', runtime, { debugName: 'search.query' }));
-const results = scope.own(
-  new Computed(
-    () => (query.value.length === 0 ? [] : search(query.value)),
-    runtime,
-    { debugName: 'search.results' }
-  )
-);
+const query = new Signal('', runtime, { debugName: 'search.query' });
+scope.own(query, { syncSafe: true, force: () => query.dispose() });
 
-scope.own(
-  new Effect(() => {
+const results = new Computed(() => (query.value.length === 0 ? [] : search(query.value)), runtime, {
+  debugName: 'search.results'
+});
+scope.own(results, { syncSafe: true, force: () => results.dispose() });
+
+const render = new Effect(
+  () => {
     renderResults(results.value);
     return () => clearResults(); // 下次重跑/dispose 前先清理
-  }, runtime, { debugName: 'search.render' })
+  },
+  runtime,
+  { debugName: 'search.render' }
 );
+scope.own(render, { syncSafe: true, force: () => render.dispose() });
 
 query.value = 'reactive';
 runtime.batch(() => {
@@ -358,7 +396,7 @@ scope.dispose(); // 按逆序释放 effect → results → query
 如果它当前没有任何订阅者（没有 `Effect` 或别的 `Computed` 依赖它），它会在空闲时被自动挂起、下次读取从头计算——这是设计如此。需要持续保留缓存，传 `{ keepAlive: true }`。
 
 **Q：读取一个用过的节点，抛 `cannot use a disposed signal` / `cannot read a disposed computed`。**
-节点已经被 `dispose()` 过，这是有意的 fail-fast 设计（不会返回一个"看着能用但永不更新"的陈旧值）。检查是不是 `Scope.dispose()` 提前释放了还在被引用的节点，或者对象被重复 `dispose()` 后又被继续使用。
+节点已经被 `dispose()` 过，这是有意的 fail-fast 设计（不会返回一个"看着能用但永不更新"的陈旧值）。检查是不是持有它的 `@migaia/lifecycle` `LifecycleScope`/`SyncLifecycleScope` 提前释放了还在被引用的节点，或者对象被重复 `dispose()` 后又被继续使用。
 
 **Q：控制台报 `possible infinite effect loop`。**
 说明某个 `Effect` 的写操作最终又落回了它自己读取的依赖，形成了同一次冲刷内的自触发环。检查该 `Effect` 是否在读取某个 `Signal` 的同时又无条件写入了它（或者经过 `Computed` 间接形成环）；错误信息里列出的 `debugName` 可以帮助定位是哪些待办被丢弃。

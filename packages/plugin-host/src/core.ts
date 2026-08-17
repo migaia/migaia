@@ -1,3 +1,4 @@
+import { createPluginHostTypeError } from './error-text.js';
 import type {
   IAsyncPipelineStage,
   IGeneratorPipelineStage,
@@ -6,10 +7,11 @@ import type {
   IPluginHostCore,
   IPipelineMode,
   ISyncPipelineStage
-} from './typing';
-import { copyConfig } from './config';
-import { adaptSyncStageToAsync, adaptSyncStageToGenerator } from './pipeline';
-import type { IRegistration } from './registry';
+} from './typing.js';
+import { copyConfig } from './config.js';
+import { adaptSyncStageToAsync, adaptSyncStageToGenerator } from './pipeline.js';
+import type { IRegistration } from './registry.js';
+import { PluginHostPipelineMode, type IPluginHostPipelineViolation } from './state-constants.js';
 
 export type IPluginCoreContext<TDomainCore extends object, TValue> = {
   readonly registration: IRegistration<TDomainCore, TValue>;
@@ -17,7 +19,7 @@ export type IPluginCoreContext<TDomainCore extends object, TValue> = {
   readonly assertRegistrationValid: () => void;
   readonly getShared: (key: PropertyKey) => unknown;
   readonly pipelineMode: () => IPipelineMode;
-  readonly onPipelineViolation: (kind: 'late' | 'duplicate') => void;
+  readonly onPipelineViolation: (kind: IPluginHostPipelineViolation) => void;
   readonly registerResource: (resource: IPluginResource) => void;
   readonly registerStage: (stage: Function, kind: IPipelineMode) => void;
 };
@@ -28,7 +30,7 @@ export const createPluginCore = <TDomainCore extends object, TValue>(
   const domainCore = context.createDomainCore() as object;
   const prototype = Object.getPrototypeOf(domainCore);
   if (prototype !== Object.prototype && prototype !== null)
-    throw new TypeError('domain core must be a plain object');
+    throw createPluginHostTypeError('domain core must be a plain object');
   const reservedKeys = new Set<PropertyKey>([
     'config',
     'getShared',
@@ -39,10 +41,11 @@ export const createPluginCore = <TDomainCore extends object, TValue>(
   ]);
   const facade: Record<PropertyKey, unknown> = {};
   for (const key of Reflect.ownKeys(domainCore)) {
-    if (reservedKeys.has(key)) throw new TypeError(`domain core key "${String(key)}" is reserved`);
+    if (reservedKeys.has(key))
+      throw createPluginHostTypeError(`domain core key "${String(key)}" is reserved`);
     const descriptor = Object.getOwnPropertyDescriptor(domainCore, key);
     if (!descriptor || !('value' in descriptor) || !descriptor.enumerable)
-      throw new TypeError('domain core must contain enumerable data properties');
+      throw createPluginHostTypeError('domain core must contain enumerable data properties');
     Object.defineProperty(facade, key, descriptor);
   }
   const define = (key: PropertyKey, value: unknown): void => {
@@ -66,17 +69,18 @@ export const createPluginCore = <TDomainCore extends object, TValue>(
   define('onDispose', (resource: IPluginResource) => context.registerResource(resource));
   define('usePipeline', (stage: ISyncPipelineStage<TValue>) => {
     const mode = context.pipelineMode();
-    if (mode === 'sync') context.registerStage(stage, mode);
-    else if (mode === 'async') context.registerStage(adaptSyncStageToAsync(stage), mode);
+    if (mode === PluginHostPipelineMode.sync) context.registerStage(stage, mode);
+    else if (mode === PluginHostPipelineMode.async)
+      context.registerStage(adaptSyncStageToAsync(stage, context.onPipelineViolation), mode);
     else context.registerStage(adaptSyncStageToGenerator(stage, context.onPipelineViolation), mode);
     return facade;
   });
   define('useAsyncPipeline', (stage: IAsyncPipelineStage<TValue>) => {
-    context.registerStage(stage, 'async');
+    context.registerStage(stage, PluginHostPipelineMode.async);
     return facade;
   });
   define('useGeneratorPipeline', (stage: IGeneratorPipelineStage<TValue>) => {
-    context.registerStage(stage, 'generator');
+    context.registerStage(stage, PluginHostPipelineMode.generator);
     return facade;
   });
   return facade as TDomainCore & IPluginHostCore<TValue>;

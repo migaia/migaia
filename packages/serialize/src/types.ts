@@ -5,15 +5,24 @@
  * 故意在这里复制一份而不是从 `@migaia/web-rpc` 里借用同名类型：serialize 是 store-persist/store-ssr/store-worker 依赖的底层
  * codec 原语，web-rpc 是更上层的 传输库，反过来依赖它会把依赖方向倒过来，也会让只想用 codec、不碰 RPC 的消费方 在依赖图上被迫挂上整个 web-rpc 包。
  */
+import { SERIALIZE_SOURCE, createSerializeRangeError, SerializeErrorCode } from './errors.js';
+import type { ISerializeErrorCode } from './error-code.js';
+import {
+  SerializeChunkKind,
+  SerializeCleanupKind,
+  SerializeCleanupPolicy,
+  SerializePhase
+} from './format-constants.js';
+
 export type ISerializeAbortSignal = {
   readonly aborted: boolean;
+  readonly reason?: unknown;
   addEventListener(
     type: 'abort',
     listener: () => void,
     options?: { readonly once?: boolean }
   ): void;
   removeEventListener(type: 'abort', listener: () => void): void;
-  readonly throwIfAborted?: () => void;
 };
 
 /**
@@ -26,9 +35,9 @@ export type ISerializeAbortSignal = {
  * wasm 走这条。 value —— 已经是成品对象，不需要再解析。用于「直通」型 parser（例如 memory storage 或测试桩），避免为了走流程而做一次无谓的编解码往返。
  */
 export type ISerializeChunk =
-  | readonly ['text', string]
-  | readonly ['bytes', Uint8Array]
-  | readonly ['value', unknown];
+  | readonly [typeof SerializeChunkKind.text, string]
+  | readonly [typeof SerializeChunkKind.bytes, Uint8Array]
+  | readonly [typeof SerializeChunkKind.value, unknown];
 
 export type ISerializeChunkType = ISerializeChunk[0];
 
@@ -36,7 +45,7 @@ export type ISerializeContext = {
   /** 协作式取消。parser 若忽略它，框架仍会丢弃其结果并以 AbortError 结束。 */
   readonly signal: ISerializeAbortSignal;
   /** 出错时拼进消息，用来定位是哪个 store / 哪个 key 出的事。 */
-  readonly source: string;
+  readonly context: string;
 };
 
 export type ISerializeOutput =
@@ -50,8 +59,8 @@ export type ISerializeParser = {
   readonly name: string;
   encode(value: unknown, context: ISerializeContext): ISerializeOutput;
   decode(chunk: ISerializeChunk, context: ISerializeContext): unknown | Promise<unknown>;
-  /** 释放 parser 自己持有的资源（worker 端口、wasm 句柄等）。 */
-  dispose?(): void;
+  /** 释放 parser 自己持有的资源（worker 端口、wasm 句柄等）。异步释放时返回 Promise，框架会 await。 */
+  dispose?(): void | Promise<void>;
 };
 
 /** 注册项。`type` 是写进信封的格式标签，读取时据此找回对应 parser——因此同一份 存档可以用旧格式读、用新格式写，格式迁移不需要清空用户数据。 */
@@ -60,7 +69,7 @@ export type ISerializePlugin = {
   readonly parser: ISerializeParser;
 };
 
-export type ISerializePhase = 'encode' | 'decode';
+export type ISerializePhase = (typeof SerializePhase)[keyof typeof SerializePhase];
 
 /**
  * 插件 type 的合法字符集。
@@ -74,8 +83,9 @@ export const SERIALIZE_TYPE_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/i;
 
 export function assertSerializeType(type: string): void {
   if (!SERIALIZE_TYPE_PATTERN.test(type)) {
-    throw new RangeError(
-      `[store] invalid serialize plugin type: ${JSON.stringify(type)}; expected ${String(SERIALIZE_TYPE_PATTERN)}`
+    throw createSerializeRangeError(
+      SerializeErrorCode.invalidOption,
+      `invalid serialize plugin type: ${JSON.stringify(type)}; expected ${String(SERIALIZE_TYPE_PATTERN)}`
     );
   }
 }
@@ -89,34 +99,61 @@ export function assertSerializeType(type: string): void {
 export const isChunkShape = (value: unknown): value is ISerializeChunk =>
   Array.isArray(value) && value.length === 2 && typeof value[0] === 'string';
 
-/** 携带定位信息的序列化异常。裸抛一个 SyntaxError 无法回答「哪个 store、哪种格式、 第几段、已经吃进去多少字节」——排查线上存档损坏时这几个数才是关键。 */
-export class SerializeError extends Error {
+/**
+ * Encode/decode 错误（`CODEC_NOT_FOUND`/`ENCODE_FAILED`/`DECODE_FAILED`/`INVALID_CHUNK`/`ABORTED`）：携带
+ * `type`/`phase`/`chunkIndex`/`bytesConsumed` 定位。构造/生命周期错误走 `createSerializeError`（tagged 原生
+ * Error），不 new 本类。
+ *
+ * `TCode` 默认收紧为 serialize 登记码 `ISerializeErrorCode`；复用本类的上层包（如 store-worker）可传自己的码联合覆盖 `code`。
+ */
+export class SerializeCodecError<TCode extends string = ISerializeErrorCode> extends Error {
+  readonly source: string;
+  readonly code: TCode;
+  readonly context?: string;
   readonly type: string;
   readonly phase: ISerializePhase;
-  readonly source: string;
   readonly chunkIndex: number;
   readonly bytesConsumed: number;
+  // cause 继承自 Error（经 super(message, { cause }) 挂载，error.cause === 原对象）
 
   constructor(
     message: string,
     details: {
+      code: TCode;
       type: string;
       phase: ISerializePhase;
-      source: string;
       chunkIndex: number;
       bytesConsumed: number;
+      context?: string;
+      /** 覆盖 `source`（默认 `@migaia/serialize`）供复用本类的上层包标自己的 source。 */
+      source?: string;
       cause?: unknown;
     }
   ) {
-    super(message, { cause: details.cause });
-    this.name = 'SerializeError';
+    super(message, details.cause !== undefined ? { cause: details.cause } : undefined);
+    this.name = 'SerializeCodecError';
+    this.source = details.source ?? SERIALIZE_SOURCE;
+    this.code = details.code;
+    if (details.context !== undefined) this.context = details.context;
     this.type = details.type;
     this.phase = details.phase;
-    this.source = details.source;
     this.chunkIndex = details.chunkIndex;
     this.bytesConsumed = details.bytesConsumed;
   }
 }
+
+/** 结构化 Encoding API（`TextEncoder`/`TextDecoder` 鸭子类型），供 core/plugins/registry 注入使用。 */
+export type ITextEncoder = { encode(input: string): Uint8Array };
+export type ITextDecoder = { decode(input: Uint8Array): string };
+
+/**
+ * Serialize 的结构化 scheduler（`ILifecycleScheduler` 的结构子集，字段签名一致，不 import
+ * lifecycle）。鸭子类型：`ILifecycleScheduler` 可赋值给它（T-18 兼容门禁）。
+ */
+export type ISerializeScheduler = {
+  now(): number;
+  schedule(callback: () => void, delayMs: number): { cancel(): void };
+};
 
 export type ISerializeRegistry = {
   /** 写入使用的格式：插件数组的第一项。 */
@@ -128,7 +165,7 @@ export type ISerializeRegistry = {
     options?: {
       readonly type?: string;
       readonly signal?: ISerializeAbortSignal;
-      readonly source?: string;
+      readonly context?: string;
     }
   ): Promise<ISerializeChunk>;
   decode(
@@ -136,8 +173,48 @@ export type ISerializeRegistry = {
     options?: {
       readonly type?: string;
       readonly signal?: ISerializeAbortSignal;
-      readonly source?: string;
+      readonly context?: string;
     }
   ): Promise<unknown>;
-  dispose(): void;
+  /** 同步：拒绝新请求并 abort 内部 closing controller；幂等；不调用 parser disposer。 */
+  close(): void;
+  /** 异步：隐含先 close()；等待在途结算或到达 deadlineAt 后同步释放 parser；幂等复用同一 promise，首次调用冻结 deadlineAt。 */
+  dispose(options?: { readonly deadlineAt?: number }): Promise<void>;
+};
+
+export type ISerializeCleanupError = {
+  readonly kind: typeof SerializeCleanupKind.cleanupError;
+  readonly source: string;
+  readonly error: unknown;
+};
+
+export type ISerializeTimeoutDiagnostic = {
+  readonly kind: typeof SerializeCleanupKind.drainTimeout;
+  readonly source: string;
+  readonly deadlineAt?: number;
+  readonly pendingCount?: number;
+};
+
+export type ISerializeRegistryOptions = {
+  /** 默认 lifecycle `systemScheduler`；创建后不可更换（scheduler 时间域契约见 R-9，此处不重复解释）。 */
+  readonly scheduler?: ISerializeScheduler;
+  /** 省略时用宿主 `TextEncoder`（Encoding API，明确声明 host capability）；创建后不可更换。 */
+  readonly encoder?: ITextEncoder;
+  /** 省略时用宿主 `TextDecoder`（Encoding API，明确声明 host capability）；创建后不可更换。 */
+  readonly decoder?: ITextDecoder;
+  /** Cleanup error 出口（可选，默认 `{ policy: 'throw' }`；report 策略强制携带 reporter）。 */
+  readonly cleanup?:
+    | { readonly policy: typeof SerializeCleanupPolicy.throw }
+    | {
+        readonly policy: typeof SerializeCleanupPolicy.report;
+        readonly report: (d: ISerializeCleanupError) => void;
+      };
+  /** Drain-timeout 观测（可选；与 cleanup error 边界分离）。 */
+  readonly onDrainTimeout?: (d: ISerializeTimeoutDiagnostic) => void;
+  /**
+   * 通用 registry 二次/迟到错误 reporter（可选；不提供时用本 registry 的固定静态 no-op fallback）。 承载两类语义：① iterator
+   * `return()` 的二次错误（active drain 期，`drainAsyncIterable` 上报）； ② deadline 后 detached task 的迟到
+   * rejection（cleanup 后，`track` 上报，不重新接入 registry 生命周期）。 两类都不改变 primary rejection，也不改变 terminal。
+   */
+  readonly report?: (error: unknown) => void;
 };

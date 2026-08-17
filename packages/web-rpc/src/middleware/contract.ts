@@ -1,14 +1,14 @@
-import { validateContractData } from '../internal/contract';
-import { WebRpcCapabilityKey } from '../internal/runtime';
+import { validateContractData } from '../internal/contract.js';
+import { WebRpcCapabilityKey } from '../internal/runtime.js';
 import type {
   IWebRpcContractCapability,
   IWebRpcContractConfig,
   IWebRpcMethodSchema,
   IWebRpcSchema,
   IWebRpcMiddleware
-} from '../typing';
-import { WebRpcError, WebRpcErrorCode } from '../errors';
-import { createSafeRecord, safeRead } from '../internal/safe-value';
+} from '../typing.js';
+import { WebRpcError, WebRpcErrorCode } from '../errors.js';
+import { createSafeRecord, safeRead } from '../internal/safe-value.js';
 export const contract = (config: IWebRpcContractConfig = {}): IWebRpcMiddleware => ({
   name: 'contract',
   install: ({ capabilities }) => {
@@ -33,7 +33,7 @@ export const contract = (config: IWebRpcContractConfig = {}): IWebRpcMiddleware 
       const source = safeRead<unknown>(config, 'schemas');
       if (source !== undefined) {
         if (!source || typeof source !== 'object' || Array.isArray(source))
-          throw new Error('schemas must be an object');
+          throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'schemas must be an object');
         schemas = createSafeRecord<IWebRpcMethodSchema>() as Record<string, IWebRpcMethodSchema>;
         for (const method of Object.keys(source)) {
           const methodSchema = safeRead<unknown>(source, method);
@@ -44,11 +44,15 @@ export const contract = (config: IWebRpcContractConfig = {}): IWebRpcMiddleware 
             typeof value === 'object' &&
             typeof safeRead<unknown>(value, 'parse') === 'function';
           if (!isSchema(params) || !isSchema(result))
-            throw new Error(`schema descriptor is invalid: ${method}`);
+            throw new WebRpcError(
+              WebRpcErrorCode.invalidConfig,
+              `schema descriptor is invalid: ${method}`
+            );
           schemas[method] = { params, result };
         }
       }
     } catch (error) {
+      if (error instanceof WebRpcError) throw error;
       throw new WebRpcError(
         WebRpcErrorCode.invalidConfig,
         'contract.schemas must contain params/result schemas with parse functions',

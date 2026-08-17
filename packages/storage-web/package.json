@@ -17,6 +17,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./memory": {
+      "types": "./dist/memory.d.ts",
+      "default": "./dist/memory.js"
     }
   },
   "publishConfig": {
@@ -35,8 +39,11 @@
     "release:pack": "pnpm pack --pack-destination /tmp",
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@migaia/storage-contract": "workspace:^"
+  },
   "devDependencies": {
+    "@migaia/web-rpc": "workspace:^",
     "@vitest/coverage-v8": "4.1.10",
     "fake-indexeddb": "6.2.5",
     "jsdom": "29.1.1"

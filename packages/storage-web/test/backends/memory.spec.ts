@@ -14,10 +14,10 @@ describe('memoryStorage', () => {
   it('拒绝运行时非字符串 value', async () => {
     const store = memoryStorage();
     expect(() => store.sync!.set('key', 42 as unknown as string)).toThrowError(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
     );
     await expect(store.set('key', 42 as unknown as string)).rejects.toMatchObject({
-      code: 'INVALID_ARGUMENT'
+      code: 'INVALID_CONFIG'
     });
   });
   it('L0 与 bytes 通道拒绝运行时非字符串 key', async () => {
@@ -48,7 +48,7 @@ describe('memoryStorage', () => {
     await expect(
       store.setBytes('key', new DataView(new ArrayBuffer(1)) as unknown as Uint8Array)
     ).rejects.toMatchObject({
-      code: 'INVALID_ARGUMENT'
+      code: 'INVALID_CONFIG'
     });
   });
   it('record replace 在 clone 失败时保留原 value 通道', async () => {

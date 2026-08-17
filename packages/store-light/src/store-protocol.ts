@@ -1,4 +1,6 @@
 import type { IDisposable, IRuntime } from '@migaia/reactive';
+import type { IAbortSignal } from '@migaia/lifecycle';
+import { StoreFieldMode } from './field-mode-constants.js';
 
 /**
  * Store 门面对外开放的扩展协议。
@@ -28,36 +30,36 @@ export type IFieldSource = IDisposable & {
  *
  * 刻意不传 scope——所有权登记是 Store 的职责。让 Builder 自己登记的话，第三方实现 一旦「创建了资源却忘了登记」，$dispose 就漏释放，而 Store 无从察觉。
  */
-export type FieldContext = {
+export type IFieldContext = {
   runtime: IRuntime;
-  signal: AbortSignal;
+  signal: IAbortSignal;
   createSource(debugName?: string): IFieldSource;
 };
 
-export type SyncFieldBuilder<F extends IDisposable> = {
+export type ISyncFieldBuilder<F extends IDisposable> = {
   readonly [FIELD_BUILDER]: true;
-  readonly mode: 'sync';
-  create(context: FieldContext): F;
+  readonly mode: typeof StoreFieldMode.sync;
+  create(context: IFieldContext): F;
 };
 
-export type AsyncFieldBuilder<F extends IDisposable> = {
+export type IAsyncFieldBuilder<F extends IDisposable> = {
   readonly [FIELD_BUILDER]: true;
-  readonly mode: 'async';
-  create(context: FieldContext): Promise<F>;
+  readonly mode: typeof StoreFieldMode.async;
+  create(context: IFieldContext): Promise<F>;
 };
 
 /** Pre-discriminant builder accepted only by legacy creation paths. */
-export type LegacyFieldBuilder<F extends IDisposable> = {
+export type ILegacyFieldBuilder<F extends IDisposable> = {
   readonly [FIELD_BUILDER]: true;
-  create(context: FieldContext): Promise<F>;
+  create(context: IFieldContext): Promise<F>;
 };
 
-export type FieldBuilder<F extends IDisposable> =
-  | SyncFieldBuilder<F>
-  | AsyncFieldBuilder<F>
-  | LegacyFieldBuilder<F>;
+export type IFieldBuilder<F extends IDisposable> =
+  | ISyncFieldBuilder<F>
+  | IAsyncFieldBuilder<F>
+  | ILegacyFieldBuilder<F>;
 
-export function isFieldBuilder(value: unknown): value is FieldBuilder<IDisposable> {
+export function isFieldBuilder(value: unknown): value is IFieldBuilder<IDisposable> {
   return (
     typeof value === 'object' &&
     value !== null &&
@@ -90,13 +92,13 @@ export type IMutationPolicy = IMutationGuard & {
 //   callback: raw(fn)  → 普通函数值字段（可读可写可替换）
 const RAW = Symbol('store.raw');
 
-export type Raw<T> = { readonly [RAW]: true; readonly value: T };
+export type IRaw<T> = { readonly [RAW]: true; readonly value: T };
 
-export function raw<T>(value: T): Raw<T> {
+export function raw<T>(value: T): IRaw<T> {
   return { [RAW]: true, value };
 }
 
-export function isRaw(value: unknown): value is Raw<unknown> {
+export function isRaw(value: unknown): value is IRaw<unknown> {
   return (
     typeof value === 'object' &&
     value !== null &&

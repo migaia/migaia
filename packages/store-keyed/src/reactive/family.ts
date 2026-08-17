@@ -1,6 +1,12 @@
 import { defaultRuntime } from '@migaia/reactive';
 import type { IComputedValue, IDisposable, IRuntime } from '@migaia/reactive';
 import type { IComputedConfig } from '@migaia/reactive/reactive/computed.class';
+import {
+  createStoreKeyedAggregateError,
+  createStoreKeyedError,
+  createStoreKeyedRangeError,
+  StoreKeyedErrorCode
+} from '../errors.js';
 
 /** Keys with deterministic Map/LRU semantics and no accidental object retention. */
 export type IFamilyKey = string | number | bigint | boolean | symbol | null | undefined | object;
@@ -45,10 +51,16 @@ type IFamilyNodeOptions<K extends IFamilyKey, V extends IDisposable> = IFamilyOp
 function validateOptions(options: IFamilyOptions): void {
   const { maxSize, ttl = Infinity } = options;
   if (maxSize !== undefined && (!Number.isInteger(maxSize) || maxSize < 1)) {
-    throw new RangeError('[store] family maxSize must be a positive integer');
+    throw createStoreKeyedRangeError(
+      StoreKeyedErrorCode.invalidOption,
+      '[store] family maxSize must be a positive integer'
+    );
   }
   if (ttl < 0 || Number.isNaN(ttl)) {
-    throw new RangeError('[store] family ttl must be non-negative');
+    throw createStoreKeyedRangeError(
+      StoreKeyedErrorCode.invalidOption,
+      '[store] family ttl must be non-negative'
+    );
   }
 }
 
@@ -62,7 +74,8 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
 ): IFamily<K, V> {
   validateOptions(options);
   if (typeof WeakRef !== 'function' || typeof FinalizationRegistry !== 'function') {
-    throw new Error(
+    throw createStoreKeyedError(
+      StoreKeyedErrorCode.envUnsupported,
       '[store] createFamily() requires WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox'
     );
   }
@@ -86,7 +99,11 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
   let ttlTimer: ReturnType<typeof setTimeout> | undefined;
 
   const assertUsable = (): void => {
-    if (disposed) throw new Error('[store] cannot use a disposed family');
+    if (disposed)
+      throw createStoreKeyedError(
+        StoreKeyedErrorCode.familyDisposed,
+        '[store] cannot use a disposed family'
+      );
   };
 
   const expired = (entry: IFamilyEntry<V>): boolean => now() >= entry.expiresAt;
@@ -183,7 +200,8 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
     }
     if (errors.length === 1) throw errors[0];
     if (errors.length > 1) {
-      throw new AggregateError(
+      throw createStoreKeyedAggregateError(
+        StoreKeyedErrorCode.evictionFailed,
         errors,
         '[store] family capacity eviction failed for multiple entries'
       );
@@ -325,7 +343,11 @@ function disposeAll(values: IDisposable[]): void {
   }
   if (errors.length === 1) throw errors[0];
   if (errors.length > 1) {
-    throw new AggregateError(errors, '[store] family disposal failed for multiple entries');
+    throw createStoreKeyedAggregateError(
+      StoreKeyedErrorCode.disposalFailed,
+      errors,
+      '[store] family disposal failed for multiple entries'
+    );
   }
 }
 

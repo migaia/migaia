@@ -1,30 +1,34 @@
-import { toPromise } from '../utils/async';
+import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract';
+import { isStorageErrorFamily } from '../core/error-family.js';
+import { createStorageOperationRuntime } from '../core/operation-reporter.js';
+import { toPromise } from '../utils/async.js';
 import {
   mergeSignals,
   snapshotSyncWriteOptions,
   throwIfAborted,
   withAbort
-} from '../core/operation';
+} from '../core/operation.js';
 import {
   assertStorageKey,
   assertStringStorageKey,
   compareStorageKeys,
   encodeFlatStorageKey,
   snapshotKeyRange
-} from '../core/key-domain';
-import { isStorageKeyInRange } from '../core/query';
-import { isUint8Array } from '../core/bytes';
-import { planChannelWrite } from '../core/channel-write';
-import { StorageError, StorageErrorCode } from '../types/errors';
-import type { IStorageKey } from '../types/context';
-import type { IRecordStore, ISyncCapableStore, ISyncKeyValueStore } from '../types/storage';
+} from '../core/key-domain.js';
+import { isStorageKeyInRange } from '../core/query.js';
+import { StorageBackend, StorageChannel, StorageOperation } from '../constants.js';
+import { isUint8Array } from '../core/bytes.js';
+import { planChannelWrite } from '../core/channel-write.js';
+import { StorageError, StorageErrorCode } from '../types/errors.js';
+import type { IStorageKey } from '../types/context.js';
+import type { IRecordStore, ISyncCapableStore, ISyncKeyValueStore } from '../types/storage.js';
 import {
   assertTransactionCallback,
   assertTransactionScopeActive,
   readTransactionConflictPolicy,
   type ITransactionScope
-} from '../core/transaction';
-import type { IStorageCapabilities } from '../types/capabilities';
+} from '../core/transaction.js';
+import type { IStorageCapabilities } from '../types/capabilities.js';
 
 const CAPABILITIES: IStorageCapabilities = Object.freeze({
   syncRead: true,
@@ -54,14 +58,21 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
   let disposed = false;
 
   const assertLive = (): void => {
-    if (disposed) throw new StorageError(StorageErrorCode.disposed, { backend: 'memory' });
+    if (disposed)
+      throw new StorageContractError(StorageContractErrorCode.disposed, {
+        backend: StorageBackend.memory
+      });
   };
 
   const cloneValue = <T>(value: T, key?: IStorageKey): T => {
     try {
       return structuredClone(value);
     } catch (cause) {
-      throw new StorageError(StorageErrorCode.serializeFailed, { backend: 'memory', key, cause });
+      throw new StorageError(StorageErrorCode.serializeFailed, {
+        backend: StorageBackend.memory,
+        key,
+        cause
+      });
     }
   };
 
@@ -77,11 +88,17 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
     if (stringKey !== undefined && kv.has(stringKey)) existing.add('value');
     if (stringKey !== undefined && bytes.has(stringKey)) existing.add('bytes');
     if (documents.has(encodedKey)) existing.add('record');
-    const plan = planChannelWrite(key, attemptedChannel, existing, conflictPolicy, 'memory');
+    const plan = planChannelWrite(
+      key,
+      attemptedChannel,
+      existing,
+      conflictPolicy,
+      StorageBackend.memory
+    );
     if (!applyReplace) return;
     for (const channel of plan.remove) {
-      if (channel === 'value' && stringKey !== undefined) kv.delete(stringKey);
-      if (channel === 'bytes' && stringKey !== undefined) bytes.delete(stringKey);
+      if (channel === StorageChannel.value && stringKey !== undefined) kv.delete(stringKey);
+      if (channel === StorageChannel.bytes && stringKey !== undefined) bytes.delete(stringKey);
       if (channel === 'record') {
         if (documents.delete(encodedKey))
           recordRevisions.set(encodedKey, (recordRevisions.get(encodedKey) ?? 0) + 1);
@@ -92,16 +109,16 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
   const sync: ISyncKeyValueStore = {
     get: (key) => {
       assertLive();
-      assertStringStorageKey(key, 'memory');
+      assertStringStorageKey(key, StorageBackend.memory);
       return kv.get(key) ?? null;
     },
     set: (key, value, options) => {
       assertLive();
-      assertStringStorageKey(key, 'memory');
+      assertStringStorageKey(key, StorageBackend.memory);
       const optionsSnapshot = snapshotSyncWriteOptions(options);
       if (typeof value !== 'string')
-        throw new StorageError(StorageErrorCode.invalidArgument, {
-          backend: 'memory',
+        throw new StorageError(StorageErrorCode.invalidConfig, {
+          backend: StorageBackend.memory,
           key,
           cause: new TypeError('storage value must be a string')
         });
@@ -110,12 +127,12 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
     },
     remove: (key) => {
       assertLive();
-      assertStringStorageKey(key, 'memory');
+      assertStringStorageKey(key, StorageBackend.memory);
       kv.delete(key);
     },
     has: (key) => {
       assertLive();
-      assertStringStorageKey(key, 'memory');
+      assertStringStorageKey(key, StorageBackend.memory);
       return kv.has(key);
     },
     keys: () => {
@@ -151,15 +168,19 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
     >();
     const readRevisions = new Map<string, number>();
     const readSnapshots = new Map<string, TValue | undefined>();
-    const snapshotEpoch = recordEpoch;
+    let snapshotEpoch: number | undefined;
     const revisionOf = (encoded: string): number => recordRevisions.get(encoded) ?? 0;
     const trackRevision = (encoded: string): void => {
+      // 惰性捕获 snapshot epoch（SW-A28/A29「快照在首次读取时建立」）：与 indexed-db 一致。事务开始后才发生的
+      // clearRecords 不影响「首次读取之后」的快照一致性——首次读取前就 clear 的，读到的是 post-clear 的一致状态，
+      // 不应误报冲突。空事务（无任何读写）不建立快照，也不做 epoch 检查。
+      if (snapshotEpoch === undefined) snapshotEpoch = recordEpoch;
       if (!readRevisions.has(encoded)) readRevisions.set(encoded, revisionOf(encoded));
     };
     const scope: ITransactionScope<TValue> = {
       get: async (key) => {
-        assertTransactionScopeActive(scopeActive, 'memory');
-        assertStorageKey(key, 'memory');
+        assertTransactionScopeActive(scopeActive, StorageBackend.memory);
+        assertStorageKey(key, StorageBackend.memory);
         const encoded = encodeFlatStorageKey(key);
         trackRevision(encoded);
         if (readSnapshots.has(encoded)) {
@@ -178,10 +199,10 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
         return snapshot === undefined ? undefined : cloneValue(snapshot, key);
       },
       put: async (value, key, options) => {
-        assertTransactionScopeActive(scopeActive, 'memory');
-        const conflictPolicy = readTransactionConflictPolicy(options, 'memory');
+        assertTransactionScopeActive(scopeActive, StorageBackend.memory);
+        const conflictPolicy = readTransactionConflictPolicy(options, StorageBackend.memory);
         const resolvedKey = key ?? autoKey();
-        assertStorageKey(resolvedKey, 'memory');
+        assertStorageKey(resolvedKey, StorageBackend.memory);
         const keySnapshot = cloneValue(resolvedKey, resolvedKey);
         const encoded = encodeFlatStorageKey(keySnapshot);
         trackRevision(encoded);
@@ -190,8 +211,8 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
         return resolvedKey;
       },
       delete: async (key) => {
-        assertTransactionScopeActive(scopeActive, 'memory');
-        assertStorageKey(key, 'memory');
+        assertTransactionScopeActive(scopeActive, StorageBackend.memory);
+        assertStorageKey(key, StorageBackend.memory);
         const encoded = encodeFlatStorageKey(key);
         trackRevision(encoded);
         readSnapshots.delete(encoded);
@@ -202,9 +223,9 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
     try {
       result = await run(scope);
     } catch (error) {
-      if (error instanceof StorageError) throw error;
+      if (isStorageErrorFamily(error)) throw error;
       throw new StorageError(StorageErrorCode.transactionFailed, {
-        backend: 'memory',
+        backend: StorageBackend.memory,
         cause: error
       });
     } finally {
@@ -218,18 +239,18 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
     }
     assertLive();
     throwIfAborted(signal);
-    if (recordEpoch !== snapshotEpoch)
+    if (snapshotEpoch !== undefined && recordEpoch !== snapshotEpoch)
       throw new StorageError(StorageErrorCode.transactionConflict, {
-        backend: 'memory',
-        operation: 'transaction.commit',
+        backend: StorageBackend.memory,
+        operation: StorageOperation.transactionCommit,
         cause: new Error('record epoch changed')
       });
     for (const [encoded, expected] of readRevisions) {
       const actual = revisionOf(encoded);
       if (actual !== expected)
         throw new StorageError(StorageErrorCode.transactionConflict, {
-          backend: 'memory',
-          operation: 'transaction.commit',
+          backend: StorageBackend.memory,
+          operation: StorageOperation.transactionCommit,
           cause: new Error(`record revision changed from ${expected} to ${actual}`)
         });
     }
@@ -247,7 +268,7 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
   };
 
   return {
-    backend: 'memory',
+    backend: StorageBackend.memory,
     capabilities: CAPABILITIES,
     sync,
     get: (key, ctx) => withAbort(ctx, async () => sync.get(key)),
@@ -255,8 +276,8 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
       withAbort(ctx, async (_signal, context) => {
         assertLive();
         if (typeof value !== 'string')
-          throw new StorageError(StorageErrorCode.invalidArgument, {
-            backend: 'memory',
+          throw new StorageError(StorageErrorCode.invalidConfig, {
+            backend: StorageBackend.memory,
             key,
             cause: new TypeError('storage value must be a string')
           });
@@ -286,17 +307,17 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
     getBytes: (key, ctx) =>
       withAbort(ctx, async () => {
         assertLive();
-        assertStringStorageKey(key, 'memory');
+        assertStringStorageKey(key, StorageBackend.memory);
         const value = bytes.get(key);
         return value ? new Uint8Array(value) : null;
       }),
     setBytes: (key, value, ctx) =>
       withAbort(ctx, async (_signal, context) => {
         assertLive();
-        assertStringStorageKey(key, 'memory');
+        assertStringStorageKey(key, StorageBackend.memory);
         if (!isUint8Array(value))
-          throw new StorageError(StorageErrorCode.invalidArgument, {
-            backend: 'memory',
+          throw new StorageError(StorageErrorCode.invalidConfig, {
+            backend: StorageBackend.memory,
             key,
             cause: new TypeError('bytes value must be a Uint8Array')
           });
@@ -305,7 +326,7 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
           prepared = new Uint8Array(value.buffer, value.byteOffset, value.byteLength).slice();
         } catch (cause) {
           throw new StorageError(StorageErrorCode.serializeFailed, {
-            backend: 'memory',
+            backend: StorageBackend.memory,
             key,
             cause
           });
@@ -322,7 +343,7 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
     getRecord: (key, ctx) =>
       withAbort(ctx, async () => {
         assertLive();
-        assertStorageKey(key, 'memory');
+        assertStorageKey(key, StorageBackend.memory);
         const value = documents.get(encodeFlatStorageKey(key))?.[1];
         return value === undefined ? undefined : cloneValue(value, key);
       }),
@@ -330,7 +351,7 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
       withAbort(ctx, async (_signal, context) => {
         assertLive();
         const resolvedKey = key ?? autoKey();
-        assertStorageKey(resolvedKey, 'memory');
+        assertStorageKey(resolvedKey, StorageBackend.memory);
         const keySnapshot = cloneValue(resolvedKey, resolvedKey);
         const encoded = encodeFlatStorageKey(keySnapshot);
         const prepared = cloneValue(value, keySnapshot);
@@ -342,7 +363,7 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
     deleteRecord: (key, ctx) =>
       withAbort(ctx, async () => {
         assertLive();
-        assertStorageKey(key, 'memory');
+        assertStorageKey(key, StorageBackend.memory);
         const encoded = encodeFlatStorageKey(key);
         documents.delete(encoded);
         recordRevisions.set(encoded, (recordRevisions.get(encoded) ?? 0) + 1);
@@ -354,8 +375,10 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
         recordEpoch += 1;
       }),
     iterateRecords: async function* (range, ctx) {
-      const rangeSnapshot = snapshotKeyRange(range, 'memory');
-      const merged = mergeSignals(ctx);
+      const rangeSnapshot = snapshotKeyRange(range, StorageBackend.memory);
+      /** One reporter shared by every abort subscription inside this iteration operation. */
+      const runtime = createStorageOperationRuntime();
+      const merged = mergeSignals(ctx, runtime.reporter);
       try {
         assertLive();
         throwIfAborted(merged.signal);
@@ -374,7 +397,7 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
     },
     transaction: (run, ctx) => {
       return withAbort(ctx, (signal) => {
-        assertTransactionCallback(run, 'memory');
+        assertTransactionCallback(run, StorageBackend.memory);
         return runTransaction(run, signal);
       });
     }

@@ -3,6 +3,7 @@ import {
   createSerializeRegistry,
   jsonParser,
   jsonPlugin,
+  type ISerializeChunk,
   type ISerializeContext
 } from '../src/index';
 
@@ -26,7 +27,9 @@ describe('jsonParser：encode', () => {
 
   it('space 控制缩进（仅调试用）', () => {
     const parser = jsonParser({ space: 2 });
-    const chunk = parser.encode({ a: 1 }, dummyContext());
+    // `encode()` is typed as `ISerializeOutput` (a union covering async/streaming outputs too);
+    // `jsonParser` is known to always return a synchronous chunk tuple directly.
+    const chunk = parser.encode({ a: 1 }, dummyContext()) as ISerializeChunk;
     expect(chunk[1]).toContain('\n');
   });
 });
@@ -87,6 +90,6 @@ function dummyContext(): ISerializeContext {
       addEventListener: () => undefined,
       removeEventListener: () => undefined
     },
-    source: 'test'
+    context: 'test'
   };
 }

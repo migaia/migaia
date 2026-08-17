@@ -24,11 +24,11 @@ describe('persistKeyed（store-keyed）', () => {
   });
 
   it('partialize/merge：只持久化 refreshToken，其余字段保持内存值', async () => {
-    type Session = { accessToken: string; refreshToken: string };
+    type ISession = { accessToken: string; refreshToken: string };
     const storage = memoryStorage();
     const runtime = createRuntime();
     const atomStore = createAtomStore(runtime);
-    const session = familyDef((): Session => ({ accessToken: '', refreshToken: '' }));
+    const session = familyDef((): ISession => ({ accessToken: '', refreshToken: '' }));
 
     const def = session('s1');
     const { dispose } = persistKeyed(atomStore, def, 's1', {
@@ -42,7 +42,7 @@ describe('persistKeyed（store-keyed）', () => {
     atomStore.set(def, { accessToken: 'a1', refreshToken: 'r1' });
     await new Promise((resolve) => setTimeout(resolve, 20));
     const raw = await storage.get('sessions:s1');
-    const parsed = JSON.parse(raw as string) as { state: Partial<Session> };
+    const parsed = JSON.parse(raw as string) as { state: Partial<ISession> };
     expect(parsed.state).toEqual({ refreshToken: 'r1' });
     expect(parsed.state.accessToken).toBeUndefined();
     dispose();

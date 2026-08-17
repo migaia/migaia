@@ -6,7 +6,8 @@ import type {
   IRuntimeNodeDescriptor,
   IRuntimeNodeKind,
   IRuntimeTraceEvent
-} from './types';
+} from './types.js';
+import { assimilateThenable } from './receiver.js';
 
 type INodeRole = 'observable' | 'observer';
 
@@ -40,13 +41,10 @@ export function containDiagnosticRejection(
     return;
   }
   if (typeof then !== 'function') return;
-  const settled = new Promise<unknown>((resolve, reject) => {
-    try {
-      Reflect.apply(then, value, [resolve, reject]);
-    } catch (error) {
-      reject(error);
-    }
-  });
+  // Reuse the `then` we already read — `assimilateThenable` invokes it exactly once with the
+  // thenable as receiver, so we never hand the value back to `Promise.resolve()` to read `.then`
+  // twice (a stateful getter could return a different function or throw on the second read).
+  const settled = assimilateThenable(then as (resolve: unknown, reject: unknown) => void, value);
   void settled.catch((error: unknown) => {
     try {
       onRejected(error);

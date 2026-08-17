@@ -213,9 +213,10 @@ pipeline stage 不调用 `next()` 时，该次 pipeline 会被拦截、`done` �
 | `PLUGIN_DUPLICATE` | 插件已安装，或同一批次中出现重复名字。 |
 | `PLUGIN_NOT_INSTALLED` | 目标插件未安装（`unUse`/`config.update` 找不到对应插件）。 |
 | `PLUGIN_INSTALL_FAILED` | 插件安装失败；原始错误位于 `cause`。 |
-| `PLUGIN_INSTALL_ROLLBACK_FAILED` | 插件安装失败且回滚清理也失败；`cause` 为包含安装与回滚错误的 `AggregateError`。 |
+| `PLUGIN_INSTALL_ROLLBACK_FAILED` | 诊断（非抛出）：插件安装失败且回滚清理也失败；原始安装错误**保持 primary**（顶层码 `PLUGIN_INSTALL_FAILED`），回滚失败经 `diagnostic` 上报。 |
 | `PLUGIN_DISPOSE_FAILED` | 单个插件卸载失败；原始错误位于 `cause`。 |
 | `HOST_DISPOSE_FAILED` | Host 整体卸载失败；原始错误位于 `cause`。 |
+| `INVALID_OPTION` | 入参校验失败（`TypeError`）：插件名/配置路径/pipeline stage/extension/domain core/资源 disposer 等输入不满足契约。 |
 | `EXTENSION_DUPLICATE` | extension key 与已有成员冲突。 |
 | `EXTENSION_OBJECT_PROTOTYPE` | extension key 与 `Object.prototype` 上的成员冲突（如 `toString`）。 |
 | `EXTENSION_RESERVED` | extension key 是 Host 保留成员（如 `then`）。 |
@@ -228,6 +229,7 @@ pipeline stage 不调用 `next()` 时，该次 pipeline 会被拦截、`done` �
 | `INVALID_PIPELINE_MODE` | 构造时传入的 pipeline mode 无效。 |
 | `PIPELINE_MODE_MISMATCH` | Host mode 合法，但调用了与当前 mode 不匹配的 stage 注册方法（比如 sync 模式下调用了 `useAsyncPipeline`）。 |
 | `PIPELINE_EXECUTING` | pipeline 执行期间尝试注册新 stage。 |
+| `PIPELINE_FAILED` | async pipeline 的 stage 与 downstream 同时失败，聚合为带 `(source, code)` 的 `AggregateError`。 |
 | `PIPELINE_NEXT_DUPLICATE` | 同一次 stage 调用里重复调用了 `next()`。 |
 | `PIPELINE_NEXT_LATE` | stage 已经返回/完成之后才调用 `next()`；通过 `diagnostic` 回调上报，不抛错。 |
 

@@ -1,3 +1,5 @@
+import { tagWebRpcError, WebRpcErrorCode } from '../errors.js';
+
 export class PeerRegistry<T extends string = string> {
   readonly #configured = new Set<T>();
   readonly #learned = new Map<T, number>();
@@ -6,9 +8,15 @@ export class PeerRegistry<T extends string = string> {
 
   constructor(maxLearned = 1024, learnedTtlMs = 300_000) {
     if (!Number.isSafeInteger(maxLearned) || maxLearned < 1)
-      throw new TypeError('maxLearned must be a positive safe integer');
+      throw tagWebRpcError(
+        new TypeError('maxLearned must be a positive safe integer'),
+        WebRpcErrorCode.invalidConfig
+      );
     if (!Number.isSafeInteger(learnedTtlMs) || learnedTtlMs < 1)
-      throw new TypeError('learnedTtlMs must be a positive safe integer');
+      throw tagWebRpcError(
+        new TypeError('learnedTtlMs must be a positive safe integer'),
+        WebRpcErrorCode.invalidConfig
+      );
     this.#maxLearned = maxLearned;
     this.#learnedTtlMs = learnedTtlMs;
   }

@@ -1,3 +1,5 @@
+import { tagWebRpcError, WebRpcErrorCode } from '../errors.js';
+
 /** Owns bounded task tombstones and recently reserved outbound identifiers. */
 export class ReplayWindow {
   readonly #reservedIds = new Map<string, number>();
@@ -11,7 +13,10 @@ export class ReplayWindow {
       !Number.isSafeInteger(ttlMs) ||
       ttlMs < 1
     )
-      throw new TypeError('replay limits must be positive safe integers');
+      throw tagWebRpcError(
+        new TypeError('replay limits must be positive safe integers'),
+        WebRpcErrorCode.invalidConfig
+      );
     this.#maxEntries = maxEntries;
     this.#ttlMs = ttlMs;
   }
@@ -30,6 +35,11 @@ export class ReplayWindow {
   /** Releases an outbound identifier after its operation has settled. */
   releaseId(id: string): void {
     this.#reservedIds.delete(id);
+  }
+
+  /** The replay retention window; used by owners that mirror this ledger's TTL. */
+  get ttlMs(): number {
+    return this.#ttlMs;
   }
 
   /** Releases all replay state during endpoint disposal. */

@@ -3,6 +3,6 @@
 export {
   FIELD_BUILDER,
   isFieldBuilder,
-  type FieldBuilder,
-  type FieldContext
+  type IFieldBuilder,
+  type IFieldContext
 } from '@migaia/store-light';

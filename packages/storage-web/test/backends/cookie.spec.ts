@@ -6,14 +6,14 @@ describe('cookies backend', () => {
   it('构造期拒绝 null、数组和 primitive options', () => {
     for (const options of [null, [], 'options', 1])
       expect(() => cookies(options as never)).toThrowError(
-        expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+        expect.objectContaining({ code: 'INVALID_CONFIG' })
       );
   });
 
   it('拒绝数组 cookie scope 配置', () => {
     expect(() =>
       cookies({ scope: [] as never, namespace: 'array-scope', document: fakeCookieDocument() })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }));
   });
 
   it('构造 options 与固定 scope 的每个字段只读取一次', async () => {
@@ -72,7 +72,7 @@ describe('cookies backend', () => {
         namespaceCodec: [] as never,
         document: fakeCookieDocument()
       })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }));
   });
 
   it('namespace codec 描述符只读取一次并固定后续行为', async () => {
@@ -100,7 +100,7 @@ describe('cookies backend', () => {
     expect(reads).toBe(2);
   });
 
-  it('namespace codec getter 异常统一返回 INVALID_ARGUMENT', () => {
+  it('namespace codec getter 异常统一返回 INVALID_CONFIG', () => {
     expect(() =>
       cookies({
         namespaceCodec: {
@@ -111,7 +111,7 @@ describe('cookies backend', () => {
         },
         document: fakeCookieDocument()
       })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', backend: 'cookie' }));
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG', backend: 'cookie' }));
   });
 
   it('拒绝非法 expires 写入上下文', async () => {
@@ -130,7 +130,7 @@ describe('cookies backend', () => {
       }
     ])
       await expect(store.set('key', 'value', { expires: expires as never })).rejects.toMatchObject({
-        code: 'INVALID_ARGUMENT'
+        code: 'INVALID_CONFIG'
       });
   });
 
@@ -151,7 +151,7 @@ describe('cookies backend', () => {
     await expect(store.get('key')).resolves.toBe('value');
   });
 
-  it('write context 字段只读取一次且 getter 异常统一返回 INVALID_ARGUMENT', async () => {
+  it('write context 字段只读取一次且 getter 异常统一返回 INVALID_CONFIG', async () => {
     const store = cookies({ namespace: 'write-context-snapshot', document: fakeCookieDocument() });
     let reads = 0;
     await store.set('key', 'value', {
@@ -179,10 +179,10 @@ describe('cookies backend', () => {
       }
     });
     expect(operation).toBeInstanceOf(Promise);
-    await expect(operation).rejects.toMatchObject({ code: 'INVALID_ARGUMENT', backend: 'cookie' });
+    await expect(operation).rejects.toMatchObject({ code: 'INVALID_CONFIG', backend: 'cookie' });
   });
 
-  it('write lifecycle getter 异常保留 Cookie 操作诊断元数据', async () => {
+  it('write lifecycle getter 异常穿透为 contract INVALID_ARGUMENT', async () => {
     const cause = new Error('hostile signal getter');
     const store = cookies({
       namespace: 'write-lifecycle-metadata',
@@ -196,27 +196,24 @@ describe('cookies backend', () => {
       })
     ).rejects.toMatchObject({
       code: 'INVALID_ARGUMENT',
-      backend: 'cookie',
-      operation: 'cookie.set',
-      key: 'hostile',
       cause
     });
   });
 
-  it('所有 Cookie async 方法的 lifecycle 错误保留操作诊断元数据', async () => {
+  it('所有 Cookie async 方法的 lifecycle 错误穿透为 contract INVALID_ARGUMENT', async () => {
     const store = cookies({
       namespace: 'async-lifecycle-metadata',
       document: fakeCookieDocument()
     });
     const operations = [
-      ['cookie.get', 'key', (context: never) => store.get('key', context)],
-      ['cookie.remove', 'key', (context: never) => store.remove('key', context)],
-      ['cookie.has', 'key', (context: never) => store.has('key', context)],
-      ['cookie.keys', undefined, (context: never) => store.keys(context)],
-      ['cookie.clearValues', undefined, (context: never) => store.clearValues(context)],
-      ['cookie.clearAll', undefined, (context: never) => store.clearAll(context)]
+      ['cookie.get', (context: never) => store.get('key', context)],
+      ['cookie.remove', (context: never) => store.remove('key', context)],
+      ['cookie.has', (context: never) => store.has('key', context)],
+      ['cookie.keys', (context: never) => store.keys(context)],
+      ['cookie.clearValues', (context: never) => store.clearValues(context)],
+      ['cookie.clearAll', (context: never) => store.clearAll(context)]
     ] as const;
-    for (const [operation, key, invoke] of operations) {
+    for (const [operation, invoke] of operations) {
       const cause = new Error(`hostile ${operation} timeout getter`);
       await expect(
         invoke({
@@ -226,9 +223,6 @@ describe('cookies backend', () => {
         } as never)
       ).rejects.toMatchObject({
         code: 'INVALID_ARGUMENT',
-        backend: 'cookie',
-        operation,
-        key,
         cause
       });
     }
@@ -238,22 +232,22 @@ describe('cookies backend', () => {
     const store = cookies({ namespace: 'max-age-guard', document: fakeCookieDocument() });
     await expect(
       store.set('key', 'value', { maxAge: Number.MAX_SAFE_INTEGER + 1 })
-    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    ).rejects.toMatchObject({ code: 'INVALID_CONFIG' });
   });
 
   it('拒绝非法 document 注入容器', () => {
     expect(() => cookies({ document: null as never })).toThrowError(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
     );
     expect(() => cookies({ document: [] as never })).toThrowError(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
     );
     expect(() => cookies({ document: {} as never })).toThrowError(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
     );
   });
 
-  it('构造期 document.cookie getter 异常统一返回 INVALID_ARGUMENT', () => {
+  it('构造期 document.cookie getter 异常统一返回 INVALID_CONFIG', () => {
     const cause = new Error('constructor cookie getter');
     expect(() =>
       cookies({
@@ -264,7 +258,7 @@ describe('cookies backend', () => {
           set cookie(_value: string) {}
         }
       })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', cause }));
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG', cause }));
   });
 
   it('运行期 document.cookie getter 异常统一返回 BACKEND_UNAVAILABLE', async () => {
@@ -345,13 +339,13 @@ describe('cookies backend', () => {
   it('拒绝运行时非字符串 key，不把它隐式编码为 cookie 名', async () => {
     const store = cookies({ namespace: 'ns', document: fakeCookieDocument() });
     await expect(store.set(42 as unknown as string, 'value')).rejects.toMatchObject({
-      code: 'INVALID_ARGUMENT'
+      code: 'INVALID_CONFIG'
     });
     expect(() => store.sync!.get(42 as unknown as string)).toThrow(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
     );
     await expect(store.set('key', 42 as unknown as string)).rejects.toMatchObject({
-      code: 'INVALID_ARGUMENT'
+      code: 'INVALID_CONFIG'
     });
   });
   it('自定义 namespace codec encode 异常统一归一化', async () => {
@@ -502,11 +496,7 @@ describe('cookies backend', () => {
     await store.set('second', 'two');
     armed = true;
     await expect(store.clearAll({ signal: controller.signal })).rejects.toMatchObject({
-      code: 'ABORTED',
-      backend: 'cookie',
-      operation: 'cookie.clearAll',
-      key: 'second',
-      cause: reason
+      code: 'ABORTED'
     });
     await expect(store.get('first')).resolves.toBeNull();
     await expect(store.get('second')).resolves.toBe('two');
@@ -617,22 +607,22 @@ describe('cookies backend', () => {
   it('构造时拒绝不安全的 SameSite=None 与 Partitioned scope', () => {
     const document = fakeCookieDocument();
     expect(() => cookies({ document, scope: { sameSite: 'none' } })).toThrow(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
     );
     expect(() => cookies({ document, scope: { partitioned: true } })).toThrow(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
     );
     expect(() => cookies({ document, scope: null as never })).toThrow(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
     );
     expect(() => cookies({ document, scope: { path: 42 } as never })).toThrow(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
     );
     expect(() => cookies({ document, namespace: '' })).toThrow(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
     );
     expect(() => cookies({ document, namespaceCodec: {} as never })).toThrow(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
     );
   });
   it('clearAll 删除本实例 scope 下写入的 cookie', async () => {

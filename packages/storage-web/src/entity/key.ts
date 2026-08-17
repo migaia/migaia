@@ -1,5 +1,5 @@
-import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain';
-import type { IKeyRange, IStorageKey } from '../types/context';
+import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.js';
+import type { IKeyRange, IStorageKey } from '../types/context.js';
 
 /**
  * 同一个 store 实例可能被多个 entity 共用（例如同一个 indexedDb() 连接 上挂 users 和 posts）。entity 名必须编入实际存储 key，否则不同

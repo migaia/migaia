@@ -1,7 +1,9 @@
-import type { ICapture } from './dependency-tracker.class';
-import { internalsOf } from './internals';
-import type { IDisposer, IReactiveNodeOptions, IRuntime } from './types';
-import { Effect } from '../reactive/effect.class';
+import type { ICapture } from './dependency-tracker.class.js';
+import { internalsOf } from './internals.js';
+import type { IDisposer, IReactiveNodeOptions, IRuntime } from './types.js';
+import { Effect } from '../reactive/effect.class.js';
+import { createReactiveError } from '../errors.js';
+import { ReactiveErrorCode } from '../error-code.js';
 
 /**
  * 一次捕获提交的完整结果。
@@ -75,7 +77,10 @@ export function createObserverBinding(runtime: IRuntime): IObserverBinding {
     capture: (read) => tracker.capture(read),
     observe: (fn, options) => {
       if (observer && !observer.disposed) {
-        throw new Error('[store] observer binding is already observed');
+        throw createReactiveError(
+          ReactiveErrorCode.bindingDuplicate,
+          '[store] observer binding is already observed'
+        );
       }
       const current = new Effect(fn, runtime, options);
       observer = current;

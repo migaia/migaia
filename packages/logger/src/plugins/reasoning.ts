@@ -1,6 +1,7 @@
-import type { IDimFn, ILoggerPluginCore, ILoggerPlugin, IPaintFn } from '../typing';
+import type { IDimFn, ILoggerPluginCore, ILoggerPlugin, IPaintFn } from '../typing.js';
 import type { IPipelineMode } from '@migaia/plugin-host';
-import type { IColorShared } from './color';
+import type { IColorShared } from './color.js';
+import { LoggerReasoningPhase } from '../plugin-constants.js';
 
 export type IReasoningPluginConfig = {
   labels?: { thinking?: string; response?: string };
@@ -17,7 +18,7 @@ export type IReasoningPluginExt = {
   endResponse(): void;
 };
 
-type IPhase = 'idle' | 'thinking' | 'responding';
+type IPhase = (typeof LoggerReasoningPhase)[keyof typeof LoggerReasoningPhase];
 
 export const REASONING_PLUGIN_NAME = 'reasoning' as const;
 
@@ -38,7 +39,7 @@ class ReasoningPlugin implements ILoggerPlugin<
   readonly name = REASONING_PLUGIN_NAME;
   readonly config: IReasoningPluginConfig;
 
-  #phase: IPhase = 'idle';
+  #phase: IPhase = LoggerReasoningPhase.idle;
   #buffer = '';
   #resolvedConfig!: IReasoningPluginConfig;
 
@@ -68,8 +69,9 @@ class ReasoningPlugin implements ILoggerPlugin<
     paint: IPaintFn,
     label?: string
   ): void {
-    if (this.#phase !== 'idle' && this.#phase !== 'thinking') this.#flushBuffer(core, 'response');
-    this.#phase = 'thinking';
+    if (this.#phase !== LoggerReasoningPhase.idle && this.#phase !== LoggerReasoningPhase.thinking)
+      this.#flushBuffer(core, 'response');
+    this.#phase = LoggerReasoningPhase.thinking;
     this.#buffer = '';
     const text = label ?? this.#resolvedConfig.labels?.thinking ?? 'Thinking...';
     this.#raw(core, `${paint('debug', text)}\n\n`);
@@ -80,13 +82,13 @@ class ReasoningPlugin implements ILoggerPlugin<
     dim: IDimFn,
     delta: string
   ): void {
-    if (this.#phase !== 'thinking') this.#startThinking(core, (_t, s) => s);
+    if (this.#phase !== LoggerReasoningPhase.thinking) this.#startThinking(core, (_t, s) => s);
     this.#buffer += delta;
     this.#raw(core, dim(delta));
   }
 
   #endThinking(core: ILoggerPluginCore<IPipelineMode, Partial<IColorShared>>): void {
-    if (this.#phase === 'thinking') this.#raw(core, '\n\n');
+    if (this.#phase === LoggerReasoningPhase.thinking) this.#raw(core, '\n\n');
     this.#flushBuffer(core, 'thinking');
   }
 
@@ -95,8 +97,12 @@ class ReasoningPlugin implements ILoggerPlugin<
     paint: IPaintFn,
     label?: string
   ): void {
-    if (this.#phase !== 'idle' && this.#phase !== 'responding') this.#flushBuffer(core, 'thinking');
-    this.#phase = 'responding';
+    if (
+      this.#phase !== LoggerReasoningPhase.idle &&
+      this.#phase !== LoggerReasoningPhase.responding
+    )
+      this.#flushBuffer(core, 'thinking');
+    this.#phase = LoggerReasoningPhase.responding;
     this.#buffer = '';
     const text = label ?? this.#resolvedConfig.labels?.response;
     if (text) this.#raw(core, `${paint('info', text)}\n\n`);
@@ -106,13 +112,13 @@ class ReasoningPlugin implements ILoggerPlugin<
     core: ILoggerPluginCore<IPipelineMode, Partial<IColorShared>>,
     delta: string
   ): void {
-    if (this.#phase !== 'responding') this.#startResponse(core, (_t, s) => s);
+    if (this.#phase !== LoggerReasoningPhase.responding) this.#startResponse(core, (_t, s) => s);
     this.#buffer += delta;
     this.#raw(core, delta);
   }
 
   #endResponse(core: ILoggerPluginCore<IPipelineMode, Partial<IColorShared>>): void {
-    if (this.#phase === 'responding') this.#raw(core, '\n');
+    if (this.#phase === LoggerReasoningPhase.responding) this.#raw(core, '\n');
     this.#flushBuffer(core, 'response');
   }
 
@@ -121,7 +127,7 @@ class ReasoningPlugin implements ILoggerPlugin<
     tag: 'thinking' | 'response'
   ): void {
     const text = this.#buffer;
-    this.#phase = 'idle';
+    this.#phase = LoggerReasoningPhase.idle;
     this.#buffer = '';
     if (!text) return;
     core.dispatchRaw(

@@ -1,9 +1,21 @@
-import type { ISerializeChunk, ISerializeRegistry } from '@migaia/serialize';
-import { createRuntime } from '@migaia/reactive';
+import {
+  SerializeChunkKind,
+  type ISerializeChunk,
+  type ISerializeRegistry
+} from '@migaia/serialize';
+import { createRuntime, ReactiveErrorPhase } from '@migaia/reactive';
 import type { IRuntime, IRuntimeOptions } from '@migaia/reactive';
-import { claimOwnership } from '@migaia/reactive/runtime/ownership';
+import { claimOwnership } from '@migaia/reactive/ownership';
 import type { IResourceCacheSnapshot } from '@migaia/resource';
 import { base64ToBytes, bytesToBase64 } from '@migaia/serialize';
+import {
+  createStoreSsrAggregateError,
+  createStoreSsrError,
+  createStoreSsrRangeError,
+  createStoreSsrTypeError,
+  StoreSsrErrorCode
+} from './errors.js';
+import { SsrWireType, SsrWorkOutcome } from './ssr-constants.js';
 
 export type IJSONPrimitive = string | number | boolean | null;
 export type IJSONValue =
@@ -57,11 +69,15 @@ export type ISSRRequestScopeOptions = {
 type ISSRRegistration = {
   readonly store: ISSRStore;
   readonly owned: boolean;
+  /** 释放顺序键（migration.sdd.md §3.1/M-T31）：store 晚于其所属 resource 释放。 */
+  readonly order: 1;
 };
 
 type ISSRResourceRegistration = {
   readonly resource: ISSRResource;
   readonly owned: boolean;
+  /** 释放顺序键（migration.sdd.md §3.1/M-T31）：resource 早于 store 释放。 */
+  readonly order: 0;
 };
 
 export type ISSRResourceFailure = {
@@ -94,14 +110,17 @@ const MAX_JSON_NODES = 1_000_000;
  */
 function assertTimeoutMs(timeoutMs: number | undefined): void {
   if (timeoutMs !== undefined && (!Number.isFinite(timeoutMs) || timeoutMs < 0)) {
-    throw new RangeError('[store] SSR awaitResources timeoutMs must be finite and non-negative');
+    throw createStoreSsrRangeError(
+      StoreSsrErrorCode.invalidOption,
+      '[store] SSR awaitResources timeoutMs must be finite and non-negative'
+    );
   }
 }
 
 type IRaceOutcome<T> =
-  | { readonly kind: 'value'; readonly value: T }
-  | { readonly kind: 'disposed' }
-  | { readonly kind: 'timeout' };
+  | { readonly kind: typeof SsrWorkOutcome.value; readonly value: T }
+  | { readonly kind: typeof SsrWorkOutcome.disposed }
+  | { readonly kind: typeof SsrWorkOutcome.timeout };
 
 /** 三方竞速：真正的等待、scope dispose 信号、可选超时。任何一个先到就结束—— 这是 `awaitResources()` 能被 dispose 中断、也能设超时的唯一入口。 */
 async function raceOutcome<T>(
@@ -110,14 +129,14 @@ async function raceOutcome<T>(
   timeoutMs: number | undefined
 ): Promise<IRaceOutcome<T>> {
   const candidates: Promise<IRaceOutcome<T>>[] = [
-    work.then((value) => ({ kind: 'value' as const, value })),
-    disposedSignal.then(() => ({ kind: 'disposed' as const }))
+    work.then((value) => ({ kind: SsrWorkOutcome.value, value })),
+    disposedSignal.then(() => ({ kind: SsrWorkOutcome.disposed }))
   ];
   let timer: ReturnType<typeof setTimeout> | undefined;
   if (timeoutMs !== undefined) {
     candidates.push(
       new Promise<IRaceOutcome<T>>((resolve) => {
-        timer = setTimeout(() => resolve({ kind: 'timeout' as const }), timeoutMs);
+        timer = setTimeout(() => resolve({ kind: SsrWorkOutcome.timeout }), timeoutMs);
       })
     );
   }
@@ -155,7 +174,10 @@ export class SSRRequestScope {
 
   constructor(options: ISSRRequestScopeOptions = {}) {
     if (options.runtime && options.runtimeOptions) {
-      throw new Error('[store] SSR scope accepts runtime or runtimeOptions, not both');
+      throw createStoreSsrError(
+        StoreSsrErrorCode.invalidOption,
+        '[store] SSR scope accepts runtime or runtimeOptions, not both'
+      );
     }
     this.runtime = options.runtime ?? createRuntime(options.runtimeOptions);
     claimOwnership(this, this.runtime);
@@ -169,10 +191,16 @@ export class SSRRequestScope {
     this.#assertActive();
     assertStoreKey(key);
     if (store.$runtime !== this.runtime) {
-      throw new Error(`[store] SSR store "${key}" belongs to a different Runtime`);
+      throw createStoreSsrError(
+        StoreSsrErrorCode.crossRuntime,
+        `[store] SSR store "${key}" belongs to a different Runtime`
+      );
     }
     if (this.#registrations.has(key)) {
-      throw new Error(`[store] duplicate SSR store key: ${key}`);
+      throw createStoreSsrError(
+        StoreSsrErrorCode.invalidOption,
+        `[store] duplicate SSR store key: ${key}`
+      );
     }
     // Hydrate before committing the registration: if $hydrate() throws, a
     // retry must still see the key as free and the pending hydration as
@@ -181,7 +209,8 @@ export class SSRRequestScope {
     if (hydration) store.$hydrate(hydration);
     this.#registrations.set(key, {
       store,
-      owned: options.owned ?? true
+      owned: options.owned ?? true,
+      order: 1
     });
     if (hydration) this.#pendingHydration.delete(key);
   }
@@ -212,10 +241,16 @@ export class SSRRequestScope {
     this.#assertActive();
     assertStoreKey(key);
     if (resource.runtime !== this.runtime) {
-      throw new Error(`[store] SSR resource "${key}" belongs to a different Runtime`);
+      throw createStoreSsrError(
+        StoreSsrErrorCode.crossRuntime,
+        `[store] SSR resource "${key}" belongs to a different Runtime`
+      );
     }
     if (this.#resources.has(key)) {
-      throw new Error(`[store] duplicate SSR resource key: ${key}`);
+      throw createStoreSsrError(
+        StoreSsrErrorCode.invalidOption,
+        `[store] duplicate SSR resource key: ${key}`
+      );
     }
     // Same ordering as register(): hydrate before committing, so a throw
     // leaves the key free and the pending hydration intact for a retry.
@@ -223,7 +258,8 @@ export class SSRRequestScope {
     if (hydration) resource.hydrate(hydration);
     this.#resources.set(key, {
       resource,
-      owned: options.owned ?? true
+      owned: options.owned ?? true,
+      order: 0
     });
     if (hydration) this.#pendingResourceHydration.delete(key);
   }
@@ -299,7 +335,8 @@ export class SSRRequestScope {
     this.#pendingResourceHydration = pendingResources;
     if (errors.length === 1) throw errors[0];
     if (errors.length > 1) {
-      throw new AggregateError(
+      throw createStoreSsrAggregateError(
+        StoreSsrErrorCode.hydrateFailed,
         errors,
         '[store] SSR hydrate() failed for one or more stores/resources; entries that could apply were still applied (best-effort, not atomic)'
       );
@@ -436,7 +473,7 @@ export class SSRRequestScope {
         this.#disposedSignal,
         remaining
       );
-      if (outcome.kind === 'disposed') return failures;
+      if (outcome.kind === SsrWorkOutcome.disposed) return failures;
       if (outcome.kind === 'timeout') {
         failures.push(...timeoutFailures(pending));
         return failures;
@@ -448,7 +485,8 @@ export class SSRRequestScope {
         }
       }
     }
-    throw new Error(
+    throw createStoreSsrError(
+      StoreSsrErrorCode.resourceRoundLimit,
       `[store] SSR resources kept registering new resources past ${MAX_RESOURCE_ROUNDS} rounds`
     );
   }
@@ -465,7 +503,7 @@ export class SSRRequestScope {
     });
     for (const failure of failures) {
       if (options.onResourceError) options.onResourceError(failure);
-      else this.runtime.reportError(failure.error, { phase: 'ssr-resource' });
+      else this.runtime.reportError(failure.error, { phase: ReactiveErrorPhase.ssrResource });
     }
     return this.dehydrate();
   }
@@ -474,38 +512,51 @@ export class SSRRequestScope {
     if (this.#disposed) return;
     this.#disposed = true;
     this.#resolveDisposedSignal();
-    const registrations = [...this.#registrations.values()].reverse();
-    const resources = [...this.#resources.values()].reverse();
+    // 显式释放顺序（migration.sdd.md §3.1/M-T31）：resource（order 0）先于 store（order 1）——
+    // store 逻辑上拥有 resource，必须先摘子资源再释放 store。组内仍按注册逆序（LIFO）。
+    const entries = [
+      ...[...this.#resources.values()].reverse().map((registration) => ({
+        order: registration.order,
+        dispose: () => {
+          if (registration.owned && !registration.resource.disposed)
+            registration.resource.dispose();
+        }
+      })),
+      ...[...this.#registrations.values()].reverse().map((registration) => ({
+        order: registration.order,
+        dispose: () => {
+          if (registration.owned && !registration.store.$disposed) registration.store.$dispose();
+        }
+      }))
+    ].sort((a, b) => a.order - b.order);
     this.#registrations.clear();
     this.#resources.clear();
     this.#pendingHydration.clear();
     this.#pendingResourceHydration.clear();
     const errors: unknown[] = [];
-    for (const registration of resources) {
-      if (!registration.owned || registration.resource.disposed) continue;
+    for (const entry of entries) {
       try {
-        registration.resource.dispose();
-      } catch (error) {
-        errors.push(error);
-      }
-    }
-    for (const registration of registrations) {
-      if (!registration.owned || registration.store.$disposed) continue;
-      try {
-        registration.store.$dispose();
+        entry.dispose();
       } catch (error) {
         errors.push(error);
       }
     }
     if (errors.length === 1) throw errors[0];
     if (errors.length > 1) {
-      throw new AggregateError(errors, '[store] SSR request scope disposal failed');
+      throw createStoreSsrAggregateError(
+        StoreSsrErrorCode.scopeDisposalFailed,
+        errors,
+        '[store] SSR request scope disposal failed'
+      );
     }
   }
 
   #assertActive(): void {
     if (this.#disposed) {
-      throw new Error('[store] SSR request scope is disposed');
+      throw createStoreSsrError(
+        StoreSsrErrorCode.scopeDisposed,
+        '[store] SSR request scope is disposed'
+      );
     }
   }
 }
@@ -558,7 +609,10 @@ export function deserializeSSRState(serialized: string): ISSRState {
 
 export function createSSRStateScript(state: ISSRState, elementId = '__STORE_STATE__'): string {
   if (!SSR_ID_PATTERN.test(elementId)) {
-    throw new Error('[store] invalid SSR state script id');
+    throw createStoreSsrError(
+      StoreSsrErrorCode.invalidStateScript,
+      '[store] invalid SSR state script id'
+    );
   }
   return `<script type="application/json" id="${elementId}">${serializeSSRState(state)}</script>`;
 }
@@ -599,7 +653,10 @@ const escapeAttribute = (value: string): string =>
 
 function assertElementId(elementId: string): void {
   if (!SSR_ID_PATTERN.test(elementId)) {
-    throw new Error('[store] invalid SSR state script id');
+    throw createStoreSsrError(
+      StoreSsrErrorCode.invalidStateScript,
+      '[store] invalid SSR state script id'
+    );
   }
 }
 
@@ -627,19 +684,22 @@ export async function createSSRStateScriptWith(
   const type = codecs.primaryType;
   const chunk = await codecs.encode(state, {
     signal,
-    source: `ssr:${elementId}`
+    context: `ssr:${elementId}`
   });
-  if (chunk[0] === 'value') {
-    throw new TypeError(`[store] SSR codec ${type} must produce wire data, not a value chunk`);
+  if (chunk[0] === SerializeChunkKind.value) {
+    throw createStoreSsrTypeError(
+      StoreSsrErrorCode.codecContract,
+      `[store] SSR codec ${type} must produce wire data, not a value chunk`
+    );
   }
 
-  if (type === 'json' && chunk[0] === 'text') {
+  if (type === SsrWireType.json && chunk[0] === SsrWireType.text) {
     const escaped = escapeJSONForHTML(chunk[1]);
     return `<script type="application/json" id="${escapeAttribute(elementId)}" data-codec="json" data-wire="text">${escaped}</script>`;
   }
 
   const payload =
-    chunk[0] === 'bytes'
+    chunk[0] === SsrWireType.bytes
       ? bytesToBase64(chunk[1])
       : bytesToBase64(new TextEncoder().encode(chunk[1]));
   // 非 JSON 的载荷一律用非可执行的 mime，避免浏览器把它当脚本对待
@@ -665,13 +725,17 @@ export async function readSSRStateFromDocumentWith(
   const type = element.getAttribute('data-codec') ?? 'json';
   const wire = element.getAttribute('data-wire') ?? 'text';
   if (!codecs.has(type)) {
-    throw new Error(`[store] SSR payload was written by codec "${type}", which is not registered`);
+    throw createStoreSsrError(
+      StoreSsrErrorCode.codecContract,
+      `[store] SSR payload was written by codec "${type}", which is not registered`
+    );
   }
-  const chunk: ISerializeChunk = wire === 'b64' ? ['bytes', base64ToBytes(text)] : ['text', text];
+  const chunk: ISerializeChunk =
+    wire === 'b64' ? [SsrWireType.bytes, base64ToBytes(text)] : [SsrWireType.text, text];
   const decoded = await codecs.decode(chunk, {
     type,
     signal,
-    source: `ssr:${elementId}`
+    context: `ssr:${elementId}`
   });
   assertSSRState(decoded);
   return decoded;
@@ -679,16 +743,22 @@ export async function readSSRStateFromDocumentWith(
 
 function assertStoreKey(key: string): void {
   if (key.length === 0 || key === '__proto__') {
-    throw new Error('[store] invalid SSR store key');
+    throw createStoreSsrError(StoreSsrErrorCode.invalidStoreKey, '[store] invalid SSR store key');
   }
 }
 
 export function assertSSRState(value: unknown): asserts value is ISSRState {
   if (!isPlainObject(value) || value.version !== 1) {
-    throw new Error('[store] invalid SSR state version');
+    throw createStoreSsrError(
+      StoreSsrErrorCode.invalidStateScript,
+      '[store] invalid SSR state version'
+    );
   }
   if (!isPlainObject(value.stores)) {
-    throw new Error('[store] invalid SSR stores snapshot');
+    throw createStoreSsrError(
+      StoreSsrErrorCode.invalidSnapshot,
+      '[store] invalid SSR stores snapshot'
+    );
   }
   for (const [key, store] of Object.entries(value.stores)) {
     assertStoreKey(key);
@@ -696,7 +766,10 @@ export function assertSSRState(value: unknown): asserts value is ISSRState {
   }
   if (value.resources !== undefined) {
     if (!isPlainObject(value.resources)) {
-      throw new Error('[store] invalid SSR resources snapshot');
+      throw createStoreSsrError(
+        StoreSsrErrorCode.invalidSnapshot,
+        '[store] invalid SSR resources snapshot'
+      );
     }
     for (const [key, snapshot] of Object.entries(value.resources)) {
       assertStoreKey(key);
@@ -708,7 +781,10 @@ export function assertSSRState(value: unknown): asserts value is ISSRState {
         (snapshot.expiresAt !== null &&
           (typeof snapshot.expiresAt !== 'number' || !Number.isFinite(snapshot.expiresAt)))
       ) {
-        throw new Error(`[store] invalid SSR resource snapshot: ${key}`);
+        throw createStoreSsrError(
+          StoreSsrErrorCode.invalidSnapshot,
+          `[store] invalid SSR resource snapshot: ${key}`
+        );
       }
       assertJSONValue(snapshot.data, `resources.${key}.data`, new WeakSet());
     }
@@ -725,15 +801,16 @@ export function assertSSRState(value: unknown): asserts value is ISSRState {
  */
 function assertJSONObject(value: unknown, path: string): void {
   if (!isPlainObject(value)) {
-    throw new TypeError(`[store] ${path} must be a plain object`);
+    throw createStoreSsrTypeError(
+      StoreSsrErrorCode.serializeUnsupported,
+      `[store] ${path} must be a plain object`
+    );
   }
   assertJSONValue(value, path, new WeakSet<object>());
 }
 
-type JSONPrimitive = null | string | boolean | number;
-
-type JSONWalker<T> = {
-  primitive(value: JSONPrimitive): T;
+type IJSONWalker<T> = {
+  primitive(value: IJSONPrimitive): T;
   array(values: readonly T[]): T;
   object(entries: readonly (readonly [string, T])[]): T;
 };
@@ -742,30 +819,45 @@ function walkJSONValue<T>(
   value: unknown,
   path: string,
   seen: WeakSet<object>,
-  walker: JSONWalker<T>,
+  walker: IJSONWalker<T>,
   depth = 0,
   state: { nodes: number } = { nodes: 0 }
 ): T {
   if (++state.nodes > MAX_JSON_NODES) {
-    throw new TypeError(`[store] ${path} exceeds the JSON node limit`);
+    throw createStoreSsrTypeError(
+      StoreSsrErrorCode.serializeUnsupported,
+      `[store] ${path} exceeds the JSON node limit`
+    );
   }
   if (depth > MAX_JSON_DEPTH) {
-    throw new TypeError(`[store] ${path} exceeds the JSON depth limit`);
+    throw createStoreSsrTypeError(
+      StoreSsrErrorCode.serializeUnsupported,
+      `[store] ${path} exceeds the JSON depth limit`
+    );
   }
   if (value === null || typeof value === 'string' || typeof value === 'boolean') {
     return walker.primitive(value);
   }
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
-      throw new TypeError(`[store] ${path} contains a non-finite number`);
+      throw createStoreSsrTypeError(
+        StoreSsrErrorCode.serializeUnsupported,
+        `[store] ${path} contains a non-finite number`
+      );
     }
     return walker.primitive(value);
   }
   if (typeof value !== 'object') {
-    throw new TypeError(`[store] ${path} is not JSON serializable`);
+    throw createStoreSsrTypeError(
+      StoreSsrErrorCode.serializeUnsupported,
+      `[store] ${path} is not JSON serializable`
+    );
   }
   if (seen.has(value)) {
-    throw new TypeError(`[store] ${path} contains a cycle`);
+    throw createStoreSsrTypeError(
+      StoreSsrErrorCode.serializeUnsupported,
+      `[store] ${path} contains a cycle`
+    );
   }
   seen.add(value);
   try {
@@ -776,7 +868,10 @@ function walkJSONValue<T>(
       return walker.array(entries);
     }
     if (!isPlainObject(value)) {
-      throw new TypeError(`[store] ${path} contains a non-plain object`);
+      throw createStoreSsrTypeError(
+        StoreSsrErrorCode.serializeUnsupported,
+        `[store] ${path} contains a non-plain object`
+      );
     }
     const entries = Object.entries(value).map(
       ([key, entry]) =>
@@ -811,7 +906,10 @@ function assertJSONValue(
 
 function toJSONObject(value: unknown, path: string): Readonly<Record<string, IJSONValue>> {
   if (!isPlainObject(value)) {
-    throw new TypeError(`[store] ${path} must be a plain object`);
+    throw createStoreSsrTypeError(
+      StoreSsrErrorCode.serializeUnsupported,
+      `[store] ${path} must be a plain object`
+    );
   }
   const seen = new WeakSet<object>();
   return toJSONValue(value, path, seen) as Readonly<Record<string, IJSONValue>>;

@@ -1,5 +1,6 @@
-import { raceWithAsyncControl, waitWithSignal } from './async-control';
-import type { IAbortSignal } from './async-control';
+import { raceWithAsyncControl, waitWithSignal } from './async-control.js';
+import type { IAbortSignal } from './async-control.js';
+import { tagWebRpcError, WebRpcErrorCode } from '../errors.js';
 
 export type IRetryDecision =
   | { readonly retry: false }
@@ -18,7 +19,10 @@ export type IRetryExecutorOptions<T> = {
 /** Executes serial attempts with cancellable backoff and no hidden retry policy. */
 export async function executeWithRetry<T>(options: IRetryExecutorOptions<T>): Promise<T> {
   if (!Number.isSafeInteger(options.maxAttempts) || options.maxAttempts < 1)
-    throw new TypeError('maxAttempts must be a positive safe integer');
+    throw tagWebRpcError(
+      new TypeError('maxAttempts must be a positive safe integer'),
+      WebRpcErrorCode.invalidConfig
+    );
   for (let attempt = 1; attempt <= options.maxAttempts; attempt += 1) {
     if (options.signals.some((signal) => signal.aborted)) throw options.createAbortError();
     try {

@@ -1,29 +1,37 @@
-import { defaultRuntime, Effect } from '@migaia/reactive';
+import { defaultRuntime, Effect, ReactiveErrorPhase } from '@migaia/reactive';
 import type { IDisposable, IDisposer, IRuntime } from '@migaia/reactive';
 import type { Signal } from '@migaia/reactive/reactive/signal.class';
 import type { Computed } from '@migaia/reactive/reactive/computed.class';
 import {
   isFieldBuilder,
   isRaw,
-  type FieldBuilder,
-  type AsyncFieldBuilder,
-  type LegacyFieldBuilder,
+  type IFieldBuilder,
+  type IAsyncFieldBuilder,
+  type ILegacyFieldBuilder,
   type IMutationPolicy,
-  type Raw
-} from './store-protocol';
-import { assertOwnedBy, claimOwnership, ownerOf } from '@migaia/reactive/runtime/ownership';
-import { createFieldSource } from '@migaia/reactive/runtime/source';
-import { internalRuntimeOf } from '@migaia/reactive/runtime/node-factories';
-export { createStoreResource, createStoreResourceScope } from './store-resource';
+  type IRaw
+} from './store-protocol.js';
+import { assertOwnedBy, claimOwnership, ownerOf } from '@migaia/reactive/ownership';
+import { createFieldSource } from '@migaia/reactive/source';
+import { internalRuntimeOf } from '@migaia/reactive/node-factories';
+import { createLifecycleScope, type ILifecycleScope } from '@migaia/lifecycle';
+import {
+  createStoreLightAggregateError,
+  createStoreLightError,
+  StoreLightErrorCode
+} from './errors.js';
+import { StoreFieldMode } from './field-mode-constants.js';
+import { StoreInitializationStatus } from './resource-state-constants.js';
+export { createStoreResource, createStoreResourceScope } from './store-resource.js';
 export type {
   IStoreResource,
   IResourceCapture,
   IStoreResourceScope,
-  StoreResourceErrorPhase,
-  StoreResourceFactory,
-  StoreResourceLoadContext,
-  StoreResourceOptions
-} from './store-resource';
+  IStoreResourceErrorPhase,
+  IStoreResourceFactory,
+  IStoreResourceLoadContext,
+  IStoreResourceOptions
+} from './store-resource.js';
 
 // 甜 API：一个普通对象字面量进来，自动拆成响应式图——
 //   普通值      → Signal（可读可写，读时自动订阅）
@@ -39,15 +47,15 @@ export type {
 //   方法                 → 保持同签名可调用
 //   值 / getter          → 保持其类型（getter 在对象字面量类型里本就表现为返回值类型的属性）
 type IBuilderKeys<S> = {
-  [K in keyof S]-?: S[K] extends FieldBuilder<IDisposable> ? K : never;
+  [K in keyof S]-?: S[K] extends IFieldBuilder<IDisposable> ? K : never;
 }[keyof S];
 
 export type IStoreShape<S> = {
-  readonly [K in IBuilderKeys<S>]: S[K] extends FieldBuilder<infer F> ? F : never;
+  readonly [K in IBuilderKeys<S>]: S[K] extends IFieldBuilder<infer F> ? F : never;
 } & {
-  [K in Exclude<keyof S, IBuilderKeys<S>>]: S[K] extends Raw<infer T>
+  [K in Exclude<keyof S, IBuilderKeys<S>>]: S[K] extends IRaw<infer T>
     ? T // raw(fn) → 普通函数值字段
-    : S[K] extends FieldBuilder<infer F>
+    : S[K] extends IFieldBuilder<infer F>
       ? F
       : S[K] extends (...args: infer A) => infer R
         ? (...args: A) => R
@@ -62,9 +70,9 @@ type IWritableKeys<S> = {
 }[keyof S];
 
 type ISettableKey<S> = {
-  [K in IWritableKeys<S>]: S[K] extends Raw<unknown>
+  [K in IWritableKeys<S>]: S[K] extends IRaw<unknown>
     ? K
-    : S[K] extends FieldBuilder<infer _Field>
+    : S[K] extends IFieldBuilder<infer _Field>
       ? never
       : S[K] extends (...args: never[]) => unknown
         ? never
@@ -115,7 +123,16 @@ export type IReactiveStoreApi<S> = {
    * 资源必须未归属或已归属本 Runtime；跨 Runtime 直接拒绝。
    */
   $own<T extends IDisposable>(resource: T): T;
-  $dispose(): void;
+  /**
+   * Always asynchronous (`docs/lifecycle/migration.sdd.md` §5.1 — the underlying
+   * `@migaia/lifecycle` `LifecycleScope.dispose()` has no synchronous form). Resolves once every
+   * owned Signal/Computed/Effect/wasm field has finished releasing. Callers that need "started" is
+   * enough (fire React `useEffect` cleanup, tear down a request scope) may call this without
+   * awaiting; `$disposed` already flips to `true` synchronously before any owned resource is
+   * touched, so read-path guards observe the disposed state immediately regardless of whether the
+   * caller awaits.
+   */
+  $dispose(): Promise<void>;
 };
 
 export type IReactiveStore<S> = IStoreShape<S> & IReactiveStoreApi<S>;
@@ -123,8 +140,8 @@ export type IReactiveStore<S> = IStoreShape<S> & IReactiveStoreApi<S>;
 /**
  * CreateStore 的输入形状：字段/getter/方法 + **ThisType**。
  *
- * 没有 ThisType 时，方法里的 `this` 仍是「输入字面量」类型——wasm 字段还是 FieldBuilder，写 `this.price.value`
- * 会类型报错，逼人去用外置函数。 加上之后，`this` 是解析后的 IReactiveStore（FieldBuilder → 真实字段）。
+ * 没有 ThisType 时，方法里的 `this` 仍是「输入字面量」类型——wasm 字段还是 IFieldBuilder，写 `this.price.value`
+ * 会类型报错，逼人去用外置函数。 加上之后，`this` 是解析后的 IReactiveStore（IFieldBuilder → 真实字段）。
  */
 export type IStoreDefinition<S extends Record<string, unknown>> = S & ThisType<IReactiveStore<S>>;
 
@@ -158,7 +175,11 @@ function createStoreCore<S extends Record<string, unknown>>(
   const warnAsyncActions = options?.warnAsyncActions ?? false;
   const mutationPolicy = options?.mutationPolicy;
   const debugName = options?.debugName ?? 'Store';
-  const scope = runtime.createScope(); // Store 内部 Computed/Effect/wasm 字段的所有权作用域
+  // Store 内部 Computed/Effect/wasm 字段的所有权作用域。混装纯 reactive 节点与 wasm 字段（真实外部
+  // 资源），按 D-6 必须用异步 LifecycleScope，不能用 SyncLifecycleScope（migration.sdd.md §4.2）。
+  const scope: ILifecycleScope = createLifecycleScope();
+  const ownReactiveNode = <T extends IDisposable>(resource: T): T =>
+    scope.own(resource, { syncSafe: true, force: () => resource.dispose() });
   const initAbort = new AbortController(); // $dispose 时中止在途的异步字段初始化
   const store = {} as Record<string, unknown>;
 
@@ -168,7 +189,7 @@ function createStoreCore<S extends Record<string, unknown>>(
   const wasmFields = new Map<string, unknown>();
   const fieldSources = new Set<ReturnType<typeof createFieldSource>>();
   const createTrackedFieldSource = (debugName?: string) => {
-    const source = scope.own(createFieldSource(runtime, debugName));
+    const source = ownReactiveNode(createFieldSource(runtime, debugName));
     fieldSources.add(source);
     return source;
   };
@@ -195,7 +216,8 @@ function createStoreCore<S extends Record<string, unknown>>(
       throw error;
     }
     try {
-      scope.own(field);
+      // wasm 字段持有真实外部资源，不是纯 reactive 节点：syncSafe: false + gcFallback（§4.2）。
+      scope.own(field, { syncSafe: false, gcFallback: true, force: () => field.dispose() });
     } catch (error) {
       try {
         field.dispose();
@@ -207,12 +229,14 @@ function createStoreCore<S extends Record<string, unknown>>(
     return field;
   };
   const readyList: Promise<void>[] = [];
-  let status: 'pending' | 'ready' | 'failed' = 'pending';
+  let status: (typeof StoreInitializationStatus)[keyof typeof StoreInitializationStatus] =
+    StoreInitializationStatus.pending;
   let disposed = false;
   let initializationFailed = false;
 
   function assertNotDisposed() {
-    if (disposed) throw new Error('[store] store is disposed');
+    if (disposed)
+      throw createStoreLightError(StoreLightErrorCode.storeDisposed, '[store] store is disposed');
   }
 
   function assertMutationAllowed(operation: string) {
@@ -231,8 +255,8 @@ function createStoreCore<S extends Record<string, unknown>>(
       // get 访问器 → Computed。getter 里的 this 绑到 store，读到的都是响应式字段。
       if (typeof desc.get === 'function') {
         const getter = desc.get;
-        const node = scope.own(
-          nodeRuntime.computed(() => getter.call(store), {
+        const node = ownReactiveNode(
+          nodeRuntime.computed(() => Reflect.apply(getter, store, []), {
             debugName: `${debugName}.${key}`
           })
         );
@@ -251,7 +275,7 @@ function createStoreCore<S extends Record<string, unknown>>(
 
       // raw(x) → 普通值字段（即使 x 是函数也不当 action）。必须在方法检查之前解包。
       if (isRaw(value)) {
-        const node = scope.own(
+        const node = ownReactiveNode(
           nodeRuntime.signal(value.value, {
             debugName: `${debugName}.${key}`
           })
@@ -281,7 +305,7 @@ function createStoreCore<S extends Record<string, unknown>>(
           assertNotDisposed();
           const actionName = `${debugName}.${key}`;
           const result = runtime.runTracedAction(actionName, () =>
-            runMutation(() => runtime.untracked(() => fn.apply(store, args)))
+            runMutation(() => runtime.untracked(() => Reflect.apply(fn, store, args)))
           );
           if (warnAsyncActions && !warnedAsync && result !== null) {
             // 诊断必须不可观察：then 可能是会抛错的用户 getter，console 也可能被替换。
@@ -306,7 +330,7 @@ function createStoreCore<S extends Record<string, unknown>>(
       }
 
       if (isFieldBuilder(value)) {
-        if ('mode' in value && value.mode === 'sync') {
+        if ('mode' in value && value.mode === StoreFieldMode.sync) {
           const field = adoptField(
             value.create({
               runtime,
@@ -348,6 +372,13 @@ function createStoreCore<S extends Record<string, unknown>>(
               adoptField(field);
               wasmFields.set(key, field);
             })
+            .catch((error: unknown) => {
+              // A disposed or synchronously failed store no longer has a caller
+              // waiting for this builder. Observe cancellation rejections here so
+              // a late abort cannot become an unhandled rejection.
+              if (disposed || initializationFailed || initAbort.signal.aborted) return;
+              throw error;
+            })
         );
         Object.defineProperty(store, key, {
           enumerable: true,
@@ -362,7 +393,7 @@ function createStoreCore<S extends Record<string, unknown>>(
 
       // 普通值 → Signal：读订阅、写触发。必须进 scope——否则 $dispose 只拆派生/订阅，
       // 源节点带着 version/subs 常驻，与「释放后不留半死图」的契约矛盾。
-      const node = scope.own(
+      const node = ownReactiveNode(
         nodeRuntime.signal(value, {
           debugName: `${debugName}.${key}`
         })
@@ -382,18 +413,21 @@ function createStoreCore<S extends Record<string, unknown>>(
       });
     }
   } catch (error) {
+    // A synchronous builder failure is terminal too: async builders that are still
+    // resolving must see both guards before attempting to adopt their field.
+    initializationFailed = true;
+    disposed = true;
+    status = StoreInitializationStatus.failed;
     initAbort.abort();
-    try {
-      scope.dispose();
-    } catch (cleanupError) {
-      if (error instanceof Error) {
-        try {
-          error.cause ??= cleanupError;
-        } catch {
-          /* preserve original */
-        }
-      }
-    }
+    // `createStoreCore()` itself is synchronous (D-1 gives LifecycleScope no sync dispose()), so
+    // this cleanup cannot be awaited here — it runs fire-and-forget and any failure goes through
+    // `runtime.reportError()`, the same diagnostic channel used elsewhere in this module, instead
+    // of being attached as `error.cause` (which required a *synchronous* cleanup failure).
+    void scope
+      .dispose()
+      .catch((cleanupError: unknown) =>
+        runtime.reportError(cleanupError, { phase: ReactiveErrorPhase.asyncFlush })
+      );
     signals.clear();
     computeds.clear();
     wasmFields.clear();
@@ -401,19 +435,21 @@ function createStoreCore<S extends Record<string, unknown>>(
     throw error;
   }
 
-  if (readyList.length === 0) status = 'ready';
+  if (readyList.length === 0) status = StoreInitializationStatus.ready;
   const ready = Promise.all(readyList).then(
     () => {
-      status = 'ready';
+      status = StoreInitializationStatus.ready;
     },
-    (error: unknown) => {
-      status = 'failed';
+    async (error: unknown) => {
+      status = StoreInitializationStatus.failed;
       initializationFailed = true;
       disposed = true;
       initAbort.abort();
-      // 初始化失败即回收已创建资源。清理错误不能替换原始初始化错误。
+      // 初始化失败即回收已创建资源。清理错误不能替换原始初始化错误。这里已经在异步延续里，可以
+      // 真正 await scope.dispose()（D-1：LifecycleScope 没有同步 dispose()），因此仍能像迁移前
+      // 一样把 cleanup 失败原样附加到原始错误的 cause 上，不需要退化成 fire-and-forget。
       try {
-        scope.dispose();
+        await scope.dispose();
       } catch (cleanupError) {
         // 保留原始初始化 Error 身份，同时附加清理失败用于诊断。
         if (error instanceof Error) {
@@ -421,7 +457,8 @@ function createStoreCore<S extends Record<string, unknown>>(
             error.cause =
               error.cause === undefined
                 ? cleanupError
-                : new AggregateError(
+                : createStoreLightAggregateError(
+                    StoreLightErrorCode.initAndCleanupFailed,
                     [error.cause, cleanupError],
                     '[store] initialization and cleanup both failed'
                   );
@@ -435,8 +472,9 @@ function createStoreCore<S extends Record<string, unknown>>(
   );
 
   function assertReady() {
-    if (status !== 'ready')
-      throw new Error(
+    if (status !== StoreInitializationStatus.ready)
+      throw createStoreLightError(
+        StoreLightErrorCode.storeNotReady,
         `[store] store is ${status}; use createAsyncStore() before accessing async fields`
       );
   }
@@ -462,7 +500,7 @@ function createStoreCore<S extends Record<string, unknown>>(
       // 粗粒度订阅只读取可变源字段。派生字段由这些源字段的变更
       // 间接触发；不在这里主动读取全部 Computed，避免一次持久化
       // 订阅把整个 Store 的昂贵 getter 变成常驻 keepAlive 节点。
-      const e = scope.own(
+      const e = ownReactiveNode(
         new Effect(
           () => {
             for (const n of signals.values()) void n.value;
@@ -472,7 +510,7 @@ function createStoreCore<S extends Record<string, unknown>>(
                 runtime.untracked(fn);
               } catch (error) {
                 runtime.reportError(error, {
-                  phase: 'subscription-listener'
+                  phase: ReactiveErrorPhase.subscriptionListener
                 });
               }
             }
@@ -498,7 +536,11 @@ function createStoreCore<S extends Record<string, unknown>>(
       runMutation(() => {
         const entries = Object.entries(patch).map(([key, value]) => {
           const node = signals.get(key);
-          if (!node) throw new Error(`[store] field is not settable: ${key}`);
+          if (!node)
+            throw createStoreLightError(
+              StoreLightErrorCode.invalidOption,
+              `[store] field is not settable: ${key}`
+            );
           return [node, value] as const;
         });
         for (const [node, value] of entries) node.value = value;
@@ -517,7 +559,10 @@ function createStoreCore<S extends Record<string, unknown>>(
       const entries = Object.entries(partial);
       const unknown = entries.filter(([key]) => !signals.has(key)).map(([key]) => key);
       if (options.unknown === 'strict' && unknown.length > 0) {
-        throw new Error(`[store] unknown hydration field: ${unknown[0]}`);
+        throw createStoreLightError(
+          StoreLightErrorCode.invalidOption,
+          `[store] unknown hydration field: ${unknown[0]}`
+        );
       }
       if (options.unknown === 'report') {
         for (const key of unknown) options.onUnknown?.(key);
@@ -536,15 +581,19 @@ function createStoreCore<S extends Record<string, unknown>>(
       assertNotDisposed();
       assertOwnedBy(resource, runtime, 'resource');
       if (!ownerOf(resource)) claimOwnership(resource, runtime);
-      return scope.own(resource);
+      // 外部资源（典型：collections），来源不明，保守按 syncSafe: false 处理（§4.2）。
+      return scope.own(resource, { syncSafe: false, force: () => resource.dispose() });
     },
-    $dispose() {
+    async $dispose() {
       if (disposed) return;
       disposed = true;
       initAbort.abort(); // 中止在途异步字段初始化
-      // scope 释放 Signal / Computed / $subscribe Effect / 已登记的 wasm 字段（best-effort）
+      // scope 释放 Signal / Computed / $subscribe Effect / 已登记的 wasm 字段。总是异步
+      // （D-1：LifecycleScope 没有同步 dispose()）；失败时按 scope 的错误策略（默认 'throw'）
+      // 拒绝，与迁移前 scope.dispose() 同步抛错时 $dispose() 直接抛穿的行为一致，只是现在是
+      // 一个 rejected Promise 而不是同步 throw。
       try {
-        scope.dispose();
+        await scope.dispose();
       } finally {
         // 丢掉强引用，避免「已 dispose 仍被 store 地图钉住」的假性常驻
         signals.clear();
@@ -596,7 +645,11 @@ const STORE_READY = new WeakMap<object, Promise<void>>();
 /** Internal bridge retained for the React adapter and legacy migration tests. */
 export function storeReady(store: object): Promise<void> {
   const ready = STORE_READY.get(store);
-  if (!ready) throw new Error('[store] store has no asynchronous initialization');
+  if (!ready)
+    throw createStoreLightError(
+      StoreLightErrorCode.noAsyncInit,
+      '[store] store has no asynchronous initialization'
+    );
   return ready;
 }
 
@@ -606,7 +659,7 @@ export function storeReady(store: object): Promise<void> {
  */
 export function createStore<S extends Record<string, unknown>>(
   shape: IStoreDefinition<S> & {
-    [K in keyof S]: S[K] extends AsyncFieldBuilder<IDisposable> | LegacyFieldBuilder<IDisposable>
+    [K in keyof S]: S[K] extends IAsyncFieldBuilder<IDisposable> | ILegacyFieldBuilder<IDisposable>
       ? never
       : S[K];
   },
@@ -617,10 +670,11 @@ export function createStore<S extends Record<string, unknown>>(
     if (
       'value' in descriptor &&
       isFieldBuilder(descriptor.value) &&
-      (!('mode' in descriptor.value) || descriptor.value.mode !== 'sync')
+      (!('mode' in descriptor.value) || descriptor.value.mode !== StoreFieldMode.sync)
     ) {
-      throw new Error(
-        `[store] createStore() only accepts synchronous fields; "${key}" is a FieldBuilder. Use createAsyncStore().`
+      throw createStoreLightError(
+        StoreLightErrorCode.syncFieldRequired,
+        `[store] createStore() only accepts synchronous fields; "${key}" is a IFieldBuilder. Use createAsyncStore().`
       );
     }
   }

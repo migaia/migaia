@@ -1,4 +1,4 @@
-import { RequestReplayLedger } from './request-replay-ledger';
+import { RequestReplayLedger } from './request-replay-ledger.js';
 
 /** Owns control-frame replay, admission and unordered abort state. */
 export class ControlTaskRegistry {

@@ -1,4 +1,8 @@
-import type { IPersistCodec, IPersistKeyValueStore } from '../core/types';
+import type { ICodec } from '@migaia/storage-web';
+import type { IPersistStorage, IPersistByteStorage } from '../core/types.js';
+import { createStorePersistTypeError } from '../errors.js';
+import { StorePersistErrorCode } from '../error-code.js';
+import { PersistCodecOutput } from '../state-constants.js';
 
 const MAP_TAG = '__migaia_persist_map__';
 const SET_TAG = '__migaia_persist_set__';
@@ -10,8 +14,12 @@ const SET_TAG = '__migaia_persist_set__';
  * 必须自己认得这两种形状，用一个打了标签的普通对象过一趟，而不是要求每个使用方自己转数组。
  */
 function jsonReplacer(_key: string, value: unknown): unknown {
-  if (value instanceof Map) return { [MAP_TAG]: [...value.entries()] };
-  if (value instanceof Set) return { [SET_TAG]: [...value.values()] };
+  // Object.prototype.toString 走内部 slot：跨 realm 的 Map/Set 也能识别；`instanceof Map` 会拒跨 realm 值，
+  // 把真实数据静默序列化成 "{}"（与 storage-contract 的 ArrayBuffer/Date 分类同一规则）。
+  if (Object.prototype.toString.call(value) === '[object Map]')
+    return { [MAP_TAG]: [...(value as Map<unknown, unknown>).entries()] };
+  if (Object.prototype.toString.call(value) === '[object Set]')
+    return { [SET_TAG]: [...(value as Set<unknown>).values()] };
   return value;
 }
 
@@ -32,19 +40,25 @@ function jsonReviver(_key: string, value: unknown): unknown {
  * 默认 codec：等价于 storage-web 的 `jsonCodec` 再加 Map/Set 往返支持——本包不 import `@migaia/storage-web`
  * 的具体值，只按结构复刻这一份零依赖实现，避免让"默认 codec 是什么"这件事 额外背上一条运行时依赖。
  */
-export const defaultJsonCodec: IPersistCodec = Object.freeze({
+export const defaultJsonCodec: ICodec = Object.freeze({
   name: 'json',
-  output: 'text',
+  output: PersistCodecOutput.text,
   async encode(value: unknown): Promise<string> {
     const encoded = JSON.stringify(value, jsonReplacer);
     if (encoded === undefined) {
-      throw new TypeError('[store] json codec cannot serialize this value');
+      throw createStorePersistTypeError(
+        StorePersistErrorCode.encodeFailed,
+        '[store] json codec cannot serialize this value'
+      );
     }
     return encoded;
   },
   async decode(raw: unknown): Promise<unknown> {
     if (typeof raw !== 'string') {
-      throw new TypeError('[store] json codec expects a string payload');
+      throw createStorePersistTypeError(
+        StorePersistErrorCode.envelopeInvalid,
+        '[store] json codec expects a string payload'
+      );
     }
     return JSON.parse(raw, jsonReviver);
   }
@@ -54,43 +68,46 @@ export const defaultJsonCodec: IPersistCodec = Object.freeze({
  * 选路：codec.output 与后端 capabilities 是否匹配，决定编码后的值往 text 通道还是 bytes 通道落地。
  *
  * 只覆盖 text/binary 两种 output——`structured` 需要 storage-web L1 `IRecordStore` 的
- * `putRecord`/`getRecord`，这个最小 `IPersistKeyValueStore` 形状不声明这两个方法， 传入 structured codec
- * 会在写入时明确抛错，而不是静默按 text 处理。
+ * `putRecord`/`getRecord`，这个最小 `IPersistStorage` 形状不声明这两个方法， 传入 structured codec 会在写入时明确抛错，而不是静默按
+ * text 处理。
  */
-function assertBinaryCapable(
-  storage: IPersistKeyValueStore
-): asserts storage is IPersistKeyValueStore &
-  Required<Pick<IPersistKeyValueStore, 'getBytes' | 'setBytes'>> {
+function assertBinaryCapable(storage: IPersistStorage): asserts storage is IPersistByteStorage {
   if (typeof storage.getBytes !== 'function' || typeof storage.setBytes !== 'function') {
-    throw new TypeError(
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.backendCapability,
       '[store] binary codec output requires a storage-web store with getBytes/setBytes (an IRecordStore-capable backend)'
     );
   }
 }
 
 export async function writeEnvelope(
-  storage: IPersistKeyValueStore,
+  storage: IPersistStorage,
   key: string,
-  codec: IPersistCodec,
+  codec: ICodec,
   value: unknown,
   ctx: { signal?: AbortSignal }
 ): Promise<void> {
-  if (codec.output === 'structured') {
-    throw new TypeError(
+  if (codec.output === PersistCodecOutput.structured) {
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.codecOutputMismatch,
       `[store] codec "${codec.name}" produces structured output, which this storage adapter shape does not support`
     );
   }
   const encoded = await codec.encode(value, ctx);
-  if (codec.output === 'binary' && storage.capabilities.binary) {
+  if (codec.output === PersistCodecOutput.binary && storage.capabilities.binary) {
     assertBinaryCapable(storage);
     if (!(encoded instanceof Uint8Array)) {
-      throw new TypeError(`[store] binary codec "${codec.name}" must encode to a Uint8Array`);
+      throw createStorePersistTypeError(
+        StorePersistErrorCode.codecOutputMismatch,
+        `[store] binary codec "${codec.name}" must encode to a Uint8Array`
+      );
     }
     await storage.setBytes(key, encoded, ctx);
     return;
   }
   if (typeof encoded !== 'string') {
-    throw new TypeError(
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.codecOutputMismatch,
       `[store] codec "${codec.name}" must encode to a string when the backend has no binary channel`
     );
   }
@@ -98,16 +115,22 @@ export async function writeEnvelope(
 }
 
 export async function readEnvelope(
-  storage: IPersistKeyValueStore,
+  storage: IPersistStorage,
   key: string,
-  codec: IPersistCodec,
+  codec: ICodec,
   ctx: { signal?: AbortSignal }
 ): Promise<unknown | undefined> {
-  if (codec.output === 'binary' && storage.capabilities.binary) {
+  if (codec.output === PersistCodecOutput.binary && storage.capabilities.binary) {
     assertBinaryCapable(storage);
     const bytes = await storage.getBytes(key, ctx);
     if (bytes === null) return undefined;
     return codec.decode(bytes, ctx);
+  }
+  if (codec.output === PersistCodecOutput.binary) {
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.codecOutputMismatch,
+      `[store] binary codec "${codec.name}" requires a storage backend with binary read support`
+    );
   }
   const text = await storage.get(key, ctx);
   if (text === null) return undefined;
@@ -115,7 +138,7 @@ export async function readEnvelope(
 }
 
 export async function removeEnvelope(
-  storage: IPersistKeyValueStore,
+  storage: IPersistStorage,
   key: string,
   ctx: { signal?: AbortSignal }
 ): Promise<void> {

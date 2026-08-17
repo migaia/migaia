@@ -1,6 +1,6 @@
-import type { IWebRpcHooksConfig, IWebRpcMiddleware } from '../typing';
-import { WebRpcCapabilityKey } from '../internal/runtime';
-import { WebRpcError, WebRpcErrorCode } from '../errors';
+import type { IWebRpcHooksConfig, IWebRpcMiddleware } from '../typing.js';
+import { WebRpcCapabilityKey } from '../internal/runtime.js';
+import { WebRpcError, WebRpcErrorCode } from '../errors.js';
 export const hooks = (config: IWebRpcHooksConfig = {}): IWebRpcMiddleware => ({
   name: 'hooks',
   install: ({ capabilities }) => {
@@ -22,9 +22,15 @@ export const hooks = (config: IWebRpcHooksConfig = {}): IWebRpcMiddleware => ({
             ? [...listenerValue]
             : [listenerValue];
       if (listeners.some((listener) => typeof listener !== 'function'))
-        throw new Error('hooks.listeners must contain functions');
+        throw new WebRpcError(
+          WebRpcErrorCode.invalidConfig,
+          'hooks.listeners must contain functions'
+        );
       if (onHookError !== undefined && typeof onHookError !== 'function')
-        throw new Error('hooks.onHookError must be a function');
+        throw new WebRpcError(
+          WebRpcErrorCode.invalidConfig,
+          'hooks.onHookError must be a function'
+        );
       capabilities.set(WebRpcCapabilityKey.hooks, { listeners, onHookError });
     } catch (error) {
       if (error instanceof WebRpcError) throw error;

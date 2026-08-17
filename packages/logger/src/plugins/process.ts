@@ -1,5 +1,7 @@
-import type { IEmptyPluginExt, ILoggerPluginCore, ILoggerPlugin } from '../typing';
-import { getLoggerRuntimeManager, type ILoggerProcess } from '../runtime-manager';
+import type { IEmptyPluginExt, ILoggerPluginCore, ILoggerPlugin } from '../typing.js';
+import { getLoggerRuntimeManager, type ILoggerProcess } from '../runtime-manager.js';
+import { createLoggerError, LoggerErrorCode } from '../errors.js';
+import { LoggerProcessReason } from '../plugin-constants.js';
 
 export type IProcessPluginConfig = {
   /** 是否捕获 uncaughtException/unhandledRejection 并记为 fatal 日志，默认 true */
@@ -38,7 +40,11 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
   }
 
   install(core: ILoggerPluginCore): IEmptyPluginExt {
-    if (ProcessPlugin.#shuttingDown) throw new Error('[logger] process runtime is shutting down');
+    if (ProcessPlugin.#shuttingDown)
+      throw createLoggerError(
+        LoggerErrorCode.runtimeShuttingDown,
+        '[logger] process runtime is shutting down'
+      );
     const runtimeProcess = getLoggerRuntimeManager().process;
     if (!runtimeProcess) return {};
     ProcessPlugin.#runtimeProcess ??= runtimeProcess;
@@ -61,6 +67,7 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
         ProcessPlugin.#shuttingDown = false;
         ProcessPlugin.#shutdownPromise = undefined;
         ProcessPlugin.#flushPromise = undefined;
+        ProcessPlugin.#config = undefined;
         ProcessPlugin.#runtimeProcess = undefined;
       }
     });
@@ -77,15 +84,20 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
     if (ProcessPlugin.#installed) {
       const previous = ProcessPlugin.#config!;
       if (JSON.stringify(previous) !== JSON.stringify(config)) {
-        throw new Error('[logger] process plugin already installed with different configuration');
+        throw createLoggerError(
+          LoggerErrorCode.pluginConfigConflict,
+          '[logger] process plugin already installed with different configuration'
+        );
       }
       return;
     }
     ProcessPlugin.#installed = true;
     ProcessPlugin.#config = config;
 
-    const onSigint = () => void ProcessPlugin.#gracefulShutdown('signal', 0, config);
-    const onSigterm = () => void ProcessPlugin.#gracefulShutdown('signal', 0, config);
+    const onSigint = () =>
+      void ProcessPlugin.#gracefulShutdown(LoggerProcessReason.signal, 0, config);
+    const onSigterm = () =>
+      void ProcessPlugin.#gracefulShutdown(LoggerProcessReason.signal, 0, config);
     const runtimeProcess = ProcessPlugin.#runtimeProcess!;
     runtimeProcess.on('SIGINT', onSigint);
     runtimeProcess.on('SIGTERM', onSigterm);
@@ -103,7 +115,7 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
       if (config.captureCrashes) {
         for (const c of ProcessPlugin.#cores) c.log('fatal', '未捕获异常，进程即将退出', err);
       }
-      void ProcessPlugin.#gracefulShutdown('uncaughtException', 1, config);
+      void ProcessPlugin.#gracefulShutdown(LoggerProcessReason.uncaughtException, 1, config);
     };
     runtimeProcess.on('uncaughtException', onUncaughtException);
     ProcessPlugin.#listeners.push(['uncaughtException', onUncaughtException]);
@@ -115,7 +127,7 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
           c.log('fatal', '未处理的 Promise rejection，进程即将退出', err);
         }
       }
-      void ProcessPlugin.#gracefulShutdown('unhandledRejection', 1, config);
+      void ProcessPlugin.#gracefulShutdown(LoggerProcessReason.unhandledRejection, 1, config);
     };
     runtimeProcess.on('unhandledRejection', onUnhandledRejection);
     ProcessPlugin.#listeners.push(['unhandledRejection', onUnhandledRejection]);
@@ -133,7 +145,7 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
   }
 
   static async #gracefulShutdown(
-    reason: 'signal' | 'uncaughtException' | 'unhandledRejection',
+    reason: (typeof LoggerProcessReason)[keyof typeof LoggerProcessReason],
     exitCode: number,
     config: Required<IProcessPluginConfig>
   ): Promise<void> {
@@ -176,7 +188,6 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
     } finally {
       if (timer) clearTimeout(timer);
       ProcessPlugin.#flushPromise = undefined;
-      ProcessPlugin.#config = undefined;
     }
   }
 }

@@ -1,5 +1,5 @@
-import type { IWebRpcAbortCapability, IWebRpcMiddleware } from '../typing';
-import { WebRpcCapabilityKey } from '../internal/runtime';
+import type { IWebRpcAbortCapability, IWebRpcMiddleware } from '../typing.js';
+import { WebRpcCapabilityKey } from '../internal/runtime.js';
 export const abort = (): IWebRpcMiddleware => ({
   name: 'abort',
   install: ({ capabilities }) => {

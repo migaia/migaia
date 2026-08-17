@@ -1,6 +1,8 @@
 import type { IDisposable } from '@migaia/reactive';
-import { allocateOwnedSync } from './arena';
-import { FIELD_BUILDER, type FieldBuilder, type FieldContext } from './field';
+import { allocateOwnedSync } from './arena.js';
+import { createStoreWasmError, createStoreWasmRangeError, StoreWasmErrorCode } from './errors.js';
+import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.js';
+import { WasmFieldMode } from './field-constants.js';
 
 const DEFAULT_MAX_BYTES = 256;
 const MAX_STRING_BYTES = 0xffff_ffff - Uint32Array.BYTES_PER_ELEMENT;
@@ -12,26 +14,34 @@ export type IWasmStringField = IDisposable & {
   readonly observed: boolean;
 };
 
-export function string(maxBytes: number = DEFAULT_MAX_BYTES): FieldBuilder<IWasmStringField> {
+export function string(maxBytes: number = DEFAULT_MAX_BYTES): IFieldBuilder<IWasmStringField> {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 0 || maxBytes > MAX_STRING_BYTES) {
-    throw new RangeError('wasm.string: maxBytes exceeds the Wasm32 allocation limit');
+    throw createStoreWasmRangeError(
+      StoreWasmErrorCode.invalidOption,
+      'wasm.string: maxBytes exceeds the Wasm32 allocation limit'
+    );
   }
   return {
     [FIELD_BUILDER]: true,
-    mode: 'sync',
-    create({ signal, createSource }: FieldContext): IWasmStringField {
+    mode: WasmFieldMode.sync,
+    create({ signal, createSource }: IFieldContext): IWasmStringField {
       // 前 4 字节存长度，后面定长字节缓冲区（固定容量：地址不能因变长而重分配）
       const block = allocateOwnedSync(4 + maxBytes);
       const { memory, ptr } = block;
       let source: ReturnType<typeof createSource> | undefined;
       try {
-        if (signal.aborted) throw new Error('[store] field init aborted');
+        if (signal.aborted)
+          throw createStoreWasmError(StoreWasmErrorCode.initAborted, '[store] field init aborted');
         source = createSource('WasmString');
         const view = () => new DataView(memory.buffer);
         let disposed = false;
         const readValue = () => {
           const len = view().getUint32(ptr, true);
-          if (len > maxBytes) throw new Error('wasm.string: corrupted byte length');
+          if (len > maxBytes)
+            throw createStoreWasmError(
+              StoreWasmErrorCode.allocationFailed,
+              'wasm.string: corrupted byte length'
+            );
           return decoder.decode(new Uint8Array(memory.buffer, ptr + 4, len));
         };
 
@@ -40,15 +50,24 @@ export function string(maxBytes: number = DEFAULT_MAX_BYTES): FieldBuilder<IWasm
             return source!.observed;
           },
           get value() {
-            if (disposed) throw new Error('[store] cannot read a disposed wasm field');
+            if (disposed)
+              throw createStoreWasmError(
+                StoreWasmErrorCode.fieldDisposed,
+                '[store] cannot read a disposed wasm field'
+              );
             source!.track();
             return readValue();
           },
           set value(v) {
-            if (disposed) throw new Error('[store] cannot write a disposed wasm field');
+            if (disposed)
+              throw createStoreWasmError(
+                StoreWasmErrorCode.fieldDisposed,
+                '[store] cannot write a disposed wasm field'
+              );
             const bytes = encoder.encode(v);
             if (bytes.length > maxBytes) {
-              throw new Error(
+              throw createStoreWasmError(
+                StoreWasmErrorCode.invalidOption,
                 `wasm.string: value exceeds maxBytes (${bytes.length} > ${maxBytes})`
               );
             }
@@ -65,8 +84,9 @@ export function string(maxBytes: number = DEFAULT_MAX_BYTES): FieldBuilder<IWasm
             if (disposed) return;
             disposed = true;
             block.unregister(field);
-            block.dispose();
+            // 逆序释放（migration.sdd.md §5.7）：先摘子资源边，再 dealloc block。
             source!.dispose();
+            block.dispose();
           }
         };
         block.register(field);

@@ -8,10 +8,12 @@ import type {
   ILoggerPluginCore,
   ILoggerPlugin,
   IPaintFn
-} from '../typing';
-import { getLoggerRuntimeManager } from '../runtime-manager';
+} from '../typing.js';
+import { getLoggerRuntimeManager } from '../runtime-manager.js';
+import { LoggerConsoleTag } from '../plugin-constants.js';
+import { LoggerColorMode } from '../plugin-constants.js';
 
-export type IColorMode = 'auto' | 'always' | 'never';
+export type IColorMode = (typeof LoggerColorMode)[keyof typeof LoggerColorMode];
 export type IOutputFormat = 'auto' | 'pretty' | 'json';
 
 export type IColorPluginConfig = {
@@ -97,9 +99,9 @@ class ColorPlugin implements ILoggerPlugin<
   }
 
   #isColorEnabled(): boolean {
-    const mode = this.#resolvedConfig.color ?? 'auto';
-    if (mode === 'always') return true;
-    if (mode === 'never') return false;
+    const mode = this.#resolvedConfig.color ?? LoggerColorMode.auto;
+    if (mode === LoggerColorMode.always) return true;
+    if (mode === LoggerColorMode.never) return false;
     const runtimeProcess = getLoggerRuntimeManager().process;
     if (runtimeProcess?.env.NO_COLOR) return false;
     if (runtimeProcess?.env.FORCE_COLOR && runtimeProcess.env.FORCE_COLOR !== '0') return true;
@@ -200,8 +202,9 @@ class ColorPlugin implements ILoggerPlugin<
   #sink(tag: string): (...args: unknown[]) => void {
     const runtime = getLoggerRuntimeManager();
     if (runtime.console) {
-      if (tag === 'error' || tag === 'fatal') return runtime.console.error;
-      if (tag === 'warn') return runtime.console.warn;
+      if (tag === LoggerConsoleTag.error || tag === LoggerConsoleTag.fatal)
+        return runtime.console.error;
+      if (tag === LoggerConsoleTag.warn) return runtime.console.warn;
       return runtime.console.log;
     }
     return (...args) =>

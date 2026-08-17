@@ -12,6 +12,12 @@ import { createMemoryTransportPair } from '../src/adapters/memory';
 
 describe('#1 splitUtf8 会产出超过 maxBytes 的分片，接收端必然拒收', () => {
   it('chunk budget 小于最大 UTF-8 code point 时拒绝配置', () => {
+    expect(() => splitUtf8('😀😀', 2)).toThrow(
+      expect.objectContaining({
+        source: '@migaia/web-rpc',
+        code: 'INVALID_CONFIG'
+      })
+    );
     expect(() => splitUtf8('😀😀', 2)).toThrow(RangeError);
   });
 });

@@ -6,7 +6,7 @@
     "lib": ["ES2024", "ESNext.Disposable", "DOM", "DOM.Iterable"],
     "rootDir": "src",
     "outDir": "dist",
-    "types": ["vitest/globals"]
+    "types": []
   },
   "include": ["src"],
   "exclude": ["src/**/*.test.ts", "src/testing/**"]

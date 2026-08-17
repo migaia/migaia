@@ -1,5 +1,7 @@
-import type { IWebRpcError } from './errors';
-import type { IWebRpcTransport } from './transport';
+import type { IWebRpcError } from './errors.js';
+import type { IWebRpcTransport } from './transport.js';
+import type { IWebRpcPlatformValue as IProtocolWebRpcPlatform } from './protocol-constants.js';
+import type { IWebRpcCandidateStatus, IWebRpcOperation } from './protocol-constants.js';
 
 export type IWebRpcProviderResult =
   | { readonly ok: true; readonly data?: unknown; readonly transfer?: readonly unknown[] }
@@ -175,7 +177,7 @@ export type IWebRpcConnectConfig = {
     context: {
       readonly endpointId: string;
       readonly targetId: string;
-      readonly operation: 'send' | 'dispatch' | 'ping';
+      readonly operation: IWebRpcOperation;
     }
   ) => string | undefined | Promise<string | undefined>;
 };
@@ -206,14 +208,7 @@ export type IWebRpcConnectCapability = Omit<IWebRpcConnectConfig, 'uniqueTargetI
   ) => string | Promise<string>;
   readonly verify: (context: IWebRpcConnectContext) => boolean | Promise<boolean>;
 };
-export type IWebRpcPlatform =
-  | 'Worker'
-  | 'Iframe'
-  | 'BroadcastChannel'
-  | 'MessagePort'
-  | 'Memory'
-  | 'WebTransport'
-  | 'RTCDataChannel';
+export type IWebRpcPlatform = IProtocolWebRpcPlatform;
 export type IWebRpcServerMetadata<TTargetId extends string = string> = {
   readonly targetId: TTargetId;
   readonly receiverId: string;
@@ -223,7 +218,7 @@ export type IWebRpcServerMetadata<TTargetId extends string = string> = {
   readonly registeredAt: number;
   readonly lastSeenAt: number;
   readonly pinned: boolean;
-  readonly status: 'active' | 'stale' | 'unregistered';
+  readonly status: IWebRpcCandidateStatus;
 };
 export type IWebRpcConnectControl<TTargetId extends string = string> = {
   readonly getServerList: (targetId?: TTargetId) => readonly IWebRpcServerMetadata<TTargetId>[];

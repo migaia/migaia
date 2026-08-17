@@ -1,17 +1,16 @@
-import type {
-  IDisposable,
-  IDisposer,
-  IObservable,
-  IObserver,
-  IRuntime
-} from '@migaia/reactive/runtime/types';
-import { internalsOf } from '@migaia/reactive/runtime/internals';
-import { claimOwnership } from '@migaia/reactive/runtime/ownership';
 import {
-  registerSubs,
-  registerVersion,
-  readVersion
-} from '@migaia/reactive/runtime/node-internals';
+  ReactiveErrorPhase,
+  type IDisposable,
+  type IDisposer,
+  type IObservable,
+  type IObserver,
+  type IRuntime
+} from '@migaia/reactive/runtime';
+import { internalsOf } from '@migaia/reactive/internals';
+import { claimOwnership } from '@migaia/reactive/ownership';
+import { registerSubs, registerVersion, readVersion } from '@migaia/reactive/node-internals';
+import { createStoreSharedError, createStoreSharedRangeError } from './errors.js';
+import { StoreSharedErrorCode } from './error-code.js';
 
 /**
  * SharedArrayBuffer 支撑的跨线程状态。
@@ -48,7 +47,8 @@ function readConsistent(
     const after = Atomics.load(view, seqSlot);
     if (before === after) return { value, version: before };
   }
-  throw new Error(
+  throw createStoreSharedError(
+    StoreSharedErrorCode.contentionLimit,
     '[store] shared cell did not settle before the contention limit; a writer may still be active or may have abandoned the seqlock'
   );
 }
@@ -62,7 +62,8 @@ function acquire(view: Int32Array, seqSlot: number): number {
       return seq;
     }
   }
-  throw new Error(
+  throw createStoreSharedError(
+    StoreSharedErrorCode.contentionLimit,
     '[store] shared cell lock was not acquired before the contention limit; another writer may still be active or may have abandoned it'
   );
 }
@@ -110,7 +111,10 @@ const SIGNAL_SLOTS = 2;
  */
 function asInt32(value: number, what: string): number {
   if (!Number.isInteger(value) || value < -2147483648 || value > 2147483647) {
-    throw new RangeError(`[store] ${what} must be an int32, received ${String(value)}`);
+    throw createStoreSharedRangeError(
+      StoreSharedErrorCode.invalidOption,
+      `[store] ${what} must be an int32, received ${String(value)}`
+    );
   }
   return value;
 }
@@ -142,7 +146,8 @@ function watchSlot(
   onError: (error: unknown) => void
 ): IDisposer {
   if (!hasWaitAsync()) {
-    throw new Error(
+    throw createStoreSharedError(
+      StoreSharedErrorCode.envUnsupported,
       '[store] Atomics.waitAsync is unavailable; pump sync() from your own message loop instead'
     );
   }
@@ -223,7 +228,10 @@ export class SharedInt32Signal implements IObservable, IDisposable {
     this.runtime = runtime;
     this.buffer = buffer ?? new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * SIGNAL_SLOTS);
     if (this.buffer.byteLength < Int32Array.BYTES_PER_ELEMENT * SIGNAL_SLOTS) {
-      throw new RangeError('[store] shared signal buffer is too small');
+      throw createStoreSharedRangeError(
+        StoreSharedErrorCode.bufferTooSmall,
+        '[store] shared signal buffer is too small'
+      );
     }
     this.#view = new Int32Array(this.buffer, 0, SIGNAL_SLOTS);
     if (!buffer) {
@@ -289,7 +297,7 @@ export class SharedInt32Signal implements IObservable, IDisposable {
       () => {
         if (!this.#disposed) this.sync();
       },
-      (error) => this.runtime.reportError(error, { phase: 'async-flush' })
+      (error) => this.runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })
     );
     this.#stopWatching = () => {
       stop();
@@ -321,7 +329,11 @@ export class SharedInt32Signal implements IObservable, IDisposable {
   }
 
   #assertActive(): void {
-    if (this.#disposed) throw new Error('[store] shared signal is disposed');
+    if (this.#disposed)
+      throw createStoreSharedError(
+        StoreSharedErrorCode.signalDisposed,
+        '[store] shared signal is disposed'
+      );
   }
 }
 
@@ -445,7 +457,10 @@ export class SharedInt32Array implements IDisposable {
     } = {}
   ) {
     if (!Number.isInteger(length) || length < 0) {
-      throw new RangeError('[store] shared array length must be a non-negative integer');
+      throw createStoreSharedRangeError(
+        StoreSharedErrorCode.invalidOption,
+        '[store] shared array length must be a non-negative integer'
+      );
     }
     this.runtime = runtime;
     this.length = length;
@@ -455,7 +470,10 @@ export class SharedInt32Array implements IDisposable {
     const requiredBytes = slots * Int32Array.BYTES_PER_ELEMENT;
     this.buffer = options.buffer ?? new SharedArrayBuffer(requiredBytes);
     if (this.buffer.byteLength < requiredBytes) {
-      throw new RangeError('[store] shared array buffer is too small');
+      throw createStoreSharedRangeError(
+        StoreSharedErrorCode.bufferTooSmall,
+        '[store] shared array buffer is too small'
+      );
     }
     this.#view = new Int32Array(this.buffer, 0, slots);
     this.#observedVersions = new Int32Array(length);
@@ -522,7 +540,8 @@ export class SharedInt32Array implements IDisposable {
         return next;
       }
     }
-    throw new Error(
+    throw createStoreSharedError(
+      StoreSharedErrorCode.contentionLimit,
       `[store] shared array update at ${index} kept losing the race; another writer never settled`
     );
   }
@@ -588,7 +607,7 @@ export class SharedInt32Array implements IDisposable {
       () => {
         if (!this.#disposed) this.sync();
       },
-      (error) => this.runtime.reportError(error, { phase: 'async-flush' })
+      (error) => this.runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })
     );
     this.#stopWatching = () => {
       stop();
@@ -630,7 +649,10 @@ export class SharedInt32Array implements IDisposable {
 
   assertActive(): void {
     if (this.#disposed) {
-      throw new Error('[store] shared array is disposed');
+      throw createStoreSharedError(
+        StoreSharedErrorCode.arrayDisposed,
+        '[store] shared array is disposed'
+      );
     }
   }
 
@@ -687,7 +709,10 @@ export class SharedInt32Array implements IDisposable {
   #assertIndex(index: number): void {
     this.assertActive();
     if (!Number.isInteger(index) || index < 0 || index >= this.length) {
-      throw new RangeError(`[store] shared array index out of range: ${index}`);
+      throw createStoreSharedRangeError(
+        StoreSharedErrorCode.indexOutOfRange,
+        `[store] shared array index out of range: ${index}`
+      );
     }
   }
 

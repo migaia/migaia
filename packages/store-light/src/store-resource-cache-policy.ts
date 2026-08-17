@@ -1,10 +1,15 @@
+import { createStoreLightRangeError, StoreLightErrorCode } from './errors.js';
+
 export class ResourceCachePolicy {
   readonly #keepAliveMs: number;
   #evictionTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(keepAliveMs: number) {
     if (!Number.isFinite(keepAliveMs) || keepAliveMs < 0)
-      throw new RangeError('[store] keepAliveMs must be a finite non-negative number');
+      throw createStoreLightRangeError(
+        StoreLightErrorCode.invalidOption,
+        '[store] keepAliveMs must be a finite non-negative number'
+      );
     this.#keepAliveMs = keepAliveMs;
   }
 

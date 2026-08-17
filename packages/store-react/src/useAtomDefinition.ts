@@ -1,7 +1,7 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import type { IAtomDefinition, IWritableAtomDefinition } from '@migaia/store-keyed/atom/definition';
 import type { IAtomStore } from '@migaia/store-keyed/atom/store';
-import { useStoreRegistry } from './provider';
+import { useStoreRegistry } from './provider.js';
 
 /**
  * 从 Provider 直接取它自己的 atom store。

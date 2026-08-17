@@ -3,9 +3,8 @@
   "compilerOptions": {
     "noEmit": true,
     "jsx": "react-jsx",
+    "types": ["node"],
     "paths": {
-      "@migaia/reactive": ["../reactive/dist/index.d.ts"],
-      "@migaia/reactive/*": ["../reactive/dist/*"],
       "@migaia/resource": ["../resource/dist/index.d.ts"],
       "@migaia/store-keyed": ["../store-keyed/dist/index.d.ts"],
       "@migaia/store-keyed/*": ["../store-keyed/dist/*"],

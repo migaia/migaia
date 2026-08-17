@@ -1,5 +1,5 @@
-import type { IWebRpcHook, IWebRpcHookEvent } from '../typing';
-import { observeListener } from './listener-safety';
+import type { IWebRpcHook, IWebRpcHookEvent } from '../typing.js';
+import { observeListener } from './listener-safety.js';
 
 /** Owns hook subscription and failure isolation for one endpoint runtime. */
 export class HookRegistry {

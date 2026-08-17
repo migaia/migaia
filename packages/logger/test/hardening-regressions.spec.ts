@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Logger } from '../src/log';
 import { batch } from '../src/plugins/batch';
-import { waitUntil } from '../src/bounded-wait';
+import { boundedWait as waitUntil, systemScheduler } from '@migaia/lifecycle';
 import type { ILogEntry } from '../src/typing';
 
 describe('#1 shutting-down 期间 raw() 拒绝但 dispatchRaw() 照收', () => {
@@ -310,7 +310,7 @@ describe('fifth adversarial pass', () => {
   it('LG-R5-2: waitUntil clears its deadline timer once the raced task settles first', async () => {
     vi.useFakeTimers();
     try {
-      await waitUntil(Promise.resolve('done'), Date.now() + 3_000);
+      await waitUntil(Promise.resolve('done'), systemScheduler.now() + 3_000);
       expect(vi.getTimerCount()).toBe(0);
     } finally {
       vi.useRealTimers();
@@ -342,7 +342,7 @@ describe('fifth adversarial pass', () => {
     process.on('unhandledRejection', onUnhandled);
     try {
       const rejecting = Promise.reject(new Error('boom-after-deadline'));
-      const alreadyElapsed = Date.now() - 1;
+      const alreadyElapsed = systemScheduler.now() - 1;
       const result = await waitUntil(rejecting, alreadyElapsed);
       expect(result).toBe(false);
       // Give Node's unhandledRejection detector (queued for a later tick) a chance to fire.

@@ -1,3 +1,5 @@
+import { createStoreLightError, StoreLightErrorCode } from './errors.js';
+
 const CAPTURES = Symbol('store-resource-captures');
 
 /**
@@ -58,7 +60,8 @@ export class ResourceCaptureRegistry {
 
   constructor(onChanged?: (version: number) => void) {
     if (typeof WeakRef !== 'function' || typeof FinalizationRegistry !== 'function')
-      throw new Error(
+      throw createStoreLightError(
+        StoreLightErrorCode.envUnsupported,
         '[store] ResourceCaptureRegistry requires WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox'
       );
     this.#onChanged = onChanged ?? (() => undefined);
@@ -151,7 +154,10 @@ export class ResourceCaptureRegistry {
   inspect(token: IResourceCapture): number {
     const captured = token as ICaptureToken;
     if (!this.#captures.has(token) || this.#committed.has(token) || captured.version === undefined)
-      throw new Error('[store] invalid or consumed resource capture');
+      throw createStoreLightError(
+        StoreLightErrorCode.captureInvalid,
+        '[store] invalid or consumed resource capture'
+      );
     return captured.version;
   }
 

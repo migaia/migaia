@@ -1,7 +1,7 @@
-import type { IWebRpcChunkCapability, IWebRpcChunkConfig, IWebRpcMiddleware } from '../typing';
-import { splitUtf8, utf8ByteLength } from '../internal/chunk';
-import { WebRpcCapabilityKey } from '../internal/runtime';
-import { WebRpcError, WebRpcErrorCode } from '../errors';
+import type { IWebRpcChunkCapability, IWebRpcChunkConfig, IWebRpcMiddleware } from '../typing.js';
+import { splitUtf8, utf8ByteLength } from '../internal/chunk.js';
+import { WebRpcCapabilityKey } from '../internal/runtime.js';
+import { WebRpcError, WebRpcErrorCode } from '../errors.js';
 
 export const chunk = (config: IWebRpcChunkConfig = {}): IWebRpcMiddleware => ({
   name: 'chunk',

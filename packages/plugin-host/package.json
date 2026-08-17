@@ -22,6 +22,9 @@
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   },
+  "dependencies": {
+    "@migaia/lifecycle": "workspace:^"
+  },
   "scripts": {
     "fmt": "oxfmt src test",
     "build": "vite build && tsc -p tsconfig.json --emitDeclarationOnly",

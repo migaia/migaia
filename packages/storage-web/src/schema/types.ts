@@ -1,4 +1,4 @@
-import type { IOperationContext } from '../types/context';
+import type { IOperationContext } from '../types/context.js';
 
 /**
  * Schema 层是面向开发者的开放契约，不绑定任何校验库，也不强制使用。 `encode`/`decode` 处理领域表示（`Date` ↔ ISO 串、内部字段裁剪），与 §7 codec

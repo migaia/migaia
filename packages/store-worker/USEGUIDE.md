@@ -42,8 +42,8 @@
 ```ts
 export type ManagedRpcHandler = {
   (message: unknown): Promise<void>;
-  dispose(): void;
-  disposeAsync(): Promise<void>;
+  dispose(): Promise<void>;
+  close(): void;
   readonly pendingCount: number;
   readonly disposed: boolean;
 };
@@ -70,14 +70,15 @@ type IWebWorkerLikePort = {
 ## 2. `WorkerAdapter` 完整参考
 
 ```ts
-class WorkerAdapter implements IDisposable {
+class WorkerAdapter {
   constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number });
   readonly disposed: boolean;
   request<Input, Output>(
     payload: Input,
     options?: { signal?: AbortSignal; transfer?: readonly Transferable[] }
   ): Promise<Output>;
-  dispose(): void;
+  close(): void;
+  dispose(): Promise<void>;
 }
 ```
 
@@ -86,7 +87,8 @@ class WorkerAdapter implements IDisposable {
 - **`options.timeoutMs`**：请求默认超时（毫秒）。省略时不设默认超时——单次 `request()` 一直等对方响应，可以在 `request()` 调用点传 `signal` 自行控制取消。
 - **`request<Input, Output>(payload, options)`**：发起一次 `'call'` RPC 调用，等价于 `endpoint.send('worker', 'call', payload, options)`。`options.signal` 用标准 `AbortSignal` 取消这次调用；`options.transfer` 传入这次调用要零拷贝转移的 `Transferable` 列表（比如 `Uint8Array.buffer`）。
 - **构造是异步的，但构造函数本身同步返回**：`createEndpoint()` 内部是异步的（要跑完中间件安装），`WorkerAdapter` 把这个 Promise 存在私有字段里，`request()` 会先 `await` 它再发请求——调用方不需要显式等待"连接就绪"，直接 `new WorkerAdapter(worker).request(...)` 就能用。
-- **`dispose()`**：标记 `disposed = true`（幂等，重复调用直接返回），异步等底层 `endpoint` 就绪后调用 `endpoint.dispose()`，失败会被吞掉（`.catch(() => undefined)`）——`dispose()` 本身不返回 Promise，是"发出去就不管"的语义。需要确认底层资源真正清理完成时，改用 `workerComputed`/`Resource` 的生命周期管理，或直接持有并 `await` 构造出的端点（当前公开 API 不直接暴露端点句柄，如果需要强一致的 dispose 确认，考虑改走 `createWorkerHandler`/`ManagedRpcHandler.disposeAsync()` 那一侧的等价语义）。
+- **`close()`**：同步标记不可用（`disposed = true`，幂等），此后 `request()` 立即拒绝，但**不**释放底层 endpoint。
+- **`dispose()`**：唯一异步释放入口——先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`。失败会 reject（**不吞错**），重复调用复用同一个 Promise。需要"立刻标记不可用、暂不关心清理完成"时用 `close()`；需要强一致的清理确认时 `await dispose()`。
 
 一个 `WorkerAdapter` 对应一个 Worker 连接，`request()` 可以并发调用多次——底层的 `abort()`/`timeout()` 中间件按请求粒度独立管理，互不影响。
 
@@ -121,13 +123,13 @@ handler.disposed;     // false
 
 await handler(incomingMessage); // 处理一条消息；disposed 时直接返回，静默丢弃
 
-handler.dispose();        // 同步返回；异步、尽力而为地清理底层端点，失败被吞掉
-await handler.disposeAsync(); // 等待底层端点真正 dispose 完成；失败会 reject
+handler.close();         // 同步标记不可用；不执行底层清理
+await handler.dispose(); // 先 close()，再等底层端点初始化并 dispose；失败会 reject
 ```
 
-- **`handler(message)`**：`disposed === true` 时直接返回 `Promise<void>`（resolve），不会处理也不会报错——这是有意的静默丢弃：`dispose()` 之后 Worker 可能还会因为消息队列里的残留消息被再调用一次，不应该因此抛错。
+- **`handler(message)`**：`disposed === true` 时直接返回 `Promise<void>`（resolve），不会处理也不会报错——这是有意的静默丢弃：`close()`/`dispose()` 之后 Worker 可能还会因为消息队列里的残留消息被再调用一次，不应该因此抛错。
 - **`pendingCount`**：每次调用 `handler(message)` 时 +1，处理结束（无论成功失败）后 -1。可以用它判断"当前是不是还有请求在处理中",比如在 Worker 准备被 `terminate()` 之前先等 `pendingCount` 归零。
-- **`dispose()` vs `disposeAsync()`**：`dispose()` 同步返回，底层清理是"发出去不管"，适合"我要立刻标记为不可用，但不关心清理什么时候真正完成"的场景；`disposeAsync()` 返回一个会等清理完成的 Promise，清理失败时会把错误 reject 出来（错误形态与 `@migaia/web-rpc` 的 `endpoint.dispose()` 一致，是 `WebRpcLifecycleError`，`cleanupErrors` 字段列出具体哪个资源没清理干净）。两者都是幂等的——多次调用不会重复触发清理。
+- **`close()` vs `dispose()`**：`close()` 同步标记 `disposed = true`，只负责"停止接受新消息"，不触发任何用户清理；`dispose()` 是唯一异步释放入口，内部先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`，清理失败时会把错误 reject 出来（错误形态与 `@migaia/web-rpc` 的 `endpoint.dispose()` 一致，是 `WebRpcLifecycleError`，`cleanupErrors` 字段列出具体哪个资源没清理干净）。两者都是幂等的——`close()` 重复调用是无操作；`dispose()` 多次调用复用同一个 Promise，不会重复触发清理。
 
 ---
 
@@ -239,7 +241,7 @@ Worker 侧的对端：把一个**普通的、跑在 Worker 里就地工作的** 
 `parser.encode()` 允许返回可迭代对象（流式输出多个 `ISerializeChunk`）。Worker 侧不引入完整的 `@migaia/serialize` 注册表逻辑来做这件事（避免把不需要的代码打进 Worker 包体），而是就地实现了一个最小拼装：
 
 - 全部段都是 `'text'` 时，直接字符串拼接。
-- 否则统一转成 `Uint8Array`（`'bytes'` 段直接用，其它段先 `String()` 再 `TextEncoder` 编码）拼成一个大 `Uint8Array`。
+- 否则统一转成 `Uint8Array`（`'bytes'` 段直接用，`'text'` 段用 `TextEncoder` 编码）；`'value'` 段不能参与混合拼装，会抛出 `SerializeError`。
 - 只有一段时直接返回该段，不做任何拼装。
 
 这个拼装逻辑只在 `encode` 输出多段时触发，`decode` 的输入固定是单段（`ISerializeChunk`），不涉及拼装。
@@ -407,7 +409,7 @@ registry.dispose(); // 连带 dispose workerParser 的端点,并 terminate worke
 这不是可重试的错误——`ownership: 'transfer'` 场景下,一旦请求被送出、随即又被取消,原始 `ArrayBuffer` 已经在传输过程中被 detach,数据回不来了。需要重试的调用点应该改用 `ownership: 'copy'`,或者在业务层保留一份数据副本用于重试。
 
 **Q:Worker 里的 `parser.encode()` 返回了多段(可迭代对象),主线程收到的结果不对。**
-多段拼装只发生在 Worker 内部(`createSerializeWorkerHandler` 就地拼装后才回包给主线程,见 [§6.5](#65-多段结果的本地拼装)),主线程收到的应该始终是拼装后的单个 `ISerializeChunk`。如果结果不对,先确认 `parser.encode()` 各段的形态是否一致(全 `'text'` 才会走字符串拼接,否则统一按字节拼接),混用形态时字节拼接路径会把非字节段强制 `String()` 后再编码,可能不是你想要的语义。
+多段拼装只发生在 Worker 内部(`createSerializeWorkerHandler` 就地拼装后才回包给主线程,见 [§6.5](#65-多段结果的本地拼装)),主线程收到的应该始终是拼装后的单个 `ISerializeChunk`。如果结果不对,先确认 `parser.encode()` 各段的形态是否一致(全 `'text'` 才会走字符串拼接,否则统一按字节拼接)。`'value'` 是已经物化的对象图，不能与 text/bytes 混合拼装；混合时会直接抛出 `SerializeError`，不会隐式转成 `"[object Object]"`。
 
 **Q:`adapter.dispose()`/`registry.dispose()` 之后,Worker 进程/线程还活着。**
 `WorkerAdapter.dispose()`/`workerParser` 的 `dispose()` 默认只 dispose RPC 端点,不会 terminate 底层 `Worker`——外部传入的 Worker 默认被认为归调用方所有。需要连带终止 Worker,`workerPlugin`/`workerParser` 传 `terminateOnDispose: true`;`WorkerAdapter` 场景下需要调用方自己在合适的时机调用 `worker.terminate()`。

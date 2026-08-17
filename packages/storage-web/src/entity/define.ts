@@ -1,16 +1,16 @@
-import { passthrough } from '../schema/passthrough';
-import { createRepository } from './repository';
-import type { IKeyValueStore } from '../types/storage';
-import type { ISchemaAdapter } from '../schema/types';
-import type { IMigration } from '../schema/migrate';
-import type { IEntityDefinition, IEntityOptions, IRepository } from './types';
-import { StorageError, StorageErrorCode } from '../types/errors';
-import { snapshotCodec } from '../serialize/registry';
+import { passthrough } from '../schema/passthrough.js';
+import { createRepository } from './repository.js';
+import type { IKeyValueStore } from '../types/storage.js';
+import type { ISchemaAdapter } from '../schema/types.js';
+import type { IMigration } from '../schema/migrate.js';
+import type { IEntityDefinition, IEntityOptions, IRepository } from './types.js';
+import { StorageError, StorageErrorCode } from '../types/errors.js';
+import { snapshotCodec } from '../serialize/registry.js';
 
 const RESERVED_ENTITY_PREFIX = '__';
 
 const invalidDefinition = (message: string): never => {
-  throw new StorageError(StorageErrorCode.invalidArgument, { cause: new TypeError(message) });
+  throw new StorageError(StorageErrorCode.invalidConfig, { cause: new TypeError(message) });
 };
 
 /** Snapshot a schema descriptor once before it becomes a long-lived repository extension. */
@@ -30,7 +30,7 @@ const snapshotSchema = <TDomain, TStored>(schema: unknown): ISchemaAdapter<TDoma
     decode = candidate.decode;
     normalize = candidate.normalize;
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, { cause });
+    throw new StorageError(StorageErrorCode.invalidConfig, { cause });
   }
   if (
     typeof name !== 'string' ||
@@ -52,7 +52,7 @@ const snapshotMigrations = (migrations: unknown): Record<number, IMigration> | u
   try {
     return Object.fromEntries(Object.entries(migrations as object));
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, { cause });
+    throw new StorageError(StorageErrorCode.invalidConfig, { cause });
   }
 };
 
@@ -138,7 +138,7 @@ export const defineEntity = <TDomain, TStored = TDomain>(
     configuredOnDiagnostic = options.onDiagnostic;
     configuredDefaultOrderBy = options.defaultOrderBy;
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, { cause });
+    throw new StorageError(StorageErrorCode.invalidConfig, { cause });
   }
   const name = configuredName as string;
   const key = configuredKey as Extract<keyof TDomain, string>;

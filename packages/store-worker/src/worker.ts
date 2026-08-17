@@ -1,5 +1,6 @@
-import type { IDisposable, IRuntime } from '@migaia/reactive';
+import type { IRuntime } from '@migaia/reactive';
 import { defaultRuntime } from '@migaia/reactive';
+import { WebRpcPlatform } from '@migaia/web-rpc/protocol-constants';
 import { Resource, type IResourceOptions } from '@migaia/resource';
 import {
   abort,
@@ -14,9 +15,10 @@ import {
   createWebWorkerTransport,
   type IWebWorkerLikePort
 } from '@migaia/web-rpc/adapters/web-worker';
-import { toManagedRpcHandler, type ManagedRpcHandler } from './managed-rpc-handler';
+import { toManagedRpcHandler, type IManagedRpcHandler } from './managed-rpc-handler.js';
+import { createStoreWorkerError, StoreWorkerErrorCode } from './errors.js';
 
-export type { ManagedRpcHandler } from './managed-rpc-handler';
+export type { IManagedRpcHandler } from './managed-rpc-handler.js';
 export type IWorkerPort = IWebWorkerLikePort;
 
 function createWorkerEndpoint(
@@ -37,9 +39,10 @@ function createWorkerEndpoint(
   }) as Promise<IWebRpcEndpoint<'worker', 'automatic', false>>;
 }
 
-export class WorkerAdapter implements IDisposable {
+export class WorkerAdapter {
   #endpoint: Promise<IWebRpcEndpoint<'worker', 'automatic', false>>;
   #disposed = false;
+  #disposePromise: Promise<void> | undefined;
 
   constructor(
     port: IWorkerPort,
@@ -54,17 +57,38 @@ export class WorkerAdapter implements IDisposable {
 
   request<Input, Output>(
     payload: Input,
-    options: { signal?: AbortSignal; transfer?: readonly Transferable[] } = {}
+    options: { signal?: IWebRpcAbortSignal; transfer?: readonly Transferable[] } = {}
   ): Promise<Output> {
+    if (this.#disposed)
+      return Promise.reject(
+        createStoreWorkerError(
+          StoreWorkerErrorCode.adapterDisposed,
+          '[store] worker adapter is disposed'
+        )
+      );
     return this.#endpoint.then((endpoint) =>
       endpoint.send<Output>('worker', 'call', payload, options)
     );
   }
 
-  dispose(): void {
-    if (this.#disposed) return;
+  /** 同步标记不可用：仅置 `disposed = true`，不释放底层 endpoint。幂等。 */
+  close(): void {
     this.#disposed = true;
-    void this.#endpoint.then((endpoint) => endpoint.dispose()).catch(() => undefined);
+  }
+
+  /**
+   * 唯一异步释放入口：先 `close()`，再等待 endpoint 初始化并执行 `endpoint.dispose()`。 不吞清理错误（失败会 reject），重复调用复用同一个
+   * Promise。
+   */
+  dispose(): Promise<void> {
+    if (this.#disposePromise === undefined) {
+      this.#disposePromise = (async () => {
+        this.close();
+        const endpoint = await this.#endpoint;
+        await endpoint.dispose();
+      })();
+    }
+    return this.#disposePromise;
   }
 }
 
@@ -72,10 +96,10 @@ export function createWorkerHandler<Input, Output>(
   compute: (payload: Input, context: { signal: IWebRpcAbortSignal }) => Output | Promise<Output>,
   postMessage: (message: unknown) => void,
   options: { readonly timeoutMs?: number } = {}
-): ManagedRpcHandler {
+): IManagedRpcHandler {
   let deliver: (message: unknown) => void = () => undefined;
   const transport = {
-    platform: 'Worker' as const,
+    platform: WebRpcPlatform.worker,
     peerId: 'main' as const,
     send: (message: unknown) => {
       postMessage(message);

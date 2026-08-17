@@ -2,9 +2,9 @@ import { useCallback, useContext, useSyncExternalStore } from 'react';
 import type { IReadableAtom, IWritableAtom } from '@migaia/store-keyed/reactive/atom';
 import type { Resource } from '@migaia/resource';
 import type { IWritableAtomDefinition } from '@migaia/store-keyed/atom/definition';
-import { useResource } from './useStore';
-import { useNodeValue } from './useNode';
-import { StoreRegistryContext } from './provider-context';
+import { useResource } from './useStore.js';
+import { useNodeValue } from './useNode.js';
+import { StoreRegistryContext } from './provider-context.js';
 
 type IAsyncAtom<T> = {
   readonly resource: Resource<T>;

@@ -1,4 +1,6 @@
-import type { IWebRpcTransport } from '../transport';
+import { WebRpcTransportError } from '../errors.js';
+import type { IWebRpcTransport } from '../transport.js';
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js';
 
 export type IMemoryTransport = IWebRpcTransport & {
   /**
@@ -31,11 +33,11 @@ export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemory
     listenerErrors: Set<(error: unknown) => void>,
     remoteListenerErrors: Set<(error: unknown) => void>
   ): IMemoryTransport => ({
-    platform: 'Memory',
+    platform: WebRpcPlatform.memory,
     topology: 'exclusive',
-    ownership: 'borrowed',
+    ownership: WebRpcTransportOwnership.borrowed,
     send(message) {
-      if (closed) throw new Error('[rpc] memory transport is closed');
+      if (closed) throw new WebRpcTransportError('[rpc] memory transport is closed');
       queueMicrotask(() => {
         // Closed between send() and delivery — the other side is gone,
         // there is nobody left to deliver to.

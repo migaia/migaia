@@ -1,5 +1,5 @@
-import type { IEmptyPluginExt, ILoggerPluginCore, ILoggerPlugin } from '../typing';
-import { getLoggerRuntimeManager } from '../runtime-manager';
+import type { IEmptyPluginExt, ILoggerPluginCore, ILoggerPlugin } from '../typing.js';
+import { getLoggerRuntimeManager } from '../runtime-manager.js';
 
 export type IUuidPluginConfig = {
   /**

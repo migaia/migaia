@@ -1,5 +1,6 @@
-import type { IWebRpcSendOptions, IWebRpcTransport } from '../transport';
-import { safeRead } from '../internal/safe-value';
+import type { IWebRpcSendOptions, IWebRpcTransport } from '../transport.js';
+import { safeRead } from '../internal/safe-value.js';
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js';
 
 /** Outbound ServiceWorker or Client target. */
 export type IServiceWorkerMessageTarget = {
@@ -59,9 +60,9 @@ export function createServiceWorkerTransport(
     }
   };
   return {
-    platform: 'Worker',
+    platform: WebRpcPlatform.worker,
     topology: 'multiplexed',
-    ownership: 'borrowed',
+    ownership: WebRpcTransportOwnership.borrowed,
     peerId,
     sourceProof: (source) =>
       source === target || (peerId !== undefined && safeRead<unknown>(source, 'id') === peerId),

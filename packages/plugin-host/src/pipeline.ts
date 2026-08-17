@@ -1,25 +1,45 @@
+import { createPluginHostTypeError, tagPluginHostError } from './error-text.js';
+import { PluginHostErrorCode } from './error-code.js';
 import type {
   IPipelineMode,
   ISyncPipelineStage,
   IAsyncPipelineStage,
   IGeneratorPipelineStage
-} from './typing';
-import { GENERATOR_CONTINUE, GENERATOR_HALT, GENERATOR_UNDEFINED } from './typing';
+} from './typing.js';
+import { GENERATOR_CONTINUE, GENERATOR_HALT, GENERATOR_UNDEFINED } from './typing.js';
+import { PluginHostPipelineMode, type IPluginHostPipelineViolation } from './state-constants.js';
 
 export type IPipelineStage<TValue> =
   | ISyncPipelineStage<TValue>
   | IAsyncPipelineStage<TValue>
   | IGeneratorPipelineStage<TValue>;
-export type IPipelineViolationHandler = (kind: 'late' | 'duplicate') => void;
+export type IPipelineViolationHandler = (kind: IPluginHostPipelineViolation) => void;
 
 /** Adapt the public synchronous stage shape to the async pipeline contract. */
 export const adaptSyncStageToAsync =
-  <TValue>(stage: ISyncPipelineStage<TValue>): IAsyncPipelineStage<TValue> =>
+  <TValue>(
+    stage: ISyncPipelineStage<TValue>,
+    // 可选以兼容既有外部调用 `adaptSyncStageToAsync(stage)`（AF-30）；Host 内部仍显式传入 `#onPipelineViolation`。
+    onViolation: IPipelineViolationHandler = () => {}
+  ): IAsyncPipelineStage<TValue> =>
   async (value, next) => {
     let downstream: Promise<void> | undefined;
+    let called = false;
+    let returned = false;
     stage(value, (nextValue) => {
+      if (returned) {
+        onViolation('late');
+        return;
+      }
+      if (called) {
+        onViolation('duplicate');
+        return;
+      }
+      called = true;
       downstream = next(nextValue);
     });
+    returned = true;
+    // 只 await 第一次合法 next 的 downstream（AF-29）：重复/迟到 next 不覆盖它，第一次 rejection 仍被观测。
     await downstream;
   };
 
@@ -106,28 +126,33 @@ export const runAsyncPipeline = async <TValue>(
       return pending;
     };
     let stageError: unknown;
+    let hasStageError = false;
     try {
       await stage(current, next);
     } catch (error) {
       stageError = error;
+      hasStageError = true;
     }
     returned = true;
     let downstreamError: unknown;
+    let hasDownstreamError = false;
     if (pending) {
       try {
         await pending;
       } catch (error) {
         downstreamError = error;
+        hasDownstreamError = true;
       }
     }
     if (!completed) assertActive?.();
-    if (stageError !== undefined && downstreamError !== undefined)
-      throw new AggregateError(
-        [stageError, downstreamError],
-        'pipeline stage and downstream failed'
+    // 用布尔位判断「发生过错误」，而非以 `undefined` 作哨兵：`throw undefined` / `reject(undefined)` 必须可见（AF-24）。
+    if (hasStageError && hasDownstreamError)
+      throw tagPluginHostError(
+        new AggregateError([stageError, downstreamError], 'pipeline stage and downstream failed'),
+        PluginHostErrorCode.pipelineFailed
       );
-    if (stageError !== undefined) throw stageError;
-    if (downstreamError !== undefined) throw downstreamError;
+    if (hasStageError) throw stageError;
+    if (hasDownstreamError) throw downstreamError;
   };
   await step(value);
 };
@@ -165,14 +190,14 @@ export const runPipeline = <TValue>(
   onNextViolation: IPipelineViolationHandler,
   assertActive?: () => void
 ): void | Promise<void> => {
-  if (mode === 'sync')
+  if (mode === PluginHostPipelineMode.sync)
     return runSyncPipeline(
       stages as readonly ISyncPipelineStage<TValue>[],
       value,
       done,
       onNextViolation
     );
-  if (mode === 'async')
+  if (mode === PluginHostPipelineMode.async)
     return runAsyncPipeline(
       stages as readonly IAsyncPipelineStage<TValue>[],
       value,
@@ -188,7 +213,8 @@ export const registerStage = <TStage>(
   stage: TStage,
   track: (dispose: () => void) => void
 ): void => {
-  if (typeof stage !== 'function') throw new TypeError('pipeline stage must be a function');
+  if (typeof stage !== 'function')
+    throw createPluginHostTypeError('pipeline stage must be a function');
   stages.push(stage);
   const registrationIndex = stages.length - 1;
   track(() => {

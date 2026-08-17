@@ -1,4 +1,5 @@
-import { tupleKey } from './safe-value';
+import { tupleKey } from './safe-value.js';
+import { tagWebRpcError, WebRpcErrorCode } from '../errors.js';
 
 /** Owns verified source bindings and issues unique, non-cryptographic identifiers. */
 export class VerifiedPeerRegistry {
@@ -28,7 +29,10 @@ export class VerifiedPeerRegistry {
       maxBindingAgeMs < 1 ||
       maxBindingAgeMs > Number.MAX_SAFE_INTEGER / 100
     )
-      throw new TypeError('binding limits must be positive safe integers');
+      throw tagWebRpcError(
+        new TypeError('binding limits must be positive safe integers'),
+        WebRpcErrorCode.invalidConfig
+      );
     this.#maxBindings = maxBindings;
     this.#maxBindingsPerOrigin = maxBindingsPerOrigin;
     this.#maxBindingAgeMs = maxBindingAgeMs;

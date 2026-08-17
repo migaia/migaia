@@ -1,28 +1,26 @@
-import { base64ToBytes, bytesToBase64 } from '../utils/base64';
-import type { IBackendKind } from '../types/capabilities';
-import type { IKeyRange, IStorageKey } from '../types/context';
-import { StorageError, StorageErrorCode } from '../types/errors';
-import { intrinsicConstructorName } from './brand';
+import { base64ToBytes, bytesToBase64 } from '../utils/base64.js';
+import {
+  KEY_DOMAIN_LIMITS,
+  StorageContractError,
+  StorageContractErrorCode,
+  assertStorageKey,
+  compareStorageKeys,
+  type IBackendKind,
+  type IKeyRange,
+  type IStorageKey
+} from '@migaia/storage-contract';
+import { intrinsicConstructorName } from './brand.js';
+import { isStorageErrorFamily } from './error-family.js';
+import { StorageBackend } from '../constants.js';
 
-/** Hard limits protect flat-key decoding from pathological persisted input. */
-export const KEY_DOMAIN_LIMITS = Object.freeze({
-  maxDepth: 32,
-  maxNodes: 4096,
-  maxBinaryBytes: 1024 * 1024
-} as const);
-
-/** Validate keys for L0, bytes, and metadata channels whose contract is string-only. */
-export function assertStringStorageKey(
-  value: unknown,
-  backend: IBackendKind,
-  label = 'key'
-): asserts value is string {
-  if (typeof value !== 'string')
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      backend,
-      cause: new TypeError(`${label} must be a string`)
-    });
-}
+// key 域纯校验（`KEY_DOMAIN_LIMITS`/`assertStorageKey`/`assertStringStorageKey`/`compareStorageKeys`）
+// 已迁往 `@migaia/storage-contract`；re-export 保持既有 import 路径不变。
+export {
+  KEY_DOMAIN_LIMITS,
+  assertStorageKey,
+  assertStringStorageKey,
+  compareStorageKeys
+} from '@migaia/storage-contract';
 
 const dateValue = (value: unknown): number | undefined => {
   if (intrinsicConstructorName(value) !== 'Date') return undefined;
@@ -53,36 +51,6 @@ const bufferValue = (value: unknown): ArrayBuffer | undefined => {
   }
 };
 
-/** Validate the IndexedDB-compatible key domain without relying on realm-local instanceof. */
-export function assertStorageKey(
-  value: unknown,
-  backend: IBackendKind,
-  label = 'key'
-): asserts value is IStorageKey {
-  let nodes = 0;
-  const visit = (candidate: unknown, depth: number, seen: Set<unknown>): boolean => {
-    nodes += 1;
-    if (nodes > KEY_DOMAIN_LIMITS.maxNodes || depth > KEY_DOMAIN_LIMITS.maxDepth) return false;
-    if (typeof candidate === 'string') return true;
-    if (typeof candidate === 'number') return Number.isFinite(candidate);
-    const date = dateValue(candidate);
-    if (date !== undefined) return !Number.isNaN(date);
-    const buffer = bufferValue(candidate);
-    if (buffer !== undefined) return buffer.byteLength <= KEY_DOMAIN_LIMITS.maxBinaryBytes;
-    if (!Array.isArray(candidate) || candidate.length === 0 || seen.has(candidate)) return false;
-    seen.add(candidate);
-    const valid = candidate.every((item) => visit(item, depth + 1, seen));
-    seen.delete(candidate);
-    return valid;
-  };
-  if (!visit(value, 0, new Set()))
-    throw new StorageError(StorageErrorCode.invalidKey, {
-      backend,
-      key: value as IStorageKey,
-      cause: new TypeError(`invalid ${label}`)
-    });
-}
-
 const toWire = (value: IStorageKey): unknown => {
   if (typeof value === 'string') return ['s', value];
   if (typeof value === 'number') return ['n', value];
@@ -100,7 +68,7 @@ export const encodeFlatStorageKey = (value: IStorageKey): string =>
 /** Decode a flat key with bounded iterative recursion and final domain validation. */
 export const decodeFlatStorageKey = (
   encoded: string,
-  backend: IBackendKind = 'memory'
+  backend: IBackendKind = StorageBackend.memory
 ): IStorageKey | undefined => {
   try {
     if (!encoded.startsWith('k:')) return undefined;
@@ -129,47 +97,13 @@ export const decodeFlatStorageKey = (
     const result = decode(root, 0);
     assertStorageKey(result, backend);
     return result;
-  } catch {
+  } catch (error) {
+    // 线材畸形（JSON 解析失败 / 形状非法）→ undefined，由调用方把损坏记录过滤掉。
+    // 但「线材合法、域校验失败」的 `assertStorageKey` → StorageContractError(invalidKey) 必须冒泡，
+    // 不得被静默吞掉（SW-A11「解码结果走同一 validator」，违规键必须可观测而非隐形孤儿记录）。
+    if (error instanceof StorageContractError) throw error;
     return undefined;
   }
-};
-
-/** Compare keys using the same cross-realm classification as validation and encoding. */
-export const compareStorageKeys = (a: IStorageKey, b: IStorageKey): number => {
-  const rank = (value: IStorageKey): number => {
-    if (typeof value === 'number') return 0;
-    if (dateValue(value) !== undefined) return 1;
-    if (typeof value === 'string') return 2;
-    if (bufferValue(value) !== undefined) return 3;
-    return 4;
-  };
-  const rankA = rank(a);
-  const rankB = rank(b);
-  if (rankA !== rankB) return rankA - rankB;
-  if (typeof a === 'number' && typeof b === 'number') return a - b;
-  const dateA = dateValue(a);
-  const dateB = dateValue(b);
-  if (dateA !== undefined && dateB !== undefined) return dateA - dateB;
-  if (typeof a === 'string' && typeof b === 'string') return a < b ? -1 : a > b ? 1 : 0;
-  const bytesA = bufferValue(a);
-  const bytesB = bufferValue(b);
-  if (bytesA !== undefined && bytesB !== undefined) {
-    const viewA = new Uint8Array(bytesA);
-    const viewB = new Uint8Array(bytesB);
-    const length = Math.min(viewA.length, viewB.length);
-    for (let index = 0; index < length; index += 1) {
-      if (viewA[index] !== viewB[index]) return viewA[index]! - viewB[index]!;
-    }
-    return viewA.length - viewB.length;
-  }
-  const arrayA = a as readonly IStorageKey[];
-  const arrayB = b as readonly IStorageKey[];
-  const length = Math.min(arrayA.length, arrayB.length);
-  for (let index = 0; index < length; index += 1) {
-    const comparison = compareStorageKeys(arrayA[index]!, arrayB[index]!);
-    if (comparison !== 0) return comparison;
-  }
-  return arrayA.length - arrayB.length;
 };
 
 /** Read and validate a range once so getter-backed inputs cannot change after validation. */
@@ -179,7 +113,7 @@ export const snapshotKeyRange = (
 ): IKeyRange | undefined => {
   if (range === undefined) return;
   if (typeof range !== 'object' || range === null || Array.isArray(range))
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
       backend,
       cause: new TypeError('key range must be an object')
     });
@@ -192,13 +126,13 @@ export const snapshotKeyRange = (
       upperOpen: range.upperOpen
     };
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, { backend, cause });
+    throw new StorageContractError(StorageContractErrorCode.invalidArgument, { backend, cause });
   }
   if (
     (snapshot.lowerOpen !== undefined && typeof snapshot.lowerOpen !== 'boolean') ||
     (snapshot.upperOpen !== undefined && typeof snapshot.upperOpen !== 'boolean')
   )
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
       backend,
       cause: new TypeError('key range open flags must be boolean')
     });
@@ -217,8 +151,8 @@ export const snapshotKeyRange = (
       assertStorageKey(cloned, backend, label);
       return cloned;
     } catch (cause) {
-      if (cause instanceof StorageError) throw cause;
-      throw new StorageError(StorageErrorCode.invalidKey, {
+      if (isStorageErrorFamily(cause)) throw cause;
+      throw new StorageContractError(StorageContractErrorCode.invalidKey, {
         backend,
         key: value,
         cause: new TypeError(`invalid ${label}`, { cause })
@@ -235,7 +169,7 @@ export const snapshotKeyRange = (
   if (normalized.lower !== undefined && normalized.upper !== undefined) {
     const comparison = compareStorageKeys(normalized.lower, normalized.upper);
     if (comparison > 0 || (comparison === 0 && (normalized.lowerOpen || normalized.upperOpen)))
-      throw new StorageError(StorageErrorCode.invalidArgument, {
+      throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
         backend,
         cause: new RangeError('invalid key range')
       });

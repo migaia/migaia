@@ -1,5 +1,6 @@
 import {
   Effect,
+  ReactiveErrorPhase,
   Signal,
   type IComputedValue,
   type IDisposer,
@@ -7,10 +8,16 @@ import {
   type IRuntime,
   type ISignal
 } from '@migaia/reactive';
-import { internalsOf } from '@migaia/reactive/runtime/internals';
-import { internalRuntimeOf } from '@migaia/reactive/runtime/node-factories';
-import { claimOwnership } from '@migaia/reactive/runtime/ownership';
-import { LifecycleScopeImpl } from '@migaia/reactive/runtime/lifecycle-primitives';
+import { internalsOf } from '@migaia/reactive/internals';
+import { internalRuntimeOf } from '@migaia/reactive/node-factories';
+import { claimOwnership } from '@migaia/reactive/ownership';
+import { createSyncLifecycleScope, type ISyncLifecycleScope } from '@migaia/lifecycle';
+import {
+  createStoreKeyedAggregateError,
+  createStoreKeyedError,
+  createStoreKeyedTypeError,
+  StoreKeyedErrorCode
+} from '../errors.js';
 import {
   assertNotThenable,
   isAtomDefinition,
@@ -23,7 +30,8 @@ import {
   type IPrimitiveFactoryDefinition,
   type IWritableAtomDefinition,
   type IWritableDerivedDefinition
-} from './definition';
+} from './definition.js';
+import { AtomKind } from './kind-constants.js';
 
 /**
  * 实例化层：把纯定义落到某个 Runtime 上。
@@ -151,7 +159,9 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
   const instances = new Map<IAtomDefinition<unknown>, IInstance<unknown>>();
   // Instance ownership is orthogonal to atom routing: releasing a definition
   // removes only that instance, while store disposal drains the scope in LIFO.
-  const instanceScope = new LifecycleScopeImpl();
+  // Every owned instance wraps a pure reactive node (Signal/Computed) — never wasm/I/O — so this
+  // can stay the synchronous scope (D-6) and `IAtomStore.dispose()` keeps its sync contract.
+  const instanceScope: ISyncLifecycleScope = createSyncLifecycleScope();
   const nodeRuntime = internalRuntimeOf(runtime);
   const overrides = new Map<IAtomDefinition<unknown>, IOverrideLayer[]>();
   const subscriptions = new Set<IDisposer>();
@@ -181,14 +191,21 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
   let previewing = false;
 
   const assertUsable = (): void => {
-    if (disposed) throw new Error('[store] cannot use a disposed atom store');
+    if (disposed)
+      throw createStoreKeyedError(
+        StoreKeyedErrorCode.atomStoreDisposed,
+        '[store] cannot use a disposed atom store'
+      );
   };
 
   const assertDefinition: (
     definition: unknown
   ) => asserts definition is IAtomDefinition<unknown> = (definition) => {
     if (!isAtomDefinition(definition)) {
-      throw new TypeError('[store] not an atom definition');
+      throw createStoreKeyedTypeError(
+        StoreKeyedErrorCode.invalidOption,
+        '[store] not an atom definition'
+      );
     }
   };
 
@@ -199,18 +216,22 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     // 只读定义本身没有公开 write 契约，因此可以把读路由到任意同值定义。
     // 反方向不成立：可写定义一旦指向只读目标，类型仍承诺 set() 可用；更糟的是
     // 还可经该只读目标继续路由到参数不同的 writable-derived，绕过直接配对校验。
-    if (definition.kind === 'derived') return;
+    if (definition.kind === AtomKind.derived) return;
     const definitionIsPrimitive =
-      definition.kind === 'primitive' || definition.kind === 'primitive-factory';
+      definition.kind === AtomKind.primitive || definition.kind === AtomKind.primitiveFactory;
     const replacementIsPrimitive =
-      replacement.kind === 'primitive' || replacement.kind === 'primitive-factory';
+      replacement.kind === AtomKind.primitive || replacement.kind === AtomKind.primitiveFactory;
     if (
       (definitionIsPrimitive && replacementIsPrimitive) ||
-      (definition.kind === 'writable-derived' && replacement.kind === 'writable-derived')
+      (definition.kind === AtomKind.writableDerived &&
+        replacement.kind === AtomKind.writableDerived)
     ) {
       return;
     }
-    throw new TypeError('[store] atom override must preserve the original write contract');
+    throw createStoreKeyedTypeError(
+      StoreKeyedErrorCode.overrideContract,
+      '[store] atom override must preserve the original write contract'
+    );
   };
 
   /** 按 override 栈递归解析；循环在入口暴露为可读错误，而不是递归爆栈。 */
@@ -220,7 +241,10 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     let current = definition as IAtomDefinition<unknown>;
     while (true) {
       if (seen.has(current)) {
-        throw new Error('[store] cyclic atom override');
+        throw createStoreKeyedError(
+          StoreKeyedErrorCode.cyclicOverride,
+          '[store] cyclic atom override'
+        );
       }
       seen.add(current);
       const layers = overrides.get(current);
@@ -246,7 +270,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
           observable.onUnobserved?.();
         } catch (error) {
           runtime.reportError(error, {
-            phase: 'lifecycle-hook',
+            phase: ReactiveErrorPhase.lifecycleHook,
             observable
           });
         }
@@ -260,10 +284,10 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
   };
 
   const build = <T>(definition: IAtomDefinition<T>): IInstance<T> => {
-    if (definition.kind === 'primitive' || definition.kind === 'primitive-factory') {
+    if (definition.kind === AtomKind.primitive || definition.kind === AtomKind.primitiveFactory) {
       const preview = previews.get(definition as IAtomDefinition<unknown>);
       let initial: T;
-      if (definition.kind === 'primitive') {
+      if (definition.kind === AtomKind.primitive) {
         initial = cloneInitial(definition.init);
       } else if (preview?.version === runtime.currentVersion()) {
         previews.delete(definition as IAtomDefinition<unknown>);
@@ -316,16 +340,22 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     const cached = previews.get(key);
     if (cached?.version === version) return cached.value as T;
     if (previewStack.has(key)) {
-      throw new Error('[store] circular atom preview detected');
+      throw createStoreKeyedError(
+        StoreKeyedErrorCode.circularPreview,
+        '[store] circular atom preview detected'
+      );
     }
     previewStack.add(key);
     try {
       let value: T;
-      if (target.kind === 'primitive') {
+      if (target.kind === AtomKind.primitive) {
         value = cloneInitial(target.init);
-      } else if (target.kind === 'primitive-factory') {
+      } else if (target.kind === AtomKind.primitiveFactory) {
         if (!target.previewSafe) {
-          throw new Error('[store] atom factory is not marked preview-safe');
+          throw createStoreKeyedError(
+            StoreKeyedErrorCode.previewUnsafe,
+            '[store] atom factory is not marked preview-safe'
+          );
         }
         // A React snapshot can be abandoned before subscription commit. Do
         // not materialize a Signal in that speculative path: doing so would
@@ -339,7 +369,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
       }
       if (
         cached &&
-        (target.kind === 'derived' || target.kind === 'writable-derived') &&
+        (target.kind === AtomKind.derived || target.kind === AtomKind.writableDerived) &&
         target.equals?.(value, cached.value as T)
       ) {
         value = cached.value as T;
@@ -383,7 +413,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     if (existing) return existing as IInstance<T>;
     const created = build(target);
     instances.set(key, created as IInstance<unknown>);
-    instanceScope.own(created);
+    instanceScope.own(created, { syncSafe: true, force: () => created.dispose() });
     return created;
   };
 
@@ -396,7 +426,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     const target = resolve(definition);
     return runtime.batch(() => {
       return runtime.untracked(() => {
-        if (target.kind === 'primitive' || target.kind === 'primitive-factory') {
+        if (target.kind === AtomKind.primitive || target.kind === AtomKind.primitiveFactory) {
           const node = instanceOf(target).node as Signal<unknown>;
           const [update] = args as unknown as [IAtomUpdate<unknown>];
           node.value =
@@ -405,8 +435,11 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
               : update;
           return undefined as Result;
         }
-        if (target.kind === 'derived') {
-          throw new TypeError('[store] atom override resolved to a read-only definition');
+        if (target.kind === AtomKind.derived) {
+          throw createStoreKeyedTypeError(
+            StoreKeyedErrorCode.overrideContract,
+            '[store] atom override resolved to a read-only definition'
+          );
         }
         const writable = target as IWritableDerivedDefinition<T, Args, Result>;
         return writable.write(store.get as IAtomGet, store.set as IAtomSet, ...args);
@@ -462,7 +495,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
           runtime.untracked(onChange);
         } catch (error) {
           runtime.reportError(error, {
-            phase: 'subscription-listener'
+            phase: ReactiveErrorPhase.subscriptionListener
           });
         }
       }, runtime);
@@ -563,7 +596,11 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
       }
       if (errors.length === 1) throw errors[0];
       if (errors.length > 1) {
-        throw new AggregateError(errors, '[store] atom store disposal failed');
+        throw createStoreKeyedAggregateError(
+          StoreKeyedErrorCode.disposalFailed,
+          errors,
+          '[store] atom store disposal failed'
+        );
       }
     }
   };

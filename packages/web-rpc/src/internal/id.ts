@@ -1,5 +1,5 @@
-import { WebRpcError, WebRpcErrorCode } from '../errors';
-import type { IWebRpcUuidConfig, IWebRpcUuidContext } from '../typing';
+import { WebRpcError, WebRpcErrorCode } from '../errors.js';
+import type { IWebRpcUuidConfig, IWebRpcUuidContext } from '../typing.js';
 
 /** Allocates collision-checked wire identifiers for one endpoint. */
 export function allocateRpcId(

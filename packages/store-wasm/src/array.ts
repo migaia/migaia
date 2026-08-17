@@ -1,8 +1,10 @@
 import type { IDisposable } from '@migaia/reactive';
 import type { IFieldSource } from '@migaia/store-light';
-import { allocateOwnedSync } from './arena';
-import type { number as numberBuilder } from './number';
-import { FIELD_BUILDER, type FieldBuilder, type FieldContext } from './field';
+import { allocateOwnedSync } from './arena.js';
+import { createStoreWasmError, createStoreWasmRangeError, StoreWasmErrorCode } from './errors.js';
+import type { number as numberBuilder } from './number.js';
+import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.js';
+import { WasmFieldMode } from './field-constants.js';
 
 const DEFAULT_GRANULARITY = 64;
 const MAX_FLOAT64_LENGTH = Math.floor(0xffff_ffff / Float64Array.BYTES_PER_ELEMENT);
@@ -21,25 +23,35 @@ export function array(
   _item: ReturnType<typeof numberBuilder>,
   length: number,
   granularity: number = DEFAULT_GRANULARITY
-): FieldBuilder<IWasmArrayField> {
+): IFieldBuilder<IWasmArrayField> {
   if (!Number.isSafeInteger(length) || length < 0 || length > MAX_FLOAT64_LENGTH) {
-    throw new RangeError('wasm.array: length exceeds the Wasm32 allocation limit');
+    throw createStoreWasmRangeError(
+      StoreWasmErrorCode.invalidOption,
+      'wasm.array: length exceeds the Wasm32 allocation limit'
+    );
   }
   if (!Number.isSafeInteger(granularity) || granularity <= 0) {
-    throw new RangeError('wasm.array: granularity must be a positive safe integer');
+    throw createStoreWasmRangeError(
+      StoreWasmErrorCode.invalidOption,
+      'wasm.array: granularity must be a positive safe integer'
+    );
   }
   return {
     [FIELD_BUILDER]: true,
-    mode: 'sync',
-    create({ signal, createSource, runtime }: FieldContext): IWasmArrayField {
+    mode: WasmFieldMode.sync,
+    create({ signal, createSource, runtime }: IFieldContext): IWasmArrayField {
       const block = allocateOwnedSync(length * 8);
       const { memory, ptr } = block;
       const buckets: Array<IFieldSource | undefined> = [];
       try {
-        if (signal.aborted) throw new Error('[store] field init aborted');
+        if (signal.aborted)
+          throw createStoreWasmError(StoreWasmErrorCode.initAborted, '[store] field init aborted');
         // Float64Array(buffer, ptr, len) 要求 ptr % 8 === 0，否则抛 RangeError。显式校验，别依赖 allocator 巧合。
         if (length > 0 && ptr % 8 !== 0) {
-          throw new Error(`wasm.array: allocation not 8-byte aligned (ptr=${ptr})`);
+          throw createStoreWasmError(
+            StoreWasmErrorCode.allocationFailed,
+            `wasm.array: allocation not 8-byte aligned (ptr=${ptr})`
+          );
         }
         // A zero-length view has no elements and must not depend on the
         // allocator's alignment for a zero-byte block. Some Wasm allocators
@@ -49,7 +61,11 @@ export function array(
         raw(); // 立即构造一次以在 try 内暴露对齐/长度错误，触发 dealloc 而非泄漏
         let disposed = false;
         const checkAlive = () => {
-          if (disposed) throw new Error('[store] cannot use a disposed wasm field');
+          if (disposed)
+            throw createStoreWasmError(
+              StoreWasmErrorCode.fieldDisposed,
+              '[store] cannot use a disposed wasm field'
+            );
         };
 
         const bucketOf = (i: number): IFieldSource => {
@@ -62,7 +78,10 @@ export function array(
         };
         const checkIndex = (i: number) => {
           if (!Number.isSafeInteger(i) || i < 0 || i >= length) {
-            throw new RangeError(`wasm.array: index out of bounds (${i})`);
+            throw createStoreWasmRangeError(
+              StoreWasmErrorCode.invalidOption,
+              `wasm.array: index out of bounds (${i})`
+            );
           }
         };
 
@@ -92,10 +111,16 @@ export function array(
               hi < lo ||
               hi > length
             ) {
-              throw new RangeError(`wasm.array: invalid range [${lo}, ${hi})`);
+              throw createStoreWasmRangeError(
+                StoreWasmErrorCode.invalidOption,
+                `wasm.array: invalid range [${lo}, ${hi})`
+              );
             }
             if (values.length !== hi - lo) {
-              throw new RangeError('wasm.array: values length must match the target range');
+              throw createStoreWasmRangeError(
+                StoreWasmErrorCode.invalidOption,
+                'wasm.array: values length must match the target range'
+              );
             }
             const memoryView = raw();
             const touched = new Map<IFieldSource, Array<[number, number]>>();
@@ -110,7 +135,10 @@ export function array(
             runtime.batch(() => {
               for (const [bucket, writes] of touched) {
                 bucket.commit(() => {
-                  for (const [index, next] of writes) memoryView[index] = next;
+                  // A re-entrant commit may grow memory and replace the backing
+                  // ArrayBuffer. Resolve the view after entering each commit.
+                  const currentView = raw();
+                  for (const [index, next] of writes) currentView[index] = next;
                 });
               }
             });
@@ -128,8 +156,9 @@ export function array(
             if (disposed) return;
             disposed = true;
             block.unregister(field);
-            block.dispose();
+            // 逆序释放（migration.sdd.md §5.7）：子资源依赖 block 的 WASM 内存，必须先摘子资源边再 dealloc。
             for (const bucket of buckets) bucket?.dispose();
+            block.dispose();
           }
         };
         block.register(field);

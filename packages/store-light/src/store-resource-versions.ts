@@ -1,13 +1,13 @@
-import type { ResourceVersion } from './store-resource-state';
+import type { IResourceVersion } from './store-resource-state.js';
 
 /** Owns all non-visible versions until they are adopted or released. */
 export class ResourceVersionRegistry<T> {
-  #stale: ResourceVersion<T> | undefined;
-  #retired = new Map<number, ResourceVersion<T>>();
+  #stale: IResourceVersion<T> | undefined;
+  #retired = new Map<number, IResourceVersion<T>>();
   #superseded: T[] = [];
-  #closing = new Map<number, ResourceVersion<T>>();
+  #closing = new Map<number, IResourceVersion<T>>();
 
-  get stale(): ResourceVersion<T> | undefined {
+  get stale(): IResourceVersion<T> | undefined {
     return this.#stale;
   }
   /** True while non-visible values still need final ownership resolution. */
@@ -19,16 +19,16 @@ export class ResourceVersionRegistry<T> {
       this.#closing.size > 0
     );
   }
-  setStale(version: ResourceVersion<T>): void {
+  setStale(version: IResourceVersion<T>): void {
     this.#stale = version;
   }
-  takeStale(): ResourceVersion<T> | undefined {
+  takeStale(): IResourceVersion<T> | undefined {
     const stale = this.#stale;
     this.#stale = undefined;
     return stale;
   }
 
-  retire(version: ResourceVersion<T>): void {
+  retire(version: IResourceVersion<T>): void {
     this.#retired.set(version.id, version);
   }
   hasRetired(id: number): boolean {
@@ -37,7 +37,7 @@ export class ResourceVersionRegistry<T> {
   retiredIds(): Iterable<number> {
     return this.#retired.keys();
   }
-  takeRetired(id: number): ResourceVersion<T> | undefined {
+  takeRetired(id: number): IResourceVersion<T> | undefined {
     const version = this.#retired.get(id);
     this.#retired.delete(id);
     return version;
@@ -55,10 +55,10 @@ export class ResourceVersionRegistry<T> {
     return values;
   }
 
-  beginClosing(values: ResourceVersion<T>[]): void {
+  beginClosing(values: IResourceVersion<T>[]): void {
     for (const value of values) this.#closing.set(value.id, value);
   }
-  takeClosing(id: number): ResourceVersion<T> | undefined {
+  takeClosing(id: number): IResourceVersion<T> | undefined {
     const value = this.#closing.get(id);
     this.#closing.delete(id);
     return value;
@@ -93,7 +93,7 @@ export class ResourceVersionRegistry<T> {
     return values;
   }
 
-  moveToClosing(): { versions: ResourceVersion<T>[]; superseded: T[] } {
+  moveToClosing(): { versions: IResourceVersion<T>[]; superseded: T[] } {
     const values = [
       ...this.#closing.values(),
       ...this.#retired.values(),

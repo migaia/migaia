@@ -1,4 +1,5 @@
-import type { IObserver } from '../runtime/types';
+import type { IObserver } from '../runtime/types.js';
+import { forwardCollectionCallback } from './receiver.js';
 
 const sets = new WeakMap<object, Set<IObserver>>();
 const depSets = new WeakMap<object, Set<object>>();
@@ -30,7 +31,13 @@ class ReadonlySetView<T> implements ReadonlySet<T> {
     return setSourceOf<T>(this).values();
   }
   forEach(callbackfn: (value: T, value2: T, set: ReadonlySet<T>) => void, thisArg?: unknown): void {
-    setSourceOf<T>(this).forEach((value) => callbackfn.call(thisArg, value, value, this));
+    setSourceOf<T>(this).forEach((value, value2) =>
+      forwardCollectionCallback(callbackfn as (...args: unknown[]) => void, thisArg, [
+        value,
+        value2,
+        this
+      ])
+    );
   }
   [Symbol.iterator](): SetIterator<T> {
     return setSourceOf<T>(this)[Symbol.iterator]();
@@ -61,7 +68,13 @@ class ReadonlyMapView<K, V> implements ReadonlyMap<K, V> {
     return mapSourceOf<K, V>(this).values();
   }
   forEach(callbackfn: (value: V, key: K, map: ReadonlyMap<K, V>) => void, thisArg?: unknown): void {
-    mapSourceOf<K, V>(this).forEach((value, key) => callbackfn.call(thisArg, value, key, this));
+    mapSourceOf<K, V>(this).forEach((value, key) =>
+      forwardCollectionCallback(callbackfn as (...args: unknown[]) => void, thisArg, [
+        value,
+        key,
+        this
+      ])
+    );
   }
   [Symbol.iterator](): MapIterator<[K, V]> {
     return mapSourceOf<K, V>(this)[Symbol.iterator]();

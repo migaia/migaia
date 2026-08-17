@@ -1,10 +1,20 @@
-import { createRuntime, type IDisposable, type IDisposer, type IRuntime } from '@migaia/reactive';
-import { claimOwnership, ownerOf } from '@migaia/reactive/runtime/ownership';
 import {
-  TerminalControllerImpl,
-  type LifecycleState
-} from '@migaia/reactive/runtime/lifecycle-primitives';
+  createRuntime,
+  ReactiveErrorPhase,
+  type IDisposable,
+  type IDisposer,
+  type IRuntime
+} from '@migaia/reactive';
+import { claimOwnership, ownerOf } from '@migaia/reactive/ownership';
+import {
+  createTerminalController,
+  type ITerminalController,
+  type ILifecycleState
+} from '@migaia/lifecycle';
+import { LifecycleState } from '@migaia/lifecycle';
 import { createAtomStore, type IAtomStore } from '@migaia/store-keyed/atom/store';
+import { createStoreReactAggregateError, createStoreReactError } from './errors.js';
+import { StoreReactErrorCode } from './error-code.js';
 
 const STORE_TOKEN_VALUE = Symbol('store-token-value');
 
@@ -19,7 +29,7 @@ const STORE_TOKEN_VALUE = Symbol('store-token-value');
  */
 const ABANDONED_RENDER_FALLBACK_MS = 4000;
 
-export type StoreToken<T> = Readonly<{
+export type IStoreToken<T> = Readonly<{
   key: symbol;
   debugName: string;
   readonly [STORE_TOKEN_VALUE]?: (value: T) => T;
@@ -34,9 +44,12 @@ type IRegistryEntry = {
   readonly owned: boolean;
 };
 
-export function createStoreToken<T>(debugName: string): StoreToken<T> {
+export function createStoreToken<T>(debugName: string): IStoreToken<T> {
   if (debugName.length === 0) {
-    throw new Error('[store] StoreToken requires a debug name');
+    throw createStoreReactError(
+      StoreReactErrorCode.invalidConfig,
+      '[store] IStoreToken requires a debug name'
+    );
   }
   return Object.freeze({
     key: Symbol(debugName),
@@ -54,7 +67,7 @@ export class StoreRegistry implements IDisposable {
   #retainCount = 0;
   #lifecycleGeneration = 0;
   #renderCommitted = false;
-  #terminal = new TerminalControllerImpl();
+  #terminal: ITerminalController = createTerminalController();
   // Disposers invoked from the synchronous dispose() path whose return value
   // turned out to be a thenable. dispose() can't await them (it's sync),
   // but a later disposeAsync() call must — and a rejection must never
@@ -68,8 +81,8 @@ export class StoreRegistry implements IDisposable {
     claimOwnership(this, runtime);
   }
 
-  /** Part of the project's unified AsyncLifecycle shape (see lifecycle-primitives.ts). */
-  get lifecycle(): LifecycleState {
+  /** Part of the project's unified lifecycle shape (see `@migaia/lifecycle`'s `ILifecycleState`). */
+  get lifecycle(): ILifecycleState {
     return this.#terminal.lifecycle;
   }
 
@@ -85,11 +98,14 @@ export class StoreRegistry implements IDisposable {
     return this.#disposed;
   }
 
-  register<T>(token: StoreToken<T>, value: T, options: IStoreRegistrationOptions = {}): IDisposer {
+  register<T>(token: IStoreToken<T>, value: T, options: IStoreRegistrationOptions = {}): IDisposer {
     this.#assertActive();
     this.#assertRuntime(token, value);
     if (this.#entries.has(token.key)) {
-      throw new Error(`[store] duplicate provider store token: ${token.debugName}`);
+      throw createStoreReactError(
+        StoreReactErrorCode.storeDuplicate,
+        `[store] duplicate provider store token: ${token.debugName}`
+      );
     }
     const entry: IRegistryEntry = {
       value,
@@ -104,7 +120,7 @@ export class StoreRegistry implements IDisposable {
     };
   }
 
-  replace<T>(token: StoreToken<T>, value: T, options: IStoreRegistrationOptions = {}): void {
+  replace<T>(token: IStoreToken<T>, value: T, options: IStoreRegistrationOptions = {}): void {
     this.#assertActive();
     this.#assertRuntime(token, value);
     const previous = this.#entries.get(token.key);
@@ -117,26 +133,29 @@ export class StoreRegistry implements IDisposable {
     }
   }
 
-  get<T>(token: StoreToken<T>): T | undefined {
+  get<T>(token: IStoreToken<T>): T | undefined {
     this.#assertActive();
     return this.#entries.get(token.key)?.value as T | undefined;
   }
 
-  require<T>(token: StoreToken<T>): T {
+  require<T>(token: IStoreToken<T>): T {
     this.#assertActive();
     const entry = this.#entries.get(token.key);
     if (!entry) {
-      throw new Error(`[store] missing provider store: ${token.debugName}`);
+      throw createStoreReactError(
+        StoreReactErrorCode.storeMissing,
+        `[store] missing provider store: ${token.debugName}`
+      );
     }
     return entry.value as T;
   }
 
-  has<T>(token: StoreToken<T>): boolean {
+  has<T>(token: IStoreToken<T>): boolean {
     this.#assertActive();
     return this.#entries.has(token.key);
   }
 
-  remove<T>(token: StoreToken<T>, disposeOwned = true): boolean {
+  remove<T>(token: IStoreToken<T>, disposeOwned = true): boolean {
     this.#assertActive();
     const entry = this.#entries.get(token.key);
     if (!entry) return false;
@@ -149,7 +168,7 @@ export class StoreRegistry implements IDisposable {
    * React StrictMode probes effect cleanup/setup. Delayed release avoids disposing an
    * internally-owned registry between those two phases.
    */
-  retain(disposeOnRelease: boolean, deferTask = false): IDisposer {
+  retain(disposeOnRelease: boolean, _deferTask = false): IDisposer {
     this.#assertActive();
     this.#renderCommitted = true;
     this.#retainCount++;
@@ -174,13 +193,14 @@ export class StoreRegistry implements IDisposable {
             this.dispose();
           } catch (error) {
             this.runtime.reportError(error, {
-              phase: 'lifecycle-hook'
+              phase: ReactiveErrorPhase.lifecycleHook
             });
           }
         }
       };
-      if (deferTask) setTimeout(dispose, 0);
-      else queueMicrotask(dispose);
+      // React StrictMode may replay passive effects across a microtask boundary;
+      // always yield to a task before reclaiming the zero-owner registry.
+      setTimeout(dispose, 0);
     };
   }
 
@@ -218,7 +238,7 @@ export class StoreRegistry implements IDisposable {
         try {
           this.dispose();
         } catch (error) {
-          this.runtime.reportError(error, { phase: 'lifecycle-hook' });
+          this.runtime.reportError(error, { phase: ReactiveErrorPhase.lifecycleHook });
         }
       }
     };
@@ -262,10 +282,14 @@ export class StoreRegistry implements IDisposable {
     } catch (error) {
       errors.push(error);
     }
-    if (this.#pendingSyncDisposals.size === 0) this.#terminal.forceDispose();
+    if (this.#pendingSyncDisposals.size === 0) this.#terminal.forceTerminal();
     if (errors.length === 1) throw errors[0];
     if (errors.length > 1) {
-      throw new AggregateError(errors, '[store] provider registry disposal failed');
+      throw createStoreReactAggregateError(
+        StoreReactErrorCode.registryDisposalFailed,
+        errors,
+        '[store] provider registry disposal failed'
+      );
     }
   }
 
@@ -277,7 +301,7 @@ export class StoreRegistry implements IDisposable {
    */
   disposeAsync(): Promise<void> {
     if (this.#disposingAsync) return this.#disposingAsync;
-    if (this.#terminal.lifecycle === 'terminal') return Promise.resolve();
+    if (this.#terminal.lifecycle === LifecycleState.terminal) return Promise.resolve();
     this.#disposingAsync = this.#performDisposeAsync();
     return this.#disposingAsync;
   }
@@ -305,10 +329,14 @@ export class StoreRegistry implements IDisposable {
       } catch (error) {
         errors.push(error);
       }
-      this.#terminal.forceDispose();
+      this.#terminal.forceTerminal();
       if (errors.length === 1) throw errors[0];
       if (errors.length > 1) {
-        throw new AggregateError(errors, '[store] provider registry disposal failed');
+        throw createStoreReactAggregateError(
+          StoreReactErrorCode.registryDisposalFailed,
+          errors,
+          '[store] provider registry disposal failed'
+        );
       }
       return;
     }
@@ -333,14 +361,14 @@ export class StoreRegistry implements IDisposable {
     const tracked: Promise<void> = thenable.then(
       () => undefined,
       (error: unknown) => {
-        this.runtime.reportError(error, { phase: 'lifecycle-hook' });
+        this.runtime.reportError(error, { phase: ReactiveErrorPhase.lifecycleHook });
       }
     );
     this.#pendingSyncDisposals.add(tracked);
     void tracked.finally(() => {
       this.#pendingSyncDisposals.delete(tracked);
       if (this.#disposed && this.#pendingSyncDisposals.size === 0) {
-        this.#terminal.forceDispose();
+        this.#terminal.forceTerminal();
       }
     });
   }
@@ -355,20 +383,26 @@ export class StoreRegistry implements IDisposable {
     const thenable = asPromiseLike(result);
     if (!thenable) return;
     void thenable.catch((error: unknown) => {
-      this.runtime.reportError(error, { phase: 'lifecycle-hook' });
+      this.runtime.reportError(error, { phase: ReactiveErrorPhase.lifecycleHook });
     });
   }
 
-  #assertRuntime<T>(token: StoreToken<T>, value: T): void {
+  #assertRuntime<T>(token: IStoreToken<T>, value: T): void {
     const runtime = readStoreRuntime(value);
     if (runtime && runtime !== this.runtime) {
-      throw new Error(`[store] provider store "${token.debugName}" belongs to a different Runtime`);
+      throw createStoreReactError(
+        StoreReactErrorCode.crossRuntime,
+        `[store] provider store "${token.debugName}" belongs to a different Runtime`
+      );
     }
   }
 
   #assertActive(): void {
     if (this.#disposed) {
-      throw new Error('[store] provider registry is disposed');
+      throw createStoreReactError(
+        StoreReactErrorCode.registryDisposed,
+        '[store] provider registry is disposed'
+      );
     }
   }
 }
@@ -395,7 +429,7 @@ function disposeValue(value: unknown): unknown {
       : typeof candidate.dispose === 'function'
         ? candidate.dispose
         : undefined;
-  return disposer ? disposer.call(value) : undefined;
+  return disposer ? Reflect.apply(disposer, value, []) : undefined;
 }
 
 function asPromiseLike(value: unknown): Promise<unknown> | undefined {

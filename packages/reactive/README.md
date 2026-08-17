@@ -67,7 +67,6 @@ count.dispose();
 | `Signal` | 可写的响应式原子值 |
 | `Computed` | 惰性求值、带缓存的派生值 |
 | `Effect` | 读取依赖并执行副作用；依赖变化后被调度重跑；构造时立即跑一次 |
-| `Scope` | 集中持有一组 `disposable` 资源，一次 `dispose()` 按后进先出顺序全部释放 |
 | `batch()` / `flush()` | 把多次写入合并成一次副作用刷新 / 手动立即触发一次冲刷 |
 | trace | 只读诊断事件流：节点创建、依赖连接/断开、副作用执行、显式 action，不影响业务状态 |
 
@@ -77,7 +76,11 @@ count.dispose();
 | --- | --- | --- |
 | `@migaia/reactive`（主入口） | `Signal`/`Computed`/`Effect`/`createRuntime`/`defaultRuntime` 及全部公共类型 | 日常使用，绝大多数场景只需要这一个入口 |
 | `@migaia/reactive/runtime` | `createObserverBinding` 等面向框架适配层的并发安全绑定原语 | 自己实现 React/Vue/Solid 一类响应式绑定的作者 |
-| `@migaia/reactive/runtime/*` | 更细粒度的扩展入口（自定义 Source、内部 Runtime 视图、多副本自检等） | 在本包之上构建 Store/集合/资源类库的作者 |
+| `@migaia/reactive/ownership` | 「某节点属于哪个 `Runtime`」的登记与断言 | 在本包之上构建 Store/集合/资源类库的作者 |
+| `@migaia/reactive/internals` / `@migaia/reactive/node-internals` / `@migaia/reactive/node-factories` | 内核内部面（clock/tracker/scheduler、可变依赖边、具体节点类工厂） | 同上，仅供需要手工接入依赖图的节点实现层使用 |
+| `@migaia/reactive/source` | `createFieldSource()`——为扩展层创建一条受控 Source | 同上 |
+
+> 通用的「一组资源集中释放」的所有权容器（原 `Scope`/`createScope()`）已随 `docs/lifecycle/migration.sdd.md` §4.1 整体移出本包，改用 `@migaia/lifecycle` 的 `LifecycleScope`/`SyncLifecycleScope`。
 
 ## 8. 最容易踩的坑
 

@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createRuntime, type IRuntime } from '@migaia/reactive';
-import { StoreRegistryContext } from './provider-context';
-import { createStoreRegistry, type StoreRegistry } from './provider-registry';
+import { StoreRegistryContext } from './provider-context.js';
+import { createStoreRegistry, type StoreRegistry } from './provider-registry.js';
+import { createStoreReactError } from './errors.js';
+import { StoreReactErrorCode } from './error-code.js';
+import { StoreProviderState } from './provider-state-constants.js';
 import {
   decodeStoreExperimental,
   encodeStoreExperimental,
@@ -9,7 +12,7 @@ import {
   StoreConfigContext,
   type IStoreProviderConfig,
   type IStoreReadyBarrier
-} from './store-config';
+} from './store-config.js';
 
 const READY_KEYS = new WeakMap<Promise<void>, number>();
 let nextReadyKey = 1;
@@ -43,7 +46,10 @@ export function StoreProvider({
   config
 }: IStoreProviderProps) {
   if (registry && runtime && registry.runtime !== runtime) {
-    throw new Error('[store] StoreProvider registry/runtime ownership mismatch');
+    throw createStoreReactError(
+      StoreReactErrorCode.invalidConfig,
+      '[store] StoreProvider registry/runtime ownership mismatch'
+    );
   }
 
   // ready 数组字面量每次 render 都是新引用；按元素浅比较稳住 Promise，避免 use() 反复 suspend
@@ -136,7 +142,7 @@ function ReadyBoundary({
   fallback,
   children
 }: {
-  ready: import('./store-config').ITrackedReady;
+  ready: import('./store-config.js').ITrackedReady;
   fallback: ReactNode;
   children: ReactNode;
 }) {
@@ -148,32 +154,32 @@ function ReadyBoundary({
   const [status, setStatus] = useState(initial);
   const [error, setError] = useState<Error | null>(() => {
     const reason = ready.error();
-    return initial === 'error' ? normalizeReadyError(reason) : null;
+    return initial === StoreProviderState.error ? normalizeReadyError(reason) : null;
   });
 
   useEffect(() => {
     let live = true;
     const snap = ready.status();
-    if (snap === 'ready') {
-      setStatus('ready');
+    if (snap === StoreProviderState.ready) {
+      setStatus(StoreProviderState.ready);
       setError(null);
       return;
     }
-    if (snap === 'error') {
-      setStatus('error');
+    if (snap === StoreProviderState.error) {
+      setStatus(StoreProviderState.error);
       setError(normalizeReadyError(ready.error()));
       return;
     }
-    setStatus('pending');
+    setStatus(StoreProviderState.pending);
     setError(null);
     ready.promise.then(
       () => {
-        if (live) setStatus('ready');
+        if (live) setStatus(StoreProviderState.ready);
       },
       (reason: unknown) => {
         if (live) {
           setError(normalizeReadyError(reason));
-          setStatus('error');
+          setStatus(StoreProviderState.error);
         }
       }
     );
@@ -182,8 +188,8 @@ function ReadyBoundary({
     };
   }, [ready]);
 
-  if (status === 'error') throw error;
-  if (status === 'pending') return <>{fallback}</>;
+  if (status === StoreProviderState.error) throw error;
+  if (status === StoreProviderState.pending) return <>{fallback}</>;
   return <>{children}</>;
 }
 
@@ -241,7 +247,7 @@ function OwnedRegistryBoundary({
   if (!initial.current) {
     const ownedRuntime = runtime ?? createRuntime();
     const ownedRegistry = createStoreRegistry(ownedRuntime);
-    ownedRegistry.prepareForRender(armInitial);
+    if (armInitial) ownedRegistry.prepareForRender(armInitial);
     initial.current = {
       runtime,
       registry: ownedRegistry
@@ -260,7 +266,7 @@ function OwnedRegistryBoundary({
       // pending. Keep the candidate armed by that same barrier; otherwise
       // prepareForRender() would dispose it on the next timer before the
       // ReadyBoundary has a chance to commit the subtree.
-      nextRegistry.prepareForRender(armInitial);
+      if (armInitial) nextRegistry.prepareForRender(armInitial);
       active = {
         runtime,
         registry: nextRegistry

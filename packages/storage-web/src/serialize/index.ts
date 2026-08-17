@@ -1,5 +1,5 @@
-export { jsonCodec } from './json';
-export { structuredCodec } from './structured';
-export { binaryCodec } from './binary';
-export { selectCodec, type ISelectedCodec } from './registry';
-export type { ICodec, ICodecOutput } from './types';
+export { jsonCodec } from './json.js';
+export { structuredCodec } from './structured.js';
+export { binaryCodec } from './binary.js';
+export { selectCodec, type ISelectedCodec } from './registry.js';
+export type { ICodec, ICodecOutput } from './types.js';

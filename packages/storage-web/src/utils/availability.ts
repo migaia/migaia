@@ -1,4 +1,4 @@
-import type { IWebStorageLike } from '../types/storage';
+import type { IWebStorageLike } from '../types/storage.js';
 
 /**
  * 探测一个 Storage 对象是否真的可用。

@@ -1,4 +1,4 @@
-export { defineEntity } from './define';
+export { defineEntity } from './define.js';
 export type {
   IEntityDefinition,
   IEntityOptions,
@@ -11,4 +11,4 @@ export type {
   IInvalidRecordHandler,
   IRecordComparator,
   IRepository
-} from './types';
+} from './types.js';

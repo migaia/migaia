@@ -1,3 +1,5 @@
+import { tagWebRpcError, WebRpcErrorCode } from '../errors.js';
+
 /** Owns global and per-peer admission leases for provider execution. */
 export class ProviderAdmissionRegistry {
   readonly #leases = new Map<string, string>();
@@ -6,7 +8,10 @@ export class ProviderAdmissionRegistry {
 
   constructor(maxGlobal = 256, maxPerPeer = 64) {
     if (![maxGlobal, maxPerPeer].every(Number.isSafeInteger) || maxGlobal < 1 || maxPerPeer < 1)
-      throw new TypeError('provider admission limits must be positive safe integers');
+      throw tagWebRpcError(
+        new TypeError('provider admission limits must be positive safe integers'),
+        WebRpcErrorCode.invalidConfig
+      );
     this.#maxGlobal = maxGlobal;
     this.#maxPerPeer = maxPerPeer;
   }

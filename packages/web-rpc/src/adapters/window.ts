@@ -1,5 +1,6 @@
-import type { IWebRpcSendOptions, IWebRpcTransport } from '../transport';
-import { WebRpcError, WebRpcErrorCode } from '../errors';
+import type { IWebRpcSendOptions, IWebRpcTransport } from '../transport.js';
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js';
+import { WebRpcError, WebRpcErrorCode } from '../errors.js';
 
 /** Outbound Window-like target that owns postMessage delivery. */
 export type IWindowMessageTarget = {
@@ -82,9 +83,9 @@ export function createWindowMessageTransport(
     }
   };
   return {
-    platform: 'Iframe',
+    platform: WebRpcPlatform.iframe,
     topology: 'multiplexed',
-    ownership: 'borrowed',
+    ownership: WebRpcTransportOwnership.borrowed,
     sourceProof: (source, origin) =>
       source === target && (targetOrigin === '*' || origin === targetOrigin),
     ...(targetOrigin === '*' ? {} : { origin: targetOrigin }),

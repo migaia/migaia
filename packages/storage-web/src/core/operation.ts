@@ -1,144 +1,46 @@
-import type { IConflictPolicy, IOperationContext } from '../types/context';
-import { StorageError, StorageErrorCode } from '../types/errors';
+import type { IOperationContext } from '@migaia/storage-contract';
+import {
+  StorageContractError,
+  StorageContractErrorCode,
+  snapshotOperationContext,
+  type IOperationContextSnapshot
+} from '@migaia/storage-contract';
+import { isStorageErrorFamily } from './error-family.js';
+import {
+  createStorageOperationRuntime,
+  reportCleanupError,
+  type IStorageOperationReporter,
+  type IStorageOperationRuntime
+} from './operation-reporter.js';
+
+// operation context / sync-write 纯校验已迁往 `@migaia/storage-contract`；re-export 保持既有 import 路径不变。
+export {
+  snapshotOperationContext,
+  assertOperationContext,
+  snapshotSyncWriteOptions,
+  assertSyncWriteOptions,
+  type IOperationContextSnapshot
+} from '@migaia/storage-contract';
 
 type IOperationValidationContext = IOperationContext & {
   readonly conflictPolicy?: unknown;
 };
 
-export type IOperationContextSnapshot = IOperationContext & {
-  readonly conflictPolicy?: IConflictPolicy;
-};
-
-/** Tracks frozen snapshots created here so layered consumers never re-read host getters. */
-const operationContextSnapshots = new WeakSet<object>();
-
-/** Read operation options once, validate them, and return an immutable-by-ownership snapshot. */
-export const snapshotOperationContext = (
-  ctx: IOperationValidationContext | undefined
-): IOperationContextSnapshot | undefined => {
-  if (ctx === undefined) return undefined;
-  if (operationContextSnapshots.has(ctx)) return ctx as IOperationContextSnapshot;
-  if (typeof ctx !== 'object' || ctx === null || Array.isArray(ctx))
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      cause: new TypeError('operation context must be an object')
-    });
-  let signal: unknown;
-  let timeoutMs: unknown;
-  let pageSize: unknown;
-  let conflictPolicy: unknown;
-  try {
-    signal = ctx.signal;
-    timeoutMs = ctx.timeoutMs;
-    pageSize = ctx.pageSize;
-    conflictPolicy = ctx.conflictPolicy;
-  } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, { cause });
-  }
-  let signalAborted: unknown;
-  let signalAddEventListener: unknown;
-  let signalRemoveEventListener: unknown;
-  if (typeof signal === 'object' && signal !== null) {
-    try {
-      signalAborted = (signal as AbortSignal).aborted;
-      signalAddEventListener = (signal as AbortSignal).addEventListener;
-      signalRemoveEventListener = (signal as AbortSignal).removeEventListener;
-    } catch (cause) {
-      throw new StorageError(StorageErrorCode.invalidArgument, { cause });
-    }
-  }
-  if (
-    signal !== undefined &&
-    (typeof signal !== 'object' ||
-      signal === null ||
-      typeof signalAborted !== 'boolean' ||
-      typeof signalAddEventListener !== 'function' ||
-      typeof signalRemoveEventListener !== 'function')
-  )
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      cause: new TypeError('signal must implement the AbortSignal surface')
-    });
-  if (timeoutMs !== undefined && (!Number.isSafeInteger(timeoutMs) || (timeoutMs as number) < 0))
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      cause: new RangeError('timeoutMs must be a non-negative safe integer')
-    });
-  if (
-    pageSize !== undefined &&
-    (!Number.isInteger(pageSize) || (pageSize as number) < 1 || (pageSize as number) > 4096)
-  )
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      cause: new RangeError('pageSize must be an integer between 1 and 4096')
-    });
-  if (conflictPolicy !== undefined && conflictPolicy !== 'conflict' && conflictPolicy !== 'replace')
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      cause: new TypeError('conflictPolicy must be conflict or replace')
-    });
-  const snapshot: IOperationContextSnapshot = Object.freeze({
-    signal: signal as AbortSignal | undefined,
-    timeoutMs: timeoutMs as number | undefined,
-    pageSize: pageSize as number | undefined,
-    conflictPolicy: conflictPolicy as IConflictPolicy | undefined
-  });
-  operationContextSnapshots.add(snapshot);
-  return snapshot;
-};
-
-/** Validate operation timing options before creating timers or merged signals. */
-export const assertOperationContext = (ctx: IOperationValidationContext | undefined): void => {
-  snapshotOperationContext(ctx);
-};
-
-/** Validate the reduced write context supported by synchronous channels. */
-export const snapshotSyncWriteOptions = (
-  options: unknown
-): { readonly conflictPolicy?: IConflictPolicy } => {
-  if (
-    options !== undefined &&
-    (typeof options !== 'object' || options === null || Array.isArray(options))
-  )
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      cause: new TypeError('sync write options must be an object')
-    });
-  const candidate = options as
-    | { readonly signal?: unknown; readonly timeoutMs?: unknown; readonly conflictPolicy?: unknown }
-    | undefined;
-  let signal: unknown;
-  let timeoutMs: unknown;
-  let conflictPolicy: unknown;
-  try {
-    signal = candidate?.signal;
-    timeoutMs = candidate?.timeoutMs;
-    conflictPolicy = candidate?.conflictPolicy;
-  } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, { cause });
-  }
-  if (signal !== undefined || timeoutMs !== undefined)
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      cause: new TypeError('sync writes do not support signal or timeoutMs')
-    });
-  if (conflictPolicy !== undefined && conflictPolicy !== 'conflict' && conflictPolicy !== 'replace')
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      cause: new TypeError('conflictPolicy must be conflict or replace')
-    });
-  return { conflictPolicy: conflictPolicy as IConflictPolicy | undefined };
-};
-
-/** Validate the reduced write context supported by synchronous channels. */
-export const assertSyncWriteOptions = (options: unknown): void => {
-  snapshotSyncWriteOptions(options);
-};
+/** 结构化取消信号（与 contract 的 `IOperationContext.signal` 同源，避免直接 import `@migaia/lifecycle`）。 */
+export type IWebAbortSignal = NonNullable<IOperationContext['signal']>;
 
 /** Read mutable abort state without allowing a hostile getter to escape the storage protocol. */
-const readSignalAborted = (signal: AbortSignal | undefined): boolean => {
+const readSignalAborted = (signal: IWebAbortSignal | undefined): boolean => {
   if (signal === undefined) return false;
   try {
     return signal.aborted;
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, { cause });
+    throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause });
   }
 };
 
 /** Treat an inaccessible abort reason as the cancellation cause instead of leaking its getter. */
-export const readAbortReason = (signal: AbortSignal | undefined): unknown => {
+export const readAbortReason = (signal: IWebAbortSignal | undefined): unknown => {
   if (signal === undefined) return undefined;
   try {
     return signal.reason;
@@ -149,8 +51,9 @@ export const readAbortReason = (signal: AbortSignal | undefined): unknown => {
 
 /** Subscribe once with race closure and return cleanup that cannot mask an operation result. */
 export const subscribeToAbort = (
-  signal: AbortSignal | undefined,
-  onAbort: () => void
+  signal: IWebAbortSignal | undefined,
+  onAbort: () => void,
+  reporter: IStorageOperationReporter
 ): (() => void) => {
   if (signal === undefined) return () => {};
   /** Prevents host cleanup from being re-entered by racing IDB and abort events. */
@@ -160,8 +63,8 @@ export const subscribeToAbort = (
     disposed = true;
     try {
       signal.removeEventListener('abort', handleAbort);
-    } catch {
-      // Cleanup must not replace a settled operation outcome.
+    } catch (cause) {
+      reportCleanupError(reporter, cause);
     }
   };
   const handleAbort = (): void => {
@@ -177,23 +80,24 @@ export const subscribeToAbort = (
     if (readSignalAborted(signal)) handleAbort();
   } catch (cause) {
     dispose();
-    if (cause instanceof StorageError) throw cause;
-    throw new StorageError(StorageErrorCode.invalidArgument, { cause });
+    if (isStorageErrorFamily(cause)) throw cause;
+    throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause });
   }
   return dispose;
 };
 
 /** Throw the stable storage error when an operation signal has already been cancelled. */
-export const throwIfAborted = (signal: AbortSignal | undefined): void => {
+export const throwIfAborted = (signal: IWebAbortSignal | undefined): void => {
   if (readSignalAborted(signal))
-    throw new StorageError(StorageErrorCode.aborted, {
-      cause: readAbortReason(signal as AbortSignal)
+    throw new StorageContractError(StorageContractErrorCode.aborted, {
+      cause: readAbortReason(signal)
     });
 };
 
 /** Merge timeout and caller cancellation into one signal and expose deterministic cleanup. */
 export const mergeSignals = (
-  ctx: IOperationValidationContext | undefined
+  ctx: IOperationValidationContext | undefined,
+  reporter: IStorageOperationReporter
 ): {
   readonly signal: AbortSignal | undefined;
   readonly dispose: () => void;
@@ -201,7 +105,8 @@ export const mergeSignals = (
 } => {
   const context = snapshotOperationContext(ctx);
   const timeoutMs = context?.timeoutMs;
-  const externalSignal = context?.signal;
+  // 运行时值恒为真实 DOM AbortSignal（调用方传入），结构类型收窄回 DOM 供 IDB/后端使用。
+  const externalSignal = context?.signal as AbortSignal | undefined;
   if (timeoutMs === undefined) return { signal: externalSignal, dispose: () => {}, context };
   const externalAborted = readSignalAborted(externalSignal);
 
@@ -209,7 +114,10 @@ export const mergeSignals = (
   const timer =
     timeoutMs === 0
       ? undefined
-      : setTimeout(() => controller.abort(new StorageError(StorageErrorCode.aborted)), timeoutMs);
+      : setTimeout(
+          () => controller.abort(new StorageContractError(StorageContractErrorCode.aborted)),
+          timeoutMs
+        );
   const onExternalAbort = (): void =>
     controller.abort(externalSignal === undefined ? undefined : readAbortReason(externalSignal));
 
@@ -223,14 +131,15 @@ export const mergeSignals = (
     if (externalSignal === undefined) return;
     try {
       externalSignal.removeEventListener('abort', onExternalAbort);
-    } catch {
-      // Host cleanup is best-effort; surfacing it could misreport a committed write as failed.
+    } catch (cause) {
+      reportCleanupError(reporter, cause);
     }
   };
 
   if (externalAborted)
     controller.abort(externalSignal === undefined ? undefined : readAbortReason(externalSignal));
-  else if (timeoutMs === 0) controller.abort(new StorageError(StorageErrorCode.aborted));
+  else if (timeoutMs === 0)
+    controller.abort(new StorageContractError(StorageContractErrorCode.aborted));
   else if (externalSignal) {
     try {
       externalSignal.addEventListener('abort', onExternalAbort, { once: true });
@@ -238,8 +147,8 @@ export const mergeSignals = (
       if (readSignalAborted(externalSignal)) onExternalAbort();
     } catch (cause) {
       dispose();
-      if (cause instanceof StorageError) throw cause;
-      throw new StorageError(StorageErrorCode.invalidArgument, { cause });
+      if (isStorageErrorFamily(cause)) throw cause;
+      throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause });
     }
   }
 
@@ -255,13 +164,15 @@ export const withAbort = async <T>(
   ctx: IOperationValidationContext | undefined,
   run: (
     signal: AbortSignal | undefined,
-    context: IOperationContextSnapshot | undefined
+    context: IOperationContextSnapshot | undefined,
+    runtime: IStorageOperationRuntime
   ) => Promise<T>
 ): Promise<T> => {
-  const { signal, dispose, context } = mergeSignals(ctx);
+  const runtime = createStorageOperationRuntime();
+  const { signal, dispose, context } = mergeSignals(ctx, runtime.reporter);
   try {
     throwIfAborted(signal);
-    return await run(signal, context);
+    return await run(signal, context, runtime);
   } finally {
     dispose();
   }

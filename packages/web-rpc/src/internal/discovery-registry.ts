@@ -489,4 +489,4 @@ export class DiscoveryRegistry {
     this.#releaseBinding?.(token);
   }
 }
-import type { IAbortSignal } from './async-control';
+import type { IAbortSignal } from './async-control.js';

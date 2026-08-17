@@ -4,3 +4,10 @@ test('主线程可以请求 Worker 并收到计算结果', async ({ page }) => {
   await page.goto('/');
   await expect(page.evaluate(() => window.runStoreWorkerScenario())).resolves.toBe(42);
 });
+
+test('Worker 请求在处理端无响应时会超时并结束请求', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.evaluate(() => window.runStoreWorkerTimeoutScenario())).rejects.toThrow(
+    /timeout/i
+  );
+});

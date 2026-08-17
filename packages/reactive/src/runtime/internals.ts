@@ -1,7 +1,10 @@
-import type { DependencyTracker } from './dependency-tracker.class';
-import type { Scheduler } from './scheduler.class';
-import type { VersionClock } from './version-clock.class';
-import type { IObservable, IRuntime, IRuntimeTraceEvent } from './types';
+import type { DependencyTracker } from './dependency-tracker.class.js';
+import type { Scheduler } from './scheduler.class.js';
+import type { VersionClock } from './version-clock.class.js';
+import type { IObservable, IRuntime, IRuntimeTraceEvent } from './types.js';
+import { createReactiveError } from '../errors.js';
+import { ReactiveErrorCode } from '../error-code.js';
+import { noteRuntimeCopy } from './copy-check.js';
 
 /**
  * 内核内部面。
@@ -18,6 +21,10 @@ export type IRuntimeInternals = {
   readonly clock: VersionClock;
   readonly tracker: DependencyTracker;
   readonly scheduler: Scheduler;
+  /** 单调 duration 时钟（adapter.now）。 */
+  now(): number;
+  /** 事件时间戳（adapter.timestamp），用于 trace。 */
+  timestamp(): number;
   /** 诊断写通道留在内部面，外部只能订阅，不能伪造 action/依赖事件。 */
   traceEnabled(): boolean;
   emitTrace(event: IRuntimeTraceEvent): void;
@@ -39,7 +46,10 @@ const INTERNALS = new WeakMap<object, IRuntimeInternals>();
 /** Runtime 构造时自报内部面。重复登记视为编程错误，直接拒绝。 */
 export function registerInternals(runtime: IRuntime, internals: IRuntimeInternals): void {
   if (INTERNALS.has(runtime)) {
-    throw new Error('[store] runtime internals are already registered');
+    throw createReactiveError(
+      ReactiveErrorCode.internalsRegistered,
+      '[store] runtime internals are already registered'
+    );
   }
   INTERNALS.set(runtime, internals);
 }
@@ -52,7 +62,12 @@ export function registerInternals(runtime: IRuntime, internals: IRuntimeInternal
 export function internalsOf(runtime: IRuntime): IRuntimeInternals {
   const internals = INTERNALS.get(runtime);
   if (internals) return internals;
-  throw new Error('[store] this object is not a Runtime created by createRuntime()');
+  // 双实例自检（copy-check.ts）：读取内部面也是正确性边界，登记本副本。
+  noteRuntimeCopy();
+  throw createReactiveError(
+    ReactiveErrorCode.notRuntimeOwned,
+    '[store] this object is not a Runtime created by createRuntime()'
+  );
 }
 
 /** 是否是本库创建的 Runtime。所有权校验用，不泄漏内部面本身。 */

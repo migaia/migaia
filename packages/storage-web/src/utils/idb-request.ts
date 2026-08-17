@@ -1,6 +1,10 @@
-import { StorageError, StorageErrorCode } from '../types/errors';
-import { normalizeStorageException } from './quota';
-import { readAbortReason, snapshotOperationContext, subscribeToAbort } from '../core/operation';
+import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract';
+import { isStorageErrorFamily } from '../core/error-family.js';
+import type { IStorageOperationRuntime } from '../core/operation-reporter.js';
+import { StorageError, StorageErrorCode } from '../types/errors.js';
+import { normalizeStorageException } from './quota.js';
+import { readAbortReason, snapshotOperationContext, subscribeToAbort } from '../core/operation.js';
+import { StorageBackend } from '../constants.js';
 
 /**
  * IndexedDB 请求/事务 → Promise 的转换。这两个函数是从早期实现直接搬运的 已验证坑位处理，逐条保留： - 写入必须等 `transaction.oncomplete` 而非
@@ -9,22 +13,22 @@ import { readAbortReason, snapshotOperationContext, subscribeToAbort } from '../
  */
 export type IIdbOperationContext = { readonly signal?: AbortSignal };
 
-const normalizeTransactionAbort = (error: unknown): StorageError => {
-  const normalized = normalizeStorageException(error, 'indexeddb');
+const normalizeTransactionAbort = (error: unknown): StorageError | StorageContractError => {
+  const normalized = normalizeStorageException(error, StorageBackend.indexedDb);
   if (normalized.code === StorageErrorCode.quotaExceeded) return normalized;
   return new StorageError(StorageErrorCode.transactionFailed, {
-    backend: 'indexeddb',
+    backend: StorageBackend.indexedDb,
     cause: error
   });
 };
 
-export const normalizeIdbRequestFailure = (error: unknown): StorageError => {
-  if (error instanceof StorageError) return error;
-  const normalized = normalizeStorageException(error, 'indexeddb');
+export const normalizeIdbRequestFailure = (error: unknown): StorageError | StorageContractError => {
+  if (isStorageErrorFamily(error)) return error;
+  const normalized = normalizeStorageException(error, StorageBackend.indexedDb);
   return normalized.code === StorageErrorCode.quotaExceeded
     ? normalized
     : new StorageError(StorageErrorCode.transactionFailed, {
-        backend: 'indexeddb',
+        backend: StorageBackend.indexedDb,
         cause: error
       });
 };
@@ -116,7 +120,8 @@ export const installIdbOpenRequestHandlers = (
 /** 把一次 IDBRequest 包成 Promise，并接上取消信号。 */
 export function fromIdbRequest<T>(
   request: IDBRequest<T>,
-  context?: IIdbOperationContext
+  context: IIdbOperationContext | undefined,
+  runtime: IStorageOperationRuntime
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const signal = snapshotOperationContext(context)?.signal;
@@ -124,8 +129,8 @@ export function fromIdbRequest<T>(
     let disposeAbort = (): void => {};
     const onAbort = (): void => {
       reject(
-        new StorageError(StorageErrorCode.aborted, {
-          backend: 'indexeddb',
+        new StorageContractError(StorageContractErrorCode.aborted, {
+          backend: StorageBackend.indexedDb,
           cause: readAbortReason(signal)
         })
       );
@@ -150,7 +155,7 @@ export function fromIdbRequest<T>(
           }
         }
       );
-      disposeAbort = subscribeToAbort(signal, onAbort);
+      disposeAbort = subscribeToAbort(signal, onAbort, runtime.reporter);
     } catch (cause) {
       disposeAbort();
       reject(normalizeIdbRequestFailure(cause));
@@ -161,7 +166,8 @@ export function fromIdbRequest<T>(
 /** 等到事务真正 commit 才算写成功；`request.onsuccess` 只保证请求被接受，不保证落盘。 */
 export function idbTransactionCommit(
   transaction: IDBTransaction,
-  context?: IIdbOperationContext
+  context: IIdbOperationContext | undefined,
+  runtime: IStorageOperationRuntime
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const signal = snapshotOperationContext(context)?.signal;
@@ -183,8 +189,8 @@ export function idbTransactionCommit(
       }
       finish(() =>
         reject(
-          new StorageError(StorageErrorCode.aborted, {
-            backend: 'indexeddb',
+          new StorageContractError(StorageContractErrorCode.aborted, {
+            backend: StorageBackend.indexedDb,
             cause: abortReason
           })
         )
@@ -204,7 +210,7 @@ export function idbTransactionCommit(
           finish(() =>
             reject(
               new StorageError(StorageErrorCode.transactionFailed, {
-                backend: 'indexeddb',
+                backend: StorageBackend.indexedDb,
                 cause: readIdbTransactionError(transaction)
               })
             )
@@ -213,15 +219,15 @@ export function idbTransactionCommit(
           finish(() =>
             reject(
               cancelled
-                ? new StorageError(StorageErrorCode.aborted, {
-                    backend: 'indexeddb',
+                ? new StorageContractError(StorageContractErrorCode.aborted, {
+                    backend: StorageBackend.indexedDb,
                     cause: abortReason
                   })
                 : normalizeTransactionAbort(readIdbTransactionError(transaction))
             )
           )
       );
-      disposeAbort = subscribeToAbort(signal, onAbort);
+      disposeAbort = subscribeToAbort(signal, onAbort, runtime.reporter);
     } catch (cause) {
       finish(() => reject(normalizeIdbRequestFailure(cause)));
       try {

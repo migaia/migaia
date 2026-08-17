@@ -1,4 +1,5 @@
 import initWasm, { alloc_bytes, dealloc_bytes, ptr_of } from '@migaia/wasm';
+import { createStoreWasmError, createStoreWasmRangeError, StoreWasmErrorCode } from './errors.js';
 
 // 模块作用域缓存，只发起一次加载；重复调用（StrictMode 双渲染、父组件无关重渲染）拿到同一个 promise 引用，
 // 不会重复 fetch/instantiate，也不会导致 use() 每次渲染都重新挂起
@@ -76,7 +77,10 @@ export function allocateOwnedSync(byteLen: number): IWasmAllocation {
 
 export async function allocate(byteLen: number) {
   if (!Number.isSafeInteger(byteLen) || byteLen < 0 || byteLen > MAX_WASM32_ALLOCATION) {
-    throw new RangeError('wasm.allocate: byteLen must fit an unsigned 32-bit integer');
+    throw createStoreWasmRangeError(
+      StoreWasmErrorCode.invalidOption,
+      'wasm.allocate: byteLen must fit an unsigned 32-bit integer'
+    );
   }
   const memory = await ensureWasm();
   const id = alloc_bytes(byteLen);
@@ -86,11 +90,17 @@ export async function allocate(byteLen: number) {
 /** Allocate after explicit WASM initialization; never starts async work. */
 export function allocateSync(byteLen: number) {
   if (!Number.isSafeInteger(byteLen) || byteLen < 0 || byteLen > MAX_WASM32_ALLOCATION) {
-    throw new RangeError('wasm.allocate: byteLen must fit an unsigned 32-bit integer');
+    throw createStoreWasmRangeError(
+      StoreWasmErrorCode.invalidOption,
+      'wasm.allocate: byteLen must fit an unsigned 32-bit integer'
+    );
   }
   const memory = wasmMemory;
   if (!memory)
-    throw new Error('[store] WASM is not initialized; await ensureWasm() or use StoreProvider');
+    throw createStoreWasmError(
+      StoreWasmErrorCode.notInitialized,
+      '[store] WASM is not initialized; await ensureWasm() or use StoreProvider'
+    );
   const id = alloc_bytes(byteLen);
   return { memory, id, ptr: ptr_of(id) };
 }

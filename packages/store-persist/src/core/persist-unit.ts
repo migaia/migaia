@@ -1,7 +1,13 @@
 import type { IDisposer } from '@migaia/reactive';
-import { readEnvelope, removeEnvelope, writeEnvelope } from '../storage/codec';
-import { defaultJsonCodec } from '../storage/codec';
-import { assertEnvelope, type IEnvelope } from './envelope';
+import { readEnvelope, removeEnvelope, writeEnvelope } from '../storage/codec.js';
+import { defaultJsonCodec } from '../storage/codec.js';
+import { assertEnvelope, type IEnvelope } from './envelope.js';
+import {
+  createStorePersistAggregateError,
+  createStorePersistError,
+  createStorePersistTypeError
+} from '../errors.js';
+import { StorePersistErrorCode } from '../error-code.js';
 import type {
   IHydrationStatus,
   IPersistHandle,
@@ -9,10 +15,14 @@ import type {
   IPersistUnit,
   IPersistUnitOptions,
   IWriteStatus
-} from './types';
+} from './types.js';
+import { PersistState } from '../state-constants.js';
 
 function disposedError(): Error {
-  const error = new Error('[store] persist operation was aborted by dispose');
+  const error = createStorePersistError(
+    StorePersistErrorCode.abortedByDispose,
+    '[store] persist operation was aborted by dispose'
+  );
   error.name = 'AbortError';
   return error;
 }
@@ -34,43 +44,67 @@ export function persistUnit<TState>(
     version = 0,
     migrate,
     partialize = (state: TState) => state as Partial<TState>,
-    // 默认"持久化整份替换当前状态"——对 Record/Map/Set/Array 这几种形状都成立，且不会像
-    // 对象展开 `{...current, ...persisted}` 那样在 Map/Set/Array 上产出错误结果（展开一个
-    // Map/Set 拿到的是 `{}`，展开两个数组拿到的是带数字字符串键的普通对象，都不是想要的合并）。
-    // 只有调用方显式收窄了 `partialize`（只持久化部分字段）时，才需要跟着显式提供匹配的
-    // `merge`——两者本来就该配对出现，默认值不替调用方猜"怎么合并一个子集"。
-    merge = (persisted: Partial<TState>) => persisted as TState,
+    // Plain-object snapshots use a shallow current-first merge so a startup
+    // mutation is not lost while storage is loading. Collection/array shapes
+    // remain replacement-based; callers can provide a shape-specific merge.
+    merge = (persisted: Partial<TState>, current: TState) => {
+      if (
+        persisted !== null &&
+        typeof persisted === 'object' &&
+        current !== null &&
+        typeof current === 'object' &&
+        !Array.isArray(persisted) &&
+        !Array.isArray(current) &&
+        (Object.getPrototypeOf(persisted) === Object.prototype ||
+          Object.getPrototypeOf(persisted) === null) &&
+        (Object.getPrototypeOf(current) === Object.prototype ||
+          Object.getPrototypeOf(current) === null)
+      )
+        return { ...(current as object), ...(persisted as object) } as TState;
+      return persisted as TState;
+    },
     debounceMs = 0
   } = options;
 
-  if (!codec) throw new TypeError(`[store] persist "${key}" resolved no codec`);
+  if (!codec)
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.codecNotResolved,
+      `[store] persist "${key}" resolved no codec`
+    );
   if (!Number.isSafeInteger(version) || version < 0) {
-    throw new TypeError(`[store] persist "${key}" version must be a safe, non-negative integer`);
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.invalidOption,
+      `[store] persist "${key}" version must be a safe, non-negative integer`
+    );
   }
 
-  const hydrationStatus = runtime.signal<IHydrationStatus>('loading');
+  const hydrationStatus = runtime.signal<IHydrationStatus>(PersistState.loading);
   const hydrationError = runtime.signal<unknown>(undefined);
-  const writeStatus = runtime.signal<IWriteStatus>('idle');
+  const writeStatus = runtime.signal<IWriteStatus>(PersistState.idle);
   const writeError = runtime.signal<unknown>(undefined);
-  const lifecycleStatus = runtime.signal<'active' | 'disposed'>('active');
+  const lifecycleStatus = runtime.signal<typeof PersistState.active | typeof PersistState.disposed>(
+    PersistState.active
+  );
   const status = runtime.computed<IPersistStatus>(() => {
-    if (lifecycleStatus.value === 'disposed') return 'disposed';
-    if (hydrationStatus.value === 'loading') return 'loading';
-    if (hydrationStatus.value === 'error' || writeStatus.value === 'error') return 'error';
-    return 'ready';
+    if (lifecycleStatus.value === PersistState.disposed) return PersistState.disposed;
+    if (hydrationStatus.value === PersistState.loading) return PersistState.loading;
+    if (hydrationStatus.value === PersistState.error || writeStatus.value === PersistState.error)
+      return PersistState.error;
+    return PersistState.ready;
   });
   const error = runtime.computed<unknown>(() => {
     const hydration = hydrationError.value;
     const write = writeError.value;
     if (hydration !== undefined && write !== undefined) {
-      return new AggregateError(
+      return createStorePersistAggregateError(
+        StorePersistErrorCode.hydrateAndWriteFailed,
         [hydration, write],
         '[store] persist hydration and write both failed'
       );
     }
     return hydration ?? write ?? undefined;
   });
-  const hydrated = runtime.computed(() => hydrationStatus.value === 'success');
+  const hydrated = runtime.computed(() => hydrationStatus.value === PersistState.success);
 
   let stopSubscription: IDisposer | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -109,15 +143,15 @@ export function persistUnit<TState>(
 
   async function runWriteOperation(operation: () => void | Promise<void>): Promise<void> {
     const operationGeneration = generationEpoch;
-    writeStatus.value = 'writing';
+    writeStatus.value = PersistState.writing;
     try {
       await operation();
       if (disposed || operationGeneration !== generationEpoch) return;
-      writeStatus.value = 'idle';
+      writeStatus.value = PersistState.idle;
       writeError.value = undefined;
     } catch (operationError) {
       if (disposed || operationGeneration !== generationEpoch) throw operationError;
-      writeStatus.value = 'error';
+      writeStatus.value = PersistState.error;
       writeError.value = operationError;
       throw operationError;
     }
@@ -125,24 +159,22 @@ export function persistUnit<TState>(
 
   function enqueueWrite(rejectOnError = false): Promise<void> {
     writeRequested = true;
-    if (!rejectOnError && writeDrain) return writeDrain;
+    // A strict flush must observe the currently running debounced write itself;
+    // chaining after writeChain would only see its error-swallowing recovery promise.
+    if (writeDrain) return writeDrain;
 
     const operation = writeChain.then(async () => {
       while (!disposed && writeRequested) {
         writeRequested = false;
-        try {
-          await runWriteOperation(() =>
-            runAdapterOperation(async (signal) => {
-              const envelope: IEnvelope<Partial<TState>> = {
-                version,
-                state: partialize(unit.snapshot())
-              };
-              await writeEnvelope(storage, key, codec, envelope, { signal });
-            })
-          );
-        } catch (writeErr) {
-          if (rejectOnError) throw writeErr;
-        }
+        await runWriteOperation(() =>
+          runAdapterOperation(async (signal) => {
+            const envelope: IEnvelope<Partial<TState>> = {
+              version,
+              state: partialize(unit.snapshot())
+            };
+            await writeEnvelope(storage, key, codec, envelope, { signal });
+          })
+        );
       }
     });
     writeChain = operation.catch(() => undefined);
@@ -167,13 +199,13 @@ export function persistUnit<TState>(
       return;
     }
     if (debounceMs <= 0) {
-      void enqueueWrite();
+      void enqueueWrite().catch(() => undefined);
       return;
     }
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
       timer = undefined;
-      void enqueueWrite();
+      void enqueueWrite().catch(() => undefined);
     }, debounceMs);
   }
 
@@ -188,25 +220,24 @@ export function persistUnit<TState>(
         let state = envelope.state;
         if (envelope.version !== version) {
           if (!migrate) {
-            throw new Error(
+            throw createStorePersistError(
+              StorePersistErrorCode.envelopeInvalid,
               `[store] persist archive "${key}" is version ${envelope.version}, but this store is version ${version}; provide migrate() to convert it`
             );
           }
           state = migrate(state as TState, envelope.version) as Partial<TState>;
         }
-        // 启动阶段用户写优先：hydrate 还没结算时若 unit 已经发生过变化，
-        // 整份持久化状态放弃应用，不做字段级合并——通用 TState 形状下无法安全地
-        // 逐字段判断"这个具体成员是不是同一个"，宁可整份跳过也不要悄悄丢一部分用户写入。
-        if (!dirtyDuringHydrate) {
-          hydrating = true;
-          try {
-            unit.restore(merge(state, unit.snapshot()));
-          } finally {
-            hydrating = false;
-          }
+        // Always reconcile the persisted snapshot with the current snapshot. The
+        // default object merge preserves fields initialized or mutated while the
+        // async read was in flight; custom store shapes can provide their own merge.
+        hydrating = true;
+        try {
+          unit.restore(merge(state, unit.snapshot()));
+        } finally {
+          hydrating = false;
         }
       }
-      hydrationStatus.value = 'success';
+      hydrationStatus.value = PersistState.success;
       hydrationError.value = undefined;
       hydrationSettled = true;
       if (dirtyDuringHydrate) scheduleWrite();
@@ -214,13 +245,13 @@ export function persistUnit<TState>(
     .catch((caught) => {
       if (disposed) return;
       hydrationError.value = caught;
-      hydrationStatus.value = 'error';
+      hydrationStatus.value = PersistState.error;
       hydrationSettled = true;
       if (dirtyDuringHydrate) scheduleWrite();
     });
 
   const ready = settled.then(() => {
-    if (hydrationStatus.value === 'error') throw hydrationError.value;
+    if (hydrationStatus.value === PersistState.error) throw hydrationError.value;
   });
   void ready.catch(() => undefined);
 
@@ -272,8 +303,8 @@ export function persistUnit<TState>(
       generationEpoch++;
       for (const controller of activeOperations) controller.abort();
       activeOperations.clear();
-      writeStatus.value = 'disposed';
-      lifecycleStatus.value = 'disposed';
+      writeStatus.value = PersistState.disposed;
+      lifecycleStatus.value = PersistState.disposed;
       if (timer) clearTimeout(timer);
       stopSubscription?.();
     }

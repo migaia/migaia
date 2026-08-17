@@ -1,62 +1,98 @@
+import {
+  createLifecycleScope,
+  createSyncLifecycleScope,
+  type ILifecycleScope,
+  type ISyncLifecycleScope
+} from '@migaia/lifecycle';
+
 export type IResourceReleaseError = { readonly resource: string; readonly error: unknown };
 export type IResourceReleasePhase = 'critical' | 'application';
 
-/** Owns heterogeneous async resources and releases them in reverse registration order. */
+/** Higher `order` runs first (§3.1: critical transport resources release before application ones). */
+const ORDER_BY_PHASE: Record<IResourceReleasePhase, number> = { critical: 1, application: 0 };
+
+/**
+ * Owns heterogeneous resources and releases them in reverse registration order.
+ *
+ * Synchronous resources (transport listener unsubscribes, which are plain `() => void`) live in a
+ * `SyncLifecycleScope` so that construction rollback can release them in the same tick — the
+ * endpoint constructor registers `subscribe`/`onTransportError`/`onListenerError` and, when a later
+ * registration throws, must have already detached every earlier listener synchronously (D-6: the
+ * general `LifecycleScope.dispose()` is always asynchronous and cannot provide that). Asynchronous
+ * resources (transport close, middleware disposers) live in a `LifecycleScope` and drain after the
+ * synchronous ones, preserving the existing "unsubscribe listeners, then close the transport, then
+ * dispose middleware" order.
+ */
 export class ResourceScope {
-  readonly #resources: Array<{
-    name: string;
-    release: () => void | Promise<void>;
-    phase: IResourceReleasePhase;
-  }> = [];
-  #released = false;
+  /** Owns synchronous release records; released first, synchronously, in LIFO order. */
+  readonly #sync: ISyncLifecycleScope = createSyncLifecycleScope({ errorPolicy: 'collect' });
+  /** Owns asynchronous release records; released after the synchronous ones. */
+  readonly #async: ILifecycleScope = createLifecycleScope({ errorPolicy: 'collect' });
+  #count = 0;
   #releasePromise: Promise<readonly IResourceReleaseError[]> | undefined;
 
   /** Returns the number of release records retained by this scope. */
   get size(): number {
-    return this.#resources.length;
+    return this.#count;
   }
 
-  /** Registers one resource and returns an idempotent unregister function. */
+  /** Registers a synchronously-released resource and returns an idempotent unregister function. */
+  addSync(name: string, release: () => void): () => void {
+    const token = {};
+    this.#count++;
+    this.#sync.own(token, {
+      syncSafe: true,
+      force: () => {
+        try {
+          release();
+        } catch (error) {
+          throw { resource: name, error } satisfies IResourceReleaseError;
+        }
+      }
+    });
+    return () => {
+      this.#sync.release(token);
+    };
+  }
+
+  /** Registers a potentially-asynchronous resource and returns an idempotent unregister function. */
   add(
     name: string,
     release: () => void | Promise<void>,
     phase: IResourceReleasePhase = 'application'
   ): () => void {
-    if (this.#released) throw new Error('ResourceScope is already released');
-    let active = true;
-    this.#resources.push({
-      name,
-      phase,
-      release: () => {
-        if (active) {
-          active = false;
-          return release();
+    const token = {};
+    this.#count++;
+    this.#async.own(token, {
+      order: ORDER_BY_PHASE[phase],
+      // `LifecycleScope`'s own error collection labels failures with an internal numeric id, not
+      // this resource's human-readable `name` — and callers match on that name (e.g.
+      // `entry.resource === 'middleware'` in endpoint.ts). Re-tag the failure with the name here so
+      // `releaseAll()` can hand back the original `{resource, error}` shape unchanged.
+      force: async () => {
+        try {
+          await release();
+        } catch (error) {
+          throw { resource: name, error } satisfies IResourceReleaseError;
         }
       }
     });
     return () => {
-      active = false;
+      this.#async.release(token);
     };
   }
 
   /** Releases every resource, continuing after failures and preserving order. */
   releaseAll(): Promise<readonly IResourceReleaseError[]> {
     if (this.#releasePromise) return this.#releasePromise;
-    this.#released = true;
     this.#releasePromise = (async () => {
-      const errors: IResourceReleaseError[] = [];
-      for (const phase of ['critical', 'application'] as const) {
-        for (const resource of this.#resources.filter((entry) => entry.phase === phase).reverse()) {
-          try {
-            const result = resource.release();
-            if (result && typeof (result as Promise<void>).then === 'function') await result;
-          } catch (error) {
-            errors.push({ resource: resource.name, error });
-          }
-        }
-      }
-      this.#resources.length = 0;
-      return errors;
+      // Synchronous resources detach in the same tick this method is called; async resources drain
+      // afterwards. The endpoint constructor's failure path depends on the synchronous part having
+      // already run by the time `releaseAll()` returns its promise.
+      const syncErrors = this.#sync.dispose();
+      const asyncErrors = await this.#async.dispose();
+      this.#count = 0;
+      return [...syncErrors, ...asyncErrors].map((entry) => entry.error as IResourceReleaseError);
     })();
     return this.#releasePromise;
   }

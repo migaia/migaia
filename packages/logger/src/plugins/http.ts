@@ -1,7 +1,8 @@
-import type { IEmptyPluginExt, ILogEntry, ILoggerPluginCore, ILoggerPlugin } from '../typing';
-import type { IBatchShared } from './batch';
+import type { IEmptyPluginExt, ILogEntry, ILoggerPluginCore, ILoggerPlugin } from '../typing.js';
+import type { IBatchShared } from './batch.js';
 import type { IPipelineMode } from '@migaia/plugin-host';
-import { getLoggerRuntimeManager } from '../runtime-manager';
+import { getLoggerRuntimeManager } from '../runtime-manager.js';
+import { createLoggerError, LoggerErrorCode } from '../errors.js';
 
 export type IHttpPluginConfig = {
   url: string;
@@ -77,10 +78,16 @@ class HttpPlugin implements ILoggerPlugin<
     try {
       body = JSON.stringify({ entries });
     } catch (err) {
-      throw new Error('[logger] http 日志序列化失败', { cause: err });
+      throw createLoggerError(LoggerErrorCode.serializeFailed, '[logger] http 日志序列化失败', {
+        cause: err
+      });
     }
     const runtimeFetch = getLoggerRuntimeManager().fetch;
-    if (!runtimeFetch) throw new Error('[logger] HTTP transport is unavailable in this runtime');
+    if (!runtimeFetch)
+      throw createLoggerError(
+        LoggerErrorCode.transportUnavailable,
+        '[logger] HTTP transport is unavailable in this runtime'
+      );
     let lastErr: unknown;
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {

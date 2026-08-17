@@ -1,9 +1,12 @@
+import { asyncDisposeKey, disposeKey } from './symbols.js';
+import type { ILifecycleScheduler } from '@migaia/lifecycle';
+
 /** 插件生命周期资源的清理函数。 */
 export type IPluginDisposer = () => void | Promise<void>;
 export type IPluginResource =
   | IPluginDisposer
-  | { [Symbol.asyncDispose](): void | Promise<void> }
-  | { [Symbol.dispose](): void };
+  | { [asyncDisposeKey](): void | Promise<void> }
+  | { [disposeKey](): void };
 
 export type IPluginConfig = Record<string, unknown>;
 
@@ -16,35 +19,17 @@ export type IPluginLifecycleCore<TConfig extends IPluginConfig = IPluginConfig> 
   readonly config: IPluginLifecycleConfig<TConfig>;
 };
 
-/** Stable machine-readable boundary errors; localized text stays in error-text.ts. */
-export const PluginHostErrorCode = {
-  hostDisposed: 'HOST_DISPOSED',
-  hostDisposing: 'HOST_DISPOSING',
-  pluginDuplicate: 'PLUGIN_DUPLICATE',
-  pluginNotInstalled: 'PLUGIN_NOT_INSTALLED',
-  pluginInstallFailed: 'PLUGIN_INSTALL_FAILED',
-  pluginDisposeFailed: 'PLUGIN_DISPOSE_FAILED',
-  hostDisposeFailed: 'HOST_DISPOSE_FAILED',
-  extensionDuplicate: 'EXTENSION_DUPLICATE',
-  extensionObjectPrototype: 'EXTENSION_OBJECT_PROTOTYPE',
-  extensionReserved: 'EXTENSION_RESERVED',
-  sharedDuplicate: 'SHARED_DUPLICATE',
-  resourceOutsideInstall: 'RESOURCE_OUTSIDE_INSTALL',
-  lifecycleMutation: 'LIFECYCLE_MUTATION',
-  invalidPipelineMode: 'INVALID_PIPELINE_MODE',
-  pipelineModeMismatch: 'PIPELINE_MODE_MISMATCH',
-  pipelineNextDuplicate: 'PIPELINE_NEXT_DUPLICATE',
-  pipelineNextLate: 'PIPELINE_NEXT_LATE',
-  pipelineExecuting: 'PIPELINE_EXECUTING',
-  pluginInstallRollbackFailed: 'PLUGIN_INSTALL_ROLLBACK_FAILED',
-  extensionNonEnumerableIgnored: 'EXTENSION_NON_ENUMERABLE_IGNORED',
-  mutationQueueTimeout: 'MUTATION_QUEUE_TIMEOUT',
-  disposeStepTimeout: 'DISPOSE_STEP_TIMEOUT'
-} as const;
+/**
+ * 错误码已迁至 `./error-code.ts`（`docs/contracts/error-codes.md` §3.5 要求每包在 `src/error-code.ts` 单点声明）。此处
+ * re-export 仅为保持既有导入路径可用，码值未变；新代码请直接从 `./error-code` 导入。
+ */
+export { PluginHostErrorCode, type IPluginHostErrorCode } from './error-code.js';
 
-export type IPluginHostErrorCode = (typeof PluginHostErrorCode)[keyof typeof PluginHostErrorCode];
+// 本文件自身也引用该类型（见 IPluginHostOptions.diagnostic）；re-export 不会把名字带进本地作用域。
+import type { IPluginHostErrorCode } from './error-code.js';
+import { PluginHostPipelineMode } from './state-constants.js';
 
-export type IPipelineMode = 'sync' | 'async' | 'generator';
+export type IPipelineMode = (typeof PluginHostPipelineMode)[keyof typeof PluginHostPipelineMode];
 export type IPipelineConfig = { mode?: IPipelineMode };
 /** Explicit generator return value for a final `undefined` payload. */
 export const GENERATOR_UNDEFINED = Symbol('plugin-host.generator-undefined');
@@ -92,8 +77,8 @@ export type IPlugin<
     core: TCore & IPluginLifecycleCore<TConfig>
   ) => void | Promise<void>;
   dispose?: () => void | Promise<void>;
-  [Symbol.asyncDispose]?: () => void | Promise<void>;
-  [Symbol.dispose]?: () => void;
+  [asyncDisposeKey]?: () => void | Promise<void>;
+  [disposeKey]?: () => void;
 };
 
 /** 用于约束插件元组，同时保留每个插件自身的精确泛型。 */
@@ -106,8 +91,8 @@ export type IPluginConstraint<TCore> = {
   ) => Record<string, unknown> | Promise<Record<string, unknown>>;
   update?: (next: never, core: TCore & IPluginLifecycleCore<any>) => void | Promise<void>;
   dispose?: () => void | Promise<void>;
-  [Symbol.asyncDispose]?: () => void | Promise<void>;
-  [Symbol.dispose]?: () => void;
+  [asyncDisposeKey]?: () => void | Promise<void>;
+  [disposeKey]?: () => void;
 };
 
 export type IExtractPluginExt<TPlugin> =
@@ -214,7 +199,7 @@ export type IPluginHostPublic<
     ): Promise<IPluginHostPublic<TDomainCore, TValue, [...TInstalled, ...TPlugins]>>;
     unUse(name: string): Promise<void>;
     dispose(): Promise<void>;
-    [Symbol.asyncDispose]?: () => Promise<void>;
+    [asyncDisposeKey]?: () => Promise<void>;
   };
 
 /** Compatibility alias for the public Host protocol. */
@@ -227,4 +212,12 @@ export type IPluginHost<
 export type IPluginHostOptions = {
   pipeline?: IPipelineConfig;
   diagnostic?: (message: string, code?: IPluginHostErrorCode) => void;
+  /** 时间域与排程来源（默认 lifecycle `systemScheduler`）；queue watchdog / dispose timeout 共用。 */
+  scheduler?: ILifecycleScheduler;
+  /** 队列 admission 阈值。`undefined`：只诊断不拒绝；`false`：不建 timer、不诊断、不拒绝；`number`：超时出队并 reject。 */
+  queueAdmissionTimeoutMs?: number | false;
+  /** `queueAdmissionTimeoutMs` 未配置时的诊断阈值；`false` 关闭诊断 timer。 */
+  queueAdmissionDiagnosticMs?: number | false;
+  /** 单个 disposer 步的最大等待时间；`false` 表示永久等待（不触发 force）。 */
+  disposeStepTimeoutMs?: number | false;
 };

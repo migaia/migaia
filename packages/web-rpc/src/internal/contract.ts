@@ -1,6 +1,7 @@
-import { WebRpcSchemaValidationError } from '../errors';
-import type { IWebRpcContractConfig } from '../typing';
-import { safeRead, safeString } from './safe-value';
+import { WebRpcSchemaValidationError } from '../errors.js';
+import type { IWebRpcContractConfig } from '../typing.js';
+import { safeRead, safeString } from './safe-value.js';
+import { WebRpcContractFailureKind } from '../protocol-constants.js';
 
 /** Validates one contract payload and preserves schema-library issues in the public error. */
 export function validateContractData(
@@ -63,7 +64,7 @@ export function validateContractData(
     throw new WebRpcSchemaValidationError(
       `Schema validation failed for ${method} ${side}`,
       {
-        kind: 'schema-validation',
+        kind: WebRpcContractFailureKind.schemaValidation,
         method,
         side,
         issues: normalizedIssues?.length ? normalizedIssues : [{ path: [], message: causeMessage }]

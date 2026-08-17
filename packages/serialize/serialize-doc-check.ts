@@ -5,21 +5,26 @@ import {
   decodeStream,
   collectStream,
   chunkToText,
-  SerializeError,
+  SerializeCodecError,
   assertSerializeType,
   type ISerializeChunk,
   type ISerializeParser,
   type ISerializePlugin
 } from './src/index';
+import { systemScheduler } from '@migaia/lifecycle';
 
 async function readmeExample() {
   const registry = createSerializeRegistry([jsonPlugin()]);
-  const chunk = await registry.encode({ answer: 42 }, { source: 'settings' });
-  const value = await registry.decode(chunk, { source: 'settings' });
+  const chunk = await registry.encode({ answer: 42 }, { context: 'settings' });
+  const value = await registry.decode(chunk, { context: 'settings' });
   registry.dispose();
 
   const hugeArrayOfRows: unknown[] = [];
-  const stream = encodeStream(registry, hugeArrayOfRows, { initialItems: 500, maxInFlight: 2 });
+  const stream = encodeStream(registry, hugeArrayOfRows, {
+    initialItems: 500,
+    maxInFlight: 2,
+    scheduler: systemScheduler
+  });
   const collected = await collectStream(stream);
   void value; void collected;
 }
@@ -48,19 +53,20 @@ async function useguideExample() {
       initialItems: 500,
       maxInFlight: 2,
       signal: controller.signal,
-      source: 'export-rows'
+      context: 'export-rows',
+      scheduler: systemScheduler
     })) {
       wire.push(chunk);
     }
   } catch (error) {
-    if (error instanceof SerializeError) {
+    if (error instanceof SerializeCodecError) {
       console.error(`导出在第 ${error.chunkIndex} 片失败：${error.message}`, { cause: error.cause });
     }
     throw error;
   }
 
   const restored: unknown[] = [];
-  for await (const rows of decodeStream(registry, wire as never, { source: 'export-rows' })) {
+  for await (const rows of decodeStream(registry, wire as never, { context: 'export-rows' })) {
     restored.push(...(rows as unknown[]));
   }
   registry.dispose();

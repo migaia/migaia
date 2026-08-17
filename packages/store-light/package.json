@@ -28,6 +28,7 @@
     "test": "vitest run test"
   },
   "dependencies": {
+    "@migaia/lifecycle": "workspace:^",
     "@migaia/reactive": "workspace:^"
   },
   "devDependencies": {

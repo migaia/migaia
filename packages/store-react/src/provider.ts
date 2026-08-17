@@ -1,14 +1,16 @@
 import { useContext } from 'react';
 import type { IReactiveStore, IStoreShape } from '@migaia/store-light';
 import type { IRuntime } from '@migaia/reactive';
-import { StoreRegistryContext } from './provider-context';
-import type { StoreToken } from './provider-registry';
-import { useStore } from './useStore';
+import { StoreRegistryContext } from './provider-context.js';
+import type { IStoreToken } from './provider-registry.js';
+import { useStore } from './useStore.js';
+import { createStoreReactError } from './errors.js';
+import { StoreReactErrorCode } from './error-code.js';
 
-export { StoreProvider } from './StoreProvider';
-export type { IStoreProviderProps } from './StoreProvider';
-export { StoreRegistry, createStoreRegistry, createStoreToken } from './provider-registry';
-export type { IStoreRegistrationOptions, StoreToken } from './provider-registry';
+export { StoreProvider } from './StoreProvider.js';
+export type { IStoreProviderProps } from './StoreProvider.js';
+export { StoreRegistry, createStoreRegistry, createStoreToken } from './provider-registry.js';
+export type { IStoreRegistrationOptions, IStoreToken } from './provider-registry.js';
 export {
   assertStoreFeature,
   normalizeStoreConfig,
@@ -16,7 +18,7 @@ export {
   useAssertStoreFeature,
   useStoreConfig,
   useStoreFeature
-} from './store-config';
+} from './store-config.js';
 export type {
   IStoreFeatureExperimental,
   IStoreFeaturePath,
@@ -25,12 +27,15 @@ export type {
   IStoreProviderDefaults,
   IStoreReadyBarrier,
   IStoreConfigValue
-} from './store-config';
+} from './store-config.js';
 
 export function useStoreRegistry() {
   const registry = useContext(StoreRegistryContext);
   if (!registry) {
-    throw new Error('[store] hook requires a StoreProvider');
+    throw createStoreReactError(
+      StoreReactErrorCode.providerRequired,
+      '[store] hook requires a StoreProvider'
+    );
   }
   return registry;
 }
@@ -39,12 +44,12 @@ export function useStoreRuntime(): IRuntime {
   return useStoreRegistry().runtime;
 }
 
-export function useStoreFromProvider<T>(token: StoreToken<T>): T {
+export function useStoreFromProvider<T>(token: IStoreToken<T>): T {
   return useStoreRegistry().require(token);
 }
 
 export function useProvidedStore<S extends Record<string, unknown>, Result>(
-  token: StoreToken<IReactiveStore<S>>,
+  token: IStoreToken<IReactiveStore<S>>,
   selector: (state: IStoreShape<S>) => Result,
   isEqual?: (left: Result, right: Result) => boolean
 ): Result {

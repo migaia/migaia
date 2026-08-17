@@ -1,6 +1,6 @@
-import type { IWebRpcMiddleware, IWebRpcUuidConfig } from '../typing';
-import { WebRpcCapabilityKey } from '../internal/runtime';
-import { WebRpcError, WebRpcErrorCode } from '../errors';
+import type { IWebRpcMiddleware, IWebRpcUuidConfig } from '../typing.js';
+import { WebRpcCapabilityKey } from '../internal/runtime.js';
+import { WebRpcError, WebRpcErrorCode } from '../errors.js';
 export const uuid = (config: IWebRpcUuidConfig = {}): IWebRpcMiddleware => ({
   name: 'uuid',
   install: ({ capabilities }) => {

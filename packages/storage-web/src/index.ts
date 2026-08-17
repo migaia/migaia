@@ -11,7 +11,7 @@ export {
   type ICookiesOptions,
   type ICookieDocument,
   type IIndexedDbOptions
-} from './backends';
+} from './backends/index.js';
 
 // 契约
 export type {
@@ -40,22 +40,37 @@ export type {
   ICookieScope,
   ISyncCapableStore,
   IWebStorageLike
-} from './types';
-export { StorageError, StorageErrorCode, asRecordStore, isRecordStore } from './types';
-export { ConflictPolicy } from './types';
-export { lengthPrefixedNamespaceCodec } from './utils/key';
-export type { INamespaceCodec } from './utils/key';
+} from './types/index.js';
+export { StorageError, StorageErrorCode, asRecordStore, isRecordStore } from './types/index.js';
+export { ConflictPolicy } from './types/index.js';
+export { lengthPrefixedNamespaceCodec } from './utils/key.js';
+export type { INamespaceCodec } from './utils/key.js';
+
+// 契约级错误家族（透传自 @migaia/storage-contract）
+export {
+  StorageContractError,
+  StorageContractErrorCode,
+  STORAGE_CONTRACT_SOURCE,
+  isStorageContractError,
+  type IStorageContractErrorCode,
+  type IStorageContractErrorDetails
+} from '@migaia/storage-contract';
 
 // 序列化接入层
-export { jsonCodec, structuredCodec, binaryCodec, selectCodec } from './serialize';
-export type { ICodec, ICodecOutput, ISelectedCodec } from './serialize';
+export { jsonCodec, structuredCodec, binaryCodec, selectCodec } from './serialize/index.js';
+export type { ICodec, ICodecOutput, ISelectedCodec } from './serialize/index.js';
 
 // schema 接入层
-export { passthrough, fromStandardSchema, runMigrations } from './schema';
-export type { ISchemaAdapter, IStandardSchemaV1, IMigration, IMigrationContext } from './schema';
+export { passthrough, fromStandardSchema, runMigrations } from './schema/index.js';
+export type {
+  ISchemaAdapter,
+  IStandardSchemaV1,
+  IMigration,
+  IMigrationContext
+} from './schema/index.js';
 
 // entity
-export { defineEntity } from './entity';
+export { defineEntity } from './entity/index.js';
 export type {
   IEntityDefinition,
   IEntityOptions,
@@ -68,4 +83,4 @@ export type {
   IInvalidRecordHandler,
   IRecordComparator,
   IRepository
-} from './entity';
+} from './entity/index.js';

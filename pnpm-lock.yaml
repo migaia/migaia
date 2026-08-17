@@ -37,6 +37,19 @@ importers:
         version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2))
 
   packages/capability:
+    dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
+    devDependencies:
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.2
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2))
+
+  packages/lifecycle:
     devDependencies:
       typescript:
         specifier: ~6.0.2
@@ -47,6 +60,9 @@ importers:
 
   packages/logger:
     dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
       '@migaia/plugin-host':
         specifier: workspace:^
         version: link:../plugin-host
@@ -54,7 +70,11 @@ importers:
         specifier: 4.3.1
         version: 4.3.1
 
-  packages/plugin-host: {}
+  packages/plugin-host:
+    dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
 
   packages/reactive:
     devDependencies:
@@ -67,6 +87,9 @@ importers:
 
   packages/resource:
     dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
       '@migaia/reactive':
         specifier: workspace:^
         version: link:../reactive
@@ -79,6 +102,23 @@ importers:
         version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2))
 
   packages/serialize:
+    dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
+    devDependencies:
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.2
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2))
+
+  packages/storage-contract:
+    dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
     devDependencies:
       typescript:
         specifier: ~6.0.2
@@ -88,7 +128,14 @@ importers:
         version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2))
 
   packages/storage-web:
+    dependencies:
+      '@migaia/storage-contract':
+        specifier: workspace:^
+        version: link:../storage-contract
     devDependencies:
+      '@migaia/web-rpc':
+        specifier: workspace:^
+        version: link:../web-rpc
       '@vitest/coverage-v8':
         specifier: 4.1.10
         version: 4.1.10(vitest@4.1.10)
@@ -136,6 +183,9 @@ importers:
 
   packages/store-keyed:
     dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
       '@migaia/reactive':
         specifier: workspace:^
         version: link:../reactive
@@ -149,6 +199,9 @@ importers:
 
   packages/store-light:
     dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
       '@migaia/reactive':
         specifier: workspace:^
         version: link:../reactive
@@ -206,6 +259,9 @@ importers:
 
   packages/store-react:
     dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
       '@migaia/reactive':
         specifier: workspace:^
         version: link:../reactive
@@ -314,6 +370,10 @@ importers:
   packages/wasm: {}
 
   packages/web-rpc:
+    dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
     devDependencies:
       typescript:
         specifier: ~6.0.2

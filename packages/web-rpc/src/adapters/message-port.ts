@@ -1,6 +1,8 @@
-import type { IWebRpcSendOptions, IWebRpcTransport } from '../transport';
-import { safeRead, safeString } from '../internal/safe-value';
-import { registerListeners, releaseListeners } from '../internal/listener-safety';
+import { WebRpcTransportError } from '../errors.js';
+import type { IWebRpcSendOptions, IWebRpcTransport } from '../transport.js';
+import { safeRead, safeString } from '../internal/safe-value.js';
+import { registerListeners, releaseListeners } from '../internal/listener-safety.js';
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js';
 
 /**
  * Structural shape of Node's `worker_threads.MessagePort` (and close enough to `EventEmitter`
@@ -68,18 +70,18 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
     ]);
   };
   return {
-    platform: 'MessagePort',
+    platform: WebRpcPlatform.messagePort,
     topology: 'exclusive',
     ownership,
     get closed() {
       return closed;
     },
     send(message, options?: IWebRpcSendOptions<TTransfer>) {
-      if (closed) throw new Error('[rpc] browser message port is closed');
+      if (closed) throw new WebRpcTransportError('[rpc] browser message port is closed');
       port.postMessage(message, options?.transfer);
     },
     subscribe(listener) {
-      if (closed) throw new Error('[rpc] browser message port is closed');
+      if (closed) throw new WebRpcTransportError('[rpc] browser message port is closed');
       if (messageListeners.size === 0) {
         registerListeners([
           {
@@ -180,21 +182,21 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IWeb
   };
 
   return {
-    platform: 'MessagePort',
+    platform: WebRpcPlatform.messagePort,
     topology: 'exclusive',
-    ownership: 'borrowed',
+    ownership: WebRpcTransportOwnership.borrowed,
     get closed() {
       return closed;
     },
     send(message, options?: IWebRpcSendOptions) {
-      if (closed) throw new Error('[rpc] message port is closed');
+      if (closed) throw new WebRpcTransportError('[rpc] message port is closed');
       port.postMessage(message, options?.transfer);
     },
     // Lazily attached/detached the same way as the web-worker adapter —
     // a client that closes must not leave the underlying port still
     // referencing listeners it can no longer reach.
     subscribe(listener) {
-      if (closed) throw new Error('[rpc] message port is closed');
+      if (closed) throw new WebRpcTransportError('[rpc] message port is closed');
       if (messageListeners.size === 0) port.on('message', onMessage);
       messageListeners.add(listener);
       return () => {

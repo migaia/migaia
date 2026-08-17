@@ -1,16 +1,25 @@
-import { DependencyTracker } from './dependency-tracker.class';
-import { Scheduler } from './scheduler.class';
-import { VersionClock } from './version-clock.class';
-import { Scope } from './scope.class';
-import { internalsOf, registerInternals } from './internals';
-import { assertReactiveOwnedBy } from './ownership';
-import { setVersion } from './node-internals';
+import { DependencyTracker } from './dependency-tracker.class.js';
+import { Scheduler } from './scheduler.class.js';
+import { VersionClock } from './version-clock.class.js';
+import { defaultRuntimeAdapter } from './default-runtime-adapter.js';
+import { internalsOf, registerInternals } from './internals.js';
+import { assertReactiveOwnedBy } from './ownership.js';
+import { setVersion } from './node-internals.js';
+import { consumePendingCopyWarning, noteRuntimeCopy } from './copy-check.js';
+import { createReactiveError, tagReactiveError } from '../errors.js';
+import { ReactiveErrorCode } from '../error-code.js';
+import {
+  ReactiveErrorPhase,
+  ReactiveTracePhase,
+  ReactiveTraceReason,
+  ReactiveTraceType
+} from './trace-constants.js';
 import {
   containDiagnosticRejection,
   describeObservable,
   sanitizeErrorContext,
   sanitizeTraceEvent
-} from './diagnostics';
+} from './diagnostics.js';
 import {
   RUNTIME_BRAND,
   type IDisposer,
@@ -23,10 +32,10 @@ import {
   type IRuntimeOptions,
   type IRuntimeTraceEvent,
   type ISchedulerStrategy
-} from './types';
-import { Signal } from '../reactive/signal.class';
-import { Computed, type IComputedConfig } from '../reactive/computed.class';
-import { Effect } from '../reactive/effect.class';
+} from './types.js';
+import { Signal } from '../reactive/signal.class.js';
+import { Computed, type IComputedConfig } from '../reactive/computed.class.js';
+import { Effect } from '../reactive/effect.class.js';
 
 // 一个 Runtime = 一套独立的版本时钟 + 依赖追踪上下文 + 冲刷调度器 + 节点工厂。
 // 同一个 Runtime 内的节点共享一张依赖图、一条单调版本时钟；不同 Runtime 之间完全隔离。
@@ -41,13 +50,34 @@ export class Runtime implements IRuntime {
   #traceListeners = new Set<(event: IRuntimeTraceEvent) => void>();
 
   constructor(options: IRuntimeOptions = {}) {
+    // 入口快照并校验 adapter 字段（AF-25/AF-28）：先 try/catch 读取自有字段（hostile getter 包装为
+    // INVALID_OPTION + cause），只把「函数」字段写入 resolved adapter——显式 `undefined` 视为 omitted、
+    // 不覆盖默认实现，杜绝「校验放行、spread 覆盖默认、首用裸抛」。
+    const adapter = { ...defaultRuntimeAdapter };
+    if (options.adapter !== undefined) {
+      for (const key of ['scheduleMicrotask', 'now', 'timestamp', 'reportError'] as const) {
+        let value: unknown;
+        try {
+          value = options.adapter[key];
+        } catch (error) {
+          throw tagReactiveError(
+            new TypeError(`[store] runtime adapter "${key}" getter failed`, { cause: error }),
+            ReactiveErrorCode.invalidOption
+          );
+        }
+        if (value === undefined) continue; // 显式 undefined = omitted，保留默认
+        if (typeof value !== 'function') {
+          throw tagReactiveError(
+            new TypeError(`[store] runtime adapter "${key}" must be a function`),
+            ReactiveErrorCode.invalidOption
+          );
+        }
+        adapter[key] = value as never;
+      }
+    }
     const clock = new VersionClock();
     const tracker = new DependencyTracker(this);
-    this.#onError =
-      options.onError ??
-      ((error, context) => {
-        console.error(`[store] reactive ${context.phase} error`, error);
-      });
+    this.#onError = options.onError ?? adapter.reportError;
     if (options.onTrace) this.#traceListeners.add(options.onTrace);
     const traceEnabled = (): boolean => this.#traceListeners.size > 0;
     const emitTrace = (event: IRuntimeTraceEvent): void => {
@@ -58,16 +88,17 @@ export class Runtime implements IRuntime {
           // tracking frame. Diagnostic reads must never join that graph.
           const result: unknown = tracker.untracked(() => listener(snapshot));
           containDiagnosticRejection(result, (error) =>
-            this.reportError(error, { phase: 'trace-listener' })
+            this.reportError(error, { phase: ReactiveErrorPhase.traceListener })
           );
         } catch (error) {
-          this.reportError(error, { phase: 'trace-listener' });
+          this.reportError(error, { phase: ReactiveErrorPhase.traceListener });
         }
       }
     };
     const scheduler = new Scheduler(
-      (error) => this.reportError(error, { phase: 'async-flush' }),
-      options.maxFlushPasses
+      (error) => this.reportError(error, { phase: ReactiveErrorPhase.asyncFlush }),
+      options.maxFlushPasses,
+      adapter.scheduleMicrotask
     );
     // 通知闭包只保存在 WeakMap 内部面。Runtime 实例本身没有 notify 方法，
     // 因而第三方不能拿一个伪造节点绕过受控节点 API。
@@ -76,10 +107,10 @@ export class Runtime implements IRuntime {
       setVersion(source, version);
       if (traceEnabled()) {
         emitTrace({
-          type: 'observable-change',
-          timestamp: Date.now(),
+          type: ReactiveTraceType.observableChange,
+          timestamp: adapter.timestamp(),
           observable: describeObservable(source),
-          reason: 'notify'
+          reason: ReactiveTraceReason.notify
         });
       }
       scheduler.runDeferred(() => {
@@ -99,17 +130,27 @@ export class Runtime implements IRuntime {
       return result;
     };
     // 内部面只经 WeakMap 暴露；拿到 Runtime 的第三方无法沿引用链摸到图。
-    const deferIdle = options.scheduleIdle ?? ((task) => queueMicrotask(task));
+    const deferIdle = options.scheduleIdle ?? adapter.scheduleMicrotask;
     registerInternals(this, {
       clock,
       tracker,
       scheduler,
+      now: adapter.now,
+      timestamp: adapter.timestamp,
       traceEnabled,
       emitTrace,
       notify,
       commitSource,
       deferIdle
     });
+    // 多副本警告发生在 Runtime 建立前（createRuntime 先 noteRuntimeCopy 再 new）——经 `reportError` 的
+    // containment 上报：reporter 同步抛/异步拒绝都不会破坏构造、不会产生 unhandled rejection（AF-18）。
+    const copyWarning = consumePendingCopyWarning();
+    if (copyWarning !== undefined) {
+      this.reportError(createReactiveError(ReactiveErrorCode.copyConflict, copyWarning), {
+        phase: ReactiveErrorPhase.lifecycleHook
+      });
+    }
   }
 
   signal<T>(value: T, options?: IReactiveNodeOptions): Signal<T> {
@@ -121,10 +162,6 @@ export class Runtime implements IRuntime {
   effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer {
     const e = new Effect(fn, this, options);
     return () => e.dispose();
-  }
-  // 新建一个所有权作用域——Store 用它统一持有/释放内部 Computed/Effect 等资源
-  createScope(): Scope {
-    return new Scope();
   }
   batch<T>(fn: () => T): T {
     return internalsOf(this).scheduler.runBatched(fn);
@@ -143,34 +180,37 @@ export class Runtime implements IRuntime {
   }
   runTracedAction<T>(name: string, fn: () => T): T {
     if (typeof name !== 'string' || name.length === 0) {
-      throw new TypeError('[store] traced action name must be a non-empty string');
+      throw tagReactiveError(
+        new TypeError('[store] traced action name must be a non-empty string'),
+        ReactiveErrorCode.invalidOption
+      );
     }
     const diagnostics = internalsOf(this);
     if (!diagnostics.traceEnabled()) return fn();
-    const startedAt = now();
+    const startedAt = diagnostics.now();
     diagnostics.emitTrace({
-      type: 'action',
-      timestamp: Date.now(),
-      phase: 'start',
+      type: ReactiveTraceType.action,
+      timestamp: diagnostics.timestamp(),
+      phase: ReactiveTracePhase.start,
       name
     });
     try {
       const result = fn();
       diagnostics.emitTrace({
-        type: 'action',
-        timestamp: Date.now(),
-        phase: 'end',
+        type: ReactiveTraceType.action,
+        timestamp: diagnostics.timestamp(),
+        phase: ReactiveTracePhase.end,
         name,
-        durationMs: now() - startedAt
+        durationMs: diagnostics.now() - startedAt
       });
       return result;
     } catch (error) {
       diagnostics.emitTrace({
-        type: 'action',
-        timestamp: Date.now(),
-        phase: 'error',
+        type: ReactiveTraceType.action,
+        timestamp: diagnostics.timestamp(),
+        phase: ReactiveTracePhase.error,
         name,
-        durationMs: now() - startedAt,
+        durationMs: diagnostics.now() - startedAt,
         error
       });
       throw error;
@@ -198,9 +238,8 @@ export class Runtime implements IRuntime {
 
 /** 新建一个隔离运行时——SSR 每请求一个、每个测试用例一个、Worker 一个… */
 export function createRuntime(options?: IRuntimeOptions): Runtime {
+  // 双实例自检（copy-check.ts）：创建 Runtime 是首个正确性边界，登记本副本，使
+  // runtimeCopyCount()/assertSingleRuntimeCopy() 能发现「两份模块副本」的部署错误。
+  noteRuntimeCopy();
   return new Runtime(options);
-}
-
-function now(): number {
-  return globalThis.performance?.now() ?? Date.now();
 }

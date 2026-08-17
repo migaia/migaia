@@ -440,8 +440,11 @@ describe('PluginHost', () => {
     expect(() => host.config.get('config-facade.enabled')).toThrow(PluginHostError);
   });
 
-  it('uses a distinct error code when install rollback also fails', async () => {
-    const host = new Host();
+  it('keeps the original construct error as primary and reports a rollback failure via diagnostic (M-T44/L-T39)', async () => {
+    const diagnostics: Array<{ message: string; code?: string }> = [];
+    const host = new Host({
+      diagnostic: (message: string, code?: string) => diagnostics.push({ message, code })
+    } as any);
     await expect(
       host.use(
         plugin('rollback-resource', (core) => {
@@ -455,9 +458,15 @@ describe('PluginHost', () => {
         })
       )
     ).rejects.toMatchObject({
-      code: 'PLUGIN_INSTALL_ROLLBACK_FAILED',
-      cause: expect.any(AggregateError)
+      code: 'PLUGIN_INSTALL_FAILED',
+      cause: expect.objectContaining({ message: expect.stringContaining('install failure') })
     });
+    expect(
+      diagnostics.some(
+        (entry) =>
+          entry.code === 'PLUGIN_INSTALL_ROLLBACK_FAILED' && /rollback dispose/.test(entry.message)
+      )
+    ).toBe(true);
   });
 
   it('cleans extensions when plugin dispose fails', async () => {

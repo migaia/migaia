@@ -1,6 +1,6 @@
-import type { IEmptyPluginExt, ILoggerPluginCore, ILoggerPlugin } from '../typing';
+import type { IEmptyPluginExt, ILoggerPluginCore, ILoggerPlugin } from '../typing.js';
 import type { IPipelineMode } from '@migaia/plugin-host';
-import { waitUntil } from '../bounded-wait';
+import { boundedWait } from '@migaia/lifecycle';
 
 export type IBatchPluginConfig = {
   maxSize?: number;
@@ -73,11 +73,12 @@ class BatchPlugin implements ILoggerPlugin<
     const flush = async (): Promise<void> => {
       if (flushing) return flushing;
       flushing = (async () => {
-        const deadline = Date.now() + 3000;
+        const deadline = core.scheduler.now() + 3000;
         do {
           await flushBatch();
-          if (!(await waitUntil(Promise.all(inFlight), deadline))) return;
-        } while ((buffer.length > 0 || inFlight.size > 0) && Date.now() < deadline);
+          if (!(await boundedWait(Promise.all(inFlight), deadline, { scheduler: core.scheduler })))
+            return;
+        } while ((buffer.length > 0 || inFlight.size > 0) && core.scheduler.now() < deadline);
       })();
       try {
         await flushing;

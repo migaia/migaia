@@ -1,7 +1,14 @@
-import { PluginHost, type IPlugin, type IPluginHostOptions } from '@migaia/plugin-host';
-import type { IDisposer, IRuntime } from '@migaia/reactive';
-import type { IRuntimeErrorPhase } from '@migaia/reactive/runtime/types';
+import {
+  PluginHost,
+  PluginHostPipelineMode,
+  type IPlugin,
+  type IPluginHostOptions
+} from '@migaia/plugin-host';
+import { ReactiveErrorPhase, type IDisposer, type IRuntime } from '@migaia/reactive';
+import type { IRuntimeErrorPhase } from '@migaia/reactive/runtime';
 import type { IReactiveStore } from '@migaia/store-light';
+import { createStoreMiddlewareError } from './errors.js';
+import { StoreMiddlewareErrorCode } from './error-code.js';
 import {
   createMutationPolicy,
   type IDevToolsAdapter,
@@ -9,7 +16,9 @@ import {
   type IMiddlewareContext,
   type MutationPolicy,
   type IStoreMiddleware
-} from './middleware';
+} from './middleware.js';
+import { ClonePolicy } from './tolerant-clone.js';
+import { MiddlewareEventPhase, MiddlewareEventType } from './event-constants.js';
 
 export type IStoreMiddlewareCore<S> = {
   readonly runtime: IRuntime;
@@ -50,7 +59,7 @@ export class StoreMiddlewareHost<S> extends PluginHost<
   #bindingDisposers: IDisposer[] = [];
 
   constructor(options: IStoreMiddlewareHostOptions<S>) {
-    super({ ...options, pipeline: { ...options.pipeline, mode: 'sync' } });
+    super({ ...options, pipeline: { ...options.pipeline, mode: PluginHostPipelineMode.sync } });
     this.#runtime = options.runtime;
     this.#getState = options.getState;
     this.#applyState = options.applyState;
@@ -63,7 +72,10 @@ export class StoreMiddlewareHost<S> extends PluginHost<
       getState: () => this.#getState(),
       applyState: (state) => {
         if (!this.#applyState)
-          throw new Error('[store] DevTools state command requires applyState');
+          throw createStoreMiddlewareError(
+            StoreMiddlewareErrorCode.devtoolsCapability,
+            '[store] DevTools state command requires applyState'
+          );
         this.#applyState(state);
       },
       reportError: (error, phase) =>
@@ -77,9 +89,13 @@ export class StoreMiddlewareHost<S> extends PluginHost<
       completed = true;
     });
     if (!completed) {
-      this.#runtime.reportError(new Error('[store] middleware did not call next()'), {
-        phase: 'trace-listener'
-      });
+      this.#runtime.reportError(
+        createStoreMiddlewareError(
+          StoreMiddlewareErrorCode.middlewareNotChained,
+          '[store] middleware did not call next()'
+        ),
+        { phase: ReactiveErrorPhase.traceListener }
+      );
     }
   }
 
@@ -87,18 +103,24 @@ export class StoreMiddlewareHost<S> extends PluginHost<
     try {
       this.emit(event);
     } catch (error) {
-      this.#runtime.reportError(error, { phase: 'trace-listener' });
+      this.#runtime.reportError(error, { phase: ReactiveErrorPhase.traceListener });
     }
   }
 
   runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T {
     const startedAt = globalThis.performance?.now() ?? Date.now();
-    this.#emitIsolated({ type: 'action', phase: 'start', name, timestamp: Date.now(), metadata });
+    this.#emitIsolated({
+      type: MiddlewareEventType.action,
+      phase: MiddlewareEventPhase.start,
+      name,
+      timestamp: Date.now(),
+      metadata
+    });
     try {
       const result = this.mutationPolicy.runInAction(() => this.#runtime.batch(fn));
       this.#emitIsolated({
-        type: 'action',
-        phase: 'end',
+        type: MiddlewareEventType.action,
+        phase: MiddlewareEventPhase.end,
         name,
         timestamp: Date.now(),
         durationMs: (globalThis.performance?.now() ?? Date.now()) - startedAt,
@@ -107,8 +129,8 @@ export class StoreMiddlewareHost<S> extends PluginHost<
       return result;
     } catch (error) {
       this.#emitIsolated({
-        type: 'action',
-        phase: 'error',
+        type: MiddlewareEventType.action,
+        phase: MiddlewareEventPhase.error,
         name,
         timestamp: Date.now(),
         durationMs: (globalThis.performance?.now() ?? Date.now()) - startedAt,
@@ -125,17 +147,30 @@ export class StoreMiddlewareHost<S> extends PluginHost<
     next: S,
     metadata?: Readonly<Record<string, unknown>>
   ): void {
-    this.#emitIsolated({ type: 'state', name, timestamp: Date.now(), previous, next, metadata });
+    this.#emitIsolated({
+      type: MiddlewareEventType.state,
+      name,
+      timestamp: Date.now(),
+      previous,
+      next,
+      metadata
+    });
   }
 
   recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void {
     if (this.#reportingError) {
-      this.#runtime.reportError(error, { phase: 'trace-listener' });
+      this.#runtime.reportError(error, { phase: ReactiveErrorPhase.traceListener });
       return;
     }
     this.#reportingError = true;
     try {
-      this.#emitIsolated({ type: 'error', phase, timestamp: Date.now(), error, metadata });
+      this.#emitIsolated({
+        type: MiddlewareEventType.error,
+        phase,
+        timestamp: Date.now(),
+        error,
+        metadata
+      });
     } finally {
       this.#reportingError = false;
     }
@@ -235,7 +270,7 @@ export function bindStoreMiddleware<S extends Record<string, unknown>>(
   store: IReactiveStore<S>,
   options: IStoreMiddlewareBindingOptions = {}
 ): IStoreMiddlewareBinding<S> {
-  const clone = options.clone ?? ((state) => structuredClone(state));
+  const clone = options.clone ?? ((state) => ClonePolicy.diagnostic(state));
   let previous = clone(store.$plain());
   const host = new StoreMiddlewareHost<Record<string, unknown>>({
     runtime: store.$runtime,
@@ -250,24 +285,29 @@ export function bindStoreMiddleware<S extends Record<string, unknown>>(
   });
   const unsubscribeTrace = store.$runtime.subscribeTrace((event) => {
     if (
-      event.type !== 'action' ||
+      event.type !== MiddlewareEventType.action ||
       (options.actionPrefix && !event.name.startsWith(options.actionPrefix))
     )
       return;
-    if (event.phase === 'start')
-      host.emit({ type: 'action', phase: 'start', name: event.name, timestamp: event.timestamp });
-    else if (event.phase === 'end')
+    if (event.phase === MiddlewareEventPhase.start)
       host.emit({
-        type: 'action',
-        phase: 'end',
+        type: MiddlewareEventType.action,
+        phase: MiddlewareEventPhase.start,
+        name: event.name,
+        timestamp: event.timestamp
+      });
+    else if (event.phase === MiddlewareEventPhase.end)
+      host.emit({
+        type: MiddlewareEventType.action,
+        phase: MiddlewareEventPhase.end,
         name: event.name,
         timestamp: event.timestamp,
         durationMs: event.durationMs ?? 0
       });
     else
       host.emit({
-        type: 'action',
-        phase: 'error',
+        type: MiddlewareEventType.action,
+        phase: MiddlewareEventPhase.error,
         name: event.name,
         timestamp: event.timestamp,
         durationMs: event.durationMs ?? 0,

@@ -1,11 +1,11 @@
-import { WebRpcAuthenticationError, WebRpcError, WebRpcErrorCode } from '../errors';
-import { WebRpcCapabilityKey } from '../internal/runtime';
+import { WebRpcAuthenticationError, WebRpcError, WebRpcErrorCode } from '../errors.js';
+import { WebRpcCapabilityKey } from '../internal/runtime.js';
 import type {
   IWebRpcAuthenticationCapability,
   IWebRpcAuthenticationConfig,
   IWebRpcAuthenticationTransform,
   IWebRpcMiddleware
-} from '../typing';
+} from '../typing.js';
 
 /** Installs optional per-frame encryption and signing transforms. */
 export const authentication = (config: IWebRpcAuthenticationConfig): IWebRpcMiddleware => ({

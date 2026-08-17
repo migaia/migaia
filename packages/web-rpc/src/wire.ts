@@ -1,6 +1,8 @@
-export type IWebRpcVariation = 'abort' | 'ping' | 'pong';
+import { WebRpcMessageKind, WebRpcVariation } from './protocol-constants.js';
+
+export type IWebRpcVariation = (typeof WebRpcVariation)[keyof typeof WebRpcVariation];
 export type IWebRpcDiscoveryQuery = {
-  readonly kind: 'discovery-query';
+  readonly kind: typeof WebRpcMessageKind.discoveryQuery;
   readonly taskId: string;
   readonly senderId: string;
   readonly targetId: string;
@@ -9,7 +11,7 @@ export type IWebRpcDiscoveryQuery = {
   readonly manual?: boolean;
 };
 export type IWebRpcDiscoveryResponse = {
-  readonly kind: 'discovery-response';
+  readonly kind: typeof WebRpcMessageKind.discoveryResponse;
   readonly taskId: string;
   readonly senderId: string;
   readonly targetId: string;
@@ -29,7 +31,7 @@ export type IWebRpcDiscoveryResponse = {
  * completed task.
  */
 export type IWebRpcChunkFrame = {
-  readonly kind: 'chunk';
+  readonly kind: typeof WebRpcMessageKind.chunk;
   readonly messageId: string;
   readonly index: number;
   readonly total: number;
@@ -39,7 +41,7 @@ export type IWebRpcChunkFrame = {
   readonly receiverId?: string;
 };
 export type IWebRpcRequest = {
-  readonly kind: 'request';
+  readonly kind: typeof WebRpcMessageKind.request;
   readonly version: string;
   readonly taskId: string;
   readonly senderId: string;
@@ -51,7 +53,7 @@ export type IWebRpcRequest = {
   readonly sentAt: number;
 };
 export type IWebRpcResponse = {
-  readonly kind: 'response';
+  readonly kind: typeof WebRpcMessageKind.response;
   readonly version: string;
   readonly taskId: string;
   readonly senderId: string;
@@ -70,7 +72,7 @@ export type IWebRpcEnvelope =
   | IWebRpcDiscoveryQuery
   | IWebRpcDiscoveryResponse
   | {
-      readonly kind: 'variation';
+      readonly kind: typeof WebRpcMessageKind.variation;
       readonly variation: IWebRpcVariation;
       readonly taskId: string;
       readonly senderId: string;
@@ -79,14 +81,14 @@ export type IWebRpcEnvelope =
       readonly sentAt: number;
     }
   | IWebRpcChunkFrame;
-import { safeRead } from './internal/safe-value';
-import { WebRpcError, WebRpcErrorCode } from './errors';
+import { safeRead } from './internal/safe-value.js';
+import { WebRpcError, WebRpcErrorCode } from './errors.js';
 
 /** Reads and freezes one canonical wire snapshot before protocol routing. */
 export function normalizeWebRpcEnvelope(value: unknown): IWebRpcEnvelope | undefined {
   if (!value || (typeof value !== 'object' && typeof value !== 'function')) return undefined;
   const kind = safeRead<unknown>(value, 'kind');
-  if (kind === 'discovery-query') {
+  if (kind === WebRpcMessageKind.discoveryQuery) {
     const taskId = safeRead<unknown>(value, 'taskId');
     const senderId = safeRead<unknown>(value, 'senderId');
     const targetId = safeRead<unknown>(value, 'targetId');
@@ -111,7 +113,7 @@ export function normalizeWebRpcEnvelope(value: unknown): IWebRpcEnvelope | undef
       ...(manual === true ? { manual } : {})
     });
   }
-  if (kind === 'discovery-response') {
+  if (kind === WebRpcMessageKind.discoveryResponse) {
     const taskId = safeRead<unknown>(value, 'taskId');
     const senderId = safeRead<unknown>(value, 'senderId');
     const targetId = safeRead<unknown>(value, 'targetId');
@@ -154,7 +156,7 @@ export function normalizeWebRpcEnvelope(value: unknown): IWebRpcEnvelope | undef
       ...(operation === undefined ? {} : { operation })
     }) as IWebRpcDiscoveryResponse;
   }
-  if (kind === 'request') {
+  if (kind === WebRpcMessageKind.request) {
     const version = safeRead<unknown>(value, 'version');
     const taskId = safeRead<unknown>(value, 'taskId');
     const senderId = safeRead<unknown>(value, 'senderId');
@@ -189,7 +191,7 @@ export function normalizeWebRpcEnvelope(value: unknown): IWebRpcEnvelope | undef
       ...(receiverId === undefined ? {} : { receiverId })
     }) as IWebRpcRequest;
   }
-  if (kind === 'response') {
+  if (kind === WebRpcMessageKind.response) {
     const version = safeRead<unknown>(value, 'version');
     const taskId = safeRead<unknown>(value, 'taskId');
     const senderId = safeRead<unknown>(value, 'senderId');
@@ -229,7 +231,7 @@ export function normalizeWebRpcEnvelope(value: unknown): IWebRpcEnvelope | undef
       ...(receiverId === undefined ? {} : { receiverId })
     }) as IWebRpcResponse;
   }
-  if (kind === 'variation') {
+  if (kind === WebRpcMessageKind.variation) {
     const variation = safeRead<unknown>(value, 'variation');
     const taskId = safeRead<unknown>(value, 'taskId');
     const senderId = safeRead<unknown>(value, 'senderId');
@@ -237,7 +239,9 @@ export function normalizeWebRpcEnvelope(value: unknown): IWebRpcEnvelope | undef
     const receiverId = safeRead<unknown>(value, 'receiverId');
     const sentAt = safeRead<unknown>(value, 'sentAt');
     if (
-      (variation !== 'abort' && variation !== 'ping' && variation !== 'pong') ||
+      (variation !== WebRpcVariation.abort &&
+        variation !== WebRpcVariation.ping &&
+        variation !== WebRpcVariation.pong) ||
       typeof senderId !== 'string' ||
       typeof targetId !== 'string' ||
       typeof taskId !== 'string' ||
@@ -256,7 +260,7 @@ export function normalizeWebRpcEnvelope(value: unknown): IWebRpcEnvelope | undef
       sentAt: sentAt as number
     });
   }
-  if (kind === 'chunk') {
+  if (kind === WebRpcMessageKind.chunk) {
     const messageId = safeRead<unknown>(value, 'messageId');
     const index = safeRead<unknown>(value, 'index');
     const total = safeRead<unknown>(value, 'total');
@@ -294,20 +298,20 @@ const isWebRpcEnvelopeUnsafe = (value: unknown): value is IWebRpcEnvelope => {
   if (!normalized) return false;
   const record = normalized as unknown as Record<string, unknown>;
   const kind = record.kind;
-  if (kind === 'discovery-query')
+  if (kind === WebRpcMessageKind.discoveryQuery)
     return (
       typeof record.taskId === 'string' &&
       typeof record.senderId === 'string' &&
       typeof record.targetId === 'string'
     );
-  if (kind === 'discovery-response')
+  if (kind === WebRpcMessageKind.discoveryResponse)
     return (
       typeof record.taskId === 'string' &&
       typeof record.senderId === 'string' &&
       typeof record.targetId === 'string' &&
       typeof record.resolvedTargetId === 'string'
     );
-  if (kind === 'request')
+  if (kind === WebRpcMessageKind.request)
     return (
       typeof record.version === 'string' &&
       typeof record.taskId === 'string' &&
@@ -317,7 +321,7 @@ const isWebRpcEnvelopeUnsafe = (value: unknown): value is IWebRpcEnvelope => {
       Number.isSafeInteger(record.sentAt) &&
       'data' in record
     );
-  if (kind === 'response')
+  if (kind === WebRpcMessageKind.response)
     return (
       typeof record.version === 'string' &&
       typeof record.taskId === 'string' &&
@@ -327,13 +331,13 @@ const isWebRpcEnvelopeUnsafe = (value: unknown): value is IWebRpcEnvelope => {
       typeof record.ok === 'boolean' &&
       Number.isSafeInteger(record.sentAt)
     );
-  if (kind === 'variation')
+  if (kind === WebRpcMessageKind.variation)
     return (
       typeof record.senderId === 'string' &&
       typeof record.targetId === 'string' &&
       ['abort', 'ping', 'pong'].includes(record.variation as string)
     );
-  if (kind === 'chunk')
+  if (kind === WebRpcMessageKind.chunk)
     return (
       typeof record.messageId === 'string' &&
       Number.isSafeInteger(record.index) &&

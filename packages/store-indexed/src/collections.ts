@@ -2,20 +2,27 @@ import { defaultRuntime } from '@migaia/reactive';
 import type { IDisposable, IRuntime } from '@migaia/reactive';
 import type { Signal } from '@migaia/reactive/reactive/signal.class';
 import type { IMutationGuard } from '@migaia/store-light';
-import { claimOwnership } from '@migaia/reactive/runtime/ownership';
+import { claimOwnership } from '@migaia/reactive/ownership';
 import {
   internalRuntimeOf,
   isRuntimeTracking,
   isAnyRuntimeTracking
-} from '@migaia/reactive/runtime/node-factories';
-import { ReactiveCellPool } from './reactive-cell-pool';
+} from '@migaia/reactive/node-factories';
+import { ReactiveCellPool } from './reactive-cell-pool.js';
+import {
+  createStoreIndexedError,
+  createStoreIndexedRangeError,
+  createStoreIndexedTypeError
+} from './errors.js';
+import { StoreIndexedErrorCode } from './error-code.js';
 
 const ABSENT = Symbol('observable-collection-absent');
 
 function isTrackingIn(runtime: IRuntime): boolean {
   const tracking = isRuntimeTracking(runtime);
   if (!tracking && isAnyRuntimeTracking()) {
-    throw new Error(
+    throw createStoreIndexedError(
+      StoreIndexedErrorCode.crossRuntime,
       '[store] cross-runtime dependency is not allowed: collection read belongs to another Runtime'
     );
   }
@@ -66,7 +73,10 @@ abstract class ObservableCollectionBase implements IDisposable {
 
   protected assertActive(): void {
     if (this.#disposed) {
-      throw new Error(`[store] ${this.debugName} is disposed`);
+      throw createStoreIndexedError(
+        StoreIndexedErrorCode.collectionDisposed,
+        `[store] ${this.debugName} is disposed`
+      );
     }
   }
 
@@ -285,7 +295,10 @@ export class ObservableArray<T> extends ObservableCollectionBase {
     this.assertMutation(`set(${index})`);
     assertIntegerIndex(index);
     if (index < 0 || index >= this.#values.length) {
-      throw new RangeError('[store] ObservableArray index out of range');
+      throw createStoreIndexedRangeError(
+        StoreIndexedErrorCode.indexOutOfRange,
+        '[store] ObservableArray index out of range'
+      );
     }
     if (Object.is(this.#values[index], value)) return;
     this.#values[index] = value;
@@ -744,6 +757,9 @@ function freezeArray<T>(values: Iterable<T>): readonly T[] {
 
 function assertIntegerIndex(index: number): void {
   if (!Number.isInteger(index)) {
-    throw new TypeError('[store] ObservableArray index must be an integer');
+    throw createStoreIndexedTypeError(
+      StoreIndexedErrorCode.invalidIndex,
+      '[store] ObservableArray index must be an integer'
+    );
   }
 }

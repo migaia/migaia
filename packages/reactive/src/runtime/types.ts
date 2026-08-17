@@ -1,6 +1,12 @@
 // 反应式内核的公共类型——只放类型，不放实现。谁需要这些类型就从这里 import，不必经过任何具体类/类实例。
 
-import type { IComputedConfig } from '../reactive/computed.class';
+import type { IComputedConfig } from '../reactive/computed.class.js';
+import {
+  ReactiveErrorPhase,
+  ReactiveTracePhase,
+  ReactiveTraceReason,
+  ReactiveTraceType
+} from './trace-constants.js';
 
 /**
  * Runtime 是本库创建并登记内部面的封闭对象，不是可结构伪造的 SPI。
@@ -51,31 +57,40 @@ export type IRuntimeNodeDescriptor = Readonly<{
 
 export type IRuntimeTraceEvent =
   | {
-      readonly type: 'observable-change';
+      readonly type: typeof ReactiveTraceType.observableChange;
       readonly timestamp: number;
       readonly observable: IRuntimeNodeDescriptor;
-      readonly reason: 'set' | 'notify';
+      readonly reason: typeof ReactiveTraceReason.set | typeof ReactiveTraceReason.notify;
     }
   | {
-      readonly type: 'dependency';
+      readonly type: typeof ReactiveTraceType.dependency;
       readonly timestamp: number;
-      readonly phase: 'connect' | 'disconnect';
+      readonly phase: typeof ReactiveTracePhase.connect | typeof ReactiveTracePhase.disconnect;
       readonly observable: IRuntimeNodeDescriptor;
       readonly observer: IRuntimeNodeDescriptor;
-      readonly reason?: 'retrack' | 'invalidate' | 'dispose';
+      readonly reason?:
+        | typeof ReactiveTraceReason.retrack
+        | typeof ReactiveTraceReason.invalidate
+        | typeof ReactiveTraceReason.dispose;
     }
   | {
-      readonly type: 'observer-run';
+      readonly type: typeof ReactiveTraceType.observerRun;
       readonly timestamp: number;
-      readonly phase: 'start' | 'end' | 'error';
+      readonly phase:
+        | typeof ReactiveTracePhase.start
+        | typeof ReactiveTracePhase.end
+        | typeof ReactiveTracePhase.error;
       readonly observer: IRuntimeNodeDescriptor;
       readonly durationMs?: number;
       readonly error?: unknown;
     }
   | {
-      readonly type: 'action';
+      readonly type: typeof ReactiveTraceType.action;
       readonly timestamp: number;
-      readonly phase: 'start' | 'end' | 'error';
+      readonly phase:
+        | typeof ReactiveTracePhase.start
+        | typeof ReactiveTracePhase.end
+        | typeof ReactiveTracePhase.error;
       readonly name: string;
       readonly durationMs?: number;
       readonly error?: unknown;
@@ -86,19 +101,6 @@ export type IRuntimeTraceEvent =
  * 实现它；节点/wasm 字段/React 适配层只依赖这个消费面，不碰具体类。 （这里 import type 反引用 Signal/Computed
  * 仅为类型，全部被擦除，不产生任何运行时循环依赖。）
  */
-/**
- * 所有权作用域的接口面。
- *
- * 用结构类型而不是 import Scope 类：`types.ts` 是叶子模块，反向 import 具体类会 让「只放类型」这句话失效（Resource 当年就是这么进内核的）。
- */
-export type IScope = {
-  readonly disposed: boolean;
-  own<T extends IDisposable>(resource: T): T;
-  release(resource: IDisposable): boolean;
-  dispose(): void;
-  disposeAsync(): Promise<void>;
-};
-
 export type IRuntime = {
   readonly [RUNTIME_BRAND]: true;
   // clock / tracker / scheduler / notify 已移出公共面：它们能绕过所有权校验、
@@ -110,12 +112,6 @@ export type IRuntime = {
   effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer;
   batch<T>(fn: () => T): T;
   untracked<T>(fn: () => T): T;
-  /**
-   * 新建一个所有权作用域。
-   *
-   * 返回类型必须随消费接口公开；否则任何只保存 IRuntime 的适配层都无法标注 createScope 的结果，只能反向依赖具体 Scope 类。
-   */
-  createScope(): IScope;
   /** 同步冲刷当前队列。observer 内重入时外层 flush 仍拥有队列，返回 `deferred`； 最外层调用完成并排空队列时返回 `completed`。 */
   flush(): IFlushResult;
   /** 受控地替换冲刷策略；只改变何时 flush，不交出 Scheduler 队列本身。 */
@@ -129,14 +125,7 @@ export type IRuntime = {
   subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer;
 };
 
-export type IRuntimeErrorPhase =
-  | 'async-flush'
-  | 'dependency-disconnect'
-  | 'lifecycle-hook'
-  // SSR 预取里某个 resource 失败：页面照发，缺的那份留给客户端重取
-  | 'ssr-resource'
-  | 'subscription-listener'
-  | 'trace-listener';
+export type IRuntimeErrorPhase = (typeof ReactiveErrorPhase)[keyof typeof ReactiveErrorPhase];
 
 export type IRuntimeErrorContext = {
   phase: IRuntimeErrorPhase;
@@ -154,7 +143,26 @@ export type IRuntimeErrorReportContext = {
   observable?: object;
 };
 
+/**
+ * 运行时宿主能力注入面（`docs/contracts/runtime-neutrality.sdd.md` R-9）。
+ *
+ * 与 lifecycle 的 `ILifecycleScheduler` 结构兼容但**不 import**：reactive 保持零 workspace 依赖。 `now()` 是单调
+ * duration 时钟；`timestamp()` 是事件时间戳（允许 epoch）；二者不得混用。默认值见 `default-runtime-adapter.ts`。
+ */
+export type IReactiveRuntimeAdapter = {
+  /** 调度一次微任务。 */
+  scheduleMicrotask(task: () => void): void;
+  /** 单调时间，用于 duration。 */
+  now(): number;
+  /** 事件时间戳，可与 duration 分离。 */
+  timestamp(): number;
+  /** 默认错误出口。 */
+  reportError(error: unknown, context: IRuntimeErrorContext): void;
+};
+
 export type IRuntimeOptions = {
+  /** 宿主能力注入面；缺省项回落到 `defaultRuntimeAdapter`。 */
+  adapter?: Partial<IReactiveRuntimeAdapter>;
   onError?: (error: unknown, context: IRuntimeErrorContext) => void;
   onTrace?: (event: IRuntimeTraceEvent) => void;
   /**
@@ -164,7 +172,7 @@ export type IRuntimeOptions = {
    */
   maxFlushPasses?: number;
   /**
-   * 无观察者 Computed 的挂起时机，默认 `queueMicrotask`。
+   * 无观察者 Computed 的挂起时机，默认走 adapter 的 `scheduleMicrotask`。
    *
    * 与调度策略分开：挂起是回收，不是冲刷。写死之后这条路径不受任何配置控制， rAF/idle 策略下时机对不上，测试也只能靠等微任务。
    */

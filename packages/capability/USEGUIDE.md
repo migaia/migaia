@@ -117,12 +117,9 @@ import {
 | `enable(name)` | `string` | `Promise<ICapabilityEnableResult>` | 异步 | 幂等启用：并发调用共享同一次 `activate()`。开关为假时直接返回 `{ status: 'blocked' }`，不会"偷偷打开"。 |
 | `enableResult(name)` | `string` | `Promise<ICapabilityEnableResult>` | 异步 | 当前是 `enable()` 的别名，语义完全一致。 |
 | `disable(name)` | `string` | `Promise<boolean>` | 异步 | 关闭并等待 handle 的 `dispose()`（含异步）真正完成后再 resolve；返回是否确实关掉了一个此前处于启用/在途状态的能力。 |
-| `disableAsync(name)` | `string` | `Promise<boolean>` | 异步 | `disable()` 的别名。 |
-| `dispose()` | 无 | `Promise<void>` | 异步 | `disposeAsync()` 的别名：按真实激活顺序反向（LIFO）关闭全部能力，并等待全部释放工作结束。 |
-| `disposeAsync()` | 无 | `Promise<void>` | 异步 | 同上。 |
+| `dispose()` | 无 | `Promise<void>` | 异步 | 唯一异步释放入口：按真实激活顺序反向（LIFO）关闭全部能力，并等待全部释放工作结束。 |
 | `enableLegacyBoolean(name)` | `string` | `Promise<boolean>` | 异步 | 语义与 `enable()` 相同，但只返回布尔值，用于接入尚未迁移到结构化结果的旧调用点。 |
 | `disableNow(name)` | `string` | `boolean` | 同步 | 同步版本：立即触发关闭和释放，但**不等待**异步 `dispose()` 完成即返回；确定要等清理完成用 `disable()`。 |
-| `disposeNow()` | 无 | `void` | 同步 | 同步版本的整体收尾：立即标记 disposed 并触发全部释放，但不等待异步清理完成。 |
 | `disposed` | 无 | `boolean`（只读） | 同步 | host 是否已经整体关闭；`true` 之后所有变更类方法都会抛错或拒绝。 |
 
 `enable()`/`enableResult()`/`enableLegacyBoolean()` 三者共享同一个内部实现和同一个 `pending` Promise：并发对同一名字调用 `enable()` 和 `enableLegacyBoolean()`，实际只会跑一次 `activate()`。
@@ -131,7 +128,7 @@ import {
 
 ## 6. 释放顺序与依赖
 
-- `dispose()`/`disposeAsync()`/`disposeNow()` 按**真实激活完成顺序**反向（LIFO）释放，具体规则见 [§4](#4-generation竞态与作废的激活)。
+- `dispose()` 按**真实激活完成顺序**反向（LIFO）释放，具体规则见 [§4](#4-generation竞态与作废的激活)。
 - `setFlags()` 替换快照导致的批量回退，同样按这个顺序释放；`disable(name)` 只影响单个条目，不触碰其余能力的顺序表位置。
 - 单个能力释放失败（`dispose()` 抛错或拒绝）不会阻断其余能力继续关闭——LIFO 回退路径必须能走完，一个失败不能连累其它已启用能力泄漏。
 - `dispose()` 之后 `disposed` 变为 `true`，host 永久不可用：`register`/`setFlag`/`setFlags` 直接抛错，`enable` 类方法返回被拒绝的 Promise（错误信息 `capability host is disposed`）。不要把同一个 host 复用给下一次请求或下一个租户，需要新的一轮应该创建新的 host。
@@ -167,9 +164,9 @@ String(host.error('worker')); // 包含 'chunk 404'
 
 ## 8. 重入与并发保护
 
-- **变更类方法之间互斥**：`register`/`setFlag`/`setFlags`/`disableNow`/`disposeNow`（及其别名 `disable`/`dispose` 触发的同步阶段）内部通过一个"事务深度"计数器互相保护——在这些方法内部（例如一个能力自己的 `dispose()` 回调）再去调用任何一个变更方法，会立即抛出 `capability host cannot mutate during a lifecycle transition`。这防止了"回退过程中被自己的清理逻辑打乱开关快照"这类难以复现的 bug。
+- **变更类方法之间互斥**：`register`/`setFlag`/`setFlags`/`disableNow`（及其别名 `disable`/`dispose` 触发的同步阶段）内部通过一个"事务深度"计数器互相保护——在这些方法内部（例如一个能力自己的 `dispose()` 回调）再去调用任何一个变更方法，会立即抛出 `capability host cannot mutate during a lifecycle transition`。这防止了"回退过程中被自己的清理逻辑打乱开关快照"这类难以复现的 bug。
 - `enable()`/`enableLegacyBoolean()` 在重入时不会同步抛错（它们是 async 语义），而是返回一个带上述错误信息的被拒绝 Promise。
-- `disposeAsync()`/`disable()` 内部用"循环直到稳定"的方式等待清理完成：因为一次释放本身可能在等待期间又产生新的、此前快照里不存在的释放任务（比如一个仍在进行中的激活，在 `disposeSync()` 跑完之后才拿到 handle，随即需要被就地释放），单次 `await` 可能错过这类"迟到"的清理工作。`disable()`/`disposeAsync()` 都会持续等到与该能力（或整个 host）相关的在途激活和在途释放都清零为止才真正 resolve。
+- `dispose()`/`disable()` 内部用"循环直到稳定"的方式等待清理完成：因为一次释放本身可能在等待期间又产生新的、此前快照里不存在的释放任务（比如一个仍在进行中的激活，在 `disposeSync()` 跑完之后才拿到 handle，随即需要被就地释放），单次 `await` 可能错过这类"迟到"的清理工作。`disable()`/`dispose()` 都会持续等到与该能力（或整个 host）相关的在途激活和在途释放都清零为止才真正 resolve。
 
 ---
 
@@ -237,8 +234,8 @@ await globex.enable('experimental-ai'); // { status: 'blocked' }
 **Q：关掉一个能力之后，过了一会儿它又自动变成 `on` 了。**
 正常情况下不应该发生——这正是 generation 机制要防止的竞态（见 [§4](#4-generation竞态与作废的激活)）。如果观察到这个现象，检查是否绕过了 host 直接持有并调用了 `activate()` 的返回值，或者在能力的 `dispose()` 里手动调用了 `enable()`（这类重入会被 [§8](#8-重入与并发保护) 描述的机制直接拒绝，但请确认没有捕获这个拒绝并静默重试）。
 
-**Q：`disableNow()`/`disposeNow()` 之后资源好像还没释放干净。**
-这两个是同步兼容接口，只是**触发**了 `dispose()`，不等待异步清理完成。如果 handle 的 `dispose()` 是异步的，需要用 `disable()`/`dispose()` 的 Promise 版本并 `await`。
+**Q：`disableNow()` 之后资源好像还没释放干净。**
+`disableNow()` 是同步兼容接口，只是**触发**了 `disable()`，不等待异步清理完成。如果 handle 的 `dispose()` 是异步的，需要用 `disable()`/`dispose()` 的 Promise 版本并 `await`。
 
 **Q：`setFlags({})` 之后所有能力都被关掉了，但我只想改一个。**
 `setFlags()` 是整份快照的原子替换，不是"打补丁"。只想改一个开关用 `setFlag(name, enabled)`；确实要批量替换，记得把所有仍需保留的能力都显式列进新快照。

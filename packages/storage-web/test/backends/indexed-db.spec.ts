@@ -1,3 +1,4 @@
+import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract';
 import { IDBDatabase, IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb';
 import { describe, expect, it } from 'vitest';
 import { indexedDb } from '../../src/backends/indexed-db';
@@ -17,7 +18,7 @@ describe('indexedDb backend', () => {
   it('构造期拒绝 null、数组和 primitive options', () => {
     for (const options of [null, [], 'options', 1])
       expect(() => indexedDb(options as never)).toThrowError(
-        expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+        expect.objectContaining({ code: 'INVALID_CONFIG' })
       );
   });
 
@@ -29,23 +30,23 @@ describe('indexedDb backend', () => {
           keyRange: IDBKeyRange,
           cleanupLegacyRecords: cleanupLegacyRecords as never
         })
-      ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+      ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }));
   });
 
-  it('构造字段 getter 异常统一返回 INVALID_ARGUMENT', () => {
+  it('构造字段 getter 异常统一返回 INVALID_CONFIG', () => {
     expect(() =>
       indexedDb({
         get dbName(): string {
           throw new Error('hostile dbName');
         }
       })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }));
   });
 
   it('拒绝运行时非字符串 value', async () => {
     const store = freshDb();
     await expect(store.set('key', 42 as unknown as string)).rejects.toMatchObject({
-      code: 'INVALID_ARGUMENT'
+      code: 'INVALID_CONFIG'
     });
     await store.dispose();
   });
@@ -187,30 +188,30 @@ describe('indexedDb backend', () => {
     const store = freshDb();
     await expect(
       store.setBytes('key', new DataView(new ArrayBuffer(1)) as unknown as Uint8Array)
-    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    ).rejects.toMatchObject({ code: 'INVALID_CONFIG' });
     await store.dispose();
   });
 
   it('拒绝结构非法的 factory 与 keyRange 注入', () => {
     expect(() => indexedDb({ factory: {} as IDBFactory })).toThrowError(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
     );
     expect(() =>
       indexedDb({ factory: freshFactory(), keyRange: {} as typeof IDBKeyRange })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }));
   });
 
   it('拒绝空/非法数据库名、重复/保留名和空的 channel store 名', () => {
     expect(() =>
       indexedDb({ factory: freshFactory(), keyRange: IDBKeyRange, dbName: '' })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }));
     expect(() =>
       indexedDb({
         factory: freshFactory(),
         keyRange: IDBKeyRange,
         dbName: null as unknown as string
       })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }));
     expect(() =>
       indexedDb({
         factory: freshFactory(),
@@ -218,24 +219,24 @@ describe('indexedDb backend', () => {
         kvStoreName: 'same',
         bytesStoreName: 'same'
       })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }));
     expect(() =>
       indexedDb({
         factory: freshFactory(),
         keyRange: IDBKeyRange,
         recordsStoreName: '__storage_web_revisions__'
       })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }));
     expect(() =>
       indexedDb({ factory: freshFactory(), keyRange: IDBKeyRange, recordsStoreName: '' })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }));
     expect(() =>
       indexedDb({
         factory: freshFactory(),
         keyRange: IDBKeyRange,
         bytesStoreName: null as unknown as string
       })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }));
   });
 
   it('不同 records store 的 transaction revision 不互相污染', async () => {
@@ -724,7 +725,7 @@ describe('indexedDb backend', () => {
     });
   });
 
-  it('request event 中动态 signal getter 失败会 settle 为 INVALID_ARGUMENT', async () => {
+  it('request event 中动态 signal getter 失败会 settle 为 INVALID_CONFIG', async () => {
     const store = freshDb();
     await store.get('warm-connection');
     const originalGet = IDBObjectStore.prototype.get;
@@ -753,7 +754,7 @@ describe('indexedDb backend', () => {
             removeEventListener: () => {}
           } as never
         })
-      ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT', backend: 'indexeddb' });
+      ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
       expect(reads).toBe(9);
     } finally {
       IDBObjectStore.prototype.get = originalGet;
@@ -940,6 +941,36 @@ describe('indexedDb backend', () => {
         code: 'TRANSACTION_FAILED',
         backend: 'indexeddb',
         operation: 'indexeddb.cursor',
+        cause
+      });
+    } finally {
+      IDBObjectStore.prototype.openCursor = originalOpenCursor;
+      await store.dispose();
+    }
+  });
+
+  it('cursor request.result getter 抛 contract 错误原样穿透（不归一为 TRANSACTION_FAILED）', async () => {
+    const store = freshDb();
+    await store.putRecord({ v: 1 }, 'cursor-contract-key');
+    const originalOpenCursor = IDBObjectStore.prototype.openCursor;
+    const cause = new Error('hostile contract result getter');
+    const contractError = new StorageContractError(StorageContractErrorCode.invalidArgument, {
+      cause
+    });
+    IDBObjectStore.prototype.openCursor = (() =>
+      ({
+        get result(): never {
+          throw contractError;
+        },
+        set onsuccess(handler: (() => void) | null) {
+          queueMicrotask(() => handler?.());
+        },
+        set onerror(_handler: unknown) {}
+      }) as unknown as IDBRequest) as typeof originalOpenCursor;
+    try {
+      await expect(store.iterateRecords().next()).rejects.toMatchObject({
+        source: '@migaia/storage-contract',
+        code: 'INVALID_ARGUMENT',
         cause
       });
     } finally {

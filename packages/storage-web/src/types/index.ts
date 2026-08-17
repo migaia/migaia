@@ -1,4 +1,4 @@
-export { ConflictPolicy } from './context';
+export { ConflictPolicy } from './context.js';
 export type {
   IOperationContext,
   IStorageKey,
@@ -6,8 +6,8 @@ export type {
   IWriteOptions,
   ISyncWriteOptions,
   IConflictPolicy
-} from './context';
-export type { IBackendKind, IStorageCapabilities } from './capabilities';
+} from './context.js';
+export type { IBackendKind, IStorageCapabilities } from './capabilities.js';
 export {
   StorageError,
   StorageErrorCode,
@@ -15,7 +15,7 @@ export {
   type IStorageErrorDetails,
   type IStorageChannel,
   type IExtensionStage
-} from './errors';
+} from './errors.js';
 export {
   asRecordStore,
   isRecordStore,
@@ -24,8 +24,8 @@ export {
   type IRecordStore,
   type ISyncCapableStore,
   type IWebStorageLike
-} from './storage';
-export type { ITransactionScope, ITransactionWriteOptions } from '../core/transaction';
+} from './storage.js';
+export type { ITransactionScope, ITransactionWriteOptions } from '../core/transaction.js';
 export type {
   ICookieStore,
   ISyncCookieStore,
@@ -33,4 +33,4 @@ export type {
   ICookieRemoveContext,
   ICookieScope,
   ISameSite
-} from './cookie';
+} from './cookie.js';

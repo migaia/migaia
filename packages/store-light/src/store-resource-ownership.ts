@@ -1,8 +1,10 @@
-import { ObjectLeaseRegistry } from '@migaia/reactive/runtime/lifecycle-primitives';
-import type { VersionToken } from '@migaia/reactive/runtime/lifecycle-primitives';
+import { createObjectLeaseRegistry, type ILeaseRegistry } from '@migaia/lifecycle';
+
+/** Opaque object identity used as a version's lease key; never round-tripped through reactive. */
+export type IVersionToken = object;
 
 export class ResourceOwnershipRegistry<T> {
-  #versionOwners = new ObjectLeaseRegistry<object>();
+  #versionOwners: ILeaseRegistry<object> = createObjectLeaseRegistry<object>();
   #versionKeys = new Map<number, object>();
   #resourceOwners = 0;
   #versionOwnerTotal = 0;
@@ -14,7 +16,9 @@ export class ResourceOwnershipRegistry<T> {
   }
 
   get hasVersionOwners(): boolean {
-    return this.#versionOwners.hasAny();
+    // `ILeaseRegistry` (WeakMap-backed) exposes no enumeration/`hasAny()` — this class already
+    // maintains an aggregate total across every version key, so reuse it instead.
+    return this.#versionOwnerTotal > 0;
   }
 
   get hasResourceOwners(): boolean {
@@ -26,7 +30,7 @@ export class ResourceOwnershipRegistry<T> {
     return key ? this.#versionOwners.count(key) : 0;
   }
 
-  versionOwnerCountToken(token: VersionToken): number {
+  versionOwnerCountToken(token: IVersionToken): number {
     return this.#versionOwners.count(token);
   }
 
@@ -48,7 +52,7 @@ export class ResourceOwnershipRegistry<T> {
     return this.#retainVersionKey(version, key, onRelease);
   }
 
-  retainVersionToken(token: VersionToken, onRelease: () => void): () => void {
+  retainVersionToken(token: IVersionToken, onRelease: () => void): () => void {
     this.#versionOwnerTotal++;
     return this.#retainVersionKey(undefined, token, onRelease);
   }
@@ -80,7 +84,10 @@ export class ResourceOwnershipRegistry<T> {
     this.#epoch++;
     this.#resourceOwners = 0;
     this.#versionOwnerTotal = 0;
-    this.#versionOwners.clear();
+    // `ILeaseRegistry` has no bulk `clear()` — bumping `#epoch` already makes every outstanding
+    // release closure a permanent no-op (guarded above), and dropping the version→key map below
+    // makes the old key objects unreachable from here, so the WeakMap-backed registry sheds those
+    // entries on its own; no explicit registry reset is needed.
     this.#versionKeys.clear();
   }
 

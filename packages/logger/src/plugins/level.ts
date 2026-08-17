@@ -1,6 +1,7 @@
-import type { ILogFilter, IOff, ILoggerPluginCore, ILoggerPlugin } from '../typing';
+import type { ILogFilter, IOff, ILoggerPluginCore, ILoggerPlugin } from '../typing.js';
+import { LoggerLevel } from '../plugin-constants.js';
 
-export type ILogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+export type ILogLevel = (typeof LoggerLevel)[keyof typeof LoggerLevel];
 
 export type ILevelPluginConfig = {
   level?: ILogLevel;
@@ -33,11 +34,11 @@ export const LEVEL_PLUGIN_NAME = 'level' as const;
  */
 class LevelPlugin implements ILoggerPlugin<ILevelPluginExt, ILevelPluginConfig> {
   static readonly #LEVEL_ORDER: Record<ILogLevel, number> = {
-    debug: 0,
-    info: 1,
-    warn: 2,
-    error: 3,
-    fatal: 4
+    [LoggerLevel.debug]: 0,
+    [LoggerLevel.info]: 1,
+    [LoggerLevel.warn]: 2,
+    [LoggerLevel.error]: 3,
+    [LoggerLevel.fatal]: 4
   };
 
   readonly name = LEVEL_PLUGIN_NAME;
@@ -53,7 +54,7 @@ class LevelPlugin implements ILoggerPlugin<ILevelPluginExt, ILevelPluginConfig> 
     // 走的是同一层，好处是"这个插件当前配置是什么"这件事对 core 本身可见，
     // 不是被插件私下攥在手里。
     const config = core.config.get<ILevelPluginConfig>() ?? {};
-    let minLevel: ILogLevel = config.level ?? 'debug';
+    let minLevel: ILogLevel = config.level ?? LoggerLevel.debug;
     let filters: ILogFilter[] = [...(config.filters ?? [])];
 
     core.usePipeline((entry, next) => {
@@ -84,11 +85,11 @@ class LevelPlugin implements ILoggerPlugin<ILevelPluginExt, ILevelPluginConfig> 
     };
 
     return {
-      debug: call('debug'),
-      info: call('info'),
-      warn: call('warn'),
-      error: call('error'),
-      fatal: call('fatal'),
+      debug: call(LoggerLevel.debug),
+      info: call(LoggerLevel.info),
+      warn: call(LoggerLevel.warn),
+      error: call(LoggerLevel.error),
+      fatal: call(LoggerLevel.fatal),
       setLevel: (level) => {
         minLevel = level;
       },

@@ -1,4 +1,4 @@
-import { createRuntime, type Runtime } from './runtime.class';
+import { createRuntime, type Runtime } from './runtime.class.js';
 
 /**
  * 默认共享运行时——全局 `signal()` / `createStore()` 这类不显式传 runtime 的写法 都落在它上面，保持「开箱即用」的心智；需要隔离时显式

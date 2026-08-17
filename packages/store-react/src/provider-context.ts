@@ -1,4 +1,4 @@
 import { createContext } from 'react';
-import type { StoreRegistry } from './provider-registry';
+import type { StoreRegistry } from './provider-registry.js';
 
 export const StoreRegistryContext = createContext<StoreRegistry | null>(null);

@@ -1,34 +1,36 @@
-import { toPromise } from '../utils/async';
+import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract';
+import { toPromise } from '../utils/async.js';
 import {
   snapshotOperationContext,
   snapshotSyncWriteOptions,
   throwIfAborted,
   withAbort
-} from '../core/operation';
+} from '../core/operation.js';
 import {
   lengthPrefixedNamespaceCodec,
   namespacedKey,
   snapshotNamespaceCodec,
   stripNamespace
-} from '../utils/key';
-import type { INamespaceCodec } from '../utils/key';
+} from '../utils/key.js';
+import type { INamespaceCodec } from '../utils/key.js';
 import {
   parseCookieEntries,
   serializeCookieAssignment,
   serializeCookieRemoval
-} from '../utils/cookie-string';
-import { StorageError, StorageErrorCode } from '../types/errors';
-import { normalizeStorageException } from '../utils/quota';
+} from '../utils/cookie-string.js';
+import { StorageError, StorageErrorCode } from '../types/errors.js';
+import { normalizeStorageException } from '../utils/quota.js';
+import { StorageBackend, StorageOperation } from '../constants.js';
 import type {
   ICookieRemoveContext,
   ICookieScope,
   ICookieStore,
   ICookieWriteContext,
   ISyncCookieStore
-} from '../types/cookie';
-import type { IStorageCapabilities } from '../types/capabilities';
-import type { IOperationContext } from '../types/context';
-import type { ISyncCapableStore } from '../types/storage';
+} from '../types/cookie.js';
+import type { IStorageCapabilities } from '../types/capabilities.js';
+import type { IOperationContext } from '../types/context.js';
+import type { ISyncCapableStore } from '../types/storage.js';
 
 const CAPABILITIES: IStorageCapabilities = Object.freeze({
   syncRead: true,
@@ -60,24 +62,15 @@ type ICookieWriteContextSnapshot = ICookieWriteContext & {
   readonly lifecycle: ReturnType<typeof snapshotOperationContext>;
 };
 
-/** Run a Cookie async operation while retaining backend diagnostics for invalid lifecycle context. */
+/**
+ * Run a Cookie async operation under the shared operation signal; invalid context 穿透为 contract
+ * INVALID_ARGUMENT。
+ */
 const withCookieAbort = async <T>(
   context: IOperationContext | undefined,
-  operation: string,
-  key: string | undefined,
   run: (signal: AbortSignal | undefined) => Promise<T>
 ): Promise<T> => {
-  let lifecycle: ReturnType<typeof snapshotOperationContext>;
-  try {
-    lifecycle = snapshotOperationContext(context);
-  } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      backend: 'cookie',
-      key,
-      operation,
-      cause: cause instanceof StorageError ? cause.cause : cause
-    });
-  }
+  const lifecycle = snapshotOperationContext(context);
   return await withAbort(lifecycle, async (signal) => run(signal));
 };
 
@@ -86,17 +79,7 @@ const snapshotCookieWriteContext = (
   context: ICookieWriteContext | undefined,
   key: string
 ): ICookieWriteContextSnapshot | undefined => {
-  let lifecycle: ReturnType<typeof snapshotOperationContext>;
-  try {
-    lifecycle = snapshotOperationContext(context);
-  } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      backend: 'cookie',
-      key,
-      operation: 'cookie.set',
-      cause: cause instanceof StorageError ? cause.cause : cause
-    });
-  }
+  const lifecycle = snapshotOperationContext(context);
   if (context === undefined) return undefined;
   let expires: unknown;
   let maxAge: unknown;
@@ -104,10 +87,10 @@ const snapshotCookieWriteContext = (
     expires = context.expires;
     maxAge = context.maxAge;
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      backend: 'cookie',
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.cookie,
       key,
-      operation: 'cookie.set',
+      operation: StorageOperation.cookieSet,
       cause
     });
   }
@@ -122,8 +105,8 @@ const snapshotCookieWriteContext = (
 /** Snapshot and validate fixed cookie scope so later writes cannot observe getter changes. */
 function snapshotCookieScope(scope: unknown): ICookieScope {
   if (typeof scope !== 'object' || scope === null || Array.isArray(scope)) {
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      backend: 'cookie',
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.cookie,
       cause: new TypeError('cookie scope must be an object')
     });
   }
@@ -140,7 +123,10 @@ function snapshotCookieScope(scope: unknown): ICookieScope {
     secure = candidate.secure;
     partitioned = candidate.partitioned;
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, { backend: 'cookie', cause });
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.cookie,
+      cause
+    });
   }
   if (
     (path !== undefined &&
@@ -150,18 +136,18 @@ function snapshotCookieScope(scope: unknown): ICookieScope {
     (secure !== undefined && typeof secure !== 'boolean') ||
     (partitioned !== undefined && typeof partitioned !== 'boolean')
   )
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      backend: 'cookie',
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.cookie,
       cause: new TypeError('cookie scope contains an invalid attribute')
     });
   if (sameSite === 'none' && !secure)
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      backend: 'cookie',
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.cookie,
       cause: new TypeError('SameSite=None requires Secure')
     });
   if (partitioned && !secure)
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      backend: 'cookie',
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.cookie,
       cause: new TypeError('Partitioned requires Secure')
     });
   return {
@@ -176,8 +162,8 @@ function snapshotCookieScope(scope: unknown): ICookieScope {
 /** Document.cookie 后端。不处理服务端 cookie；SSR 场景由调用方在服务端 自行解析 `req.headers.cookie` 并注入 memoryStorage。 */
 export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICookieStore> => {
   if (options === null || typeof options !== 'object' || Array.isArray(options))
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      backend: 'cookie',
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.cookie,
       cause: new TypeError('cookie options must be an object')
     });
   let configuredNamespace: unknown;
@@ -190,7 +176,10 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
     configuredScope = options.scope;
     configuredDocument = options.document;
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, { backend: 'cookie', cause });
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.cookie,
+      cause
+    });
   }
   const namespace = configuredNamespace === undefined ? 'default' : configuredNamespace;
   const namespaceCodecCandidate =
@@ -198,8 +187,8 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
       ? lengthPrefixedNamespaceCodec
       : configuredNamespaceCodec;
   if (typeof namespace !== 'string' || namespace.length === 0)
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      backend: 'cookie',
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.cookie,
       cause: new TypeError('namespace must be non-empty and namespaceCodec must be callable')
     });
   const scope = snapshotCookieScope(
@@ -210,28 +199,31 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
       ? (globalThis as { document?: ICookieDocument }).document
       : configuredDocument;
   if (documentCandidate === undefined)
-    throw new StorageError(StorageErrorCode.unavailable, { backend: 'cookie' });
+    throw new StorageError(StorageErrorCode.unavailable, { backend: StorageBackend.cookie });
   if (
     typeof documentCandidate !== 'object' ||
     documentCandidate === null ||
     Array.isArray(documentCandidate)
   )
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      backend: 'cookie',
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.cookie,
       cause: new TypeError('cookie document must expose a string cookie property')
     });
   let initialCookie: unknown;
   try {
     initialCookie = (documentCandidate as ICookieDocument).cookie;
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, { backend: 'cookie', cause });
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.cookie,
+      cause
+    });
   }
   if (typeof initialCookie !== 'string')
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      backend: 'cookie',
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.cookie,
       cause: new TypeError('cookie document must expose a string cookie property')
     });
-  const namespaceCodec = snapshotNamespaceCodec(namespaceCodecCandidate, 'cookie');
+  const namespaceCodec = snapshotNamespaceCodec(namespaceCodecCandidate, StorageBackend.cookie);
   const doc = documentCandidate as ICookieDocument;
 
   /** Read the live cookie jar while preserving host failures in the storage error protocol. */
@@ -243,7 +235,7 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
       return value;
     } catch (cause) {
       throw new StorageError(StorageErrorCode.unavailable, {
-        backend: 'cookie',
+        backend: StorageBackend.cookie,
         key,
         operation,
         cause
@@ -257,7 +249,7 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
       doc.cookie = value;
     } catch (cause) {
       throw new StorageError(StorageErrorCode.writeFailed, {
-        backend: 'cookie',
+        backend: StorageBackend.cookie,
         key,
         operation,
         cause
@@ -267,7 +259,10 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
 
   let disposed = false;
   const assertLive = (): void => {
-    if (disposed) throw new StorageError(StorageErrorCode.disposed, { backend: 'cookie' });
+    if (disposed)
+      throw new StorageContractError(StorageContractErrorCode.disposed, {
+        backend: StorageBackend.cookie
+      });
   };
 
   const namespacedEntries = (
@@ -280,11 +275,11 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
     /** Repeated visible names prove that document.cookie cannot identify their scopes. */
     const seenPhysicalKeys = new Set<string>();
     for (const [rawKey] of parseCookieEntries(readCookie(operation))) {
-      const stripped = stripNamespace(namespace, rawKey, namespaceCodec, 'cookie');
+      const stripped = stripNamespace(namespace, rawKey, namespaceCodec, StorageBackend.cookie);
       if (stripped === undefined) continue;
       if (seenPhysicalKeys.has(rawKey))
         throw new StorageError(StorageErrorCode.cookieScopeAmbiguous, {
-          backend: 'cookie',
+          backend: StorageBackend.cookie,
           key: stripped,
           operation,
           cause: new Error('multiple visible cookies share one physical name')
@@ -310,7 +305,7 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
     }
     if (matches > 1)
       throw new StorageError(StorageErrorCode.cookieScopeAmbiguous, {
-        backend: 'cookie',
+        backend: StorageBackend.cookie,
         key: logicalKey,
         operation,
         cause: new Error('multiple visible cookies share one physical name')
@@ -324,13 +319,13 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
     try {
       throwIfAborted(signal);
     } catch (error) {
-      throw normalizeStorageException(error, 'cookie', undefined, operation);
+      throw normalizeStorageException(error, StorageBackend.cookie, undefined, operation);
     }
     for (const entry of entries) {
       try {
         throwIfAborted(signal);
       } catch (error) {
-        throw normalizeStorageException(error, 'cookie', entry.logicalKey, operation);
+        throw normalizeStorageException(error, StorageBackend.cookie, entry.logicalKey, operation);
       }
       writeCookie(serializeCookieRemoval(entry.physicalKey, scope), operation, entry.logicalKey);
     }
@@ -341,7 +336,7 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
       assertLive();
       return (
         readVisibleCookie(
-          namespacedKey(namespace, key, namespaceCodec, 'cookie'),
+          namespacedKey(namespace, key, namespaceCodec, StorageBackend.cookie),
           'cookie.get',
           key
         ) ?? null
@@ -352,24 +347,24 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
       const context = snapshotCookieWriteContext(ctx, key);
       snapshotSyncWriteOptions(context);
       if (typeof value !== 'string')
-        throw new StorageError(StorageErrorCode.invalidArgument, {
-          backend: 'cookie',
+        throw new StorageError(StorageErrorCode.invalidConfig, {
+          backend: StorageBackend.cookie,
           key,
           cause: new TypeError('cookie value must be a string')
         });
-      const physicalKey = namespacedKey(namespace, key, namespaceCodec, 'cookie');
+      const physicalKey = namespacedKey(namespace, key, namespaceCodec, StorageBackend.cookie);
       /** Snapshot mutable/getter-backed context fields before validation and serialization. */
       const maxAge = context?.maxAge;
       const expires = context?.expires;
       if (maxAge !== undefined && !Number.isSafeInteger(maxAge))
-        throw new StorageError(StorageErrorCode.invalidArgument, {
-          backend: 'cookie',
+        throw new StorageError(StorageErrorCode.invalidConfig, {
+          backend: StorageBackend.cookie,
           key,
           cause: new RangeError('cookie maxAge must be a safe integer')
         });
       if (expires !== undefined && (typeof expires !== 'object' || expires === null))
-        throw new StorageError(StorageErrorCode.invalidArgument, {
-          backend: 'cookie',
+        throw new StorageError(StorageErrorCode.invalidConfig, {
+          backend: StorageBackend.cookie,
           key,
           cause: new RangeError('cookie expires must be a valid Date')
         });
@@ -381,15 +376,15 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
             ? undefined
             : ((expires as { getTime(): unknown }).getTime() as number);
       } catch (cause) {
-        throw new StorageError(StorageErrorCode.invalidArgument, {
-          backend: 'cookie',
+        throw new StorageError(StorageErrorCode.invalidConfig, {
+          backend: StorageBackend.cookie,
           key,
           cause
         });
       }
       if (expiresTime !== undefined && !Number.isFinite(expiresTime))
-        throw new StorageError(StorageErrorCode.invalidArgument, {
-          backend: 'cookie',
+        throw new StorageError(StorageErrorCode.invalidConfig, {
+          backend: StorageBackend.cookie,
           key,
           cause: new RangeError('cookie expires must be a valid Date')
         });
@@ -404,37 +399,37 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
               expires: expiresTime === undefined ? undefined : new Date(expiresTime),
               maxAge
             }),
-        'cookie.set',
+        StorageOperation.cookieSet,
         key
       );
-      const visible = readVisibleCookie(physicalKey, 'cookie.set', key);
+      const visible = readVisibleCookie(physicalKey, StorageOperation.cookieSet, key);
       if (expiresNow && visible === undefined) return;
       if (!expiresNow && visible === value) return;
       if (visible !== undefined)
         throw new StorageError(StorageErrorCode.cookieScopeAmbiguous, {
-          backend: 'cookie',
+          backend: StorageBackend.cookie,
           key,
-          operation: 'cookie.set',
+          operation: StorageOperation.cookieSet,
           cause: new Error('same cookie name remains visible from an unknown scope')
         });
       throw new StorageError(StorageErrorCode.writeFailed, {
-        backend: 'cookie',
+        backend: StorageBackend.cookie,
         key,
-        operation: 'cookie.set',
+        operation: StorageOperation.cookieSet,
         cause: new Error('cookie write was not visible in the active scope')
       });
     },
     remove: (key) => {
       assertLive();
-      const physicalKey = namespacedKey(namespace, key, namespaceCodec, 'cookie');
-      readVisibleCookie(physicalKey, 'cookie.remove', key);
-      writeCookie(serializeCookieRemoval(physicalKey, scope), 'cookie.remove', key);
+      const physicalKey = namespacedKey(namespace, key, namespaceCodec, StorageBackend.cookie);
+      readVisibleCookie(physicalKey, StorageOperation.cookieRemove, key);
+      writeCookie(serializeCookieRemoval(physicalKey, scope), StorageOperation.cookieRemove, key);
     },
     has: (key) => {
       assertLive();
       return (
         readVisibleCookie(
-          namespacedKey(namespace, key, namespaceCodec, 'cookie'),
+          namespacedKey(namespace, key, namespaceCodec, StorageBackend.cookie),
           'cookie.has',
           key
         ) !== undefined
@@ -451,10 +446,10 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
   };
 
   return {
-    backend: 'cookie',
+    backend: StorageBackend.cookie,
     capabilities: CAPABILITIES,
     sync,
-    get: (key, ctx) => withCookieAbort(ctx, 'cookie.get', key, async () => sync.get(key)),
+    get: (key, ctx) => withCookieAbort(ctx, async () => sync.get(key)),
     set: async (key, value, ctx?: ICookieWriteContext) => {
       const context = snapshotCookieWriteContext(ctx, key);
       await withAbort(context?.lifecycle, async () =>
@@ -464,17 +459,16 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
         })
       );
     },
-    remove: (key, ctx?: ICookieRemoveContext) =>
-      withCookieAbort(ctx, 'cookie.remove', key, async () => sync.remove(key)),
-    has: (key, ctx) => withCookieAbort(ctx, 'cookie.has', key, async () => sync.has(key)),
-    keys: (ctx) => withCookieAbort(ctx, 'cookie.keys', undefined, async () => sync.keys()),
+    remove: (key, ctx?: ICookieRemoveContext) => withCookieAbort(ctx, async () => sync.remove(key)),
+    has: (key, ctx) => withCookieAbort(ctx, async () => sync.has(key)),
+    keys: (ctx) => withCookieAbort(ctx, async () => sync.keys()),
     clearValues: (ctx) =>
-      withCookieAbort(ctx, 'cookie.clearValues', undefined, async (signal) => {
+      withCookieAbort(ctx, async (signal) => {
         assertLive();
         clearNamespacedEntries('cookie.clearValues', signal);
       }),
     clearAll: (ctx) =>
-      withCookieAbort(ctx, 'cookie.clearAll', undefined, async (signal) => {
+      withCookieAbort(ctx, async (signal) => {
         assertLive();
         clearNamespacedEntries('cookie.clearAll', signal);
       }),

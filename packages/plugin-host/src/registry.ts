@@ -1,4 +1,10 @@
-import type { IPluginConfig, IPluginConstraint, IPluginDisposer, IPluginHostCore } from './typing';
+import type {
+  IPluginConfig,
+  IPluginConstraint,
+  IPluginDisposer,
+  IPluginHostCore
+} from './typing.js';
+import { PluginHostRegistrationLifecycle } from './state-constants.js';
 
 export type IPluginDefinition<TCore> = {
   readonly owner: IPluginConstraint<TCore>;
@@ -19,7 +25,7 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   disposers: IPluginDisposer[];
   shared: PropertyKey[];
   installed: boolean;
-  lifecycle: 'idle' | 'install' | 'dispose';
+  lifecycle: (typeof PluginHostRegistrationLifecycle)[keyof typeof PluginHostRegistrationLifecycle];
   core?: TDomainCore & IPluginHostCore<TValue>;
 };
 

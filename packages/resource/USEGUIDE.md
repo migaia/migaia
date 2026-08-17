@@ -202,21 +202,37 @@ type IResourceCacheSnapshot<T> = {
 
 ## 9. 错误与异常完整参考
 
-`Resource` 不定义自己的错误类/错误码体系，直接使用标准 `Error`/`RangeError`/`DOMException`，`error.message` 都带 `[store]` 前缀方便日志过滤。
+`Resource` **自己抛出**的每一个错误都携带 `(source, code)` 二元组：`source` 恒为 `'@migaia/resource'`，`code` 取自 `src/error-code.ts` 的 `ResourceErrorCode`（6 个码）。全仓契约见 `docs/contracts/error-codes.md`，本包码表的权威定义见 `docs/lifecycle/migration.sdd.md` §3.7.2。
 
-| 触发场景 | 异常类型 | `message` / `name` |
-| --- | --- | --- |
-| 构造时 `ttl` 为负数或 `NaN` | `RangeError` | `[store] resource ttl must be non-negative` |
-| 构造时 `retry` 为负数或非整数（数字形式） | `RangeError` | `[store] resource retry count must be a non-negative integer` |
-| 计算出的重试延迟不是非负有限数 | `RangeError` | `[store] resource retry delay must be a non-negative finite number` |
-| `hydrate()` 传入形状不合法的快照 | `Error` | `[store] invalid resource cache snapshot` |
-| 已 `dispose()` 后调用任意方法 | `Error` | `[store] cannot use a disposed resource` |
-| 读 `promise` 但从未发起过任何请求（理论边界情况） | `Error` | `[store] resource has no active or cached promise` |
-| `fetcher` 的请求被依赖变化/`refetch()`/`invalidate()` 取代 | `DOMException` | `name: 'AbortError'`，`message: '[store] resource request aborted'` |
-| 显式调用 `cancel()` 中止一个 `pending` 请求 | `DOMException` | `name: 'AbortError'`，`message: '[store] resource request cancelled'`（出现在 `state.error`，`state.status` 为 `cancelled`） |
-| `fetcher` 自身抛出的业务错误 | 原样透传 | 不做任何包装，直接出现在 `state.error` |
-| `retry`/`retryDelay` 策略函数自身抛出的异常 | 原样透传 | 直接作为这次请求的失败原因，不会被误判成"不重试" |
-| 状态结算（`then`/`catch` 回调）内部再次抛出的框架级异常（极端情况） | 通过 `runtime.reportError(error, { phase: 'async-flush' })` 上报 | 不会作为 `Promise` rejection 抛给调用方，需要通过 runtime 的 `onError` 观察 |
+**码是附加字段，绝不替换错误类型**——选项校验仍是 `RangeError`，中止/取消仍是 `name === 'AbortError'` 的 `DOMException`，依赖 `instanceof` 或 `error.name` 判断的调用方（包括 `store-react` 的 suspension 路径）完全不受影响。`error.message` 也一律保留 `[store]` 前缀。
+
+```ts
+import { ResourceErrorCode } from '@migaia/resource';
+
+try {
+  resource.state;
+} catch (error) {
+  if ((error as { code?: string }).code === ResourceErrorCode.resourceDisposed) {
+    // 这个 Resource 已经终结，必须新建
+  }
+}
+```
+
+| 触发场景 | 异常类型 | `code` | `message` / `name` |
+| --- | --- | --- | --- |
+| 构造时 `ttl` 为负数或 `NaN` | `RangeError` | `INVALID_OPTION` | `[store] resource ttl must be non-negative` |
+| 构造时 `retry` 为负数或非整数（数字形式） | `RangeError` | `INVALID_OPTION` | `[store] resource retry count must be a non-negative integer` |
+| 计算出的重试延迟不是非负有限数 | `RangeError` | `INVALID_OPTION` | `[store] resource retry delay must be a non-negative finite number` |
+| `hydrate()` 传入形状不合法的快照 | `Error` | `INVALID_SNAPSHOT` | `[store] invalid resource cache snapshot` |
+| 已 `dispose()` 后调用任意方法 | `Error` | `RESOURCE_DISPOSED` | `[store] cannot use a disposed resource` |
+| 读 `promise` 但从未发起过任何请求（理论边界情况） | `Error` | `NO_ACTIVE_PROMISE` | `[store] resource has no active or cached promise` |
+| `fetcher` 的请求被依赖变化/`refetch()`/`invalidate()` 取代 | `DOMException` | `REQUEST_ABORTED` | `name: 'AbortError'`，`message: '[store] resource request aborted'` |
+| 显式调用 `cancel()` 中止一个 `pending` 请求 | `DOMException` | `REQUEST_CANCELLED` | `name: 'AbortError'`，`message: '[store] resource request cancelled'`（出现在 `state.error`，`state.status` 为 `cancelled`） |
+| `fetcher` 自身抛出的业务错误 | 原样透传 | **无**（不是本包的错误） | 不做任何包装，按引用原样出现在 `state.error` |
+| `retry`/`retryDelay` 策略函数自身抛出的异常 | 原样透传 | **无**（同上） | 直接作为这次请求的失败原因，不会被误判成"不重试" |
+| 状态结算（`then`/`catch` 回调）内部再次抛出的框架级异常（极端情况） | 通过 `runtime.reportError(error, { phase: 'async-flush' })` 上报 | — | 不会作为 `Promise` rejection 抛给调用方，需要通过 runtime 的 `onError` 观察 |
+
+> **传给 `fetcher` 的 `signal.reason`**：当一次在途请求被**新请求取代**时，底座 `@migaia/lifecycle` 的 `GenerationController` 以字符串 `'superseded by a new generation'` 作为 abort reason（迁移前是不带 reason 的默认 `AbortError`）。`Resource` 对外的 rejection 仍然被归一化成上表的 `REQUEST_ABORTED` `DOMException`，所以调用方契约不变；但如果你的 `fetcher` 直接把 `signal` 透传给 `fetch()` 并读取 `signal.reason`，看到的会是那个字符串。
 
 区分两类失败很重要：**业务失败**（`fetcher` reject 或抛错）落在 `state.error`，是正常的、预期内的状态；**框架自身在结算回调里意外出错**（几乎不会在正常使用下发生）才会走 `runtime.reportError`，需要在创建 `runtime` 时传入 `onError` 才能观察到。
 

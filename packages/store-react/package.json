@@ -25,6 +25,7 @@
   },
   "peerDependencies": { "react": ">=18", "react-dom": ">=18" },
   "dependencies": {
+    "@migaia/lifecycle": "workspace:^",
     "@migaia/reactive": "workspace:^",
     "@migaia/resource": "workspace:^",
     "@migaia/store-keyed": "workspace:^",
