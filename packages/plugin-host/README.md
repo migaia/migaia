@@ -10,6 +10,8 @@
 
 `@migaia/plugin-host` 就是把这套"插件宿主"基础设施抽出来、独立成包的实现。你的库只需要继承 `PluginHost` 这个抽象类，提供自己的"领域能力"（比如 logger 提供 `log()`，网络客户端提供 `request()`），插件系统的安装顺序、生命周期、配置管理、资源回收、共享能力注入、处理管线（pipeline）这些通用机制全部由它负责。`@migaia/logger` 就是用这套机制实现插件化的一个真实例子。
 
+处理管线的纯执行算法由 `@migaia/middleware-pipeline` 提供；plugin-host 仍拥有插件注册、生命周期、active guard、诊断和错误码。直接使用执行器时，见 [`@migaia/middleware-pipeline`](../middleware-pipeline/README.md)。
+
 ## 2. 适合什么场景
 
 | 场景 | 说明 |

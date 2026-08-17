@@ -23,7 +23,8 @@
     "registry": "https://npm.pkg.github.com"
   },
   "dependencies": {
-    "@migaia/lifecycle": "workspace:^"
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/middleware-pipeline": "workspace:^"
   },
   "scripts": {
     "fmt": "oxfmt src test",
