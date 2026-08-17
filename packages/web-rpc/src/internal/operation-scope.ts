@@ -1,14 +1,23 @@
-import { WebRpcLifecycleError, WebRpcTimeoutError } from '../errors';
-import type { IAbortSignal } from './async-control';
+import { createGenerationController, type IGenerationController } from '@migaia/lifecycle';
+import { WebRpcLifecycleError, WebRpcTimeoutError } from '../errors.js';
+import type { IAbortSignal } from './async-control.js';
 
-/** Owns one public operation's generation, deadline and cancellation signal. */
+/**
+ * Owns one public operation's deadline and cancellation signal.
+ *
+ * The per-operation `AbortSignal` and its parent closing-signal linkage are owned by
+ * `@migaia/lifecycle`'s `GenerationController` (migration.sdd.md §3.2: the "generation + deadline +
+ * parent closing signal" invariant belongs to the core). The remaining-budget computation and the
+ * endpoint's external receive-generation check stay here — they are web-rpc domain concerns the
+ * controller does not model (the controller's own generation is an internal supersession counter,
+ * not the endpoint's monotonic receive generation).
+ */
 export class OperationScope {
   readonly signal: IAbortSignal;
-  readonly #controller = new AbortController();
+  /** Owns the operation's AbortSignal and parent closing-signal linkage. */
+  readonly #controller: IGenerationController;
   readonly #generation: number;
   readonly #deadlineAt: number | undefined;
-  readonly #closingSignal: IAbortSignal;
-  readonly #onClosingAbort = (): void => this.abort();
   #closed = false;
 
   constructor(
@@ -17,12 +26,10 @@ export class OperationScope {
     closingSignal: IAbortSignal
   ) {
     this.#generation = generation;
-    this.#closingSignal = closingSignal;
     this.#deadlineAt =
       timeoutMs === undefined || timeoutMs === false ? undefined : Date.now() + timeoutMs;
-    this.signal = this.#controller.signal;
-    if (closingSignal.aborted) this.abort();
-    else closingSignal.addEventListener('abort', this.#onClosingAbort, { once: true });
+    this.#controller = createGenerationController({ parentSignal: closingSignal });
+    this.signal = this.#controller.begin().signal;
   }
 
   /** Returns the remaining operation budget, preserving false as unlimited. */
@@ -43,7 +50,6 @@ export class OperationScope {
   abort(): void {
     if (this.#closed) return;
     this.#closed = true;
-    this.#controller.abort();
-    this.#closingSignal.removeEventListener('abort', this.#onClosingAbort);
+    this.#controller.supersede();
   }
 }

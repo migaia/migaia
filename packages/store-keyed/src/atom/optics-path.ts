@@ -1,4 +1,10 @@
 /** Shared immutable path operations for instance and definition optics. */
+import {
+  createStoreKeyedError,
+  createStoreKeyedTypeError,
+  StoreKeyedErrorCode
+} from '../errors.js';
+
 export function readOpticPath(
   value: unknown,
   path: readonly PropertyKey[],
@@ -7,7 +13,10 @@ export function readOpticPath(
   let current = value;
   for (const key of path) {
     if (current === null || typeof current !== 'object') {
-      throw new TypeError(`[store] ${label} cannot read path segment ${String(key)}`);
+      throw createStoreKeyedTypeError(
+        StoreKeyedErrorCode.invalidOption,
+        `[store] ${label} cannot read path segment ${String(key)}`
+      );
     }
     current = Reflect.get(current, key);
   }
@@ -22,14 +31,20 @@ export function writeOpticPath(
 ): unknown {
   const [key, ...rest] = path;
   if (value === null || typeof value !== 'object') {
-    throw new TypeError(`[store] ${label} cannot write path segment ${String(key)}`);
+    throw createStoreKeyedTypeError(
+      StoreKeyedErrorCode.invalidOption,
+      `[store] ${label} cannot write path segment ${String(key)}`
+    );
   }
   const clone: Record<PropertyKey, unknown> | unknown[] = Array.isArray(value)
     ? [...value]
     : { ...value };
   const childSource = Reflect.get(value, key);
   if (rest.length > 0 && (childSource === null || typeof childSource !== 'object')) {
-    throw new TypeError(`[store] ${label} cannot write path segment ${String(rest[0])}`);
+    throw createStoreKeyedTypeError(
+      StoreKeyedErrorCode.invalidOption,
+      `[store] ${label} cannot write path segment ${String(rest[0])}`
+    );
   }
   const child = rest.length === 0 ? next : writeOpticPath(childSource, rest, next, label);
   if (key === '__proto__') {
@@ -83,7 +98,10 @@ export function computeUniqueKeys<T, Key>(
   const keys = items.map((item, index) => {
     const key = keyOf(item, index);
     if (seen.has(key)) {
-      throw new Error(`[store] ${label} keys must be unique`);
+      throw createStoreKeyedError(
+        StoreKeyedErrorCode.invalidOption,
+        `[store] ${label} keys must be unique`
+      );
     }
     seen.add(key);
     return key;
@@ -99,7 +117,7 @@ export function requireKeyIndex<T, Key>(
   label: string
 ): number {
   const index = findKeyIndex(items, keyOf, key);
-  if (index < 0) throw new Error(`[store] ${label}`);
+  if (index < 0) throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, `[store] ${label}`);
   return index;
 }
 

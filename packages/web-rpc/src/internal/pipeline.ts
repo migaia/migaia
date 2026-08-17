@@ -3,7 +3,7 @@ import {
   WebRpcErrorCode,
   WebRpcSerializationError,
   WebRpcTransportError
-} from '../errors';
+} from '../errors.js';
 import type {
   IWebRpcAuthenticationCapability,
   IWebRpcAuthenticationContext,
@@ -11,10 +11,11 @@ import type {
   IWebRpcPlatform,
   IWebRpcProtocolCapability,
   ISendOptions
-} from '../typing';
-import type { IWebRpcTransport } from '../transport';
-import { isUint8Array } from './safe-value';
-import { utf8ByteLength } from './chunk';
+} from '../typing.js';
+import type { IWebRpcTransport } from '../transport.js';
+import { isUint8Array } from './safe-value.js';
+import { utf8ByteLength } from './chunk.js';
+import { WebRpcMessageKind } from '../protocol-constants.js';
 
 /** Owns outbound protocol encoding, chunk framing, and transport error classification. */
 export class WebRpcOutboundPipeline<TTargetId extends string> {
@@ -117,7 +118,7 @@ export class WebRpcOutboundPipeline<TTargetId extends string> {
           parts.map((data, index) =>
             this.#sendTransport(
               this.encodeFrame({
-                kind: 'chunk',
+                kind: WebRpcMessageKind.chunk,
                 messageId,
                 index,
                 total: parts.length,

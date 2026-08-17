@@ -1,8 +1,18 @@
-import { StorageError, StorageErrorCode } from '../types/errors';
-import { bytesToBase64, base64ToBytes } from '../utils/base64';
-import { snapshotStorageCapabilities, type IStorageCapabilities } from '../types/capabilities';
-import type { ICodec } from './types';
-import { isUint8Array } from '../core/bytes';
+import { StorageError, StorageErrorCode } from '../types/errors.js';
+import {
+  StorageContractError,
+  StorageContractErrorCode,
+  snapshotCodec,
+  assertCodec,
+  type ICodec,
+  type IOperationContext
+} from '@migaia/storage-contract';
+import { bytesToBase64, base64ToBytes } from '../utils/base64.js';
+import { snapshotStorageCapabilities, type IStorageCapabilities } from '../types/capabilities.js';
+import { isUint8Array } from '../core/bytes.js';
+
+// codec 描述符 guard 已迁往 `@migaia/storage-contract`；re-export 保持既有 import 路径不变。
+export { snapshotCodec, assertCodec };
 
 const toBinaryBytes = (value: unknown): Uint8Array => {
   if (!isUint8Array(value))
@@ -25,47 +35,16 @@ const fromBase64 = (value: unknown): Uint8Array => {
   }
 };
 
-/** Read and validate a codec descriptor once so routing cannot observe changed accessors. */
-export const snapshotCodec = (codec: unknown): ICodec => {
-  if (typeof codec !== 'object' || codec === null || Array.isArray(codec))
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      cause: new TypeError('codec must declare name, output, encode, and decode')
-    });
-  const candidate = codec as Record<string, unknown>;
-  let name: unknown;
-  let output: unknown;
-  let encode: unknown;
-  let decode: unknown;
-  try {
-    name = candidate.name;
-    output = candidate.output;
-    encode = candidate.encode;
-    decode = candidate.decode;
-  } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, { cause });
-  }
-  if (
-    typeof name !== 'string' ||
-    name.trim() === '' ||
-    !['text', 'binary', 'structured'].includes(output as string) ||
-    typeof encode !== 'function' ||
-    typeof decode !== 'function'
-  )
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      cause: new TypeError('codec must declare name, output, encode, and decode')
-    });
-  return { name, output, encode, decode } as ICodec;
-};
-
-/** Validate the common runtime codec descriptor before any capability routing. */
-export function assertCodec(codec: unknown): asserts codec is ICodec {
-  snapshotCodec(codec);
-}
-
 export type ISelectedCodec = {
   /** 选路后实际要写入存储的字符串或字节。 */
-  encode(value: unknown, ctx?: { signal?: AbortSignal }): Promise<string | Uint8Array | unknown>;
-  decode(raw: string | Uint8Array | unknown, ctx?: { signal?: AbortSignal }): Promise<unknown>;
+  encode(
+    value: unknown,
+    ctx?: { signal?: NonNullable<IOperationContext['signal']> }
+  ): Promise<string | Uint8Array | unknown>;
+  decode(
+    raw: string | Uint8Array | unknown,
+    ctx?: { signal?: NonNullable<IOperationContext['signal']> }
+  ): Promise<unknown>;
 };
 
 /**
@@ -84,16 +63,16 @@ export const selectCodec = (
   const normalizedCodec = snapshotCodec(codec);
   const normalizedCapabilities = snapshotStorageCapabilities(capabilities);
   if (!normalizedCapabilities)
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
       cause: new TypeError('capabilities must be a complete storage descriptor')
     });
   if (onDiagnostic !== undefined && typeof onDiagnostic !== 'function')
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
       cause: new TypeError('onDiagnostic must be a function')
     });
   if (normalizedCodec.output === 'structured') {
     if (!normalizedCapabilities.records)
-      throw new StorageError(StorageErrorCode.unsupported, {
+      throw new StorageContractError(StorageContractErrorCode.unsupported, {
         cause: new Error(
           `codec "${normalizedCodec.name}" produces structured output but the backend only supports text`
         )

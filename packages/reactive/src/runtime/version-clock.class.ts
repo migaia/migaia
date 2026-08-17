@@ -1,3 +1,6 @@
+import { createReactiveError, tagReactiveError } from '../errors.js';
+import { ReactiveErrorCode } from '../error-code.js';
+
 // 单调版本时钟：memo 失效判定、脏检查短路、时间旅行锚点都靠同一个递增计数器。
 export class VersionClock {
   #version = 0;
@@ -11,7 +14,10 @@ export class VersionClock {
    */
   constructor(maxVersion = Number.MAX_SAFE_INTEGER) {
     if (!Number.isSafeInteger(maxVersion) || maxVersion < 1) {
-      throw new RangeError('[store] maximum reactive version must be a positive safe integer');
+      throw tagReactiveError(
+        new RangeError('[store] maximum reactive version must be a positive safe integer'),
+        ReactiveErrorCode.invalidOption
+      );
     }
     this.#maxVersion = maxVersion;
   }
@@ -19,7 +25,8 @@ export class VersionClock {
   /** 领取下一个版本号——signal/computed 的值真的变了就调一次 */
   next(): number {
     if (this.#version >= this.#maxVersion) {
-      throw new Error(
+      throw createReactiveError(
+        ReactiveErrorCode.versionExhausted,
         '[store] reactive version clock exhausted; stop writes and create a fresh Runtime'
       );
     }

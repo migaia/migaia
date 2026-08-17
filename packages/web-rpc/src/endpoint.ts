@@ -10,7 +10,7 @@ import {
   WebRpcSchemaValidationError,
   WebRpcTransportError,
   WebRpcTimeoutError
-} from './errors';
+} from './errors.js';
 import type {
   IWebRpcContractConfig,
   IWebRpcContractCapability,
@@ -40,36 +40,42 @@ import type {
   IWebRpcProtocolCapability,
   IWebRpcAbortSignal,
   IWebRpcAuthenticationCapability
-} from './typing';
+} from './typing.js';
 import type {
   IWebRpcInboundMessage,
   IWebRpcTransport,
   IWebRpcTransportTopology
-} from './transport';
-import { WebRpcCapabilityRegistry, WebRpcRuntime } from './internal/runtime';
-import type { PeerRegistry } from './internal/peers';
-import { splitUtf8, utf8ByteLength } from './internal/chunk';
-import { validateContractData } from './internal/contract';
-import { allocateRpcId } from './internal/id';
-import { WebRpcOutboundPipeline } from './internal/pipeline';
-import { ProviderExecutor } from './internal/provider-executor';
-import { executeWithRetry } from './internal/retry';
-import { createSettlement } from './internal/settlement';
-import { createSafeRecord, safeRead, safeString, tupleKey } from './internal/safe-value';
-import { createRuntimeTimer, raceWithAsyncControl } from './internal/async-control';
-import { ResourceScope } from './internal/resource-scope';
-import { VerifiedPeerRegistry } from './internal/identity';
-import { ReplayWindow } from './internal/replay';
-import { RequestReplayLedger } from './internal/request-replay-ledger';
-import { ProviderAdmissionRegistry } from './internal/provider-admission';
-import { ControlTaskRegistry } from './internal/control-task-registry';
-import { OperationScope } from './internal/operation-scope';
-import { DiscoveryRegistry } from './internal/discovery-registry';
-import { EndpointResourceManager } from './internal/endpoint-resource-manager';
+} from './transport.js';
+import { WebRpcCapabilityRegistry, WebRpcRuntime } from './internal/runtime.js';
+import type { PeerRegistry } from './internal/peers.js';
+import { splitUtf8, utf8ByteLength } from './internal/chunk.js';
+import { validateContractData } from './internal/contract.js';
+import { allocateRpcId } from './internal/id.js';
+import { WebRpcOutboundPipeline } from './internal/pipeline.js';
+import { ProviderExecutor } from './internal/provider-executor.js';
+import { executeWithRetry } from './internal/retry.js';
+import { createSettlement } from './internal/settlement.js';
+import { createSafeRecord, safeRead, safeString, tupleKey } from './internal/safe-value.js';
+import { createRuntimeTimer, raceWithAsyncControl } from './internal/async-control.js';
+import { ResourceScope } from './internal/resource-scope.js';
+import { VerifiedPeerRegistry } from './internal/identity.js';
+import { ReplayWindow } from './internal/replay.js';
+import { RequestReplayLedger } from './internal/request-replay-ledger.js';
+import { ProviderAdmissionRegistry } from './internal/provider-admission.js';
+import { ControlTaskRegistry } from './internal/control-task-registry.js';
+import { OperationScope } from './internal/operation-scope.js';
+import { DiscoveryRegistry } from './internal/discovery-registry.js';
+import { EndpointResourceManager } from './internal/endpoint-resource-manager.js';
+import {
+  WebRpcEndpointStatus,
+  WebRpcMessageKind,
+  WebRpcOperation,
+  WebRpcVariation
+} from './protocol-constants.js';
 import {
   registerEndpointDebugSnapshot,
   type IWebRpcEndpointDebugSnapshot
-} from './internal/test-observer';
+} from './internal/test-observer.js';
 import {
   assertMethod,
   normalizeWebRpcEnvelope,
@@ -79,7 +85,7 @@ import {
   type IWebRpcResponse,
   type IWebRpcDiscoveryQuery,
   type IWebRpcDiscoveryResponse
-} from './wire';
+} from './wire.js';
 
 let nextReceiverNonce = 0;
 
@@ -689,27 +695,19 @@ export class WebRpcEndpoint<
           this.#emit({ name: 'receive.failure', code: WebRpcErrorCode.internal, error });
         });
       });
-      this.#resources.add('transport subscription', this.#unsubscribe, 'critical');
+      this.#resources.addSync('transport subscription', this.#unsubscribe);
       this.#unsubscribeTransportError = (
         onTransportError as IWebRpcTransport['onTransportError'] | undefined
       )?.((error) => this.#failTransport(error));
       if (this.#unsubscribeTransportError)
-        this.#resources.add(
-          'transport error subscription',
-          this.#unsubscribeTransportError,
-          'critical'
-        );
+        this.#resources.addSync('transport error subscription', this.#unsubscribeTransportError);
       this.#unsubscribeListenerError = (
         onListenerError as IWebRpcTransport['onListenerError'] | undefined
       )?.((error) =>
         this.#emit({ name: 'transport.listener.failure', code: WebRpcErrorCode.transport, error })
       );
       if (this.#unsubscribeListenerError)
-        this.#resources.add(
-          'listener error subscription',
-          this.#unsubscribeListenerError,
-          'critical'
-        );
+        this.#resources.addSync('listener error subscription', this.#unsubscribeListenerError);
     } catch (error) {
       const cleanupPromise = this.#resources.releaseAll();
       throw new WebRpcConstructionError(
@@ -874,7 +872,7 @@ export class WebRpcEndpoint<
                 )
               };
         const request: IWebRpcRequest = {
-          kind: 'request',
+          kind: WebRpcMessageKind.request,
           version: this.#version,
           taskId: this.#makeId('task', targetId),
           senderId: this.#id,
@@ -1025,7 +1023,7 @@ export class WebRpcEndpoint<
         return Promise.resolve()
           .then(() =>
             this.#send({
-              kind: 'request',
+              kind: WebRpcMessageKind.request,
               version: this.#version,
               taskId,
               senderId: this.#id,
@@ -1177,7 +1175,7 @@ export class WebRpcEndpoint<
           pending.verifiedPeerKey = selectedReceiver.verifiedPeerKey;
           return this.#sendVariation(
             {
-              kind: 'variation',
+              kind: WebRpcMessageKind.variation,
               variation: 'ping',
               taskId,
               senderId: this.#id,
@@ -1393,7 +1391,7 @@ export class WebRpcEndpoint<
       registeredAt: now,
       lastSeenAt: now,
       pinned: false,
-      status: 'active'
+      status: WebRpcEndpointStatus.active
     };
     this.#discovery.setLocal(targetId, entry);
     this.#emit({
@@ -1492,7 +1490,7 @@ export class WebRpcEndpoint<
             __unique_id__: this.#connect.uniqueTargetId
           };
     await this.#send({
-      kind: 'discovery-response',
+      kind: WebRpcMessageKind.discoveryResponse,
       taskId: query.queryId,
       senderId: this.#id,
       targetId: query.senderId,
@@ -1560,7 +1558,7 @@ export class WebRpcEndpoint<
   /** Chooses one receiver for a single-target operation without mutating discovery state. */
   async #receiverForOperation(
     targetId: TTargetId,
-    operation: 'send' | 'dispatch' | 'ping',
+    operation: (typeof WebRpcOperation)[keyof typeof WebRpcOperation],
     timeoutMs?: number | false,
     signal?: IWebRpcAbortSignal
   ): Promise<{ readonly receiverId?: string; readonly verifiedPeerKey?: string }> {
@@ -1727,7 +1725,7 @@ export class WebRpcEndpoint<
     void Promise.resolve()
       .then(() =>
         this.#send({
-          kind: 'discovery-query',
+          kind: WebRpcMessageKind.discoveryQuery,
           taskId,
           senderId: this.#id,
           targetId,
@@ -1847,7 +1845,7 @@ export class WebRpcEndpoint<
         .then(() => {
           if (this.#discovery.getManualWaiter(taskId) !== waiter) return;
           return this.#send({
-            kind: 'discovery-query',
+            kind: WebRpcMessageKind.discoveryQuery,
             taskId,
             senderId: this.#id,
             targetId,
@@ -1933,7 +1931,7 @@ export class WebRpcEndpoint<
           registeredAt: now,
           lastSeenAt: now,
           pinned: previous?.pinned ?? false,
-          status: 'active'
+          status: WebRpcEndpointStatus.active
         },
         candidateProof.verifiedPeerKey
       )
@@ -2130,7 +2128,7 @@ export class WebRpcEndpoint<
         if (this.#features.abort !== true) return;
         const receiver = this.#receiverForTarget(request.targetId as TTargetId);
         void this.#sendVariation({
-          kind: 'variation',
+          kind: WebRpcMessageKind.variation,
           variation: 'abort',
           taskId: request.taskId,
           senderId: this.#id,
@@ -2261,7 +2259,7 @@ export class WebRpcEndpoint<
       return;
     }
     let envelope = normalizeWebRpcEnvelope(decoded);
-    if (envelope?.kind === 'chunk') {
+    if (envelope?.kind === WebRpcMessageKind.chunk) {
       const frame = envelope as IWebRpcChunkFrame;
       if (frame.targetId !== this.#id) return;
       if (!this.#validIdentifiers(frame)) return;
@@ -2279,7 +2277,8 @@ export class WebRpcEndpoint<
     }
     if (!envelope) return;
     if (
-      (envelope.kind === 'discovery-query' || envelope.kind === 'discovery-response') &&
+      (envelope.kind === WebRpcMessageKind.discoveryQuery ||
+        envelope.kind === WebRpcMessageKind.discoveryResponse) &&
       (envelope.sentAt < Date.now() - this.#maxClockSkewMs ||
         envelope.sentAt > Date.now() + this.#maxClockSkewMs)
     ) {
@@ -2287,7 +2286,7 @@ export class WebRpcEndpoint<
       return;
     }
     if (
-      envelope.kind === 'variation' &&
+      envelope.kind === WebRpcMessageKind.variation &&
       (envelope.sentAt < Date.now() - this.#maxClockSkewMs ||
         envelope.sentAt > Date.now() + this.#maxClockSkewMs)
     ) {
@@ -2297,17 +2296,17 @@ export class WebRpcEndpoint<
     const receiverId = 'receiverId' in envelope ? envelope.receiverId : undefined;
     if (
       receiverId !== undefined &&
-      envelope.kind !== 'response' &&
+      envelope.kind !== WebRpcMessageKind.response &&
       envelope.kind !== 'discovery-response' &&
       !this.#ownsReceiver(envelope.targetId, receiverId) &&
       !(
-        envelope.kind === 'variation' &&
-        envelope.variation === 'pong' &&
+        envelope.kind === WebRpcMessageKind.variation &&
+        envelope.variation === WebRpcVariation.pong &&
         this.#resourceManager.getPingPending(envelope.taskId)?.receiverId === receiverId
       )
     )
       return;
-    if (envelope.kind === 'chunk') return;
+    if (envelope.kind === WebRpcMessageKind.chunk) return;
     if (
       envelope.kind !== 'variation' &&
       envelope.kind !== 'discovery-query' &&
@@ -2317,14 +2316,14 @@ export class WebRpcEndpoint<
       this.#emit({ name: 'failure', code: 'CONTRACT_INVALID', contract: envelope });
       return;
     }
-    if (envelope.kind === 'variation' && !this.#validIdentifiers(envelope)) return;
+    if (envelope.kind === WebRpcMessageKind.variation && !this.#validIdentifiers(envelope)) return;
     if (envelope.targetId !== this.#id) return;
     const pendingResponse =
-      envelope.kind === 'response'
+      envelope.kind === WebRpcMessageKind.response
         ? this.#resourceManager.getPending<IPendingTask>(envelope.taskId)
         : undefined;
     const pendingPong =
-      envelope.kind === 'variation' && envelope.variation === 'pong'
+      envelope.kind === WebRpcMessageKind.variation && envelope.variation === WebRpcVariation.pong
         ? this.#resourceManager.getPingPending(envelope.taskId)
         : undefined;
     const requiresExistingUniqueBinding =
@@ -2334,10 +2333,10 @@ export class WebRpcEndpoint<
       envelope.kind !== 'discovery-response';
     const requiresExistingBinding =
       requiresExistingUniqueBinding ||
-      (envelope.kind === 'response' &&
+      (envelope.kind === WebRpcMessageKind.response &&
         (pendingResponse === undefined || pendingResponse.verifiedPeerKey !== undefined)) ||
-      (envelope.kind === 'variation' &&
-        envelope.variation === 'pong' &&
+      (envelope.kind === WebRpcMessageKind.variation &&
+        envelope.variation === WebRpcVariation.pong &&
         (pendingPong === undefined || pendingPong.verifiedPeerKey !== undefined));
     const verifiedPeerKey = await this.#verifySource(
       envelope,
@@ -2346,7 +2345,7 @@ export class WebRpcEndpoint<
       generation
     );
     if (!verifiedPeerKey || generation !== this.#receiveGeneration || this.#disposed) return;
-    if (envelope.kind === 'discovery-query') {
+    if (envelope.kind === WebRpcMessageKind.discoveryQuery) {
       if (envelope.targetId !== this.#id) return;
       if (envelope.manual && this.#connect?.discoveryMode === 'manual') {
         const replayKey = tupleKey(
@@ -2458,7 +2457,7 @@ export class WebRpcEndpoint<
       }
       const receiverId = this.#ensureLocalReceiver(this.#id as TTargetId);
       const response: IWebRpcDiscoveryResponse = {
-        kind: 'discovery-response',
+        kind: WebRpcMessageKind.discoveryResponse,
         taskId: envelope.taskId,
         senderId: this.#id,
         targetId: envelope.senderId,
@@ -2477,7 +2476,7 @@ export class WebRpcEndpoint<
         );
       return;
     }
-    if (envelope.kind === 'discovery-response') {
+    if (envelope.kind === WebRpcMessageKind.discoveryResponse) {
       if (envelope.manual && envelope.operation === 'unregister') {
         // A requester may only forget its own remote DNS entry. It cannot
         // mutate the server's local ownership through a generic wire message.
@@ -2665,7 +2664,7 @@ export class WebRpcEndpoint<
             pinned:
               previousRemote?.pinned ??
               this.#discovery.getPin(envelope.resolvedTargetId as TTargetId) === receiverId,
-            status: 'active'
+            status: WebRpcEndpointStatus.active
           },
           verifiedPeerKey
         )
@@ -2678,11 +2677,11 @@ export class WebRpcEndpoint<
       return;
     }
     this.#peers.add(envelope.senderId as TTargetId);
-    if (envelope.kind === 'response') {
+    if (envelope.kind === WebRpcMessageKind.response) {
       this.#settle(envelope, verifiedPeerKey);
       return;
     }
-    if (envelope.kind === 'variation') {
+    if (envelope.kind === WebRpcMessageKind.variation) {
       return this.#handleVariation(envelope, verifiedPeerKey);
     }
     await this.#handleRequest(envelope, verifiedPeerKey);
@@ -2690,7 +2689,7 @@ export class WebRpcEndpoint<
 
   /** Handles one inbound control variation under a manager-owned terminal scope. */
   async #handleVariation(
-    envelope: Extract<IWebRpcEnvelope, { kind: 'variation' }>,
+    envelope: Extract<IWebRpcEnvelope, { kind: typeof WebRpcMessageKind.variation }>,
     verifiedPeerKey: string
   ): Promise<void> {
     const operation = this.#resourceManager.begin(
@@ -2699,7 +2698,10 @@ export class WebRpcEndpoint<
       true
     );
     try {
-      if (envelope.variation === 'ping' || envelope.variation === 'abort') {
+      if (
+        envelope.variation === WebRpcVariation.ping ||
+        envelope.variation === WebRpcVariation.abort
+      ) {
         const variationReplayKey = tupleKey(
           'variation',
           verifiedPeerKey,
@@ -2712,7 +2714,11 @@ export class WebRpcEndpoint<
           return;
         }
       }
-      if (this.#features.abort === true && envelope.variation === 'abort' && envelope.taskId) {
+      if (
+        this.#features.abort === true &&
+        envelope.variation === WebRpcVariation.abort &&
+        envelope.taskId
+      ) {
         const abortKey = tupleKey(verifiedPeerKey, envelope.senderId, envelope.taskId);
         const controller = this.#activeControllers.get(abortKey);
         if (controller) controller.abort();
@@ -2721,9 +2727,9 @@ export class WebRpcEndpoint<
         } else this.#emit({ name: 'failure', code: 'ABORT_LIMIT' });
         return;
       }
-      if (this.#features.ping === true && envelope.variation === 'ping')
+      if (this.#features.ping === true && envelope.variation === WebRpcVariation.ping)
         void this.#sendVariation({
-          kind: 'variation',
+          kind: WebRpcMessageKind.variation,
           variation: 'pong',
           taskId: envelope.taskId,
           senderId: this.#id,
@@ -2731,7 +2737,7 @@ export class WebRpcEndpoint<
           sentAt: Date.now(),
           ...(envelope.receiverId === undefined ? {} : { receiverId: envelope.receiverId })
         });
-      if (envelope.variation === 'pong' && envelope.taskId) {
+      if (envelope.variation === WebRpcVariation.pong && envelope.taskId) {
         const pending = this.#resourceManager.getPingPending(envelope.taskId);
         if (
           pending &&

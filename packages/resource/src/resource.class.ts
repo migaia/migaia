@@ -1,23 +1,42 @@
-import type { IDisposable, IObservable, IObserver, IRuntime } from '@migaia/reactive/runtime/types';
+import {
+  ReactiveErrorPhase,
+  type IDisposable,
+  type IObservable,
+  type IObserver,
+  type IRuntime
+} from '@migaia/reactive/runtime';
 import type { Signal } from '@migaia/reactive/reactive/signal.class';
-import { internalsOf } from '@migaia/reactive/runtime/internals';
-import { internalRuntimeOf } from '@migaia/reactive/runtime/node-factories';
-import { claimOwnership } from '@migaia/reactive/runtime/ownership';
-import { registerDeps, registerDepVersions } from '@migaia/reactive/runtime/node-internals';
-import { GenerationController } from '@migaia/reactive/runtime/generation-controller';
-import type { GenerationToken } from '@migaia/reactive/runtime/lifecycle-primitives';
-import { TerminalControllerImpl } from '@migaia/reactive/runtime/lifecycle-primitives';
+import { internalsOf } from '@migaia/reactive/internals';
+import { internalRuntimeOf } from '@migaia/reactive/node-factories';
+import { claimOwnership } from '@migaia/reactive/ownership';
+import { registerDeps, registerDepVersions } from '@migaia/reactive/node-internals';
+import {
+  assimilateCapturedThen,
+  createGenerationController,
+  createTerminalController,
+  probeThenable,
+  systemScheduler,
+  LifecycleState,
+  ThenableProbeKind,
+  type IAbortSignal,
+  type IGenerationToken,
+  type ILifecycleScheduler
+} from '@migaia/lifecycle';
+import { createResourceError, tagResourceError } from './errors.js';
+import { ResourceErrorCode } from './error-code.js';
+import { ResourceStatus } from './state-constants.js';
+export { ResourceStatus, type IResourceStatus } from './state-constants.js';
 
 export type IResourceState<T> =
-  | { status: 'idle' }
-  | { status: 'pending' }
-  | { status: 'success'; data: T; refreshing?: boolean }
-  | { status: 'error'; error: unknown }
-  | { status: 'cancelled'; error: DOMException };
+  | { status: typeof ResourceStatus.idle }
+  | { status: typeof ResourceStatus.pending }
+  | { status: typeof ResourceStatus.success; data: T; refreshing?: boolean }
+  | { status: typeof ResourceStatus.error; error: unknown }
+  | { status: typeof ResourceStatus.cancelled; error: DOMException };
 
-export type IResourceFetchStatus = 'idle' | 'fetching';
+export type IResourceFetchStatus = typeof ResourceStatus.idle | typeof ResourceStatus.fetching;
 
-export type IResourceFetcher<T> = (ctx: { signal: AbortSignal }) => T | PromiseLike<T>;
+export type IResourceFetcher<T> = (ctx: { signal: IAbortSignal }) => T | PromiseLike<T>;
 
 export type IResourceCacheSnapshot<T> = {
   readonly version: 1;
@@ -47,40 +66,42 @@ export type IResourceOptions<T = unknown> = {
   keepAlive?: boolean;
   /** SSR/persisted success cache used before optional revalidation. */
   initialSnapshot?: IResourceCacheSnapshot<T>;
+  /**
+   * 时间域与排程来源（`runtime-neutrality.sdd.md` R-9 / AR-02）：TTL/`updatedAt`/`expiresAt`/retry delay 全部走同一
+   * scheduler，默认 lifecycle `systemScheduler`。缺宿主能力时 fail-fast，不静默降级成微任务。
+   */
+  scheduler?: ILifecycleScheduler;
 };
 
 function abortError(): DOMException {
-  return new DOMException('[store] resource request aborted', 'AbortError');
+  return tagResourceError(
+    new DOMException('[store] resource request aborted', 'AbortError'),
+    ResourceErrorCode.requestAborted
+  );
 }
 
 class ResourceCancelledError extends DOMException {
   constructor() {
     super('[store] resource request cancelled', 'AbortError');
+    tagResourceError(this, ResourceErrorCode.requestCancelled);
   }
 }
 
 function validateTtl(ttl: number): void {
   if (ttl < 0 || Number.isNaN(ttl)) {
-    throw new RangeError('[store] resource ttl must be non-negative');
+    throw tagResourceError(
+      new RangeError('[store] resource ttl must be non-negative'),
+      ResourceErrorCode.invalidOption
+    );
   }
 }
 
 function validateRetry(retry: IResourceRetryPolicy): void {
   if (typeof retry === 'number' && (!Number.isInteger(retry) || retry < 0)) {
-    throw new RangeError('[store] resource retry count must be a non-negative integer');
-  }
-}
-
-function asThenable(value: unknown): PromiseLike<unknown> | undefined {
-  if ((value === null || typeof value !== 'object') && typeof value !== 'function') {
-    return undefined;
-  }
-  try {
-    return typeof (value as { then?: unknown }).then === 'function'
-      ? (value as PromiseLike<unknown>)
-      : undefined;
-  } catch {
-    return undefined;
+    throw tagResourceError(
+      new RangeError('[store] resource retry count must be a non-negative integer'),
+      ResourceErrorCode.invalidOption
+    );
   }
 }
 
@@ -106,7 +127,7 @@ export class Resource<T> implements IObserver, IDisposable {
   #retry: IResourceRetryPolicy;
   #retryDelay: number | ((failureCount: number, error: unknown) => number);
   #keepAlive: boolean;
-  #requests = new GenerationController();
+  #requests = createGenerationController();
   #currentPromise: Promise<T> | undefined;
   #expiresAt = 0;
   #updatedAt = 0;
@@ -116,7 +137,8 @@ export class Resource<T> implements IObserver, IDisposable {
   #suspensionGeneration = 0;
   #paused = false;
   #staleAfterSettlement = false;
-  #terminal = new TerminalControllerImpl();
+  #terminal = createTerminalController();
+  #scheduler: ILifecycleScheduler;
 
   constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options: IResourceOptions<T> = {}) {
     this.deps = registerDeps(this, this.#_deps);
@@ -135,8 +157,30 @@ export class Resource<T> implements IObserver, IDisposable {
     this.#retryDelay = options.retryDelay ?? 0;
     this.#staleWhileRevalidate = options.staleWhileRevalidate ?? false;
     this.#keepAlive = options.keepAlive ?? false;
+    // 只读取一次 scheduler 快照（AF-31）：校验、保存、后续传递都用这个局部快照，避免 getter/Proxy 二次读取漂移。
+    const schedulerOption = options.scheduler;
+    if (schedulerOption !== undefined) {
+      let now: unknown;
+      let schedule: unknown;
+      try {
+        now = (schedulerOption as { now?: unknown }).now;
+        schedule = (schedulerOption as { schedule?: unknown }).schedule;
+      } catch (error) {
+        throw tagResourceError(
+          new TypeError('[store] resource scheduler getter failed', { cause: error }),
+          ResourceErrorCode.invalidOption
+        );
+      }
+      if (typeof now !== 'function' || typeof schedule !== 'function') {
+        throw tagResourceError(
+          new TypeError('[store] resource scheduler must provide now() and schedule() functions'),
+          ResourceErrorCode.invalidOption
+        );
+      }
+    }
+    this.#scheduler = schedulerOption ?? systemScheduler;
     this.#stateSignal = internalRuntimeOf(runtime).signal<IResourceState<T>>(
-      { status: 'idle' },
+      { status: ResourceStatus.idle },
       {
         debugName: options.debugName ? `${options.debugName}.state` : undefined
       }
@@ -172,33 +216,36 @@ export class Resource<T> implements IObserver, IDisposable {
     this.#assertUsable();
     this.#ensureFresh();
     if (!this.#currentPromise) {
-      throw new Error('[store] resource has no active or cached promise');
+      throw createResourceError(
+        ResourceErrorCode.noActivePromise,
+        '[store] resource has no active or cached promise'
+      );
     }
     return this.#currentPromise;
   }
 
   get disposed(): boolean {
-    return this.#terminal.lifecycle === 'terminal';
+    return this.#terminal.lifecycle === LifecycleState.terminal;
   }
 
   /** True while a fresh request runs without hiding an existing success value. */
   get refreshing(): boolean {
-    if (this.#terminal.lifecycle !== 'open') return false;
+    if (this.#terminal.lifecycle !== LifecycleState.open) return false;
     const state = this.#stateSignal.peek();
-    return state.status === 'success' && state.refreshing === true;
+    return state.status === ResourceStatus.success && state.refreshing === true;
   }
 
   /** Transport status, separate from the visible data/error state. */
   get fetchStatus(): IResourceFetchStatus {
     this.#assertUsable();
-    return this.#requestPending ? 'fetching' : 'idle';
+    return this.#requestPending ? ResourceStatus.fetching : ResourceStatus.idle;
   }
 
   /** Whether the currently cached success value has crossed its TTL. */
   get isStale(): boolean {
     this.#assertUsable();
     const state = this.#stateSignal.peek();
-    return state.status === 'success' && !this.#isFresh();
+    return state.status === ResourceStatus.success && !this.#isFresh();
   }
 
   /** Whether reactive consumers currently observe this resource's state. */
@@ -253,7 +300,7 @@ export class Resource<T> implements IObserver, IDisposable {
   dehydrate(): IResourceCacheSnapshot<T> | undefined {
     this.#assertUsable();
     const state = this.#stateSignal.peek();
-    if (state.status !== 'success') return undefined;
+    if (state.status !== ResourceStatus.success) return undefined;
     return {
       version: 1,
       data: state.data,
@@ -269,7 +316,10 @@ export class Resource<T> implements IObserver, IDisposable {
       !Number.isFinite(snapshot.updatedAt) ||
       (snapshot.expiresAt !== null && !Number.isFinite(snapshot.expiresAt))
     ) {
-      throw new Error('[store] invalid resource cache snapshot');
+      throw createResourceError(
+        ResourceErrorCode.invalidSnapshot,
+        '[store] invalid resource cache snapshot'
+      );
     }
     this.#requests.supersede();
     this.#requestPending = false;
@@ -278,7 +328,7 @@ export class Resource<T> implements IObserver, IDisposable {
     this.#updatedAt = snapshot.updatedAt;
     this.#expiresAt = snapshot.expiresAt ?? Infinity;
     this.#stateSignal.value = {
-      status: 'success',
+      status: ResourceStatus.success,
       data: snapshot.data
     };
     this.#currentPromise = Promise.resolve(snapshot.data);
@@ -295,7 +345,7 @@ export class Resource<T> implements IObserver, IDisposable {
   }
 
   dispose(): void {
-    if (this.#terminal.lifecycle === 'terminal') return;
+    if (this.#terminal.lifecycle === LifecycleState.terminal) return;
     this.#terminal.close();
     this.#requests.dispose();
     this.#refreshScheduled = false;
@@ -303,27 +353,33 @@ export class Resource<T> implements IObserver, IDisposable {
     this.#requestPending = false;
     internalsOf(this.runtime).tracker.clearDependencies(this);
     this.#stateSignal.dispose();
-    this.#terminal.forceDispose();
+    this.#terminal.forceTerminal();
   }
 
   #assertUsable(): void {
-    if (this.#terminal.lifecycle !== 'open') {
-      throw new Error('[store] cannot use a disposed resource');
+    if (this.#terminal.lifecycle !== LifecycleState.open) {
+      throw createResourceError(
+        ResourceErrorCode.resourceDisposed,
+        '[store] cannot use a disposed resource'
+      );
     }
   }
 
   #materialize(state: IResourceState<T>): T {
     switch (state.status) {
-      case 'success':
+      case ResourceStatus.success:
         return state.data;
-      case 'error':
+      case ResourceStatus.error:
         throw state.error;
-      case 'cancelled':
+      case ResourceStatus.cancelled:
         throw state.error;
-      case 'pending':
-      case 'idle':
+      case ResourceStatus.pending:
+      case ResourceStatus.idle:
         if (!this.#currentPromise) {
-          throw new Error('[store] resource has no active or cached promise');
+          throw createResourceError(
+            ResourceErrorCode.noActivePromise,
+            '[store] resource has no active or cached promise'
+          );
         }
         throw this.#currentPromise;
     }
@@ -331,7 +387,7 @@ export class Resource<T> implements IObserver, IDisposable {
 
   #isFresh(): boolean {
     const state = this.#stateSignal.peek();
-    return state.status === 'success' && Date.now() < this.#expiresAt;
+    return state.status === ResourceStatus.success && this.#scheduler.now() < this.#expiresAt;
   }
 
   #ensureFresh(): void {
@@ -339,7 +395,10 @@ export class Resource<T> implements IObserver, IDisposable {
     const state = this.#stateSignal.peek();
     // error/cancelled are stable, inspectable states. Only explicit
     // refetch()/invalidate() retries them; passive reads must not loop.
-    if (state.status === 'idle' || (state.status === 'success' && !this.#isFresh())) {
+    if (
+      state.status === ResourceStatus.idle ||
+      (state.status === ResourceStatus.success && !this.#isFresh())
+    ) {
       this.#observe(this.#startRequest());
     }
   }
@@ -354,10 +413,10 @@ export class Resource<T> implements IObserver, IDisposable {
     this.#requestPending = true;
     this.#staleAfterSettlement = false;
     const current = this.#stateSignal.peek();
-    if (this.#staleWhileRevalidate && current.status === 'success') {
+    if (this.#staleWhileRevalidate && current.status === ResourceStatus.success) {
       this.#stateSignal.value = { ...current, refreshing: true };
     } else {
-      this.#stateSignal.value = { status: 'pending' };
+      this.#stateSignal.value = { status: ResourceStatus.pending };
     }
 
     const request = this.#withAbort(this.#executeFetcher({ signal }, 0), signal);
@@ -366,7 +425,7 @@ export class Resource<T> implements IObserver, IDisposable {
     return request;
   }
 
-  #executeFetcher(controller: { signal: AbortSignal }, failureCount: number): Promise<T> {
+  #executeFetcher(controller: { signal: IAbortSignal }, failureCount: number): Promise<T> {
     if (controller.signal.aborted) return Promise.reject(abortError());
     let fetched: T | PromiseLike<T>;
     try {
@@ -374,11 +433,27 @@ export class Resource<T> implements IObserver, IDisposable {
         this.#fetcher({ signal: controller.signal })
       );
     } catch (error) {
-      const suspended = asThenable(error);
-      if (!suspended) {
+      const probe = probeThenable(error);
+      if (probe.kind === ThenableProbeKind.failed) {
+        // Getter failed while probing a Suspense throw: surface the getter error and keep the
+        // original thrown value reachable — never rewrite it into a plain fetch failure (AF-08).
+        return Promise.reject(
+          tagResourceError(
+            new AggregateError(
+              [error, probe.error],
+              '[store] resource fetcher threw a value whose then getter failed'
+            ),
+            ResourceErrorCode.suspenseProbeFailed
+          )
+        );
+      }
+      if (probe.kind === 'not-thenable') {
         return this.#retryFailure(error, controller, failureCount);
       }
-      return Promise.resolve(suspended).then(() => this.#executeFetcher(controller, failureCount));
+      // Captured `then` is applied exactly once — no second `.then` read via Promise.resolve.
+      return assimilateCapturedThen<void>(probe.thenFn, error).then(() =>
+        this.#executeFetcher(controller, failureCount)
+      );
     }
     return Promise.resolve(fetched).catch((error: unknown) =>
       this.#retryFailure(error, controller, failureCount)
@@ -387,7 +462,7 @@ export class Resource<T> implements IObserver, IDisposable {
 
   #retryFailure(
     error: unknown,
-    controller: { signal: AbortSignal },
+    controller: { signal: IAbortSignal },
     failureCount: number
   ): Promise<T> {
     if (controller.signal.aborted) return Promise.reject(abortError());
@@ -413,15 +488,19 @@ export class Resource<T> implements IObserver, IDisposable {
     }
     if (!Number.isFinite(delay) || delay < 0) {
       return Promise.reject(
-        new RangeError('[store] resource retry delay must be a non-negative finite number')
+        tagResourceError(
+          new RangeError('[store] resource retry delay must be a non-negative finite number'),
+          ResourceErrorCode.invalidOption
+        )
       );
     }
     return new Promise<void>((resolve, reject) => {
-      const onAbort = () => {
-        clearTimeout(timer);
+      let timer: { cancel(): void };
+      const onAbort = (): void => {
+        timer.cancel();
         reject(abortError());
       };
-      const timer = setTimeout(() => {
+      timer = this.#scheduler.schedule(() => {
         controller.signal.removeEventListener('abort', onAbort);
         resolve();
       }, delay);
@@ -429,7 +508,7 @@ export class Resource<T> implements IObserver, IDisposable {
     }).then(() => this.#executeFetcher(controller, nextFailureCount));
   }
 
-  #withAbort(source: Promise<T>, signal: AbortSignal): Promise<T> {
+  #withAbort(source: Promise<T>, signal: IAbortSignal): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       if (signal.aborted) {
         reject(abortError());
@@ -450,19 +529,20 @@ export class Resource<T> implements IObserver, IDisposable {
     });
   }
 
-  #observeSettlement(request: Promise<T>, token: GenerationToken): void {
+  #observeSettlement(request: Promise<T>, token: IGenerationToken): void {
     void request
       .then(
         (data) => {
-          if (!this.#requests.isCurrentToken(token) || this.#terminal.lifecycle !== 'open') return;
-          this.#updatedAt = Date.now();
+          if (!this.#requests.isCurrent(token) || this.#terminal.lifecycle !== LifecycleState.open)
+            return;
+          this.#updatedAt = this.#scheduler.now();
           this.#expiresAt = this.#ttl === Infinity ? Infinity : this.#updatedAt + this.#ttl;
           if (this.#staleAfterSettlement) {
             this.#expiresAt = 0;
             this.#staleAfterSettlement = false;
           }
           try {
-            this.#stateSignal.value = { status: 'success', data };
+            this.#stateSignal.value = { status: ResourceStatus.success, data };
           } finally {
             this.#requestPending = false;
           }
@@ -472,10 +552,11 @@ export class Resource<T> implements IObserver, IDisposable {
           }
         },
         (error: unknown) => {
-          if (!this.#requests.isCurrentToken(token) || this.#terminal.lifecycle !== 'open') return;
+          if (!this.#requests.isCurrent(token) || this.#terminal.lifecycle !== LifecycleState.open)
+            return;
           this.#staleAfterSettlement = false;
           try {
-            this.#stateSignal.value = { status: 'error', error };
+            this.#stateSignal.value = { status: ResourceStatus.error, error };
           } finally {
             this.#requestPending = false;
           }
@@ -486,7 +567,7 @@ export class Resource<T> implements IObserver, IDisposable {
         }
       )
       .catch((error: unknown) => {
-        this.runtime.reportError(error, { phase: 'async-flush' });
+        this.runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush });
       });
   }
 
@@ -504,22 +585,30 @@ export class Resource<T> implements IObserver, IDisposable {
     this.#requests.supersede();
     this.#requestPending = false;
     this.#paused = pause;
-    if (this.#stateSignal.peek().status === 'pending') {
+    const current = this.#stateSignal.peek();
+    if (current.status === ResourceStatus.pending) {
       this.#stateSignal.value = pause
-        ? { status: 'cancelled', error: new ResourceCancelledError() }
-        : { status: 'idle' };
+        ? { status: ResourceStatus.cancelled, error: new ResourceCancelledError() }
+        : { status: ResourceStatus.idle };
+      return;
+    }
+    // AF-07 / AL-02: an in-flight SWR refresh was superseded. Keep the stale success data visible
+    // but clear `refreshing` so `fetchStatus === 'idle'` and `refreshing === false` stay consistent
+    // instead of leaving a permanent `refreshing: true` with no current request.
+    if (current.status === ResourceStatus.success && current.refreshing === true) {
+      this.#stateSignal.value = { status: ResourceStatus.success, data: current.data };
     }
   }
 
   #scheduleDependencyRefresh(force: boolean): void {
-    if (this.#terminal.lifecycle !== 'open') return;
+    if (this.#terminal.lifecycle !== LifecycleState.open) return;
     this.#forceRefresh ||= force;
     if (this.#refreshScheduled) return;
     this.#refreshScheduled = true;
     // 与 Computed 挂起同一条 idle 通道：Resource 不得私自 queueMicrotask，
     // 否则 setSchedulerStrategy / scheduleIdle 对异步失效无效。
     internalsOf(this.runtime).deferIdle(() => {
-      if (!this.#refreshScheduled || this.#terminal.lifecycle !== 'open') return;
+      if (!this.#refreshScheduled || this.#terminal.lifecycle !== LifecycleState.open) return;
       this.#refreshScheduled = false;
       const mustRefresh = this.#forceRefresh;
       this.#forceRefresh = false;
@@ -531,17 +620,17 @@ export class Resource<T> implements IObserver, IDisposable {
       } catch (error) {
         this.#requestPending = false;
         this.#expiresAt = 0;
-        this.#stateSignal.value = { status: 'error', error };
+        this.#stateSignal.value = { status: ResourceStatus.error, error };
       }
     });
   }
 
   #scheduleSuspension(): void {
-    if (this.#keepAlive || this.#terminal.lifecycle !== 'open') return;
+    if (this.#keepAlive || this.#terminal.lifecycle !== LifecycleState.open) return;
     const generation = ++this.#suspensionGeneration;
     internalsOf(this.runtime).deferIdle(() => {
       if (
-        this.#terminal.lifecycle !== 'open' ||
+        this.#terminal.lifecycle !== LifecycleState.open ||
         this.#keepAlive ||
         this.#stateSignal.subs.size > 0 ||
         generation !== this.#suspensionGeneration
@@ -551,7 +640,7 @@ export class Resource<T> implements IObserver, IDisposable {
       const hadDependencies = this.deps.size > 0;
       internalsOf(this.runtime).tracker.clearDependencies(this);
       if (hadDependencies) {
-        if (this.#stateSignal.peek().status === 'success') this.#expiresAt = 0;
+        if (this.#stateSignal.peek().status === ResourceStatus.success) this.#expiresAt = 0;
         else if (this.#requestPending) this.#staleAfterSettlement = true;
       }
     });

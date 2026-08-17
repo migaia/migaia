@@ -1,5 +1,5 @@
-import { compareStorageKeys } from './key-domain';
-import type { IKeyRange, IStorageKey } from '../types/context';
+import { compareStorageKeys } from './key-domain.js';
+import type { IKeyRange, IStorageKey } from '../types/context.js';
 
 /** Apply the shared inclusive/exclusive storage-key range contract. */
 export const isStorageKeyInRange = (key: IStorageKey, range: IKeyRange | undefined): boolean => {

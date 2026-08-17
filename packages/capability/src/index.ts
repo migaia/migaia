@@ -14,6 +14,23 @@
  * 但省下体积的是打包器，不是闸门。
  */
 
+import {
+  assimilateCapturedThen,
+  containAsyncRejection,
+  createGenerationController,
+  createQuiescenceTracker,
+  type IGenerationController
+} from '@migaia/lifecycle';
+import { CapabilityErrorCode } from './error-code.js';
+import { createCapabilityError, tagCapabilityError } from './errors.js';
+import { CapabilityEnableStatus, CapabilityState } from './state-constants.js';
+export * from './state-constants.js';
+
+// 错误码是公开 API（`docs/contracts/error-codes.md` §3.5 / migration.sdd.md §8.1）：调用方要能按
+// `(source, code)` 分支，必须从主入口拿得到常量与类型，不能被迫抄写字符串字面量。
+export { CapabilityErrorCode, type ICapabilityErrorCode } from './error-code.js';
+export { CAPABILITY_SOURCE } from './errors.js';
+
 export type ICapabilityHandle = {
   dispose(): void | PromiseLike<void>;
 };
@@ -21,15 +38,16 @@ export type ICapabilityHandle = {
 /**
  * 能力当前生命周期。
  *
- * `off` 表示闸门允许、但尚未启用；`blocked` 表示被开关明确拒绝。两者分开后， 控制台与调用方不再把「从未尝试」误报成「灰度策略拦截」。
+ * `off` 表示闸门允许、但尚未启用；`gated` 表示被开关明确拒绝。两者分开后， 控制台与调用方不再把「从未尝试」误报成「灰度策略拦截」。名字与 tray 的 graph
+ * availability `blocked` 区分开（`migration.sdd.md` §5.5）——两者是完全不同的恢复语义，不共用一个状态名。
  */
-export type ICapabilityState = 'off' | 'blocked' | 'activating' | 'on' | 'failed';
+export type ICapabilityState = (typeof CapabilityState)[keyof typeof CapabilityState];
 
 export type ICapabilityEnableResult =
-  | { readonly status: 'enabled' }
-  | { readonly status: 'blocked' }
-  | { readonly status: 'cancelled' }
-  | { readonly status: 'failed'; readonly error: unknown };
+  | { readonly status: typeof CapabilityEnableStatus.enabled }
+  | { readonly status: typeof CapabilityEnableStatus.gated }
+  | { readonly status: typeof CapabilityEnableStatus.cancelled }
+  | { readonly status: typeof CapabilityEnableStatus.failed; readonly error: unknown };
 
 export type ICapabilityDefinition<Context, Handle extends ICapabilityHandle = ICapabilityHandle> = {
   readonly name: string;
@@ -78,17 +96,12 @@ export type ICapabilityHost<Context> = {
   enableResult(name: string): Promise<ICapabilityEnableResult>;
   /** 关闭并释放 handle。返回是否确实关掉了一个启用态的能力。 */
   disable(name: string): Promise<boolean>;
-  /** Awaitable counterpart for integrations whose handle release is asynchronous. */
-  disableAsync(name: string): Promise<boolean>;
-  /** 关闭全部（后进先出）并使 host 不可用。 */
+  /** 关闭全部（后进先出）并使 host 不可用。唯一异步释放入口。 */
   dispose(): Promise<void>;
-  disposeAsync(): Promise<void>;
   /** Synchronous compatibility adapter for integrations that require a boolean. */
   enableLegacyBoolean(name: string): Promise<boolean>;
   /** Synchronous release adapter; prefer awaitable `disable()`. */
   disableNow(name: string): boolean;
-  /** Synchronous teardown adapter; prefer awaitable `dispose()`. */
-  disposeNow(): void;
   readonly disposed: boolean;
 };
 
@@ -102,47 +115,13 @@ type IEntry<Context> = {
   /** 在途激活。用于幂等：并发 enable 共享它。 */
   pending?: Promise<boolean>;
   /**
-   * 激活代数。
+   * 激活代数，换成 `@migaia/lifecycle` 的 `GenerationController`（`migration.sdd.md` §3.2）。
    *
    * 异步激活期间可能被 `disable()` 或 `dispose()`，此时 activate 的结果**不能** 被采纳——否则关掉的能力会在几毫秒后自己回来（而调用方以为已经回退了）。
-   * 代数不匹配就把刚拿到的 handle 直接释放。
+   * `adopt()` 在代数不匹配时会把刚拿到的 handle 直接释放。
    */
-  generation: number;
+  readonly generationController: IGenerationController;
 };
-
-/**
- * `() => void` 在 TypeScript 中仍接受 async 函数。对诊断/释放回调的返回值做 thenable 兜底，避免一次回退在下个微任务变成宿主的 unhandled
- * rejection。
- */
-function containAsyncRejection(value: unknown, onRejected: (error: unknown) => void): void {
-  if ((value === null || typeof value !== 'object') && typeof value !== 'function') {
-    return;
-  }
-  let then: unknown;
-  try {
-    then = (value as { then?: unknown }).then;
-  } catch (error) {
-    onRejected(error);
-    return;
-  }
-  if (typeof then !== 'function') return;
-  // 复用第一次取得的 then，不能再交给 Promise.resolve 读取一次：状态型 getter
-  // 可以让两次读取返回不同函数，甚至让第二次读取抛错。
-  const settled = new Promise<unknown>((resolve, reject) => {
-    try {
-      Reflect.apply(then, value, [resolve, reject]);
-    } catch (error) {
-      reject(error);
-    }
-  });
-  void settled.catch((error: unknown) => {
-    try {
-      onRejected(error);
-    } catch {
-      // 拒绝处理本身也是最后一道边界，不能再制造一条未处理拒绝。
-    }
-  });
-}
 
 export function createCapabilityHost<Context>(
   context: Context,
@@ -150,45 +129,28 @@ export function createCapabilityHost<Context>(
 ): ICapabilityHost<Context> {
   const { onError } = options;
   const entries = new Map<string, IEntry<Context>>();
-  const pendingReleases = new Set<Promise<void>>();
-  const entryReleases = new Map<IEntry<Context>, Set<Promise<void>>>();
-  // A still-running `activate()` has not produced a handle yet, so it has
-  // nothing in `pendingReleases` to await — but it may still create one
-  // after `disposeSync()`/`disableSync()` already ran (the generation check
-  // inside `enableBoolean`'s async body catches this and releases the
-  // handle then). Awaiting `pendingReleases` alone therefore misses exactly
-  // the case this exists to close: dispose/disable returning while a
-  // same-tick activation is still in flight.
-  const pendingActivations = new Set<Promise<boolean>>();
-  const entryActivations = new Map<IEntry<Context>, Set<Promise<boolean>>>();
-  const trackActivation = (entry: IEntry<Context>, promise: Promise<boolean>) => {
-    pendingActivations.add(promise);
-    let set = entryActivations.get(entry);
-    if (!set) entryActivations.set(entry, (set = new Set()));
-    set.add(promise);
-    void promise.finally(() => {
-      pendingActivations.delete(promise);
-      set!.delete(promise);
-      if (!set!.size) entryActivations.delete(entry);
-    });
+  /**
+   * 排空的双视图（`migration.sdd.md` §3.3）：`ALL_KEY` 给 `dispose()` 的全局排空， `entry` 对象自身给 `disable()`
+   * 的逐单元排空——同一个 `QuiescenceTracker` 承担两种 key，靠它自带的 `retain()`/`whenZeroOnce()`
+   * 保证「排空过程中冒出的新待排空项不会被提前放行」，不用自己再手写 Set 快照。 激活与释放两类在途 Promise 合并计一个维度：原实现分开算但求和判零，观察语义等价。
+   */
+  const pendingTracker = createQuiescenceTracker<object>();
+  const ALL_KEY = {};
+  const trackPending = <T>(entry: IEntry<Context>, promise: Promise<T>): void => {
+    const releaseAll = pendingTracker.retain(ALL_KEY);
+    const releaseEntry = pendingTracker.retain(entry);
+    const settle = (): void => {
+      releaseAll();
+      releaseEntry();
+    };
+    void promise.then(settle, settle);
   };
   const asPromiseLike = (value: unknown): Promise<void> | undefined => {
     if (value === null || (typeof value !== 'object' && typeof value !== 'function'))
       return undefined;
     const then = (value as { then?: unknown }).then;
     if (typeof then !== 'function') return undefined;
-    return new Promise<void>((resolve, reject) => Reflect.apply(then, value, [resolve, reject]));
-  };
-  const trackRelease = (entry: IEntry<Context>, promise: Promise<void>) => {
-    pendingReleases.add(promise);
-    let set = entryReleases.get(entry);
-    if (!set) entryReleases.set(entry, (set = new Set()));
-    set.add(promise);
-    void promise.finally(() => {
-      pendingReleases.delete(promise);
-      set!.delete(promise);
-      if (!set!.size) entryReleases.delete(entry);
-    });
+    return assimilateCapturedThen<void>(then as (resolve: unknown, reject: unknown) => void, value);
   };
   /**
    * 记录真正进入 on 的顺序，回退按这个顺序 LIFO。
@@ -216,7 +178,19 @@ export function createCapabilityHost<Context>(
   ): Map<string, boolean> => {
     const copied = new Map<string, boolean>();
     if (!source) return copied;
-    for (const [name, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(source))) {
+    let descriptors: PropertyDescriptorMap;
+    try {
+      descriptors = Object.getOwnPropertyDescriptors(source);
+    } catch (error) {
+      // hostile Proxy ownKeys/getOwnPropertyDescriptor trap — surface with (source, code), cause
+      // keeps the original Proxy exception === reachable (AF-09).
+      throw createCapabilityError(
+        CapabilityErrorCode.invalidOption,
+        '[store] capability flags snapshot failed',
+        { cause: error }
+      );
+    }
+    for (const [name, descriptor] of Object.entries(descriptors)) {
       if (descriptor.enumerable && 'value' in descriptor && descriptor.value === true) {
         copied.set(name, true);
       }
@@ -227,12 +201,19 @@ export function createCapabilityHost<Context>(
   let flagValues = copyFlags(options.flags);
 
   const assertUsable = (): void => {
-    if (disposed) throw new Error('[store] capability host is disposed');
+    if (disposed)
+      throw createCapabilityError(
+        CapabilityErrorCode.hostDisposed,
+        '[store] capability host is disposed'
+      );
   };
 
   const assertNotTransitioning = (): void => {
     if (transitionDepth > 0) {
-      throw new Error('[store] capability host cannot mutate during a lifecycle transition');
+      throw createCapabilityError(
+        CapabilityErrorCode.hostTransitioning,
+        '[store] capability host cannot mutate during a lifecycle transition'
+      );
     }
   };
 
@@ -261,7 +242,10 @@ export function createCapabilityHost<Context>(
   const entryOf = (name: string): IEntry<Context> => {
     const entry = entries.get(name);
     if (!entry) {
-      throw new Error(`[store] capability "${name}" is not registered`);
+      throw createCapabilityError(
+        CapabilityErrorCode.notRegistered,
+        `[store] capability "${name}" is not registered`
+      );
     }
     return entry;
   };
@@ -283,16 +267,17 @@ export function createCapabilityHost<Context>(
   const release = (
     entry: IEntry<Context>,
     handle: ICapabilityHandle,
-    ownerGeneration = entry.generation
+    ownerGeneration = entry.generationController.generation
   ): void => {
     const recordCleanupError = (error: unknown): void => {
       const inactiveWithoutReplacement =
-        (entry.state === 'blocked' || entry.state === 'off') &&
+        (entry.state === CapabilityState.gated || entry.state === CapabilityState.off) &&
         entry.pending === undefined &&
         entry.handle === undefined;
       if (
-        ownerGeneration === entry.generation ||
-        (entry.generation === ownerGeneration + 1 && inactiveWithoutReplacement)
+        ownerGeneration === entry.generationController.generation ||
+        (entry.generationController.generation === ownerGeneration + 1 &&
+          inactiveWithoutReplacement)
       ) {
         entry.error = error;
       }
@@ -311,7 +296,7 @@ export function createCapabilityHost<Context>(
               reportError(entry.name, error);
             }
           );
-          trackRelease(entry, pending);
+          trackPending(entry, pending);
         }
         if (!thenable)
           containAsyncRejection(result, (error) => {
@@ -338,12 +323,12 @@ export function createCapabilityHost<Context>(
     if (index >= 0) activationOrder.splice(index, 1);
   };
 
-  /** 关闭一个 entry；flag 已更新后调用，因此最终状态可准确表示 blocked/off。 */
+  /** 关闭一个 entry；flag 已更新后调用，因此最终状态可准确表示 gated/off。 */
   const deactivate = (entry: IEntry<Context>): boolean => {
-    entry.generation++;
+    entry.generationController.supersede();
     entry.pending = undefined;
-    const wasOn = entry.state === 'on';
-    entry.state = allowed(entry.name) ? 'off' : 'blocked';
+    const wasOn = entry.state === CapabilityState.on;
+    entry.state = allowed(entry.name) ? CapabilityState.off : CapabilityState.gated;
     entry.error = undefined;
     forgetActivation(entry);
     releaseHandle(entry);
@@ -359,9 +344,9 @@ export function createCapabilityHost<Context>(
     }
     for (const entry of entries.values()) {
       if (!allowed(entry.name)) {
-        if (entry.state !== 'blocked') deactivate(entry);
-      } else if (entry.state === 'blocked') {
-        entry.state = 'off';
+        if (entry.state !== CapabilityState.gated) deactivate(entry);
+      } else if (entry.state === CapabilityState.gated) {
+        entry.state = CapabilityState.off;
         entry.error = undefined;
       }
     }
@@ -379,43 +364,50 @@ export function createCapabilityHost<Context>(
       return rejectedOperation(error);
     }
     if (!allowed(name)) {
-      entry.state = 'blocked';
+      entry.state = CapabilityState.gated;
       entry.error = undefined;
       return Promise.resolve(false);
     }
-    if (entry.state === 'on') return Promise.resolve(true);
+    if (entry.state === CapabilityState.on) return Promise.resolve(true);
     if (entry.pending) return entry.pending;
 
-    const generation = ++entry.generation;
-    entry.state = 'activating';
+    const { generation, token } = entry.generationController.begin();
+    entry.state = CapabilityState.activating;
     entry.error = undefined;
     const pending = (async () => {
       try {
         const handle = await entry.activate(context);
         if (!handle || typeof handle.dispose !== 'function') {
-          throw new TypeError(`[store] capability "${name}" returned an invalid handle`);
+          throw tagCapabilityError(
+            new TypeError(`[store] capability "${name}" returned an invalid handle`),
+            CapabilityErrorCode.invalidHandle
+          );
         }
-        if (disposed || generation !== entry.generation) {
-          release(entry, handle, generation);
-          return false;
-        }
+        // `adopt()` returns false and releases `handle` itself whenever this token is no longer
+        // current — covers both `disable()`/`setFlag(false)` superseding it (a new generation
+        // began) and the whole host having been disposed meanwhile (the controller itself is
+        // disposed too, see `disposeSync()`).
+        const adopted = entry.generationController.adopt(token, handle, (adoptedHandle) =>
+          release(entry, adoptedHandle, generation)
+        );
+        if (!adopted) return false;
         entry.handle = handle;
-        entry.state = 'on';
+        entry.state = CapabilityState.on;
         activationOrder.push(entry);
         return true;
       } catch (error) {
-        if (generation === entry.generation) {
-          entry.state = 'failed';
+        if (entry.generationController.isCurrent(token)) {
+          entry.state = CapabilityState.failed;
           entry.error = error;
         }
         reportError(name, error);
         return false;
       } finally {
-        if (generation === entry.generation) entry.pending = undefined;
+        if (entry.generationController.isCurrent(token)) entry.pending = undefined;
       }
     })();
     entry.pending = pending;
-    trackActivation(entry, pending);
+    trackPending(entry, pending);
     return pending;
   };
 
@@ -431,25 +423,24 @@ export function createCapabilityHost<Context>(
     if (disposed) return;
     disposed = true;
     for (const entry of entries.values()) {
-      entry.generation++;
+      entry.generationController.dispose();
       entry.pending = undefined;
     }
     for (const entry of [...activationOrder].reverse()) {
       releaseHandle(entry);
-      entry.state = 'off';
+      entry.state = CapabilityState.off;
     }
     activationOrder.length = 0;
-    for (const entry of entries.values()) entry.state = 'off';
+    for (const entry of entries.values()) entry.state = CapabilityState.off;
   };
 
-  const disposeAsync = async (): Promise<void> => {
+  const disposeAll = async (): Promise<void> => {
     disposeSync();
-    // Loop, not a single await: draining a still-in-flight activation can
-    // itself enqueue a new release promise that did not exist in any
-    // earlier snapshot (see `pendingActivations` above). `disposeAsync()`
-    // must not resolve until both sets have settled to empty together.
-    while (pendingActivations.size || pendingReleases.size) {
-      await Promise.all([...pendingActivations, ...pendingReleases]);
+    // `whenZeroOnce()` loops until the count is actually zero the instant it resolves — draining a
+    // still-in-flight activation can itself enqueue a new release promise under the same key, and
+    // this must not resolve until that settles too (§8.2 "排空循环在冒出新待排空项时不提前返回").
+    while (pendingTracker.count(ALL_KEY) > 0) {
+      await pendingTracker.whenZeroOnce(ALL_KEY);
     }
   };
 
@@ -458,33 +449,55 @@ export function createCapabilityHost<Context>(
       assertUsable();
       assertNotTransitioning();
       const snapshot = runTransition(() => {
-        const name: unknown = definition?.name;
-        const activate: unknown = definition?.activate;
+        let name: unknown;
+        let activate: unknown;
+        try {
+          name = definition?.name;
+          activate = definition?.activate;
+        } catch (error) {
+          // hostile Proxy getter on definition — surface with (source, code) + cause reachable (AF-09).
+          throw createCapabilityError(
+            CapabilityErrorCode.invalidOption,
+            '[store] capability definition snapshot failed',
+            { cause: error }
+          );
+        }
         if (typeof name !== 'string' || name.trim().length === 0) {
-          throw new TypeError('[store] capability name must be a non-empty string');
+          throw tagCapabilityError(
+            new TypeError('[store] capability name must be a non-empty string'),
+            CapabilityErrorCode.invalidName
+          );
         }
         if (typeof activate !== 'function') {
-          throw new TypeError(`[store] capability "${name}" activate must be a function`);
+          throw tagCapabilityError(
+            new TypeError(`[store] capability "${name}" activate must be a function`),
+            CapabilityErrorCode.invalidActivate
+          );
         }
         const activation = activate as (
           context: Context
         ) => ICapabilityHandle | Promise<ICapabilityHandle>;
         // Preserve method-style `this.name` without retaining the caller's
-        // mutable definition object or exposing the private entry.
+        // mutable definition object or exposing the private entry. Invoking
+        // `receiver.activate` as a method binds `this` to the frozen receiver —
+        // the method-call form supplies the receiver without `call`/`apply`/`bind`.
         const receiver = Object.freeze({ name, activate: activation });
         return {
           name,
-          activate: (context: Context) => Reflect.apply(activation, receiver, [context])
+          activate: (context: Context) => receiver.activate(context)
         };
       });
       if (entries.has(snapshot.name)) {
-        throw new Error(`[store] capability "${snapshot.name}" is already registered`);
+        throw createCapabilityError(
+          CapabilityErrorCode.alreadyRegistered,
+          `[store] capability "${snapshot.name}" is already registered`
+        );
       }
       entries.set(snapshot.name, {
         name: snapshot.name,
         activate: snapshot.activate,
-        state: allowed(snapshot.name) ? 'off' : 'blocked',
-        generation: 0
+        state: allowed(snapshot.name) ? CapabilityState.off : CapabilityState.gated,
+        generationController: createGenerationController()
       });
     },
 
@@ -532,10 +545,11 @@ export function createCapabilityHost<Context>(
     enable(name) {
       return enableBoolean(name).then((enabled) => {
         const entry = entries.get(name);
-        if (enabled) return { status: 'enabled' as const };
-        if (entry?.state === 'blocked') return { status: 'blocked' as const };
-        if (entry?.state === 'failed') return { status: 'failed' as const, error: entry.error };
-        return { status: 'cancelled' as const };
+        if (enabled) return { status: CapabilityEnableStatus.enabled };
+        if (entry?.state === CapabilityState.gated) return { status: CapabilityEnableStatus.gated };
+        if (entry?.state === CapabilityState.failed)
+          return { status: CapabilityEnableStatus.failed, error: entry.error };
+        return { status: CapabilityEnableStatus.cancelled };
       });
     },
 
@@ -548,32 +562,19 @@ export function createCapabilityHost<Context>(
     },
 
     async disable(name) {
+      // disposed 优先级高于 NOT_REGISTERED（AF-20）：先断言 host 可用，再做 name lookup。
+      assertUsable();
       const entry = entryOf(name);
       const changed = disableSync(name);
-      // Same loop-until-stable reasoning as disposeAsync(), scoped to this entry.
-      while (true) {
-        const activations = entryActivations.get(entry);
-        const releases = entryReleases.get(entry);
-        if (!activations?.size && !releases?.size) break;
-        await Promise.all([...(activations ?? []), ...(releases ?? [])]);
+      // Same loop-until-stable reasoning as dispose(), scoped to this entry.
+      while (pendingTracker.count(entry) > 0) {
+        await pendingTracker.whenZeroOnce(entry);
       }
       return changed;
     },
 
-    disableAsync(name) {
-      return this.disable(name);
-    },
-
-    disposeNow() {
-      disposeSync();
-    },
-
-    async disposeAsync() {
-      await disposeAsync();
-    },
-
     dispose() {
-      return this.disposeAsync();
+      return disposeAll();
     },
 
     get disposed() {

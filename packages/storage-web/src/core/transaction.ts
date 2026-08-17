@@ -1,61 +1,20 @@
-import type { IConflictPolicy, IStorageKey } from '../types/context';
-import type { IBackendKind } from '../types/capabilities';
-import { StorageError, StorageErrorCode } from '../types/errors';
+import type { IBackendKind } from '@migaia/storage-contract';
+import { StorageOperation } from '../constants.js';
+import { StorageError, StorageErrorCode } from '../types/errors.js';
 
-export type ITransactionWriteOptions = {
-  readonly conflictPolicy?: IConflictPolicy;
-};
+// 类型与选项校验 guard 已迁往 `@migaia/storage-contract`；re-export 保持既有 import 路径不变。
+export type { ITransactionScope, ITransactionWriteOptions } from '@migaia/storage-contract';
+export { assertTransactionCallback, readTransactionConflictPolicy } from '@migaia/storage-contract';
 
-/** Backend-neutral transaction scope shared by memory and IndexedDB commit engines. */
-export type ITransactionScope<TValue = unknown> = {
-  get(key: IStorageKey): Promise<TValue | undefined>;
-  put(value: TValue, key?: IStorageKey, options?: ITransactionWriteOptions): Promise<IStorageKey>;
-  delete(key: IStorageKey): Promise<void>;
-};
-
-/** Validate transaction entry callbacks before a backend allocates snapshot/connection state. */
-export const assertTransactionCallback = (run: unknown, backend: IBackendKind): void => {
-  if (typeof run === 'function') return;
-  throw new StorageError(StorageErrorCode.invalidArgument, {
-    backend,
-    operation: 'transaction',
-    cause: new TypeError('transaction callback must be a function')
-  });
-};
-
-/** Validate and snapshot scope write options shared by both transaction engines. */
-export const readTransactionConflictPolicy = (
-  options: unknown,
-  backend: IBackendKind
-): IConflictPolicy => {
-  if (options === undefined) return 'conflict';
-  if (typeof options === 'object' && options !== null && !Array.isArray(options)) {
-    let policy: unknown;
-    try {
-      policy = (options as { conflictPolicy?: unknown }).conflictPolicy;
-    } catch (cause) {
-      throw new StorageError(StorageErrorCode.invalidArgument, {
-        backend,
-        operation: 'transaction.put',
-        cause
-      });
-    }
-    if (policy === undefined || policy === 'conflict') return 'conflict';
-    if (policy === 'replace') return 'replace';
-  }
-  throw new StorageError(StorageErrorCode.invalidArgument, {
-    backend,
-    operation: 'transaction.put',
-    cause: new TypeError('transaction write options contain an invalid conflictPolicy')
-  });
-};
-
-/** Reject work attempted after the owning transaction callback has settled. */
+/**
+ * Reject work attempted after the owning transaction callback has settled（抛 web
+ * `transactionFailed`，留 web）。
+ */
 export const assertTransactionScopeActive = (active: boolean, backend: IBackendKind): void => {
   if (active) return;
   throw new StorageError(StorageErrorCode.transactionFailed, {
     backend,
-    operation: 'transaction.scope',
+    operation: StorageOperation.transactionScope,
     cause: new Error('transaction scope is no longer active')
   });
 };

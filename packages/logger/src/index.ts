@@ -1,12 +1,21 @@
-export type { IDimFn, IPaintFn } from './typing';
+export type { IDimFn, IPaintFn } from './typing.js';
 
-export { Logger } from './log';
+export { Logger } from './log.js';
+export { LoggerStatus, type ILoggerStatus } from './state-constants.js';
+export {
+  LoggerLevel,
+  LoggerColorMode,
+  LoggerReasoningPhase,
+  type ILoggerLevel,
+  type ILoggerColorMode,
+  type ILoggerReasoningPhase
+} from './plugin-constants.js';
 export {
   getLoggerRuntimeManager,
   setLoggerRuntimeManager,
   type ILoggerProcess,
   type ILoggerRuntimeManager
-} from './runtime-manager';
+} from './runtime-manager.js';
 export type {
   IErrorInfo,
   IFlusher,
@@ -32,4 +41,4 @@ export type {
   IShutdownReason,
   ISink,
   IStaticLoggerCtor
-} from './typing';
+} from './typing.js';

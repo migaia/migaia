@@ -1,5 +1,5 @@
-import { StorageError, StorageErrorCode } from '../types/errors';
-import type { ISchemaAdapter } from './types';
+import { StorageError, StorageErrorCode } from '../types/errors.js';
+import type { ISchemaAdapter } from './types.js';
 
 /**
  * [Standard Schema](https://standardschema.dev) 的最小契约。zod ≥3.24、 valibot ≥1.0、arktype ≥2.0
@@ -26,17 +26,17 @@ export const fromStandardSchema = <T>(
   schema: IStandardSchemaV1<unknown, T>
 ): ISchemaAdapter<T, T> => {
   if (typeof schema !== 'object' || schema === null || Array.isArray(schema))
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
       cause: new TypeError('Standard Schema must be an object')
     });
   let standard: unknown;
   try {
     standard = (schema as { readonly '~standard'?: unknown })['~standard'];
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, { cause });
+    throw new StorageError(StorageErrorCode.invalidConfig, { cause });
   }
   if (typeof standard !== 'object' || standard === null || Array.isArray(standard))
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
       cause: new TypeError('Standard Schema must provide version 1, vendor, and validate')
     });
   const candidate = standard as Record<string, unknown>;
@@ -48,7 +48,7 @@ export const fromStandardSchema = <T>(
     vendor = candidate.vendor;
     validate = candidate.validate;
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, { cause });
+    throw new StorageError(StorageErrorCode.invalidConfig, { cause });
   }
   if (
     version !== 1 ||
@@ -56,7 +56,7 @@ export const fromStandardSchema = <T>(
     vendor.trim() === '' ||
     typeof validate !== 'function'
   )
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
       cause: new TypeError('Standard Schema must provide version 1, vendor, and validate')
     });
   return {

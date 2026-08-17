@@ -89,7 +89,7 @@ type ISerializeParser = {
   readonly name: string;
   encode(value: unknown, context: ISerializeContext): ISerializeOutput;
   decode(chunk: ISerializeChunk, context: ISerializeContext): unknown | Promise<unknown>;
-  dispose?(): void;
+  dispose?(): void | Promise<void>;
 };
 ```
 
@@ -144,7 +144,7 @@ type ISerializeRegistry = {
     chunk: ISerializeChunk,
     options?: { readonly type?: string; readonly signal?: AbortSignal; readonly source?: string }
   ): Promise<unknown>;
-  dispose(): void;
+  dispose(options?: { readonly deadlineAt?: number }): Promise<void>;
 };
 ```
 
@@ -156,13 +156,13 @@ type ISerializeRegistry = {
 | `registry.has(type)` | `type: string` | 必填 | `boolean` | 同步 | 是否已注册该 `type` |
 | `registry.encode(value, options?)` | `value: unknown`；`options.type`/`.signal`/`.source` 均可选 | — | `Promise<ISerializeChunk>` | 异步 | 调对应 parser 的 `encode`，拼装多段输出，见 [§2.2](#22-parser-的输出可以是单段promise或流) |
 | `registry.decode(chunk, options?)` | `chunk: ISerializeChunk`；options 同上 | — | `Promise<unknown>` | 异步 | 先校验 `chunk` 形状，再调对应 parser 的 `decode` |
-| `registry.dispose()` | — | — | `void` | 同步 | 见下方"释放语义" |
+| `registry.dispose(options?)` | `options.deadlineAt` 可选 | — | `Promise<void>` | 异步 | 见下方"释放语义" |
 
 `encode`/`decode` 都不传 `type` 时使用 `primaryType`；传了但 registry 里没有注册这个 `type` 会抛 `SerializeError`（"no serialize plugin registered for type: ..."，`source` 固定为 `'registry'`）。
 
 ### 释放语义
 
-`dispose()` 是同步的：先把 registry 标成 disposed（后续任何 `encode`/`decode` 调用立即抛 `Error('[store] serialize registry is disposed')`），再逐个调用已注册 parser 的 `dispose?()`。**顺序是刻意的**——先切断新请求，再释放，否则释放过程中还能有新的 encode/decode 请求钻进来。每个 parser 的 `dispose()` 抛错都会被单独捕获，不会打断其余 parser 的释放（"释放失败反而造成泄漏"是要刻意避免的经典问题）；全部释放完成后，如果只有一个 parser 失败就直接重新抛出该错误，多个失败则聚合成 `AggregateError` 抛出。
+`dispose()` 是异步的：先等所有在途 `encode`/`decode` 排空（可配 `deadlineAt` 上限），再把 registry 标成 disposed（后续任何 `encode`/`decode` 调用立即抛 `Error('[store] serialize registry is disposed')`），然后逐个调用已注册 parser 的 `dispose?()`——parser 的 `dispose` 可以是异步的，registry 会 `await`。每个 parser 的 `dispose()` 抛错都会被单独捕获，不会打断其余 parser 的释放（"释放失败反而造成泄漏"是要刻意避免的经典问题）；全部释放完成后，如果只有一个 parser 失败就直接重新抛出该错误，多个失败则聚合成 `AggregateError` 抛出。
 
 ---
 
@@ -386,7 +386,7 @@ const registry = createSerializeRegistry([jsonPlugin(), cborPlugin]);
 
 - `encode`/`decode` 拿到的第二个参数是 `ISerializeContext`（`{ signal, source }`），需要支持取消的 parser 应该在耗时操作中检查 `signal.aborted`；即使 parser 完全忽略它，registry 在拼装结果时仍会检测 `signal.aborted` 并以 `SerializeError` 结束。
 - 想要流式产出（比如边编码边压缩）时，`encode()` 可以返回一个 `AsyncGenerator<ISerializeChunk>`，framework 会边取边校验形状。
-- 需要持有资源的 parser（worker 端口、wasm 实例）实现可选的 `dispose()`，registry 的 `dispose()` 会在释放时调用它。
+- 需要持有资源的 parser（worker 端口、wasm 实例）实现可选的 `dispose()`（可返回 Promise），registry 的 `dispose()` 会在释放时 `await` 它。
 - `type` 字符串会经过 `assertSerializeType` 校验，见下一节。
 
 ---

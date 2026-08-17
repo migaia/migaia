@@ -9,6 +9,9 @@
  * 分层：kernel → atom-definition（此处）→ atom-store → atom facade → React
  */
 
+import { createStoreKeyedTypeError, StoreKeyedErrorCode } from '../errors.js';
+import { AtomKind } from './kind-constants.js';
+
 // Symbol.for keeps definitions recognizable when two copies of the package
 // coexist in one Realm (for example an app bundle plus a worker/devtools copy).
 const DEFINITION = Symbol.for('morning-watch.store.atom-definition');
@@ -39,7 +42,7 @@ type IDefinitionBase = {
 
 /** 源定义：只有初值。 */
 export type IPrimitiveDefinition<T> = IDefinitionBase & {
-  readonly kind: 'primitive';
+  readonly kind: typeof AtomKind.primitive;
   readonly init: T;
 };
 
@@ -49,7 +52,7 @@ export type IPrimitiveDefinition<T> = IDefinitionBase & {
  * 对象、数组及其它可变容器不应作为跨 Provider/SSR scope 共享的模板引用； 独立 kind 避免把“函数值”误判成初始化函数。
  */
 export type IPrimitiveFactoryDefinition<T> = IDefinitionBase & {
-  readonly kind: 'primitive-factory';
+  readonly kind: typeof AtomKind.primitiveFactory;
   readonly create: () => T;
   /** Only explicitly marked factories may execute during speculative preview. */
   readonly previewSafe: boolean;
@@ -57,7 +60,7 @@ export type IPrimitiveFactoryDefinition<T> = IDefinitionBase & {
 
 /** 派生定义：只有读函数。 */
 export type IDerivedDefinition<T> = IDefinitionBase & {
-  readonly kind: 'derived';
+  readonly kind: typeof AtomKind.derived;
   readonly read: IAtomRead<T>;
   /** 自定义相等比较。这里只是个参数，怎么用由 store 层决定。 */
   readonly equals?: (a: T, b: T) => boolean;
@@ -69,7 +72,7 @@ export type IWritableDerivedDefinition<
   Args extends readonly unknown[],
   Result
 > = IDefinitionBase & {
-  readonly kind: 'writable-derived';
+  readonly kind: typeof AtomKind.writableDerived;
   readonly read: IAtomRead<T>;
   readonly write: IAtomWriter<Args, Result>;
   readonly equals?: (a: T, b: T) => boolean;
@@ -82,7 +85,7 @@ export type IWritableDerivedDefinition<
  * `IWritableAtomDefinition` 重新收窄。
  */
 type IErasedWritableDerived<T> = IDefinitionBase & {
-  readonly kind: 'writable-derived';
+  readonly kind: typeof AtomKind.writableDerived;
   readonly read: IAtomRead<T>;
   readonly write: (...args: never[]) => unknown;
   readonly equals?: (a: T, b: T) => boolean;
@@ -120,7 +123,8 @@ export function assertNotThenable(value: unknown, context: string): void {
     typeof value === 'object' &&
     typeof (value as { then?: unknown }).then === 'function'
   ) {
-    throw new TypeError(
+    throw createStoreKeyedTypeError(
+      StoreKeyedErrorCode.invalidOption,
       `[store] ${context} returned a thenable — async initial values are not supported here; ` +
         `compose with @migaia/resource instead (e.g. \`familyDef((id) => createResource(() => fetch(id)))\`)`
     );
@@ -133,7 +137,7 @@ export function atomDef<T>(init: T, debugLabel?: string): IPrimitiveDefinition<T
   assertNotThenable(init, 'atomDef(init)');
   return Object.freeze({
     [DEFINITION]: true as const,
-    kind: 'primitive',
+    kind: AtomKind.primitive,
     init,
     debugLabel
   });
@@ -145,7 +149,7 @@ export function atomDefFactory<T>(
 ): IPrimitiveFactoryDefinition<T> {
   return Object.freeze({
     [DEFINITION]: true as const,
-    kind: 'primitive-factory',
+    kind: AtomKind.primitiveFactory,
     create,
     previewSafe: false,
     debugLabel
@@ -163,7 +167,7 @@ export function previewSafeAtomDefFactory<T>(
 ): IPrimitiveFactoryDefinition<T> {
   return Object.freeze({
     [DEFINITION]: true as const,
-    kind: 'primitive-factory',
+    kind: AtomKind.primitiveFactory,
     create,
     previewSafe: true,
     debugLabel
@@ -177,7 +181,7 @@ export function derivedDef<T>(
 ): IDerivedDefinition<T> {
   return Object.freeze({
     [DEFINITION]: true as const,
-    kind: 'derived',
+    kind: AtomKind.derived,
     read,
     debugLabel,
     equals
@@ -192,7 +196,7 @@ export function writableDef<T, Args extends readonly unknown[], Result>(
 ): IWritableDerivedDefinition<T, Args, Result> {
   return Object.freeze({
     [DEFINITION]: true as const,
-    kind: 'writable-derived',
+    kind: AtomKind.writableDerived,
     read,
     write,
     debugLabel,

@@ -68,7 +68,7 @@ for (const { label, create } of backends) {
     it('put 缺少 key 属性时抛稳定 StorageError', async () => {
       const repo = users.connect(create());
       await expect(repo.put({ name: 'Ada' } as unknown as IUser)).rejects.toMatchObject({
-        code: 'INVALID_ARGUMENT'
+        code: 'INVALID_CONFIG'
       });
     });
 
@@ -244,13 +244,13 @@ describe('查询排序与无效记录策略', () => {
       memoryStorage()
     );
     await expect(repo.list({ orderBy: null as never })).rejects.toMatchObject({
-      code: 'INVALID_ARGUMENT'
+      code: 'INVALID_CONFIG'
     });
     await expect(
       (async () => {
         for await (const value of repo.stream({ orderBy: null as never })) void value;
       })()
-    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    ).rejects.toMatchObject({ code: 'INVALID_CONFIG' });
   });
 
   it('list/stream 拒绝 null、数组和 primitive range', async () => {
@@ -290,12 +290,12 @@ describe('查询排序与无效记录策略', () => {
       memoryStorage()
     );
     for (const options of [null, [], 'options', 1]) {
-      await expect(repo.list(options as never)).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+      await expect(repo.list(options as never)).rejects.toMatchObject({ code: 'INVALID_CONFIG' });
       await expect(
         (async () => {
           for await (const value of repo.stream(options as never)) void value;
         })()
-      ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+      ).rejects.toMatchObject({ code: 'INVALID_CONFIG' });
     }
   });
 
@@ -305,13 +305,13 @@ describe('查询排序与无效记录策略', () => {
     );
     for (const onInvalid of [null, [], 'invalid', 1]) {
       await expect(repo.list({ onInvalid: onInvalid as never })).rejects.toMatchObject({
-        code: 'INVALID_ARGUMENT'
+        code: 'INVALID_CONFIG'
       });
       expect(() => repo.stream({ onInvalid: onInvalid as never })).toThrowError(
-        expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+        expect.objectContaining({ code: 'INVALID_CONFIG' })
       );
       await expect(repo.migrate({ onInvalid: onInvalid as never })).rejects.toMatchObject({
-        code: 'INVALID_ARGUMENT'
+        code: 'INVALID_CONFIG'
       });
     }
   });
@@ -409,14 +409,14 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
       schema: {
         name: 'throws-storage-error',
         validate: async () => {
-          throw new StorageError(StorageErrorCode.invalidArgument);
+          throw new StorageError(StorageErrorCode.invalidConfig);
         }
       }
     });
     const store = memoryStorage();
     await store.putRecord({ __v: 1, data: { id: 'u1' } }, ['schema-storage-error-context', 'u1']);
     await expect(entity.connect(store).get('u1')).rejects.toMatchObject({
-      code: 'INVALID_ARGUMENT',
+      code: 'INVALID_CONFIG',
       operation: 'entity.schema.validate',
       extensionStage: 'schema'
     });
@@ -657,7 +657,7 @@ describe('版本迁移', () => {
       memoryStorage()
     );
     await expect(repo.migrate({ batchSize: null as never })).rejects.toMatchObject({
-      code: 'INVALID_ARGUMENT'
+      code: 'INVALID_CONFIG'
     });
   });
 
@@ -666,7 +666,7 @@ describe('版本迁移', () => {
       memoryStorage()
     );
     await expect(repo.migrate({ batchSize: Number.MAX_SAFE_INTEGER + 1 })).rejects.toMatchObject({
-      code: 'INVALID_ARGUMENT'
+      code: 'INVALID_CONFIG'
     });
   });
 
@@ -700,7 +700,7 @@ describe('版本迁移', () => {
     }).connect(memoryStorage());
     for (const options of [null, [], 'options', 1])
       await expect(repo.migrate(options as never)).rejects.toMatchObject({
-        code: 'INVALID_ARGUMENT'
+        code: 'INVALID_CONFIG'
       });
   });
 
@@ -972,7 +972,7 @@ describe('batch', () => {
     const repo = users.connect(memoryStorage());
     for (const callback of [null, undefined, {}, 'run'])
       await expect(repo.batch(callback as never)).rejects.toMatchObject({
-        code: 'INVALID_ARGUMENT'
+        code: 'INVALID_CONFIG'
       });
   });
 
@@ -1089,7 +1089,7 @@ describe('entity key and invalid-record boundaries', () => {
       memoryStorage()
     );
     for (const limit of [-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])
-      await expect(repo.list({ limit })).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+      await expect(repo.list({ limit })).rejects.toMatchObject({ code: 'INVALID_CONFIG' });
     await expect(repo.list({ limit: 0 })).resolves.toEqual([]);
   });
 
@@ -1210,11 +1210,11 @@ describe('entity key and invalid-record boundaries', () => {
     await expect(
       entity.connect(store).list({ onInvalid: 'invalid' as never })
     ).rejects.toMatchObject({
-      code: 'INVALID_ARGUMENT'
+      code: 'INVALID_CONFIG'
     });
     await expect(
       entity.connect(store).list({ onInvalid: () => 'invalid' as never })
-    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    ).rejects.toMatchObject({ code: 'INVALID_CONFIG' });
   });
 
   it('onInvalid.stage 区分 migration failure', async () => {

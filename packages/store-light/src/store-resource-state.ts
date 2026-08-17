@@ -1,23 +1,34 @@
-import { TerminalControllerImpl } from '@migaia/reactive/runtime/lifecycle-primitives';
-import type { LifecycleState, VersionToken } from '@migaia/reactive/runtime/lifecycle-primitives';
+import {
+  createTerminalController,
+  type ITerminalController,
+  type ILifecycleState
+} from '@migaia/lifecycle';
+import { LifecycleState } from '@migaia/lifecycle';
+import type { IVersionToken } from './store-resource-ownership.js';
+import { createStoreLightError, StoreLightErrorCode } from './errors.js';
+import { StoreResourceDataKind, StoreResourceKind } from './resource-state-constants.js';
 
-export type ResourceVersion<T> = {
+export type IResourceVersion<T> = {
   readonly id: number;
-  readonly token: VersionToken;
+  readonly token: IVersionToken;
   readonly value: T;
 };
 
-export type ResourceCoreState<T> =
-  | { readonly kind: 'idle' }
+export type IResourceCoreState<T> =
+  | { readonly kind: typeof StoreResourceKind.idle }
   | {
-      readonly kind: 'loading';
+      readonly kind: typeof StoreResourceKind.loading;
       readonly operation: Promise<T>;
-      readonly previous?: ResourceVersion<T>;
+      readonly previous?: IResourceVersion<T>;
     }
-  | { readonly kind: 'ready'; readonly current: ResourceVersion<T> }
-  | { readonly kind: 'failed'; readonly error: unknown; readonly previous?: ResourceVersion<T> }
-  | { readonly kind: 'closing'; readonly current?: ResourceVersion<T> }
-  | { readonly kind: 'disposed' };
+  | { readonly kind: typeof StoreResourceKind.ready; readonly current: IResourceVersion<T> }
+  | {
+      readonly kind: typeof StoreResourceKind.failed;
+      readonly error: unknown;
+      readonly previous?: IResourceVersion<T>;
+    }
+  | { readonly kind: typeof StoreResourceKind.closing; readonly current?: IResourceVersion<T> }
+  | { readonly kind: typeof StoreResourceKind.disposed };
 
 /**
  * Composes the shared terminal primitive instead of reimplementing open/closing/terminal a second
@@ -28,21 +39,28 @@ export type ResourceCoreState<T> =
  * machine _with_ a lifecycle, not a lifecycle that happens to also hold a payload.
  */
 export class ResourceStateController<T> {
-  #terminal = new TerminalControllerImpl();
+  #terminal: ITerminalController = createTerminalController();
   #request:
-    | { readonly kind: 'idle' }
+    | { readonly kind: typeof StoreResourceKind.idle }
     | {
-        readonly kind: 'loading';
+        readonly kind: typeof StoreResourceKind.loading;
         readonly operation: Promise<T>;
-        readonly previous?: ResourceVersion<T>;
-      } = { kind: 'idle' };
+        readonly previous?: IResourceVersion<T>;
+      } = { kind: StoreResourceKind.idle };
   #data:
-    | { readonly kind: 'empty' }
-    | { readonly kind: 'value'; readonly current: ResourceVersion<T>; readonly stale: boolean }
-    | { readonly kind: 'error'; readonly error: unknown; readonly previous?: ResourceVersion<T> } =
-    { kind: 'empty' };
+    | { readonly kind: typeof StoreResourceDataKind.empty }
+    | {
+        readonly kind: typeof StoreResourceDataKind.value;
+        readonly current: IResourceVersion<T>;
+        readonly stale: boolean;
+      }
+    | {
+        readonly kind: typeof StoreResourceDataKind.error;
+        readonly error: unknown;
+        readonly previous?: IResourceVersion<T>;
+      } = { kind: StoreResourceDataKind.empty };
 
-  get lifecycle(): LifecycleState {
+  get lifecycle(): ILifecycleState {
     return this.#terminal.lifecycle;
   }
 
@@ -51,69 +69,83 @@ export class ResourceStateController<T> {
     return this.#terminal.whenTerminal();
   }
 
-  get current(): ResourceCoreState<T> {
-    if (this.#terminal.lifecycle === 'terminal') return { kind: 'disposed' };
-    if (this.#terminal.lifecycle === 'closing') {
-      return this.#data.kind === 'value'
-        ? { kind: 'closing', current: this.#data.current }
-        : { kind: 'closing' };
+  get current(): IResourceCoreState<T> {
+    if (this.#terminal.lifecycle === LifecycleState.terminal)
+      return { kind: StoreResourceKind.disposed };
+    if (this.#terminal.lifecycle === LifecycleState.closing) {
+      return this.#data.kind === StoreResourceDataKind.value
+        ? { kind: StoreResourceKind.closing, current: this.#data.current }
+        : { kind: StoreResourceKind.closing };
     }
-    if (this.#request.kind === 'loading') {
+    if (this.#request.kind === StoreResourceKind.loading) {
       return {
-        kind: 'loading',
+        kind: StoreResourceKind.loading,
         operation: this.#request.operation,
         ...(this.#request.previous ? { previous: this.#request.previous } : {})
       };
     }
-    if (this.#data.kind === 'error') {
+    if (this.#data.kind === StoreResourceDataKind.error) {
       return {
-        kind: 'failed',
+        kind: StoreResourceKind.failed,
         error: this.#data.error,
         ...(this.#data.previous ? { previous: this.#data.previous } : {})
       };
     }
-    if (this.#data.kind === 'value') return { kind: 'ready', current: this.#data.current };
-    return { kind: 'idle' };
+    if (this.#data.kind === StoreResourceDataKind.value)
+      return { kind: StoreResourceKind.ready, current: this.#data.current };
+    return { kind: StoreResourceKind.idle };
   }
 
-  loading(operation: Promise<T>, previous?: ResourceVersion<T>): void {
+  loading(operation: Promise<T>, previous?: IResourceVersion<T>): void {
     this.#assertOpen();
-    this.#request = { kind: 'loading', operation, ...(previous ? { previous } : {}) };
-    this.#data = previous ? { kind: 'value', current: previous, stale: true } : { kind: 'empty' };
+    this.#request = {
+      kind: StoreResourceKind.loading,
+      operation,
+      ...(previous ? { previous } : {})
+    };
+    this.#data = previous
+      ? { kind: StoreResourceDataKind.value, current: previous, stale: true }
+      : { kind: StoreResourceDataKind.empty };
   }
 
-  ready(current: ResourceVersion<T>): void {
+  ready(current: IResourceVersion<T>): void {
     this.#assertOpen();
-    this.#request = { kind: 'idle' };
-    this.#data = { kind: 'value', current, stale: false };
+    this.#request = { kind: StoreResourceKind.idle };
+    this.#data = { kind: StoreResourceDataKind.value, current, stale: false };
   }
 
-  failed(error: unknown, previous?: ResourceVersion<T>): void {
+  failed(error: unknown, previous?: IResourceVersion<T>): void {
     this.#assertOpen();
-    this.#request = { kind: 'idle' };
-    this.#data = { kind: 'error', error, ...(previous ? { previous } : {}) };
+    this.#request = { kind: StoreResourceKind.idle };
+    this.#data = { kind: StoreResourceDataKind.error, error, ...(previous ? { previous } : {}) };
   }
 
   idle(): void {
     this.#assertOpen();
-    this.#request = { kind: 'idle' };
-    this.#data = { kind: 'empty' };
+    this.#request = { kind: StoreResourceKind.idle };
+    this.#data = { kind: StoreResourceDataKind.empty };
   }
 
-  close(current?: ResourceVersion<T>): void {
-    if (this.#terminal.lifecycle === 'terminal') return;
+  close(current?: IResourceVersion<T>): void {
+    if (this.#terminal.lifecycle === LifecycleState.terminal) return;
     this.#terminal.close();
-    this.#request = { kind: 'idle' };
-    this.#data = current ? { kind: 'value', current, stale: false } : { kind: 'empty' };
+    this.#request = { kind: StoreResourceKind.idle };
+    this.#data = current
+      ? { kind: StoreResourceDataKind.value, current, stale: false }
+      : { kind: StoreResourceDataKind.empty };
   }
 
   dispose(): void {
-    this.#terminal.forceDispose();
-    this.#request = { kind: 'idle' };
-    this.#data = { kind: 'empty' };
+    this.#terminal.forceTerminal();
+    this.#request = { kind: StoreResourceKind.idle };
+    this.#data = { kind: StoreResourceDataKind.empty };
   }
 
   #assertOpen(): void {
-    if (this.#terminal.lifecycle !== 'open') throw new Error('[store] resource is disposed');
+    if (this.#terminal.lifecycle !== LifecycleState.open)
+      throw createStoreLightError(
+        StoreLightErrorCode.resourceDisposed,
+        '[store] resource is disposed'
+      );
   }
 }

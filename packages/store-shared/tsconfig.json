@@ -2,11 +2,19 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
-    "lib": ["ES2024", "ESNext.Disposable", "DOM", "DOM.Iterable", "WebWorker"],
-    "paths": {
-      "@migaia/reactive": ["../reactive/dist/index.d.ts"],
-      "@migaia/reactive/*": ["../reactive/dist/*"]
-    }
+    "lib": [
+      "ES2024",
+      "ESNext.Disposable",
+      "DOM",
+      "DOM.Iterable",
+      "WebWorker"
+    ],
+    "types": [
+      "node"
+    ]
   },
-  "include": ["src", "test"]
+  "include": [
+    "src",
+    "test"
+  ]
 }

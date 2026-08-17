@@ -30,7 +30,7 @@
 - **竞态不会让关掉的东西自己回来**：异步 `activate()` 还没跑完，开关就被关掉——迟到的结果会被就地释放，而不是"晚几毫秒又亮起来"。
 - **失败不会卡在半开状态**：`activate()` 抛错或返回的 handle 无效，能力直接进入 `failed` 态，`error(name)` 能查到原因，不会留下一个看似启用、实际没有 handle 的假状态。
 - **安全默认拒绝的开关表**：只有严格等于 `true` 的自有数据属性才会被当作"允许"；继承属性、getter、`__proto__` 这类都不生效，配置来源不可信时也不会被绕过。
-- **两条 API 轨道**：`enable`/`disable`/`dispose` 返回结构化结果并等待异步清理完成；`enableLegacyBoolean`/`disableNow`/`disposeNow` 是同步/布尔风格的兼容适配器，接旧调用点不用重写。
+- **两条 API 轨道**：`enable`/`disable`/`dispose` 返回结构化结果并等待异步清理完成；`enableLegacyBoolean`/`disableNow` 是同步/布尔风格的兼容适配器，接旧调用点不用重写。
 - **租户互不可见**：不同 host 实例的 context、开关表、状态机完全独立。
 
 ## 4. 安装
@@ -82,10 +82,10 @@ await capabilities.dispose(); // 整个 host 收尾，之后不可再用
 | --- | --- | --- |
 | 登记 | `register` / `names` | 登记能力定义；查看已登记名单 |
 | 开关 | `setFlag` / `setFlags` | 更新允许表，决定谁能被启用；关闭会同步作废在途激活并释放 handle |
-| 结构化生命周期 | `enable` / `enableResult` / `disable` / `disableAsync` | 推荐使用，返回结构化结果并等待异步清理完成 |
-| 兼容适配器 | `enableLegacyBoolean` / `disableNow` / `disposeNow` | 旧调用点用的同步/布尔风格接口，不等待异步清理 |
+| 结构化生命周期 | `enable` / `enableResult` / `disable` | 推荐使用，返回结构化结果并等待异步清理完成 |
+| 兼容适配器 | `enableLegacyBoolean` / `disableNow` | 旧调用点用的同步/布尔风格接口，不等待异步清理 |
 | 状态查询 | `state` / `handle` / `error` / `disposed` | 只读查询，不触发任何副作用 |
-| 整体回收 | `dispose` / `disposeAsync` | 按真实启用顺序反向（LIFO）关闭全部能力 |
+| 整体回收 | `dispose` | 按真实启用顺序反向（LIFO）关闭全部能力 |
 
 每个成员的精确签名、参数和边界行为见 [USEGUIDE.md](./USEGUIDE.md)。
 
@@ -93,7 +93,7 @@ await capabilities.dispose(); // 整个 host 收尾，之后不可再用
 
 1. **`setFlags()` 替换的是整份快照**，未列出的能力一律按拒绝处理，不是"维持原状"——远端配置删掉一个键，旧的 `true` 不会残留。
 2. **本包不维护依赖图**。能力 A 依赖 B 时，必须显式 `await enable('A')` 完成后再 `enable('B')`，不能指望声明顺序或注册顺序。
-3. **兼容适配器不等待异步清理**：`enableLegacyBoolean`/`disableNow`/`disposeNow` 是同步/尽快返回的接口；确定要等 `dispose()` 完全跑完，用 `enable`/`disable`/`dispose`。
+3. **兼容适配器不等待异步清理**：`enableLegacyBoolean`/`disableNow` 是同步/尽快返回的接口；确定要等 `dispose()` 完全跑完，用 `enable`/`disable`/`dispose`。
 4. **`dispose()` 之后 host 永久不可用**，不要把同一个 host 实例复用给下一个租户或下一次请求。
 5. **能力自己的 `dispose()` 里不能再调用 `setFlag`/`enable` 等变更方法**——重入会立即抛错，防止回退过程中状态被自己写乱。
 

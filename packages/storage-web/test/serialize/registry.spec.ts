@@ -37,7 +37,7 @@ describe('selectCodec 选路规则', () => {
       );
     expect(() =>
       selectCodec(binaryCodec, textOnlyCapabilities, 'diagnostic' as never)
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }));
   });
   it('内建 codec runtime descriptor 不可变', () => {
     expect(() => {

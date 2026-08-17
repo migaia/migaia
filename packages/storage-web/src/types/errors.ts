@@ -1,29 +1,11 @@
-import type { IBackendKind } from './capabilities';
-import type { IStorageKey } from './context';
+import type { IBackendKind } from './capabilities.js';
+import type { IStorageKey } from './context.js';
+import { StorageErrorCode, type IStorageErrorCode } from '../error-code.js';
 
-export const StorageErrorCode = Object.freeze({
-  unavailable: 'BACKEND_UNAVAILABLE', // 隐私模式、被禁用、无 IndexedDB
-  quotaExceeded: 'QUOTA_EXCEEDED',
-  valueTooLarge: 'VALUE_TOO_LARGE', // 超出单值上限（cookie 4KB）
-  unsupported: 'UNSUPPORTED_CAPABILITY',
-  serializeFailed: 'SERIALIZE_FAILED',
-  deserializeFailed: 'DESERIALIZE_FAILED',
-  validationFailed: 'VALIDATION_FAILED',
-  migrationFailed: 'MIGRATION_FAILED',
-  transactionFailed: 'TRANSACTION_FAILED',
-  aborted: 'ABORTED',
-  disposed: 'STORE_DISPOSED',
-  duplicateKey: 'DUPLICATE_KEY',
-  invalidArgument: 'INVALID_ARGUMENT',
-  invalidKey: 'INVALID_KEY',
-  versionUnsupported: 'VERSION_UNSUPPORTED',
-  extensionFailed: 'EXTENSION_FAILED',
-  transactionConflict: 'TRANSACTION_CONFLICT',
-  writeFailed: 'WRITE_FAILED',
-  cookieScopeAmbiguous: 'COOKIE_SCOPE_AMBIGUOUS'
-} as const);
+export { StorageErrorCode, type IStorageErrorCode };
 
-export type IStorageErrorCode = (typeof StorageErrorCode)[keyof typeof StorageErrorCode];
+/** `source` value stamped onto every error this package throws. */
+export const STORAGE_WEB_SOURCE = '@migaia/storage-web';
 
 export type IStorageErrorDetails = {
   readonly backend?: IBackendKind;
@@ -40,6 +22,7 @@ export type IExtensionStage = 'schema' | 'codec' | 'migration' | 'comparator' | 
 
 /** 所有后端异常的统一归一化形态。原始异常一律进 cause，不改写其 message。 */
 export class StorageError extends Error {
+  readonly source: string;
   readonly code: IStorageErrorCode;
   readonly backend?: IBackendKind;
   readonly key?: string | IStorageKey;
@@ -58,6 +41,7 @@ export class StorageError extends Error {
   ) {
     super(message ?? `[storage-web] ${code}`, { cause: details.cause });
     this.name = 'StorageError';
+    this.source = STORAGE_WEB_SOURCE;
     this.code = code;
     this.backend = details.backend;
     this.key = details.key;

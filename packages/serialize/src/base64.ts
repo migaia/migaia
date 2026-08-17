@@ -1,61 +1,97 @@
-/** Shared binary wire helpers used by persistence and SSR codecs. */
+/**
+ * Shared binary wire helpers used by persistence and SSR codecs. Pure algorithm, no host
+ * `btoa`/`atob`.
+ */
 
-// A byte-per-iteration `binary += String.fromCharCode(bytes[i])` loop, plus a
-// single whole-input `btoa()` call, means a 71MB payload briefly holds the
-// original Uint8Array, a 71M-character binary string, and the full base64
-// output simultaneously — several times the input size in peak memory, on
-// the main thread, for a codec whose whole point is handling large payloads.
-//
-// Chunking bounds the binary-string and per-chunk btoa() work to one chunk at
-// a time; only the final concatenated base64 string is still held in full
-// (persist.ts/ssr.ts want one string back, not a stream — see
-// streamBase64Chunks below for a caller that wants to avoid even that).
-//
-// The chunk size must be a multiple of 3: base64 encodes 3 bytes into 4
-// characters, so a chunk boundary that isn't 3-aligned makes btoa() insert
-// `=` padding mid-stream, corrupting every chunk after the first non-aligned
-// one. `String.fromCharCode(...chunk)` also has to stay well under engines'
-// max-arguments-per-call limit (~65536 in most).
-const CHUNK_BYTES = 0x7ffd - (0x7ffd % 3); // 32763, a multiple of 3
+// base64 把 3 字节编成 4 字符；片大小必须是 3 的倍数，否则非对齐的片边界会让 `=` 填充
+// 插进流中间，污染后面每一片。
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+const CHUNK_BYTES = 0x7ffd - (0x7ffd % 3); // 32763，3 的倍数
 
-export function bytesToBase64(bytes: Uint8Array): string {
-  if (bytes.length <= CHUNK_BYTES) {
-    return btoa(bytesChunkToBinary(bytes));
-  }
+/** 编码一个 3 对齐的字节块（无填充）。调用方保证 `chunk.length` 是 3 的倍数。 */
+function encodeTripleAligned(chunk: Uint8Array): string {
   let result = '';
-  for (let offset = 0; offset < bytes.length; offset += CHUNK_BYTES) {
-    result += btoa(bytesChunkToBinary(bytes.subarray(offset, offset + CHUNK_BYTES)));
+  for (let i = 0; i < chunk.length; i += 3) {
+    const n = (chunk[i] << 16) | (chunk[i + 1] << 8) | chunk[i + 2];
+    result +=
+      ALPHABET[(n >> 18) & 63] +
+      ALPHABET[(n >> 12) & 63] +
+      ALPHABET[(n >> 6) & 63] +
+      ALPHABET[n & 63];
   }
   return result;
 }
 
-function bytesChunkToBinary(chunk: Uint8Array): string {
-  // One call per (small, bounded) chunk instead of one call per byte.
-  return String.fromCharCode(...chunk);
+export function bytesToBase64(bytes: Uint8Array): string {
+  if (bytes.length <= CHUNK_BYTES) {
+    return encodeWithPadding(bytes);
+  }
+  const parts: string[] = [];
+  const aligned = bytes.length - (bytes.length % 3);
+  for (let offset = 0; offset < aligned; offset += CHUNK_BYTES) {
+    parts.push(
+      encodeTripleAligned(bytes.subarray(offset, Math.min(offset + CHUNK_BYTES, aligned)))
+    );
+  }
+  if (aligned < bytes.length) {
+    parts.push(encodeWithPadding(bytes.subarray(aligned)));
+  }
+  return parts.join('');
+}
+
+/** 完整编码，含末尾 `=` 填充（仅最后一个非 3 对齐的块需要）。 */
+function encodeWithPadding(bytes: Uint8Array): string {
+  let result = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b0 = bytes[i];
+    const b1 = i + 1 < bytes.length ? bytes[i + 1] : 0;
+    const b2 = i + 2 < bytes.length ? bytes[i + 2] : 0;
+    const n = (b0 << 16) | (b1 << 8) | b2;
+    result += ALPHABET[(n >> 18) & 63] + ALPHABET[(n >> 12) & 63];
+    result += i + 1 < bytes.length ? ALPHABET[(n >> 6) & 63] : '=';
+    result += i + 2 < bytes.length ? ALPHABET[n & 63] : '=';
+  }
+  return result;
 }
 
 /**
- * Same chunking as `bytesToBase64`, but yields each chunk instead of concatenating them — for a
- * caller writing into a sink (a `WritableStream`, a chunked upload) that never needs the complete
- * base64 string materialized at once. `bytesToBase64` stays the right choice for a caller that
- * ultimately wants one string back (e.g. a JSON/localStorage field): joining these chunks yourself
- * would just rebuild that same string with extra steps.
+ * 逐片产出 base64 文本，供写入 sink（`WritableStream`、分块上传）的调用方——它永远不需要整份 base64 字符串一次成型。`bytesToBase64`
+ * 仍是「最终只要一个字符串」时的正确选择。
  */
 export function* streamBase64Chunks(bytes: Uint8Array): Generator<string, void, void> {
+  if (bytes.length === 0) return;
   if (bytes.length <= CHUNK_BYTES) {
-    if (bytes.length > 0) yield btoa(bytesChunkToBinary(bytes));
+    yield encodeWithPadding(bytes);
     return;
   }
-  for (let offset = 0; offset < bytes.length; offset += CHUNK_BYTES) {
-    yield btoa(bytesChunkToBinary(bytes.subarray(offset, offset + CHUNK_BYTES)));
+  const aligned = bytes.length - (bytes.length % 3);
+  for (let offset = 0; offset < aligned; offset += CHUNK_BYTES) {
+    yield encodeTripleAligned(bytes.subarray(offset, Math.min(offset + CHUNK_BYTES, aligned)));
+  }
+  if (aligned < bytes.length) {
+    yield encodeWithPadding(bytes.subarray(aligned));
   }
 }
 
+const DECODE_TABLE = new Int16Array(128).fill(-1);
+for (let i = 0; i < ALPHABET.length; i++) DECODE_TABLE[ALPHABET.charCodeAt(i)] = i;
+
 export function base64ToBytes(text: string): Uint8Array {
-  const binary = atob(text);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index++) {
-    bytes[index] = binary.charCodeAt(index);
+  const clean = text.replace(/=+$/, '');
+  const output = new Uint8Array(Math.floor((clean.length * 3) / 4));
+  let outIndex = 0;
+  let buffer = 0;
+  let bits = 0;
+  for (let i = 0; i < clean.length; i++) {
+    const code = clean.charCodeAt(i);
+    const value = code < 128 ? DECODE_TABLE[code] : -1;
+    if (value < 0) throw new TypeError('invalid base64 input');
+    buffer = (buffer << 6) | value;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      output[outIndex++] = (buffer >> bits) & 0xff;
+    }
   }
-  return bytes;
+  return output;
 }

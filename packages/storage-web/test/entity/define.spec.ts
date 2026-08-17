@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { defineEntity } from '../../src/entity';
 import { memoryStorage } from '../../src/backends/memory';
 import { StorageErrorCode } from '../../src/types/errors';
+import { StorageContractErrorCode } from '@migaia/storage-contract';
 
 describe('defineEntity runtime contract', () => {
   it.each([
@@ -9,17 +10,17 @@ describe('defineEntity runtime contract', () => {
     ['__internal', 'entity name uses reserved prefix']
   ])('rejects reserved or empty name: %s', (name) => {
     expect(() => defineEntity<{ id: string }>({ name, key: 'id' })).toThrow(
-      StorageErrorCode.invalidArgument
+      StorageErrorCode.invalidConfig
     );
   });
 
   it('rejects invalid version and incomplete migration graph', () => {
     expect(() => defineEntity({ name: 'null-version', key: 'id', version: null } as never)).toThrow(
-      StorageErrorCode.invalidArgument
+      StorageErrorCode.invalidConfig
     );
     expect(() =>
       defineEntity<{ id: string }>({ name: 'invalid-version', key: 'id', version: 0 })
-    ).toThrow(StorageErrorCode.invalidArgument);
+    ).toThrow(StorageErrorCode.invalidConfig);
     expect(() =>
       defineEntity<{ id: string }>({
         name: 'missing-migration',
@@ -27,14 +28,14 @@ describe('defineEntity runtime contract', () => {
         version: 3,
         migrations: { 2: async (value) => value }
       })
-    ).toThrow(StorageErrorCode.invalidArgument);
+    ).toThrow(StorageErrorCode.invalidConfig);
     expect(() =>
       defineEntity<{ id: string }>({
         name: 'unsafe-version',
         key: 'id',
         version: Number.MAX_SAFE_INTEGER + 1
       })
-    ).toThrow(StorageErrorCode.invalidArgument);
+    ).toThrow(StorageErrorCode.invalidConfig);
     expect(() =>
       defineEntity<{ id: string }>({
         name: 'unsafe-migration-version',
@@ -42,7 +43,7 @@ describe('defineEntity runtime contract', () => {
         version: Number.MAX_SAFE_INTEGER,
         migrations: { '9007199254740993': async (value: unknown) => value } as never
       })
-    ).toThrow(StorageErrorCode.invalidArgument);
+    ).toThrow(StorageErrorCode.invalidConfig);
     expect(() =>
       defineEntity<{ id: string }>({
         name: 'sparse-huge-version',
@@ -50,18 +51,18 @@ describe('defineEntity runtime contract', () => {
         version: Number.MAX_SAFE_INTEGER,
         migrations: { 2: async (value: unknown) => value }
       })
-    ).toThrow(StorageErrorCode.invalidArgument);
+    ).toThrow(StorageErrorCode.invalidConfig);
   });
 
   it('normalizes null, arrays, and primitive runtime definitions to INVALID_ARGUMENT', () => {
     for (const value of [null, undefined, [], 'entity', 42, true])
-      expect(() => defineEntity(value as never)).toThrow(StorageErrorCode.invalidArgument);
+      expect(() => defineEntity(value as never)).toThrow(StorageErrorCode.invalidConfig);
   });
 
   it('normalizes invalid connected stores to INVALID_ARGUMENT', () => {
     const entity = defineEntity<{ id: string }>({ name: 'store-guard', key: 'id' });
     for (const store of [null, undefined, [], {}, { backend: 'memory' }])
-      expect(() => entity.connect(store as never)).toThrow(StorageErrorCode.invalidArgument);
+      expect(() => entity.connect(store as never)).toThrow(StorageErrorCode.invalidConfig);
     expect(() => entity.connect(memoryStorage())).not.toThrow();
     const alienStore = {
       backend: 'alien',
@@ -75,14 +76,14 @@ describe('defineEntity runtime contract', () => {
       clearAll: async () => undefined,
       dispose: async () => undefined
     };
-    expect(() => entity.connect(alienStore as never)).toThrow(StorageErrorCode.invalidArgument);
+    expect(() => entity.connect(alienStore as never)).toThrow(StorageErrorCode.invalidConfig);
     expect(() =>
       entity.connect({
         ...alienStore,
         backend: 'memory',
         capabilities: { syncRead: 'yes' }
       } as never)
-    ).toThrow(StorageErrorCode.invalidArgument);
+    ).toThrow(StorageErrorCode.invalidConfig);
     expect(() =>
       entity.connect({
         ...alienStore,
@@ -97,14 +98,14 @@ describe('defineEntity runtime contract', () => {
           maxValueBytes: 1.5
         }
       } as never)
-    ).toThrow(StorageErrorCode.invalidArgument);
+    ).toThrow(StorageErrorCode.invalidConfig);
   });
 
   it('rejects malformed custom codecs at definition time', () => {
     const invalidCodecs = [null, [], {}, { name: 'codec' }, { name: 'codec', output: 'unknown' }];
     for (const codec of invalidCodecs)
       expect(() => defineEntity({ name: 'codec-guard', key: 'id', codec } as never)).toThrow(
-        StorageErrorCode.invalidArgument
+        StorageContractErrorCode.invalidArgument
       );
     expect(() =>
       defineEntity<{ id: string }>({
@@ -124,7 +125,7 @@ describe('defineEntity runtime contract', () => {
     const invalidSchemas = [null, [], {}, { name: 'schema' }, { name: 'schema', validate: true }];
     for (const schema of invalidSchemas)
       expect(() => defineEntity({ name: 'schema-guard', key: 'id', schema } as never)).toThrow(
-        StorageErrorCode.invalidArgument
+        StorageErrorCode.invalidConfig
       );
     expect(() =>
       defineEntity<{ id: string }>({
@@ -216,14 +217,14 @@ describe('defineEntity runtime contract', () => {
     for (const validateOnRead of [null, 'yes', 1, []])
       expect(() =>
         defineEntity({ name: 'validate-on-read-guard', key: 'id', validateOnRead } as never)
-      ).toThrow(StorageErrorCode.invalidArgument);
+      ).toThrow(StorageErrorCode.invalidConfig);
   });
 
   it('rejects malformed migration containers at definition time', () => {
     for (const migrations of [null, [], 'migrations', 42])
       expect(() =>
         defineEntity({ name: 'migration-guard', key: 'id', version: 1, migrations } as never)
-      ).toThrow(StorageErrorCode.invalidArgument);
+      ).toThrow(StorageErrorCode.invalidConfig);
   });
 
   it('does not satisfy migration continuity from the prototype chain', () => {
@@ -233,7 +234,7 @@ describe('defineEntity runtime contract', () => {
     >;
     expect(() =>
       defineEntity({ name: 'prototype-migration', key: 'id', version: 2, migrations })
-    ).toThrow(StorageErrorCode.invalidArgument);
+    ).toThrow(StorageErrorCode.invalidConfig);
   });
 
   it('freezes the returned definition', () => {

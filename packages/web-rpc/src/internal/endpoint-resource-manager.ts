@@ -1,18 +1,17 @@
-import { ReplayWindow } from './replay';
-import { ResourceScope } from './resource-scope';
-import { VerifiedPeerRegistry } from './identity';
-import { ChunkAssembler } from './chunk';
-import { ProviderAdmissionRegistry } from './provider-admission';
-import { PendingRegistry } from './pending';
+import { ReplayWindow } from './replay.js';
+import { ResourceScope } from './resource-scope.js';
+import { VerifiedPeerRegistry } from './identity.js';
+import { ChunkAssembler } from './chunk.js';
+import { ProviderAdmissionRegistry } from './provider-admission.js';
+import { PendingRegistry } from './pending.js';
+import { WebRpcError, WebRpcErrorCode, WebRpcLifecycleError } from '../errors.js';
+import { WebRpcControlKind, WebRpcMessageKind } from '../protocol-constants.js';
 
 export type IEndpointOperationKind =
-  | 'request'
-  | 'dispatch'
-  | 'ping'
-  | 'discovery'
-  | 'variation'
-  | 'provider'
-  | 'chunk';
+  | (typeof WebRpcControlKind)[keyof typeof WebRpcControlKind]
+  | typeof WebRpcMessageKind.variation
+  | typeof WebRpcMessageKind.chunk
+  | 'provider';
 
 export type IOperationResourceScope = {
   readonly kind: IEndpointOperationKind;
@@ -43,7 +42,8 @@ export class EndpointResourceManager {
   readonly #resources: ResourceScope;
   readonly #verifiedPeers: VerifiedPeerRegistry;
   readonly #operations = new Map<string, IOperationResourceScope>();
-  readonly #replayRetainedIds = new Set<string>();
+  /** 重放保留 id（TTL 有界，`purgeReplay()` 到期清理），值域为创建时间戳。 */
+  readonly #replayRetainedIds = new Map<string, number>();
   readonly #timers = new Map<string, { readonly clear: () => void }>();
   readonly #replayOwners: IReplayOwner[] = [];
   readonly #maintenanceOwners: IReplayOwner[] = [];
@@ -211,20 +211,28 @@ export class EndpointResourceManager {
 
   /** Registers a replay owner whose TTL and disposal are coordinated by the endpoint. */
   registerReplayOwner(owner: IReplayOwner): void {
-    if (this.#disposed) throw new Error('EndpointResourceManager is disposed');
+    if (this.#disposed) throw new WebRpcLifecycleError('EndpointResourceManager is disposed');
     if (this.#replayOwners.includes(owner)) return;
     this.#replayOwners.push(owner);
   }
 
-  /** Purges all registered replay owners using one endpoint clock sample. */
+  /** Purges all registered replay owners and the TTL-bounded replay-retained id set. */
   purgeReplay(now = Date.now()): void {
     for (const owner of this.#replayOwners) owner.purge(now);
     for (const owner of this.#maintenanceOwners) owner.purge(now);
+    this.#purgeReplayRetained(now);
+  }
+
+  /** Purges expired entries from the replay-retained id set (same TTL as the shared `ReplayWindow`). */
+  #purgeReplayRetained(now = Date.now()): void {
+    const ttl = this.#replay.ttlMs;
+    for (const [id, createdAt] of this.#replayRetainedIds)
+      if (now - createdAt >= ttl) this.#replayRetainedIds.delete(id);
   }
 
   /** Registers bounded admission/TTL maintenance under the endpoint owner. */
   registerMaintenanceOwner(owner: IReplayOwner): void {
-    if (this.#disposed) throw new Error('EndpointResourceManager is disposed');
+    if (this.#disposed) throw new WebRpcLifecycleError('EndpointResourceManager is disposed');
     if (this.#maintenanceOwners.includes(owner)) return;
     this.#maintenanceOwners.push(owner);
   }
@@ -246,26 +254,26 @@ export class EndpointResourceManager {
 
   /** Attaches runtime registries after endpoint construction has created them. */
   attachRuntime(chunks: ChunkAssembler, providerAdmission: ProviderAdmissionRegistry): void {
-    if (this.#disposed) throw new Error('EndpointResourceManager is disposed');
+    if (this.#disposed) throw new WebRpcLifecycleError('EndpointResourceManager is disposed');
     this.#chunks = chunks;
     this.#providerAdmission = providerAdmission;
   }
 
   /** Assigns provider-registry cleanup to the endpoint-wide lifecycle owner. */
   attachProviderRegistry(provider: { readonly clear: () => void }): void {
-    if (this.#disposed) throw new Error('EndpointResourceManager is disposed');
+    if (this.#disposed) throw new WebRpcLifecycleError('EndpointResourceManager is disposed');
     this.#providerClear = () => provider.clear();
   }
 
   /** Assigns discovery waiter/session shutdown to the endpoint-wide lifecycle owner. */
   attachDiscoveryRegistry(close: () => void): void {
-    if (this.#disposed) throw new Error('EndpointResourceManager is disposed');
+    if (this.#disposed) throw new WebRpcLifecycleError('EndpointResourceManager is disposed');
     this.#discoveryClose = close;
   }
 
   /** Registers the endpoint-specific caller settlement transaction. */
   attachCallerSettlement(settle: () => void): void {
-    if (this.#disposed) throw new Error('EndpointResourceManager is disposed');
+    if (this.#disposed) throw new WebRpcLifecycleError('EndpointResourceManager is disposed');
     this.#settleCallers = settle;
   }
 
@@ -288,11 +296,20 @@ export class EndpointResourceManager {
 
   /** Registers an operation scope and centralizes its terminal release policy. */
   begin(kind: IEndpointOperationKind, id: string, replayRetained = false): IOperationResourceScope {
-    if (this.#disposed) throw new Error('EndpointResourceManager is disposed');
+    if (this.#disposed) throw new WebRpcLifecycleError('EndpointResourceManager is disposed');
+    this.#purgeReplayRetained();
     if (this.#operations.has(id) || this.#replayRetainedIds.has(id))
-      throw new Error('operation identifier is already active');
-    if (!this.#replay.hasReservedId(id) && !this.#replay.reserveId(id))
-      throw new Error('operation identifier is not available');
+      throw new WebRpcError(WebRpcErrorCode.overloaded, 'operation identifier is already active');
+    // 只有「出站」kind（本 endpoint 发起）才占用出站 id 账本（ReplayWindow）。入站 kind
+    // （provider/variation/chunk）的 id 来自对端 wire，若同样 reserve 会让已认证 peer 用 ~4096 个
+    // 入站操作耗尽本 endpoint 的出站发送预算（overloaded）——见 hardening 2G.2 的跨命名空间容量攻击。
+    const isOutbound =
+      kind === WebRpcControlKind.request ||
+      kind === WebRpcControlKind.dispatch ||
+      kind === WebRpcControlKind.ping ||
+      kind === WebRpcControlKind.discovery;
+    if (isOutbound && !this.#replay.hasReservedId(id) && !this.#replay.reserveId(id))
+      throw new WebRpcError(WebRpcErrorCode.overloaded, 'operation identifier is not available');
     let active = true;
     let retained = replayRetained;
     const scope: IOperationResourceScope = {
@@ -305,8 +322,8 @@ export class EndpointResourceManager {
         if (!active) return;
         active = false;
         if (this.#operations.get(id) === scope) this.#operations.delete(id);
-        if (retained) this.#replayRetainedIds.add(id);
-        if (!retained) this.#replay.releaseId(id);
+        if (retained) this.#replayRetainedIds.set(id, Date.now());
+        else if (isOutbound) this.#replay.releaseId(id);
       },
       retainForReplay: () => {
         if (!active) return;

@@ -1,4 +1,5 @@
-import type { IWebRpcTransport } from '../transport';
+import type { IWebRpcTransport } from '../transport.js';
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js';
 
 /** Adapts BroadcastChannel for tab-to-tab and storage-backed coordination. */
 export function createBroadcastChannelTransport(channel: BroadcastChannel): IWebRpcTransport {
@@ -36,9 +37,9 @@ export function createBroadcastChannelTransport(channel: BroadcastChannel): IWeb
     }
   };
   return {
-    platform: 'BroadcastChannel',
+    platform: WebRpcPlatform.broadcastChannel,
     topology: 'broadcast',
-    ownership: 'borrowed',
+    ownership: WebRpcTransportOwnership.borrowed,
     send(message) {
       channel.postMessage(message);
     },

@@ -1,11 +1,7 @@
 import type { IDisposer, IRuntime } from '@migaia/reactive';
-import { persistUnit } from '../core/persist-unit';
-import type {
-  IPersistCodec,
-  IPersistHandle,
-  IPersistKeyValueStore,
-  IPersistUnit
-} from '../core/types';
+import { persistUnit } from '../core/persist-unit.js';
+import type { ICodec } from '@migaia/storage-web';
+import type { IPersistHandle, IPersistStorage, IPersistUnit } from '../core/types.js';
 
 /**
  * `persist()` 实际用到的 store 能力面，只有 4 个成员。
@@ -28,8 +24,8 @@ export type IPersistableStore = {
 
 export type IPersistOptions = {
   key: string;
-  storage: IPersistKeyValueStore;
-  codec?: IPersistCodec;
+  storage: IPersistStorage;
+  codec?: ICodec;
   version?: number;
   migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;
   partialize?: (state: Record<string, unknown>) => Record<string, unknown>;

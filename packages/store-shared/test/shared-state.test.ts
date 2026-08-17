@@ -203,6 +203,117 @@ describeShared('SharedInt32Array：逐下标失效', () => {
     reader.dispose();
     writer.dispose();
   });
+
+  it('ignores initialValues when attaching to an existing buffer', () => {
+    // 与 SharedInt32Signal 的 initialValue 一样：附着已有 buffer 时那块内存已经
+    // 有数据了，不该被 initialValues 覆盖（USEGUIDE §3.1 明确承诺的行为）。
+    const runtime = syncRuntime();
+    const writer = sharedInt32Array(runtime, 2, { initialValues: [1, 2] });
+
+    const attached = sharedInt32Array(runtime, 2, {
+      buffer: writer.buffer,
+      initialValues: [99, 99]
+    });
+    expect(attached.get(0)).toBe(1);
+    expect(attached.get(1)).toBe(2);
+
+    attached.dispose();
+    writer.dispose();
+  });
+
+  it('truncates initialValues beyond the array length instead of throwing', () => {
+    const runtime = syncRuntime();
+    const array = sharedInt32Array(runtime, 2, { initialValues: [1, 2, 3, 4] });
+
+    expect(array.get(0)).toBe(1);
+    expect(array.get(1)).toBe(2);
+
+    array.dispose();
+  });
+
+  it('does not bump anything when the same value is written back via set()', () => {
+    const runtime = syncRuntime();
+    const array = sharedInt32Array(runtime, 1, { initialValues: [5] });
+    let runs = 0;
+    const observer = new Effect(() => {
+      runs++;
+      void array.get(0);
+    }, runtime);
+
+    array.set(0, 5);
+    expect(runs).toBe(1);
+
+    array.set(0, 6);
+    expect(runs).toBe(2);
+
+    observer.dispose();
+    array.dispose();
+  });
+
+  it('rejects out-of-range int32 values from set() and update()', () => {
+    // asInt32 是三条写入路径共用的同一道校验（USEGUIDE §4.3），此前只有
+    // SharedInt32Signal.value 测过；set()/update() 这两条路径完全没测到。
+    const runtime = syncRuntime();
+    const array = sharedInt32Array(runtime, 1, { initialValues: [0] });
+
+    expect(() => array.set(0, 3.9)).toThrow('must be an int32');
+    expect(() => array.set(0, 2_147_483_648)).toThrow('must be an int32');
+    expect(() => array.update(0, () => 2_147_483_648)).toThrow('must be an int32');
+    // 拒绝之后那格没被动过
+    expect(array.get(0)).toBe(0);
+
+    array.dispose();
+  });
+
+  it('throws when update() keeps losing the CAS race indefinitely', () => {
+    // update() 的重试上限和 readConsistent/acquire 共用 SPIN_LIMIT，但走它自己
+    // 的错误消息（'kept losing the race'），此前完全没测到。用一个在 updater
+    // 内部抢先落盘的“捣乱写者”制造出永远对不上期望值的 CAS，逼它耗尽重试。
+    const runtime = syncRuntime();
+    const array = sharedInt32Array(runtime, 1, { initialValues: [0] });
+    let attempts = 0;
+
+    expect(() =>
+      array.update(0, (current) => {
+        attempts++;
+        array.writeCell(0, current + 999); // 无条件写，绕开 update() 自己的 CAS 期望值
+        return current + 1;
+      })
+    ).toThrow(/kept losing the race/);
+    expect(attempts).toBe(1 << 16);
+
+    array.dispose();
+  });
+
+  it('computes a snapshot of every index without mutating shared state', () => {
+    const runtime = syncRuntime();
+    const array = sharedInt32Array(runtime, 4, { initialValues: [1, 2, 3, 4] });
+
+    const snap = array.snapshot();
+    expect(Array.from(snap)).toEqual([1, 2, 3, 4]);
+    expect(snap).toBeInstanceOf(Int32Array);
+    // 快照是普通内存的拷贝，不是共享内存的视图：改它不影响数组
+    snap[0] = 999;
+    expect(array.get(0)).toBe(1);
+
+    array.dispose();
+  });
+
+  it('refuses every access once disposed, and dispose() stays idempotent', () => {
+    const runtime = syncRuntime();
+    const array = sharedInt32Array(runtime, 2, { initialValues: [1, 2] });
+    array.dispose();
+
+    expect(array.disposed).toBe(true);
+    expect(() => array.get(0)).toThrow('shared array is disposed');
+    expect(() => array.set(0, 1)).toThrow('shared array is disposed');
+    expect(() => array.update(0, (value) => value + 1)).toThrow('shared array is disposed');
+    expect(() => array.sync()).toThrow('shared array is disposed');
+    expect(() => array.watch()).toThrow('shared array is disposed');
+    expect(() => array.snapshot()).toThrow('shared array is disposed');
+    expect(() => array.prune()).toThrow('shared array is disposed');
+    expect(() => array.dispose()).not.toThrow();
+  });
 });
 
 describeShared('SharedInt32Array：脏页稀疏同步', () => {
@@ -484,5 +595,45 @@ describeShared('waitAsync 推送：远端写入不必靠 pump', () => {
     expect(wakes).toBe(1);
     stopCounting.dispose();
     writer.dispose();
+  });
+
+  maybe('returns the same stop function on repeated watch() calls', () => {
+    // USEGUIDE §3.2/§5：重复调用 watch() 不应叠加第二条回路，而是复用同一个
+    // 停止函数。此前只测过“stop 一次就彻底停”，没测过“调用两次不是两条回路”。
+    const runtime = syncRuntime();
+    const signal = sharedInt32(runtime, 0);
+    const array = sharedInt32Array(runtime, 2);
+
+    const firstSignalStop = signal.watch();
+    expect(signal.watch()).toBe(firstSignalStop);
+    const firstArrayStop = array.watch();
+    expect(array.watch()).toBe(firstArrayStop);
+
+    firstSignalStop();
+    firstArrayStop();
+    signal.dispose();
+    array.dispose();
+  });
+
+  it('throws instead of silently falling back to polling when Atomics.waitAsync is unavailable', () => {
+    // USEGUIDE §5/§8 明确承诺：环境不支持 waitAsync 时 watch() 直接抛错，而不是
+    // 静默退化成轮询。此前完全没有测过这条分支——不依赖当前环境是否真的支持
+    // waitAsync，而是临时摘掉它来模拟“不支持”的环境。
+    const original = (Atomics as unknown as { waitAsync?: unknown }).waitAsync;
+    delete (Atomics as unknown as { waitAsync?: unknown }).waitAsync;
+    try {
+      const runtime = syncRuntime();
+      const signal = sharedInt32(runtime, 0);
+      expect(() => signal.watch()).toThrow('Atomics.waitAsync is unavailable');
+      signal.dispose();
+
+      const array = sharedInt32Array(runtime, 2);
+      expect(() => array.watch()).toThrow('Atomics.waitAsync is unavailable');
+      array.dispose();
+    } finally {
+      if (original !== undefined) {
+        (Atomics as unknown as { waitAsync: unknown }).waitAsync = original;
+      }
+    }
   });
 });

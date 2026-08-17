@@ -1,8 +1,9 @@
-import { WebRpcContractError, WebRpcErrorCode, WebRpcSchemaValidationError } from '../errors';
-import type { IWebRpcProviderResult } from '../typing';
-import type { IWebRpcRequest } from '../wire';
-import type { ProviderRegistry } from './provider';
-import { safeRead, safeString, tupleKey } from './safe-value';
+import { WebRpcContractError, WebRpcErrorCode, WebRpcSchemaValidationError } from '../errors.js';
+import type { IWebRpcProviderResult } from '../typing.js';
+import type { IWebRpcRequest } from '../wire.js';
+import type { ProviderRegistry } from './provider.js';
+import { safeRead, safeString, tupleKey } from './safe-value.js';
+import { WebRpcMessageKind } from '../protocol-constants.js';
 type IProviderAdmission = {
   acquire(taskKey: string, peerKey: string): boolean;
   release(taskKey: string): void;
@@ -174,7 +175,7 @@ export class ProviderExecutor<TTargetId extends string> {
           await this.failureResponse(
             request,
             new Error('Provider not found'),
-            'PROVIDER_NOT_FOUND'
+            WebRpcErrorCode.providerNotFound
           );
         }
         return;
@@ -196,7 +197,7 @@ export class ProviderExecutor<TTargetId extends string> {
       responseSendStarted = true;
       await this.options.send(
         {
-          kind: 'response',
+          kind: WebRpcMessageKind.response,
           version: request.version,
           taskId: request.taskId,
           senderId: this.options.id,
@@ -236,7 +237,7 @@ export class ProviderExecutor<TTargetId extends string> {
   ): Promise<void> {
     const schemaError = error instanceof WebRpcSchemaValidationError;
     await this.options.send({
-      kind: 'response',
+      kind: WebRpcMessageKind.response,
       version: request.version,
       taskId: request.taskId,
       senderId: this.options.id,

@@ -27,7 +27,7 @@
 - **像调本地函数一样调用 Worker**：`WorkerAdapter.request<Input, Output>(payload)` 返回 `Promise<Output>`，超时/取消/来源校验这些细节都交给底层的 `@migaia/web-rpc`。
 - **和 `Resource` 无缝集成**：`workerComputed()` 返回的就是一个标准 `Resource<Output>`，`ttl`、`retry`、`staleWhileRevalidate`、`keepAlive` 这些 `@migaia/resource` 的能力照常可用，只是 fetcher 换成了 Worker 调用。
 - **序列化编解码可插拔进 Worker**：`workerPlugin()` 产出的是标准 `ISerializePlugin`，和 `@migaia/serialize` 其他插件（如内置 JSON 插件）用同一套注册表机制，业务代码不需要知道某个格式是在主线程还是 Worker 里编解码的。
-- **托管的 Worker 端生命周期**：`createWorkerHandler()`/`createSerializeWorkerHandler()` 返回的 `ManagedRpcHandler` 统一提供 `dispose()`/`disposeAsync()`/`pendingCount`/`disposed`，不用在 Worker 那端自己管理端点生命周期。
+- **托管的 Worker 端生命周期**：`createWorkerHandler()`/`createSerializeWorkerHandler()` 返回的 `ManagedRpcHandler` 统一提供 `close()`/`dispose()`/`pendingCount`/`disposed`，不用在 Worker 那端自己管理端点生命周期。
 - **字节转移的所有权语义显式化**：`ownership: 'transfer'` 是显式选择，默认 `'copy'`——避免"调用方以为数据还能用，实际底层 buffer 已经被 detach"这类隐蔽 bug。
 
 ## 4. 五分钟上手

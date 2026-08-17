@@ -1,15 +1,18 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
 
-/** Produces one runtime-neutral ESM entry; declarations are emitted by TypeScript. */
+/** Produces runtime-neutral ESM entries; declarations are emitted by TypeScript. */
 export default defineConfig({
   cacheDir: fileURLToPath(new URL('../../node_modules/.vite/storage-web', import.meta.url)),
   build: {
     target: 'es2020',
     lib: {
-      entry: 'src/index.ts',
+      entry: {
+        index: 'src/index.ts',
+        memory: 'src/memory.ts'
+      },
       formats: ['es'],
-      fileName: () => 'index.js'
+      fileName: (_format, entryName) => `${entryName}.js`
     },
     sourcemap: true
   }

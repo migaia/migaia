@@ -1,4 +1,4 @@
-import type { IAbortSignal } from './async-control';
+import type { IAbortSignal } from './async-control.js';
 
 export type IPending<T> = {
   readonly resolve: (value: T) => void;

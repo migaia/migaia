@@ -6,6 +6,8 @@ import {
   withAbort
 } from '../../src/core/operation';
 
+const noopReporter = (): void => {};
+
 describe('throwIfAborted', () => {
   it('非法 timeoutMs 抛 INVALID_ARGUMENT', () => {
     for (const timeoutMs of [-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])
@@ -65,7 +67,7 @@ describe('throwIfAborted', () => {
     expect(() => throwIfAborted(signal)).toThrow(
       expect.objectContaining({ code: 'ABORTED', cause })
     );
-    const merged = mergeSignals({ signal, timeoutMs: 1000 });
+    const merged = mergeSignals({ signal, timeoutMs: 1000 }, noopReporter);
     expect(merged.signal?.aborted).toBe(true);
     expect(merged.signal?.reason).toBe(cause);
     merged.dispose();
@@ -77,13 +79,13 @@ describe('throwIfAborted', () => {
 
 describe('mergeSignals', () => {
   it('无 ctx 时返回 undefined signal 与空 dispose', () => {
-    const { signal, dispose } = mergeSignals(undefined);
+    const { signal, dispose } = mergeSignals(undefined, noopReporter);
     expect(signal).toBeUndefined();
     expect(() => dispose()).not.toThrow();
   });
   it('只有外部 signal 时原样返回', () => {
     const controller = new AbortController();
-    const { signal } = mergeSignals({ signal: controller.signal });
+    const { signal } = mergeSignals({ signal: controller.signal }, noopReporter);
     expect(signal).toBe(controller.signal);
   });
   it('operation context 每个字段只读取一次并传递快照', async () => {
@@ -138,13 +140,13 @@ describe('mergeSignals', () => {
         return () => {};
       }
     } as never;
-    const snapshot = mergeSignals({ signal }).context;
+    const snapshot = mergeSignals({ signal }, noopReporter).context;
     await expect(withAbort(snapshot, async () => 42)).resolves.toBe(42);
     expect(reads).toEqual({ aborted: 2, addEventListener: 1, removeEventListener: 1 });
     expect(Object.isFrozen(snapshot)).toBe(true);
   });
   it('timeoutMs 到期后合成 signal 被 abort', async () => {
-    const { signal, dispose } = mergeSignals({ timeoutMs: 5 });
+    const { signal, dispose } = mergeSignals({ timeoutMs: 5 }, noopReporter);
     expect(signal?.aborted).toBe(false);
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(signal?.aborted).toBe(true);
@@ -153,13 +155,19 @@ describe('mergeSignals', () => {
   it('外部 signal 已 abort 时合成 signal 立即 abort', () => {
     const controller = new AbortController();
     controller.abort('external reason');
-    const { signal, dispose } = mergeSignals({ signal: controller.signal, timeoutMs: 1000 });
+    const { signal, dispose } = mergeSignals(
+      { signal: controller.signal, timeoutMs: 1000 },
+      noopReporter
+    );
     expect(signal?.aborted).toBe(true);
     dispose();
   });
   it('外部 signal 后触发时合成 signal 跟着 abort', () => {
     const controller = new AbortController();
-    const { signal, dispose } = mergeSignals({ signal: controller.signal, timeoutMs: 1000 });
+    const { signal, dispose } = mergeSignals(
+      { signal: controller.signal, timeoutMs: 1000 },
+      noopReporter
+    );
     expect(signal?.aborted).toBe(false);
     controller.abort();
     expect(signal?.aborted).toBe(true);
@@ -177,7 +185,7 @@ describe('mergeSignals', () => {
       },
       removeEventListener: () => {}
     };
-    const merged = mergeSignals({ signal: external as never, timeoutMs: 1000 });
+    const merged = mergeSignals({ signal: external as never, timeoutMs: 1000 }, noopReporter);
     expect(merged.signal?.aborted).toBe(true);
     expect(merged.signal?.reason).toBe('race abort');
     merged.dispose();
@@ -186,16 +194,19 @@ describe('mergeSignals', () => {
     const clearTimer = vi.spyOn(globalThis, 'clearTimeout');
     const cause = new Error('hostile addEventListener');
     expect(() =>
-      mergeSignals({
-        timeoutMs: 1000,
-        signal: {
-          aborted: false,
-          addEventListener: () => {
-            throw cause;
-          },
-          removeEventListener: () => {}
-        } as never
-      })
+      mergeSignals(
+        {
+          timeoutMs: 1000,
+          signal: {
+            aborted: false,
+            addEventListener: () => {
+              throw cause;
+            },
+            removeEventListener: () => {}
+          } as never
+        },
+        noopReporter
+      )
     ).toThrow(expect.objectContaining({ code: 'INVALID_ARGUMENT', cause }));
     expect(clearTimer).toHaveBeenCalledOnce();
     clearTimer.mockRestore();
@@ -218,7 +229,7 @@ describe('mergeSignals', () => {
     ).resolves.toBe(42);
   });
   it('timeoutMs 为 0 时立即 abort，不创建延迟操作', () => {
-    const { signal, dispose } = mergeSignals({ timeoutMs: 0 });
+    const { signal, dispose } = mergeSignals({ timeoutMs: 0 }, noopReporter);
     expect(signal?.aborted).toBe(true);
     dispose();
   });

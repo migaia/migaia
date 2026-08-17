@@ -1,8 +1,9 @@
-import type { IOperationContext, IKeyRange, IStorageKey } from '../types/context';
-import type { IKeyValueStore } from '../types/storage';
-import type { ISchemaAdapter } from '../schema/types';
-import type { IMigration } from '../schema/migrate';
-import type { ICodec } from '../serialize/types';
+import type { IOperationContext, IKeyRange, IStorageKey } from '../types/context.js';
+import type { IKeyValueStore } from '../types/storage.js';
+import type { ISchemaAdapter } from '../schema/types.js';
+import type { IMigration } from '../schema/migrate.js';
+import type { ICodec } from '../serialize/types.js';
+import type { IStorageInvalidRecordAction, IStorageRecordStage } from '../constants.js';
 
 export type IEntityOptions<TDomain, TStored = TDomain> = {
   readonly name: string;
@@ -34,12 +35,12 @@ export type IListOptions<TRecord = unknown> = {
   readonly onInvalid?: IInvalidRecordAction | IInvalidRecordHandler<TRecord>;
 };
 
-export type IInvalidRecordAction = 'skip' | 'throw';
+export type IInvalidRecordAction = IStorageInvalidRecordAction;
 export type IInvalidRecordIssue<TRecord = unknown> = {
   readonly key: IStorageKey;
   readonly raw: unknown;
   readonly record?: TRecord;
-  readonly stage: 'decode' | 'migrate' | 'validate';
+  readonly stage: IStorageRecordStage;
   readonly cause: unknown;
 };
 export type IInvalidRecordHandler<TRecord = unknown> = (

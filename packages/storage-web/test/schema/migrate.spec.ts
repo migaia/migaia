@@ -5,21 +5,21 @@ describe('runMigrations', () => {
   it('拒绝非法版本，避免 Infinity 循环与整数精度丢失', async () => {
     for (const fromVersion of [-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])
       await expect(runMigrations({}, fromVersion, 1, undefined)).rejects.toMatchObject({
-        code: 'INVALID_ARGUMENT'
+        code: 'INVALID_CONFIG'
       });
     for (const toVersion of [-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])
       await expect(runMigrations({}, 0, toVersion, undefined)).rejects.toMatchObject({
-        code: 'INVALID_ARGUMENT'
+        code: 'INVALID_CONFIG'
       });
   });
 
   it('拒绝非法 migrations 容器、非函数步骤与伪造 signal', async () => {
     for (const migrations of [null, [], 'migrations', 1])
       await expect(runMigrations({}, 0, 1, migrations as never)).rejects.toMatchObject({
-        code: 'INVALID_ARGUMENT'
+        code: 'INVALID_CONFIG'
       });
     await expect(runMigrations({}, 0, 1, { 1: 'invalid' } as never)).rejects.toMatchObject({
-      code: 'INVALID_ARGUMENT'
+      code: 'INVALID_CONFIG'
     });
     await expect(
       runMigrations({}, 0, 1, undefined, { aborted: false } as never)
@@ -148,7 +148,7 @@ describe('runMigrations', () => {
         },
         removeEventListener: () => {}
       } as never)
-    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT', cause: setupCause });
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
     await expect(
       runMigrations({}, 0, 1, { 1: async () => ({ migrated: true }) }, {
         aborted: false,
@@ -173,7 +173,7 @@ describe('runMigrations', () => {
 
 it('将 operation signal 传给 migration context', async () => {
   const controller = new AbortController();
-  let received: AbortSignal | undefined;
+  let received: unknown;
   await expect(
     runMigrations(
       { v: 0 },

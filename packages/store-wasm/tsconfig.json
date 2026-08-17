@@ -2,6 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
+    "types": ["node"],
     "paths": {
       "@migaia/reactive": ["../reactive/dist/index.d.ts"],
       "@migaia/store-light": ["../store-light/dist/index.d.ts"],

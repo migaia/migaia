@@ -1,5 +1,6 @@
-import { StorageError, StorageErrorCode } from '../types/errors';
-import type { ICookieRemoveContext, ICookieScope, ICookieWriteContext } from '../types/cookie';
+import { StorageError, StorageErrorCode } from '../types/errors.js';
+import { StorageBackend } from '../constants.js';
+import type { ICookieRemoveContext, ICookieScope, ICookieWriteContext } from '../types/cookie.js';
 
 /** Cookie 单值上限；超出直接抛错，不静默截断。 */
 export const MAX_COOKIE_VALUE_BYTES = 4096;
@@ -56,7 +57,10 @@ export const serializeCookieAssignment = (
   if (ctx?.partitioned) parts.push('partitioned');
   const serialized = parts.join('; ');
   if (byteLength(serialized) > MAX_COOKIE_VALUE_BYTES)
-    throw new StorageError(StorageErrorCode.valueTooLarge, { backend: 'cookie', key: name });
+    throw new StorageError(StorageErrorCode.valueTooLarge, {
+      backend: StorageBackend.cookie,
+      key: name
+    });
   return serialized;
 };
 

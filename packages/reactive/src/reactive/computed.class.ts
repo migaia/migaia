@@ -1,9 +1,12 @@
-import type { IDisposable, IObservable, IObserver, IRuntime } from '../runtime/types';
-import { internalsOf } from '../runtime/internals';
-import { claimOwnership } from '../runtime/ownership';
-import { describeObserver } from '../runtime/diagnostics';
-import { registerSubs } from '../runtime/node-internals';
-import { registerDeps, registerDepVersions } from '../runtime/node-internals';
+import type { IDisposable, IObservable, IObserver, IRuntime } from '../runtime/types.js';
+import { internalsOf } from '../runtime/internals.js';
+import { claimOwnership } from '../runtime/ownership.js';
+import { describeObserver } from '../runtime/diagnostics.js';
+import { registerSubs } from '../runtime/node-internals.js';
+import { registerDeps, registerDepVersions } from '../runtime/node-internals.js';
+import { createReactiveError } from '../errors.js';
+import { ReactiveErrorCode } from '../error-code.js';
+import { ReactiveTracePhase, ReactiveTraceType } from '../runtime/trace-constants.js';
 
 export type IComputedOptions<T> = {
   equals?: (a: T, b: T) => boolean;
@@ -103,7 +106,11 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
    * committed subscription still uses `value`/`peek` and receives the normal cached reactive path.
    */
   preview(): T {
-    if (this.#disposed) throw new Error('[store] cannot read a disposed computed');
+    if (this.#disposed)
+      throw createReactiveError(
+        ReactiveErrorCode.nodeDisposed,
+        '[store] cannot read a disposed computed'
+      );
     const version = this.runtime.currentVersion();
     if (
       this.#previewVersion === version &&
@@ -126,7 +133,11 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
   }
   pull(): void {
     // 所有读取路径（value/peek/上游 hasStaleDependencies 的 dep.pull）都经过 pull，在此统一拦截已释放读取
-    if (this.#disposed) throw new Error('[store] cannot read a disposed computed');
+    if (this.#disposed)
+      throw createReactiveError(
+        ReactiveErrorCode.nodeDisposed,
+        '[store] cannot read a disposed computed'
+      );
     if (!this.#dirty) return;
     const version = this.runtime.currentVersion();
     // A React snapshot may have already evaluated this exact version. Consume
@@ -152,17 +163,20 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
   #recompute(): void {
     if (this.#computing) {
       // 求值过程中又读到了自己：环。给出可理解的响应式错误，而不是让引擎栈溢出。
-      throw new Error('[store] circular computed dependency detected');
+      throw createReactiveError(
+        ReactiveErrorCode.circularDependency,
+        '[store] circular computed dependency detected'
+      );
     }
     this.#computing = true;
     const runtime = internalsOf(this.runtime);
     const tracing = runtime.traceEnabled();
-    const startedAt = tracing ? now() : 0;
+    const startedAt = tracing ? runtime.now() : 0;
     if (tracing) {
       runtime.emitTrace({
-        type: 'observer-run',
-        timestamp: Date.now(),
-        phase: 'start',
+        type: ReactiveTraceType.observerRun,
+        timestamp: runtime.timestamp(),
+        phase: ReactiveTracePhase.start,
         observer: describeObserver(this)
       });
     }
@@ -180,11 +194,11 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     } catch (error) {
       if (tracing) {
         runtime.emitTrace({
-          type: 'observer-run',
-          timestamp: Date.now(),
-          phase: 'error',
+          type: ReactiveTraceType.observerRun,
+          timestamp: runtime.timestamp(),
+          phase: ReactiveTracePhase.error,
           observer: describeObserver(this),
-          durationMs: now() - startedAt,
+          durationMs: runtime.now() - startedAt,
           error
         });
       }
@@ -195,11 +209,11 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     this.#dirty = false; // 仅在完全成功后才落定 dirty
     if (tracing) {
       runtime.emitTrace({
-        type: 'observer-run',
-        timestamp: Date.now(),
-        phase: 'end',
+        type: ReactiveTraceType.observerRun,
+        timestamp: runtime.timestamp(),
+        phase: ReactiveTracePhase.end,
         observer: describeObserver(this),
-        durationMs: now() - startedAt
+        durationMs: runtime.now() - startedAt
       });
     }
     this.#scheduleSuspension();
@@ -222,8 +236,4 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     internalsOf(this.runtime).tracker.clearDependencies(this);
     this.#dirty = true;
   }
-}
-
-function now(): number {
-  return globalThis.performance?.now() ?? Date.now();
 }

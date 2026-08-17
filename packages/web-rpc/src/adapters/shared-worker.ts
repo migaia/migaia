@@ -1,5 +1,6 @@
-import type { IWebRpcSendOptions, IWebRpcTransport } from '../transport';
-import { registerListeners, releaseListeners } from '../internal/listener-safety';
+import type { IWebRpcSendOptions, IWebRpcTransport } from '../transport.js';
+import { registerListeners, releaseListeners } from '../internal/listener-safety.js';
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js';
 
 /** Minimal SharedWorker port surface accepted by the adapter. */
 export type ISharedWorkerPort = {
@@ -65,9 +66,9 @@ export function createSharedWorkerTransport(
     }
   };
   return {
-    platform: 'Worker',
+    platform: WebRpcPlatform.worker,
     topology: 'exclusive',
-    ownership: 'borrowed',
+    ownership: WebRpcTransportOwnership.borrowed,
     send(message, options?: IWebRpcSendOptions<Transferable>) {
       port.postMessage(message, options?.transfer);
     },

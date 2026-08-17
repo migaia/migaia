@@ -1,10 +1,11 @@
-import { StorageError, StorageErrorCode } from '../types/errors';
-import type { ICodec } from './types';
+import { StorageError, StorageErrorCode } from '../types/errors.js';
+import type { ICodec } from './types.js';
+import { StorageCodecOutput } from '../constants.js';
 
 /** 默认 codec：零依赖，全后端可用。 */
 export const jsonCodec: ICodec<unknown, string> = Object.freeze({
   name: 'json',
-  output: 'text',
+  output: StorageCodecOutput.text,
   encode: async (value) => {
     try {
       return JSON.stringify(value) ?? 'null';

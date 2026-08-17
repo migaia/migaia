@@ -1,7 +1,7 @@
 import { use, useCallback, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { defaultRuntime, type IDisposer, type IRuntime, type ISignal } from '@migaia/reactive';
 import type { Resource, IResourceState } from '@migaia/resource';
-import { useNodeValue } from './useNode';
+import { useNodeValue } from './useNode.js';
 import {
   storeReady,
   type IReactiveStore,
@@ -9,7 +9,7 @@ import {
   type IStoreResource
 } from '@migaia/store-light';
 import { createObserverBinding, type ICapture } from '@migaia/reactive/runtime';
-import { notifyReact } from './notify-react';
+import { notifyReact } from './notify-react.js';
 
 export function useStoreResource<T>(resource: IStoreResource<T>): T {
   useSyncExternalStore(resource.subscribe, resource.getSnapshot, resource.getSnapshot);

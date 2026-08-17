@@ -4,11 +4,14 @@ import type {
   IObserver,
   IReactiveNodeOptions,
   IRuntime
-} from '../runtime/types';
-import { internalsOf } from '../runtime/internals';
-import { claimOwnership } from '../runtime/ownership';
-import { describeObservable } from '../runtime/diagnostics';
-import { registerSubs } from '../runtime/node-internals';
+} from '../runtime/types.js';
+import { internalsOf } from '../runtime/internals.js';
+import { claimOwnership } from '../runtime/ownership.js';
+import { describeObservable } from '../runtime/diagnostics.js';
+import { registerSubs } from '../runtime/node-internals.js';
+import { createReactiveError, tagReactiveError } from '../errors.js';
+import { ReactiveErrorCode } from '../error-code.js';
+import { ReactiveTraceReason, ReactiveTraceType } from '../runtime/trace-constants.js';
 
 // 可写原子——反应式图里唯一的"真值来源"，Computed/Effect 都是从它（或从彼此）派生。
 // 每个节点持有自己的 runtime：同一 runtime 内的节点才共享依赖图/版本时钟。
@@ -50,7 +53,10 @@ export class Signal<T> implements IObservable, IDisposable {
   }
   #assertActive(): void {
     if (this.#disposed) {
-      throw new Error('[store] cannot use a disposed signal');
+      throw createReactiveError(
+        ReactiveErrorCode.nodeDisposed,
+        '[store] cannot use a disposed signal'
+      );
     }
   }
   get value(): T {
@@ -69,10 +75,10 @@ export class Signal<T> implements IObservable, IDisposable {
     this.#version = nextVersion;
     if (runtime.traceEnabled()) {
       runtime.emitTrace({
-        type: 'observable-change',
-        timestamp: Date.now(),
+        type: ReactiveTraceType.observableChange,
+        timestamp: runtime.timestamp(),
         observable: describeObservable(this),
-        reason: 'set'
+        reason: ReactiveTraceReason.set
       });
     }
     // 先快照 subs：同步 scheduler 可能在通知过程中重新追踪并改动 subs，直接迭代活 Set 会死循环
@@ -122,7 +128,10 @@ export class Signal<T> implements IObservable, IDisposable {
       }
       if (errors.length === 1) throw errors[0];
       if (errors.length > 1) {
-        throw new AggregateError(errors, '[store] multiple observable lifecycle hooks failed');
+        throw tagReactiveError(
+          new AggregateError(errors, '[store] multiple observable lifecycle hooks failed'),
+          ReactiveErrorCode.observerFailed
+        );
       }
     };
   }

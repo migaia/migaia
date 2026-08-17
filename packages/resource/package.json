@@ -19,10 +19,12 @@
     "fmt": "oxfmt src test",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:test": "tsc -p tsconfig.test.json",
     "lint": "oxlint src test",
     "test": "vitest run test"
   },
   "dependencies": {
+    "@migaia/lifecycle": "workspace:^",
     "@migaia/reactive": "workspace:^"
   },
   "devDependencies": {

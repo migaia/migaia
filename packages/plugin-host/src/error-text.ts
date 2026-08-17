@@ -1,14 +1,46 @@
-import type { IPluginHostErrorCode } from './typing';
+import type { IPluginHostErrorCode } from './typing.js';
+import { PLUGIN_HOST_SOURCE, PluginHostErrorCode } from './error-code.js';
 
 export type ILocaleKey = 'en' | 'zh';
 
 export class PluginHostError extends Error {
+  /** `(source, code)` 二元组的 source 部分，恒为 `'@migaia/plugin-host'`（`docs/contracts/error-codes.md` §2）。 */
+  readonly source: string;
   readonly code: IPluginHostErrorCode;
-  constructor(code: IPluginHostErrorCode, message: string, options?: ErrorOptions) {
+  /** 结构化诊断（如 queue timeout 的 `owner`/`waitedMs`）；不与 `cause` 混用。 */
+  readonly detail?: Readonly<Record<string, unknown>>;
+  constructor(
+    code: IPluginHostErrorCode,
+    message: string,
+    options?: ErrorOptions & { readonly detail?: Readonly<Record<string, unknown>> }
+  ) {
     super(message, options);
     this.name = 'PluginHostError';
+    this.source = PLUGIN_HOST_SOURCE;
     this.code = code;
+    if (options?.detail !== undefined) this.detail = options.detail;
   }
+}
+
+/**
+ * 给已经构造好的错误对象（`TypeError` 等）补上 `(source, code)`，不触碰 `message`/`name`/`stack`/构造函数带来的其它字段——
+ * 用于入参校验这类必须保持原生类型（调用方按 `instanceof TypeError` 分支）的场景。返回类型把 `source`/`code` 交叉进原类型，
+ * 使类型层面可访问（`docs/contracts/error-codes.md` §2）。
+ */
+export function tagPluginHostError<E extends Error>(
+  error: E,
+  code: IPluginHostErrorCode
+): E & { readonly source: string; readonly code: IPluginHostErrorCode } {
+  Object.defineProperty(error, 'source', { value: PLUGIN_HOST_SOURCE, enumerable: true });
+  Object.defineProperty(error, 'code', { value: code, enumerable: true });
+  return error as E & { readonly source: string; readonly code: IPluginHostErrorCode };
+}
+
+/** 入参校验错误：原生 `TypeError` + `INVALID_OPTION`（`docs/contracts/error-codes.md` §7 裸抛扫描门禁）。 */
+export function createPluginHostTypeError(
+  message: string
+): TypeError & { readonly source: string; readonly code: IPluginHostErrorCode } {
+  return tagPluginHostError(new TypeError(message), PluginHostErrorCode.invalidOption);
 }
 
 const PREFIX = '[plugin-host] ';

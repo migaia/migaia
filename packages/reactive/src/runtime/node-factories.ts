@@ -1,8 +1,8 @@
-import { internalsOf } from './internals';
-import { DependencyTracker } from './dependency-tracker.class';
-import type { IReactiveNodeOptions, IRuntime } from './types';
-import type { Signal } from '../reactive/signal.class';
-import type { Computed, IComputedConfig } from '../reactive/computed.class';
+import { internalsOf } from './internals.js';
+import { DependencyTracker } from './dependency-tracker.class.js';
+import type { IReactiveNodeOptions, IRuntime } from './types.js';
+import type { Signal } from '../reactive/signal.class.js';
+import type { Computed, IComputedConfig } from '../reactive/computed.class.js';
 
 /**
  * 具体节点类的工厂视图。

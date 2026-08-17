@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { EndpointResourceManager } from '../../src/internal/endpoint-resource-manager';
 import { ReplayWindow } from '../../src/internal/replay';
 import { ResourceScope } from '../../src/internal/resource-scope';
@@ -87,7 +87,10 @@ describe('EndpointResourceManager', () => {
     expect(manager.reserveId('duplicate')).toBe(true);
     const first = manager.begin('request', 'duplicate');
     expect(() => manager.begin('request', 'duplicate')).toThrow(
-      'operation identifier is already active'
+      expect.objectContaining({
+        code: 'OVERLOADED',
+        message: 'operation identifier is already active'
+      })
     );
     first.release();
     expect(manager.hasReservedId('duplicate')).toBe(false);
@@ -104,6 +107,41 @@ describe('EndpointResourceManager', () => {
     );
     manager.releaseId('replay-duplicate');
     expect(manager.hasReservedId('replay-duplicate')).toBe(false);
+  });
+
+  it('replay-retained ids expire after TTL instead of growing unboundedly (hardening 2G.2)', () => {
+    vi.useFakeTimers();
+    try {
+      const manager = new EndpointResourceManager(new ReplayWindow(4096, 10), new ResourceScope());
+      expect(manager.reserveId('ttl-id')).toBe(true);
+      const operation = manager.begin('request', 'ttl-id');
+      operation.retainForReplay();
+      operation.release();
+      // TTL 内仍被保留，begin 拒绝复用。
+      expect(() => manager.begin('request', 'ttl-id')).toThrow(
+        'operation identifier is already active'
+      );
+      vi.advanceTimersByTime(20);
+      // 过期后保留集合被清理，可以重新 begin（有界，不再永久泄漏）。
+      expect(() => manager.begin('request', 'ttl-id')).not.toThrow();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('inbound operations do not consume the shared outbound id ledger budget', () => {
+    const manager = new EndpointResourceManager(new ReplayWindow(2, 310_000), new ResourceScope());
+    // 入站 kind 大量进入也不应占用出站账本（ReplayWindow 容量 2）。
+    manager.begin('provider', 'inbound-p', true).release();
+    manager.begin('variation', 'inbound-v', true).release();
+    manager.begin('chunk', 'inbound-c', true).release();
+    expect(manager.hasReservedId('inbound-p')).toBe(false);
+    expect(manager.hasReservedId('inbound-v')).toBe(false);
+    expect(manager.hasReservedId('inbound-c')).toBe(false);
+    // 出站账本仍有两个可用槽位。
+    expect(manager.reserveId('outbound-1')).toBe(true);
+    expect(manager.reserveId('outbound-2')).toBe(true);
+    expect(manager.reserveId('outbound-3')).toBe(false);
   });
 
   it('tracks provider operations independently from request operations', () => {
@@ -265,7 +303,12 @@ describe('EndpointResourceManager', () => {
     const manager = new EndpointResourceManager(new ReplayWindow(), new ResourceScope());
     const owner = { purge: () => undefined, clear: () => undefined };
     await manager.dispose();
-    expect(() => manager.registerReplayOwner(owner)).toThrow('EndpointResourceManager is disposed');
+    expect(() => manager.registerReplayOwner(owner)).toThrow(
+      expect.objectContaining({
+        code: 'ENDPOINT_DISPOSED',
+        message: 'EndpointResourceManager is disposed'
+      })
+    );
     expect(() => manager.registerMaintenanceOwner(owner)).toThrow(
       'EndpointResourceManager is disposed'
     );

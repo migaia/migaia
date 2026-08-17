@@ -1,5 +1,2 @@
-import { intrinsicConstructorName } from './brand';
-
-/** Cross-realm runtime check for the exact byte channel input type. */
-export const isUint8Array = (value: unknown): value is Uint8Array =>
-  ArrayBuffer.isView(value) && intrinsicConstructorName(value) === 'Uint8Array';
+// 纯工具已迁往 `@migaia/storage-contract`；本文件 re-export 以保持既有 import 路径不变。
+export { isUint8Array } from '@migaia/storage-contract';

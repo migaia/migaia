@@ -1,7 +1,7 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import { Effect, type IDisposer, type IRuntime } from '@migaia/reactive';
-import { assertReactiveOwnedBy } from '@migaia/reactive/runtime/ownership';
-import { notifyReact } from './notify-react';
+import { assertReactiveOwnedBy } from '@migaia/reactive/ownership';
+import { notifyReact } from './notify-react.js';
 
 /**
  * 稳定节点的专用订阅路径。

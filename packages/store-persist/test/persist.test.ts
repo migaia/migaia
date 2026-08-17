@@ -27,6 +27,46 @@ describe('persist（store-light）', () => {
     store.$dispose();
   });
 
+  it('hydrate 与启动期 mutation 竞争时保留双方对象字段', async () => {
+    const storage = memoryStorage();
+    await storage.set('race', JSON.stringify({ version: 0, state: { persisted: true } }));
+    const originalGet = storage.get;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    storage.get = async (key, ctx) => {
+      await gate;
+      return originalGet(key, ctx);
+    };
+    const store = createStore({ persisted: false, local: 0 });
+    const handle = persist(store, { key: 'race', storage });
+    store.local = 1;
+    release();
+    await handle.ready;
+    expect(store.persisted).toBe(true);
+    expect(store.local).toBe(1);
+    handle.dispose();
+    store.$dispose();
+  });
+
+  it('flush observes a failing write already in flight', async () => {
+    const storage = memoryStorage();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    storage.set = async () => {
+      await gate;
+      throw new Error('disk full');
+    };
+    const store = createStore({ count: 0 });
+    const handle = persist(store, { key: 'flush-failure', storage });
+    await handle.ready;
+    store.count = 1;
+    const flush = handle.flush();
+    release();
+    await expect(flush).rejects.toThrow('disk full');
+    handle.dispose();
+    store.$dispose();
+  });
+
   it('partialize 只持久化裁剪后的字段', async () => {
     const store = createStore({ theme: 'light', session: 'secret' });
     const storage = memoryStorage();

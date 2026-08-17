@@ -1,6 +1,6 @@
 /** Snapshot of endpoint-owned lifecycle state exposed only to package tests. */
 export type IWebRpcEndpointDebugSnapshot = {
-  readonly phase: 'active' | 'disposed';
+  readonly phase: (typeof WebRpcDebugPhase)[keyof typeof WebRpcDebugPhase];
   readonly pending: number;
   readonly pingPending: number;
   readonly activeControllers: number;
@@ -39,3 +39,4 @@ export function readEndpointDebugSnapshot(
 ): IWebRpcEndpointDebugSnapshot | undefined {
   return readers.get(endpoint)?.();
 }
+import { WebRpcDebugPhase } from '../protocol-constants.js';

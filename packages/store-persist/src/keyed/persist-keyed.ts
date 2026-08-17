@@ -1,12 +1,13 @@
 import type { IAtomStore, IWritableAtomDefinition } from '@migaia/store-keyed';
-import { persistUnit } from '../core/persist-unit';
-import type { IPersistCodec, IPersistKeyValueStore, IPersistUnit } from '../core/types';
+import { persistUnit } from '../core/persist-unit.js';
+import type { ICodec } from '@migaia/storage-web';
+import type { IPersistStorage, IPersistUnit } from '../core/types.js';
 
 export type IPersistKeyedOptions<T> = {
   /** Storage key 前缀，格式 `${namespace}:${id}`——必填，clearFamily() 靠它过滤。 */
   namespace: string;
-  storage: IPersistKeyValueStore;
-  codec?: IPersistCodec;
+  storage: IPersistStorage;
+  codec?: ICodec;
   version?: number;
   debounceMs?: number;
   partialize?: (value: T) => Partial<T>;
@@ -65,10 +66,7 @@ export function persistKeyed<T>(
  * `${namespace}:` 为前缀的记录。 若调用方同时持有若干个还没 dispose 的 `persistKeyed()` handle，它们各自的内存值不受影响，也不会
  * 因为存档被删掉就重新触发一次写回（下一次它们自己的 subscribe 触发时才会覆盖写回一条新记录）。
  */
-export async function clearFamily(
-  storage: IPersistKeyValueStore,
-  namespace: string
-): Promise<number> {
+export async function clearFamily(storage: IPersistStorage, namespace: string): Promise<number> {
   const prefix = `${namespace}:`;
   const allKeys = await storage.keys();
   const matching = allKeys.filter((k) => k.startsWith(prefix));

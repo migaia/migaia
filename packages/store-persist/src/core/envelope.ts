@@ -9,7 +9,19 @@ export type IEnvelope<TState> = {
   state: TState;
 };
 
-export class PersistEnvelopeError extends TypeError {}
+export class PersistEnvelopeError extends TypeError {
+  constructor(message: string) {
+    super(message);
+    Object.defineProperty(this, 'source', { value: STORE_PERSIST_SOURCE, enumerable: true });
+    Object.defineProperty(this, 'code', {
+      value: StorePersistErrorCode.envelopeInvalid,
+      enumerable: true
+    });
+  }
+}
+
+import { STORE_PERSIST_SOURCE } from '../errors.js';
+import { StorePersistErrorCode } from '../error-code.js';
 
 export function assertEnvelope<TState>(value: unknown, key: string): IEnvelope<TState> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -23,7 +35,7 @@ export function assertEnvelope<TState>(value: unknown, key: string): IEnvelope<T
   ) {
     throw new PersistEnvelopeError(`[store] persist archive "${key}" has no usable version`);
   }
-  if (!('state' in envelope)) {
+  if (!('state' in envelope) || envelope.state === null || envelope.state === undefined) {
     throw new PersistEnvelopeError(`[store] persist archive "${key}" carries no state`);
   }
   return { version: envelope.version, state: envelope.state as TState };

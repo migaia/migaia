@@ -1,8 +1,8 @@
-import { PeerRegistry } from './peers';
-import { ProviderRegistry } from './provider';
-import { HookRegistry } from './hooks';
-import { ChunkAssembler } from './chunk';
-import { WebRpcError, WebRpcErrorCode } from '../errors';
+import { PeerRegistry } from './peers.js';
+import { ProviderRegistry } from './provider.js';
+import { HookRegistry } from './hooks.js';
+import { ChunkAssembler } from './chunk.js';
+import { WebRpcError, WebRpcErrorCode } from '../errors.js';
 
 /** Centralized keys used for middleware-to-runtime capability composition. */
 export const WebRpcCapabilityKey = {

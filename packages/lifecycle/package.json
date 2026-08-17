@@ -1,0 +1,30 @@
+{
+  "name": "@migaia/lifecycle",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Runtime-neutral lifecycle primitives: scopes, generations, quiescence tracking and dispose transactions.",
+  "license": "MIT",
+  "type": "module",
+  "files": ["dist", "README.md"],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "fmt": "oxfmt src test",
+    "build": "vite build && tsc -p tsconfig.json --emitDeclarationOnly",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:test": "tsc -p tsconfig.test.json",
+    "lint": "oxlint src test",
+    "test": "pnpm run build && vitest run"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vitest": "4.1.10"
+  }
+}

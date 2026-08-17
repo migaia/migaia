@@ -1,4 +1,5 @@
-import { createRuntimeTimer } from './async-control';
+import { createRuntimeTimer } from './async-control.js';
+import { tagWebRpcError, WebRpcErrorCode } from '../errors.js';
 
 /** Measures encoded text in UTF-8 bytes. */
 export function utf8ByteLength(value: string): number {
@@ -13,7 +14,10 @@ export function utf8ByteLength(value: string): number {
 /** Splits text without cutting a Unicode code point or exceeding a byte budget. */
 export function splitUtf8(value: string, maxBytes: number): readonly string[] {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 4)
-    throw new RangeError('maxBytes must be at least 4 bytes');
+    throw tagWebRpcError(
+      new RangeError('maxBytes must be at least 4 bytes'),
+      WebRpcErrorCode.invalidConfig
+    );
   const parts: string[] = [];
   let part = '';
   let bytes = 0;

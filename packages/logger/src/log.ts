@@ -1,5 +1,6 @@
 import { PluginHost } from '@migaia/plugin-host';
 import type { IPluginHostOptions, IPipelineMode, ISyncPipelineStage } from '@migaia/plugin-host';
+import { createLoggerError, LoggerErrorCode } from './errors.js';
 import type {
   IFlusher,
   ILogFailureHook,
@@ -19,7 +20,7 @@ import type {
   IShutdownReason,
   ISink,
   IStaticLoggerCtor
-} from './typing';
+} from './typing.js';
 
 type ILoggerExtendsTarget<TMode extends IPipelineMode> = Omit<
   ILoggerCore<TMode>,
@@ -27,8 +28,9 @@ type ILoggerExtendsTarget<TMode extends IPipelineMode> = Omit<
 >;
 const loggerInternalState = Symbol('logger.internal.state');
 type ILoggerInternalState = { extendPath: string[]; topicChain: string[] };
-import { getLoggerRuntimeManager } from './runtime-manager';
-import { waitUntil } from './bounded-wait';
+import { getLoggerRuntimeManager } from './runtime-manager.js';
+import { boundedWait, systemScheduler, type ILifecycleScheduler } from '@migaia/lifecycle';
+import { LoggerStatus, type ILoggerStatus } from './state-constants.js';
 
 /**
  * Cross-realm-safe check for "awaitable", so a Promise constructed in another realm (an iframe, a
@@ -67,19 +69,28 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   #failureHooks: ILogFailureHook[] = [];
   /** Every asynchronous path enters this registry before it can affect flush completion. */
   #pending = new Set<Promise<void>>();
-  #status: 'active' | 'flushing' | 'shutting-down' | 'closed' = 'active';
+  #status: ILoggerStatus = LoggerStatus.active;
   #flushPromise: Promise<void> | undefined;
   #shutdownPromise: Promise<void> | undefined;
   /** Extends() 注册的转发目标 */
   #extendTargets: ILoggerExtendsTarget<IPipelineMode>[] = [];
+  /** 单调时钟源（R-9）；`flush`/`shutdown`/`#drain` 的 deadline 与 `boundedWait` 共用。 */
+  #scheduler: ILifecycleScheduler;
+
+  get scheduler(): ILifecycleScheduler {
+    return this.#scheduler;
+  }
+
   constructor(
     userOptions: Readonly<Record<string, unknown>>,
     path: string[],
     topic: string,
     hostOptions: IPluginHostOptions = {},
-    plugins: readonly ILoggerPluginConstraint[] = []
+    plugins: readonly ILoggerPluginConstraint[] = [],
+    scheduler: ILifecycleScheduler = systemScheduler
   ) {
     super(hostOptions);
+    this.#scheduler = scheduler;
     // Freeze the top-level context containers. Nested option values and Date remain
     // identity-preserving and mutable by contract; callers own that trade-off.
     const runtime = getLoggerRuntimeManager();
@@ -117,6 +128,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   protected createPluginDomainCore(): ILoggerDomainCore<IPipelineMode> {
     const domainCore: ILoggerDomainCore<IPipelineMode> = {
       ctx: this.ctx,
+      scheduler: this.scheduler,
       log: (tag, message, ...args) => this.log(tag, message, ...args),
       dispatchRaw: (input, options) => this.dispatchRaw(input, options),
       raw: (text, options) => this.raw(text, options),
@@ -258,15 +270,19 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
    * passes in the same absolute deadline it already used for the shutdown-handler loop — see
    * LG-R5-1 — so a single shutdown() invocation spends at most one 3s budget total instead of
    * handlers and flush each getting their own independent window.
+   *
+   * `deadlineAt` is an absolute deadline in this logger's monotonic `scheduler` clock (the same
+   * clock `boundedWait` reads), not a Unix epoch; compute it with `scheduler.now() + budgetMs`.
    */
-  flush(deadlineAt: number = Date.now() + 3000): Promise<void> {
-    if (this.#status === 'closed') return Promise.resolve();
+  flush(deadlineAt: number = this.#scheduler.now() + 3000): Promise<void> {
+    if (this.#status === LoggerStatus.closed) return Promise.resolve();
     if (this.#flushPromise) return this.#flushPromise;
-    const restoreActive = this.#status === 'active';
-    if (restoreActive) this.#status = 'flushing';
+    const restoreActive = this.#status === LoggerStatus.active;
+    if (restoreActive) this.#status = LoggerStatus.flushing;
     this.#flushPromise = this.#flush(deadlineAt).finally(() => {
       this.#flushPromise = undefined;
-      if (restoreActive && this.#status === 'flushing') this.#status = 'active';
+      if (restoreActive && this.#status === LoggerStatus.flushing)
+        this.#status = LoggerStatus.active;
     });
     return this.#flushPromise;
   }
@@ -275,7 +291,11 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     await this.#drain(deadlineAt);
     for (const flusher of this.#flushers.slice()) {
       try {
-        if (!(await waitUntil(Promise.resolve(flusher()), deadlineAt))) {
+        if (
+          !(await boundedWait(Promise.resolve(flusher()), deadlineAt, {
+            scheduler: this.#scheduler
+          }))
+        ) {
           this.#reportFailure('flush', new Error('flush deadline reached'));
           break;
         }
@@ -286,7 +306,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     await this.#drain(deadlineAt);
     for (const target of this.#extendTargets) {
       try {
-        if (!(await waitUntil(target.flush(), deadlineAt))) {
+        if (!(await boundedWait(target.flush(), deadlineAt, { scheduler: this.#scheduler }))) {
           this.#reportFailure('forward', new Error('extends flush deadline reached'));
           break;
         }
@@ -308,8 +328,8 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
 
   shutdown(reason: IShutdownReason): Promise<void> {
     if (this.#shutdownPromise) return this.#shutdownPromise;
-    if (this.#status === 'closed') return Promise.resolve();
-    this.#status = 'shutting-down';
+    if (this.#status === LoggerStatus.closed) return Promise.resolve();
+    this.#status = LoggerStatus.shuttingDown;
     // Publish #shutdownPromise synchronously, before any handler runs. An async IIFE's body
     // starts executing immediately up to its first await — if the first shutdown handler is a
     // plain sync function that itself calls shutdown() (reentrant), that call happens before
@@ -332,7 +352,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     // also keeps total shutdown latency bounded to ~3s instead of handlers-plus-flush stacking two
     // independent windows. See LG-R5-1 in
     // docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
-    const deadlineAt = Date.now() + 3000;
+    const deadlineAt = this.#scheduler.now() + 3000;
     (async () => {
       for (const handler of this.#shutdownHandlers.slice()) {
         try {
@@ -340,7 +360,11 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
           // on timeout) — onShutdown() never promised handlers would be skipped once a prior one is
           // slow, and changing that would be a public-behavior change this round must not make.
           // Only the *wait* for each handler is capped at the shared remaining budget.
-          if (!(await waitUntil(Promise.resolve(handler(reason)), deadlineAt))) {
+          if (
+            !(await boundedWait(Promise.resolve(handler(reason)), deadlineAt, {
+              scheduler: this.#scheduler
+            }))
+          ) {
             this.#reportFailure('shutdown', new Error('shutdown handler deadline reached'));
           }
         } catch (error) {
@@ -349,13 +373,13 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
       }
       await this.flush(deadlineAt);
       await super.dispose();
-      this.#status = 'closed';
+      this.#status = LoggerStatus.closed;
     })().then(
       () => settle?.(),
       (error) => {
         // PluginHost disposal is terminal even when one disposer fails. Keep Logger
         // terminal too; accepting new entries would route them into a disposed host.
-        this.#status = 'closed';
+        this.#status = LoggerStatus.closed;
         this.#shutdownPromise = undefined;
         fail?.(error);
       }
@@ -368,7 +392,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   }
 
   raw(text: string, options: ILogDispatchOptions = {}): void {
-    if (this.#status === 'closed') return;
+    if (this.#status === LoggerStatus.closed) return;
     const write = () => {
       getLoggerRuntimeManager().write(text);
     };
@@ -380,13 +404,17 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     for (const other of others) {
       if (this.#extendTargets.some((target) => target.ctx.id === other.ctx.id)) continue;
       if (other === (this as unknown as ILoggerCore)) {
-        throw new Error(`[logger] extends() 不能传入自己 (id=${this.ctx.id})`);
+        throw createLoggerError(
+          LoggerErrorCode.extendsSelf,
+          `[logger] extends() 不能传入自己 (id=${this.ctx.id})`
+        );
       }
       // 主动检测：如果 other 沿着它自己已有的 extends 链路能转发回 this，
       // 说明这次调用会形成环，直接在注册这一刻拒绝，而不是留到真正转发
       // 日志时才默默跳过——那样问题会隐藏很久才被发现。
       if (other instanceof LoggerCore && LoggerCore.#canReach(other, this.ctx.id, new Set())) {
-        throw new Error(
+        throw createLoggerError(
+          LoggerErrorCode.extendsCycle,
           `[logger] extends() 会形成循环引用：目标 logger 已经能沿着它自己的 extends 链路` +
             ` 转发回当前 logger (id=${this.ctx.id})，已阻止这次调用`
         );
@@ -422,24 +450,24 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   async #drain(deadlineAt: number): Promise<void> {
     let rounds = 0;
     while (this.#pending.size > 0 && rounds++ < 100) {
-      const remainingMs = deadlineAt - Date.now();
+      const remainingMs = deadlineAt - this.#scheduler.now();
       if (remainingMs <= 0) return;
       const settled = Symbol('drain-settled');
-      let timer: ReturnType<typeof setTimeout> | undefined;
+      let timer: { cancel(): void } | undefined;
       try {
         const winner = await Promise.race([
           Promise.all(this.#pending).then(() => settled),
           new Promise<undefined>((resolve) => {
-            timer = setTimeout(() => resolve(undefined), remainingMs);
-            (timer as { unref?: () => void }).unref?.();
+            // R-9：deadline 定时器走注入的 scheduler，不用宿主 setTimeout（时间域与 `deadlineAt` 一致）。
+            timer = this.#scheduler.schedule(() => resolve(undefined), remainingMs);
           })
         ]);
         if (winner !== settled) return; // deadline hit while something in #pending is still stuck
       } finally {
-        // Same timer-leak hazard as waitUntil() (LG-R5-2): without this, every round that resolves
+        // Same timer-leak hazard as boundedWait() (LG-R5-2): without this, every round that resolves
         // via #pending settling first — the common, happy-path case — leaves its deadline timer
         // dangling until it fires on its own up to `remainingMs` later.
-        if (timer !== undefined) clearTimeout(timer);
+        if (timer !== undefined) timer.cancel();
       }
     }
   }
@@ -596,7 +624,8 @@ class LoggerImpl<const P extends readonly ILoggerPluginConstraint[] = []> {
       {
         pipeline: options.pipeline
       },
-      options.plugins ?? []
+      options.plugins ?? [],
+      options.scheduler ?? systemScheduler
     );
 
     for (const [name, fn] of Object.entries(options.on ?? {})) {
@@ -633,4 +662,4 @@ export type {
   IShutdownReason,
   ISink,
   IStaticLoggerCtor
-} from './typing';
+} from './typing.js';

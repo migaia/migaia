@@ -1,20 +1,21 @@
-import { ResourceCachePolicy } from './store-resource-cache-policy';
-import { ResourceOwnershipRegistry } from './store-resource-ownership';
-import type { StoreResourceLoadContext } from './store-resource-request';
-import { GenerationController } from '@migaia/reactive/runtime/generation-controller';
-import { ResourceStateController } from './store-resource-state';
-import type { ResourceVersion } from './store-resource-state';
-import { ResourceVersionRegistry } from './store-resource-versions';
-import { ResourceCaptureRegistry, type IResourceCapture } from './store-resource-captures';
-import type { VersionToken } from '@migaia/reactive/runtime/lifecycle-primitives';
+import { ResourceCachePolicy } from './store-resource-cache-policy.js';
+import { ResourceOwnershipRegistry, type IVersionToken } from './store-resource-ownership.js';
+import type { IStoreResourceLoadContext } from './store-resource-request.js';
+import { createGenerationController } from '@migaia/lifecycle';
+import { ResourceStateController } from './store-resource-state.js';
+import { StoreResourceKind } from './resource-state-constants.js';
+import type { IResourceVersion } from './store-resource-state.js';
+import { ResourceVersionRegistry } from './store-resource-versions.js';
+import { ResourceCaptureRegistry, type IResourceCapture } from './store-resource-captures.js';
+import { createStoreLightError, createStoreLightTypeError, StoreLightErrorCode } from './errors.js';
 
-export type { StoreResourceLoadContext } from './store-resource-request';
-export type { IResourceCapture } from './store-resource-captures';
+export type { IStoreResourceLoadContext } from './store-resource-request.js';
+export type { IResourceCapture } from './store-resource-captures.js';
 
 export type IStoreResourceSnapshot<T> = {
   readonly value: T;
   readonly version: number;
-  readonly token: VersionToken;
+  readonly token: IVersionToken;
 };
 
 /** Readable async value with separate resource and rendered-version leases. */
@@ -23,9 +24,9 @@ export type IStoreResource<T> = {
   preload(): void;
   retry(): void;
   /** @deprecated Use retainResource() or retainVersion(). */
-  retain(version?: number | VersionToken): () => void;
+  retain(version?: number | IVersionToken): () => void;
   retainResource(): () => void;
-  retainVersion(version: number | VersionToken): () => void;
+  retainVersion(version: number | IVersionToken): () => void;
   /** Internal React bridge: protect version during render, then commit in layout. */
   captureVersion(version: number): IResourceCapture;
   commitCapture(capture: IResourceCapture): () => void;
@@ -42,21 +43,21 @@ export type IStoreResource<T> = {
   };
 };
 
-export type StoreResourceErrorPhase = 'load' | 'dispose' | 'listener';
-export type StoreResourceOptions<T> = {
+export type IStoreResourceErrorPhase = 'load' | 'dispose' | 'listener';
+export type IStoreResourceOptions<T> = {
   /** Cache TTL only; React render safety comes from capture/commit leases. */
   keepAliveMs?: number;
   dispose?: (value: T) => void;
-  onError?: (error: unknown, phase: StoreResourceErrorPhase) => void;
+  onError?: (error: unknown, phase: IStoreResourceErrorPhase) => void;
   onTerminal?: () => void;
 };
-export type StoreResourceFactory<T> = (context: StoreResourceLoadContext) => Promise<T> | T;
+export type IStoreResourceFactory<T> = (context: IStoreResourceLoadContext) => Promise<T> | T;
 export type IStoreResourceScope = {
   resource<T>(
     factory:
-      | StoreResourceFactory<T>
-      | { load: StoreResourceFactory<T>; dispose?: (value: T) => void },
-    options?: StoreResourceOptions<T>
+      | IStoreResourceFactory<T>
+      | { load: IStoreResourceFactory<T>; dispose?: (value: T) => void },
+    options?: IStoreResourceOptions<T>
   ): IStoreResource<T>;
   dispose(): void;
 };
@@ -103,19 +104,19 @@ export function createStoreResourceScope(): IStoreResourceScope {
  */
 export function createStoreResource<T>(
   factory:
-    | StoreResourceFactory<T>
+    | IStoreResourceFactory<T>
     | {
-        load: StoreResourceFactory<T>;
+        load: IStoreResourceFactory<T>;
         dispose?: (value: T) => void;
         keepAliveMs?: number;
-        onError?: (error: unknown, phase: StoreResourceErrorPhase) => void;
+        onError?: (error: unknown, phase: IStoreResourceErrorPhase) => void;
         onTerminal?: () => void;
       },
-  options?: StoreResourceOptions<T>
+  options?: IStoreResourceOptions<T>
 ): IStoreResource<T> {
   const load = typeof factory === 'function' ? factory : factory.load;
   const config = typeof factory === 'function' ? (options ?? {}) : { ...factory, ...options };
-  const requests = new GenerationController();
+  const requests = createGenerationController();
   const state = new ResourceStateController<T>();
   const ownership = new ResourceOwnershipRegistry<T>();
   const versions = new ResourceVersionRegistry<T>();
@@ -127,9 +128,9 @@ export function createStoreResource<T>(
   });
   const cachePolicy = new ResourceCachePolicy(config.keepAliveMs ?? 1000);
   let version = 0;
-  const versionTokens = new Map<number, VersionToken>();
+  const versionTokens = new Map<number, IVersionToken>();
   const tokenVersions = new WeakMap<object, number>();
-  const versionToken = (id: number): VersionToken => {
+  const versionToken = (id: number): IVersionToken => {
     let token = versionTokens.get(id);
     if (!token) {
       token = {};
@@ -141,7 +142,7 @@ export function createStoreResource<T>(
   let revision = 0;
   const listeners = new Set<() => void>();
   const activeLeaseTokens = new WeakMap<object, number>();
-  const report = (error: unknown, phase: StoreResourceErrorPhase) => {
+  const report = (error: unknown, phase: IStoreResourceErrorPhase) => {
     try {
       config.onError?.(error, phase);
     } catch {
@@ -170,7 +171,10 @@ export function createStoreResource<T>(
       config.dispose &&
       (value == null || (typeof value !== 'object' && typeof value !== 'function'))
     )
-      throw new TypeError('[store] disposable resource values must use reference identity');
+      throw createStoreLightTypeError(
+        StoreLightErrorCode.identityRequired,
+        '[store] disposable resource values must use reference identity'
+      );
   };
   const resolveDisposer = (value: T): (() => void | PromiseLike<void>) | undefined => {
     if (config.dispose) return () => config.dispose?.(value);
@@ -178,7 +182,7 @@ export function createStoreResource<T>(
       return undefined;
     try {
       const dispose = (value as { $dispose?: unknown }).$dispose;
-      return typeof dispose === 'function' ? () => dispose.call(value) : undefined;
+      return typeof dispose === 'function' ? () => Reflect.apply(dispose, value, []) : undefined;
     } catch (error) {
       report(error, 'dispose');
       return undefined;
@@ -186,7 +190,8 @@ export function createStoreResource<T>(
   };
   const heldElsewhere = (value: T) =>
     versions.holds(value) ||
-    ((state.current.kind === 'ready' || state.current.kind === 'closing') &&
+    ((state.current.kind === StoreResourceKind.ready ||
+      state.current.kind === StoreResourceKind.closing) &&
       state.current.current !== undefined &&
       Object.is(state.current.current.value, value));
   const cleanupOnce = (value: T) => {
@@ -242,7 +247,8 @@ export function createStoreResource<T>(
    * mints on miss, which would be wrong inside a "can we forget this" check.
    */
   const pruneVersionToken = (id: number) => {
-    const stillVisible = state.current.kind === 'ready' && state.current.current.id === id;
+    const stillVisible =
+      state.current.kind === StoreResourceKind.ready && state.current.current.id === id;
     if (stillVisible || versions.has(id)) return;
     const token = versionTokens.get(id);
     if (token && ownership.versionOwnerCountToken(token) > 0) return;
@@ -258,7 +264,7 @@ export function createStoreResource<T>(
       // A first-load dispose can leave a value in `closing` after its
       // provisional resource owner releases before settlement. That value has
       // no version lease, so TTL must terminate the closing resource too.
-      if (state.current.kind === 'closing') {
+      if (state.current.kind === StoreResourceKind.closing) {
         forceDisposeResource();
         return;
       }
@@ -267,7 +273,7 @@ export function createStoreResource<T>(
         cleanupUnique([stale.value]);
         pruneVersionToken(stale.id);
       }
-      if (state.current.kind === 'ready') {
+      if (state.current.kind === StoreResourceKind.ready) {
         const evicted = state.current.current;
         state.idle();
         notify();
@@ -276,7 +282,7 @@ export function createStoreResource<T>(
       }
     });
   const forceDisposeResource = () => {
-    const wasDisposed = state.current.kind === 'disposed';
+    const wasDisposed = state.current.kind === StoreResourceKind.disposed;
     cachePolicy.dispose();
     requests.dispose();
     ownership.forceReset();
@@ -284,8 +290,10 @@ export function createStoreResource<T>(
     const visible = state.current;
     const values = [
       ...versions.clear(),
-      ...(visible.kind === 'ready' ? [visible.current.value] : []),
-      ...(visible.kind === 'closing' && visible.current ? [visible.current.value] : [])
+      ...(visible.kind === StoreResourceKind.ready ? [visible.current.value] : []),
+      ...(visible.kind === StoreResourceKind.closing && visible.current
+        ? [visible.current.value]
+        : [])
     ];
     state.dispose();
     if (!wasDisposed) notify();
@@ -298,7 +306,7 @@ export function createStoreResource<T>(
       report(error, 'dispose');
     }
   };
-  const finalizeClosingFailure = (error: unknown, superseded: T[], stale?: ResourceVersion<T>) => {
+  const finalizeClosingFailure = (error: unknown, superseded: T[], stale?: IResourceVersion<T>) => {
     // Closing has no legal failed state. Transition to terminal first so
     // observers cannot see a half-closed resource, then report the original
     // load failure and release every value that was waiting on settlement.
@@ -321,42 +329,51 @@ export function createStoreResource<T>(
   const onOwnersChanged = () => {
     if (hasCommittedOwners()) return;
     if (
-      (state.current.kind === 'closing' && !hasVersionReservations()) ||
-      (state.current.kind === 'disposed' && versions.hasPending)
+      (state.current.kind === StoreResourceKind.closing && !hasVersionReservations()) ||
+      (state.current.kind === StoreResourceKind.disposed && versions.hasPending)
     ) {
       forceDisposeResource();
       return;
     }
-    if (state.current.kind === 'ready') scheduleEviction();
+    if (state.current.kind === StoreResourceKind.ready) scheduleEviction();
   };
   const start = () => {
-    if (state.current.kind === 'disposed' || state.current.kind === 'closing')
-      throw new Error('[store] resource is disposed');
-    if (state.current.kind !== 'idle') return;
+    if (
+      state.current.kind === StoreResourceKind.disposed ||
+      state.current.kind === StoreResourceKind.closing
+    )
+      throw createStoreLightError(
+        StoreLightErrorCode.resourceDisposed,
+        '[store] resource is disposed'
+      );
+    if (state.current.kind !== StoreResourceKind.idle) return;
     const context = requests.begin();
     const operation = Promise.resolve()
       .then(() => load(context))
       .then((next) => {
         assertDisposableValue(next);
-        if (state.current.kind === 'disposed') {
+        if (state.current.kind === StoreResourceKind.disposed) {
           if (!heldElsewhere(next)) cleanupUnique([next]);
           return next;
         }
-        if (!requests.isCurrentToken(context.token)) {
+        if (!requests.isCurrent(context.token)) {
           captures.discard(context.generation);
-          if (state.current.kind === 'loading') versions.addSuperseded(next);
+          if (state.current.kind === StoreResourceKind.loading) versions.addSuperseded(next);
           else cleanupUnique([next]);
           return next;
         }
         if (ownership.isDisposed(next))
-          throw new Error('[store] resource factory returned a disposed value');
+          throw createStoreLightError(
+            StoreLightErrorCode.resourceDisposed,
+            '[store] resource factory returned a disposed value'
+          );
         const stale = versions.takeStale();
         const sameIdentity = stale !== undefined && Object.is(next, stale.value);
         if (stale && !sameIdentity) retire(version, stale.value);
         if (!sameIdentity) version++;
         captures.resolve(context.generation, version);
         const published = { id: version, token: versionToken(version), value: next };
-        if (state.current.kind === 'closing') state.close(published);
+        if (state.current.kind === StoreResourceKind.closing) state.close(published);
         else state.ready(published);
         notify();
         cleanupUnique(versions.takeSuperseded());
@@ -364,11 +381,11 @@ export function createStoreResource<T>(
         return next;
       })
       .catch((error) => {
-        if (requests.isCurrentToken(context.token)) {
+        if (requests.isCurrent(context.token)) {
           captures.discard(context.generation);
           const superseded = versions.takeSuperseded();
           const stale = versions.takeStale();
-          if (state.current.kind === 'closing') {
+          if (state.current.kind === StoreResourceKind.closing) {
             finalizeClosingFailure(error, superseded, stale);
             throw error;
           }
@@ -397,23 +414,30 @@ export function createStoreResource<T>(
   });
   const readSnapshot = (): IStoreResourceSnapshot<T> => {
     const current = state.current;
-    if (current.kind === 'ready') return snapshot(current.current.value, current.current.id);
-    if (current.kind === 'closing') {
+    if (current.kind === StoreResourceKind.ready)
+      return snapshot(current.current.value, current.current.id);
+    if (current.kind === StoreResourceKind.closing) {
       if (current.current && ownership.hasResourceOwners)
         return snapshot(current.current.value, current.current.id);
-      throw new Error('[store] resource is disposed');
+      throw createStoreLightError(
+        StoreLightErrorCode.resourceDisposed,
+        '[store] resource is disposed'
+      );
     }
-    if (current.kind === 'failed') throw current.error;
-    if (current.kind === 'loading' && current.previous)
+    if (current.kind === StoreResourceKind.failed) throw current.error;
+    if (current.kind === StoreResourceKind.loading && current.previous)
       return snapshot(current.previous.value, current.previous.id);
     start();
     const loading = state.current;
-    if (loading.kind === 'loading') throw loading.operation;
-    throw new Error('[store] resource is disposed');
+    if (loading.kind === StoreResourceKind.loading) throw loading.operation;
+    throw createStoreLightError(
+      StoreLightErrorCode.resourceDisposed,
+      '[store] resource is disposed'
+    );
   };
   const captureSnapshot = (existingLease?: object) => {
     const current = state.current;
-    if (current.kind === 'ready') {
+    if (current.kind === StoreResourceKind.ready) {
       const rendered = snapshot(current.current.value, current.current.id);
       if (
         existingLease !== undefined &&
@@ -425,16 +449,19 @@ export function createStoreResource<T>(
         capture: captures.capture(current.current.id) as IResourceCapture
       };
     }
-    if (current.kind === 'closing' && current.current) {
+    if (current.kind === StoreResourceKind.closing && current.current) {
       if (
         existingLease === undefined ||
         activeLeaseTokens.get(existingLease) !== current.current.id
       )
-        throw new Error('[store] resource is disposed');
+        throw createStoreLightError(
+          StoreLightErrorCode.resourceDisposed,
+          '[store] resource is disposed'
+        );
       return { snapshot: snapshot(current.current.value, current.current.id), capture: undefined };
     }
-    if (current.kind === 'failed') throw current.error;
-    if (current.kind === 'loading') {
+    if (current.kind === StoreResourceKind.failed) throw current.error;
+    if (current.kind === StoreResourceKind.loading) {
       if (current.previous) {
         const rendered = snapshot(current.previous.value, current.previous.id);
         if (
@@ -453,12 +480,21 @@ export function createStoreResource<T>(
     captures.capture();
     start();
     const loading = state.current;
-    if (loading.kind === 'loading') throw loading.operation;
-    throw new Error('[store] resource is disposed');
+    if (loading.kind === StoreResourceKind.loading) throw loading.operation;
+    throw createStoreLightError(
+      StoreLightErrorCode.resourceDisposed,
+      '[store] resource is disposed'
+    );
   };
   const retainResourceLease = () => {
-    if (state.current.kind === 'disposed' || state.current.kind === 'closing')
-      throw new Error('[store] resource is disposed');
+    if (
+      state.current.kind === StoreResourceKind.disposed ||
+      state.current.kind === StoreResourceKind.closing
+    )
+      throw createStoreLightError(
+        StoreLightErrorCode.resourceDisposed,
+        '[store] resource is disposed'
+      );
     cancelEviction();
     start();
     return ownership.retainResource(() => onOwnersChanged());
@@ -481,34 +517,63 @@ export function createStoreResource<T>(
     activeLeaseTokens.set(token, id);
     return token;
   };
-  const retainVersionLease = (versionInput: number | VersionToken) => {
+  const retainVersionLease = (versionInput: number | IVersionToken) => {
     const id = typeof versionInput === 'number' ? versionInput : tokenVersions.get(versionInput);
-    if (id === undefined) throw new Error('[store] unknown resource version');
-    if (state.current.kind === 'disposed' || state.current.kind === 'closing')
-      throw new Error('[store] resource is disposed');
+    if (id === undefined)
+      throw createStoreLightError(
+        StoreLightErrorCode.unknownVersion,
+        '[store] unknown resource version'
+      );
+    if (
+      state.current.kind === StoreResourceKind.disposed ||
+      state.current.kind === StoreResourceKind.closing
+    )
+      throw createStoreLightError(
+        StoreLightErrorCode.resourceDisposed,
+        '[store] resource is disposed'
+      );
     if (id !== version && !versions.hasRetired(id) && versions.stale?.id !== id)
-      throw new Error('[store] unknown resource version');
+      throw createStoreLightError(
+        StoreLightErrorCode.unknownVersion,
+        '[store] unknown resource version'
+      );
     cancelEviction();
     start();
     return createVersionLease(id);
   };
   const captureVersion = (id: number) => {
-    if (state.current.kind === 'disposed' || state.current.kind === 'closing')
-      throw new Error('[store] resource is disposed');
+    if (
+      state.current.kind === StoreResourceKind.disposed ||
+      state.current.kind === StoreResourceKind.closing
+    )
+      throw createStoreLightError(
+        StoreLightErrorCode.resourceDisposed,
+        '[store] resource is disposed'
+      );
     if (id !== version && !versions.hasRetired(id) && versions.stale?.id !== id)
-      throw new Error('[store] unknown resource version');
+      throw createStoreLightError(
+        StoreLightErrorCode.unknownVersion,
+        '[store] unknown resource version'
+      );
     return captures.capture(id);
   };
   const commitCapture = (capture: IResourceCapture) => {
     const id = captures.inspect(capture);
-    if (state.current.kind === 'disposed') throw new Error('[store] resource is disposed');
+    if (state.current.kind === StoreResourceKind.disposed)
+      throw createStoreLightError(
+        StoreLightErrorCode.resourceDisposed,
+        '[store] resource is disposed'
+      );
     if (
       id !== version &&
       !versions.hasRetired(id) &&
       versions.stale?.id !== id &&
       !versions.hasClosing(id)
     )
-      throw new Error('[store] unknown resource version');
+      throw createStoreLightError(
+        StoreLightErrorCode.unknownVersion,
+        '[store] unknown resource version'
+      );
     captures.commit(capture);
     cancelEviction();
     return createVersionLease(id);
@@ -518,16 +583,26 @@ export function createStoreResource<T>(
     readSnapshot,
     captureSnapshot,
     preload() {
-      if (state.current.kind === 'closing') throw new Error('[store] resource is disposed');
+      if (state.current.kind === StoreResourceKind.closing)
+        throw createStoreLightError(
+          StoreLightErrorCode.resourceDisposed,
+          '[store] resource is disposed'
+        );
       start();
     },
     retry() {
       const previous = state.current;
-      if (previous.kind === 'disposed' || previous.kind === 'closing')
-        throw new Error('[store] resource is disposed');
+      if (
+        previous.kind === StoreResourceKind.disposed ||
+        previous.kind === StoreResourceKind.closing
+      )
+        throw createStoreLightError(
+          StoreLightErrorCode.resourceDisposed,
+          '[store] resource is disposed'
+        );
       cancelEviction();
       requests.supersede();
-      if (previous.kind === 'ready') versions.setStale(previous.current);
+      if (previous.kind === StoreResourceKind.ready) versions.setStale(previous.current);
       state.idle();
       notify();
       start();
@@ -541,23 +616,35 @@ export function createStoreResource<T>(
     commitCapture,
     dispose() {
       const previous = state.current;
-      if (previous.kind === 'disposed' || previous.kind === 'closing') return;
+      if (
+        previous.kind === StoreResourceKind.disposed ||
+        previous.kind === StoreResourceKind.closing
+      )
+        return;
       cancelEviction();
-      const keepPendingLoad = previous.kind === 'loading' && ownership.hasResourceOwners;
+      const keepPendingLoad =
+        previous.kind === StoreResourceKind.loading && ownership.hasResourceOwners;
       if (!keepPendingLoad) requests.supersede();
       const moved = versions.moveToClosing();
-      if (previous.kind === 'ready') moved.versions.push(previous.current);
+      if (previous.kind === StoreResourceKind.ready) moved.versions.push(previous.current);
       versions.beginClosing(moved.versions);
       cleanupUnique(moved.superseded);
-      if (previous.kind === 'ready' && (hasCommittedOwners() || hasVersionReservations())) {
+      if (
+        previous.kind === StoreResourceKind.ready &&
+        (hasCommittedOwners() || hasVersionReservations())
+      ) {
         state.close(previous.current);
         return;
       }
-      if (previous.kind === 'loading' && previous.previous && hasCommittedOwners()) {
+      if (
+        previous.kind === StoreResourceKind.loading &&
+        previous.previous &&
+        hasCommittedOwners()
+      ) {
         state.close(previous.previous);
         return;
       }
-      if (previous.kind === 'loading' && keepPendingLoad) {
+      if (previous.kind === StoreResourceKind.loading && keepPendingLoad) {
         state.close();
         return;
       }
@@ -566,13 +653,14 @@ export function createStoreResource<T>(
       if (!hasOwners() && !ownership.hasVersionOwners) forceDisposeResource();
     },
     forceDispose() {
-      if (state.current.kind === 'disposed' && !hasOwners() && !versions.hasPending) return;
+      if (state.current.kind === StoreResourceKind.disposed && !hasOwners() && !versions.hasPending)
+        return;
       forceDisposeResource();
     },
     whenTerminal: () => state.whenTerminal(),
     getSnapshot: () => revision,
     subscribe(listener) {
-      if (state.current.kind === 'disposed') return () => {};
+      if (state.current.kind === StoreResourceKind.disposed) return () => {};
       listeners.add(listener);
       return () => listeners.delete(listener);
     }

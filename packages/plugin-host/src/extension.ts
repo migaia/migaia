@@ -1,13 +1,13 @@
-import ERROR_TEXT, { PluginHostError } from './error-text';
-import { asyncDisposeKey, disposeKey } from './disposal';
+import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js';
+import { asyncDisposeKey, disposeKey } from './disposal.js';
 
 /** Validate extension container before Host-specific descriptor mounting. */
 export const assertExtensionResult = (extension: unknown, pluginName: string): object => {
   if (extension === null || typeof extension !== 'object' || Array.isArray(extension))
-    throw new TypeError('plugin install() must return an object');
+    throw createPluginHostTypeError('plugin install() must return an object');
   const prototype = Object.getPrototypeOf(extension);
   if (prototype !== Object.prototype && prototype !== null)
-    throw new TypeError('plugin install() must return a plain object');
+    throw createPluginHostTypeError('plugin install() must return a plain object');
   for (const key of Reflect.ownKeys(extension)) {
     if (
       key === 'then' ||

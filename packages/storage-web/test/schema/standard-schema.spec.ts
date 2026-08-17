@@ -95,7 +95,7 @@ describe('fromStandardSchema', () => {
   it('构造期拒绝畸形 Standard Schema 契约', () => {
     for (const schema of [null, [], {}, { '~standard': null }, { '~standard': {} }])
       expect(() => fromStandardSchema(schema as never)).toThrowError(
-        expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+        expect.objectContaining({ code: 'INVALID_CONFIG' })
       );
   });
   it('校验期拒绝畸形 Standard Schema result', async () => {

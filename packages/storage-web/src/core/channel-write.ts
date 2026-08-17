@@ -1,5 +1,11 @@
-import { StorageError, StorageErrorCode, type IStorageChannel } from '../types/errors';
-import type { IStorageKey } from '../types/context';
+import { StorageError, StorageErrorCode, type IStorageChannel } from '../types/errors.js';
+import type { IStorageKey } from '../types/context.js';
+import {
+  StorageBackend,
+  StorageConflictPolicy,
+  type IStorageBackend,
+  type IStorageConflictPolicy
+} from '../constants.js';
 
 export type IChannelPresence = ReadonlySet<IStorageChannel>;
 export type IChannelMutationPlan = {
@@ -11,11 +17,11 @@ export const planChannelWrite = (
   key: IStorageKey,
   attempted: IStorageChannel,
   existing: IChannelPresence,
-  policy: 'conflict' | 'replace' = 'conflict',
-  backend: 'memory' | 'indexeddb' = 'memory'
+  policy: IStorageConflictPolicy = StorageConflictPolicy.conflict,
+  backend: IStorageBackend = StorageBackend.memory
 ): IChannelMutationPlan => {
   const conflicts = [...existing].filter((channel) => channel !== attempted);
-  if (conflicts.length > 0 && policy !== 'replace')
+  if (conflicts.length > 0 && policy !== StorageConflictPolicy.replace)
     throw new StorageError(StorageErrorCode.duplicateKey, {
       backend,
       key,

@@ -1,11 +1,18 @@
-import type { IBackendKind } from '../types/capabilities';
+import {
+  StorageContractError,
+  StorageContractErrorCode,
+  isStorageContractError
+} from '@migaia/storage-contract';
+import { isStorageErrorFamily } from './error-family.js';
+import type { IStorageOperationRuntime } from './operation-reporter.js';
+import type { IBackendKind } from '../types/capabilities.js';
 import {
   StorageError,
   StorageErrorCode,
   type IExtensionStage,
   type IStorageErrorCode
-} from '../types/errors';
-import { readAbortReason, subscribeToAbort } from './operation';
+} from '../types/errors.js';
+import { readAbortReason, subscribeToAbort, type IWebAbortSignal } from './operation.js';
 
 /** Normalize an extension or backend failure without discarding its original cause. */
 export const normalizeError = (
@@ -14,8 +21,8 @@ export const normalizeError = (
   code: IStorageErrorCode = StorageErrorCode.transactionFailed,
   operation?: string,
   extensionStage?: IExtensionStage
-): StorageError => {
-  if (error instanceof StorageError) return error;
+): StorageError | StorageContractError => {
+  if (isStorageErrorFamily(error)) return error;
   return new StorageError(code, { backend, cause: error, operation, extensionStage });
 };
 
@@ -25,7 +32,8 @@ export const invokeExtension = async <T>(
   backend: IBackendKind,
   operation: string,
   extensionStage: IExtensionStage,
-  signal?: AbortSignal
+  signal: IWebAbortSignal | undefined,
+  runtime: IStorageOperationRuntime
 ): Promise<T> => {
   try {
     if (!signal) return await Promise.resolve().then(fn);
@@ -33,16 +41,18 @@ export const invokeExtension = async <T>(
     /** Owns the shared race-safe abort subscription until extension settlement. */
     let disposeAbort = (): void => {};
     const aborted = new Promise<never>((_, reject) => {
-      disposeAbort = subscribeToAbort(signal, () => {
-        reject(
-          new StorageError(StorageErrorCode.aborted, {
-            backend,
-            operation,
-            extensionStage,
-            cause: readAbortReason(signal)
-          })
-        );
-      });
+      disposeAbort = subscribeToAbort(
+        signal,
+        () => {
+          reject(
+            new StorageContractError(StorageContractErrorCode.aborted, {
+              backend,
+              cause: readAbortReason(signal)
+            })
+          );
+        },
+        runtime.reporter
+      );
     });
     try {
       return await Promise.race([result, aborted]);
@@ -62,6 +72,7 @@ export const invokeExtension = async <T>(
         cause: error.cause ?? error
       });
     }
+    if (isStorageContractError(error)) throw error;
     throw normalizeError(
       error,
       backend,

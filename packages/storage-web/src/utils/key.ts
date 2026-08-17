@@ -1,6 +1,6 @@
-import type { IBackendKind } from '../types/capabilities';
-import { StorageError, StorageErrorCode } from '../types/errors';
-import { normalizeError } from '../core/errors';
+import type { IBackendKind } from '../types/capabilities.js';
+import { StorageError, StorageErrorCode } from '../types/errors.js';
+import { normalizeError } from '../core/errors.js';
 
 /** Namespace/key codec boundary. Custom codecs own migration and collision safety. */
 export type INamespaceCodec = {
@@ -39,7 +39,7 @@ export const snapshotNamespaceCodec = (
   backend: IBackendKind = 'local'
 ): INamespaceCodec => {
   if (typeof codec !== 'object' || codec === null || Array.isArray(codec))
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
       backend,
       cause: new TypeError('namespace codec must provide callable encode and decode methods')
     });
@@ -50,10 +50,10 @@ export const snapshotNamespaceCodec = (
     encode = candidate.encode;
     decode = candidate.decode;
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, { backend, cause });
+    throw new StorageError(StorageErrorCode.invalidConfig, { backend, cause });
   }
   if (typeof encode !== 'function' || typeof decode !== 'function')
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
       backend,
       cause: new TypeError('namespace codec must provide callable encode and decode methods')
     });
@@ -68,7 +68,7 @@ export const namespacedKey = (
   backend: IBackendKind = 'local'
 ): string => {
   if (typeof namespace !== 'string' || typeof key !== 'string')
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
       backend,
       cause: new TypeError('namespace and key must be strings')
     });
@@ -96,7 +96,7 @@ export const stripNamespace = (
   backend: IBackendKind = 'local'
 ): string | undefined => {
   if (typeof namespace !== 'string' || typeof physicalKey !== 'string')
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
       backend,
       cause: new TypeError('namespace and physicalKey must be strings')
     });

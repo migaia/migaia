@@ -17,9 +17,29 @@
       "types": "./dist/runtime/index.d.ts",
       "default": "./dist/runtime/index.js"
     },
-    "./runtime/*": {
-      "types": "./dist/runtime/*.d.ts",
-      "default": "./dist/runtime/*.js"
+    "./ownership": {
+      "types": "./dist/runtime/ownership.d.ts",
+      "default": "./dist/runtime/ownership.js"
+    },
+    "./internals": {
+      "types": "./dist/runtime/internals.d.ts",
+      "default": "./dist/runtime/internals.js"
+    },
+    "./node-internals": {
+      "types": "./dist/runtime/node-internals.d.ts",
+      "default": "./dist/runtime/node-internals.js"
+    },
+    "./node-factories": {
+      "types": "./dist/runtime/node-factories.d.ts",
+      "default": "./dist/runtime/node-factories.js"
+    },
+    "./source": {
+      "types": "./dist/runtime/source.d.ts",
+      "default": "./dist/runtime/source.js"
+    },
+    "./copy-check": {
+      "types": "./dist/runtime/copy-check.d.ts",
+      "default": "./dist/runtime/copy-check.js"
     },
     "./reactive/*": {
       "types": "./dist/reactive/*.d.ts",
@@ -31,6 +51,7 @@
     "fmt": "oxfmt src test",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:test": "tsc -p tsconfig.test.json",
     "lint": "oxlint src test",
     "test": "vitest run test"
   },

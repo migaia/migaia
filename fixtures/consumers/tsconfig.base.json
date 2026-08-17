@@ -23,7 +23,8 @@
       "@migaia/store-devtools": ["../../packages/store-devtools/dist/index.d.ts"],
       "@migaia/store-ssr": ["../../packages/store-ssr/dist/index.d.ts"],
       "@migaia/serialize": ["../../packages/serialize/dist/index.d.ts"],
-      "@migaia/storage-web": ["../../packages/storage-web/dist/index.d.ts"]
+      "@migaia/storage-web": ["../../packages/storage-web/dist/index.d.ts"],
+      "@migaia/storage-web/memory": ["../../packages/storage-web/dist/memory.d.ts"]
     },
     "skipLibCheck": false,
     "verbatimModuleSyntax": true

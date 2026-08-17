@@ -1,9 +1,15 @@
-import { isRecordStore } from '../types/storage';
-import { StorageError, StorageErrorCode } from '../types/errors';
-import { runMigrations } from '../schema/migrate';
-import { selectCodec } from '../serialize/registry';
-import { jsonCodec } from '../serialize/json';
-import { structuredCodec } from '../serialize/structured';
+import {
+  StorageContractError,
+  StorageContractErrorCode,
+  isStorageContractError
+} from '@migaia/storage-contract';
+import { isStorageErrorFamily } from '../core/error-family.js';
+import { isRecordStore } from '../types/storage.js';
+import { StorageError, StorageErrorCode } from '../types/errors.js';
+import { runMigrationsWithRuntime } from '../schema/migrate.js';
+import { selectCodec } from '../serialize/registry.js';
+import { jsonCodec } from '../serialize/json.js';
+import { structuredCodec } from '../serialize/structured.js';
 import {
   composeFlatKey,
   composeRepositoryKey,
@@ -11,23 +17,27 @@ import {
   decodeRepositoryKey,
   flatKeyPrefix,
   repositoryEntityRange
-} from './key';
+} from './key.js';
 import {
   assertStorageKey,
   compareStorageKeys,
   decodeFlatStorageKey,
   encodeFlatStorageKey,
   snapshotKeyRange
-} from '../core/key-domain';
-import { isStorageKeyInRange } from '../core/query';
-import { invokeExtension, normalizeError } from '../core/errors';
-import { snapshotOperationContext } from '../core/operation';
-import type { IOperationContext, IStorageKey } from '../types/context';
-import type { IRecordStore, IKeyValueStore } from '../types/storage';
-import type { ISchemaAdapter } from '../schema/types';
-import type { IMigration } from '../schema/migrate';
-import type { ICodec } from '../serialize/types';
-import type { ISelectedCodec } from '../serialize/registry';
+} from '../core/key-domain.js';
+import { isStorageKeyInRange } from '../core/query.js';
+import { invokeExtension, normalizeError } from '../core/errors.js';
+import {
+  createStorageOperationRuntime,
+  type IStorageOperationRuntime
+} from '../core/operation-reporter.js';
+import { snapshotOperationContext } from '../core/operation.js';
+import type { IOperationContext, IStorageKey } from '../types/context.js';
+import type { IRecordStore, IKeyValueStore } from '../types/storage.js';
+import type { ISchemaAdapter } from '../schema/types.js';
+import type { IMigration } from '../schema/migrate.js';
+import type { ICodec } from '../serialize/types.js';
+import type { ISelectedCodec } from '../serialize/registry.js';
 import type {
   IEntityTransactionScope,
   IInvalidRecordHandler,
@@ -36,11 +46,19 @@ import type {
   IInvalidRecordIssue,
   IMigrateOptions,
   IRepository
-} from './types';
+} from './types.js';
+import {
+  StorageMigrationPhase,
+  StorageMigrationStatus,
+  StorageInvalidRecordAction,
+  StorageOperation,
+  StorageRecordStage,
+  type IStorageRecordStage
+} from '../constants.js';
 
 type IEnvelope = { readonly __v: number; readonly data: unknown };
 type IStageFailure = Error & {
-  readonly stage: 'decode' | 'migrate' | 'validate';
+  readonly stage: IStorageRecordStage;
   readonly cause: unknown;
 };
 
@@ -66,6 +84,7 @@ const stageFailure = (stage: IStageFailure['stage'], cause: unknown): IStageFail
     ) as unknown as IStageFailure;
     return staged;
   }
+  if (isStorageContractError(cause)) return cause as unknown as IStageFailure;
   const error = new Error(String(cause)) as IStageFailure;
   Object.defineProperties(error, {
     stage: { value: stage, enumerable: true },
@@ -77,7 +96,7 @@ const stageFailure = (stage: IStageFailure['stage'], cause: unknown): IStageFail
 
 const validateLimit = (limit: number | undefined, backend: IKeyValueStore['backend']): void => {
   if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 0))
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
       backend,
       cause: new RangeError('list limit must be a non-negative safe integer')
     });
@@ -85,7 +104,7 @@ const validateLimit = (limit: number | undefined, backend: IKeyValueStore['backe
 
 const validateOrderBy = (orderBy: unknown, backend: IKeyValueStore['backend']): void => {
   if (orderBy !== undefined && typeof orderBy !== 'function')
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
       backend,
       cause: new TypeError('list orderBy must be a function')
     });
@@ -96,7 +115,7 @@ const validateListOptions = (options: unknown, backend: IKeyValueStore['backend'
     options !== undefined &&
     (typeof options !== 'object' || options === null || Array.isArray(options))
   )
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
       backend,
       cause: new TypeError('list options must be an object')
     });
@@ -107,7 +126,7 @@ const BACKEND_KINDS = new Set(['local', 'session', 'cookie', 'indexeddb', 'memor
 /** Reject foreign objects before capability selection can dereference an incomplete store. */
 const assertKeyValueStore: (store: unknown) => asserts store is IKeyValueStore = (store) => {
   if (typeof store !== 'object' || store === null || Array.isArray(store)) {
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
       cause: new TypeError('entity store must be an object')
     });
   }
@@ -136,7 +155,7 @@ const assertKeyValueStore: (store: unknown) => asserts store is IKeyValueStore =
       (method) => typeof candidate[method] === 'function'
     )
   )
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
       cause: new TypeError('entity store does not implement the key-value store contract')
     });
 };
@@ -162,7 +181,7 @@ const idOf = <TDomain>(
 ): IStorageKey => {
   const id = (value as Record<string, unknown>)[keyProp];
   if (id === undefined || id === null)
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
       backend,
       cause: new TypeError(`entity "${entityName}": missing storage key "${keyProp}"`)
     });
@@ -220,9 +239,10 @@ export const createRepository = <TDomain, TStored>(
   const writeEnvelopeAt = async (
     target: IWriteTarget,
     envelope: IEnvelope,
-    ctx?: IOperationContext
+    ctx: IOperationContext | undefined,
+    runtime: IStorageOperationRuntime
   ): Promise<void> => {
-    const raw = await encodeEnvelope(envelope, ctx);
+    const raw = await encodeEnvelope(envelope, ctx, runtime);
     if (recordStore && target.documentKey !== undefined) {
       await recordStore.putRecord(raw, target.documentKey, ctx);
       return;
@@ -233,18 +253,24 @@ export const createRepository = <TDomain, TStored>(
   };
 
   /** Encode every repository write through one extension error boundary. */
-  const encodeEnvelope = async (envelope: IEnvelope, ctx?: IOperationContext): Promise<unknown> =>
+  const encodeEnvelope = async (
+    envelope: IEnvelope,
+    ctx: IOperationContext | undefined,
+    runtime: IStorageOperationRuntime
+  ): Promise<unknown> =>
     invokeExtension(
       () => selectedCodec.encode(envelope, ctx),
       store.backend,
       'entity.codec.encode',
       'codec',
-      ctx?.signal
+      ctx?.signal,
+      runtime
     );
 
   const materialize = async (
     envelope: IEnvelope | undefined,
-    ctx?: IOperationContext
+    ctx: IOperationContext | undefined,
+    runtime: IStorageOperationRuntime
   ): Promise<TDomain | undefined> => {
     if (!envelope) return undefined;
     if (envelope.__v > version)
@@ -255,7 +281,14 @@ export const createRepository = <TDomain, TStored>(
     let stored = envelope.data;
     if (envelope.__v < version) {
       try {
-        stored = await runMigrations(stored, envelope.__v, version, migrations, ctx?.signal);
+        stored = await runMigrationsWithRuntime(
+          runtime,
+          stored,
+          envelope.__v,
+          version,
+          migrations,
+          ctx?.signal
+        );
       } catch (cause) {
         throw stageFailure('migrate', cause);
       }
@@ -268,7 +301,8 @@ export const createRepository = <TDomain, TStored>(
             store.backend,
             'entity.schema.decode',
             'schema',
-            ctx?.signal
+            ctx?.signal,
+            runtime
           )
         : (stored as TDomain);
     } catch (cause) {
@@ -281,7 +315,8 @@ export const createRepository = <TDomain, TStored>(
         store.backend,
         'entity.schema.validate',
         'schema',
-        ctx?.signal
+        ctx?.signal,
+        runtime
       );
     } catch (cause) {
       throw stageFailure('validate', cause);
@@ -290,14 +325,16 @@ export const createRepository = <TDomain, TStored>(
 
   const toEnvelope = async (
     value: TDomain,
-    ctx?: IOperationContext
+    ctx: IOperationContext | undefined,
+    runtime: IStorageOperationRuntime
   ): Promise<{ readonly domain: TDomain; readonly envelope: IEnvelope }> => {
     const domain = await invokeExtension(
       () => schema.validate(value, ctx),
       store.backend,
       'entity.schema.validate',
       'schema',
-      ctx?.signal
+      ctx?.signal,
+      runtime
     );
     const normalized = schema.normalize
       ? await invokeExtension(
@@ -305,7 +342,8 @@ export const createRepository = <TDomain, TStored>(
           store.backend,
           'entity.schema.normalize',
           'schema',
-          ctx?.signal
+          ctx?.signal,
+          runtime
         )
       : domain;
     const stored = schema.encode
@@ -314,19 +352,25 @@ export const createRepository = <TDomain, TStored>(
           store.backend,
           'entity.schema.encode',
           'schema',
-          ctx?.signal
+          ctx?.signal,
+          runtime
         )
       : (normalized as unknown as TStored);
     return { domain: normalized, envelope: { __v: version, data: stored } };
   };
 
-  const decodeEnvelope = async (raw: unknown, ctx?: IOperationContext): Promise<IEnvelope> => {
+  const decodeEnvelope = async (
+    raw: unknown,
+    ctx: IOperationContext | undefined,
+    runtime: IStorageOperationRuntime
+  ): Promise<IEnvelope> => {
     const decoded: unknown = await invokeExtension(
       () => selectedCodec.decode(raw, ctx),
       store.backend,
       'entity.codec.decode',
       'codec',
-      ctx?.signal
+      ctx?.signal,
+      runtime
     );
     if (
       typeof decoded !== 'object' ||
@@ -355,7 +399,7 @@ export const createRepository = <TDomain, TStored>(
       handler !== 'throw' &&
       typeof handler !== 'function'
     )
-      throw new StorageError(StorageErrorCode.invalidArgument, {
+      throw new StorageError(StorageErrorCode.invalidConfig, {
         backend: store.backend,
         cause: new TypeError('onInvalid must be skip, throw, or a handler')
       });
@@ -377,7 +421,7 @@ export const createRepository = <TDomain, TStored>(
       orderBy = options.orderBy;
       onInvalid = options.onInvalid;
     } catch (cause) {
-      throw new StorageError(StorageErrorCode.invalidArgument, {
+      throw new StorageError(StorageErrorCode.invalidConfig, {
         backend: store.backend,
         cause
       });
@@ -394,7 +438,7 @@ export const createRepository = <TDomain, TStored>(
     options: IMigrateOptions<TDomain>
   ): { readonly batchSize: number; readonly onInvalid: IMigrateOptions<TDomain>['onInvalid'] } => {
     if (options === null || typeof options !== 'object' || Array.isArray(options))
-      throw new StorageError(StorageErrorCode.invalidArgument, {
+      throw new StorageError(StorageErrorCode.invalidConfig, {
         backend: store.backend,
         cause: new TypeError('migrate options must be an object')
       });
@@ -404,14 +448,14 @@ export const createRepository = <TDomain, TStored>(
       batchSize = options.batchSize;
       onInvalid = options.onInvalid;
     } catch (cause) {
-      throw new StorageError(StorageErrorCode.invalidArgument, {
+      throw new StorageError(StorageErrorCode.invalidConfig, {
         backend: store.backend,
         cause
       });
     }
     const normalizedBatchSize = batchSize === undefined ? 100 : batchSize;
     if (!Number.isSafeInteger(normalizedBatchSize) || normalizedBatchSize < 1)
-      throw new StorageError(StorageErrorCode.invalidArgument, {
+      throw new StorageError(StorageErrorCode.invalidConfig, {
         backend: store.backend,
         cause: new RangeError('migrate batchSize must be a positive safe integer')
       });
@@ -426,7 +470,7 @@ export const createRepository = <TDomain, TStored>(
     if (handler === undefined || handler === 'skip' || handler === 'throw')
       return handler ?? 'skip';
     if (typeof handler !== 'function')
-      throw new StorageError(StorageErrorCode.invalidArgument, {
+      throw new StorageError(StorageErrorCode.invalidConfig, {
         backend: store.backend,
         key: issue.key,
         cause: new TypeError('onInvalid must be skip, throw, or a handler')
@@ -434,15 +478,14 @@ export const createRepository = <TDomain, TStored>(
     try {
       const action = handler(issue);
       if (action !== 'skip' && action !== 'throw')
-        throw new StorageError(StorageErrorCode.invalidArgument, {
+        throw new StorageError(StorageErrorCode.invalidConfig, {
           backend: store.backend,
           key: issue.key,
           cause: new TypeError('onInvalid handler must return skip or throw')
         });
       return action;
     } catch (cause) {
-      if (cause instanceof StorageError && cause.code === StorageErrorCode.invalidArgument)
-        throw cause;
+      if (isStorageErrorFamily(cause) && cause.code === StorageErrorCode.invalidConfig) throw cause;
       throw new StorageError(StorageErrorCode.validationFailed, {
         backend: store.backend,
         key: issue.key,
@@ -453,11 +496,11 @@ export const createRepository = <TDomain, TStored>(
 
   const throwInvalid = (issue: IInvalidRecordIssue<TDomain>): never => {
     /* c8 ignore start -- all current decode/migrate/validate stages normalize to StorageError. */
-    if (issue.cause instanceof StorageError) throw issue.cause;
+    if (isStorageErrorFamily(issue.cause)) throw issue.cause;
     const code =
-      issue.stage === 'migrate'
+      issue.stage === StorageRecordStage.migrate
         ? StorageErrorCode.migrationFailed
-        : issue.stage === 'decode'
+        : issue.stage === StorageRecordStage.decode
           ? StorageErrorCode.deserializeFailed
           : StorageErrorCode.validationFailed;
     throw new StorageError(code, {
@@ -471,18 +514,19 @@ export const createRepository = <TDomain, TStored>(
   const materializeForRead = async (
     id: IStorageKey,
     envelope: IEnvelope | undefined,
-    ctx?: IOperationContext
+    ctx: IOperationContext | undefined,
+    runtime: IStorageOperationRuntime
   ): Promise<TDomain | undefined> => {
     try {
-      return await materialize(envelope, ctx);
+      return await materialize(envelope, ctx, runtime);
     } catch (cause) {
       /* c8 ignore start -- materialize's extension boundaries already return StorageError. */
-      if (cause instanceof StorageError) throw cause;
-      const stage = (cause as Partial<IStageFailure>).stage ?? 'validate';
+      if (isStorageErrorFamily(cause)) throw cause;
+      const stage = (cause as Partial<IStageFailure>).stage ?? StorageRecordStage.validate;
       const code =
-        stage === 'migrate'
+        stage === StorageRecordStage.migrate
           ? StorageErrorCode.migrationFailed
-          : stage === 'decode'
+          : stage === StorageRecordStage.decode
             ? StorageErrorCode.deserializeFailed
             : StorageErrorCode.validationFailed;
       throw new StorageError(code, { backend: store.backend, key: id, cause });
@@ -491,17 +535,18 @@ export const createRepository = <TDomain, TStored>(
 
   const readEnvelope = async (
     id: IStorageKey,
-    ctx?: IOperationContext
+    ctx: IOperationContext | undefined,
+    runtime: IStorageOperationRuntime
   ): Promise<IEnvelope | undefined> => {
     if (recordStore) {
       let raw = await recordStore.getRecord(composeRepositoryKey(name, id), ctx);
       if (raw === undefined) raw = await recordStore.getRecord(composeStructuredKey(name, id), ctx);
       if (raw === undefined) return undefined;
-      return decodeEnvelope(raw, ctx);
+      return decodeEnvelope(raw, ctx, runtime);
     }
     const raw = await store.get(composeFlatKey(name, id), ctx);
     if (raw === null) return undefined;
-    return decodeEnvelope(raw, ctx);
+    return decodeEnvelope(raw, ctx, runtime);
   };
 
   const sortRecords = (
@@ -519,7 +564,7 @@ export const createRepository = <TDomain, TStored>(
       throw new StorageError(StorageErrorCode.extensionFailed, {
         backend: store.backend,
         cause,
-        operation: 'entity.orderBy',
+        operation: StorageOperation.entityOrderBy,
         extensionStage: 'comparator'
       });
       /* c8 ignore stop */
@@ -528,14 +573,16 @@ export const createRepository = <TDomain, TStored>(
 
   const streamImpl = async function* (
     options: IListOptions<TDomain> | undefined,
-    ctx?: IOperationContext,
+    ctx: IOperationContext | undefined,
+    runtime: IStorageOperationRuntime,
     applyOrdering = true
   ) {
     const comparator = applyOrdering ? (options?.orderBy ?? defaultOrderBy) : undefined;
     if (comparator) {
       const buffered: TDomain[] = [];
       const scanOptions = { ...options, orderBy: undefined, limit: undefined };
-      for await (const record of streamImpl(scanOptions, ctx, false)) buffered.push(record);
+      for await (const record of streamImpl(scanOptions, ctx, runtime, false))
+        buffered.push(record);
       sortRecords(buffered, comparator);
       const limited = options?.limit === undefined ? buffered : buffered.slice(0, options.limit);
       for (const record of limited) yield record;
@@ -569,11 +616,11 @@ export const createRepository = <TDomain, TStored>(
           try {
             let envelope: IEnvelope;
             try {
-              envelope = await decodeEnvelope(raw, ctx);
+              envelope = await decodeEnvelope(raw, ctx, runtime);
             } catch (cause) {
               throw stageFailure('decode', cause);
             }
-            value = await materialize(envelope, ctx);
+            value = await materialize(envelope, ctx, runtime);
           } catch (cause) {
             const issue: IInvalidRecordIssue<TDomain> = {
               key: recordId,
@@ -615,11 +662,11 @@ export const createRepository = <TDomain, TStored>(
       try {
         let envelope: IEnvelope;
         try {
-          envelope = await decodeEnvelope(raw, ctx);
+          envelope = await decodeEnvelope(raw, ctx, runtime);
         } catch (cause) {
           throw stageFailure('decode', cause);
         }
-        value = await materialize(envelope, ctx);
+        value = await materialize(envelope, ctx, runtime);
       } catch (cause) {
         const issue: IInvalidRecordIssue<TDomain> = {
           key: id,
@@ -640,28 +687,34 @@ export const createRepository = <TDomain, TStored>(
     }
   };
 
-  const persistValue = async (value: TDomain, ctx?: IOperationContext): Promise<void> => {
-    const prepared = await toEnvelope(value, ctx);
+  const persistValue = async (
+    value: TDomain,
+    ctx: IOperationContext | undefined,
+    runtime: IStorageOperationRuntime
+  ): Promise<void> => {
+    const prepared = await toEnvelope(value, ctx, runtime);
     const id = idOf(name, keyProp, prepared.domain, store.backend);
     const target: IWriteTarget = recordStore
       ? { documentKey: composeRepositoryKey(name, id) }
       : { flatKey: composeFlatKey(name, id) };
-    await writeEnvelopeAt(target, prepared.envelope, ctx);
+    await writeEnvelopeAt(target, prepared.envelope, ctx, runtime);
   };
 
   return {
     get: async (id, ctx) => {
       const context = snapshotOperationContext(ctx);
+      const runtime = createStorageOperationRuntime();
       assertStorageKey(id, store.backend, `entity "${name}" id`);
-      return materializeForRead(id, await readEnvelope(id, context), context);
+      return materializeForRead(id, await readEnvelope(id, context, runtime), context, runtime);
     },
 
     put: async (value, ctx) => {
       const context = snapshotOperationContext(ctx);
-      const prepared = await toEnvelope(value, context);
+      const runtime = createStorageOperationRuntime();
+      const prepared = await toEnvelope(value, context, runtime);
       const id = idOf(name, keyProp, prepared.domain, store.backend);
       if (recordStore) {
-        const raw = await encodeEnvelope(prepared.envelope, context);
+        const raw = await encodeEnvelope(prepared.envelope, context, runtime);
         await recordStore.transaction(async (tx) => {
           await tx.put(raw, composeRepositoryKey(name, id));
           await tx.delete(composeStructuredKey(name, id));
@@ -669,7 +722,7 @@ export const createRepository = <TDomain, TStored>(
         return id;
       }
       const target: IWriteTarget = { flatKey: composeFlatKey(name, id) };
-      await writeEnvelopeAt(target, prepared.envelope, context);
+      await writeEnvelopeAt(target, prepared.envelope, context, runtime);
       return id;
     },
 
@@ -688,27 +741,30 @@ export const createRepository = <TDomain, TStored>(
 
     list: async (options, ctx) => {
       const context = snapshotOperationContext(ctx);
+      const runtime = createStorageOperationRuntime();
       const normalized = normalizeListOptions(options);
       const results: TDomain[] = [];
       const comparator = normalized?.orderBy ?? defaultOrderBy;
       const streamOptions = comparator ? { ...normalized, limit: undefined } : normalized;
-      for await (const record of streamImpl(streamOptions, context)) results.push(record);
+      for await (const record of streamImpl(streamOptions, context, runtime)) results.push(record);
       if (normalized?.limit !== undefined) return results.slice(0, normalized.limit);
       return results;
     },
 
     stream: (options, ctx) => {
-      return streamImpl(normalizeListOptions(options), snapshotOperationContext(ctx));
+      const runtime = createStorageOperationRuntime();
+      return streamImpl(normalizeListOptions(options), snapshotOperationContext(ctx), runtime);
     },
 
     migrate: async (options: IMigrateOptions<TDomain> = {}, ctx) => {
       const context = snapshotOperationContext(ctx);
+      const runtime = createStorageOperationRuntime();
       const { batchSize, onInvalid } = normalizeMigrateOptions(options);
       const migrationMetadata = recordStore?.metadata;
       const checkpointKey = `repository:${name}:migration`;
       type IMigrationCheckpoint = {
-        readonly status: 'running' | 'complete';
-        readonly phase?: 'v2' | 'legacy';
+        readonly status: (typeof StorageMigrationStatus)[keyof typeof StorageMigrationStatus];
+        readonly phase?: (typeof StorageMigrationPhase)[keyof typeof StorageMigrationPhase];
         readonly version: number;
         readonly schemaFingerprint: string;
         readonly lastPhysicalKey?: IStorageKey;
@@ -726,7 +782,7 @@ export const createRepository = <TDomain, TStored>(
         | IMigrationCheckpoint
         | undefined;
       const checkpointMatches =
-        checkpoint?.status === 'running' &&
+        checkpoint?.status === StorageMigrationStatus.running &&
         checkpoint.version === version &&
         checkpoint.schemaFingerprint === migrationFingerprint;
       let scanned = checkpointMatches ? checkpoint.scanned : 0;
@@ -736,7 +792,9 @@ export const createRepository = <TDomain, TStored>(
       let skipped = checkpointMatches ? checkpoint.skipped : 0;
       let conflicted = checkpointMatches ? checkpoint.conflicted : 0;
       let lastPhysicalKey = checkpointMatches ? checkpoint.lastPhysicalKey : undefined;
-      let phase: 'v2' | 'legacy' = checkpointMatches ? (checkpoint.phase ?? 'legacy') : 'v2';
+      let phase = checkpointMatches
+        ? (checkpoint.phase ?? StorageMigrationPhase.legacy)
+        : StorageMigrationPhase.v2;
       const batch: Array<{
         readonly physicalKey: IStorageKey;
         readonly raw: unknown;
@@ -747,7 +805,7 @@ export const createRepository = <TDomain, TStored>(
       const persistBatch = async (): Promise<void> => {
         if (batch.length === 0) return;
         if (!recordStore) {
-          for (const entry of batch) await persistValue(entry.value, context);
+          for (const entry of batch) await persistValue(entry.value, context, runtime);
           migrated += batch.length;
         } else {
           try {
@@ -762,18 +820,18 @@ export const createRepository = <TDomain, TStored>(
                     await tx.delete(entry.physicalKey);
                     continue;
                   }
-                  const currentEnvelope = await decodeEnvelope(currentRaw, context);
-                  const currentValue = await materialize(currentEnvelope, context);
+                  const currentEnvelope = await decodeEnvelope(currentRaw, context, runtime);
+                  const currentValue = await materialize(currentEnvelope, context, runtime);
                   if (currentValue === undefined) continue;
-                  const prepared = await toEnvelope(currentValue, context);
-                  const raw = await encodeEnvelope(prepared.envelope, context);
+                  const prepared = await toEnvelope(currentValue, context, runtime);
+                  const raw = await encodeEnvelope(prepared.envelope, context, runtime);
                   await tx.put(raw, composeRepositoryKey(name, entry.id));
                   await tx.delete(entry.physicalKey);
                   count += 1;
                   continue;
                 }
-                const prepared = await toEnvelope(entry.value, context);
-                const raw = await encodeEnvelope(prepared.envelope, context);
+                const prepared = await toEnvelope(entry.value, context, runtime);
+                const raw = await encodeEnvelope(prepared.envelope, context, runtime);
                 await tx.put(raw, composeRepositoryKey(name, entry.id));
                 count += 1;
               }
@@ -782,7 +840,7 @@ export const createRepository = <TDomain, TStored>(
             migrated += migratedInBatch;
           } catch (cause) {
             if (
-              cause instanceof StorageError &&
+              isStorageErrorFamily(cause) &&
               cause.code === StorageErrorCode.transactionConflict
             ) {
               for (const entry of batch) {
@@ -790,7 +848,7 @@ export const createRepository = <TDomain, TStored>(
                   const retryOutcome = await recordStore.transaction(async (tx) => {
                     const targetRaw = await tx.get(composeRepositoryKey(name, entry.id));
                     if (targetRaw !== undefined) {
-                      const targetEnvelope = await decodeEnvelope(targetRaw, context);
+                      const targetEnvelope = await decodeEnvelope(targetRaw, context, runtime);
                       if (targetEnvelope.__v >= version) {
                         if (entry.legacy) await tx.delete(entry.physicalKey);
                         return 'alreadyCurrent' as const;
@@ -798,12 +856,12 @@ export const createRepository = <TDomain, TStored>(
                     }
                     const currentRaw = await tx.get(entry.physicalKey);
                     if (currentRaw === undefined) return 'missing' as const;
-                    const currentEnvelope = await decodeEnvelope(currentRaw, context);
-                    const currentValue = await materialize(currentEnvelope, context);
+                    const currentEnvelope = await decodeEnvelope(currentRaw, context, runtime);
+                    const currentValue = await materialize(currentEnvelope, context, runtime);
                     if (currentValue === undefined) return 'missing' as const;
                     if (currentEnvelope.__v >= version) return 'alreadyCurrent' as const;
-                    const prepared = await toEnvelope(currentValue, context);
-                    const nextRaw = await encodeEnvelope(prepared.envelope, context);
+                    const prepared = await toEnvelope(currentValue, context, runtime);
+                    const nextRaw = await encodeEnvelope(prepared.envelope, context, runtime);
                     await tx.put(nextRaw, composeRepositoryKey(name, entry.id));
                     if (entry.legacy) await tx.delete(entry.physicalKey);
                     return 'migrated' as const;
@@ -812,7 +870,7 @@ export const createRepository = <TDomain, TStored>(
                   if (retryOutcome === 'alreadyCurrent') alreadyCurrent += 1;
                 } catch (retryCause) {
                   if (
-                    retryCause instanceof StorageError &&
+                    isStorageErrorFamily(retryCause) &&
                     retryCause.code === StorageErrorCode.transactionConflict
                   ) {
                     conflicted += 1;
@@ -837,7 +895,7 @@ export const createRepository = <TDomain, TStored>(
           }
         }
         await writeCheckpoint({
-          status: 'running',
+          status: StorageMigrationStatus.running,
           phase,
           version,
           schemaFingerprint: migrationFingerprint,
@@ -852,14 +910,22 @@ export const createRepository = <TDomain, TStored>(
         batch.length = 0;
       };
       if (recordStore) {
-        const phases: Array<'v2' | 'legacy'> = phase === 'v2' ? ['v2', 'legacy'] : ['legacy'];
+        const phases =
+          phase === StorageMigrationPhase.v2
+            ? [StorageMigrationPhase.v2, StorageMigrationPhase.legacy]
+            : [StorageMigrationPhase.legacy];
         for (const scanPhase of phases) {
           phase = scanPhase;
-          if (scanPhase !== (checkpointMatches ? (checkpoint.phase ?? 'legacy') : 'v2'))
+          if (
+            scanPhase !==
+            (checkpointMatches
+              ? (checkpoint.phase ?? StorageMigrationPhase.legacy)
+              : StorageMigrationPhase.v2)
+          )
             lastPhysicalKey = undefined;
           const entityRange = repositoryEntityRange(name);
           const migrationRange =
-            scanPhase === 'v2'
+            scanPhase === StorageMigrationPhase.v2
               ? lastPhysicalKey
                 ? { ...entityRange, lower: lastPhysicalKey, lowerOpen: true }
                 : entityRange
@@ -878,14 +944,14 @@ export const createRepository = <TDomain, TStored>(
               physicalKey.length === 2 &&
               physicalKey[0] === name;
             const recordId = v2RecordId ?? (legacy ? (physicalKey[1] as IStorageKey) : undefined);
-            if (scanPhase === 'v2' && v2RecordId === undefined) continue;
-            if (scanPhase === 'legacy' && !legacy) continue;
+            if (scanPhase === StorageMigrationPhase.v2 && v2RecordId === undefined) continue;
+            if (scanPhase === StorageMigrationPhase.legacy && !legacy) continue;
             if (recordId === undefined) continue;
             scanned += 1;
             let envelope: IEnvelope;
             try {
-              envelope = await decodeEnvelope(raw, context);
-              const value = await materialize(envelope, context);
+              envelope = await decodeEnvelope(raw, context, runtime);
+              const value = await materialize(envelope, context, runtime);
               if (value === undefined) continue;
               if (envelope.__v >= version) {
                 alreadyCurrent += 1;
@@ -897,20 +963,20 @@ export const createRepository = <TDomain, TStored>(
               const issue: IInvalidRecordIssue<TDomain> = {
                 key: recordId,
                 raw,
-                stage: (cause as Partial<IStageFailure>).stage ?? 'decode',
+                stage: (cause as Partial<IStageFailure>).stage ?? StorageRecordStage.decode,
                 cause
               };
               const action = invokeInvalidHandler(onInvalid, issue);
-              if (action === 'throw') throwInvalid(issue);
+              if (action === StorageInvalidRecordAction.throw) throwInvalid(issue);
               skipped += 1;
             }
             if (batch.length >= batchSize) await persistBatch();
           }
-          if (scanPhase === 'v2' && phases.length > 1) {
-            phase = 'legacy';
+          if (scanPhase === StorageMigrationPhase.v2 && phases.length > 1) {
+            phase = StorageMigrationPhase.legacy;
             lastPhysicalKey = undefined;
             await writeCheckpoint({
-              status: 'running',
+              status: StorageMigrationStatus.running,
               phase,
               version,
               schemaFingerprint: migrationFingerprint,
@@ -924,7 +990,7 @@ export const createRepository = <TDomain, TStored>(
           }
         }
       } else {
-        for await (const value of streamImpl({ onInvalid }, context)) {
+        for await (const value of streamImpl({ onInvalid }, context, runtime)) {
           eligible += 1;
           batch.push({
             physicalKey: String(scanned),
@@ -939,7 +1005,7 @@ export const createRepository = <TDomain, TStored>(
       }
       await persistBatch();
       await writeCheckpoint({
-        status: 'complete',
+        status: StorageMigrationStatus.complete,
         phase,
         version,
         schemaFingerprint: migrationFingerprint,
@@ -956,13 +1022,16 @@ export const createRepository = <TDomain, TStored>(
 
     batch: async (run, ctx) => {
       const context = snapshotOperationContext(ctx);
+      const runtime = createStorageOperationRuntime();
       if (typeof run !== 'function')
-        throw new StorageError(StorageErrorCode.invalidArgument, {
+        throw new StorageError(StorageErrorCode.invalidConfig, {
           backend: store.backend,
           cause: new TypeError('batch callback must be a function')
         });
       if (!recordStore)
-        throw new StorageError(StorageErrorCode.unsupported, { backend: store.backend });
+        throw new StorageContractError(StorageContractErrorCode.unsupported, {
+          backend: store.backend
+        });
       return recordStore.transaction(async (tx) => {
         const scope: IEntityTransactionScope<TDomain> = {
           get: async (id) => {
@@ -970,12 +1039,17 @@ export const createRepository = <TDomain, TStored>(
             let raw = await tx.get(composeRepositoryKey(name, id));
             if (raw === undefined) raw = await tx.get(composeStructuredKey(name, id));
             if (raw === undefined) return undefined;
-            return materializeForRead(id, await decodeEnvelope(raw, context), context);
+            return materializeForRead(
+              id,
+              await decodeEnvelope(raw, context, runtime),
+              context,
+              runtime
+            );
           },
           put: async (value) => {
-            const prepared = await toEnvelope(value, context);
+            const prepared = await toEnvelope(value, context, runtime);
             const id = idOf(name, keyProp, prepared.domain, store.backend);
-            const raw = await encodeEnvelope(prepared.envelope, context);
+            const raw = await encodeEnvelope(prepared.envelope, context, runtime);
             await tx.put(raw, composeRepositoryKey(name, id));
             await tx.delete(composeStructuredKey(name, id));
             return id;

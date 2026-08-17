@@ -4,7 +4,12 @@ import {
   type IAtomDefinition,
   type IAtomGet,
   type IWritableAtomDefinition
-} from '../atom/definition';
+} from '../atom/definition.js';
+import {
+  createStoreKeyedError,
+  createStoreKeyedRangeError,
+  StoreKeyedErrorCode
+} from '../errors.js';
 
 /**
  * 按键产出**定义**的 family。
@@ -69,7 +74,8 @@ function createDefinitionCache<K extends IFamilyKey, D extends object>(
   create: (key: K) => D
 ): IDefinitionCache<K, D> {
   if (typeof WeakRef !== 'function' || typeof FinalizationRegistry !== 'function') {
-    throw new Error(
+    throw createStoreKeyedError(
+      StoreKeyedErrorCode.envUnsupported,
       '[store] family definitions require WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox'
     );
   }
@@ -141,7 +147,10 @@ export function familyDef<K extends IFamilyKey, T>(
 ): IFamilyDef<K, T, IWritableAtomDefinition<T>> {
   const { maxSize = 4096, debugLabel = 'family' } = options;
   if (!Number.isSafeInteger(maxSize) || maxSize < 1) {
-    throw new RangeError('[store] family maxSize must be a positive integer');
+    throw createStoreKeyedRangeError(
+      StoreKeyedErrorCode.invalidOption,
+      '[store] family maxSize must be a positive integer'
+    );
   }
   const cache = createDefinitionCache<K, IWritableAtomDefinition<T>>(maxSize, (key) =>
     atomDefFactory(() => initial(key), `${debugLabel}[${String(key)}]`)
@@ -161,7 +170,10 @@ export function derivedFamilyDef<K extends IFamilyKey, T>(
 ): IFamilyDef<K, T> {
   const { maxSize = 4096, debugLabel = 'derived-family' } = options;
   if (!Number.isSafeInteger(maxSize) || maxSize < 1) {
-    throw new RangeError('[store] family maxSize must be a positive integer');
+    throw createStoreKeyedRangeError(
+      StoreKeyedErrorCode.invalidOption,
+      '[store] family maxSize must be a positive integer'
+    );
   }
   const cache = createDefinitionCache<K, IAtomDefinition<T>>(maxSize, (key) =>
     derivedDef(read(key), `${debugLabel}[${String(key)}]`)

@@ -77,7 +77,10 @@ describe('#4（结论修正）install 在 await 之后调用 use()：两种子�
     vi.useFakeTimers();
     try {
       const diagnostics: string[] = [];
-      const host = new Host({ diagnostic: (message: string) => diagnostics.push(message) } as any);
+      const host = new Host({
+        diagnostic: (message: string) => diagnostics.push(message),
+        queueAdmissionTimeoutMs: 5_000
+      } as any);
       let innerRan = false;
 
       const outer = host
@@ -112,7 +115,7 @@ describe('#4（结论修正）install 在 await 之后调用 use()：两种子�
   it('诊断兜底：排队超过 QUEUE_WATCHDOG_MS 仍未处理时，watchdog 上报可操作的诊断信息', async () => {
     vi.useFakeTimers();
     try {
-      const host = new Host({ diagnostic: () => undefined } as any);
+      const host = new Host({ diagnostic: () => undefined, queueAdmissionTimeoutMs: 5_000 } as any);
 
       void host.use({
         name: 'outer3',
@@ -149,9 +152,14 @@ describe('#5 扩展属性被外部覆写后，unUse 静默放弃卸载', () => {
   });
 });
 
-describe('#6 useSync 的回滚保持同步且错误可见', () => {
-  it('同步 disposer 抛出的错误会出现在抛给调用方的错误链里', () => {
-    const host = new Host();
+describe('#6（重新裁定，见 SDD §5.6/M-T15）useSync 回滚改为两阶段：close 同步 + dispose 异步', () => {
+  // §5.6：useSync 的同步性只覆盖 close（撤销 extensions/registrations/shared 等 host 可见状态），
+  // 不再覆盖实际跑 disposer——那部分和普通异步 dispose 走同一条路径，fire-and-forget，失败通过
+  // diagnostic 通道上报，不再折进 useSync 同步抛出的错误链。原始构造错误（install-boom）保持为
+  // useSync 抛出错误的唯一原因（primary），不会被 rollback 结果改写（对齐 M-T44 的 L-T39 口径）。
+  it('同步 disposer 抛出的错误不再折进同步抛出链，而是通过 diagnostic 异步上报', async () => {
+    const diagnostics: string[] = [];
+    const host = new Host({ diagnostic: (message: string) => diagnostics.push(message) } as any);
 
     let thrown: any;
     try {
@@ -176,31 +184,27 @@ describe('#6 useSync 的回滚保持同步且错误可见', () => {
       thrown = error;
     }
 
-    const rollbackErrors = thrown?.cause?.errors ?? thrown?.cause?.cause?.errors ?? [];
-    const chain = JSON.stringify(
-      [
-        thrown?.message,
-        thrown?.cause?.message,
-        String(thrown?.cause?.cause?.message),
-        ...rollbackErrors.map((error: unknown) => String((error as Error)?.message ?? error))
-      ].join('|')
-    );
-    expect(chain).toContain('install-boom');
-    expect(chain).toContain('rollback-boom');
+    expect(thrown?.code).toBe('PLUGIN_INSTALL_FAILED');
+    expect(String(thrown?.cause?.message ?? thrown?.cause)).toContain('install-boom');
+    expect(diagnostics.join('|')).not.toContain('install-boom'); // 不重复上报构造错误本身
+
+    await new Promise((resolve) => setTimeout(resolve, 20)); // 等 fire-and-forget 的 rollback 落地
+    expect(diagnostics.join('|')).toContain('rollback-boom');
   });
 
-  it('异步 disposer 在 useSync 里注册时被立即拒绝（PH-R3-2 修复：不再是"回滚时才发现"）', () => {
+  it('异步 disposer 在 useSync 里注册时不再被拒绝，回滚仍然正确执行（M-T15）', async () => {
     const host = new Host();
-    let asyncDisposerDone = false;
+    let asyncDisposerRan = false;
 
-    expect(() =>
+    let thrown: any;
+    try {
       host.install([
         {
           name: 'first',
           install: (core: any) => {
             core.onDispose(async () => {
               await new Promise((resolve) => setTimeout(resolve, 10));
-              asyncDisposerDone = true;
+              asyncDisposerRan = true;
             });
             return {};
           }
@@ -211,10 +215,16 @@ describe('#6 useSync 的回滚保持同步且错误可见', () => {
             throw new Error('install-boom');
           }
         }
-      ])
-    ).toThrow(/async disposer/); // 'first' 注册 disposer 那一步已经抛错，'second' 根本不会跑到
+      ]);
+    } catch (error) {
+      thrown = error;
+    }
 
-    expect(asyncDisposerDone).toBe(false); // 函数体从未被调用，不是"调用后没等完"
+    expect(thrown?.code).toBe('PLUGIN_INSTALL_FAILED'); // 注册时不再拒绝，失败原因仍是原始构造错误
+    expect(asyncDisposerRan).toBe(false); // 还没来得及跑
+
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(asyncDisposerRan).toBe(true); // 回滚异步执行后，async disposer 确实跑完了
   });
 });
 
@@ -298,7 +308,8 @@ describe('second adversarial pass (R3, fixed)', () => {
     try {
       const diagnostics: string[] = [];
       const diagnosedHost = new Host({
-        diagnostic: (message: string) => diagnostics.push(message)
+        diagnostic: (message: string) => diagnostics.push(message),
+        queueAdmissionTimeoutMs: 5_000
       } as any);
       const slow = diagnosedHost.use({
         name: 'slow',
@@ -327,7 +338,7 @@ describe('second adversarial pass (R3, fixed)', () => {
     }
   });
 
-  it('PH-R3-2 fixed: an async disposer registered during useSync is rejected at registration time, not discovered later', () => {
+  it('PH-R3-2 superseded by §5.6/M-T15: an async disposer registered during useSync is no longer rejected at all', () => {
     const host = new Host();
     let started = false;
 
@@ -344,8 +355,8 @@ describe('second adversarial pass (R3, fixed)', () => {
           }
         }
       ])
-    ).toThrow(/async disposer/);
-    expect(started).toBe(false); // rejected before the disposer function was ever invoked
+    ).not.toThrow(); // no install failure here, so no rollback either — nothing rejects registration
+    expect(started).toBe(false); // the disposer itself hasn't run — the plugin was never disposed
   });
 
   it('PH-R3-3 fixed: non-enumerable extension omission is reported through the diagnostic channel', async () => {
@@ -379,6 +390,35 @@ describe('second adversarial pass (R3, fixed)', () => {
       // If the watchdog for "second" were still armed, it would still be sitting in the
       // timer queue for up to 5s after settlement. Assert there is nothing left pending.
       expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a resource disposer that never settles is recorded as DISPOSE_STEP_TIMEOUT and disposal still moves on to the rest', async () => {
+    vi.useFakeTimers();
+    try {
+      const host = new Host();
+      let laterDisposerRan = false;
+      await host.use({
+        name: 'stuck-disposer',
+        install: (core: any) => {
+          core.onDispose(() => new Promise(() => undefined)); // never settles
+          core.onDispose(() => {
+            laterDisposerRan = true; // registered first, so it's the *later* one in LIFO order
+          });
+          return {};
+        }
+      } as any);
+
+      const unUse = host.unUse('stuck-disposer').then(
+        () => 'resolved',
+        (error) => error
+      );
+      await vi.advanceTimersByTimeAsync(5_000);
+      const outcome = await unUse;
+      expect(laterDisposerRan).toBe(true); // the timed-out step didn't block the rest of the group
+      expect(String((outcome as any)?.cause?.cause?.message ?? outcome)).toMatch(/等待超过 5000ms/);
     } finally {
       vi.useRealTimers();
     }
@@ -464,8 +504,6 @@ describe('fifth adversarial pass (R5)', () => {
 
   it('PH-R5-2: ERROR_TEXT carries no dead diagnostic text left over from the superseded diagnostic-only watchdog', async () => {
     const errorTextModule = await import('../src/error-text');
-    expect(
-      Object.prototype.hasOwnProperty.call(errorTextModule.default, 'QUEUE_WATCHDOG_TIMEOUT')
-    ).toBe(false);
+    expect(Object.hasOwn(errorTextModule.default, 'QUEUE_WATCHDOG_TIMEOUT')).toBe(false);
   });
 });

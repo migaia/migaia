@@ -78,7 +78,7 @@ describe('#14 主键类型入口统一校验', () => {
       dbName: `adv2-${Math.random().toString(36).slice(2)}`
     });
     await expect(store.putRecord({ v: 1 }, true as unknown as string)).rejects.toMatchObject({
-      name: 'StorageError',
+      name: 'StorageContractError',
       code: 'INVALID_KEY',
       backend: 'indexeddb'
     });

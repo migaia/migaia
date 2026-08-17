@@ -47,6 +47,7 @@ function createDefaultRuntimeManager(): ILoggerRuntimeManager {
     process: runtimeProcess,
     randomUUID: () =>
       globals.crypto?.randomUUID?.() ??
+      // 仅用于 log 唯一 ID 的 fallback，不是 deadline/计时，不参与任何时间域契约（R-9）。
       `log-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
     defer: (task) => {
       if (globals.setImmediate) globals.setImmediate(task);

@@ -1,9 +1,18 @@
 import {
-  SerializeError,
+  SerializeCodecError,
   type ISerializeAbortSignal,
   type ISerializeChunk,
-  type ISerializeRegistry
-} from './types';
+  type ISerializeRegistry,
+  type ISerializeScheduler,
+  type ITextEncoder
+} from './types.js';
+import {
+  createSerializeError,
+  createSerializeRangeError,
+  createSerializeTypeError,
+  SerializeErrorCode
+} from './errors.js';
+import { SerializeChunkKind, SerializePhase } from './format-constants.js';
 
 /**
  * 帧预算切片。
@@ -23,14 +32,18 @@ export type IFrameBudgetOptions = {
   readonly maxItems?: number;
   /** 首片大小。太大则第一片必然超预算，所以刻意保守。 */
   readonly initialItems?: number;
-  /** 让出方式。默认 setTimeout(0)——浏览器里这正是渲染一帧的位置。 可换成 scheduler.yield()（更精确）或 requestIdleCallback（更保守）。 */
+  /**
+   * 让出方式。缺省用 `scheduler.schedule(resolve, 0)`；可换成 `scheduler.yield()`（更精确）或
+   * requestIdleCallback（更保守）。
+   */
   readonly yieldTo?: () => Promise<void>;
   readonly signal?: ISerializeAbortSignal;
+  /**
+   * Runtime-neutral scheduler（**必填**，R-4：core 无默认 timer、不直接使用宿主
+   * `setTimeout`/`performance`/`Date.now`）。
+   */
+  readonly scheduler: ISerializeScheduler;
 };
-
-const now = (): number => globalThis.performance?.now() ?? Date.now();
-
-const defaultYield = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 const clamp = (value: number, low: number, high: number): number =>
   value < low ? low : value > high ? high : value;
@@ -38,8 +51,9 @@ const clamp = (value: number, low: number, high: number): number =>
 /** 有限正数；NaN 与 Infinity 都要挡住。 */
 function assertPositiveMs(value: number, name: string): void {
   if (!Number.isFinite(value) || value <= 0) {
-    throw new RangeError(
-      `[store] frame budget ${name} must be a finite positive number, got ${value}`
+    throw createSerializeRangeError(
+      SerializeErrorCode.invalidOption,
+      `frame budget ${name} must be a finite positive number, got ${value}`
     );
   }
 }
@@ -47,7 +61,10 @@ function assertPositiveMs(value: number, name: string): void {
 /** 条目数必须是有限正整数——小数会让片边界漂移，NaN 会让循环停不下来。 */
 function assertCount(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value < 1) {
-    throw new RangeError(`[store] frame budget ${name} must be a positive integer, got ${value}`);
+    throw createSerializeRangeError(
+      SerializeErrorCode.invalidOption,
+      `frame budget ${name} must be a positive integer, got ${value}`
+    );
   }
 }
 
@@ -58,16 +75,31 @@ function assertCount(value: number, name: string): void {
  */
 export async function* sliceByFrameBudget<T>(
   items: readonly T[],
-  options: IFrameBudgetOptions = {}
+  options: IFrameBudgetOptions
 ): AsyncGenerator<readonly T[], void, undefined> {
   const {
     targetMs = 8,
     minItems = 64,
     maxItems = 250_000,
     initialItems = 2_048,
-    yieldTo = defaultYield,
-    signal
+    yieldTo,
+    signal,
+    scheduler
   } = options;
+  // scheduler 必填（R-4）：core 无默认 timer，不直接触碰宿主 `setTimeout`/`performance`/`Date.now`。
+  if (
+    !scheduler ||
+    typeof scheduler.now !== 'function' ||
+    typeof scheduler.schedule !== 'function'
+  ) {
+    throw createSerializeTypeError(
+      SerializeErrorCode.invalidOption,
+      'frame budget scheduler must be { now, schedule }'
+    );
+  }
+  const now = (): number => scheduler.now();
+  const resolveYield =
+    yieldTo ?? (() => new Promise<void>((resolve) => void scheduler.schedule(resolve, 0)));
   // NaN 必须显式挡掉：NaN <= 0 是 false，能穿过朴素的范围检查，然后
   // clamp(NaN) 仍是 NaN、slice(0, NaN) 得到空数组、index += 0 —— while 永不结束。
   // 这类参数常来自配置或远端下发，不能假定调用方给的是数字。
@@ -76,13 +108,17 @@ export async function* sliceByFrameBudget<T>(
   assertCount(maxItems, 'maxItems');
   assertCount(initialItems, 'initialItems');
   if (maxItems < minItems) {
-    throw new RangeError('[store] frame budget maxItems must be at least minItems');
+    throw createSerializeRangeError(
+      SerializeErrorCode.invalidOption,
+      'frame budget maxItems must be at least minItems'
+    );
   }
 
   let size = clamp(initialItems, minItems, maxItems);
   let index = 0;
   while (index < items.length) {
-    signal?.throwIfAborted?.();
+    if (signal?.aborted)
+      throw createSerializeError(SerializeErrorCode.aborted, 'serialize aborted');
     const slice = items.slice(index, index + size);
     const startedAt = now();
     yield slice;
@@ -96,13 +132,13 @@ export async function* sliceByFrameBudget<T>(
     const target = clamp(Math.round(size * ratio), minItems, maxItems);
     size = clamp(Math.round((size + target) / 2), minItems, maxItems);
 
-    if (index < items.length) await yieldTo();
+    if (index < items.length) await resolveYield();
   }
 }
 
 export type IEncodeStreamOptions = IFrameBudgetOptions & {
   readonly type?: string;
-  readonly source?: string;
+  readonly context?: string;
   /** 同时在途的请求数上限，即背压。默认 1：编好一片就等它落地再编下一片， 峰值内存只有一片。调高可以让编码与 worker 处理重叠，代价是峰值内存翻倍。 */
   readonly maxInFlight?: number;
 };
@@ -116,13 +152,16 @@ export type IEncodeStreamOptions = IFrameBudgetOptions & {
 export async function* encodeStream<T>(
   registry: ISerializeRegistry,
   items: readonly T[],
-  options: IEncodeStreamOptions = {}
+  options: IEncodeStreamOptions
 ): AsyncGenerator<ISerializeChunk, void, undefined> {
-  const { type, source = 'stream', signal, maxInFlight = 1 } = options;
+  const { type, context = 'stream', signal, maxInFlight = 1 } = options;
   // NaN 会让 `inFlight.length >= maxInFlight` 恒为 false，背压彻底关闭，
   // 在途请求无限堆积直到内存耗尽
   if (!Number.isSafeInteger(maxInFlight) || maxInFlight < 1) {
-    throw new RangeError(`[store] maxInFlight must be a positive integer, got ${maxInFlight}`);
+    throw createSerializeRangeError(
+      SerializeErrorCode.invalidOption,
+      `maxInFlight must be a positive integer, got ${maxInFlight}`
+    );
   }
   const inFlight: Promise<ISerializeChunk>[] = [];
   let sliceIndex = 0;
@@ -132,18 +171,19 @@ export async function* encodeStream<T>(
     try {
       return await pending;
     } catch (error) {
-      // 刻意不透传内层 SerializeError：它的 chunkIndex 说的是「本次编码的第几段」，
+      // 刻意不透传内层 SerializeCodecError：它的 chunkIndex 说的是「本次编码的第几段」，
       // 恒为 0，会把「流里的第几片」这个真正有用的位置盖掉。原错误挂在 cause 上。
-      throw new SerializeError(
-        `[store] encode stream failed at slice ${sliceIndex}: ${
+      throw new SerializeCodecError(
+        `encode stream failed at slice ${sliceIndex}: ${
           error instanceof Error ? error.message : String(error)
         }`,
         {
           type: type ?? registry.primaryType,
-          phase: 'encode',
-          source,
+          phase: SerializePhase.encode,
+          context,
           chunkIndex: sliceIndex,
           bytesConsumed: 0,
+          code: SerializeErrorCode.encodeFailed,
           cause: error
         }
       );
@@ -152,8 +192,9 @@ export async function* encodeStream<T>(
 
   try {
     for await (const slice of sliceByFrameBudget(items, options)) {
-      signal?.throwIfAborted?.();
-      inFlight.push(registry.encode(slice, { type, signal, source }));
+      if (signal?.aborted)
+        throw createSerializeError(SerializeErrorCode.aborted, 'serialize aborted');
+      inFlight.push(registry.encode(slice, { type, signal, context }));
       // 背压：在途数达到上限就先把最早那笔排空，避免无限堆积
       while (inFlight.length >= maxInFlight) {
         yield await drainOne();
@@ -178,28 +219,30 @@ export async function* decodeStream(
   chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>,
   options: {
     readonly type?: string;
-    readonly source?: string;
+    readonly context?: string;
     readonly signal?: ISerializeAbortSignal;
   } = {}
 ): AsyncGenerator<unknown, void, undefined> {
-  const { type, source = 'stream', signal } = options;
+  const { type, context = 'stream', signal } = options;
   let index = 0;
   for await (const chunk of chunks as AsyncIterable<ISerializeChunk>) {
-    signal?.throwIfAborted?.();
+    if (signal?.aborted)
+      throw createSerializeError(SerializeErrorCode.aborted, 'serialize aborted');
     try {
-      yield await registry.decode(chunk, { type, signal, source });
+      yield await registry.decode(chunk, { type, signal, context });
     } catch (error) {
       // 同上：保留流位置，内层错误挂 cause
-      throw new SerializeError(
-        `[store] decode stream failed at chunk ${index}: ${
+      throw new SerializeCodecError(
+        `decode stream failed at chunk ${index}: ${
           error instanceof Error ? error.message : String(error)
         }`,
         {
           type: type ?? registry.primaryType,
-          phase: 'decode',
-          source,
+          phase: SerializePhase.decode,
+          context,
           chunkIndex: index,
           bytesConsumed: 0,
+          code: SerializeErrorCode.decodeFailed,
           cause: error
         }
       );
@@ -210,15 +253,19 @@ export async function* decodeStream(
 
 /** 把分段流合并成一整块。只在消费者确实需要完整 blob 时才用——它会把整份数据 同时驻留在内存里，正是流式想避免的那笔峰值。 */
 export async function collectStream(
-  chunks: AsyncIterable<ISerializeChunk>
+  chunks: AsyncIterable<ISerializeChunk>,
+  encoder?: ITextEncoder
 ): Promise<ISerializeChunk> {
   const collected: ISerializeChunk[] = [];
   let sawBytes = false;
   for await (const chunk of chunks) {
-    if (chunk[0] === 'value') {
-      throw new TypeError('[store] cannot collect a value chunk into a stream');
+    if (chunk[0] === SerializeChunkKind.value) {
+      throw createSerializeTypeError(
+        SerializeErrorCode.invalidChunk,
+        'cannot collect a value chunk into a stream'
+      );
     }
-    if (chunk[0] === 'bytes') sawBytes = true;
+    if (chunk[0] === SerializeChunkKind.bytes) sawBytes = true;
     collected.push(chunk);
   }
   if (collected.length === 0) return ['text', ''];
@@ -227,9 +274,13 @@ export async function collectStream(
     // long stream (which otherwise turns collection into quadratic work).
     return ['text', collected.map((chunk) => chunk[1] as string).join('')];
   }
-  const encoder = new TextEncoder();
+  // core 无默认 Encoding adapter（R-4）：出现 bytes 需要合并时必须注入 encoder，不直接使用宿主 TextEncoder。
+  const enc = encoder;
+  if (enc === undefined) {
+    throw createSerializeError(SerializeErrorCode.envUnsupported, 'TextEncoder is unavailable');
+  }
   const parts = collected.map((chunk) =>
-    chunk[0] === 'bytes' ? chunk[1] : encoder.encode(chunk[1] as string)
+    chunk[0] === SerializeChunkKind.bytes ? chunk[1] : enc.encode(chunk[1] as string)
   );
   let total = 0;
   for (const part of parts) total += part.byteLength;

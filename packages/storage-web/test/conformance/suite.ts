@@ -380,6 +380,24 @@ export const recordConformance = (
       await expect(store.getRecord('aba-record')).resolves.toEqual({ value: 1 });
     });
 
+    it('空事务（无读写）与并发 clearRecords 不误报冲突（memory 与 indexed-db 一致）', async () => {
+      const store = await create();
+      await store.putRecord({ value: 0 }, 'empty-epoch');
+      let release: (() => void) | undefined;
+      const paused = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const first = store.transaction(async (tx) => {
+        await paused;
+        void tx;
+      });
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
+      await store.clearRecords();
+      release!();
+      // 空事务没有建立任何快照，clearRecords 发生在快照之外，两后端都应收敛为「无冲突」提交。
+      await expect(first).resolves.toBeUndefined();
+    });
+
     it('transaction 成功 delete 会持久化删除', async () => {
       const store = await create();
       await store.putRecord({ v: 1 }, 'delete-key');

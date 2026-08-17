@@ -1,5 +1,5 @@
-import type { IWebRpcMiddleware, IWebRpcPingCapability } from '../typing';
-import { WebRpcCapabilityKey } from '../internal/runtime';
+import type { IWebRpcMiddleware, IWebRpcPingCapability } from '../typing.js';
+import { WebRpcCapabilityKey } from '../internal/runtime.js';
 export type IPingMiddleware = IWebRpcMiddleware & { readonly pingCapability: true };
 export const ping = (): IPingMiddleware => ({
   name: 'ping',

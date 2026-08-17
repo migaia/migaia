@@ -34,7 +34,7 @@ export class KeyedCellRegistry<K, C> {
   }
 }
 
-type CellRegistry<K, C> = {
+type ICellRegistry<K, C> = {
   get(key: K): C | undefined;
   set(key: K, cell: C): void;
   delete(key: K): boolean;
@@ -45,7 +45,7 @@ type CellRegistry<K, C> = {
  * collection implementations from drifting on abandoned render cleanup semantics.
  */
 export function scheduleLazyCellRelease<K, C>(
-  registry: CellRegistry<K, C>,
+  registry: ICellRegistry<K, C>,
   key: K,
   cell: C,
   release: () => boolean

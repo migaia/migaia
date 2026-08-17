@@ -1,10 +1,2 @@
-/** Read a built-in constructor name without invoking user-provided methods. */
-export const intrinsicConstructorName = (value: unknown): string | undefined => {
-  if (typeof value !== 'object' || value === null) return undefined;
-  try {
-    const constructor = Object.getPrototypeOf(value)?.constructor;
-    return typeof constructor?.name === 'string' ? constructor.name : undefined;
-  } catch {
-    return undefined;
-  }
-};
+// 纯工具已迁往 `@migaia/storage-contract`；本文件 re-export 以保持既有 import 路径不变。
+export { intrinsicConstructorName } from '@migaia/storage-contract';

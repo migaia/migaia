@@ -1,14 +1,14 @@
-import { WebRpcEndpoint } from './endpoint';
-import { WebRpcCapabilityKey, WebRpcCapabilityRegistry } from './internal/runtime';
+import { WebRpcEndpoint } from './endpoint.js';
+import { WebRpcCapabilityKey, WebRpcCapabilityRegistry } from './internal/runtime.js';
 import {
   WebRpcAbortError,
   WebRpcConstructionError,
   WebRpcError,
   WebRpcErrorCode,
   WebRpcTimeoutError
-} from './errors';
-import { raceWithAsyncControl } from './internal/async-control';
-import { safeRead } from './internal/safe-value';
+} from './errors.js';
+import { raceWithAsyncControl } from './internal/async-control.js';
+import { safeRead } from './internal/safe-value.js';
 import type {
   IWebRpcAbortCapability,
   IWebRpcFactoryConfig,
@@ -22,8 +22,8 @@ import type {
   IFactoryPingCapability,
   IWebRpcMiddleware as IWebRpcMiddlewareType,
   IWebRpcEndpoint as IWebRpcEndpointType
-} from './typing';
-import type { IWebRpcTransport } from './transport';
+} from './typing.js';
+import type { IWebRpcTransport } from './transport.js';
 
 export async function createEndpoint<
   TTargetId extends string = string,
@@ -46,7 +46,7 @@ export async function createEndpoint<
   let factoryReplay: IWebRpcFactoryConfig['replay'];
   try {
     if (!config || typeof config !== 'object' || Array.isArray(config))
-      throw new Error('factory descriptor is invalid');
+      throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'factory descriptor is invalid');
     factoryId = config.id;
     factoryMiddlewares = config.middlewares;
     factoryTargetIds = config.targetIds;
@@ -60,6 +60,7 @@ export async function createEndpoint<
     // docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
     factoryReplay = config.replay;
   } catch (error) {
+    if (error instanceof WebRpcError) throw error;
     throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'factory descriptor is unreadable', error);
   }
   if (typeof factoryId !== 'string' || factoryId.length === 0)
@@ -229,7 +230,7 @@ export async function createEndpoint<
           if (error instanceof WebRpcError && error.code === WebRpcErrorCode.capabilityConflict)
             throw error;
           throw new WebRpcError(
-            'PLUGIN_INSTALL_FAILED',
+            WebRpcErrorCode.pluginInstallFailed,
             `Middleware "${item.name}" installation failed: ${
               error instanceof Error ? error.message : String(error)
             }`,

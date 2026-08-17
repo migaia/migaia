@@ -1,4 +1,7 @@
 import { createContext, useContext, type ReactNode } from 'react';
+import { createStoreReactError } from './errors.js';
+import { StoreReactErrorCode } from './error-code.js';
+import { EMPTY_EXPERIMENTAL_ENCODING, StoreProviderState } from './provider-state-constants.js';
 
 /**
  * 应用级 Store 配置（挂在 StoreProvider 上）。
@@ -38,7 +41,7 @@ export type IStoreProviderConfig = {
   readonly defaults?: IStoreProviderDefaults;
 };
 
-export type IReadyStatus = 'pending' | 'ready' | 'error';
+export type IReadyStatus = (typeof StoreProviderState)[keyof typeof StoreProviderState];
 
 export type ITrackedReady = {
   readonly promise: Promise<void>;
@@ -77,7 +80,8 @@ export function normalizeStoreConfig(
       ? ([
           () =>
             Promise.reject(
-              new Error(
+              createStoreReactError(
+                StoreReactErrorCode.invalidConfig,
                 '[store] features.wasm is true but config.ready is empty; pass ensureWasm from @migaia/store-wasm (e.g. ready: [ensureWasm])'
               )
             )
@@ -116,27 +120,32 @@ function getReadyPromise(barriers: readonly IStoreReadyBarrier[], scope: object)
 }
 
 const READY_TRACK = new WeakMap<Promise<void>, { status: IReadyStatus; error: unknown }>();
+const READY_OBJECTS = new WeakMap<Promise<void>, ITrackedReady>();
 
 function trackReady(promise: Promise<void>): ITrackedReady {
+  const tracked = READY_OBJECTS.get(promise);
+  if (tracked) return tracked;
   let state = READY_TRACK.get(promise);
   if (!state) {
-    state = { status: 'pending', error: undefined };
+    state = { status: StoreProviderState.pending, error: undefined };
     READY_TRACK.set(promise, state);
     promise.then(
       () => {
-        state!.status = 'ready';
+        state!.status = StoreProviderState.ready;
       },
       (reason: unknown) => {
-        state!.status = 'error';
+        state!.status = StoreProviderState.error;
         state!.error = reason;
       }
     );
   }
-  return {
+  const result = {
     promise,
     status: () => state!.status,
     error: () => state!.error
   };
+  READY_OBJECTS.set(promise, result);
+  return result;
 }
 
 function freezeExperimental(
@@ -168,7 +177,7 @@ export function encodeStoreExperimental(input: IStoreFeatureExperimental | undef
 }
 
 export function decodeStoreExperimental(encoded: string): Readonly<Record<string, boolean>> {
-  if (encoded === '[]') return EMPTY_EXPERIMENTAL;
+  if (encoded === EMPTY_EXPERIMENTAL_ENCODING) return EMPTY_EXPERIMENTAL;
   const entries = JSON.parse(encoded) as Array<readonly [string, boolean]>;
   const out = Object.create(null) as Record<string, boolean>;
   for (const [key, enabled] of entries) out[key] = enabled === true;
@@ -222,10 +231,14 @@ export function assertStoreFeature(
   apiName = 'this API'
 ): void {
   if (!config) {
-    throw new Error(`[store] ${apiName} requires a StoreProvider (feature "${path}")`);
+    throw createStoreReactError(
+      StoreReactErrorCode.providerRequired,
+      `[store] ${apiName} requires a StoreProvider (feature "${path}")`
+    );
   }
   if (!readStoreFeature(config, path)) {
-    throw new Error(
+    throw createStoreReactError(
+      StoreReactErrorCode.featureDisabled,
       `[store] ${apiName} requires feature "${path}" to be explicitly enabled on StoreProvider config`
     );
   }

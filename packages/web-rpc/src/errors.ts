@@ -1,54 +1,41 @@
-export const WebRpcErrorCode = {
-  middlewareDuplicated: 'MIDDLEWARE_DUPLICATED',
-  middlewareMissing: 'MIDDLEWARE_MISSING',
-  invalidConfig: 'INVALID_CONFIG',
-  providerDuplicated: 'PROVIDER_DUPLICATED',
-  uuidUnavailable: 'UUID_UNAVAILABLE',
-  uuidInvalid: 'UUID_INVALID',
-  uuidConflict: 'UUID_CONFLICT',
-  protocolInvalid: 'PROTOCOL_INVALID',
-  protocolUnsupported: 'PROTOCOL_UNSUPPORTED',
-  protocolDecryptFailed: 'PROTOCOL_DECRYPT_FAILED',
-  contractInvalid: 'CONTRACT_INVALID',
-  contractVersionUnsupported: 'CONTRACT_VERSION_UNSUPPORTED',
-  payloadInvalid: 'PAYLOAD_INVALID',
-  payloadTooLarge: 'PAYLOAD_TOO_LARGE',
-  methodNotFound: 'METHOD_NOT_FOUND',
-  providerNotSettled: 'PROVIDER_NOT_SETTLED',
-  internal: 'INTERNAL',
-  targetUnknown: 'TARGET_UNKNOWN',
-  targetNotIdentifiable: 'TARGET_NOT_IDENTIFIABLE',
-  endpointDisposed: 'ENDPOINT_DISPOSED',
-  cancelled: 'CANCELLED',
-  deadlineExceeded: 'DEADLINE_EXCEEDED',
-  contextExpired: 'PROVIDER_CONTEXT_EXPIRED',
-  transport: 'TRANSPORT',
-  authenticationFailed: 'AUTHENTICATION_FAILED',
-  unauthenticated: 'UNAUTHENTICATED',
-  forbidden: 'FORBIDDEN',
-  unavailable: 'UNAVAILABLE',
-  schemaInvalid: 'SCHEMA_INVALID',
-  capabilityConflict: 'CAPABILITY_CONFLICT',
-  overloaded: 'OVERLOADED',
-  chunkInvalid: 'CHUNK_INVALID',
-  chunkTooLarge: 'CHUNK_TOO_LARGE',
-  chunkCapacityExceeded: 'CHUNK_CAPACITY_EXCEEDED',
-  chunkReceiveTimeout: 'CHUNK_RECEIVE_TIMEOUT',
-  chunkAckTimeout: 'CHUNK_ACK_TIMEOUT'
-} as const;
-export type IWebRpcErrorCode = (typeof WebRpcErrorCode)[keyof typeof WebRpcErrorCode];
+import { WebRpcErrorCode, type IWebRpcErrorCode } from './error-code.js';
+export { WebRpcErrorCode, type IWebRpcErrorCode };
+
+/** `source` value stamped onto every error this package throws locally. */
+export const WEBRPC_SOURCE = '@migaia/web-rpc';
+
 export type IWebRpcCleanupError = { readonly resource: string; readonly error: unknown };
-export type IWebRpcError = { readonly code: string; readonly cause?: unknown };
+export type IWebRpcError = {
+  readonly source: string;
+  readonly code: IWebRpcErrorCode;
+  readonly cause?: unknown;
+};
 export class WebRpcError extends Error implements IWebRpcError {
-  readonly code: string;
+  readonly source: string;
+  readonly code: IWebRpcErrorCode;
   readonly cause?: unknown;
   readonly cleanupErrors?: readonly IWebRpcCleanupError[];
-  constructor(code: string, message: string, cause?: unknown) {
+  constructor(code: IWebRpcErrorCode, message: string, cause?: unknown) {
     super(message);
     this.name = 'WebRpcError';
+    this.source = WEBRPC_SOURCE;
     this.code = code;
     this.cause = cause;
   }
+}
+
+/**
+ * 给已构造的错误对象（`TypeError`/`RangeError` 等）补上 `(source, code)`，不触碰
+ * `message`/`name`/`stack`/构造函数带来的其它字段—— 用于入参校验这类必须保持原生类型（调用方按 `instanceof TypeError`
+ * 分支）的场景（`docs/contracts/error-codes.md` §2.2）。
+ */
+export function tagWebRpcError<E extends Error>(
+  error: E,
+  code: IWebRpcErrorCode
+): E & Pick<IWebRpcError, 'source' | 'code'> {
+  Object.defineProperty(error, 'source', { value: WEBRPC_SOURCE, enumerable: true });
+  Object.defineProperty(error, 'code', { value: code, enumerable: true });
+  return error as E & Pick<IWebRpcError, 'source' | 'code'>;
 }
 export class WebRpcSchemaValidationError extends WebRpcError {
   readonly data: unknown;
@@ -123,13 +110,19 @@ export class WebRpcChunkError extends WebRpcError {
     this.name = 'WebRpcChunkError';
   }
 }
-export class WebRpcRemoteError extends WebRpcError {
-  constructor(code: string, message: string, data?: unknown, cause?: unknown) {
-    super(code, message, cause);
-    this.name = 'WebRpcRemoteError';
-    this.data = data;
-  }
+export class WebRpcRemoteError extends Error {
+  readonly source: string;
+  readonly code: string;
   readonly data?: unknown;
+  readonly cause?: unknown;
+  constructor(code: string, message: string, data?: unknown, cause?: unknown) {
+    super(message);
+    this.name = 'WebRpcRemoteError';
+    this.source = WEBRPC_SOURCE;
+    this.code = code;
+    this.data = data;
+    this.cause = cause;
+  }
 }
 export class WebRpcAbortError extends WebRpcError {
   readonly cleanupPromise?: Promise<readonly IWebRpcCleanupError[]>;
@@ -138,7 +131,8 @@ export class WebRpcAbortError extends WebRpcError {
     cleanupPromise?: Promise<readonly IWebRpcCleanupError[]>
   ) {
     super(WebRpcErrorCode.cancelled, message);
-    this.name = 'WebRpcAbortError';
+    // 按 web-rpc.sdd.md §5.5：name 用标准 `AbortError`，供调用方与跨 realm 复原按 `name` 判定取消语义。
+    this.name = 'AbortError';
     this.cleanupPromise = cleanupPromise;
   }
 }
@@ -149,10 +143,11 @@ export class WebRpcTimeoutError extends WebRpcError {
     cleanupPromise?: Promise<readonly IWebRpcCleanupError[]>
   ) {
     super(WebRpcErrorCode.deadlineExceeded, message);
-    this.name = 'WebRpcTimeoutError';
+    // 按 web-rpc.sdd.md §5.5：name 用标准 `TimeoutError`，供调用方与跨 realm 复原按 `name` 判定超时语义。
+    this.name = 'TimeoutError';
     this.cleanupPromise = cleanupPromise;
   }
 }
 export const isWebRpcError = (value: unknown): value is IWebRpcError =>
   typeof value === 'object' && value !== null && typeof safeRead(value, 'code') === 'string';
-import { safeRead } from './internal/safe-value';
+import { safeRead } from './internal/safe-value.js';

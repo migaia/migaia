@@ -13,8 +13,9 @@ import {
   type IDerivedDefinition,
   type IWritableAtomDefinition,
   type IWritableDerivedDefinition
-} from './definition';
-import type { IAtomStore } from './store';
+} from './definition.js';
+import { createStoreKeyedError, StoreKeyedErrorCode } from '../errors.js';
+import type { IAtomStore } from './store.js';
 import {
   readOpticPath,
   writeOpticPath,
@@ -25,7 +26,7 @@ import {
   filterOutKey,
   replaceAtIndex,
   KeyedSplitCache
-} from './optics-path';
+} from './optics-path.js';
 
 /** 与实例层 IAtomOptic 同形：不可变 get/set。 */
 export type IDefOptic<Source, Focus> = {
@@ -88,7 +89,10 @@ export function focusDef<Source>(
   ...path: readonly PropertyKey[]
 ): IWritableDerivedDefinition<unknown, readonly [IAtomUpdate<unknown>], void> {
   if (path.length === 0) {
-    throw new Error('[store] focusDef requires at least one path segment');
+    throw createStoreKeyedError(
+      StoreKeyedErrorCode.invalidOption,
+      '[store] focusDef requires at least one path segment'
+    );
   }
   return opticDef(source, {
     get: (value) => readOpticPath(value, path, 'focusDef'),

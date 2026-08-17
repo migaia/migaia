@@ -1,4 +1,4 @@
-export { Signal } from './signal.class';
-export { Computed } from './computed.class';
-export { Effect } from './effect.class';
-export type { IComputedConfig } from './computed.class';
+export { Signal } from './signal.class.js';
+export { Computed } from './computed.class.js';
+export { Effect } from './effect.class.js';
+export type { IComputedConfig } from './computed.class.js';

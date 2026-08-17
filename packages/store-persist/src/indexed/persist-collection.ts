@@ -1,11 +1,7 @@
 import type { IRuntime } from '@migaia/reactive';
-import { persistUnit } from '../core/persist-unit';
-import type {
-  IPersistCodec,
-  IPersistHandle,
-  IPersistKeyValueStore,
-  IPersistUnit
-} from '../core/types';
+import { persistUnit } from '../core/persist-unit.js';
+import type { ICodec } from '@migaia/storage-web';
+import type { IPersistHandle, IPersistStorage, IPersistUnit } from '../core/types.js';
 
 /**
  * `persistCollection()` 支持的四种 store-indexed 集合。全部都有 `snapshot()`（tracked 读， 内部读了一个结构性 Signal，包进
@@ -20,8 +16,8 @@ export type IPersistableCollection<TState> = {
 
 export type IPersistCollectionOptions<TState> = {
   key: string;
-  storage: IPersistKeyValueStore;
-  codec?: IPersistCodec;
+  storage: IPersistStorage;
+  codec?: ICodec;
   version?: number;
   migrate?: (persisted: TState, fromVersion: number) => TState;
   partialize?: (state: TState) => Partial<TState>;

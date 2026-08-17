@@ -5,11 +5,12 @@ import type {
   IObserver,
   IReactiveNodeOptions,
   IRuntime
-} from '../runtime/types';
-import { internalsOf } from '../runtime/internals';
-import { claimOwnership } from '../runtime/ownership';
-import { describeObserver } from '../runtime/diagnostics';
-import { registerDeps, registerDepVersions } from '../runtime/node-internals';
+} from '../runtime/types.js';
+import { internalsOf } from '../runtime/internals.js';
+import { claimOwnership } from '../runtime/ownership.js';
+import { describeObserver } from '../runtime/diagnostics.js';
+import { registerDeps, registerDepVersions } from '../runtime/node-internals.js';
+import { ReactiveTracePhase, ReactiveTraceType } from '../runtime/trace-constants.js';
 
 // 副作用：唯一真正"被执行"的观察者——Computed 只标脏不重跑，只有 Effect 会被调度器实际 tick
 export class Effect implements IObserver, IDisposable {
@@ -57,12 +58,12 @@ export class Effect implements IObserver, IDisposable {
     if (this.#disposed) return;
     const runtime = internalsOf(this.runtime);
     const tracing = runtime.traceEnabled();
-    const startedAt = tracing ? now() : 0;
+    const startedAt = tracing ? runtime.now() : 0;
     if (tracing) {
       runtime.emitTrace({
-        type: 'observer-run',
-        timestamp: Date.now(),
-        phase: 'start',
+        type: ReactiveTraceType.observerRun,
+        timestamp: runtime.timestamp(),
+        phase: ReactiveTracePhase.start,
         observer: describeObserver(this)
       });
     }
@@ -78,11 +79,11 @@ export class Effect implements IObserver, IDisposable {
     } catch (error) {
       if (tracing) {
         runtime.emitTrace({
-          type: 'observer-run',
-          timestamp: Date.now(),
-          phase: 'error',
+          type: ReactiveTraceType.observerRun,
+          timestamp: runtime.timestamp(),
+          phase: ReactiveTracePhase.error,
           observer: describeObserver(this),
-          durationMs: now() - startedAt,
+          durationMs: runtime.now() - startedAt,
           error
         });
       }
@@ -90,11 +91,11 @@ export class Effect implements IObserver, IDisposable {
     }
     if (tracing) {
       runtime.emitTrace({
-        type: 'observer-run',
-        timestamp: Date.now(),
-        phase: 'end',
+        type: ReactiveTraceType.observerRun,
+        timestamp: runtime.timestamp(),
+        phase: ReactiveTracePhase.end,
         observer: describeObserver(this),
-        durationMs: now() - startedAt
+        durationMs: runtime.now() - startedAt
       });
     }
   }
@@ -107,8 +108,4 @@ export class Effect implements IObserver, IDisposable {
     if (typeof previousCleanup === 'function') this.runtime.untracked(previousCleanup);
     internalsOf(this.runtime).scheduler.dequeue(this);
   }
-}
-
-function now(): number {
-  return globalThis.performance?.now() ?? Date.now();
 }

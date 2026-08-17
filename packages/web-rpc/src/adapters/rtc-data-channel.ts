@@ -1,6 +1,8 @@
-import type { IWebRpcTransport } from '../transport';
-import { safeRead } from '../internal/safe-value';
-import { registerListeners, releaseListeners } from '../internal/listener-safety';
+import { WebRpcErrorCode, WebRpcTransportError, tagWebRpcError } from '../errors.js';
+import type { IWebRpcTransport } from '../transport.js';
+import { safeRead } from '../internal/safe-value.js';
+import { registerListeners, releaseListeners } from '../internal/listener-safety.js';
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js';
 
 /** Minimal RTCDataChannel surface accepted by the adapter. */
 export type IRTCDataChannel = {
@@ -26,9 +28,15 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IWebRpc
     typeof channel.addEventListener !== 'function' ||
     typeof channel.removeEventListener !== 'function'
   )
-    throw new TypeError('RTCDataChannel must expose readyState and terminal event listeners');
+    throw tagWebRpcError(
+      new TypeError('RTCDataChannel must expose readyState and terminal event listeners'),
+      WebRpcErrorCode.invalidConfig
+    );
   if (channel.readyState !== 'open' && channel.readyState !== 'closed')
-    throw new TypeError('RTCDataChannel must be open before transport construction');
+    throw tagWebRpcError(
+      new TypeError('RTCDataChannel must be open before transport construction'),
+      WebRpcErrorCode.invalidConfig
+    );
   const listeners = new Set<(message: { data: unknown }) => void>();
   const listenerErrors = new Set<(error: unknown) => void>();
   const transportErrors = new Set<(error: unknown) => void>();
@@ -105,19 +113,19 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IWebRpc
     }
   };
   return {
-    platform: 'RTCDataChannel',
+    platform: WebRpcPlatform.rtcDataChannel,
     topology: 'exclusive',
-    ownership: 'borrowed',
+    ownership: WebRpcTransportOwnership.borrowed,
     get closed() {
       return closed;
     },
     encodedType: 'string',
     send(message) {
-      if (closed) throw new Error('RTCDataChannel is closed');
+      if (closed) throw new WebRpcTransportError('RTCDataChannel is closed');
       channel.send(typeof message === 'string' ? message : JSON.stringify(message));
     },
     subscribe(listener) {
-      if (closed) throw new Error('RTCDataChannel is closed');
+      if (closed) throw new WebRpcTransportError('RTCDataChannel is closed');
       if (listeners.size === 0) {
         installTerminalListeners();
         try {

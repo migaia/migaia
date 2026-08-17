@@ -1,5 +1,7 @@
-import type { IWebRpcTransport } from '../transport';
-import { isUint8Array } from '../internal/safe-value';
+import { WebRpcErrorCode, WebRpcTransportError, tagWebRpcError } from '../errors.js';
+import type { IWebRpcTransport } from '../transport.js';
+import { isUint8Array } from '../internal/safe-value.js';
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js';
 
 /** Minimal datagram surface accepted by the WebTransport adapter. */
 export type IWebTransportDatagrams = {
@@ -84,21 +86,24 @@ export function createWebTransportDatagramTransport(
     }
   };
   return {
-    platform: 'WebTransport',
+    platform: WebRpcPlatform.webTransport,
     topology: 'exclusive',
     encodedType: 'uint8array',
-    ownership: 'owned',
+    ownership: WebRpcTransportOwnership.owned,
     get closed() {
       return closed;
     },
     send(message) {
-      if (closed) throw new Error('WebTransport is closed');
+      if (closed) throw new WebRpcTransportError('WebTransport is closed');
       if (!isUint8Array(message))
-        throw new TypeError('WebTransport requires Uint8Array encoded messages');
+        throw tagWebRpcError(
+          new TypeError('WebTransport requires Uint8Array encoded messages'),
+          WebRpcErrorCode.invalidConfig
+        );
       return writer.write(message);
     },
     subscribe(listener) {
-      if (closed) throw new Error('WebTransport is closed');
+      if (closed) throw new WebRpcTransportError('WebTransport is closed');
       listeners.add(listener);
       if (!readPromise) {
         readPromise = read().finally(() => {

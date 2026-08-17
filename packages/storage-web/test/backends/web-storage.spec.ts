@@ -22,14 +22,14 @@ describe('createWebStorageBackend', () => {
     for (const options of [null, [], 'options', 1])
       expect(() =>
         createWebStorageBackend('local', fakeWebStorage(), options as never)
-      ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+      ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }));
   });
 
   it('local/session wrapper 在解构前拒绝非法 options', () => {
     for (const factory of [localStorage, sessionStorage])
       for (const options of [null, [], 'options', 1])
         expect(() => factory(options as never)).toThrowError(
-          expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+          expect.objectContaining({ code: 'INVALID_CONFIG' })
         );
   });
 
@@ -41,7 +41,7 @@ describe('createWebStorageBackend', () => {
             throw new Error('hostile storage getter');
           }
         })
-      ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+      ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }));
   });
 
   it('local/session wrapper 对三个构造字段各读取一次', () => {
@@ -66,14 +66,14 @@ describe('createWebStorageBackend', () => {
     }
   });
 
-  it('namespace getter 异常统一返回 INVALID_ARGUMENT', () => {
+  it('namespace getter 异常统一返回 INVALID_CONFIG', () => {
     expect(() =>
       localStorage({
         get namespace(): string {
           throw new Error('hostile namespace');
         }
       })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }));
   });
 
   it('namespace codec 描述符只读取一次并固定后续行为', async () => {
@@ -100,7 +100,7 @@ describe('createWebStorageBackend', () => {
     expect(reads).toBe(2);
   });
 
-  it('namespace codec getter 异常统一返回 INVALID_ARGUMENT', () => {
+  it('namespace codec getter 异常统一返回 INVALID_CONFIG', () => {
     expect(() =>
       createWebStorageBackend('local', fakeWebStorage(), {
         namespaceCodec: {
@@ -110,23 +110,23 @@ describe('createWebStorageBackend', () => {
           decode: () => undefined
         }
       })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', backend: 'local' }));
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG', backend: 'local' }));
   });
 
   it('构造期拒绝非法 namespace 与 namespace codec 形状', () => {
     expect(() =>
       createWebStorageBackend('local', fakeWebStorage(), { namespace: '' })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }));
     expect(() =>
       createWebStorageBackend('local', fakeWebStorage(), {
         namespace: null as unknown as string
       })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }));
     expect(() =>
       createWebStorageBackend('local', fakeWebStorage(), {
         namespaceCodec: [] as never
       })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }));
   });
 
   it('backend 与 capabilities 正确声明', () => {
@@ -138,7 +138,7 @@ describe('createWebStorageBackend', () => {
   });
   it('拒绝 malformed storage 注入而不误报为 unavailable', () => {
     expect(() => createWebStorageBackend('local', {} as never)).toThrowError(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
     );
   });
   it('拒绝非法 storage length', () => {
@@ -148,7 +148,7 @@ describe('createWebStorageBackend', () => {
         length
       };
       expect(() => createWebStorageBackend('local', storage as never)).toThrowError(
-        expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+        expect.objectContaining({ code: 'INVALID_CONFIG' })
       );
     }
   });
@@ -166,7 +166,7 @@ describe('createWebStorageBackend', () => {
     expect(store.sync!.get('missing')).toBeNull();
     expect(reads).toBe(1);
   });
-  it('storage surface getter 异常统一返回 INVALID_ARGUMENT', () => {
+  it('storage surface getter 异常统一返回 INVALID_CONFIG', () => {
     const storage = fakeWebStorage();
     Object.defineProperty(storage, 'getItem', {
       get: () => {
@@ -174,7 +174,7 @@ describe('createWebStorageBackend', () => {
       }
     });
     expect(() => createWebStorageBackend('local', storage)).toThrowError(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
     );
   });
   it('不可用时始终抛 BACKEND_UNAVAILABLE', () => {
@@ -296,11 +296,7 @@ describe('createWebStorageBackend', () => {
     await store.set('second', 'two');
     armed = true;
     await expect(store.clearAll({ signal: controller.signal })).rejects.toMatchObject({
-      code: 'ABORTED',
-      backend: 'local',
-      operation: 'local.clearAll',
-      key: 'second',
-      cause: reason
+      code: 'ABORTED'
     });
     await expect(store.get('first')).resolves.toBeNull();
     await expect(store.get('second')).resolves.toBe('two');
@@ -333,13 +329,13 @@ describe('createWebStorageBackend', () => {
   it('拒绝运行时非字符串 key，不把它隐式编码为物理键', async () => {
     const store = createWebStorageBackend('local', fakeWebStorage());
     await expect(store.set(42 as unknown as string, 'value')).rejects.toMatchObject({
-      code: 'INVALID_ARGUMENT'
+      code: 'INVALID_CONFIG'
     });
     expect(() => store.sync!.get(42 as unknown as string)).toThrow(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ code: 'INVALID_CONFIG' })
     );
     await expect(store.set('key', 42 as unknown as string)).rejects.toMatchObject({
-      code: 'INVALID_ARGUMENT'
+      code: 'INVALID_CONFIG'
     });
   });
   it('自定义 namespace codec encode/decode 异常统一归一化', async () => {

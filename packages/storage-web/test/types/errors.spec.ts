@@ -2,17 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { StorageError, StorageErrorCode } from '../../src/types/errors';
 
 describe('StorageError', () => {
-  it('公开错误码集合保持 19 个稳定值且无重复', () => {
+  it('公开错误码集合保持 15 个稳定值且无重复', () => {
     const codes = Object.values(StorageErrorCode);
-    expect(codes).toHaveLength(19);
+    expect(codes).toHaveLength(15);
     expect(new Set(codes).size).toBe(codes.length);
   });
 
   it('StorageErrorCode runtime descriptor 不可变', () => {
     expect(() => {
-      (StorageErrorCode as { aborted: string }).aborted = 'changed';
+      (StorageErrorCode as { invalidConfig: string }).invalidConfig = 'changed';
     }).toThrow(TypeError);
-    expect(StorageErrorCode.aborted).toBe('ABORTED');
+    expect(StorageErrorCode.invalidConfig).toBe('INVALID_CONFIG');
   });
 
   it('携带 code/backend/key', () => {
@@ -25,11 +25,11 @@ describe('StorageError', () => {
     expect(error.key).toBe('k');
   });
   it('StorageError 实例字段在运行时不可变', () => {
-    const error = new StorageError(StorageErrorCode.aborted);
+    const error = new StorageError(StorageErrorCode.invalidConfig);
     expect(() => {
       (error as { code: string }).code = 'changed';
     }).toThrow(TypeError);
-    expect(error.code).toBe('ABORTED');
+    expect(error.code).toBe('INVALID_CONFIG');
   });
   it('原始异常进 cause，不改写自身 message', () => {
     const cause = new Error('原始信息');
@@ -38,9 +38,9 @@ describe('StorageError', () => {
     expect(cause.message).toBe('原始信息');
   });
   it('未提供 message 时使用默认文案', () => {
-    expect(new StorageError(StorageErrorCode.disposed).message).toContain('STORE_DISPOSED');
+    expect(new StorageError(StorageErrorCode.invalidConfig).message).toContain('INVALID_CONFIG');
   });
   it('name 固定为 StorageError', () => {
-    expect(new StorageError(StorageErrorCode.aborted).name).toBe('StorageError');
+    expect(new StorageError(StorageErrorCode.invalidConfig).name).toBe('StorageError');
   });
 });

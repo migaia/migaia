@@ -2,9 +2,9 @@ import type {
   IWebRpcMiddleware,
   IWebRpcProtocolCapability,
   IWebRpcProtocolConfig
-} from '../typing';
-import { WebRpcCapabilityKey } from '../internal/runtime';
-import { WebRpcError, WebRpcErrorCode } from '../errors';
+} from '../typing.js';
+import { WebRpcCapabilityKey } from '../internal/runtime.js';
+import { WebRpcError, WebRpcErrorCode } from '../errors.js';
 export const protocol = (config: IWebRpcProtocolConfig = {}): IWebRpcMiddleware => ({
   name: 'protocol',
   install: ({ capabilities }) => {

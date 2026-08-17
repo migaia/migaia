@@ -1,17 +1,18 @@
-import { toPromise } from '../utils/async';
-import { snapshotSyncWriteOptions, throwIfAborted, withAbort } from '../core/operation';
+import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract';
+import { toPromise } from '../utils/async.js';
+import { snapshotSyncWriteOptions, throwIfAborted, withAbort } from '../core/operation.js';
 import {
   lengthPrefixedNamespaceCodec,
   namespacedKey,
   snapshotNamespaceCodec,
   stripNamespace
-} from '../utils/key';
-import type { INamespaceCodec } from '../utils/key';
-import { probeWebStorage } from '../utils/availability';
-import { normalizeStorageException } from '../utils/quota';
-import { StorageError, StorageErrorCode } from '../types/errors';
-import type { IKeyValueStore, ISyncKeyValueStore, IWebStorageLike } from '../types/storage';
-import type { IBackendKind, IStorageCapabilities } from '../types/capabilities';
+} from '../utils/key.js';
+import type { INamespaceCodec } from '../utils/key.js';
+import { probeWebStorage } from '../utils/availability.js';
+import { normalizeStorageException } from '../utils/quota.js';
+import { StorageError, StorageErrorCode } from '../types/errors.js';
+import type { IKeyValueStore, ISyncKeyValueStore, IWebStorageLike } from '../types/storage.js';
+import type { IBackendKind, IStorageCapabilities } from '../types/capabilities.js';
 
 const CAPABILITIES: IStorageCapabilities = Object.freeze({
   syncRead: true,
@@ -35,7 +36,7 @@ export const assertWebStorageOptions: (
   options: unknown
 ) => asserts options is IWebStorageOptions = (options) => {
   if (options === null || typeof options !== 'object' || Array.isArray(options))
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
       cause: new TypeError('web storage options must be an object')
     });
 };
@@ -50,7 +51,7 @@ export const snapshotWebStorageOptions = (
   try {
     return { namespace: candidate.namespace, namespaceCodec: candidate.namespaceCodec };
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, { backend, cause });
+    throw new StorageError(StorageErrorCode.invalidConfig, { backend, cause });
   }
 };
 
@@ -61,7 +62,7 @@ const assertWebStorageInjection: (
 ) => asserts storage is IWebStorageLike = (storage, backend) => {
   if (storage === undefined) return;
   if (typeof storage !== 'object' || storage === null || Array.isArray(storage))
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
       backend,
       cause: new TypeError('web storage injection must implement the Storage surface')
     });
@@ -80,7 +81,7 @@ const assertWebStorageInjection: (
     )
       throw new TypeError('web storage injection must implement the Storage surface');
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, { backend, cause });
+    throw new StorageError(StorageErrorCode.invalidConfig, { backend, cause });
   }
 };
 
@@ -97,7 +98,7 @@ export const createWebStorageBackend = (
       ? lengthPrefixedNamespaceCodec
       : optionsSnapshot.namespaceCodec;
   if (typeof namespace !== 'string' || namespace.length === 0)
-    throw new StorageError(StorageErrorCode.invalidArgument, {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
       backend,
       cause: new TypeError('namespace must be non-empty and namespaceCodec must be callable')
     });
@@ -121,7 +122,7 @@ export const createWebStorageBackend = (
   let disposed = false;
 
   const assertLive = (): void => {
-    if (disposed) throw new StorageError(StorageErrorCode.disposed, { backend });
+    if (disposed) throw new StorageContractError(StorageContractErrorCode.disposed, { backend });
   };
 
   const namespacedEntries = (): Array<{
@@ -183,7 +184,7 @@ export const createWebStorageBackend = (
       assertLive();
       snapshotSyncWriteOptions(options);
       if (typeof value !== 'string')
-        throw new StorageError(StorageErrorCode.invalidArgument, {
+        throw new StorageError(StorageErrorCode.invalidConfig, {
           backend,
           key,
           cause: new TypeError('storage value must be a string')

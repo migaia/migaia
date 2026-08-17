@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createCapabilityHost, type ICapabilityHandle } from '../src/index';
+import { createCapabilityHost, CapabilityErrorCode, type ICapabilityHandle } from '../src/index';
 
 /**
  * 能力闸门的验收。
@@ -43,23 +43,23 @@ describe('能力闸门', () => {
     expect(await host.enableResult('worker')).toEqual({
       status: 'enabled'
     });
-    await host.disposeAsync();
+    await host.dispose();
     expect(released).toBe(true);
   });
-  it('disposeAsync() waits for an activation still in flight, not just already-tracked releases', async () => {
-    // The bug this guards: disposeAsync() used to snapshot only
+  it('dispose() waits for an activation still in flight, not just already-tracked releases', async () => {
+    // The bug this guards: dispose() used to snapshot only
     // `pendingReleases` — a still-running activate() has no handle yet, so
     // it has nothing in that snapshot to await. It would resolve, then the
     // activation would finish *after*, creating a handle that gets released
-    // invisibly to whoever awaited disposeAsync().
+    // invisibly to whoever awaited dispose().
     const activation = deferred<ICapabilityHandle>();
     const dispose = vi.fn();
     const host = enabledHost({}, 'worker');
     host.register({ name: 'worker', activate: () => activation.promise });
 
     const enabling = host.enable('worker');
-    const disposing = host.disposeAsync();
-    // Let disposeAsync() run its synchronous disposeSync() phase and enter
+    const disposing = host.dispose();
+    // Let dispose() run its synchronous disposeSync() phase and enter
     // its wait loop before the activation settles.
     await Promise.resolve();
     activation.resolve(handleOf(dispose));
@@ -83,7 +83,7 @@ describe('能力闸门', () => {
     await disabling;
     expect(dispose).toHaveBeenCalledTimes(1);
     await enabling;
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('activates once no matter how many callers ask concurrently', async () => {
@@ -100,7 +100,7 @@ describe('能力闸门', () => {
     expect(results).toEqual([true, true, true]);
     expect(activate).toHaveBeenCalledTimes(1);
     expect(host.state('persist')).toBe('on');
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('passes the host context into activation', async () => {
@@ -111,7 +111,7 @@ describe('能力闸门', () => {
     await host.enableLegacyBoolean('persist');
 
     expect(activate).toHaveBeenCalledWith({ tenant: 'acme' });
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('snapshots registration identity and activation against caller mutation', async () => {
@@ -138,13 +138,13 @@ describe('能力闸门', () => {
     expect(observedThisNames).toEqual(['persist']);
     expect(activateReplacement).not.toHaveBeenCalled();
     host.setFlag('persist', false);
-    expect(host.state('persist')).toBe('blocked');
+    expect(host.state('persist')).toBe('gated');
     expect(original.dispose).toHaveBeenCalledOnce();
     expect(() => host.state('worker')).toThrow('not registered');
-    host.disposeNow();
+    await host.dispose();
   });
 
-  it('rejects malformed registrations before they enter the name table', () => {
+  it('rejects malformed registrations before they enter the name table', async () => {
     const host = enabledHost(undefined, 'valid');
 
     expect(() => host.register({ name: '   ', activate: async () => handleOf() })).toThrow(
@@ -157,7 +157,7 @@ describe('能力闸门', () => {
       } as never)
     ).toThrow('activate must be a function');
     expect(host.names).toEqual([]);
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('disposes the handle exactly once when disabled, and re-activates fresh', async () => {
@@ -179,7 +179,7 @@ describe('能力闸门', () => {
 
     await host.enableLegacyBoolean('persist');
     expect(host.handle('persist')).toBe(second);
-    host.disposeNow();
+    await host.dispose();
     expect(second.dispose).toHaveBeenCalledTimes(1);
   });
 
@@ -204,7 +204,7 @@ describe('能力闸门', () => {
     expect(onError).toHaveBeenCalledTimes(1);
     // 失败不影响 host 本身
     expect(host.disposed).toBe(false);
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('refuses to enable what the flags turned off, which is the rollback path', async () => {
@@ -214,8 +214,8 @@ describe('能力闸门', () => {
 
     await expect(host.enableLegacyBoolean('devtools')).resolves.toBe(false);
     expect(activate).not.toHaveBeenCalled();
-    expect(host.state('devtools')).toBe('blocked');
-    host.disposeNow();
+    expect(host.state('devtools')).toBe('gated');
+    await host.dispose();
   });
 
   it('uses own-property allowlisting without invoking getters or the prototype chain', async () => {
@@ -235,15 +235,15 @@ describe('能力闸门', () => {
 
     expect(getter).not.toHaveBeenCalled();
     expect(host.state('persist')).toBe('off');
-    expect(host.state('inherited')).toBe('blocked');
-    expect(host.state('getter')).toBe('blocked');
-    expect(host.state('__proto__')).toBe('blocked');
+    expect(host.state('inherited')).toBe('gated');
+    expect(host.state('getter')).toBe('gated');
+    expect(host.state('__proto__')).toBe('gated');
 
     // Map 保存 flag：危险键名只是普通字符串，不会落到 Object.prototype。
     host.setFlag('__proto__', true);
     expect(host.state('__proto__')).toBe('off');
     await expect(host.enableLegacyBoolean('__proto__')).resolves.toBe(true);
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('fails closed when a replacement flag snapshot cannot be inspected', async () => {
@@ -257,11 +257,16 @@ describe('能力闸门', () => {
       }
     });
 
-    expect(() => host.setFlags(unreadable)).toThrow('unreadable');
-    expect(host.state('persist')).toBe('blocked');
+    expect(() => host.setFlags(unreadable)).toThrow(
+      expect.objectContaining({
+        code: CapabilityErrorCode.invalidOption,
+        cause: expect.objectContaining({ message: 'flag service payload is unreadable' })
+      })
+    );
+    expect(host.state('persist')).toBe('gated');
     expect(handle.dispose).toHaveBeenCalledTimes(1);
     await expect(host.enableLegacyBoolean('persist')).resolves.toBe(false);
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('turns setFlag(false) into an atomic rollback and can explicitly reopen', async () => {
@@ -277,14 +282,14 @@ describe('能力闸门', () => {
     await host.enableLegacyBoolean('persist');
     host.setFlag('persist', false);
     expect(first.dispose).toHaveBeenCalledTimes(1);
-    expect(host.state('persist')).toBe('blocked');
+    expect(host.state('persist')).toBe('gated');
     await expect(host.enableLegacyBoolean('persist')).resolves.toBe(false);
 
     host.setFlag('persist', true);
     expect(host.state('persist')).toBe('off');
     await expect(host.enableLegacyBoolean('persist')).resolves.toBe(true);
     expect(host.handle('persist')).toBe(second);
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('replaces the complete flag snapshot so an omitted old allow cannot survive', async () => {
@@ -297,11 +302,11 @@ describe('能力闸门', () => {
 
     host.setFlags({ worker: true });
 
-    expect(host.state('persist')).toBe('blocked');
+    expect(host.state('persist')).toBe('gated');
     expect(persist.dispose).toHaveBeenCalledTimes(1);
     expect(host.state('worker')).toBe('on');
     expect(worker.dispose).not.toHaveBeenCalled();
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('releases a multi-flag rollback in reverse activation order', async () => {
@@ -330,9 +335,9 @@ describe('能力闸门', () => {
     host.setFlags({});
 
     expect(order).toEqual(['dependent', 'foundation']);
-    expect(host.state('foundation')).toBe('blocked');
-    expect(host.state('dependent')).toBe('blocked');
-    host.disposeNow();
+    expect(host.state('foundation')).toBe('gated');
+    expect(host.state('dependent')).toBe('gated');
+    await host.dispose();
   });
 
   it('contains a later disposer failure and still completes LIFO rollback', async () => {
@@ -365,13 +370,13 @@ describe('能力闸门', () => {
     expect(() => host.setFlags({})).not.toThrow();
 
     expect(order).toEqual(['dependent', 'foundation']);
-    expect(host.state('dependent')).toBe('blocked');
-    expect(host.state('foundation')).toBe('blocked');
+    expect(host.state('dependent')).toBe('gated');
+    expect(host.state('foundation')).toBe('gated');
     expect(onError).toHaveBeenCalledWith(
       'dependent',
       expect.objectContaining({ message: 'dependent cleanup failed' })
     );
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('rejects disposer reentry without letting it rewrite the outer flag snapshot', async () => {
@@ -386,8 +391,7 @@ describe('能力闸门', () => {
           for (const mutation of [
             () => host.setFlag('persist', true),
             () => host.setFlags({ persist: true }),
-            () => host.disableNow('persist'),
-            () => host.disposeNow()
+            () => host.disableNow('persist')
           ]) {
             try {
               mutation();
@@ -403,7 +407,7 @@ describe('能力闸门', () => {
 
     host.setFlags({});
 
-    expect(reentryErrors).toHaveLength(4);
+    expect(reentryErrors).toHaveLength(3);
     for (const error of reentryErrors) {
       expect(error).toEqual(
         expect.objectContaining({
@@ -412,10 +416,10 @@ describe('能力闸门', () => {
       );
     }
     await expect(enableDuringDispose).rejects.toThrow('lifecycle transition');
-    expect(host.state('persist')).toBe('blocked');
+    expect(host.state('persist')).toBe('gated');
     expect(host.handle('persist')).toBeUndefined();
     await expect(host.enableLegacyBoolean('persist')).resolves.toBe(false);
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('contains disposal and reporter errors when an in-flight activation is revoked', async () => {
@@ -440,10 +444,10 @@ describe('能力闸门', () => {
     });
 
     await expect(enabling).resolves.toBe(false);
-    expect(host.state('worker')).toBe('blocked');
+    expect(host.state('worker')).toBe('gated');
     expect(host.error('worker')).toBe(disposeError);
     expect(onError).toHaveBeenCalledWith('worker', disposeError);
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('contains async disposal and reporter rejections during rollback', async () => {
@@ -471,10 +475,10 @@ describe('能力闸门', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(host.state('worker')).toBe('blocked');
+    expect(host.state('worker')).toBe('gated');
     expect(host.error('worker')).toBe(disposeError);
     expect(onError).toHaveBeenCalledWith('worker', disposeError);
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('reports a stale async cleanup failure without poisoning a replacement generation', async () => {
@@ -509,7 +513,7 @@ describe('能力闸门', () => {
     expect(host.handle('worker')).toBe(replacement);
     expect(host.error('worker')).toBeUndefined();
     expect(onError).toHaveBeenCalledWith('worker', cleanupError);
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('does not let a superseded activation cleanup poison the replacement', async () => {
@@ -546,7 +550,7 @@ describe('能力闸门', () => {
     expect(host.state('worker')).toBe('on');
     expect(host.handle('worker')).toBe(replacement);
     expect(host.error('worker')).toBeUndefined();
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('reads a disposal then getter only once', async () => {
@@ -574,7 +578,7 @@ describe('能力闸门', () => {
 
     expect(getThen).toHaveBeenCalledTimes(1);
     expect(host.error('worker')).toBe(failure);
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('contains activation reporter errors and rejects malformed handles as failures', async () => {
@@ -594,7 +598,7 @@ describe('能力闸门', () => {
     expect(host.state('malformed')).toBe('failed');
     expect(String(host.error('malformed'))).toContain('invalid handle');
     expect(onError).toHaveBeenCalledTimes(1);
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('discards an in-flight activation that was disabled meanwhile', async () => {
@@ -615,7 +619,7 @@ describe('能力闸门', () => {
     expect(host.handle('persist')).toBeUndefined();
     // 作废不等于泄漏：刚建出来的东西要就地释放
     expect(handle.dispose).toHaveBeenCalledTimes(1);
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('discards an in-flight activation that the host outlived', async () => {
@@ -625,9 +629,10 @@ describe('能力闸门', () => {
     host.register({ name: 'persist', activate: () => gate.promise });
 
     const enabling = host.enableLegacyBoolean('persist');
-    host.disposeNow();
+    const disposing = host.dispose();
     gate.resolve(handle);
 
+    await disposing;
     await expect(enabling).resolves.toBe(false);
     expect(handle.dispose).toHaveBeenCalledTimes(1);
   });
@@ -647,7 +652,7 @@ describe('能力闸门', () => {
     await right.enable('persist');
 
     expect(left.state('persist')).toBe('on');
-    expect(right.state('persist')).toBe('blocked');
+    expect(right.state('persist')).toBe('gated');
     left.dispose();
     right.dispose();
   });
@@ -669,7 +674,7 @@ describe('能力闸门', () => {
     await host.enableLegacyBoolean('worker');
     await host.enableLegacyBoolean('persist');
     await host.enableLegacyBoolean('devtools');
-    host.disposeNow();
+    await host.dispose();
 
     expect(order).toEqual(['devtools', 'persist', 'worker']);
     expect(host.disposed).toBe(true);
@@ -685,7 +690,7 @@ describe('能力闸门', () => {
     expect(() => host.state('nope')).toThrow('not registered');
     await expect(host.enableLegacyBoolean('nope')).rejects.toThrow('not registered');
 
-    host.disposeNow();
+    await host.dispose();
     // enable 是 async：释放后的调用以 rejection 形态报错，不是同步抛
     await expect(host.enableLegacyBoolean('persist')).rejects.toThrow('disposed');
   });
@@ -705,7 +710,7 @@ describe('能力闸门', () => {
     expect(load).not.toHaveBeenCalled();
     await host.enableLegacyBoolean('persist');
     expect(load).toHaveBeenCalledTimes(1);
-    host.disposeNow();
+    await host.dispose();
   });
 
   it('primary lifecycle methods expose structured and awaitable semantics', async () => {

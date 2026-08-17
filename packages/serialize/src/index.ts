@@ -1,30 +1,22 @@
+/**
+ * `@migaia/serialize` 主入口：聚合 re-export core / plugins / registry 三者。
+ *
+ * Core 不 import index（防循环）；registry 依赖 core + lifecycle。
+ */
+export * from './core.js';
+export * from './plugins.js';
+export { chunkToBytes, chunkToText, createSerializeRegistry } from './registry.js';
 export {
-  SERIALIZE_TYPE_PATTERN,
-  SerializeError,
-  assertSerializeType,
-  isChunkShape,
-  type ISerializeAbortSignal,
-  type ISerializeChunk,
-  type ISerializeChunkType,
-  type ISerializeContext,
-  type ISerializeOutput,
-  type ISerializeParser,
+  SerializeChunkKind,
+  SerializeOutput,
+  SerializePhase,
+  SerializeCleanupPolicy,
+  SerializeCleanupKind,
+  SerializePluginType,
+  type ISerializeChunkKind,
+  type ISerializeOutputFormat,
   type ISerializePhase,
-  type ISerializePlugin,
-  type ISerializeRegistry
-} from './types';
-
-export { chunkToBytes, chunkToText, createSerializeRegistry } from './registry';
-
-export { base64ToBytes, bytesToBase64, streamBase64Chunks } from './base64';
-
-export {
-  collectStream,
-  decodeStream,
-  encodeStream,
-  sliceByFrameBudget,
-  type IEncodeStreamOptions,
-  type IFrameBudgetOptions
-} from './stream';
-
-export { jsonParser, jsonPlugin, type IJsonPluginOptions } from './plugins/json';
+  type ISerializeCleanupPolicy,
+  type ISerializeCleanupKind,
+  type ISerializePluginType
+} from './format-constants.js';

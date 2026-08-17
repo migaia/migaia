@@ -1,21 +1,34 @@
-import type { IObservable, IObserver, IRuntime } from './types';
-import { internalsOf } from './internals';
-import { assertReactiveOwnedBy } from './ownership';
-import { describeObservable, describeObserver } from './diagnostics';
+import type { IObservable, IObserver, IRuntime } from './types.js';
+import { internalsOf } from './internals.js';
+import { assertReactiveOwnedBy } from './ownership.js';
+import { describeObservable, describeObserver } from './diagnostics.js';
+import { createReactiveError } from '../errors.js';
+import { ReactiveErrorCode } from '../error-code.js';
+import {
+  ReactiveDependencyKind,
+  ReactiveErrorPhase,
+  ReactiveTracePhase,
+  ReactiveTraceReason,
+  ReactiveTraceType
+} from './trace-constants.js';
 import {
   mutableSubs as mutableNodeSubs,
   mutableDeps as mutableNodeDeps,
   mutableDepVersions as mutableNodeVersions
-} from './node-internals';
+} from './node-internals.js';
 
 function mutableSubs(observable: IObservable): Set<IObserver> {
   return mutableNodeSubs(observable, observable.subs);
 }
 
 // 一次追踪的临时帧：fn 执行期间读到的依赖先攒在 nextDeps，不碰正式依赖边。
-type TrackingFrame =
-  | { kind: 'observer'; observer: IObserver; nextDeps: Set<IObservable> }
-  | { kind: 'capture'; nextDeps: Set<IObservable> };
+type ITrackingFrame =
+  | {
+      kind: typeof ReactiveDependencyKind.observer;
+      observer: IObserver;
+      nextDeps: Set<IObservable>;
+    }
+  | { kind: typeof ReactiveDependencyKind.capture; nextDeps: Set<IObservable> };
 
 // Capture 的依赖与 Tracker 身份只存在于私有 WeakMap；调用者只能读取结果并交回整个 token。
 declare const CAPTURE_TOKEN: unique symbol;
@@ -49,7 +62,7 @@ function swapActiveTracker(next: DependencyTracker): DependencyTracker | null {
 // 依赖追踪上下文（每个 Runtime 一个）：谁在被求值、依赖边的暂存/提交/断开/脏检查。
 // 事务化：runTracked 期间 track() 只暂存到 nextDeps；成功才 commit 差异，失败直接丢弃、旧图不动。
 export class DependencyTracker {
-  #stack: (TrackingFrame | null)[] = [];
+  #stack: (ITrackingFrame | null)[] = [];
   #captures = new WeakMap<object, ICaptureState>();
   /**
    * Terminal invalidation is deliberately independent from VersionClock.
@@ -70,7 +83,7 @@ export class DependencyTracker {
     this.#runtime = runtime;
   }
 
-  get #top(): TrackingFrame | null {
+  get #top(): ITrackingFrame | null {
     return this.#stack.length ? this.#stack[this.#stack.length - 1] : null;
   }
 
@@ -97,7 +110,8 @@ export class DependencyTracker {
     }
     // 派发到的是本 observable 所属 runtime 的 tracker；若它不是当前活跃 tracker 而别处正在追踪 → 跨 runtime
     if (activeTracker !== null && activeTracker.#hasActiveObserver()) {
-      throw new Error(
+      throw createReactiveError(
+        ReactiveErrorCode.crossRuntime,
         '[store] cross-runtime dependency is not allowed: a node was read while a node from another runtime was being tracked'
       );
     }
@@ -117,7 +131,10 @@ export class DependencyTracker {
    * `invalidate` 用于仍可继续使用的节点（例如 Atom override）；`dispose` 是终态。 两者都更换独立的 topology token 使在途 capture
    * 过期，不消耗全局值版本， 因此在 VersionClock 已耗尽时仍能完整释放或撤销路由。
    */
-  disconnectObservable(observable: IObservable, reason: 'invalidate' | 'dispose'): void {
+  disconnectObservable(
+    observable: IObservable,
+    reason: typeof ReactiveTraceReason.invalidate | typeof ReactiveTraceReason.dispose
+  ): void {
     this.#assertObservableOwner(observable);
     const runtime = internalsOf(this.#runtime);
     this.#topologyTokens.set(observable, {});
@@ -131,9 +148,9 @@ export class DependencyTracker {
       mutableNodeVersions(observer, observer.depVersions).delete(observable);
       if (runtime.traceEnabled()) {
         runtime.emitTrace({
-          type: 'dependency',
-          timestamp: Date.now(),
-          phase: 'disconnect',
+          type: ReactiveTraceType.dependency,
+          timestamp: runtime.timestamp(),
+          phase: ReactiveTracePhase.disconnect,
           observable: describeObservable(observable),
           observer: describeObserver(observer),
           reason
@@ -145,7 +162,7 @@ export class DependencyTracker {
         observer.onDependencyDisconnected(observable);
       } catch (error) {
         observer.runtime.reportError(error, {
-          phase: 'dependency-disconnect',
+          phase: ReactiveErrorPhase.dependencyDisconnect,
           observer: describeObserver(observer),
           observable: describeObservable(observable)
         });
@@ -155,8 +172,8 @@ export class DependencyTracker {
 
   /** 事务化重算：成功才 commit 差异，失败丢弃临时集合。 */
   runTracked<R>(observer: IObserver, fn: () => R): R {
-    const frame: TrackingFrame = {
-      kind: 'observer',
+    const frame: ITrackingFrame = {
+      kind: ReactiveDependencyKind.observer,
       observer,
       nextDeps: new Set()
     };
@@ -174,8 +191,8 @@ export class DependencyTracker {
 
   /** Render 阶段只采集依赖与版本，不修改正式订阅边。调用方可在提交阶段交回 token，因而被 Concurrent React 丢弃的 render 不会泄漏订阅。 */
   capture<R>(fn: () => R): ICapture<R> {
-    const frame: TrackingFrame = {
-      kind: 'capture',
+    const frame: ITrackingFrame = {
+      kind: ReactiveDependencyKind.capture,
       nextDeps: new Set()
     };
     this.#stack.push(frame);
@@ -201,17 +218,24 @@ export class DependencyTracker {
   /** 原子验证并提交一次 capture。返回 false 表示捕获后依赖已变化，调用方必须重新求值； token 单次使用，且 observer 必须属于当前 Tracker。 */
   commitCapture(observer: IObserver, capture: ICapture<unknown>): boolean {
     if (internalsOf(observer.runtime).tracker !== this) {
-      throw new Error('[store] cannot commit a capture to an observer from another runtime');
+      throw createReactiveError(
+        ReactiveErrorCode.crossRuntime,
+        '[store] cannot commit a capture to an observer from another runtime'
+      );
     }
     // A Concurrent render may finish after its committed observer was
     // disposed. Reject before consuming the token so a replacement observer
     // can still validate and commit the same capture.
     if (observer.disposed) {
-      throw new Error('[store] cannot commit a capture to a disposed observer');
+      throw createReactiveError(
+        ReactiveErrorCode.captureInvalid,
+        '[store] cannot commit a capture to a disposed observer'
+      );
     }
     const state = this.#captures.get(capture);
     if (!state) {
-      throw new Error(
+      throw createReactiveError(
+        ReactiveErrorCode.captureInvalid,
         '[store] capture is invalid, already consumed, or belongs to another tracker'
       );
     }
@@ -259,7 +283,7 @@ export class DependencyTracker {
         observable.onObserved?.();
       } catch (error) {
         observer.runtime.reportError(error, {
-          phase: 'lifecycle-hook',
+          phase: ReactiveErrorPhase.lifecycleHook,
           observer: describeObserver(observer),
           observable: describeObservable(observable)
         });
@@ -267,9 +291,9 @@ export class DependencyTracker {
     }
     if (runtime.traceEnabled()) {
       runtime.emitTrace({
-        type: 'dependency',
-        timestamp: Date.now(),
-        phase: 'connect',
+        type: ReactiveTraceType.dependency,
+        timestamp: runtime.timestamp(),
+        phase: ReactiveTracePhase.connect,
         observable: describeObservable(observable),
         observer: describeObserver(observer)
       });
@@ -282,12 +306,12 @@ export class DependencyTracker {
     const runtime = internalsOf(this.#runtime);
     if (runtime.traceEnabled()) {
       runtime.emitTrace({
-        type: 'dependency',
-        timestamp: Date.now(),
-        phase: 'disconnect',
+        type: ReactiveTraceType.dependency,
+        timestamp: runtime.timestamp(),
+        phase: ReactiveTracePhase.disconnect,
         observable: describeObservable(observable),
         observer: describeObserver(observer),
-        reason: 'retrack'
+        reason: ReactiveTraceReason.retrack
       });
     }
     if (observable.subs.size === 0) {
@@ -295,7 +319,7 @@ export class DependencyTracker {
         observable.onUnobserved?.();
       } catch (error) {
         observer.runtime.reportError(error, {
-          phase: 'lifecycle-hook',
+          phase: ReactiveErrorPhase.lifecycleHook,
           observer: describeObserver(observer),
           observable: describeObservable(observable)
         });

@@ -1,21 +1,38 @@
-import { StorageError, StorageErrorCode } from '../types/errors';
+import {
+  StorageContractError,
+  StorageContractErrorCode,
+  isStorageContractError
+} from '@migaia/storage-contract';
+import { isStorageErrorFamily } from '../core/error-family.js';
+import {
+  createStorageOperationRuntime,
+  type IStorageOperationRuntime
+} from '../core/operation-reporter.js';
+import { StorageError, StorageErrorCode } from '../types/errors.js';
+import {
+  StorageBackend,
+  StorageChannel,
+  StorageConflictPolicy,
+  StorageMigrationStatus,
+  StorageOperation
+} from '../constants.js';
 import {
   mergeSignals,
   readAbortReason,
   subscribeToAbort,
   throwIfAborted,
   withAbort
-} from '../core/operation';
+} from '../core/operation.js';
 import {
   assertStorageKey,
   assertStringStorageKey,
   encodeFlatStorageKey,
   snapshotKeyRange
-} from '../core/key-domain';
-import { planChannelWrite } from '../core/channel-write';
-import { isUint8Array } from '../core/bytes';
-import { intrinsicConstructorName } from '../core/brand';
-import { normalizeError } from '../core/errors';
+} from '../core/key-domain.js';
+import { planChannelWrite } from '../core/channel-write.js';
+import { isUint8Array } from '../core/bytes.js';
+import { intrinsicConstructorName } from '../core/brand.js';
+import { normalizeError } from '../core/errors.js';
 import {
   fromIdbRequest,
   idbTransactionCommit,
@@ -27,16 +44,16 @@ import {
   readIdbRequestError,
   readIdbRequestResult,
   readIdbTransactionError
-} from '../utils/idb-request';
-import type { IKeyRange, IStorageKey } from '../types/context';
-import type { IRecordStore } from '../types/storage';
+} from '../utils/idb-request.js';
+import type { IKeyRange, IStorageKey } from '../types/context.js';
+import type { IRecordStore } from '../types/storage.js';
 import {
   assertTransactionCallback,
   assertTransactionScopeActive,
   readTransactionConflictPolicy,
   type ITransactionScope
-} from '../core/transaction';
-import type { IStorageCapabilities } from '../types/capabilities';
+} from '../core/transaction.js';
+import type { IStorageCapabilities } from '../types/capabilities.js';
 
 const CAPABILITIES: IStorageCapabilities = Object.freeze({
   syncRead: false,
@@ -49,18 +66,21 @@ const CAPABILITIES: IStorageCapabilities = Object.freeze({
 });
 
 /** Convert current cancellation state into an IndexedDB-owned error without throwing from events. */
-const indexedDbSignalFailure = (signal: AbortSignal | undefined): StorageError | undefined => {
+const indexedDbSignalFailure = (
+  signal: AbortSignal | undefined
+): StorageError | StorageContractError | undefined => {
   try {
     throwIfAborted(signal);
     return undefined;
   } catch (cause) {
     if (cause instanceof StorageError)
       return new StorageError(cause.code, {
-        backend: 'indexeddb',
+        backend: StorageBackend.indexedDb,
         cause: cause.cause ?? cause
       });
-    return new StorageError(StorageErrorCode.invalidArgument, {
-      backend: 'indexeddb',
+    if (isStorageContractError(cause)) return cause;
+    return new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.indexedDb,
       cause
     });
   }
@@ -116,11 +136,11 @@ const toIdbRange = (
   range: IKeyRange | undefined,
   KeyRange: typeof IDBKeyRange | undefined
 ): IDBKeyRange | undefined => {
-  const rangeSnapshot = snapshotKeyRange(range, 'indexeddb');
+  const rangeSnapshot = snapshotKeyRange(range, StorageBackend.indexedDb);
   if (!rangeSnapshot) return undefined;
   if (!KeyRange)
     throw new StorageError(StorageErrorCode.unavailable, {
-      backend: 'indexeddb',
+      backend: StorageBackend.indexedDb,
       cause: new Error('IDBKeyRange is unavailable; pass options.keyRange explicitly')
     });
   if (rangeSnapshot.lower !== undefined && rangeSnapshot.upper !== undefined)
@@ -146,8 +166,8 @@ export const indexedDb = <TValue = unknown>(
   options: IIndexedDbOptions = {}
 ): IRecordStore<TValue> => {
   if (options === null || typeof options !== 'object' || Array.isArray(options))
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      backend: 'indexeddb',
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.indexedDb,
       cause: new TypeError('IndexedDB options must be an object')
     });
   let configuredDbName: string | undefined;
@@ -166,7 +186,10 @@ export const indexedDb = <TValue = unknown>(
     configuredFactory = options.factory;
     configuredKeyRange = options.keyRange;
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidArgument, { backend: 'indexeddb', cause });
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.indexedDb,
+      cause
+    });
   }
   const dbName = configuredDbName === undefined ? 'storage-web' : configuredDbName;
   const kvStoreName = configuredKvStoreName === undefined ? 'kv' : configuredKvStoreName;
@@ -186,19 +209,20 @@ export const indexedDb = <TValue = unknown>(
       : configuredKeyRange;
 
   if (typeof cleanupLegacyRecords !== 'boolean')
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      backend: 'indexeddb',
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.indexedDb,
       cause: new TypeError('cleanupLegacyRecords must be a boolean')
     });
 
-  if (!factory) throw new StorageError(StorageErrorCode.unavailable, { backend: 'indexeddb' });
+  if (!factory)
+    throw new StorageError(StorageErrorCode.unavailable, { backend: StorageBackend.indexedDb });
   if (
     (typeof factory !== 'object' && typeof factory !== 'function') ||
     factory === null ||
     typeof (factory as { open?: unknown }).open !== 'function'
   )
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      backend: 'indexeddb',
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.indexedDb,
       cause: new TypeError('IndexedDB factory must provide open()')
     });
   if (
@@ -208,8 +232,8 @@ export const indexedDb = <TValue = unknown>(
       typeof (keyRange as typeof IDBKeyRange).lowerBound !== 'function' ||
       typeof (keyRange as typeof IDBKeyRange).upperBound !== 'function')
   )
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      backend: 'indexeddb',
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.indexedDb,
       cause: new TypeError('IDBKeyRange must provide bound/lowerBound/upperBound')
     });
   const configuredStoreNames = [kvStoreName, bytesStoreName, recordsStoreName];
@@ -219,8 +243,8 @@ export const indexedDb = <TValue = unknown>(
     new Set(configuredStoreNames).size !== configuredStoreNames.length ||
     configuredStoreNames.some((storeName) => INTERNAL_STORE_NAMES.has(storeName))
   )
-    throw new StorageError(StorageErrorCode.invalidArgument, {
-      backend: 'indexeddb',
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.indexedDb,
       cause: new TypeError(
         'IndexedDB channel store names must be non-empty, unique, and non-reserved'
       )
@@ -233,7 +257,10 @@ export const indexedDb = <TValue = unknown>(
 
   let disposed = false;
   const assertLive = (): void => {
-    if (disposed) throw new StorageError(StorageErrorCode.disposed, { backend: 'indexeddb' });
+    if (disposed)
+      throw new StorageContractError(StorageContractErrorCode.disposed, {
+        backend: StorageBackend.indexedDb
+      });
   };
 
   // 只开一次库，之后所有事务复用同一个连接。失败时要清掉缓存，否则一次瞬时
@@ -258,8 +285,8 @@ export const indexedDb = <TValue = unknown>(
     if (cause !== undefined) {
       activeDatabase = database;
       throw new StorageError(StorageErrorCode.unavailable, {
-        backend: 'indexeddb',
-        operation: 'indexeddb.close',
+        backend: StorageBackend.indexedDb,
+        operation: StorageOperation.indexedDbClose,
         cause
       });
     }
@@ -296,11 +323,14 @@ export const indexedDb = <TValue = unknown>(
   };
 
   /** Copy the historical store in restartable read/write batches. */
-  const migrateLegacyRecords = async (database: IDBDatabase): Promise<void> => {
+  const migrateLegacyRecords = async (
+    database: IDBDatabase,
+    runtime: IStorageOperationRuntime
+  ): Promise<void> => {
     if (!database.objectStoreNames.contains(LEGACY_RECORDS_STORE_NAME)) return;
     if (!database.objectStoreNames.contains(recordsStoreName)) return;
     if (recordsStoreName === LEGACY_RECORDS_STORE_NAME) return;
-    const state = (await readFromMetadata(database, LEGACY_RECORDS_MIGRATION_KEY)) as
+    const state = (await readFromMetadata(database, LEGACY_RECORDS_MIGRATION_KEY, runtime)) as
       | { status?: unknown; to?: unknown; lastKey?: IDBValidKey }
       | undefined;
     if (state?.status === 'complete' && state.to === recordsStoreName) return;
@@ -308,11 +338,15 @@ export const indexedDb = <TValue = unknown>(
     while (true) {
       const batch = await readLegacyBatch(database, lastKey);
       if (batch.length === 0) {
-        await writeLegacyMigrationState(database, {
-          status: 'complete',
-          from: LEGACY_RECORDS_STORE_NAME,
-          to: recordsStoreName
-        });
+        await writeLegacyMigrationState(
+          database,
+          {
+            status: StorageMigrationStatus.complete,
+            from: LEGACY_RECORDS_STORE_NAME,
+            to: recordsStoreName
+          },
+          runtime
+        );
         return;
       }
       const transaction = createTransaction(
@@ -320,22 +354,22 @@ export const indexedDb = <TValue = unknown>(
         [LEGACY_RECORDS_STORE_NAME, recordsStoreName, META_STORE_NAME],
         'readwrite'
       );
-      const committed = idbTransactionCommit(transaction);
+      const committed = idbTransactionCommit(transaction, undefined, runtime);
       void committed.catch(() => {});
       const source = transaction.objectStore(LEGACY_RECORDS_STORE_NAME);
       const target = transaction.objectStore(recordsStoreName);
       try {
         for (const entry of batch) {
-          const existingKey = await fromIdbRequest(target.getKey(entry.key), {});
+          const existingKey = await fromIdbRequest(target.getKey(entry.key), {}, runtime);
           if (existingKey !== undefined) continue;
-          const currentKey = await fromIdbRequest(source.getKey(entry.key), {});
+          const currentKey = await fromIdbRequest(source.getKey(entry.key), {}, runtime);
           if (currentKey === undefined) continue;
-          const currentValue = await fromIdbRequest(source.get(entry.key), {});
+          const currentValue = await fromIdbRequest(source.get(entry.key), {}, runtime);
           target.put(currentValue, entry.key);
         }
         transaction.objectStore(META_STORE_NAME).put(
           {
-            status: 'running',
+            status: StorageMigrationStatus.running,
             from: LEGACY_RECORDS_STORE_NAME,
             to: recordsStoreName,
             lastKey: batch[batch.length - 1]!.key
@@ -358,18 +392,20 @@ export const indexedDb = <TValue = unknown>(
 
   const readFromMetadata = async (
     database: IDBDatabase,
-    key: string
+    key: string,
+    runtime: IStorageOperationRuntime
   ): Promise<unknown | undefined> => {
     const transaction = createTransaction(database, META_STORE_NAME, 'readonly');
-    return fromIdbRequest(transaction.objectStore(META_STORE_NAME).get(key), {});
+    return fromIdbRequest(transaction.objectStore(META_STORE_NAME).get(key), {}, runtime);
   };
 
   const writeLegacyMigrationState = async (
     database: IDBDatabase,
-    state: unknown
+    state: unknown,
+    runtime: IStorageOperationRuntime
   ): Promise<void> => {
     const transaction = createTransaction(database, META_STORE_NAME, 'readwrite');
-    const committed = idbTransactionCommit(transaction);
+    const committed = idbTransactionCommit(transaction, undefined, runtime);
     void committed.catch(() => {});
     try {
       transaction.objectStore(META_STORE_NAME).put(state, LEGACY_RECORDS_MIGRATION_KEY);
@@ -391,8 +427,8 @@ export const indexedDb = <TValue = unknown>(
   ): Promise<Array<{ readonly key: IDBValidKey; readonly value: unknown }>> => {
     if (lastKey !== undefined && !keyRange)
       throw new StorageError(StorageErrorCode.unavailable, {
-        backend: 'indexeddb',
-        operation: 'indexeddb.legacy.migration',
+        backend: StorageBackend.indexedDb,
+        operation: StorageOperation.indexedDbLegacyMigration,
         cause: new Error('IDBKeyRange is required to resume legacy migration')
       });
     let transaction: IDBTransaction;
@@ -406,7 +442,7 @@ export const indexedDb = <TValue = unknown>(
     } catch (cause) {
       throw normalizeError(
         cause,
-        'indexeddb',
+        StorageBackend.indexedDb,
         StorageErrorCode.transactionFailed,
         'indexeddb.legacy.cursor'
       );
@@ -418,12 +454,16 @@ export const indexedDb = <TValue = unknown>(
       const failure = (cause: unknown): void => {
         if (settled) return;
         settled = true;
-        /** Preserve the host failure while assigning this cursor boundary's operation metadata. */
-        const rootCause = cause instanceof StorageError ? cause.cause : cause;
+        /**
+         * Preserve the host failure while assigning this cursor boundary's operation metadata. Only
+         * a web `StorageError` bridge wrapper is unwrapped; a contract error stays whole so
+         * `normalizeError` lets it penetrate (rule §4.4).
+         */
+        const rootCause = cause instanceof StorageError ? (cause.cause ?? cause) : cause;
         reject(
           normalizeError(
             rootCause,
-            'indexeddb',
+            StorageBackend.indexedDb,
             StorageErrorCode.transactionFailed,
             'indexeddb.legacy.cursor'
           )
@@ -507,10 +547,18 @@ export const indexedDb = <TValue = unknown>(
       const rejectOpen = (cause: unknown): void => {
         if (settled) return;
         settled = true;
-        /** Remove an intermediate canonical bridge wrapper before assigning open semantics. */
-        const rootCause = cause instanceof StorageError ? cause.cause : cause;
+        /**
+         * Remove an intermediate web bridge wrapper before assigning open semantics; a contract
+         * error is never unwrapped so `normalizeError` lets it penetrate (rule §4.4).
+         */
+        const rootCause = cause instanceof StorageError ? (cause.cause ?? cause) : cause;
         reject(
-          normalizeError(rootCause, 'indexeddb', StorageErrorCode.unavailable, 'indexeddb.open')
+          normalizeError(
+            rootCause,
+            StorageBackend.indexedDb,
+            StorageErrorCode.unavailable,
+            StorageOperation.indexedDbOpen
+          )
         );
       };
       try {
@@ -573,7 +621,7 @@ export const indexedDb = <TValue = unknown>(
       }
     });
 
-  const open = (): Promise<IDBDatabase> =>
+  const open = (runtime: IStorageOperationRuntime): Promise<IDBDatabase> =>
     (connection ??= (async () => {
       const recoveryDatabase = activeDatabase;
       if (recoveryDatabase) closeForTransition(recoveryDatabase);
@@ -605,7 +653,12 @@ export const indexedDb = <TValue = unknown>(
           };
           activeDatabase = connected;
         } catch (cause) {
-          throw normalizeError(cause, 'indexeddb', StorageErrorCode.unavailable, 'indexeddb.open');
+          throw normalizeError(
+            cause,
+            StorageBackend.indexedDb,
+            StorageErrorCode.unavailable,
+            StorageOperation.indexedDbOpen
+          );
         }
       };
       try {
@@ -621,8 +674,8 @@ export const indexedDb = <TValue = unknown>(
           database = await openOnce(nextVersion);
         }
         attachConnectionHandlers(database);
-        await ensureMeta(database);
-        await migrateLegacyRecords(database);
+        await ensureMeta(database, runtime);
+        await migrateLegacyRecords(database, runtime);
         if (cleanupLegacyRecords && database.objectStoreNames.contains(LEGACY_RECORDS_STORE_NAME)) {
           const nextVersion = database.version + 1;
           closeForTransition(database);
@@ -634,9 +687,14 @@ export const indexedDb = <TValue = unknown>(
         const closeCause = tryCloseDatabase(database);
         if (closeCause !== undefined) activeDatabase = database;
         else if (activeDatabase === database) activeDatabase = undefined;
-        throw cause instanceof StorageError
+        throw isStorageErrorFamily(cause)
           ? cause
-          : normalizeError(cause, 'indexeddb', StorageErrorCode.unavailable, 'indexeddb.open');
+          : normalizeError(
+              cause,
+              StorageBackend.indexedDb,
+              StorageErrorCode.unavailable,
+              StorageOperation.indexedDbOpen
+            );
       }
     })().catch((error: unknown) => {
       connection = undefined;
@@ -653,34 +711,38 @@ export const indexedDb = <TValue = unknown>(
     } catch (cause) {
       throw normalizeError(
         cause,
-        'indexeddb',
+        StorageBackend.indexedDb,
         StorageErrorCode.transactionFailed,
-        'indexeddb.transaction'
+        StorageOperation.indexedDbTransaction
       );
     }
   };
 
   /** Persist the schema checkpoint so future upgrades can distinguish initialized v2 stores. */
-  const ensureMeta = async (database: IDBDatabase): Promise<void> => {
+  const ensureMeta = async (
+    database: IDBDatabase,
+    runtime: IStorageOperationRuntime
+  ): Promise<void> => {
     const readTransaction = createTransaction(database, META_STORE_NAME, 'readonly');
     const current = await fromIdbRequest(
       readTransaction.objectStore(META_STORE_NAME).get(META_SCHEMA_KEY),
-      {}
+      {},
+      runtime
     );
     if (current && typeof current === 'object') {
       const schemaVersion = (current as { version?: unknown }).version;
       if (schemaVersion === CURRENT_SCHEMA_VERSION) return;
       if (typeof schemaVersion === 'number' && schemaVersion > CURRENT_SCHEMA_VERSION)
         throw new StorageError(StorageErrorCode.versionUnsupported, {
-          backend: 'indexeddb',
-          operation: 'indexeddb.schema',
+          backend: StorageBackend.indexedDb,
+          operation: StorageOperation.indexedDbSchema,
           cause: new Error(
             `IndexedDB schema version ${schemaVersion} is newer than ${CURRENT_SCHEMA_VERSION}`
           )
         });
     }
     const writeTransaction = createTransaction(database, META_STORE_NAME, 'readwrite');
-    const committed = idbTransactionCommit(writeTransaction);
+    const committed = idbTransactionCommit(writeTransaction, undefined, runtime);
     void committed.catch(() => {});
     try {
       writeTransaction.objectStore(META_STORE_NAME).put(
@@ -706,15 +768,16 @@ export const indexedDb = <TValue = unknown>(
   const readFrom = async <T>(
     storeName: string,
     run: (store: IDBObjectStore) => IDBRequest<T>,
-    signal?: AbortSignal
+    signal: AbortSignal | undefined,
+    runtime: IStorageOperationRuntime
   ): Promise<T> => {
-    const database = await open();
+    const database = await open(runtime);
     assertLive();
     const transaction = createTransaction(database, storeName, 'readonly');
-    const committed = idbTransactionCommit(transaction, { signal });
+    const committed = idbTransactionCommit(transaction, { signal }, runtime);
     void committed.catch(() => {});
     try {
-      const request = fromIdbRequest(run(transaction.objectStore(storeName)), { signal });
+      const request = fromIdbRequest(run(transaction.objectStore(storeName)), { signal }, runtime);
       const [value] = await Promise.all([request, committed]);
       return value;
     } catch (cause) {
@@ -726,12 +789,12 @@ export const indexedDb = <TValue = unknown>(
       await committed.catch(() => {});
       const signalFailure = indexedDbSignalFailure(signal);
       if (signalFailure) throw signalFailure;
-      if (cause instanceof StorageError) throw cause;
+      if (isStorageErrorFamily(cause)) throw cause;
       throw normalizeError(
         cause,
-        'indexeddb',
+        StorageBackend.indexedDb,
         StorageErrorCode.transactionFailed,
-        'indexeddb.read'
+        StorageOperation.indexedDbRead
       );
     }
   };
@@ -740,12 +803,13 @@ export const indexedDb = <TValue = unknown>(
   const writeTo = async (
     storeName: string,
     run: (store: IDBObjectStore) => unknown,
-    signal?: AbortSignal
+    signal: AbortSignal | undefined,
+    runtime: IStorageOperationRuntime
   ): Promise<void> => {
-    const database = await open();
+    const database = await open(runtime);
     assertLive();
     const transaction = createTransaction(database, storeName, 'readwrite');
-    const committed = idbTransactionCommit(transaction, { signal });
+    const committed = idbTransactionCommit(transaction, { signal }, runtime);
     void committed.catch(() => {});
     if (indexedDbSignalFailure(signal)) {
       await committed;
@@ -759,7 +823,10 @@ export const indexedDb = <TValue = unknown>(
       } catch {
         /* already settled */
       }
-      throw new StorageError(StorageErrorCode.transactionFailed, { backend: 'indexeddb', cause });
+      throw new StorageError(StorageErrorCode.transactionFailed, {
+        backend: StorageBackend.indexedDb,
+        cause
+      });
     }
     await committed;
   };
@@ -769,16 +836,17 @@ export const indexedDb = <TValue = unknown>(
     key: IStorageKey,
     value: unknown,
     signal: AbortSignal | undefined,
-    policy: 'conflict' | 'replace' = 'conflict'
+    policy: (typeof StorageConflictPolicy)[keyof typeof StorageConflictPolicy] = StorageConflictPolicy.conflict,
+    runtime: IStorageOperationRuntime
   ): Promise<void> => {
-    const database = await open();
+    const database = await open(runtime);
     assertLive();
     const transaction = createTransaction(
       database,
       [kvStoreName, bytesStoreName, recordsStoreName, REVISIONS_STORE_NAME],
       'readwrite'
     );
-    const committed = idbTransactionCommit(transaction, { signal });
+    const committed = idbTransactionCommit(transaction, { signal }, runtime);
     void committed.catch(() => {});
     try {
       const stringKey = typeof key === 'string' ? key : undefined;
@@ -790,31 +858,38 @@ export const indexedDb = <TValue = unknown>(
           : transaction.objectStore(bytesStoreName).get(stringKey);
       const recordRequest = transaction.objectStore(recordsStoreName).get(toIdbKey(key));
       const [kvExisting, bytesExisting, recordExisting] = await Promise.all([
-        kvRequest ? fromIdbRequest(kvRequest, { signal }) : Promise.resolve(undefined),
-        bytesRequest ? fromIdbRequest(bytesRequest, { signal }) : Promise.resolve(undefined),
-        fromIdbRequest(recordRequest, { signal })
+        kvRequest ? fromIdbRequest(kvRequest, { signal }, runtime) : Promise.resolve(undefined),
+        bytesRequest
+          ? fromIdbRequest(bytesRequest, { signal }, runtime)
+          : Promise.resolve(undefined),
+        fromIdbRequest(recordRequest, { signal }, runtime)
       ]);
       const existing = new Set<'value' | 'bytes' | 'record'>();
       if (kvExisting !== undefined) existing.add('value');
       if (bytesExisting !== undefined) existing.add('bytes');
       if (recordExisting !== undefined) existing.add('record');
-      const plan = planChannelWrite(key, channel, existing, policy, 'indexeddb');
+      const plan = planChannelWrite(key, channel, existing, policy, StorageBackend.indexedDb);
       for (const removal of plan.remove) {
-        if (removal === 'value' && stringKey !== undefined)
+        if (removal === StorageChannel.value && stringKey !== undefined)
           transaction.objectStore(kvStoreName).delete(stringKey);
-        if (removal === 'bytes' && stringKey !== undefined)
+        if (removal === StorageChannel.bytes && stringKey !== undefined)
           transaction.objectStore(bytesStoreName).delete(stringKey);
         if (removal === 'record') transaction.objectStore(recordsStoreName).delete(toIdbKey(key));
       }
       const target =
-        channel === 'value' ? kvStoreName : channel === 'bytes' ? bytesStoreName : recordsStoreName;
+        channel === StorageChannel.value
+          ? kvStoreName
+          : channel === StorageChannel.bytes
+            ? bytesStoreName
+            : recordsStoreName;
       const targetKey = channel === 'record' ? toIdbKey(key) : (key as string);
       transaction.objectStore(target).put(value, targetKey);
       if (channel === 'record') {
         const revisionStore = transaction.objectStore(REVISIONS_STORE_NAME);
         const revision = await fromIdbRequest(
           revisionStore.get(recordRevisionKey(key)) as IDBRequest<number | undefined>,
-          { signal }
+          { signal },
+          runtime
         );
         revisionStore.put((revision ?? 0) + 1, recordRevisionKey(key));
       }
@@ -823,7 +898,8 @@ export const indexedDb = <TValue = unknown>(
         const encoded = recordRevisionKey(key);
         const revision = await fromIdbRequest(
           revisionStore.get(encoded) as IDBRequest<number | undefined>,
-          { signal }
+          { signal },
+          runtime
         );
         revisionStore.put((revision ?? 0) + 1, encoded);
       }
@@ -841,9 +917,10 @@ export const indexedDb = <TValue = unknown>(
 
   const runTransaction = async <T>(
     run: (tx: ITransactionScope<TValue>) => Promise<T>,
-    signal?: AbortSignal
+    signal: AbortSignal | undefined,
+    runtime: IStorageOperationRuntime
   ): Promise<T> => {
-    const database = await open();
+    const database = await open(runtime);
     /** Scope remains usable only while the transaction callback is pending. */
     let scopeActive = true;
     const tombstone = Symbol('indexeddb-transaction-tombstone');
@@ -869,19 +946,22 @@ export const indexedDb = <TValue = unknown>(
         revisionTx.objectStore(REVISIONS_STORE_NAME).get(RECORD_EPOCH_KEY) as IDBRequest<
           number | undefined
         >,
-        { signal }
+        { signal },
+        runtime
       );
       const revision = await fromIdbRequest(
         revisionTx.objectStore(REVISIONS_STORE_NAME).get(recordRevisionKey(key)) as IDBRequest<
           number | undefined
         >,
-        { signal }
+        { signal },
+        runtime
       );
       const value = await fromIdbRequest(
         revisionTx.objectStore(recordsStoreName).get(toIdbKey(key)) as IDBRequest<
           TValue | undefined
         >,
-        { signal }
+        { signal },
+        runtime
       );
       if (snapshotEpoch === undefined) {
         snapshotEpoch = epoch ?? 0;
@@ -891,10 +971,10 @@ export const indexedDb = <TValue = unknown>(
     };
     const scope: ITransactionScope<TValue> = {
       get: async (key) => {
-        assertTransactionScopeActive(scopeActive, 'indexeddb');
-        assertStorageKey(key, 'indexeddb');
+        assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb);
+        assertStorageKey(key, StorageBackend.indexedDb);
         await readRevision(key);
-        assertTransactionScopeActive(scopeActive, 'indexeddb');
+        assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb);
         const entry = draft.get(encodeFlatStorageKey(key));
         if (entry !== undefined && entry.length === 2 && entry[1] === tombstone) return undefined;
         if (entry !== undefined) return structuredClone(entry[1] as TValue);
@@ -902,12 +982,12 @@ export const indexedDb = <TValue = unknown>(
         return snapshot === undefined ? undefined : structuredClone(snapshot);
       },
       put: async (value, key, options) => {
-        assertTransactionScopeActive(scopeActive, 'indexeddb');
-        const conflictPolicy = readTransactionConflictPolicy(options, 'indexeddb');
+        assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb);
+        const conflictPolicy = readTransactionConflictPolicy(options, StorageBackend.indexedDb);
         const resolvedKey = key ?? autoKey();
-        assertStorageKey(resolvedKey, 'indexeddb');
+        assertStorageKey(resolvedKey, StorageBackend.indexedDb);
         await readRevision(resolvedKey);
-        assertTransactionScopeActive(scopeActive, 'indexeddb');
+        assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb);
         draft.set(encodeFlatStorageKey(resolvedKey), [
           resolvedKey,
           structuredClone(value),
@@ -916,10 +996,10 @@ export const indexedDb = <TValue = unknown>(
         return resolvedKey;
       },
       delete: async (key) => {
-        assertTransactionScopeActive(scopeActive, 'indexeddb');
-        assertStorageKey(key, 'indexeddb');
+        assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb);
+        assertStorageKey(key, StorageBackend.indexedDb);
         await readRevision(key);
-        assertTransactionScopeActive(scopeActive, 'indexeddb');
+        assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb);
         draft.set(encodeFlatStorageKey(key), [key, tombstone]);
       }
     };
@@ -927,9 +1007,9 @@ export const indexedDb = <TValue = unknown>(
     try {
       result = await run(scope);
     } catch (error) {
-      if (error instanceof StorageError) throw error;
+      if (isStorageErrorFamily(error)) throw error;
       throw new StorageError(StorageErrorCode.transactionFailed, {
-        backend: 'indexeddb',
+        backend: StorageBackend.indexedDb,
         cause: error
       });
     } finally {
@@ -943,19 +1023,23 @@ export const indexedDb = <TValue = unknown>(
       [kvStoreName, bytesStoreName, recordsStoreName, REVISIONS_STORE_NAME],
       'readwrite'
     );
-    const committed = idbTransactionCommit(idbTx, { signal });
+    const committed = idbTransactionCommit(idbTx, { signal }, runtime);
     void committed.catch(() => {});
     const revisionStore = idbTx.objectStore(REVISIONS_STORE_NAME);
     const currentEpoch =
-      (await fromIdbRequest(revisionStore.get(RECORD_EPOCH_KEY) as IDBRequest<number | undefined>, {
-        signal
-      })) ?? 0;
+      (await fromIdbRequest(
+        revisionStore.get(RECORD_EPOCH_KEY) as IDBRequest<number | undefined>,
+        {
+          signal
+        },
+        runtime
+      )) ?? 0;
     if (snapshotEpoch !== undefined && currentEpoch !== snapshotEpoch) {
       idbTx.abort();
       await committed.catch(() => {});
       throw new StorageError(StorageErrorCode.transactionConflict, {
-        backend: 'indexeddb',
-        operation: 'transaction.commit',
+        backend: StorageBackend.indexedDb,
+        operation: StorageOperation.transactionCommit,
         cause: new Error('record epoch changed')
       });
     }
@@ -965,14 +1049,15 @@ export const indexedDb = <TValue = unknown>(
           revisionStore.get(recordRevisionKey(key)) as IDBRequest<number | undefined>,
           {
             signal
-          }
+          },
+          runtime
         )) ?? 0;
       if (actual !== expected) {
         idbTx.abort();
         await committed.catch(() => {});
         throw new StorageError(StorageErrorCode.transactionConflict, {
-          backend: 'indexeddb',
-          operation: 'transaction.commit',
+          backend: StorageBackend.indexedDb,
+          operation: StorageOperation.transactionCommit,
           cause: new Error(`record revision changed from ${expected} to ${actual}`)
         });
       }
@@ -986,7 +1071,8 @@ export const indexedDb = <TValue = unknown>(
             revisionStore.get(recordRevisionKey(key)) as IDBRequest<number | undefined>,
             {
               signal
-            }
+            },
+            runtime
           )) ?? 0;
         revisionStore.put(current + 1, recordRevisionKey(key));
         continue;
@@ -994,10 +1080,14 @@ export const indexedDb = <TValue = unknown>(
       const [key, value, policy] = entry;
       const stringKey = typeof key === 'string' ? key : undefined;
       const kvExisting = stringKey
-        ? await fromIdbRequest(idbTx.objectStore(kvStoreName).get(stringKey), { signal })
+        ? await fromIdbRequest(idbTx.objectStore(kvStoreName).get(stringKey), { signal }, runtime)
         : undefined;
       const bytesExisting = stringKey
-        ? await fromIdbRequest(idbTx.objectStore(bytesStoreName).get(stringKey), { signal })
+        ? await fromIdbRequest(
+            idbTx.objectStore(bytesStoreName).get(stringKey),
+            { signal },
+            runtime
+          )
         : undefined;
       const conflict =
         (kvExisting !== undefined && 'value') || (bytesExisting !== undefined && 'bytes');
@@ -1005,7 +1095,7 @@ export const indexedDb = <TValue = unknown>(
         idbTx.abort();
         await committed.catch(() => {});
         throw new StorageError(StorageErrorCode.duplicateKey, {
-          backend: 'indexeddb',
+          backend: StorageBackend.indexedDb,
           key,
           existingChannel: conflict,
           attemptedChannel: 'record'
@@ -1021,7 +1111,8 @@ export const indexedDb = <TValue = unknown>(
           revisionStore.get(recordRevisionKey(key)) as IDBRequest<number | undefined>,
           {
             signal
-          }
+          },
+          runtime
         )) ?? 0;
       revisionStore.put(current + 1, recordRevisionKey(key));
     }
@@ -1030,7 +1121,7 @@ export const indexedDb = <TValue = unknown>(
   };
 
   return {
-    backend: 'indexeddb',
+    backend: StorageBackend.indexedDb,
     capabilities: CAPABILITIES,
     // sync 未定义：IndexedDB 无同步 API。
 
@@ -1054,63 +1145,65 @@ export const indexedDb = <TValue = unknown>(
     },
 
     get: (key, ctx) =>
-      withAbort(ctx, async (signal) => {
+      withAbort(ctx, async (signal, _context, runtime) => {
         assertLive();
-        assertStringStorageKey(key, 'indexeddb');
+        assertStringStorageKey(key, StorageBackend.indexedDb);
         const value = await readFrom(
           kvStoreName,
           (store) => store.get(key) as IDBRequest<unknown>,
-          signal
+          signal,
+          runtime
         );
         return typeof value === 'string' ? value : null;
       }),
     set: (key, value, ctx) =>
-      withAbort(ctx, async (signal, context) => {
+      withAbort(ctx, async (signal, context, runtime) => {
         assertLive();
-        assertStringStorageKey(key, 'indexeddb');
+        assertStringStorageKey(key, StorageBackend.indexedDb);
         if (typeof value !== 'string')
-          throw new StorageError(StorageErrorCode.invalidArgument, {
-            backend: 'indexeddb',
+          throw new StorageError(StorageErrorCode.invalidConfig, {
+            backend: StorageBackend.indexedDb,
             key,
             cause: new TypeError('storage value must be a string')
           });
-        await writeWithConflict('value', key, value, signal, context?.conflictPolicy);
+        await writeWithConflict('value', key, value, signal, context?.conflictPolicy, runtime);
       }),
     remove: (key, ctx) =>
-      withAbort(ctx, async (signal) => {
+      withAbort(ctx, async (signal, _context, runtime) => {
         assertLive();
-        assertStringStorageKey(key, 'indexeddb');
-        await writeTo(kvStoreName, (store) => store.delete(key), signal);
+        assertStringStorageKey(key, StorageBackend.indexedDb);
+        await writeTo(kvStoreName, (store) => store.delete(key), signal, runtime);
       }),
     has: (key, ctx) =>
-      withAbort(ctx, async (signal) => {
+      withAbort(ctx, async (signal, _context, runtime) => {
         assertLive();
-        assertStringStorageKey(key, 'indexeddb');
+        assertStringStorageKey(key, StorageBackend.indexedDb);
         const value = await readFrom(
           kvStoreName,
           (store) => store.get(key) as IDBRequest<unknown>,
-          signal
+          signal,
+          runtime
         );
         return value !== undefined;
       }),
     keys: (ctx) =>
-      withAbort(ctx, async (signal) => {
+      withAbort(ctx, async (signal, _context, runtime) => {
         assertLive();
-        const raw = await readFrom(kvStoreName, (store) => store.getAllKeys(), signal);
+        const raw = await readFrom(kvStoreName, (store) => store.getAllKeys(), signal, runtime);
         return raw.map((key) => {
-          assertStringStorageKey(key, 'indexeddb', 'persisted value key');
+          assertStringStorageKey(key, StorageBackend.indexedDb, 'persisted value key');
           return key;
         });
       }),
     clearValues: (ctx) =>
-      withAbort(ctx, async (signal) => {
+      withAbort(ctx, async (signal, _context, runtime) => {
         assertLive();
-        await writeTo(kvStoreName, (store) => store.clear(), signal);
+        await writeTo(kvStoreName, (store) => store.clear(), signal, runtime);
       }),
     clearAll: (ctx) =>
-      withAbort(ctx, async (signal) => {
+      withAbort(ctx, async (signal, _context, runtime) => {
         assertLive();
-        const database = await open();
+        const database = await open(runtime);
         assertLive();
         throwIfAborted(signal);
         const transaction = createTransaction(
@@ -1118,7 +1211,7 @@ export const indexedDb = <TValue = unknown>(
           [kvStoreName, bytesStoreName, recordsStoreName, REVISIONS_STORE_NAME],
           'readwrite'
         );
-        const committed = idbTransactionCommit(transaction, { signal });
+        const committed = idbTransactionCommit(transaction, { signal }, runtime);
         void committed.catch(() => {});
         try {
           const revisionStore = transaction.objectStore(REVISIONS_STORE_NAME);
@@ -1158,33 +1251,34 @@ export const indexedDb = <TValue = unknown>(
       }),
     metadata: {
       get: (key, ctx) =>
-        withAbort(ctx, async (signal) => {
+        withAbort(ctx, async (signal, _context, runtime) => {
           assertLive();
-          assertStringStorageKey(key, 'indexeddb', 'metadata key');
-          return readFrom(META_STORE_NAME, (store) => store.get(key), signal);
+          assertStringStorageKey(key, StorageBackend.indexedDb, 'metadata key');
+          return readFrom(META_STORE_NAME, (store) => store.get(key), signal, runtime);
         }),
       set: (key, value, ctx) =>
-        withAbort(ctx, async (signal) => {
+        withAbort(ctx, async (signal, _context, runtime) => {
           assertLive();
-          assertStringStorageKey(key, 'indexeddb', 'metadata key');
-          await writeTo(META_STORE_NAME, (store) => store.put(value, key), signal);
+          assertStringStorageKey(key, StorageBackend.indexedDb, 'metadata key');
+          await writeTo(META_STORE_NAME, (store) => store.put(value, key), signal, runtime);
         }),
       delete: (key, ctx) =>
-        withAbort(ctx, async (signal) => {
+        withAbort(ctx, async (signal, _context, runtime) => {
           assertLive();
-          assertStringStorageKey(key, 'indexeddb', 'metadata key');
-          await writeTo(META_STORE_NAME, (store) => store.delete(key), signal);
+          assertStringStorageKey(key, StorageBackend.indexedDb, 'metadata key');
+          await writeTo(META_STORE_NAME, (store) => store.delete(key), signal, runtime);
         })
     },
 
     getBytes: (key, ctx) =>
-      withAbort(ctx, async (signal) => {
+      withAbort(ctx, async (signal, _context, runtime) => {
         assertLive();
-        assertStringStorageKey(key, 'indexeddb');
+        assertStringStorageKey(key, StorageBackend.indexedDb);
         const value = await readFrom(
           bytesStoreName,
           (store) => store.get(key) as IDBRequest<unknown>,
-          signal
+          signal,
+          runtime
         );
         if (isByteView(value))
           return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
@@ -1193,53 +1287,61 @@ export const indexedDb = <TValue = unknown>(
         return null;
       }),
     setBytes: (key, value, ctx) =>
-      withAbort(ctx, async (signal, context) => {
+      withAbort(ctx, async (signal, context, runtime) => {
         assertLive();
-        assertStringStorageKey(key, 'indexeddb');
+        assertStringStorageKey(key, StorageBackend.indexedDb);
         if (!isUint8Array(value))
-          throw new StorageError(StorageErrorCode.invalidArgument, {
-            backend: 'indexeddb',
+          throw new StorageError(StorageErrorCode.invalidConfig, {
+            backend: StorageBackend.indexedDb,
             key,
             cause: new TypeError('bytes value must be a Uint8Array')
           });
-        await writeWithConflict('bytes', key, value, signal, context?.conflictPolicy);
+        await writeWithConflict('bytes', key, value, signal, context?.conflictPolicy, runtime);
       }),
     clearBytes: (ctx) =>
-      withAbort(ctx, async (signal) => {
+      withAbort(ctx, async (signal, _context, runtime) => {
         assertLive();
-        await writeTo(bytesStoreName, (store) => store.clear(), signal);
+        await writeTo(bytesStoreName, (store) => store.clear(), signal, runtime);
       }),
 
     getRecord: (key, ctx) =>
-      withAbort(ctx, async (signal) => {
+      withAbort(ctx, async (signal, _context, runtime) => {
         assertLive();
-        assertStorageKey(key, 'indexeddb');
+        assertStorageKey(key, StorageBackend.indexedDb);
         return readFrom(
           recordsStoreName,
           (store) => store.get(toIdbKey(key)) as IDBRequest<TValue | undefined>,
-          signal
+          signal,
+          runtime
         );
       }),
     putRecord: (value, key, ctx) =>
-      withAbort(ctx, async (signal, context) => {
+      withAbort(ctx, async (signal, context, runtime) => {
         assertLive();
         const resolvedKey = key ?? autoKey();
-        assertStorageKey(resolvedKey, 'indexeddb');
-        await writeWithConflict('record', resolvedKey, value, signal, context?.conflictPolicy);
+        assertStorageKey(resolvedKey, StorageBackend.indexedDb);
+        await writeWithConflict(
+          'record',
+          resolvedKey,
+          value,
+          signal,
+          context?.conflictPolicy,
+          runtime
+        );
         return resolvedKey;
       }),
     deleteRecord: (key, ctx) =>
-      withAbort(ctx, async (signal) => {
+      withAbort(ctx, async (signal, _context, runtime) => {
         assertLive();
-        assertStorageKey(key, 'indexeddb');
-        const database = await open();
+        assertStorageKey(key, StorageBackend.indexedDb);
+        const database = await open(runtime);
         throwIfAborted(signal);
         const transaction = createTransaction(
           database,
           [recordsStoreName, REVISIONS_STORE_NAME],
           'readwrite'
         );
-        const committed = idbTransactionCommit(transaction, { signal });
+        const committed = idbTransactionCommit(transaction, { signal }, runtime);
         void committed.catch(() => {});
         try {
           const revisionStore = transaction.objectStore(REVISIONS_STORE_NAME);
@@ -1278,16 +1380,16 @@ export const indexedDb = <TValue = unknown>(
         }
       }),
     clearRecords: (ctx) =>
-      withAbort(ctx, async (signal) => {
+      withAbort(ctx, async (signal, _context, runtime) => {
         assertLive();
-        const database = await open();
+        const database = await open(runtime);
         throwIfAborted(signal);
         const transaction = createTransaction(
           database,
           [recordsStoreName, REVISIONS_STORE_NAME],
           'readwrite'
         );
-        const committed = idbTransactionCommit(transaction, { signal });
+        const committed = idbTransactionCommit(transaction, { signal }, runtime);
         void committed.catch(() => {});
         try {
           const revisionStore = transaction.objectStore(REVISIONS_STORE_NAME);
@@ -1324,9 +1426,11 @@ export const indexedDb = <TValue = unknown>(
         }
       }),
     iterateRecords: async function* (range, ctx) {
-      const rangeSnapshot = snapshotKeyRange(range, 'indexeddb');
+      const rangeSnapshot = snapshotKeyRange(range, StorageBackend.indexedDb);
       assertLive();
-      const { signal, dispose: disposeSignal, context } = mergeSignals(ctx);
+      /** One reporter shared by every abort subscription inside this iteration operation. */
+      const runtime = createStorageOperationRuntime();
+      const { signal, dispose: disposeSignal, context } = mergeSignals(ctx, runtime.reporter);
       const pageSize = context?.pageSize ?? 128;
       let lower = rangeSnapshot?.lower;
       let lowerOpen = rangeSnapshot?.lowerOpen;
@@ -1342,7 +1446,7 @@ export const indexedDb = <TValue = unknown>(
                   upper: rangeSnapshot?.upper,
                   upperOpen: rangeSnapshot?.upperOpen
                 };
-          const database = await open();
+          const database = await open(runtime);
           assertLive();
           const transaction = createTransaction(database, recordsStoreName, 'readonly');
           const store = transaction.objectStore(recordsStoreName);
@@ -1362,18 +1466,26 @@ export const indexedDb = <TValue = unknown>(
               disposeAbort();
               callback();
             };
-            /** Normalize every non-cancellation cursor failure at its owning operation boundary. */
-            const cursorFailure = (cause: unknown): StorageError =>
-              new StorageError(StorageErrorCode.transactionFailed, {
-                backend: 'indexeddb',
-                operation: 'indexeddb.cursor',
-                cause: cause instanceof StorageError ? cause.cause : cause
-              });
+            /**
+             * Normalize every non-cancellation cursor failure at its owning operation boundary. A
+             * contract error penetrates whole (rule §4.4); only a web `StorageError` bridge wrapper
+             * is unwrapped before the cursor boundary assigns its own metadata.
+             */
+            const cursorFailure = (cause: unknown): StorageError | StorageContractError =>
+              isStorageContractError(cause)
+                ? cause
+                : new StorageError(StorageErrorCode.transactionFailed, {
+                    backend: StorageBackend.indexedDb,
+                    operation: StorageOperation.indexedDbCursor,
+                    cause: cause instanceof StorageError ? (cause.cause ?? cause) : cause
+                  });
             const abort = (): void => {
               cancelled = true;
               abortReason = readAbortReason(signal);
               finish(() =>
-                reject(new StorageError(StorageErrorCode.aborted, { cause: abortReason }))
+                reject(
+                  new StorageContractError(StorageContractErrorCode.aborted, { cause: abortReason })
+                )
               );
             };
             try {
@@ -1382,7 +1494,11 @@ export const indexedDb = <TValue = unknown>(
                 () => {
                   finish(() => {
                     if (cancelled) {
-                      reject(new StorageError(StorageErrorCode.aborted, { cause: abortReason }));
+                      reject(
+                        new StorageContractError(StorageContractErrorCode.aborted, {
+                          cause: abortReason
+                        })
+                      );
                       return;
                     }
                     if (!cursorFinished) {
@@ -1418,11 +1534,12 @@ export const indexedDb = <TValue = unknown>(
                 },
                 () => finish(() => reject(cursorFailure(readIdbRequestError(request))))
               );
-              disposeAbort = subscribeToAbort(signal, abort);
+              disposeAbort = subscribeToAbort(signal, abort, runtime.reporter);
             } catch (cause) {
               finish(() =>
                 reject(
-                  cause instanceof StorageError && cause.code === StorageErrorCode.invalidArgument
+                  isStorageContractError(cause) ||
+                    (cause instanceof StorageError && cause.code === StorageErrorCode.invalidConfig)
                     ? cause
                     : cursorFailure(cause)
                 )
@@ -1449,9 +1566,9 @@ export const indexedDb = <TValue = unknown>(
     },
     transaction: (run, ctx) => {
       assertLive();
-      return withAbort(ctx, (signal) => {
-        assertTransactionCallback(run, 'indexeddb');
-        return runTransaction(run, signal);
+      return withAbort(ctx, (signal, _context, runtime) => {
+        assertTransactionCallback(run, StorageBackend.indexedDb);
+        return runTransaction(run, signal, runtime);
       });
     }
   };

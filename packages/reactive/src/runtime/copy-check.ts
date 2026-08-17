@@ -16,6 +16,8 @@
  *
  * 这套 `Symbol.for` 登记是发布产物与第二份消费者副本共存时的基础设施防线； 当前单体源码树不会因此自动产生第二份 Runtime。
  */
+import { createReactiveError } from '../errors.js';
+import { ReactiveErrorCode } from '../error-code.js';
 
 /** 跨副本共享的键。函数化避免 import 时连全局 Symbol registry 都被触碰。 */
 const registryKey = (): symbol => Symbol.for('@morning-watch/store.runtime-copies');
@@ -66,7 +68,10 @@ function registryOf(create: boolean): IRegistry | undefined {
   if (descriptor) {
     const existing = 'value' in descriptor ? descriptor.value : undefined;
     if (!isRegistry(existing)) {
-      throw new Error('[store] runtime copy registry is incompatible or corrupted');
+      throw createReactiveError(
+        ReactiveErrorCode.copyConflict,
+        '[store] runtime copy registry is incompatible or corrupted'
+      );
     }
     return existing as IRegistry;
   }
@@ -95,9 +100,15 @@ export function brandOwnedValue(value: object): void {
     if ('value' in descriptor && typeof descriptor.value === 'symbol') {
       noteRuntimeCopy(descriptor.value);
       noteRuntimeCopy();
-      throw new Error('[store] this value was created by a different copy of this library');
+      throw createReactiveError(
+        ReactiveErrorCode.copyConflict,
+        '[store] this value was created by a different copy of this library'
+      );
     }
-    throw new Error('[store] reactive ownership brand is corrupted');
+    throw createReactiveError(
+      ReactiveErrorCode.brandCorrupted,
+      '[store] reactive ownership brand is corrupted'
+    );
   }
   Object.defineProperty(value, key, {
     value: THIS_COPY,
@@ -115,12 +126,29 @@ export function assertNoForeignOwnershipBrand(value: object): void {
   if ('value' in descriptor && typeof descriptor.value === 'symbol') {
     noteRuntimeCopy(descriptor.value);
     noteRuntimeCopy();
-    throw new Error(
+    throw createReactiveError(
+      ReactiveErrorCode.copyConflict,
       '[store] this value was created by a different copy of this library; deduplicate the dependency'
     );
   }
-  throw new Error('[store] reactive ownership brand is corrupted');
+  throw createReactiveError(
+    ReactiveErrorCode.brandCorrupted,
+    '[store] reactive ownership brand is corrupted'
+  );
 }
+
+/**
+ * 待上报的多副本诊断。`noteRuntimeCopy` 可能发生在 Runtime 构造**之前**（`createRuntime` 先登记再 new）， 所以先记录状态，等 Runtime
+ * 建立后经其 diagnostic 通道上报；不直接 `console.error`（AF-04）。
+ */
+let pendingCopyWarning: string | undefined;
+
+/** 取出并清空待上报的多副本诊断；Runtime 构造时消费。 */
+export const consumePendingCopyWarning = (): string | undefined => {
+  const warning = pendingCopyWarning;
+  pendingCopyWarning = undefined;
+  return warning;
+};
 
 /**
  * 登记本副本。`createRuntime()` 与所有权/内部面边界调用，幂等且有本地 fast path。
@@ -134,17 +162,12 @@ export function noteRuntimeCopy(copy: symbol = THIS_COPY): void {
   if (copy === THIS_COPY) thisCopyNoted = true;
   if (registry.copies.size > 1 && !registry.warned) {
     registry.warned = true;
-    try {
-      console.error(
-        '[store] more than one copy of this library is live in this process. ' +
-          'Ownership tables and the synchronous tracking context are per copy, so: ' +
-          'nodes created by one copy are rejected as foreign by the other, and ' +
-          'cross-runtime dependency reads between copies are not detected. ' +
-          'Deduplicate the dependency, or call assertSingleRuntimeCopy() to fail loudly.'
-      );
-    } catch {
-      // 诊断不得制造第二个异常
-    }
+    pendingCopyWarning =
+      '[store] more than one copy of this library is live in this process. ' +
+      'Ownership tables and the synchronous tracking context are per copy, so: ' +
+      'nodes created by one copy are rejected as foreign by the other, and ' +
+      'cross-runtime dependency reads between copies are not detected. ' +
+      'Deduplicate the dependency, or call assertSingleRuntimeCopy() to fail loudly.';
   }
 }
 
@@ -161,7 +184,8 @@ export function assertSingleRuntimeCopy(): void {
   noteRuntimeCopy();
   const registry = registryOf(true);
   if (registry.copies.size > 1) {
-    throw new Error(
+    throw createReactiveError(
+      ReactiveErrorCode.copyConflict,
       `[store] expected a single copy of this library, found ${registry.copies.size}`
     );
   }
