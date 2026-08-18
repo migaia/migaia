@@ -8,16 +8,16 @@ test('真实 IndexedDB 的基本 put/get 冒烟测试', async ({ page }) => {
   expect(result.metadata).toEqual({ ready: true });
 });
 
-test('真实浏览器 IndexedDB options 非法容器统一返回 INVALID_ARGUMENT', async ({ page }) => {
+test('真实浏览器 IndexedDB options 非法容器统一返回 INVALID_CONFIG', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(() => window.runIndexedDbOptionsGuardScenario());
   expect(result).toEqual([
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
     'INVALID_ARGUMENT',
     'INVALID_ARGUMENT',
     'INVALID_ARGUMENT',
@@ -156,19 +156,19 @@ test('真实 IndexedDB entity migrate 分批迁移并清理 legacy record', asyn
   expect(result.result).toMatchObject({ scanned: 1, eligible: 1, migrated: 1 });
   expect(result.value).toEqual({ id: 'a', displayName: 'Ada' });
   expect(result.legacyValue).toBeUndefined();
-  expect(result.invalidBatchCode).toBe('INVALID_ARGUMENT');
+  expect(result.invalidBatchCode).toBe('INVALID_CONFIG');
   expect(result.invalidOptionsCodes).toEqual([
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT'
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
   ]);
   expect(result.invalidBatchCallbackCodes).toEqual([
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT'
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
   ]);
   expect(result.migrationOptionReads).toBe(1);
 });
@@ -266,7 +266,7 @@ test('真实 IndexedDB 旧 entity 客户端拒绝 future version 且不覆盖原
   expect(result.getCode).toBe('VERSION_UNSUPPORTED');
   expect(result.skippedCount).toBe(0);
   expect(result.throwCode).toBe('VERSION_UNSUPPORTED');
-  expect(result.invalidHandlerCode).toBe('INVALID_ARGUMENT');
+  expect(result.invalidHandlerCode).toBe('INVALID_CONFIG');
   expect(result.rawValue).toEqual({ __v: 2, data: { id: 'future', name: 'New' } });
 });
 
@@ -305,23 +305,23 @@ test('真实 IndexedDB schema validation failure 不提交 raw entity record', a
   expect(result.value).toBeUndefined();
 });
 
-test('真实浏览器 entity definition 非对象入口统一返回 INVALID_ARGUMENT', async ({ page }) => {
+test('真实浏览器 entity definition 非对象入口统一返回 INVALID_CONFIG', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(() => window.runEntityDefinitionGuardScenario());
   expect(result.codes).toEqual([
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT'
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
   ]);
   expect(result.storeCodes).toEqual([
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT'
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
   ]);
   expect(result.hostileStorePredicates).toEqual([false, false]);
   expect(result.codecCodes).toEqual([
@@ -332,55 +332,51 @@ test('真实浏览器 entity definition 非对象入口统一返回 INVALID_ARGU
     'INVALID_ARGUMENT'
   ]);
   expect(result.schemaCodes).toEqual([
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT'
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
   ]);
   expect(result.migrationCodes).toEqual([
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT'
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
   ]);
-  expect(result.versionCodes).toEqual(['INVALID_ARGUMENT']);
-  expect(result.migrationVersionCodes).toEqual(['INVALID_ARGUMENT']);
-  expect(result.prototypeMigrationCodes).toEqual(['INVALID_ARGUMENT']);
-  expect(result.nullVersionCodes).toEqual(['INVALID_ARGUMENT']);
-  expect(result.backendCodes).toEqual(['INVALID_ARGUMENT']);
-  expect(result.capabilityCodes).toEqual([
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT'
-  ]);
-  expect(result.sparseVersionCodes).toEqual(['INVALID_ARGUMENT']);
+  expect(result.versionCodes).toEqual(['INVALID_CONFIG']);
+  expect(result.migrationVersionCodes).toEqual(['INVALID_CONFIG']);
+  expect(result.prototypeMigrationCodes).toEqual(['INVALID_CONFIG']);
+  expect(result.nullVersionCodes).toEqual(['INVALID_CONFIG']);
+  expect(result.backendCodes).toEqual(['INVALID_CONFIG']);
+  expect(result.capabilityCodes).toEqual(['INVALID_CONFIG', 'INVALID_CONFIG', 'INVALID_CONFIG']);
+  expect(result.sparseVersionCodes).toEqual(['INVALID_CONFIG']);
   expect(result.validateOnReadCodes).toEqual([
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT'
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
   ]);
   expect(result.standardSchemaCodes).toEqual([
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT'
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
   ]);
   expect(result.standardSchemaContractReads).toBe(4);
   expect(result.standardSchemaResultReads).toBe(2);
   expect(result.migrationHelperCodes).toEqual([
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT'
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
   ]);
   expect(result.inheritedMigrationCalls).toBe(0);
   expect(result.migrationRaceCode).toBe('ABORTED');
   expect(result.codecSelectionCodes).toEqual([
     'INVALID_ARGUMENT',
     'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT'
+    'INVALID_CONFIG'
   ]);
   expect(result.codecDescriptorReads).toBe(4);
   expect(result.definitionOptionReads).toBe(9);
@@ -391,13 +387,13 @@ test('真实浏览器 orderBy comparator 返回非法类型时拒绝静默排序
   await page.goto('/');
   const result = await page.evaluate(() => window.runEntityComparatorGuardScenario());
   expect(result.codes).toEqual(['EXTENSION_FAILED', 'EXTENSION_FAILED']);
-  expect(result.nullCode).toBe('INVALID_ARGUMENT');
+  expect(result.nullCode).toBe('INVALID_CONFIG');
   expect(result.invalidOptionsCodes).toEqual([
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT'
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
   ]);
   expect(result.rangeCodes).toEqual([
     'INVALID_ARGUMENT',
@@ -408,10 +404,10 @@ test('真实浏览器 orderBy comparator 返回非法类型时拒绝静默排序
     'INVALID_ARGUMENT'
   ]);
   expect(result.invalidHandlerCodes).toEqual([
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT',
-    'INVALID_ARGUMENT'
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
   ]);
   expect(result.invalidPolicyCode).toBe('INVALID_ARGUMENT');
   expect(result.rangeSnapshotReads).toBe(1);

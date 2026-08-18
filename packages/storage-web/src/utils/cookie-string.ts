@@ -72,5 +72,8 @@ export const serializeCookieRemoval = (
   const parts = [`${encodeURIComponent(name)}=`, 'expires=Thu, 01 Jan 1970 00:00:00 GMT'];
   parts.push(`path=${ctx?.path ?? '/'}`);
   if (ctx?.domain) parts.push(`domain=${ctx.domain}`);
+  // Partitioned is part of cookie identity; omitting it targets the unpartitioned cookie jar.
+  if (ctx?.secure) parts.push('secure');
+  if (ctx?.partitioned) parts.push('partitioned');
   return parts.join('; ');
 };

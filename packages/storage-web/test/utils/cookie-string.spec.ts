@@ -95,4 +95,9 @@ describe('serializeCookieRemoval', () => {
     expect(serializeCookieRemoval('name', { domain: 'example.com' })).toContain(
       'domain=example.com'
     ));
+  it('删除 Partitioned cookie 时保留分区身份与 Secure 属性', () => {
+    const removal = serializeCookieRemoval('name', { secure: true, partitioned: true });
+    expect(removal).toContain('secure');
+    expect(removal).toContain('partitioned');
+  });
 });

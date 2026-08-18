@@ -9,6 +9,12 @@ import {
 } from '../../src/core/key-domain';
 
 describe('core key-domain', () => {
+  it('数组 key 的自定义 map 不能改变 wire 编码', () => {
+    const key = ['actual'];
+    key.map = (() => ['forged']) as typeof key.map;
+    expect(decodeFlatStorageKey(encodeFlatStorageKey(key))).toEqual(['actual']);
+  });
+
   it('range getter 只读取一次并返回稳定快照', () => {
     let reads = 0;
     const range = {

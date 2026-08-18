@@ -38,6 +38,7 @@ export { assertTransactionCallback, readTransactionConflictPolicy } from './tran
 export {
   KEY_DOMAIN_LIMITS,
   assertStorageKey,
+  snapshotStorageKey,
   assertStringStorageKey,
   compareStorageKeys
 } from './key.js';

@@ -5,6 +5,7 @@ import {
   StorageContractErrorCode,
   assertStorageKey,
   compareStorageKeys,
+  snapshotStorageKey,
   type IBackendKind,
   type IKeyRange,
   type IStorageKey
@@ -18,6 +19,7 @@ import { StorageBackend } from '../constants.js';
 export {
   KEY_DOMAIN_LIMITS,
   assertStorageKey,
+  snapshotStorageKey,
   assertStringStorageKey,
   compareStorageKeys
 } from '@migaia/storage-contract';
@@ -30,6 +32,7 @@ const dateValue = (value: unknown): number | undefined => {
       const cloned = clone(value);
       return intrinsicConstructorName(cloned) === 'Date' ? (cloned as Date).getTime() : undefined;
     }
+    // Without structuredClone, constructor-name checks are forgeable; require same-realm Date.
     return value instanceof Date ? value.getTime() : undefined;
   } catch {
     return undefined;
@@ -58,7 +61,10 @@ const toWire = (value: IStorageKey): unknown => {
   if (date !== undefined) return ['d', date];
   const buffer = bufferValue(value);
   if (buffer !== undefined) return ['b', bytesToBase64(new Uint8Array(buffer))];
-  return ['a', (value as readonly IStorageKey[]).map(toWire)];
+  const source = value as readonly IStorageKey[];
+  const entries: unknown[] = [];
+  for (let index = 0; index < source.length; index += 1) entries.push(toWire(source[index]!));
+  return ['a', entries];
 };
 
 /** Encode a validated key reversibly for flat backends. */
@@ -139,17 +145,7 @@ export const snapshotKeyRange = (
   /** Clone one range bound before validation so later caller mutation cannot alter the operation. */
   const snapshotBound = (value: IStorageKey, label: string): IStorageKey => {
     try {
-      /** Native clone when available; canonical wire round-trip preserves older-runtime support. */
-      const clone = globalThis.structuredClone;
-      /** Detached key ownership transferred to the normalized range snapshot. */
-      const cloned: unknown =
-        typeof value === 'string' || typeof value === 'number'
-          ? value
-          : typeof clone === 'function'
-            ? clone(value)
-            : decodeFlatStorageKey(encodeFlatStorageKey(value), backend);
-      assertStorageKey(cloned, backend, label);
-      return cloned;
+      return snapshotStorageKey(value, backend, label);
     } catch (cause) {
       if (isStorageErrorFamily(cause)) throw cause;
       throw new StorageContractError(StorageContractErrorCode.invalidKey, {

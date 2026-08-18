@@ -687,19 +687,6 @@ export const createRepository = <TDomain, TStored>(
     }
   };
 
-  const persistValue = async (
-    value: TDomain,
-    ctx: IOperationContext | undefined,
-    runtime: IStorageOperationRuntime
-  ): Promise<void> => {
-    const prepared = await toEnvelope(value, ctx, runtime);
-    const id = idOf(name, keyProp, prepared.domain, store.backend);
-    const target: IWriteTarget = recordStore
-      ? { documentKey: composeRepositoryKey(name, id) }
-      : { flatKey: composeFlatKey(name, id) };
-    await writeEnvelopeAt(target, prepared.envelope, ctx, runtime);
-  };
-
   return {
     get: async (id, ctx) => {
       const context = snapshotOperationContext(ctx);
@@ -805,7 +792,11 @@ export const createRepository = <TDomain, TStored>(
       const persistBatch = async (): Promise<void> => {
         if (batch.length === 0) return;
         if (!recordStore) {
-          for (const entry of batch) await persistValue(entry.value, context, runtime);
+          for (const entry of batch) {
+            const prepared = await toEnvelope(entry.value, context, runtime);
+            const nextKey = composeFlatKey(name, entry.id);
+            await writeEnvelopeAt({ flatKey: nextKey }, prepared.envelope, context, runtime);
+          }
           migrated += batch.length;
         } else {
           try {
@@ -990,16 +981,43 @@ export const createRepository = <TDomain, TStored>(
           }
         }
       } else {
-        for await (const value of streamImpl({ onInvalid }, context, runtime)) {
-          eligible += 1;
-          batch.push({
-            physicalKey: String(scanned),
-            raw: undefined,
-            id: idOf(name, keyProp, value, store.backend),
-            legacy: false,
-            value
-          });
+        const prefix = flatKeyPrefix(name);
+        const keys = (await store.keys(context))
+          .filter((rawKey) => rawKey.startsWith(prefix))
+          .map((rawKey) => ({ rawKey, id: decodeFlatStorageKey(rawKey.slice(prefix.length)) }))
+          .filter((entry): entry is { rawKey: string; id: IStorageKey } => entry.id !== undefined)
+          .sort((left, right) => compareStorageKeys(left.id, right.id));
+        for (const { rawKey, id } of keys) {
+          const raw = await store.get(rawKey, context);
+          if (raw === null) continue;
           scanned += 1;
+          try {
+            const envelope = await decodeEnvelope(raw, context, runtime);
+            const value = await materialize(envelope, context, runtime);
+            if (value === undefined) continue;
+            if (envelope.__v >= version) {
+              alreadyCurrent += 1;
+              continue;
+            }
+            eligible += 1;
+            batch.push({
+              physicalKey: rawKey,
+              raw,
+              id,
+              legacy: false,
+              value
+            });
+          } catch (cause) {
+            const issue: IInvalidRecordIssue<TDomain> = {
+              key: id,
+              raw,
+              stage: (cause as Partial<IStageFailure>).stage ?? StorageRecordStage.decode,
+              cause
+            };
+            const action = invokeInvalidHandler(onInvalid, issue);
+            if (action === StorageInvalidRecordAction.throw) throwInvalid(issue);
+            skipped += 1;
+          }
           if (batch.length >= batchSize) await persistBatch();
         }
       }

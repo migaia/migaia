@@ -2,6 +2,23 @@ import { describe, expect, it } from 'vitest';
 import { memoryStorage } from '../../src/backends/memory';
 
 describe('memoryStorage', () => {
+  it('自动生成 key 即使随机源重复也不会覆盖已有 record', async () => {
+    const originalCrypto = globalThis.crypto;
+    Object.defineProperty(globalThis, 'crypto', {
+      configurable: true,
+      value: { randomUUID: () => 'fixed-auto-key' }
+    });
+    try {
+      const store = memoryStorage();
+      const first = await store.putRecord({ value: 1 });
+      const second = await store.putRecord({ value: 2 });
+      expect(second).not.toEqual(first);
+      await expect(store.getRecord(first)).resolves.toEqual({ value: 1 });
+      await expect(store.getRecord(second)).resolves.toEqual({ value: 2 });
+    } finally {
+      Object.defineProperty(globalThis, 'crypto', { configurable: true, value: originalCrypto });
+    }
+  });
   it('在无冲突写入路径也拒绝非法 conflictPolicy', async () => {
     const store = memoryStorage();
     await expect(
@@ -295,5 +312,13 @@ describe('memoryStorage', () => {
     await expect(store.getRecord(['transaction', 1])).resolves.toEqual({ source: 'transaction' });
     await expect(store.getRecord(['direct', 9])).resolves.toBeUndefined();
     await expect(store.getRecord(['transaction', 9])).resolves.toBeUndefined();
+
+    const overriddenMapKey = ['overridden-map', 1] as (string | number)[];
+    overriddenMapKey.map = (() => ['overridden-map', 2]) as typeof overriddenMapKey.map;
+    await store.putRecord({ source: 'map-safe' }, overriddenMapKey);
+    await expect(store.getRecord(['overridden-map', 1])).resolves.toEqual({
+      source: 'map-safe'
+    });
+    await expect(store.getRecord(['overridden-map', 2])).resolves.toBeUndefined();
   });
 });

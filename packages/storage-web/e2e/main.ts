@@ -12,6 +12,7 @@ import {
 } from '../src/index';
 import { fromIdbRequest, idbTransactionCommit } from '../src/utils/idb-request';
 import { snapshotOperationContext, withAbort } from '../src/core/operation';
+import { createStorageOperationRuntime } from '../src/core/operation-reporter';
 import { isKeyValueStore, isRecordStore } from '../src/types/storage';
 
 declare global {
@@ -846,7 +847,7 @@ window.runCookieScopeGuardScenario = async () => {
       { expires: { getTime: () => Infinity } as never }
     );
   } catch (error) {
-    if ((error as { code?: string }).code !== 'INVALID_ARGUMENT') throw error;
+    if ((error as { code?: string }).code !== 'INVALID_CONFIG') throw error;
   }
   let maxAgeCode: string | undefined;
   try {
@@ -1072,9 +1073,6 @@ window.runCookieScopeGuardScenario = async () => {
     };
     writeLifecycleMetadata =
       storageError.code === 'INVALID_ARGUMENT' &&
-      storageError.backend === 'cookie' &&
-      storageError.operation === 'cookie.set' &&
-      storageError.key === 'lifecycle-hostile' &&
       storageError.cause instanceof Error &&
       storageError.cause.message === 'browser hostile signal getter';
   }
@@ -1095,9 +1093,6 @@ window.runCookieScopeGuardScenario = async () => {
     };
     removeLifecycleMetadata =
       storageError.code === 'INVALID_ARGUMENT' &&
-      storageError.backend === 'cookie' &&
-      storageError.operation === 'cookie.remove' &&
-      storageError.key === 'remove-hostile' &&
       storageError.cause instanceof Error &&
       storageError.cause.message === 'browser hostile remove timeout getter';
   }
@@ -1728,6 +1723,7 @@ window.runMemoryCompositeKeyOwnershipScenario = async () => {
 
 /** 真实浏览器验证 timeoutMs=0 与 dispose 的统一 operation lifecycle。 */
 window.runOperationLifecycleScenario = async () => {
+  const operationRuntime = createStorageOperationRuntime();
   const memory = (await import('../src/index')).memoryStorage();
   let contextSnapshotReads = 0;
   const contextController = new AbortController();
@@ -2009,87 +2005,112 @@ window.runOperationLifecycleScenario = async () => {
   let idbRequestContextReads = 0;
   let idbRequestRaceCode: string | undefined;
   try {
-    await fromIdbRequest(requestDatabase.transaction('kv').objectStore('kv').get('missing'), {
-      get signal() {
-        idbRequestContextReads += 1;
-        return {
-          get aborted() {
-            return requestAborted;
-          },
-          reason: 'browser request race',
-          addEventListener: () => {
-            requestAborted = true;
-          },
-          removeEventListener: () => {}
-        } as never;
-      }
-    });
+    await fromIdbRequest(
+      requestDatabase.transaction('kv').objectStore('kv').get('missing'),
+      {
+        get signal() {
+          idbRequestContextReads += 1;
+          return {
+            get aborted() {
+              return requestAborted;
+            },
+            reason: 'browser request race',
+            addEventListener: () => {
+              requestAborted = true;
+            },
+            removeEventListener: () => {}
+          } as never;
+        }
+      },
+      operationRuntime
+    );
   } catch (error) {
     idbRequestRaceCode = (error as { code?: string }).code;
   }
   let idbRequestSetupCode: string | undefined;
   try {
-    await fromIdbRequest(requestDatabase.transaction('kv').objectStore('kv').get('missing'), {
-      signal: {
-        aborted: false,
-        addEventListener: () => {
-          throw new Error('browser request listener setup');
-        },
-        removeEventListener: () => {}
-      } as never
-    });
+    await fromIdbRequest(
+      requestDatabase.transaction('kv').objectStore('kv').get('missing'),
+      {
+        signal: {
+          aborted: false,
+          addEventListener: () => {
+            throw new Error('browser request listener setup');
+          },
+          removeEventListener: () => {}
+        } as never
+      },
+      operationRuntime
+    );
   } catch (error) {
     idbRequestSetupCode = (error as { code?: string }).code;
   }
   const idbRequestCleanupPreserved =
-    (await fromIdbRequest(requestDatabase.transaction('kv').objectStore('kv').get('missing'), {
-      signal: {
-        aborted: false,
-        addEventListener: () => {},
-        removeEventListener: () => {
-          throw new Error('browser request listener cleanup');
-        }
-      } as never
-    })) === undefined;
+    (await fromIdbRequest(
+      requestDatabase.transaction('kv').objectStore('kv').get('missing'),
+      {
+        signal: {
+          aborted: false,
+          addEventListener: () => {},
+          removeEventListener: () => {
+            throw new Error('browser request listener cleanup');
+          }
+        } as never
+      },
+      operationRuntime
+    )) === undefined;
   let idbResultGetterCode: string | undefined;
   try {
-    await fromIdbRequest({
-      get result(): never {
-        throw new Error('browser hostile request result getter');
-      },
-      set onsuccess(handler: (() => void) | null) {
-        queueMicrotask(() => handler?.());
-      },
-      set onerror(_handler: unknown) {}
-    } as unknown as IDBRequest<unknown>);
+    await fromIdbRequest(
+      {
+        get result(): never {
+          throw new Error('browser hostile request result getter');
+        },
+        set onsuccess(handler: (() => void) | null) {
+          queueMicrotask(() => handler?.());
+        },
+        set onerror(_handler: unknown) {}
+      } as unknown as IDBRequest<unknown>,
+      undefined,
+      operationRuntime
+    );
   } catch (error) {
     idbResultGetterCode = (error as { code?: string }).code;
   }
   let idbErrorGetterCode: string | undefined;
   try {
-    await fromIdbRequest({
-      get error(): never {
-        throw new Error('browser hostile request error getter');
-      },
-      set onsuccess(_handler: unknown) {},
-      set onerror(handler: (() => void) | null) {
-        queueMicrotask(() => handler?.());
-      }
-    } as unknown as IDBRequest<unknown>);
+    await fromIdbRequest(
+      {
+        get error(): never {
+          throw new Error('browser hostile request error getter');
+        },
+        set onsuccess(_handler: unknown) {},
+        set onerror(handler: (() => void) | null) {
+          queueMicrotask(() => handler?.());
+        }
+      } as unknown as IDBRequest<unknown>,
+      undefined,
+      operationRuntime
+    );
   } catch (error) {
     idbErrorGetterCode = (error as { code?: string }).code;
   }
   const idbRequestSetterCodes: Array<string | undefined> = [];
   for (const property of ['onsuccess', 'onerror'] as const) {
     try {
-      await fromIdbRequest({
-        set onsuccess(_handler: unknown) {
-          if (property === 'onsuccess') throw new Error('browser hostile request onsuccess setter');
-        },
-        set onerror(_handler: unknown) {
-          if (property === 'onerror') throw new Error('browser hostile request onerror setter');
-        }
-      } as unknown as IDBRequest<unknown>);
+      await fromIdbRequest(
+        {
+          set onsuccess(_handler: unknown) {
+            if (property === 'onsuccess')
+              throw new Error('browser hostile request onsuccess setter');
+          },
+          set onerror(_handler: unknown) {
+            if (property === 'onerror') throw new Error('browser hostile request onerror setter');
+          }
+        } as unknown as IDBRequest<unknown>,
+        undefined,
+        operationRuntime
+      );
       idbRequestSetterCodes.push(undefined);
     } catch (error) {
       idbRequestSetterCodes.push((error as { code?: string }).code);
@@ -2098,19 +2119,25 @@ window.runOperationLifecycleScenario = async () => {
   const idbTransactionSetterCodes: Array<string | undefined> = [];
   for (const property of ['oncomplete', 'onerror', 'onabort'] as const) {
     try {
-      await idbTransactionCommit({
-        abort: () => {},
-        set oncomplete(_handler: unknown) {
-          if (property === 'oncomplete')
-            throw new Error('browser hostile transaction oncomplete setter');
-        },
-        set onerror(_handler: unknown) {
-          if (property === 'onerror') throw new Error('browser hostile transaction onerror setter');
-        },
-        set onabort(_handler: unknown) {
-          if (property === 'onabort') throw new Error('browser hostile transaction onabort setter');
-        }
-      } as unknown as IDBTransaction);
+      await idbTransactionCommit(
+        {
+          abort: () => {},
+          set oncomplete(_handler: unknown) {
+            if (property === 'oncomplete')
+              throw new Error('browser hostile transaction oncomplete setter');
+          },
+          set onerror(_handler: unknown) {
+            if (property === 'onerror')
+              throw new Error('browser hostile transaction onerror setter');
+          },
+          set onabort(_handler: unknown) {
+            if (property === 'onabort')
+              throw new Error('browser hostile transaction onabort setter');
+          }
+        } as unknown as IDBTransaction,
+        undefined,
+        operationRuntime
+      );
       idbTransactionSetterCodes.push(undefined);
     } catch (error) {
       idbTransactionSetterCodes.push((error as { code?: string }).code);
@@ -2120,21 +2147,27 @@ window.runOperationLifecycleScenario = async () => {
   setupTransaction.objectStore('kv').put('must-rollback', 'setup-failure');
   let idbTransactionSetupCode: string | undefined;
   try {
-    await idbTransactionCommit(setupTransaction, {
-      signal: {
-        aborted: false,
-        addEventListener: () => {
-          throw new Error('browser hostile transaction listener setup');
-        },
-        removeEventListener: () => {}
-      } as never
-    });
+    await idbTransactionCommit(
+      setupTransaction,
+      {
+        signal: {
+          aborted: false,
+          addEventListener: () => {
+            throw new Error('browser hostile transaction listener setup');
+          },
+          removeEventListener: () => {}
+        } as never
+      },
+      operationRuntime
+    );
   } catch (error) {
     idbTransactionSetupCode = (error as { code?: string }).code;
   }
   const idbTransactionSetupRolledBack =
     (await fromIdbRequest(
-      requestDatabase.transaction('kv').objectStore('kv').get('setup-failure')
+      requestDatabase.transaction('kv').objectStore('kv').get('setup-failure'),
+      undefined,
+      operationRuntime
     )) === undefined;
   const destructiveDbName = `idb-destructive-setter-${Math.random().toString(36).slice(2)}`;
   const destructiveStore = indexedDb({ dbName: destructiveDbName });

@@ -1,4 +1,8 @@
-import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract';
+import {
+  StorageContractError,
+  StorageContractErrorCode,
+  type IStorageKey
+} from '@migaia/storage-contract';
 import { IDBDatabase, IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb';
 import { describe, expect, it } from 'vitest';
 import { indexedDb } from '../../src/backends/indexed-db';
@@ -15,6 +19,24 @@ const freshDb = () =>
   });
 
 describe('indexedDb backend', () => {
+  it('自动生成 key 即使随机源重复也不会覆盖已有 record', async () => {
+    const originalCrypto = globalThis.crypto;
+    Object.defineProperty(globalThis, 'crypto', {
+      configurable: true,
+      value: { randomUUID: () => 'fixed-auto-key' }
+    });
+    try {
+      const store = freshDb();
+      const first = await store.putRecord({ value: 1 });
+      const second = await store.putRecord({ value: 2 });
+      expect(second).not.toEqual(first);
+      await expect(store.getRecord(first)).resolves.toEqual({ value: 1 });
+      await expect(store.getRecord(second)).resolves.toEqual({ value: 2 });
+      await store.dispose();
+    } finally {
+      Object.defineProperty(globalThis, 'crypto', { configurable: true, value: originalCrypto });
+    }
+  });
   it('构造期拒绝 null、数组和 primitive options', () => {
     for (const options of [null, [], 'options', 1])
       expect(() => indexedDb(options as never)).toThrowError(
@@ -68,6 +90,76 @@ describe('indexedDb backend', () => {
         code: 'INVALID_ARGUMENT',
         backend: 'indexeddb'
       });
+    await store.dispose();
+  });
+
+  it('结构化 key 在异步边界前快照，调用方后续修改不改变目标记录', async () => {
+    const store = freshDb();
+    const key: IStorageKey = ['tenant', 1];
+    const pendingPut = store.putRecord({ value: 'original' }, key);
+    (key as IStorageKey[])[1] = 2;
+    await pendingPut;
+    await expect(store.getRecord(['tenant', 1])).resolves.toEqual({ value: 'original' });
+    await expect(store.getRecord(['tenant', 2])).resolves.toBeUndefined();
+
+    const transactionKey: IStorageKey = ['transaction', 1];
+    await store.transaction(async (tx) => {
+      const pending = tx.put({ value: 'transaction' }, transactionKey);
+      (transactionKey as IStorageKey[])[1] = 2;
+      await pending;
+    });
+    await expect(store.getRecord(['transaction', 1])).resolves.toEqual({
+      value: 'transaction'
+    });
+    await expect(store.getRecord(['transaction', 2])).resolves.toBeUndefined();
+
+    const overriddenMapKey = ['overridden-map', 1] as IStorageKey[];
+    overriddenMapKey.map = (() => ['overridden-map', 2]) as typeof overriddenMapKey.map;
+    await store.putRecord({ value: 'map-safe' }, overriddenMapKey);
+    await expect(store.getRecord(['overridden-map', 1])).resolves.toEqual({ value: 'map-safe' });
+    await expect(store.getRecord(['overridden-map', 2])).resolves.toBeUndefined();
+    await store.dispose();
+  });
+
+  it('可变写入值在异步边界前快照', async () => {
+    const store = freshDb();
+    const record = { nested: { value: 1 } };
+    const pendingRecord = store.putRecord(record, 'record-snapshot');
+    record.nested.value = 2;
+    await pendingRecord;
+    await expect(store.getRecord('record-snapshot')).resolves.toEqual({ nested: { value: 1 } });
+
+    const bytes = new Uint8Array([1, 2]);
+    const pendingBytes = store.setBytes('bytes-snapshot', bytes);
+    bytes[0] = 9;
+    await pendingBytes;
+    await expect(store.getBytes('bytes-snapshot')).resolves.toEqual(new Uint8Array([1, 2]));
+
+    const transactionValue = { nested: { value: 1 } };
+    await store.transaction(async (tx) => {
+      const pending = tx.put(transactionValue, 'transaction-value-snapshot');
+      transactionValue.nested.value = 2;
+      await pending;
+    });
+    await expect(store.getRecord('transaction-value-snapshot')).resolves.toEqual({
+      nested: { value: 1 }
+    });
+    await store.dispose();
+  });
+
+  it('值为 undefined 的 record 仍参与跨通道冲突检测', async () => {
+    const store = freshDb();
+    await store.putRecord(undefined, 'undefined-record');
+    await expect(store.set('undefined-record', 'text')).rejects.toMatchObject({
+      code: 'DUPLICATE_KEY',
+      existingChannel: 'record',
+      attemptedChannel: 'value'
+    });
+    await store.set('undefined-record', 'text', { conflictPolicy: 'replace' });
+    await expect(store.get('undefined-record')).resolves.toBe('text');
+    const entries = [];
+    for await (const entry of store.iterateRecords()) entries.push(entry);
+    expect(entries).toEqual([]);
     await store.dispose();
   });
 

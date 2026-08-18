@@ -24,9 +24,9 @@ import {
   withAbort
 } from '../core/operation.js';
 import {
-  assertStorageKey,
   assertStringStorageKey,
   encodeFlatStorageKey,
+  snapshotStorageKey,
   snapshotKeyRange
 } from '../core/key-domain.js';
 import { planChannelWrite } from '../core/channel-write.js';
@@ -116,12 +116,32 @@ const INTERNAL_STORE_NAMES = new Set([REVISIONS_STORE_NAME, META_STORE_NAME]);
 const isValidStoreName = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0;
 
-const autoKey = (): string =>
-  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+/** Realm-wide monotonic suffix prevents silent overwrite when entropy sources repeat. */
+let indexedDbAutoKeySequence = 0;
+
+const autoKey = (): string => {
+  const entropy =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  indexedDbAutoKeySequence += 1;
+  return `${entropy}-${indexedDbAutoKeySequence.toString(36)}`;
+};
 
 const toIdbKey = (key: IStorageKey): IDBValidKey => key as IDBValidKey;
+
+/** Detach mutable record/byte payloads before the first asynchronous backend boundary. */
+const snapshotWriteValue = <T>(value: T, key: IStorageKey): T => {
+  try {
+    return structuredClone(value);
+  } catch (cause) {
+    throw new StorageError(StorageErrorCode.serializeFailed, {
+      backend: StorageBackend.indexedDb,
+      key,
+      cause
+    });
+  }
+};
 
 /**
  * `ArrayBuffer.isView` 与 `Object.prototype.toString` 是跨 realm 安全的： IndexedDB 的结构化克隆可能在与调用方不同的 realm
@@ -839,6 +859,7 @@ export const indexedDb = <TValue = unknown>(
     policy: (typeof StorageConflictPolicy)[keyof typeof StorageConflictPolicy] = StorageConflictPolicy.conflict,
     runtime: IStorageOperationRuntime
   ): Promise<void> => {
+    const valueSnapshot = channel === StorageChannel.value ? value : snapshotWriteValue(value, key);
     const database = await open(runtime);
     assertLive();
     const transaction = createTransaction(
@@ -856,7 +877,7 @@ export const indexedDb = <TValue = unknown>(
         stringKey === undefined
           ? undefined
           : transaction.objectStore(bytesStoreName).get(stringKey);
-      const recordRequest = transaction.objectStore(recordsStoreName).get(toIdbKey(key));
+      const recordRequest = transaction.objectStore(recordsStoreName).getKey(toIdbKey(key));
       const [kvExisting, bytesExisting, recordExisting] = await Promise.all([
         kvRequest ? fromIdbRequest(kvRequest, { signal }, runtime) : Promise.resolve(undefined),
         bytesRequest
@@ -883,7 +904,7 @@ export const indexedDb = <TValue = unknown>(
             ? bytesStoreName
             : recordsStoreName;
       const targetKey = channel === 'record' ? toIdbKey(key) : (key as string);
-      transaction.objectStore(target).put(value, targetKey);
+      transaction.objectStore(target).put(valueSnapshot, targetKey);
       if (channel === 'record') {
         const revisionStore = transaction.objectStore(REVISIONS_STORE_NAME);
         const revision = await fromIdbRequest(
@@ -972,35 +993,32 @@ export const indexedDb = <TValue = unknown>(
     const scope: ITransactionScope<TValue> = {
       get: async (key) => {
         assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb);
-        assertStorageKey(key, StorageBackend.indexedDb);
-        await readRevision(key);
+        const keySnapshot = snapshotStorageKey(key, StorageBackend.indexedDb);
+        await readRevision(keySnapshot);
         assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb);
-        const entry = draft.get(encodeFlatStorageKey(key));
+        const entry = draft.get(encodeFlatStorageKey(keySnapshot));
         if (entry !== undefined && entry.length === 2 && entry[1] === tombstone) return undefined;
         if (entry !== undefined) return structuredClone(entry[1] as TValue);
-        const snapshot = readSnapshots.get(encodeFlatStorageKey(key));
+        const snapshot = readSnapshots.get(encodeFlatStorageKey(keySnapshot));
         return snapshot === undefined ? undefined : structuredClone(snapshot);
       },
       put: async (value, key, options) => {
         assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb);
         const conflictPolicy = readTransactionConflictPolicy(options, StorageBackend.indexedDb);
         const resolvedKey = key ?? autoKey();
-        assertStorageKey(resolvedKey, StorageBackend.indexedDb);
-        await readRevision(resolvedKey);
+        const keySnapshot = snapshotStorageKey(resolvedKey, StorageBackend.indexedDb);
+        const valueSnapshot = snapshotWriteValue(value, keySnapshot);
+        await readRevision(keySnapshot);
         assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb);
-        draft.set(encodeFlatStorageKey(resolvedKey), [
-          resolvedKey,
-          structuredClone(value),
-          conflictPolicy
-        ]);
+        draft.set(encodeFlatStorageKey(keySnapshot), [keySnapshot, valueSnapshot, conflictPolicy]);
         return resolvedKey;
       },
       delete: async (key) => {
         assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb);
-        assertStorageKey(key, StorageBackend.indexedDb);
-        await readRevision(key);
+        const keySnapshot = snapshotStorageKey(key, StorageBackend.indexedDb);
+        await readRevision(keySnapshot);
         assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb);
-        draft.set(encodeFlatStorageKey(key), [key, tombstone]);
+        draft.set(encodeFlatStorageKey(keySnapshot), [keySnapshot, tombstone]);
       }
     };
     let result: T;
@@ -1307,10 +1325,10 @@ export const indexedDb = <TValue = unknown>(
     getRecord: (key, ctx) =>
       withAbort(ctx, async (signal, _context, runtime) => {
         assertLive();
-        assertStorageKey(key, StorageBackend.indexedDb);
+        const keySnapshot = snapshotStorageKey(key, StorageBackend.indexedDb);
         return readFrom(
           recordsStoreName,
-          (store) => store.get(toIdbKey(key)) as IDBRequest<TValue | undefined>,
+          (store) => store.get(toIdbKey(keySnapshot)) as IDBRequest<TValue | undefined>,
           signal,
           runtime
         );
@@ -1319,10 +1337,10 @@ export const indexedDb = <TValue = unknown>(
       withAbort(ctx, async (signal, context, runtime) => {
         assertLive();
         const resolvedKey = key ?? autoKey();
-        assertStorageKey(resolvedKey, StorageBackend.indexedDb);
+        const keySnapshot = snapshotStorageKey(resolvedKey, StorageBackend.indexedDb);
         await writeWithConflict(
           'record',
-          resolvedKey,
+          keySnapshot,
           value,
           signal,
           context?.conflictPolicy,
@@ -1333,7 +1351,7 @@ export const indexedDb = <TValue = unknown>(
     deleteRecord: (key, ctx) =>
       withAbort(ctx, async (signal, _context, runtime) => {
         assertLive();
-        assertStorageKey(key, StorageBackend.indexedDb);
+        const keySnapshot = snapshotStorageKey(key, StorageBackend.indexedDb);
         const database = await open(runtime);
         throwIfAborted(signal);
         const transaction = createTransaction(
@@ -1346,7 +1364,7 @@ export const indexedDb = <TValue = unknown>(
         try {
           const revisionStore = transaction.objectStore(REVISIONS_STORE_NAME);
           await new Promise<void>((resolve, reject) => {
-            const request = revisionStore.get(recordRevisionKey(key)) as IDBRequest<
+            const request = revisionStore.get(recordRevisionKey(keySnapshot)) as IDBRequest<
               number | undefined
             >;
             installIdbRequestHandlers(
@@ -1354,8 +1372,8 @@ export const indexedDb = <TValue = unknown>(
               () => {
                 try {
                   const revision = readIdbRequestResult(request);
-                  transaction.objectStore(recordsStoreName).delete(toIdbKey(key));
-                  revisionStore.put((revision ?? 0) + 1, recordRevisionKey(key));
+                  transaction.objectStore(recordsStoreName).delete(toIdbKey(keySnapshot));
+                  revisionStore.put((revision ?? 0) + 1, recordRevisionKey(keySnapshot));
                   resolve();
                 } catch (cause) {
                   reject(normalizeIdbRequestFailure(cause));
