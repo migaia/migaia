@@ -87,6 +87,12 @@ describe('M-T41 (§3.7.5): capability 码表穷尽 + 单点声明', () => {
     expect(srcFiles.length).toBeGreaterThan(2);
   });
 
+  it('does not expose the pre-extraction store message prefix', () => {
+    expect(srcFiles.flatMap((file) => readFileSync(file, 'utf8')).join('\n')).not.toContain(
+      ['[', 'store', ']'].join('')
+    );
+  });
+
   it('code values are unique and the table has 9 entries (§3.7.3 + INVALID_OPTION)', () => {
     const declared = Object.values(CapabilityErrorCode);
     expect(new Set(declared).size).toBe(declared.length);

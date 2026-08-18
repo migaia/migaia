@@ -28,6 +28,256 @@ const enabledHost = <Context>(context: Context, ...names: string[]) =>
   });
 
 describe('能力闸门', () => {
+  it('uses the disposer captured at adoption even if the public handle mutates', async () => {
+    const original = vi.fn();
+    const hijacked = vi.fn();
+    const handle = { dispose: original };
+    const host = enabledHost({}, 'x');
+    host.register({ name: 'x', activate: () => handle });
+    await host.enable('x');
+    handle.dispose = hijacked;
+    await host.disable('x');
+    expect(original).toHaveBeenCalledOnce();
+    expect(hijacked).not.toHaveBeenCalled();
+  });
+
+  it('invokes the captured disposer with the capability handle as receiver', async () => {
+    const handle = {
+      released: false,
+      dispose() {
+        this.released = true;
+      }
+    };
+    const host = enabledHost({}, 'receiver');
+    host.register({ name: 'receiver', activate: () => handle });
+    await host.enable('receiver');
+    await host.disable('receiver');
+    expect(handle.released).toBe(true);
+  });
+
+  it('reads a hostile disposer getter exactly once', async () => {
+    let reads = 0;
+    let original = 0;
+    let hijacked = 0;
+    const handle: { readonly dispose: () => void } = {
+      get dispose() {
+        reads++;
+        return reads === 1
+          ? () => {
+              original++;
+            }
+          : () => {
+              hijacked++;
+            };
+      }
+    };
+    const host = enabledHost({}, 'hostile');
+    host.register({ name: 'hostile', activate: () => handle });
+    await host.enable('hostile');
+    await host.disable('hostile');
+    expect({ reads, original, hijacked }).toEqual({ reads: 1, original: 1, hijacked: 0 });
+  });
+
+  it('Round24 C-T01: classifies a throwing handle disposer getter and converges disable/dispose', async () => {
+    const getterError = new Error('dispose getter failed');
+    let reads = 0;
+    const handle = {
+      get dispose() {
+        reads++;
+        throw getterError;
+      }
+    };
+    const reported: unknown[] = [];
+    const host = createCapabilityHost(undefined, {
+      flags: { hostile: true },
+      onError: (_name, error) => reported.push(error)
+    });
+    host.register({ name: 'hostile', activate: () => handle as never });
+
+    await expect(host.enable('hostile')).resolves.toEqual({
+      status: 'failed',
+      error: expect.objectContaining({
+        source: '@migaia/capability',
+        code: CapabilityErrorCode.invalidHandle,
+        cause: getterError
+      })
+    });
+    expect(reads).toBe(1);
+    expect(host.handle('hostile')).toBeUndefined();
+    expect(host.error('hostile')).toEqual(
+      expect.objectContaining({ code: CapabilityErrorCode.invalidHandle, cause: getterError })
+    );
+    expect(reported).toEqual([
+      expect.objectContaining({ code: CapabilityErrorCode.invalidHandle, cause: getterError })
+    ]);
+
+    await expect(host.disable('hostile')).resolves.toBe(false);
+    await expect(host.dispose()).resolves.toBeUndefined();
+    expect(host.state('hostile')).toBe('off');
+    expect(host.handle('hostile')).toBeUndefined();
+  });
+
+  it('Round26 C-T02: rejects delayed disposer-origin dispose and reports once', async () => {
+    let host!: ReturnType<typeof createCapabilityHost<undefined>>;
+    let selfError: unknown;
+    const reported: unknown[] = [];
+    const disposer = vi.fn(async () => {
+      try {
+        host.dispose();
+      } catch (error) {
+        selfError = error;
+      }
+      await Promise.resolve();
+      await host.dispose();
+    });
+    host = createCapabilityHost(undefined, {
+      flags: { worker: true },
+      onError: (_name, error) => reported.push(error)
+    });
+    host.register({
+      name: 'worker',
+      activate: () => ({ dispose: disposer })
+    });
+    await host.enable('worker');
+
+    const first = host.dispose();
+    expect(host.disposed).toBe(true);
+    expect(selfError).toEqual(
+      expect.objectContaining({
+        source: '@migaia/capability',
+        code: CapabilityErrorCode.hostTransitioning,
+        message: 'capability host cannot mutate during a lifecycle transition'
+      })
+    );
+    expect(disposer).toHaveBeenCalledOnce();
+
+    await first;
+    expect(reported).toEqual([
+      expect.objectContaining({
+        source: '@migaia/capability',
+        code: CapabilityErrorCode.hostTransitioning
+      })
+    ]);
+    expect(host.state('worker')).toBe('off');
+    expect(host.handle('worker')).toBeUndefined();
+    expect(host.dispose()).toBe(first);
+    expect(disposer).toHaveBeenCalledOnce();
+  });
+
+  it('Round26 C-T03: rejects external in-progress dispose and reuses completed canonical Promise', async () => {
+    const cleanup = deferred<void>();
+    const disposer = vi.fn(() => cleanup.promise);
+    const host = enabledHost(undefined, 'worker');
+    host.register({ name: 'worker', activate: () => ({ dispose: disposer }) });
+    await host.enable('worker');
+
+    const first = host.dispose();
+    const concurrent = host.dispose();
+    expect(concurrent).not.toBe(first);
+    await expect(concurrent).rejects.toEqual(
+      expect.objectContaining({
+        source: '@migaia/capability',
+        code: CapabilityErrorCode.hostTransitioning
+      })
+    );
+
+    cleanup.resolve();
+    await expect(first).resolves.toBeUndefined();
+    expect(host.dispose()).toBe(first);
+  });
+
+  it('preserves the existing report-and-resolve cleanup rejection semantics', async () => {
+    const cleanupError = new Error('cleanup rejected');
+    const onError = vi.fn();
+    const host = createCapabilityHost<undefined>(undefined, {
+      flags: { worker: true },
+      onError
+    });
+    const disposer = vi.fn(async () => {
+      throw cleanupError;
+    });
+    host.register({ name: 'worker', activate: () => ({ dispose: disposer }) });
+    await host.enable('worker');
+
+    const first = host.dispose();
+    const second = host.dispose();
+    await expect(second).rejects.toEqual(
+      expect.objectContaining({
+        source: '@migaia/capability',
+        code: CapabilityErrorCode.hostTransitioning
+      })
+    );
+    await expect(first).resolves.toBeUndefined();
+    expect(disposer).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith('worker', cleanupError);
+    expect(host.dispose()).toBe(first);
+  });
+
+  it('isolates dispose cleanup failures and converges every entry to off', async () => {
+    const releaseOrder: string[] = [];
+    const firstCleanupError = new Error('third cleanup failed');
+    const secondCleanupError = new Error('second cleanup failed');
+    const onError = vi.fn();
+    const host = createCapabilityHost(undefined, {
+      flags: { first: true, second: true, third: true },
+      onError
+    });
+    host.register({
+      name: 'first',
+      activate: () => ({
+        dispose: () => {
+          releaseOrder.push('first');
+        }
+      })
+    });
+    host.register({
+      name: 'second',
+      activate: () => ({
+        dispose: () => {
+          releaseOrder.push('second');
+          throw secondCleanupError;
+        }
+      })
+    });
+    host.register({
+      name: 'third',
+      activate: () => ({
+        dispose: () => {
+          releaseOrder.push('third');
+          throw firstCleanupError;
+        }
+      })
+    });
+
+    await host.enable('first');
+    await host.enable('second');
+    await host.enable('third');
+
+    const firstDispose = host.dispose();
+    expect(host.disposed).toBe(true);
+    await expect(host.dispose()).rejects.toEqual(
+      expect.objectContaining({
+        source: '@migaia/capability',
+        code: CapabilityErrorCode.hostTransitioning
+      })
+    );
+    await expect(firstDispose).resolves.toBeUndefined();
+
+    expect(releaseOrder).toEqual(['third', 'second', 'first']);
+    expect(onError.mock.calls).toEqual([
+      ['third', firstCleanupError],
+      ['second', secondCleanupError]
+    ]);
+    expect(host.error('third')).toBe(firstCleanupError);
+    expect(host.error('second')).toBe(secondCleanupError);
+    for (const name of ['first', 'second', 'third']) {
+      expect(host.state(name)).toBe('off');
+      expect(host.handle(name)).toBeUndefined();
+    }
+    expect(host.dispose()).toBe(firstDispose);
+  });
+
   it('structured enable result and async disposal await cleanup', async () => {
     let released = false;
     const host = createCapabilityHost<unknown>({}, { flags: { worker: true } });
@@ -67,6 +317,44 @@ describe('能力闸门', () => {
     await disposing;
     expect(dispose).toHaveBeenCalledTimes(1);
     await enabling;
+  });
+
+  it('publishes activation before synchronous activate disposal and waits for late cleanup', async () => {
+    const cleanup = deferred<void>();
+    const dispose = vi.fn(() => cleanup.promise);
+    let internalDispose!: Promise<void>;
+    let host!: ReturnType<typeof createCapabilityHost<undefined>>;
+    host = enabledHost(undefined, 'worker');
+    host.register({
+      name: 'worker',
+      activate: () => {
+        internalDispose = host.dispose();
+        return { dispose };
+      }
+    });
+
+    const enabling = host.enable('worker');
+    expect(host.disposed).toBe(true);
+    await expect(host.dispose()).rejects.toEqual(
+      expect.objectContaining({
+        source: '@migaia/capability',
+        code: CapabilityErrorCode.hostTransitioning
+      })
+    );
+
+    let settled = false;
+    void internalDispose.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    cleanup.resolve();
+    await expect(internalDispose).resolves.toBeUndefined();
+    await expect(enabling).resolves.toEqual({ status: 'cancelled' });
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(host.state('worker')).toBe('off');
+    expect(host.handle('worker')).toBeUndefined();
   });
 
   it("disable() waits for that entry's activation still in flight, not just already-tracked releases", async () => {
@@ -411,7 +699,7 @@ describe('能力闸门', () => {
     for (const error of reentryErrors) {
       expect(error).toEqual(
         expect.objectContaining({
-          message: '[store] capability host cannot mutate during a lifecycle transition'
+          message: 'capability host cannot mutate during a lifecycle transition'
         })
       );
     }
