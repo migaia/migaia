@@ -13,7 +13,7 @@ export class ControlTaskRegistry {
   #variationAdmissionWindowStartedAt = 0;
 
   constructor(lease?: {
-    readonly retain: (peerKey: string) => void;
+    readonly retain: (peerKey: string) => boolean;
     readonly release: (peerKey: string) => void;
   }) {
     this.#replay = new RequestReplayLedger(1024, 256, 310_000, lease);

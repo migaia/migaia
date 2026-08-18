@@ -1,183 +1,455 @@
-import { safeRead } from './internal/safe-value.js';
+import { safeRead, safeString } from './internal/safe-value.js';
+import { WebRpcSerializationError } from './errors.js';
+
+/** Maximum error-graph depth accepted by either boundary direction. */
+const MAX_ERROR_GRAPH_DEPTH = 64;
+/** Maximum serialized error records allocated by either boundary direction. */
+const MAX_ERROR_GRAPH_NODES = 1024;
+/** Stable diagnostic for malformed or over-budget error graphs. */
+const SERIALIZED_ERROR_GRAPH_INVALID =
+  'Serialized error graph exceeds safety limits or is malformed';
 
 /**
- * Cross-realm error shape (`docs/contracts/error-codes.md` §3.4). `Error` cannot survive
- * `structuredClone` with its prototype, so anything crossing a Worker/RPC/persistence boundary is
- * serialized to this plain record and rebuilt on the other side.
+ * Cross-realm error record. Serialization rejects an over-budget graph with existing coded
+ * `PAYLOAD_INVALID`; it never returns partial or unbounded record.
  */
 export type ISerializedError = {
   readonly source: string;
   readonly code: string;
-  /** Original constructor name, used to restore `AbortError`-style type checks. */
   readonly name: string;
   readonly message: string;
-  /** Preserved verbatim; the receiving side must NOT regenerate it. */
   readonly stack?: string;
   readonly phase?: string;
   readonly detail?: Readonly<Record<string, unknown>>;
-  /** Web-rpc 领域错误的结构化 `data`（`WebRpcRemoteError`/`WebRpcSchemaValidationError`），跨 realm 原样保留。 */
   readonly data?: unknown;
-  /** Flattened `cause` chain + `AggregateError.errors` + `cleanupErrors[].error`, in reach order. */
+  readonly errors?: readonly ISerializedError[];
   readonly causes?: readonly ISerializedError[];
 };
 
+type ISourceSnapshot = {
+  readonly source: string;
+  readonly code: string;
+  readonly name: string;
+  readonly message: string;
+  readonly stack?: string;
+  readonly phase?: string;
+  readonly detail?: Readonly<Record<string, unknown>>;
+  readonly data?: unknown;
+  readonly cause?: unknown;
+  readonly cleanup: readonly unknown[];
+  readonly aggregate: readonly unknown[] | undefined;
+};
+
+type ISerializedSnapshot = Omit<ISerializedError, 'errors' | 'causes'> & {
+  readonly errors?: readonly ISerializedSnapshot[];
+  readonly causes?: readonly ISerializedSnapshot[];
+};
+
+function isObjectLike(value: unknown): value is object {
+  return value !== null && (typeof value === 'object' || typeof value === 'function');
+}
+
+function readArrayOnce(value: unknown): readonly unknown[] | undefined {
+  let isArray: boolean;
+  try {
+    isArray = Array.isArray(value);
+  } catch (cause) {
+    throwMalformedSerializedError(cause);
+  }
+  if (!isArray) return undefined;
+
+  try {
+    const lengthValue = (value as readonly unknown[]).length;
+    if (
+      typeof lengthValue !== 'number' ||
+      !Number.isSafeInteger(lengthValue) ||
+      lengthValue < 0 ||
+      lengthValue > MAX_ERROR_GRAPH_NODES
+    ) {
+      throwMalformedSerializedError();
+    }
+    const result: unknown[] = [];
+    for (let index = 0; index < lengthValue; index++)
+      result.push((value as readonly unknown[])[index]);
+    return result;
+  } catch (cause) {
+    if (cause instanceof WebRpcSerializationError) throw cause;
+    throwMalformedSerializedError(cause);
+  }
+}
+
 /**
- * Walks the error graph the same way `error-codes.md` §3.2 specifies for cause-reachability: yield
- * the root, then `cause`, then every `cleanupErrors[].error`, then every `AggregateError.errors`
- * entry — each recursively. Cycle-guarded so a malformed cyclic chain terminates.
+ * Classifies and snapshots native aggregate entries once; hostile traps become coded boundary
+ * errors.
  */
+function readAggregateEntries(value: unknown): readonly unknown[] | undefined {
+  let aggregateValue: unknown;
+  try {
+    if (!(value instanceof AggregateError)) return undefined;
+    aggregateValue = value.errors;
+  } catch (cause) {
+    throw new WebRpcSerializationError(SERIALIZED_ERROR_GRAPH_INVALID, cause);
+  }
+  return readArrayOnce(aggregateValue);
+}
+
+function sourceChildren(snapshot: ISourceSnapshot): readonly unknown[] {
+  return [
+    ...(snapshot.cause === undefined || snapshot.cause === null ? [] : [snapshot.cause]),
+    ...snapshot.cleanup,
+    ...(snapshot.aggregate ?? [])
+  ];
+}
+
+/** Reads every source property once and stores results in an owned snapshot. */
+function snapshotSource(
+  value: unknown,
+  snapshots: Map<object, ISourceSnapshot>,
+  active: Set<object>,
+  depth: number
+): ISourceSnapshot | undefined {
+  if (!isObjectLike(value)) return undefined;
+  if (depth > MAX_ERROR_GRAPH_DEPTH) throwMalformedSerializedError();
+  const object = value as object;
+  const existing = snapshots.get(object);
+  if (existing !== undefined) return existing;
+  if (snapshots.size >= MAX_ERROR_GRAPH_NODES) throwMalformedSerializedError();
+
+  const sourceValue = safeRead(value, 'source');
+  const codeValue = safeRead(value, 'code');
+  const nameValue = safeRead(value, 'name');
+  const messageValue = safeRead(value, 'message');
+  const stackValue = safeRead(value, 'stack');
+  const phaseValue = safeRead(value, 'phase');
+  const detailValue = safeRead(value, 'detail');
+  const dataValue = safeRead(value, 'data');
+  const causeValue = safeRead(value, 'cause');
+  const cleanupValue = safeRead(value, 'cleanupErrors');
+  const cleanupEntries = readArrayOnce(cleanupValue) ?? [];
+  const cleanup = cleanupEntries.map((entry) => safeRead(entry, 'error'));
+  const snapshot: ISourceSnapshot = {
+    source: typeof sourceValue === 'string' ? sourceValue : '',
+    code: typeof codeValue === 'string' ? codeValue : '',
+    name: typeof nameValue === 'string' ? nameValue : 'Error',
+    message: typeof messageValue === 'string' ? messageValue : safeString(value),
+    ...(typeof stackValue === 'string' ? { stack: stackValue } : {}),
+    ...(typeof phaseValue === 'string' ? { phase: phaseValue } : {}),
+    ...(detailValue !== undefined
+      ? { detail: detailValue as Readonly<Record<string, unknown>> }
+      : {}),
+    ...(dataValue !== undefined ? { data: dataValue } : {}),
+    ...(causeValue !== undefined ? { cause: causeValue } : {}),
+    cleanup,
+    aggregate: readAggregateEntries(value)
+  };
+  snapshots.set(object, snapshot);
+  if (active.has(object)) return snapshot;
+  active.add(object);
+  for (const child of sourceChildren(snapshot)) snapshotSource(child, snapshots, active, depth + 1);
+  active.delete(object);
+  return snapshot;
+}
+
+/** Walks cause, cleanup, and aggregate edges in contract-defined reach order. */
 export function* reachError(error: unknown): Generator<unknown> {
   yield error;
-  if (error === null || (typeof error !== 'object' && typeof error !== 'function')) return;
-  const seen = new Set<object>([error as object]);
-  yield* reachInner(error, seen);
-}
-
-function* reachInner(error: unknown, seen: Set<object>): Generator<unknown> {
-  const cause = safeRead(error, 'cause');
-  if (cause !== undefined && cause !== null) {
-    yield cause;
-    yield* visit(cause, seen);
-  }
-  const cleanupErrors = safeRead(error, 'cleanupErrors');
-  if (Array.isArray(cleanupErrors)) {
-    for (const entry of cleanupErrors) {
-      const inner = safeRead(entry, 'error');
-      if (inner !== undefined) {
-        yield inner;
-        yield* visit(inner, seen);
-      }
-    }
-  }
-  if (error instanceof AggregateError) {
-    for (const inner of error.errors) {
-      yield inner;
-      yield* visit(inner, seen);
-    }
+  if (!isObjectLike(error)) return;
+  const snapshots = new Map<object, ISourceSnapshot>();
+  snapshotSource(error, snapshots, new Set<object>(), 0);
+  const seen = new Set<object>([error]);
+  const pending: unknown[] = sourceChildren(snapshots.get(error)!).slice().reverse();
+  while (pending.length > 0) {
+    const current = pending.pop();
+    yield current;
+    if (!isObjectLike(current) || seen.has(current)) continue;
+    seen.add(current);
+    const snapshot = snapshots.get(current);
+    if (snapshot !== undefined) pending.push(...sourceChildren(snapshot).slice().reverse());
   }
 }
 
-function* visit(value: unknown, seen: Set<object>): Generator<unknown> {
-  if (value === null || (typeof value !== 'object' && typeof value !== 'function')) return;
-  if (seen.has(value)) return;
-  seen.add(value);
-  yield* reachInner(value, seen);
+type ISerializationState = { nodes: number };
+
+function serializePrimitive(value: unknown): ISerializedError {
+  return { source: '', code: '', name: 'Error', message: safeString(value) };
 }
 
-/** Serializes one error node without flattening its descendants. */
-function serializeLeaf(error: unknown): ISerializedError {
-  if (error === null || (typeof error !== 'object' && typeof error !== 'function')) {
-    return { source: '', code: '', name: 'Error', message: String(error) };
+function serializeSnapshot(
+  snapshot: ISourceSnapshot,
+  snapshots: Map<object, ISourceSnapshot>,
+  state: ISerializationState,
+  depth: number,
+  active: Set<ISourceSnapshot>,
+  includeCauseGraph = false
+): ISerializedError {
+  if (depth > MAX_ERROR_GRAPH_DEPTH || state.nodes >= MAX_ERROR_GRAPH_NODES) {
+    throwMalformedSerializedError();
   }
-  const source = safeRead(error, 'source');
-  const code = safeRead(error, 'code');
-  const name = safeRead(error, 'name');
-  const message = safeRead(error, 'message');
-  const stack = safeRead(error, 'stack');
-  const phase = safeRead(error, 'phase');
-  const detail = safeRead(error, 'detail');
-  const data = safeRead(error, 'data');
+  state.nodes++;
+  const base = {
+    source: snapshot.source,
+    code: snapshot.code,
+    name: snapshot.name,
+    message: snapshot.message,
+    ...(snapshot.stack !== undefined ? { stack: snapshot.stack } : {}),
+    ...(snapshot.phase !== undefined ? { phase: snapshot.phase } : {}),
+    ...(snapshot.detail !== undefined ? { detail: snapshot.detail } : {}),
+    ...(snapshot.data !== undefined ? { data: snapshot.data } : {})
+  };
+  const aggregate = snapshot.aggregate;
+  if (active.has(snapshot)) return aggregate === undefined ? base : { ...base, errors: [] };
+  active.add(snapshot);
+  const nestedCauses = includeCauseGraph
+    ? [
+        ...(snapshot.cause === undefined || snapshot.cause === null ? [] : [snapshot.cause]),
+        ...snapshot.cleanup
+      ].map((child) => {
+        if (!isObjectLike(child)) return serializePrimitive(child);
+        const childSnapshot = snapshots.get(child);
+        if (childSnapshot === undefined) throwMalformedSerializedError();
+        return serializeSnapshot(childSnapshot, snapshots, state, depth + 1, active, true);
+      })
+    : undefined;
+  if (aggregate === undefined) {
+    active.delete(snapshot);
+    return {
+      ...base,
+      ...(nestedCauses !== undefined && nestedCauses.length > 0 ? { causes: nestedCauses } : {})
+    };
+  }
+  const errors = aggregate.map((child) => {
+    if (!isObjectLike(child)) return serializePrimitive(child);
+    const childSnapshot = snapshots.get(child);
+    if (childSnapshot === undefined) throwMalformedSerializedError();
+    return serializeSnapshot(childSnapshot, snapshots, state, depth + 1, active, true);
+  });
+  active.delete(snapshot);
   return {
-    source: typeof source === 'string' ? source : '',
-    code: typeof code === 'string' ? code : '',
-    name: typeof name === 'string' ? name : 'Error',
-    message: typeof message === 'string' ? message : String(error),
-    ...(typeof stack === 'string' ? { stack } : {}),
-    ...(typeof phase === 'string' ? { phase } : {}),
-    ...(detail !== undefined ? { detail: detail as Readonly<Record<string, unknown>> } : {}),
-    ...(data !== undefined ? { data } : {})
+    ...base,
+    ...(nestedCauses !== undefined && nestedCauses.length > 0 ? { causes: nestedCauses } : {}),
+    errors
   };
 }
 
-/** Collects the flattened descendant list for `error` in §3.2 reach order. */
-function collectCauses(error: unknown, seen: Set<object>): ISerializedError[] {
-  const result: ISerializedError[] = [];
-  if (error === null || (typeof error !== 'object' && typeof error !== 'function')) return result;
-  const cause = safeRead(error, 'cause');
-  if (cause !== undefined && cause !== null) {
-    result.push(serializeLeaf(cause));
-    pushInner(cause, result, seen);
-  }
-  const cleanupErrors = safeRead(error, 'cleanupErrors');
-  if (Array.isArray(cleanupErrors)) {
-    for (const entry of cleanupErrors) {
-      const inner = safeRead(entry, 'error');
-      if (inner !== undefined) {
-        result.push(serializeLeaf(inner));
-        pushInner(inner, result, seen);
-      }
-    }
-  }
-  if (error instanceof AggregateError) {
-    for (const inner of error.errors) {
-      result.push(serializeLeaf(inner));
-      pushInner(inner, result, seen);
-    }
-  }
-  return result;
-}
-
-function pushInner(value: unknown, result: ISerializedError[], seen: Set<object>): void {
-  if (value === null || (typeof value !== 'object' && typeof value !== 'function')) return;
-  if (seen.has(value)) return;
-  seen.add(value);
-  result.push(...collectCauses(value, seen));
-}
-
-/** Serializes an error and its whole reachable graph into a plain, cross-realm-safe record. */
+/** Serializes bounded snapshots; overflow deterministically throws coded `PAYLOAD_INVALID`. */
 export function serializeError(error: unknown): ISerializedError {
-  let root = serializeLeaf(error);
-  if (error === null || (typeof error !== 'object' && typeof error !== 'function')) return root;
-  const causes = collectCauses(error, new Set([error as object]));
+  if (!isObjectLike(error)) return serializePrimitive(error);
+  const snapshots = new Map<object, ISourceSnapshot>();
+  snapshotSource(error, snapshots, new Set<object>(), 0);
+  const state: ISerializationState = { nodes: 0 };
+  const rootSnapshot = snapshots.get(error)!;
+  const includeNestedCauseGraph = rootSnapshot.aggregate !== undefined;
+  let root = serializeSnapshot(rootSnapshot, snapshots, state, 0, new Set());
+  const causes: ISerializedError[] = [];
+  const seen = new Set<object>([error]);
+  const pending: unknown[] = sourceChildren(rootSnapshot).slice().reverse();
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (isObjectLike(current)) {
+      const snapshot = snapshots.get(current);
+      if (snapshot === undefined) throwMalformedSerializedError();
+      causes.push(
+        serializeSnapshot(snapshot, snapshots, state, 0, new Set(), includeNestedCauseGraph)
+      );
+      if (!seen.has(current)) {
+        seen.add(current);
+        pending.push(...sourceChildren(snapshot).slice().reverse());
+      }
+    } else {
+      causes.push(serializePrimitive(current));
+    }
+  }
   if (causes.length > 0) root = { ...root, causes };
   return root;
 }
 
-/** Rebuilds one serialized node into a real `Error` without touching `stack`. */
-function buildError(serialized: ISerializedError): Error {
-  const error = new Error(serialized.message);
-  error.name = serialized.name;
+function buildError(serialized: ISerializedSnapshot, children: readonly Error[] = []): Error {
+  const domException = (
+    globalThis as typeof globalThis & {
+      DOMException?: new (message?: string, name?: string) => Error;
+    }
+  ).DOMException;
+  const error =
+    serialized.name === 'AggregateError'
+      ? new AggregateError(children, serialized.message)
+      : serialized.name === 'TypeError'
+        ? new TypeError(serialized.message)
+        : serialized.name === 'RangeError'
+          ? new RangeError(serialized.message)
+          : serialized.name === 'SyntaxError'
+            ? new SyntaxError(serialized.message)
+            : serialized.name === 'ReferenceError'
+              ? new ReferenceError(serialized.message)
+              : serialized.name === 'URIError'
+                ? new URIError(serialized.message)
+                : serialized.name === 'EvalError'
+                  ? new EvalError(serialized.message)
+                  : serialized.name === 'AbortError' && typeof domException === 'function'
+                    ? new domException(serialized.message, 'AbortError')
+                    : new Error(serialized.message);
+  if (error.name !== serialized.name)
+    Object.defineProperty(error, 'name', {
+      value: serialized.name,
+      writable: true,
+      configurable: true
+    });
   if (serialized.stack !== undefined) {
-    // Preserve the original stack verbatim; do not let the engine regenerate one.
     Object.defineProperty(error, 'stack', {
       value: serialized.stack,
       writable: true,
-      configurable: true,
-      enumerable: false
+      configurable: true
     });
+  } else {
+    Reflect.deleteProperty(error, 'stack');
   }
   Object.defineProperty(error, 'source', { value: serialized.source, enumerable: true });
   Object.defineProperty(error, 'code', { value: serialized.code, enumerable: true });
-  if (serialized.phase !== undefined) {
+  if (serialized.phase !== undefined)
     Object.defineProperty(error, 'phase', { value: serialized.phase, enumerable: true });
-  }
-  if (serialized.detail !== undefined) {
+  if (serialized.detail !== undefined)
     Object.defineProperty(error, 'detail', { value: serialized.detail, enumerable: true });
-  }
-  if (serialized.data !== undefined) {
+  if (serialized.data !== undefined)
     Object.defineProperty(error, 'data', { value: serialized.data, enumerable: true });
-  }
   return error;
 }
 
 function defineCause(target: Error, cause: Error): void {
-  Object.defineProperty(target, 'cause', {
-    value: cause,
-    writable: true,
-    configurable: true,
-    enumerable: false
-  });
+  Object.defineProperty(target, 'cause', { value: cause, writable: true, configurable: true });
 }
 
-/**
- * Rebuilds a serialized error graph into real `Error` objects, linking the flattened `causes` list
- * back into a singly-linked `cause` chain so a subsequent `serializeError()` round-trips to the
- * same flat list.
- */
+/** Compares wire snapshots by owned graph shape after structured cloning removed identity. */
+function serializedNodeEqual(left: ISerializedSnapshot, right: ISerializedSnapshot): boolean {
+  if (
+    left.source !== right.source ||
+    left.code !== right.code ||
+    left.name !== right.name ||
+    left.message !== right.message ||
+    left.stack !== right.stack
+  )
+    return false;
+  const leftCauses = left.causes ?? [];
+  const rightCauses = right.causes ?? [];
+  const leftErrors = left.errors ?? [];
+  const rightErrors = right.errors ?? [];
+  return (
+    leftCauses.length === rightCauses.length &&
+    leftErrors.length === rightErrors.length &&
+    leftCauses.every((child, index) => serializedNodeEqual(child, rightCauses[index]!)) &&
+    leftErrors.every((child, index) => serializedNodeEqual(child, rightErrors[index]!))
+  );
+}
+
+/** Lists one serialized node's diagnostic reach in source traversal order. */
+function serializedReach(node: ISerializedSnapshot): ISerializedSnapshot[] {
+  const reached = [node];
+  for (const cause of node.causes ?? []) reached.push(...serializedReach(cause));
+  for (const child of node.errors ?? []) reached.push(...serializedReach(child));
+  return reached;
+}
+
+/** Removes aggregate children already represented by nested `errors` graphs from flat causes. */
+function removeAggregateErrorReach(
+  causes: readonly ISerializedSnapshot[],
+  errors: readonly ISerializedSnapshot[]
+): ISerializedSnapshot[] {
+  const remaining = [...causes];
+  for (const error of errors) {
+    const reach = serializedReach(error);
+    for (let start = remaining.length - reach.length; start >= 0; start--) {
+      if (reach.every((entry, index) => serializedNodeEqual(entry, remaining[start + index]!))) {
+        remaining.splice(start, reach.length);
+        break;
+      }
+    }
+  }
+  return remaining;
+}
+
+function snapshotSerializedGraph(serialized: unknown): {
+  root: ISerializedSnapshot;
+  records: ISerializedSnapshot[];
+} {
+  const snapshots = new Map<object, ISerializedSnapshot>();
+  const active = new Set<object>();
+  const records: ISerializedSnapshot[] = [];
+  const visit = (value: unknown, depth: number): ISerializedSnapshot => {
+    if (!isObjectLike(value) || depth > MAX_ERROR_GRAPH_DEPTH) throwMalformedSerializedError();
+    const object = value as object;
+    const existing = snapshots.get(object);
+    if (existing !== undefined) {
+      if (active.has(object)) throwMalformedSerializedError();
+      return existing;
+    }
+    if (snapshots.size >= MAX_ERROR_GRAPH_NODES) throwMalformedSerializedError();
+    const source = safeRead(value, 'source');
+    const code = safeRead(value, 'code');
+    const name = safeRead(value, 'name');
+    const message = safeRead(value, 'message');
+    const stack = safeRead(value, 'stack');
+    const phase = safeRead(value, 'phase');
+    const detail = safeRead(value, 'detail');
+    const data = safeRead(value, 'data');
+    const errorsValue = safeRead(value, 'errors');
+    const causesValue = safeRead(value, 'causes');
+    if (
+      typeof source !== 'string' ||
+      typeof code !== 'string' ||
+      typeof name !== 'string' ||
+      typeof message !== 'string'
+    )
+      throwMalformedSerializedError();
+    const errors = readArrayOnce(errorsValue);
+    const causes = readArrayOnce(causesValue);
+    if (errorsValue !== undefined && errors === undefined) throwMalformedSerializedError();
+    if (causesValue !== undefined && causes === undefined) throwMalformedSerializedError();
+    const base: ISerializedSnapshot = {
+      source,
+      code,
+      name,
+      message,
+      ...(typeof stack === 'string' ? { stack } : {}),
+      ...(typeof phase === 'string' ? { phase } : {}),
+      ...(detail !== undefined ? { detail: detail as Readonly<Record<string, unknown>> } : {}),
+      ...(data !== undefined ? { data } : {})
+    };
+    snapshots.set(object, base);
+    active.add(object);
+    const ownedErrors = errors?.map((child) => visit(child, depth + 1));
+    const ownedCauses = causes?.map((child) => visit(child, depth + 1));
+    active.delete(object);
+    const owned = {
+      ...base,
+      ...(ownedErrors !== undefined ? { errors: ownedErrors } : {}),
+      ...(ownedCauses !== undefined ? { causes: ownedCauses } : {})
+    };
+    snapshots.set(object, owned);
+    records.push(owned);
+    return owned;
+  };
+  return { root: visit(serialized, 0), records };
+}
+
+/** Rebuilds only owned snapshots; hostile wire getters are never read during reconstruction. */
 export function deserializeError(serialized: ISerializedError): Error {
-  const error = buildError(serialized);
-  const causes = (serialized.causes ?? []).map(deserializeError);
-  for (let i = 0; i < causes.length - 1; i++) defineCause(causes[i], causes[i + 1]);
-  if (causes.length > 0) defineCause(error, causes[0]);
-  return error;
+  const { root, records } = snapshotSerializedGraph(serialized);
+  const rebuilt = new Map<ISerializedSnapshot, Error>();
+  for (const node of records) {
+    rebuilt.set(node, buildError(node, node.errors?.map((entry) => rebuilt.get(entry)!) ?? []));
+  }
+  for (const node of records) {
+    const error = rebuilt.get(node)!;
+    const causes =
+      error instanceof AggregateError && node.errors !== undefined
+        ? removeAggregateErrorReach(node.causes ?? [], node.errors)
+        : [...(node.causes ?? [])];
+    for (let index = 0; index < causes.length - 1; index++)
+      defineCause(rebuilt.get(causes[index])!, rebuilt.get(causes[index + 1])!);
+    if (causes.length > 0) defineCause(error, rebuilt.get(causes[0])!);
+  }
+  return rebuilt.get(root)!;
+}
+
+/** Throws existing coded payload error for malformed or over-budget graphs. */
+function throwMalformedSerializedError(cause?: unknown): never {
+  throw new WebRpcSerializationError(SERIALIZED_ERROR_GRAPH_INVALID, cause);
 }

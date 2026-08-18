@@ -168,4 +168,18 @@ describe('wire boundary', () => {
     expect(() => assertMethod(1 as never)).toThrow('non-empty');
     expect(() => assertMethod('')).toThrow('non-empty');
   });
+
+  it('rejects impossible chunk indexes at the wire boundary', () => {
+    expect(
+      normalizeWebRpcEnvelope({
+        kind: 'chunk',
+        messageId: 'message',
+        index: 2,
+        total: 2,
+        data: 'payload',
+        senderId: 'a',
+        targetId: 'b'
+      })
+    ).toBeUndefined();
+  });
 });

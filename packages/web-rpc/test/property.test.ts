@@ -254,6 +254,7 @@ describe('property invariants', () => {
         let operation: ReturnType<EndpointResourceManager['begin']> | undefined;
         let active = false;
         let replayRetained = false;
+        let released = false;
         for (const current of commands) {
           if (current === 'begin') {
             if (active || replayRetained) {
@@ -261,6 +262,7 @@ describe('property invariants', () => {
             } else {
               operation = manager.begin('request', 'model-id');
               active = true;
+              released = false;
             }
           } else if (current === 'retain' && active) {
             operation?.retainForReplay();
@@ -269,11 +271,13 @@ describe('property invariants', () => {
             operation?.release();
             operation = undefined;
             active = false;
+            released = !replayRetained;
           } else if (current === 'releaseId' && !active) {
             manager.releaseId('model-id');
+            released = released || replayRetained;
             replayRetained = false;
           }
-          expect(manager.hasReservedId('model-id')).toBe(active || replayRetained);
+          expect(manager.hasReservedId('model-id')).toBe(active || replayRetained || released);
           expect(manager.size).toBe(active ? 1 : 0);
         }
       }),

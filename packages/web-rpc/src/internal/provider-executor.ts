@@ -4,6 +4,7 @@ import type { IWebRpcRequest } from '../wire.js';
 import type { ProviderRegistry } from './provider.js';
 import { safeRead, safeString, tupleKey } from './safe-value.js';
 import { WebRpcMessageKind } from '../protocol-constants.js';
+import { serializeError } from '../error-serialization.js';
 type IProviderAdmission = {
   acquire(taskKey: string, peerKey: string): boolean;
   release(taskKey: string): void;
@@ -251,6 +252,7 @@ export class ProviderExecutor<TTargetId extends string> {
         : 'Provider failed',
       data: error instanceof WebRpcSchemaValidationError ? error.data : undefined,
       sentAt: Date.now(),
+      ...(schemaError ? { serializedError: serializeError(error) } : {}),
       ...(request.receiverId === undefined ? {} : { receiverId: request.receiverId })
     });
   }

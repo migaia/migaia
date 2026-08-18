@@ -96,6 +96,20 @@ describe('chunk assembler limits', () => {
     );
   });
 
+  it('does not allocate a timer for a frame rejected at assembly capacity', () => {
+    const timerSpy = vi.spyOn(globalThis, 'setTimeout');
+    const assembler = new ChunkAssembler({ maxConcurrentMessages: 1 });
+    expect(assembler.accept({ messageId: 'first', index: 0, total: 2, data: 'a' })).toBe(undefined);
+    expect(timerSpy).toHaveBeenCalledTimes(1);
+    expect(assembler.accept({ messageId: 'rejected', index: 0, total: 2, data: 'b' })).toBe(
+      undefined
+    );
+    expect(timerSpy).toHaveBeenCalledTimes(1);
+    expect(assembler.size).toBe(1);
+    assembler.clear();
+    timerSpy.mockRestore();
+  });
+
   it('drops duplicate and inconsistent assemblies, then admits a fresh message', () => {
     const assembler = new ChunkAssembler();
     expect(assembler.accept({ messageId: 'duplicate', index: 0, total: 2, data: 'a' })).toBe(

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { WebRpcEndpoint } from '../src/endpoint';
 import { WebRpcErrorCode, WebRpcLifecycleError, WebRpcSchemaValidationError } from '../src/errors';
 import { createMemoryTransportPair } from '../src/adapters/memory';
+import { readEndpointDebugSnapshot } from '../src/internal/test-observer';
 import { createBroadcastChannelTransport } from '../src/adapters/broadcast-channel';
 import type { IWebRpcInboundMessage, IWebRpcTransport } from '../src/transport';
 
@@ -52,7 +53,76 @@ function pair(): readonly [IWebRpcTransport, IWebRpcTransport] {
   return [make(right, left, 'b'), make(left, right, 'a')];
 }
 
+class PrivateTransport implements IWebRpcTransport {
+  #listeners = new Set<(message: IWebRpcInboundMessage<unknown>) => void>();
+  #transportErrorListener: ((error: unknown) => void) | undefined;
+  #listenerErrorListener: ((error: unknown) => void) | undefined;
+  #closed = false;
+
+  readonly platform = 'Memory' as const;
+  readonly ownership = 'owned' as const;
+
+  send(): void {
+    if (this.#closed) throw new Error('closed');
+  }
+
+  subscribe(listener: (message: IWebRpcInboundMessage<unknown>) => void): () => void {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
+  }
+
+  onTransportError(listener: (error: unknown) => void): () => void {
+    this.#transportErrorListener = listener;
+    return () => {
+      if (this.#transportErrorListener === listener) this.#transportErrorListener = undefined;
+    };
+  }
+
+  onListenerError(listener: (error: unknown) => void): () => void {
+    this.#listenerErrorListener = listener;
+    return () => {
+      if (this.#listenerErrorListener === listener) this.#listenerErrorListener = undefined;
+    };
+  }
+
+  close(): void {
+    this.#closed = true;
+    this.#listeners.clear();
+  }
+
+  get closed(): boolean {
+    return this.#closed;
+  }
+
+  emitListenerError(error: unknown): void {
+    this.#listenerErrorListener?.(error);
+  }
+
+  emitTransportError(error: unknown): void {
+    this.#transportErrorListener?.(error);
+  }
+}
+
 describe('WebRpcEndpoint', () => {
+  it('preserves class transport receivers through construction, callbacks, and disposal', async () => {
+    const transport = new PrivateTransport();
+    const failures: unknown[] = [];
+    const endpoint = new WebRpcEndpoint('a', transport, undefined, {
+      hooks: {
+        listeners: (event) => {
+          failures.push(event.error);
+        }
+      }
+    });
+
+    transport.emitListenerError(new Error('listener failure'));
+    transport.emitTransportError(new Error('transport failure'));
+    expect(failures).toHaveLength(2);
+
+    await endpoint.dispose();
+    expect(transport.closed).toBe(true);
+  });
+
   it('bootstraps default discovery over a real anonymous BroadcastChannel', async () => {
     if (typeof BroadcastChannel === 'undefined') return;
     const channelName = `web-rpc-${Math.random().toString(36).slice(2)}`;
@@ -246,7 +316,9 @@ describe('WebRpcEndpoint', () => {
       // a reused id) — only dispatch-only ids are released right after send. If that release
       // did not happen, the 6th of these dispatch() calls would exceed maxEntries and surface
       // as a 'dispatch.failure' hook event.
-      replay: { maxEntries: 2, ttlMs: 60_000 },
+      // Released ids remain tombstones until TTL; leave enough bounded capacity for this
+      // repeated-dispatch smoke test.
+      replay: { maxEntries: 16, ttlMs: 60_000 },
       hooks: {
         listeners: (event) => {
           if (event.name === 'dispatch.failure') failures.push(event);
@@ -280,7 +352,8 @@ describe('WebRpcEndpoint', () => {
     const a = new WebRpcEndpoint<'b'>('a', aTransport, undefined, {
       chunk: { chunkSize: 4 },
       // One slot is occupied by the dispatch task while its chunk message is in flight.
-      replay: { maxEntries: 2, ttlMs: 60_000 },
+      // Each dispatch consumes a task id and a chunk message id until their tombstones expire.
+      replay: { maxEntries: 16, ttlMs: 60_000 },
       hooks: {
         listeners: (event) => {
           if (event.name === 'dispatch.failure') failures.push(event);
@@ -717,6 +790,42 @@ describe('WebRpcEndpoint', () => {
     await expect(client.connect.query?.('missing', { timeoutMs: 1000, signal })).rejects.toThrow(
       'Discovery aborted'
     );
+    await new Promise<void>((resolve) => queueMicrotask(resolve));
+    expect(sends).toBe(0);
+    await client.dispose();
+  });
+  it('rechecks manual discovery signal state after listener registration', async () => {
+    const [transport] = createMemoryTransportPair();
+    let sends = 0;
+    const sendingTransport: IWebRpcTransport = {
+      ...transport,
+      send(message, options) {
+        sends += 1;
+        return transport.send(message, options);
+      }
+    };
+    const client = new WebRpcEndpoint<'missing'>('client', sendingTransport, undefined, {
+      connect: {
+        transport: sendingTransport,
+        discoveryMode: 'manual',
+        verify: () => true
+      }
+    });
+    let aborted = false;
+    const signal = {
+      get aborted() {
+        return aborted;
+      },
+      addEventListener() {
+        aborted = true;
+      },
+      removeEventListener() {}
+    };
+    await expect(
+      client.connect.query?.('missing', { timeoutMs: 1000, signal })
+    ).rejects.toMatchObject({
+      code: WebRpcErrorCode.cancelled
+    });
     await new Promise<void>((resolve) => queueMicrotask(resolve));
     expect(sends).toBe(0);
     await client.dispose();
@@ -1170,6 +1279,89 @@ describe('WebRpcEndpoint', () => {
     expect(() => endpoint.ping('b')).toThrow('timeoutMs must be false');
     await endpoint.dispose();
   });
+  it('rolls back ping ownership when signal registration fails', async () => {
+    const [transport] = pair();
+    const endpoint = new WebRpcEndpoint<'missing'>('a', transport, undefined, {
+      replay: { maxEntries: 2 }
+    });
+    const registrationError = new Error('ping signal registration failed');
+    let removed = 0;
+    const signal = {
+      aborted: false,
+      addEventListener() {
+        throw registrationError;
+      },
+      removeEventListener() {
+        removed += 1;
+      }
+    } as unknown as AbortSignal;
+
+    await expect(endpoint.ping('missing', undefined, { signal })).rejects.toBe(registrationError);
+    expect(registrationError).toMatchObject({
+      source: '@migaia/web-rpc',
+      code: WebRpcErrorCode.invalidConfig
+    });
+    expect(removed).toBe(1);
+    await expect(endpoint.ping('missing', undefined, { timeoutMs: 0 })).rejects.toMatchObject({
+      code: WebRpcErrorCode.overloaded
+    });
+    await endpoint.dispose();
+  });
+  it('settles ping when signal registration synchronously disposes the endpoint', async () => {
+    const [transport] = pair();
+    const endpoint = new WebRpcEndpoint<'missing'>('a', transport);
+    let disposal: Promise<void> | undefined;
+    const signal = {
+      aborted: false,
+      addEventListener() {
+        disposal = endpoint.dispose();
+      },
+      removeEventListener() {}
+    } as unknown as AbortSignal;
+
+    await expect(endpoint.ping('missing', undefined, { signal })).resolves.toBe(false);
+    await disposal;
+  });
+  it('reports a late ping signal registration error after synchronous abort settlement', async () => {
+    const [transport] = pair();
+    const registrationError = new Error('ping signal registration failed after abort');
+    const failures: unknown[] = [];
+    const endpoint = new WebRpcEndpoint<'missing'>('a', transport, undefined, {
+      replay: { maxEntries: 2 },
+      uuid: { generate: () => 'fixed-ping-id' },
+      hooks: {
+        listeners: (event) => {
+          throw event.error;
+        },
+        onHookError: (error) => failures.push(error)
+      }
+    });
+    const signal = {
+      aborted: false,
+      addEventListener(_type: string, listener: () => void) {
+        listener();
+        throw registrationError;
+      },
+      removeEventListener() {}
+    } as unknown as AbortSignal;
+
+    await expect(endpoint.ping('missing', undefined, { signal })).resolves.toBe(false);
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toBe(registrationError);
+    expect(registrationError).toMatchObject({
+      source: '@migaia/web-rpc',
+      code: WebRpcErrorCode.invalidConfig
+    });
+    // The operation release retains this id for duplicate-response protection.
+    // A second attempt with the same generated id must therefore be rejected;
+    // an extra releaseId would incorrectly erase that replay tombstone.
+    expect(() => endpoint.ping('missing', undefined, { timeoutMs: 0 })).toThrow(
+      expect.objectContaining({
+        code: WebRpcErrorCode.invalidConfig
+      })
+    );
+    await endpoint.dispose();
+  });
   it('contains abort listener registration failures', async () => {
     const [transport] = pair();
     const endpoint = new WebRpcEndpoint<'b'>('a', transport);
@@ -1201,6 +1393,107 @@ describe('WebRpcEndpoint', () => {
       code: 'CANCELLED'
     });
     await endpoint.dispose();
+  });
+  it('preserves request abort and reports one late registration failure', async () => {
+    const [transport, peerTransport] = pair();
+    const peer = new WebRpcEndpoint('b', peerTransport, {
+      echo: (context) => context.success(context.data)
+    });
+    const registrationError = new Error('request signal registration failed after abort');
+    const failures: unknown[] = [];
+    let registrations = 0;
+    const endpoint = new WebRpcEndpoint<'b'>('a', transport, undefined, {
+      timeout: { timeoutMs: false },
+      hooks: {
+        listeners: (event) => {
+          throw event.error;
+        },
+        onHookError: (error) => failures.push(error)
+      }
+    });
+    await endpoint.send('b', 'echo', 'warmup');
+    const receiverId = endpoint.discovery.getServerList('b')[0]!.receiverId;
+    const signal = {
+      aborted: false,
+      addEventListener(_type: string, listener: () => void) {
+        registrations += 1;
+        if (registrations === 2) {
+          listener();
+          throw registrationError;
+        }
+      },
+      removeEventListener() {}
+    } as unknown as AbortSignal;
+    try {
+      await expect(
+        endpoint.send('b', 'missing', null, {
+          signal,
+          receiverId
+        } as never)
+      ).rejects.toMatchObject({ code: WebRpcErrorCode.cancelled });
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toBe(registrationError);
+      expect(registrationError).toMatchObject({
+        source: '@migaia/web-rpc',
+        code: WebRpcErrorCode.invalidConfig
+      });
+    } finally {
+      await endpoint.dispose();
+      await peer.dispose();
+    }
+  });
+
+  it('settles an unlimited request when the remote serialized error is malformed', async () => {
+    const [clientTransport, rawServerTransport] = createMemoryTransportPair();
+    const serverTransport: IWebRpcTransport = {
+      ...rawServerTransport,
+      send(message, options) {
+        if (
+          message &&
+          typeof message === 'object' &&
+          'serializedError' in message &&
+          (message as { serializedError?: unknown }).serializedError !== undefined
+        ) {
+          const causes: {
+            source: string;
+            code: string;
+            name: string;
+            message: string;
+            causes?: unknown[];
+          } = {
+            source: '@migaia/web-rpc',
+            code: 'REMOTE_FAILURE',
+            name: 'Error',
+            message: 'malformed'
+          };
+          causes.causes = [causes];
+          message = {
+            ...(message as Record<string, unknown>),
+            serializedError: causes
+          };
+        }
+        return rawServerTransport.send(message, options);
+      }
+    };
+    const server = new WebRpcEndpoint('server', serverTransport, {
+      schema: () => {
+        throw new WebRpcSchemaValidationError('schema failure', { invalid: true });
+      }
+    });
+    const client = new WebRpcEndpoint<'server'>('client', clientTransport, undefined, {
+      targetIds: ['server'],
+      timeout: { timeoutMs: false }
+    });
+    try {
+      await expect(client.send('server', 'schema', null)).rejects.toMatchObject({
+        code: WebRpcErrorCode.payloadInvalid
+      });
+      expect(readEndpointDebugSnapshot(client)).toMatchObject({ pending: 0 });
+    } finally {
+      await client.dispose();
+      await server.dispose();
+    }
   });
   it('quiesces provider work after a terminal transport close', async () => {
     const [aTransport, bTransport] = createMemoryTransportPair();

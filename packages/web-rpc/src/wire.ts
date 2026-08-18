@@ -1,4 +1,5 @@
 import { WebRpcMessageKind, WebRpcVariation } from './protocol-constants.js';
+import type { ISerializedError } from './error-serialization.js';
 
 export type IWebRpcVariation = (typeof WebRpcVariation)[keyof typeof WebRpcVariation];
 export type IWebRpcDiscoveryQuery = {
@@ -64,6 +65,8 @@ export type IWebRpcResponse = {
   readonly data?: unknown;
   readonly message?: string;
   readonly code?: string;
+  /** Sanitized public error graph; omitted for unexpected internal failures. */
+  readonly serializedError?: ISerializedError;
   readonly sentAt: number;
 };
 export type IWebRpcEnvelope =
@@ -202,6 +205,7 @@ export function normalizeWebRpcEnvelope(value: unknown): IWebRpcEnvelope | undef
     const message = safeRead<unknown>(value, 'message');
     const code = safeRead<unknown>(value, 'code');
     const receiverId = safeRead<unknown>(value, 'receiverId');
+    const serializedError = safeRead<unknown>(value, 'serializedError');
     if (
       typeof version !== 'string' ||
       typeof taskId !== 'string' ||
@@ -212,6 +216,8 @@ export function normalizeWebRpcEnvelope(value: unknown): IWebRpcEnvelope | undef
       (message !== undefined && typeof message !== 'string') ||
       (code !== undefined && typeof code !== 'string') ||
       (receiverId !== undefined && typeof receiverId !== 'string') ||
+      (serializedError !== undefined &&
+        (!serializedError || typeof serializedError !== 'object')) ||
       !Number.isSafeInteger(sentAt) ||
       (sentAt as number) < 0
     )
@@ -228,7 +234,10 @@ export function normalizeWebRpcEnvelope(value: unknown): IWebRpcEnvelope | undef
       message,
       code,
       sentAt,
-      ...(receiverId === undefined ? {} : { receiverId })
+      ...(receiverId === undefined ? {} : { receiverId }),
+      ...(serializedError === undefined
+        ? {}
+        : { serializedError: serializedError as ISerializedError })
     }) as IWebRpcResponse;
   }
   if (kind === WebRpcMessageKind.variation) {
@@ -274,6 +283,7 @@ export function normalizeWebRpcEnvelope(value: unknown): IWebRpcEnvelope | undef
       !Number.isSafeInteger(total) ||
       (index as number) < 0 ||
       (total as number) <= 0 ||
+      (index as number) >= (total as number) ||
       typeof data !== 'string' ||
       typeof senderId !== 'string' ||
       typeof targetId !== 'string' ||

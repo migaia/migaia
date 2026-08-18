@@ -42,8 +42,10 @@ export class EndpointResourceManager {
   readonly #resources: ResourceScope;
   readonly #verifiedPeers: VerifiedPeerRegistry;
   readonly #operations = new Map<string, IOperationResourceScope>();
-  /** 重放保留 id（TTL 有界，`purgeReplay()` 到期清理），值域为创建时间戳。 */
+  /** Outbound replay-retained ids that still occupy the shared ReplayWindow. */
   readonly #replayRetainedIds = new Map<string, number>();
+  /** Inbound replay-retained ids use an isolated TTL namespace and never touch ReplayWindow. */
+  readonly #inboundReplayRetainedIds = new Map<string, number>();
   readonly #timers = new Map<string, { readonly clear: () => void }>();
   readonly #replayOwners: IReplayOwner[] = [];
   readonly #maintenanceOwners: IReplayOwner[] = [];
@@ -55,8 +57,10 @@ export class EndpointResourceManager {
   #providerAdmission: ProviderAdmissionRegistry | undefined;
   #providerClear: (() => void) | undefined;
   #discoveryClose: (() => void) | undefined;
-  #discoveryCloseFailure: unknown;
   #disposed = false;
+  #disposePromise:
+    | Promise<readonly { readonly resource: string; readonly error: unknown }[]>
+    | undefined;
 
   constructor(
     replay: ReplayWindow,
@@ -144,7 +148,10 @@ export class EndpointResourceManager {
 
   /** Registers one ping caller record under the operation owner. */
   setPingPending(taskId: string, pending: IPingPending): void {
-    if (this.#disposed) return;
+    if (this.#disposed) {
+      pending.settle(false);
+      return;
+    }
     this.pingPending.set(taskId, pending);
   }
 
@@ -156,8 +163,17 @@ export class EndpointResourceManager {
 
   /** Registers one active provider controller under the endpoint owner. */
   set(key: string, controller: AbortController): void {
-    if (this.#disposed) return;
-    if (this.activeControllers.has(key)) return;
+    if (this.#disposed) {
+      controller.abort();
+      return;
+    }
+    // The first controller owns the key. A void registration API cannot report a
+    // rejected transfer to the caller, so the incoming controller must be aborted
+    // immediately instead of becoming an unowned live operation.
+    if (this.activeControllers.has(key)) {
+      controller.abort();
+      return;
+    }
     this.activeControllers.set(key, controller);
   }
 
@@ -196,7 +212,10 @@ export class EndpointResourceManager {
 
   /** Registers a discovery or lifecycle timer under the endpoint owner. */
   trackTimer(key: string, timer: { readonly clear: () => void }): void {
-    if (this.#disposed) return;
+    if (this.#disposed) {
+      timer.clear();
+      return;
+    }
     this.#timers.get(key)?.clear();
     this.#timers.set(key, timer);
   }
@@ -223,11 +242,16 @@ export class EndpointResourceManager {
     this.#purgeReplayRetained(now);
   }
 
-  /** Purges expired entries from the replay-retained id set (same TTL as the shared `ReplayWindow`). */
+  /** Purges outbound and inbound replay-retained namespaces without crossing ownership. */
   #purgeReplayRetained(now = Date.now()): void {
     const ttl = this.#replay.ttlMs;
     for (const [id, createdAt] of this.#replayRetainedIds)
-      if (now - createdAt >= ttl) this.#replayRetainedIds.delete(id);
+      if (now - createdAt >= ttl) {
+        this.#replayRetainedIds.delete(id);
+        this.#replay.expireId(id);
+      }
+    for (const [id, createdAt] of this.#inboundReplayRetainedIds)
+      if (now - createdAt >= ttl) this.#inboundReplayRetainedIds.delete(id);
   }
 
   /** Registers bounded admission/TTL maintenance under the endpoint owner. */
@@ -239,7 +263,10 @@ export class EndpointResourceManager {
 
   /** Registers one discovery waiter cleanup transaction under the endpoint owner. */
   trackWaiter(key: string, cleanup: () => void): void {
-    if (this.#disposed) return;
+    if (this.#disposed) {
+      cleanup();
+      return;
+    }
     this.#waiters.get(key)?.();
     this.#waiters.set(key, cleanup);
   }
@@ -298,8 +325,6 @@ export class EndpointResourceManager {
   begin(kind: IEndpointOperationKind, id: string, replayRetained = false): IOperationResourceScope {
     if (this.#disposed) throw new WebRpcLifecycleError('EndpointResourceManager is disposed');
     this.#purgeReplayRetained();
-    if (this.#operations.has(id) || this.#replayRetainedIds.has(id))
-      throw new WebRpcError(WebRpcErrorCode.overloaded, 'operation identifier is already active');
     // 只有「出站」kind（本 endpoint 发起）才占用出站 id 账本（ReplayWindow）。入站 kind
     // （provider/variation/chunk）的 id 来自对端 wire，若同样 reserve 会让已认证 peer 用 ~4096 个
     // 入站操作耗尽本 endpoint 的出站发送预算（overloaded）——见 hardening 2G.2 的跨命名空间容量攻击。
@@ -308,6 +333,17 @@ export class EndpointResourceManager {
       kind === WebRpcControlKind.dispatch ||
       kind === WebRpcControlKind.ping ||
       kind === WebRpcControlKind.discovery;
+    const retainedInNamespace = isOutbound
+      ? this.#replayRetainedIds.has(id)
+      : this.#inboundReplayRetainedIds.has(id);
+    if (this.#operations.has(id) || retainedInNamespace)
+      throw new WebRpcError(WebRpcErrorCode.overloaded, 'operation identifier is already active');
+    if (
+      replayRetained &&
+      !isOutbound &&
+      this.#inboundReplayRetainedIds.size >= this.#replay.maxEntries
+    )
+      throw new WebRpcError(WebRpcErrorCode.overloaded, 'operation identifier is not available');
     if (isOutbound && !this.#replay.hasReservedId(id) && !this.#replay.reserveId(id))
       throw new WebRpcError(WebRpcErrorCode.overloaded, 'operation identifier is not available');
     let active = true;
@@ -322,8 +358,10 @@ export class EndpointResourceManager {
         if (!active) return;
         active = false;
         if (this.#operations.get(id) === scope) this.#operations.delete(id);
-        if (retained) this.#replayRetainedIds.set(id, Date.now());
-        else if (isOutbound) this.#replay.releaseId(id);
+        if (retained) {
+          if (isOutbound) this.#replayRetainedIds.set(id, Date.now());
+          else this.#inboundReplayRetainedIds.set(id, Date.now());
+        } else if (isOutbound) this.#replay.releaseId(id);
       },
       retainForReplay: () => {
         if (!active) return;
@@ -340,42 +378,68 @@ export class EndpointResourceManager {
   }
 
   /** Stops new operations and releases operation-owned resources before endpoint resources. */
-  async dispose(): Promise<readonly { readonly resource: string; readonly error: unknown }[]> {
-    if (this.#disposed) return [];
+  dispose(): Promise<readonly { readonly resource: string; readonly error: unknown }[]> {
+    if (this.#disposePromise) return this.#disposePromise;
     this.#disposed = true;
-    this.#settleCallers?.();
+    let resolveDispose!: (
+      errors: readonly { readonly resource: string; readonly error: unknown }[]
+    ) => void;
+    let rejectDispose!: (error: unknown) => void;
+    this.#disposePromise = new Promise((resolve, reject) => {
+      resolveDispose = resolve;
+      rejectDispose = reject;
+    });
+    this.#disposeInternal().then(resolveDispose, rejectDispose);
+    return this.#disposePromise;
+  }
+
+  /** Runs every cleanup phase, retaining later work and all failures after the first one. */
+  async #disposeInternal(): Promise<
+    readonly { readonly resource: string; readonly error: unknown }[]
+  > {
+    const errors: Array<{ readonly resource: string; readonly error: unknown }> = [];
+    const collect = (resource: string, cleanup: () => void): void => {
+      try {
+        cleanup();
+      } catch (error) {
+        errors.push({ resource, error });
+      }
+    };
+
+    collect('caller settlement', () => this.#settleCallers?.());
     this.#settleCallers = undefined;
-    this.pending.clear();
-    this.pingPending.clear();
-    try {
-      this.#discoveryClose?.();
-    } catch (error) {
-      this.#discoveryCloseFailure = error;
-    }
+    collect('pending callers', () => this.pending.clear());
+    collect('ping callers', () => this.pingPending.clear());
+    collect('manual discovery abort listener', () => this.#discoveryClose?.());
     this.#discoveryClose = undefined;
-    for (const operation of this.#operations.values()) operation.release();
+    for (const operation of this.#operations.values())
+      collect('operation', () => operation.release());
     this.#operations.clear();
     this.#replayRetainedIds.clear();
+    this.#inboundReplayRetainedIds.clear();
+    for (const operation of this.#chunkOperations.values())
+      collect('chunk operation', () => operation.release());
     this.#chunkOperations.clear();
-    for (const key of this.#timers.keys()) this.releaseTimer(key);
-    for (const owner of this.#replayOwners) owner.clear();
+    for (const key of this.#timers.keys()) collect('timer', () => this.releaseTimer(key));
+    for (const owner of this.#replayOwners) collect('replay owner', () => owner.clear());
     this.#replayOwners.length = 0;
-    for (const owner of this.#maintenanceOwners) owner.clear();
+    for (const owner of this.#maintenanceOwners) collect('maintenance owner', () => owner.clear());
     this.#maintenanceOwners.length = 0;
-    this.#replay.clear();
-    this.#verifiedPeers.clear();
-    for (const key of this.#waiters.keys()) this.releaseWaiter(key);
-    for (const controller of this.activeControllers.values()) controller.abort();
-    this.activeControllers.clear();
-    this.#chunks?.clear();
-    this.#providerAdmission?.clear();
-    this.#providerClear?.();
-    const resourceErrors = await this.#resources.releaseAll();
-    if (this.#discoveryCloseFailure !== undefined)
-      return [
-        { resource: 'manual discovery abort listener', error: this.#discoveryCloseFailure },
-        ...resourceErrors
-      ];
-    return resourceErrors;
+    collect('replay registry', () => this.#replay.clear());
+    collect('verified peer registry', () => this.#verifiedPeers.clear());
+    for (const key of this.#waiters.keys()) collect('waiter', () => this.releaseWaiter(key));
+    for (const [key, controller] of this.activeControllers) {
+      collect('controller', () => controller.abort());
+      this.activeControllers.delete(key);
+    }
+    collect('chunks', () => this.#chunks?.clear());
+    collect('provider admission registry', () => this.#providerAdmission?.clear());
+    collect('provider registry', () => this.#providerClear?.());
+    try {
+      errors.push(...(await this.#resources.releaseAll()));
+    } catch (error) {
+      errors.push({ resource: 'resources', error });
+    }
+    return errors;
   }
 }

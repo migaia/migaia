@@ -31,4 +31,22 @@ describe('ControlTaskRegistry', () => {
     expect(registry.admitControl('quota-peer', 'rejected-by-capacity', 2_000)).toBe(false);
     expect(registry.admitVariation('quota-peer', 2_001)).toBe(true);
   });
+
+  it('requires a boolean lease decision and skips tombstones when retain rejects', () => {
+    let available = false;
+    const retained: string[] = [];
+    const registry = new ControlTaskRegistry({
+      retain: (peerKey) => {
+        if (!available) return false;
+        retained.push(peerKey);
+        return true;
+      },
+      release: () => undefined
+    });
+
+    expect(registry.admitControl('peer', 'rejected', 0)).toBe(false);
+    available = true;
+    expect(registry.admitControl('peer', 'rejected', 1)).toBe(true);
+    expect(retained).toEqual(['peer']);
+  });
 });

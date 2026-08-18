@@ -45,4 +45,33 @@ describe('ResourceScope', () => {
     await scope.releaseAll();
     expect(order).toEqual(['transport', 'middleware']);
   });
+
+  it('decrements size once for each unregister and leaves failed registration uncounted', async () => {
+    const scope = new ResourceScope();
+    const unregisterSync = scope.addSync('sync', () => undefined);
+    const unregisterAsync = scope.add('async', () => undefined);
+    expect(scope.size).toBe(2);
+    unregisterSync();
+    unregisterSync();
+    unregisterAsync();
+    unregisterAsync();
+    expect(scope.size).toBe(0);
+
+    const release = scope.releaseAll();
+    expect(() => scope.add('late', () => undefined)).toThrow();
+    await release;
+    expect(scope.size).toBe(0);
+  });
+
+  it('reaches zero after concurrent releaseAll callers share one result', async () => {
+    const scope = new ResourceScope();
+    scope.add('resource', async () => {
+      await Promise.resolve();
+    });
+    const first = scope.releaseAll();
+    const second = scope.releaseAll();
+    expect(first).toBe(second);
+    await Promise.all([first, second]);
+    expect(scope.size).toBe(0);
+  });
 });

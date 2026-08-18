@@ -327,6 +327,21 @@ describe('ProviderExecutor result normalization', () => {
       });
       await executor.execute(request);
       expect(sent).toHaveLength(1);
+      if (provider === cases[0]) {
+        expect(sent[0]).toEqual(
+          expect.objectContaining({
+            ok: false,
+            code: 'SCHEMA_INVALID',
+            serializedError: expect.objectContaining({
+              name: 'WebRpcSchemaValidationError',
+              code: 'SCHEMA_INVALID',
+              data: { result: true }
+            })
+          })
+        );
+      } else {
+        expect(sent[0]).not.toHaveProperty('serializedError');
+      }
       expect(failures).toHaveLength(1);
       expect(controllers.size).toBe(0);
     }
