@@ -1,6 +1,6 @@
 {
   "name": "@migaia/logger",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "private": true,
   "repository": {
     "type": "git",
@@ -41,9 +41,9 @@
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
   "dependencies": {
-    "@migaia/utils": "workspace:^",
     "@migaia/lifecycle": "workspace:^",
     "@migaia/plugin-host": "workspace:^",
+    "@migaia/utils": "workspace:^",
     "ansis": "4.3.1"
   },
   "engines": {
