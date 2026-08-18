@@ -24,47 +24,37 @@ export function assertStringStorageKey(
 }
 
 const dateValue = (value: unknown): number | undefined => {
-  // 同 realm 走 `instanceof`（不可伪造）；跨 realm 走原型链内建构造器名 + 行为校验（真实 Date 才有内建 `getTime`）。
-  // 全程不触发 `Symbol.toStringTag`、不调用宿主方法、hostile getter 被 try/catch 收容，`Object.create({constructor:{name:'Date'}})` 无 `getTime` 会被拒绝。
-  if (value instanceof Date) {
-    try {
-      return value.getTime();
-    } catch {
-      return undefined;
-    }
-  }
   if (intrinsicConstructorName(value) !== 'Date') return undefined;
   try {
-    if (typeof (value as Date).getTime !== 'function') return undefined;
-    return (value as Date).getTime();
+    const structuredClone = (globalThis as { structuredClone?: (input: unknown) => unknown })
+      .structuredClone;
+    // Without structuredClone, constructor-name checks are forgeable; require same-realm Date.
+    if (typeof structuredClone !== 'function' && !(value instanceof Date)) return undefined;
+    const cloned = typeof structuredClone === 'function' ? structuredClone(value) : value;
+    return intrinsicConstructorName(cloned) === 'Date' ? (cloned as Date).getTime() : undefined;
   } catch {
     return undefined;
   }
 };
 
 const bufferValue = (value: unknown): ArrayBuffer | undefined => {
-  // 同 realm 走 `instanceof`；跨 realm 走原型链内建构造器名 + 行为校验（真实 ArrayBuffer 才有内建 `slice`）。
-  // `Object.create({constructor:{name:'ArrayBuffer'}})` 无 `slice`，会被拒绝；forgery 也不触发宿主异常。
-  if (value instanceof ArrayBuffer) {
-    try {
-      return new Uint8Array(value).slice().buffer;
-    } catch {
-      return undefined;
-    }
-  }
   if (intrinsicConstructorName(value) !== 'ArrayBuffer') return undefined;
   try {
-    if (typeof (value as ArrayBuffer).slice !== 'function') return undefined;
-    return new Uint8Array(value as ArrayBuffer).slice().buffer;
+    const structuredClone = (globalThis as { structuredClone?: (input: unknown) => unknown })
+      .structuredClone;
+    const cloned = typeof structuredClone === 'function' ? structuredClone(value) : value;
+    if (intrinsicConstructorName(cloned) === 'ArrayBuffer')
+      return new Uint8Array(cloned as ArrayBuffer).slice().buffer;
+    if (value instanceof ArrayBuffer) return new Uint8Array(value).slice().buffer;
+    return undefined;
   } catch {
     return undefined;
   }
 };
 
 /**
- * Validate the IndexedDB-compatible key domain. Date/ArrayBuffer 经 `intrinsicConstructorName`
- * 走原型链内建构造器名分类： 跨 realm 安全、不触发 `Symbol.toStringTag` getter、不调用宿主方法，且 hostile getter 异常被内部 try/catch
- * 收容。
+ * Validate the IndexedDB-compatible key domain. Date/ArrayBuffer use structuredClone when available
+ * so cross-realm values are accepted while constructor-name forgeries are rejected.
  */
 export function assertStorageKey(
   value: unknown,
@@ -81,11 +71,23 @@ export function assertStorageKey(
     if (date !== undefined) return !Number.isNaN(date);
     const buffer = bufferValue(candidate);
     if (buffer !== undefined) return buffer.byteLength <= KEY_DOMAIN_LIMITS.maxBinaryBytes;
-    if (!Array.isArray(candidate) || candidate.length === 0 || seen.has(candidate)) return false;
-    seen.add(candidate);
-    const valid = candidate.every((item) => visit(item, depth + 1, seen));
-    seen.delete(candidate);
-    return valid;
+    if (!Array.isArray(candidate) || seen.has(candidate)) return false;
+    try {
+      const length = candidate.length;
+      if (length === 0) return false;
+      seen.add(candidate);
+      for (let index = 0; index < length; index += 1) {
+        if (!Object.hasOwn(candidate, index) || !visit(candidate[index], depth + 1, seen)) {
+          seen.delete(candidate);
+          return false;
+        }
+      }
+      seen.delete(candidate);
+      return true;
+    } catch {
+      seen.delete(candidate);
+      return false;
+    }
   };
   if (!visit(value, 0, new Set()))
     throw new StorageContractError(StorageContractErrorCode.invalidKey, {
@@ -94,6 +96,38 @@ export function assertStorageKey(
       cause: new TypeError(`invalid ${label}`)
     });
 }
+
+/** Validate and detach one key so later asynchronous work cannot observe caller mutation. */
+export const snapshotStorageKey = (
+  value: unknown,
+  backend: IBackendKind,
+  label = 'key'
+): IStorageKey => {
+  assertStorageKey(value, backend, label);
+  const clone = (candidate: IStorageKey): IStorageKey => {
+    if (typeof candidate === 'string' || typeof candidate === 'number') return candidate;
+    const date = dateValue(candidate);
+    if (date !== undefined) return new Date(date);
+    const buffer = bufferValue(candidate);
+    if (buffer !== undefined) return buffer;
+    const source = candidate as readonly IStorageKey[];
+    const snapshot: IStorageKey[] = [];
+    for (let index = 0; index < source.length; index += 1) snapshot.push(clone(source[index]!));
+    return snapshot;
+  };
+  try {
+    const snapshot = clone(value);
+    assertStorageKey(snapshot, backend, label);
+    return snapshot;
+  } catch (cause) {
+    if (cause instanceof StorageContractError) throw cause;
+    throw new StorageContractError(StorageContractErrorCode.invalidKey, {
+      backend,
+      key: value,
+      cause
+    });
+  }
+};
 
 /** Compare keys using the same cross-realm classification as validation and encoding. */
 export const compareStorageKeys = (a: IStorageKey, b: IStorageKey): number => {

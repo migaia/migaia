@@ -9,10 +9,10 @@ import {
   withAbort
 } from '../core/operation.js';
 import {
-  assertStorageKey,
   assertStringStorageKey,
   compareStorageKeys,
   encodeFlatStorageKey,
+  snapshotStorageKey,
   snapshotKeyRange
 } from '../core/key-domain.js';
 import { isStorageKeyInRange } from '../core/query.js';
@@ -40,10 +40,17 @@ const CAPABILITIES: IStorageCapabilities = Object.freeze({
   opaqueEntries: false
 });
 
-const autoKey = (): string =>
-  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+/** Realm-wide monotonic suffix prevents silent overwrite when entropy sources repeat. */
+let memoryAutoKeySequence = 0;
+
+const autoKey = (): string => {
+  const entropy =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  memoryAutoKeySequence += 1;
+  return `${entropy}-${memoryAutoKeySequence.toString(36)}`;
+};
 
 /**
  * 纯内存实现。用于测试、SSR 服务端、以及其他后端不可用时的显式降级目标。 每个实例持有独立存储，天然隔离，不需要命名空间参数。 实现全部 L0 + L1 接口（record 使用
@@ -180,30 +187,29 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
     const scope: ITransactionScope<TValue> = {
       get: async (key) => {
         assertTransactionScopeActive(scopeActive, StorageBackend.memory);
-        assertStorageKey(key, StorageBackend.memory);
-        const encoded = encodeFlatStorageKey(key);
+        const keySnapshot = snapshotStorageKey(key, StorageBackend.memory);
+        const encoded = encodeFlatStorageKey(keySnapshot);
         trackRevision(encoded);
         if (readSnapshots.has(encoded)) {
           const snapshot = readSnapshots.get(encoded);
-          return snapshot === undefined ? undefined : cloneValue(snapshot, key);
+          return snapshot === undefined ? undefined : cloneValue(snapshot, keySnapshot);
         }
         if (draft.has(encoded)) {
           const entry = draft.get(encoded)!;
-          const snapshot = entry === TOMBSTONE ? undefined : cloneValue(entry[1], key);
+          const snapshot = entry === TOMBSTONE ? undefined : cloneValue(entry[1], keySnapshot);
           readSnapshots.set(encoded, snapshot);
-          return snapshot === undefined ? undefined : cloneValue(snapshot, key);
+          return snapshot === undefined ? undefined : cloneValue(snapshot, keySnapshot);
         }
         const stored = documents.get(encoded)?.[1];
-        const snapshot = stored === undefined ? undefined : cloneValue(stored, key);
+        const snapshot = stored === undefined ? undefined : cloneValue(stored, keySnapshot);
         readSnapshots.set(encoded, snapshot);
-        return snapshot === undefined ? undefined : cloneValue(snapshot, key);
+        return snapshot === undefined ? undefined : cloneValue(snapshot, keySnapshot);
       },
       put: async (value, key, options) => {
         assertTransactionScopeActive(scopeActive, StorageBackend.memory);
         const conflictPolicy = readTransactionConflictPolicy(options, StorageBackend.memory);
         const resolvedKey = key ?? autoKey();
-        assertStorageKey(resolvedKey, StorageBackend.memory);
-        const keySnapshot = cloneValue(resolvedKey, resolvedKey);
+        const keySnapshot = snapshotStorageKey(resolvedKey, StorageBackend.memory);
         const encoded = encodeFlatStorageKey(keySnapshot);
         trackRevision(encoded);
         readSnapshots.delete(encoded);
@@ -212,8 +218,8 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
       },
       delete: async (key) => {
         assertTransactionScopeActive(scopeActive, StorageBackend.memory);
-        assertStorageKey(key, StorageBackend.memory);
-        const encoded = encodeFlatStorageKey(key);
+        const keySnapshot = snapshotStorageKey(key, StorageBackend.memory);
+        const encoded = encodeFlatStorageKey(keySnapshot);
         trackRevision(encoded);
         readSnapshots.delete(encoded);
         draft.set(encoded, TOMBSTONE);
@@ -343,16 +349,15 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
     getRecord: (key, ctx) =>
       withAbort(ctx, async () => {
         assertLive();
-        assertStorageKey(key, StorageBackend.memory);
-        const value = documents.get(encodeFlatStorageKey(key))?.[1];
-        return value === undefined ? undefined : cloneValue(value, key);
+        const keySnapshot = snapshotStorageKey(key, StorageBackend.memory);
+        const value = documents.get(encodeFlatStorageKey(keySnapshot))?.[1];
+        return value === undefined ? undefined : cloneValue(value, keySnapshot);
       }),
     putRecord: (value, key, ctx) =>
       withAbort(ctx, async (_signal, context) => {
         assertLive();
         const resolvedKey = key ?? autoKey();
-        assertStorageKey(resolvedKey, StorageBackend.memory);
-        const keySnapshot = cloneValue(resolvedKey, resolvedKey);
+        const keySnapshot = snapshotStorageKey(resolvedKey, StorageBackend.memory);
         const encoded = encodeFlatStorageKey(keySnapshot);
         const prepared = cloneValue(value, keySnapshot);
         checkCrossChannel(keySnapshot, 'record', context?.conflictPolicy, true, encoded);
@@ -363,8 +368,8 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
     deleteRecord: (key, ctx) =>
       withAbort(ctx, async () => {
         assertLive();
-        assertStorageKey(key, StorageBackend.memory);
-        const encoded = encodeFlatStorageKey(key);
+        const keySnapshot = snapshotStorageKey(key, StorageBackend.memory);
+        const encoded = encodeFlatStorageKey(keySnapshot);
         documents.delete(encoded);
         recordRevisions.set(encoded, (recordRevisions.get(encoded) ?? 0) + 1);
       }),

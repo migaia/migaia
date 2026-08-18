@@ -39,8 +39,34 @@ describe('StorageContractError 家族', () => {
 });
 
 describe('assertStorageKey 伪造品牌防护（实现期安全回归）', () => {
+  it('拒绝覆盖 every 的数组、稀疏数组与 hostile 元素 getter', () => {
+    const overridden = [() => undefined];
+    Object.defineProperty(overridden, 'every', { value: () => true });
+    expect(() => assertStorageKey(overridden as never, 'memory', 'key')).toThrow(
+      expect.objectContaining({ code: StorageContractErrorCode.invalidKey })
+    );
+
+    const sparse = Array(1);
+    expect(() => assertStorageKey(sparse as never, 'memory', 'key')).toThrow(
+      expect.objectContaining({ code: StorageContractErrorCode.invalidKey })
+    );
+
+    const hostile = ['safe'];
+    Object.defineProperty(hostile, 0, {
+      get: () => {
+        throw new Error('hostile key element');
+      }
+    });
+    expect(() => assertStorageKey(hostile as never, 'memory', 'key')).toThrow(
+      expect.objectContaining({ code: StorageContractErrorCode.invalidKey })
+    );
+  });
+
   it('拒绝伪造 ArrayBuffer 品牌（constructor.name 伪造）', () => {
-    const forged = Object.create({ constructor: { name: 'ArrayBuffer' } });
+    const forged = Object.create({
+      constructor: { name: 'ArrayBuffer' },
+      slice: () => new ArrayBuffer(2)
+    });
     expect(() => assertStorageKey(forged, 'memory', 'key')).toThrow(StorageContractError);
     try {
       assertStorageKey(forged, 'memory', 'key');
@@ -51,8 +77,48 @@ describe('assertStorageKey 伪造品牌防护（实现期安全回归）', () =>
   });
 
   it('拒绝伪造 Date 品牌', () => {
-    const forged = Object.create({ constructor: { name: 'Date' } });
+    const forged = Object.create({
+      constructor: { name: 'Date' },
+      getTime: () => 0
+    });
     expect(() => assertStorageKey(forged, 'memory', 'key')).toThrow(StorageContractError);
+  });
+
+  it('无 structuredClone 时仍拒绝伪造 Date 品牌', () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, 'structuredClone');
+    Object.defineProperty(globalThis, 'structuredClone', { configurable: true, value: undefined });
+    try {
+      const forged = Object.create({
+        constructor: { name: 'Date' },
+        getTime: () => 0
+      });
+      expect(() => assertStorageKey(forged, 'memory', 'key')).toThrow(StorageContractError);
+    } finally {
+      if (original) Object.defineProperty(globalThis, 'structuredClone', original);
+      else Reflect.deleteProperty(globalThis, 'structuredClone');
+    }
+  });
+
+  it('structuredClone 全局 getter 异常不会逃逸出 key validator', () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, 'structuredClone');
+    const cause = new Error('hostile structuredClone getter');
+    Object.defineProperty(globalThis, 'structuredClone', {
+      configurable: true,
+      get: () => {
+        throw cause;
+      }
+    });
+    try {
+      expect(() => assertStorageKey(new Date(), 'memory', 'key')).toThrow(
+        expect.objectContaining({ code: StorageContractErrorCode.invalidKey })
+      );
+      expect(() => assertStorageKey(new ArrayBuffer(8), 'memory', 'key')).toThrow(
+        expect.objectContaining({ code: StorageContractErrorCode.invalidKey })
+      );
+    } finally {
+      if (original) Object.defineProperty(globalThis, 'structuredClone', original);
+      else Reflect.deleteProperty(globalThis, 'structuredClone');
+    }
   });
 
   it('接受真实 ArrayBuffer / Date key', () => {

@@ -3,7 +3,7 @@ import { defineEntity } from '../../src/entity';
 import { memoryStorage, localStorage } from '../../src/backends';
 import { fakeWebStorage } from '../../src/testing/fake-web-storage';
 import { StorageError, StorageErrorCode } from '../../src/types/errors';
-import { composeRepositoryKey } from '../../src/entity/key';
+import { composeFlatKey, composeRepositoryKey } from '../../src/entity/key';
 import type { IStorageKey } from '../../src/types/context';
 
 type IUser = { id: string; name: string; email: string };
@@ -718,6 +718,43 @@ describe('版本迁移', () => {
     await expect(v2.connect(store).migrate({ batchSize: 1 })).resolves.toMatchObject({
       eligible: 1,
       migrated: 1
+    });
+  });
+
+  it('KV-only migrate 正确区分当前记录与坏记录', async () => {
+    const store = localStorage({ namespace: 'kv-migrate-stats', storage: fakeWebStorage() });
+    const current = defineEntity<{ id: string; name: string }>({
+      name: 'kv-migrate-stats',
+      key: 'id',
+      version: 2,
+      migrations: { 2: async (value: unknown) => value }
+    });
+    await current.connect(store).put({ id: 'current', name: 'Current' });
+
+    const legacy = defineEntity<{ id: string; name: string }>({
+      name: 'kv-migrate-stats',
+      key: 'id'
+    });
+    await legacy.connect(store).put({ id: 'legacy', name: 'Legacy' });
+    await store.set(composeFlatKey('kv-migrate-stats', 'bad'), '{broken-json');
+
+    const migrated = defineEntity<{ id: string; name: string }>({
+      name: 'kv-migrate-stats',
+      key: 'id',
+      version: 2,
+      migrations: { 2: async (value: unknown) => value }
+    });
+    await expect(migrated.connect(store).migrate({ batchSize: 1 })).resolves.toEqual({
+      scanned: 3,
+      eligible: 1,
+      migrated: 1,
+      alreadyCurrent: 1,
+      skipped: 1,
+      conflicted: 0
+    });
+    await expect(migrated.connect(store).get('legacy')).resolves.toEqual({
+      id: 'legacy',
+      name: 'Legacy'
     });
   });
 

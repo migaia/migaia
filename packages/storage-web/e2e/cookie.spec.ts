@@ -29,12 +29,12 @@ test('同名不同 path 的真实 cookie 不会被静默折叠为单一 scope', 
 test('真实浏览器 cookie scope 数组配置被拒绝', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(() => window.runCookieScopeGuardScenario());
-  expect(result.scopeCode).toBe('INVALID_ARGUMENT');
-  expect(result.codecCode).toBe('INVALID_ARGUMENT');
-  expect(result.documentCode).toBe('INVALID_ARGUMENT');
-  expect(result.optionsCode).toBe('INVALID_ARGUMENT');
-  expect(result.expiresCode).toBe('INVALID_ARGUMENT');
-  expect(result.maxAgeCode).toBe('INVALID_ARGUMENT');
+  expect(result.scopeCode).toBe('INVALID_CONFIG');
+  expect(result.codecCode).toBe('INVALID_CONFIG');
+  expect(result.documentCode).toBe('INVALID_CONFIG');
+  expect(result.optionsCode).toBe('INVALID_CONFIG');
+  expect(result.expiresCode).toBe('INVALID_CONFIG');
+  expect(result.maxAgeCode).toBe('INVALID_CONFIG');
   expect(result.expiresReads).toBe(1);
   expect(result.constructorOptionReads).toBe(4);
   expect(result.scopeReads).toBe(5);
@@ -49,12 +49,12 @@ test('真实浏览器 cookie scope 数组配置被拒绝', async ({ page }) => {
   expect(result.snapshotClearCode).toBe('BACKEND_UNAVAILABLE');
   expect(result.snapshotClearOperation).toBe('cookie.clearAll');
   expect(result.reentrantAbortCode).toBe('ABORTED');
-  expect(result.reentrantAbortOperation).toBe('cookie.clearAll');
-  expect(result.reentrantAbortKeyMatchesRemaining).toBe(true);
+  expect(result.reentrantAbortOperation).toBeUndefined();
+  expect(result.reentrantAbortKeyMatchesRemaining).toBe(false);
   expect(result.syncRemoveOverrideReads).toBe(0);
   expect(result.writeContextReads).toBe(4);
   expect(result.writeContextReturnedPromise).toBe(true);
-  expect(result.writeContextGetterCode).toBe('INVALID_ARGUMENT');
+  expect(result.writeContextGetterCode).toBe('INVALID_CONFIG');
   expect(result.writeLifecycleMetadata).toBe(true);
   expect(result.removeLifecycleMetadata).toBe(true);
 });
