@@ -6,8 +6,6 @@
     "paths": {
       "@migaia/plugin-host": ["../../packages/plugin-host/dist/index.d.ts"],
       "@migaia/logger": ["../../packages/logger/dist/index.d.ts"],
-      "@migaia/web-rpc": ["../../packages/web-rpc/dist/index.d.ts"],
-      "@migaia/web-rpc/*": ["../../packages/web-rpc/dist/adapters/*.d.ts"],
       "@migaia/capability": ["../../packages/capability/dist/index.d.ts"],
       "@migaia/reactive": ["../../packages/reactive/dist/index.d.ts"],
       "@migaia/resource": ["../../packages/resource/dist/index.d.ts"],
@@ -24,7 +22,8 @@
       "@migaia/store-ssr": ["../../packages/store-ssr/dist/index.d.ts"],
       "@migaia/serialize": ["../../packages/serialize/dist/index.d.ts"],
       "@migaia/storage-web": ["../../packages/storage-web/dist/index.d.ts"],
-      "@migaia/storage-web/memory": ["../../packages/storage-web/dist/memory.d.ts"]
+      "@migaia/storage-web/memory": ["../../packages/storage-web/dist/memory.d.ts"],
+      "@migaia/lifecycle": ["../../packages/lifecycle/dist/index.d.ts"]
     },
     "skipLibCheck": false,
     "verbatimModuleSyntax": true

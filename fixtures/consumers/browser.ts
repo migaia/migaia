@@ -3,6 +3,7 @@ import { createStore } from '@migaia/store-light'
 import { localStorage, cookies, indexedDb } from '@migaia/storage-web'
 import { StoreProvider } from '@migaia/store-react'
 import { number as wasmNumber } from '@migaia/store-wasm'
+import { createEventChannel, type IEventAbortSignal } from '@migaia/event-subscriber'
 
 const runtime = createRuntime()
 const state = createStore({ count: 0 }, { runtime })
@@ -16,3 +17,9 @@ void cookies().set('k', 'v')
 void indexedDb().dispose()
 void StoreProvider
 void wasmNumber
+
+const eventChannel = createEventChannel<number>()
+const browserSignal: IEventAbortSignal = new AbortController().signal
+eventChannel.subscribeUntil(browserSignal, (event) => {
+  void event.value
+})
