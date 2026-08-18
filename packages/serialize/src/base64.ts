@@ -3,6 +3,8 @@
  * `btoa`/`atob`.
  */
 
+import { createSerializeTypeError, SerializeErrorCode } from './errors.js';
+
 // base64 把 3 字节编成 4 字符；片大小必须是 3 的倍数，否则非对齐的片边界会让 `=` 填充
 // 插进流中间，污染后面每一片。
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -77,7 +79,15 @@ const DECODE_TABLE = new Int16Array(128).fill(-1);
 for (let i = 0; i < ALPHABET.length; i++) DECODE_TABLE[ALPHABET.charCodeAt(i)] = i;
 
 export function base64ToBytes(text: string): Uint8Array {
-  const clean = text.replace(/=+$/, '');
+  const paddingMatch = /=+$/.exec(text);
+  const padding = paddingMatch?.[0].length ?? 0;
+  const clean = padding === 0 ? text : text.slice(0, -padding);
+  const invalid = (): never => {
+    throw createSerializeTypeError(SerializeErrorCode.invalidOption, 'invalid base64 input');
+  };
+  if (text.length % 4 === 1 || padding > 2 || clean.includes('=')) invalid();
+  if (padding > 0 && clean.length % 4 !== 4 - padding) invalid();
+  if (padding === 0 && clean.length % 4 === 1) invalid();
   const output = new Uint8Array(Math.floor((clean.length * 3) / 4));
   let outIndex = 0;
   let buffer = 0;
@@ -85,13 +95,18 @@ export function base64ToBytes(text: string): Uint8Array {
   for (let i = 0; i < clean.length; i++) {
     const code = clean.charCodeAt(i);
     const value = code < 128 ? DECODE_TABLE[code] : -1;
-    if (value < 0) throw new TypeError('invalid base64 input');
+    if (value < 0) invalid();
     buffer = (buffer << 6) | value;
     bits += 6;
     if (bits >= 8) {
       bits -= 8;
       output[outIndex++] = (buffer >> bits) & 0xff;
     }
+  }
+  if (clean.length > 0 && bits > 0) {
+    const last = DECODE_TABLE[clean.charCodeAt(clean.length - 1)];
+    const unusedMask = bits === 2 ? 3 : 15;
+    if ((last & unusedMask) !== 0) invalid();
   }
   return output;
 }

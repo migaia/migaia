@@ -89,12 +89,14 @@ export function createLifecycleError(
     readonly errors?: readonly unknown[];
   }
 ): ILifecycleError {
-  const error = new Error(
-    message,
-    options?.cause !== undefined ? { cause: options.cause } : undefined
-  );
-  Object.defineProperty(error, 'source', { value: LIFECYCLE_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
+  const hasCause = options !== undefined && 'cause' in options;
+  const error = new Error(message, hasCause ? { cause: options.cause } : undefined);
+  Object.defineProperty(error, 'source', {
+    value: LIFECYCLE_SOURCE,
+    enumerable: true,
+    configurable: true
+  });
+  Object.defineProperty(error, 'code', { value: code, enumerable: true, configurable: true });
   if (options?.phase !== undefined) {
     Object.defineProperty(error, 'phase', { value: options.phase, enumerable: true });
   }
@@ -116,14 +118,64 @@ export function createLifecycleError(
  * matters to callers (`AggregateError`) so `createLifecycleError`'s plain `Error` cannot be used.
  */
 export function tagLifecycleError<E extends Error>(error: E, code: string): E {
-  Object.defineProperty(error, 'source', { value: LIFECYCLE_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
+  Object.defineProperty(error, 'source', {
+    value: LIFECYCLE_SOURCE,
+    enumerable: true,
+    configurable: true
+  });
+  Object.defineProperty(error, 'code', { value: code, enumerable: true, configurable: true });
   return error;
 }
 
+/**
+ * Converts an arbitrary cleanup/listener throw into a lifecycle-boundary failure. Extensible
+ * `Error` objects are tagged in place so callers retain identity and native type; primitive throws
+ * (or objects that reject tagging) are wrapped with the original reachable through `cause`.
+ */
+export function createLifecycleFailure(
+  code: string,
+  message: string,
+  error: unknown
+): ILifecycleError {
+  if (error instanceof Error) {
+    try {
+      return tagLifecycleError(error, code) as ILifecycleError;
+    } catch {
+      // Frozen or already non-configurable errors cannot be retagged without replacing identity.
+    }
+  }
+  return createLifecycleError(code, message, { cause: error });
+}
+
 /** 入参校验错误：原生 `RangeError` + 指定 code（`docs/contracts/error-codes.md` §2.2 保持原生类型）。 */
-export function createLifecycleRangeError(code: string, message: string): RangeError {
-  return tagLifecycleError(new RangeError(message), code);
+export function createLifecycleRangeError(
+  code: string,
+  message: string,
+  options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>> }
+): RangeError {
+  const error = new RangeError(
+    message,
+    options?.cause === undefined ? undefined : { cause: options.cause }
+  );
+  tagLifecycleError(error, code);
+  if (options?.detail !== undefined)
+    Object.defineProperty(error, 'detail', { value: options.detail, enumerable: true });
+  return error;
+}
+
+/** Creates a lifecycle-tagged native TypeError without replacing its runtime type. */
+export function createLifecycleTypeError(
+  code: string,
+  message: string,
+  options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>> }
+): TypeError {
+  /** Whether caller explicitly supplied a cause, including an intentional `undefined` throw. */
+  const hasCause = options !== undefined && 'cause' in options;
+  const error = new TypeError(message, hasCause ? { cause: options.cause } : undefined);
+  tagLifecycleError(error, code);
+  if (options?.detail !== undefined)
+    Object.defineProperty(error, 'detail', { value: options.detail, enumerable: true });
+  return error;
 }
 
 /**

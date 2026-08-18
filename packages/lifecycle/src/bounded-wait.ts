@@ -1,4 +1,11 @@
-import { systemScheduler, type ILifecycleScheduler, type IScheduledTask } from './scheduler.js';
+import {
+  resolveSchedulerOption,
+  systemScheduler,
+  validateSchedulerDelay,
+  validateSchedulerTime,
+  type ILifecycleScheduler,
+  type IScheduledTask
+} from './scheduler.js';
 
 /**
  * Waits for one awaitable until an existing absolute deadline, without cancelling it.
@@ -14,6 +21,8 @@ export const boundedWait = async (
   deadlineAt: number,
   options?: { scheduler?: ILifecycleScheduler }
 ): Promise<boolean> => {
+  const scheduler = resolveSchedulerOption(options, systemScheduler);
+  validateSchedulerTime(deadlineAt, 'deadlineAt');
   // Observe `task` unconditionally, before the deadline check below can return early. If the
   // deadline has already elapsed by the time this is called, returning `false` without ever
   // touching `task` would let a `task` that later rejects surface as a genuine unhandled rejection
@@ -21,13 +30,12 @@ export const boundedWait = async (
   // swallows the rejection seen by the real race below (`LG-R5-3`).
   const observedTask = Promise.resolve(task);
   void observedTask.catch(() => undefined);
-
-  const scheduler = options?.scheduler ?? systemScheduler;
   const remainingMs = deadlineAt - scheduler.now();
-  if (remainingMs <= 0) return false;
+  if (remainingMs < 0) return false;
+  const delayMs = validateSchedulerDelay(Math.max(0, remainingMs), 'deadline delay');
   let timer: IScheduledTask | undefined;
   const timeout = new Promise<false>((resolve) => {
-    timer = scheduler.schedule(() => resolve(false), remainingMs);
+    timer = scheduler.schedule(() => resolve(false), delayMs);
   });
   try {
     return await Promise.race([observedTask.then(() => true), timeout]);

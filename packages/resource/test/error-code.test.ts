@@ -110,6 +110,28 @@ describe('M-T41 (§3.7.5): the table is exhaustive and tagging is non-destructiv
     expect(srcFiles.length).toBeGreaterThan(2);
   });
 
+  it('does not expose the pre-extraction store message prefix', () => {
+    expect(srcFiles.flatMap((file) => readFileSync(file, 'utf8')).join('\n')).not.toContain(
+      ['[', 'store', ']'].join('')
+    );
+  });
+
+  it('legacy package metadata resolves the same root entry as exports', () => {
+    const manifest = JSON.parse(
+      readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8')
+    ) as {
+      main?: string;
+      types?: string;
+      exports?: { '.': { default?: string; types?: string } };
+    };
+    expect(manifest.main).toBe('./dist/index.js');
+    expect(manifest.types).toBe('./dist/index.d.ts');
+    expect(manifest.exports?.['.']).toEqual({
+      types: './dist/index.d.ts',
+      default: './dist/index.js'
+    });
+  });
+
   it('no source module outside errors.ts still throws an untagged built-in error', () => {
     const offenders: string[] = [];
     for (const file of srcFiles) {
@@ -138,7 +160,7 @@ describe('M-T41 (§3.7.5): the table is exhaustive and tagging is non-destructiv
   it('code values are unique within this source, so (source, code) is unique by construction', () => {
     const declared = Object.values(ResourceErrorCode);
     expect(new Set(declared).size).toBe(declared.length);
-    expect(declared).toHaveLength(7); // §3.7.2 表格行数 + SUSPENSE_PROBE_FAILED（AF-08）
+    expect(declared).toHaveLength(8); // §3.7.2 表格行数 + SUSPENSE_PROBE_FAILED/CANCELLATION_CLEANUP_FAILED
   });
 
   it('a tagged error carries source === "@migaia/resource" and a non-empty stack', () => {

@@ -9,18 +9,67 @@
  * `lib: ["ES2024"]` 不声明 `performance`/`setTimeout`/`clearTimeout`，故用内部结构化 host-global 类型经
  * `globalThis` 访问，不 import DOM/Node，也不把这些宿主类型暴露到公共接口。
  */
-import { createLifecycleError, createLifecycleRangeError } from './errors.js';
+import {
+  createLifecycleError,
+  createLifecycleRangeError,
+  createLifecycleTypeError
+} from './errors.js';
 import { LifecycleErrorCode } from './error-code.js';
+import { LifecycleErrorText } from './error-text.js';
 
-/** 拒绝非有限或负数的 delay/advance，落实 R-9/T-16 的「delay 有限非负、now 单调不递减」。 */
-const assertNonNegativeDelay = (ms: number, label: string): void => {
-  if (!Number.isFinite(ms) || ms < 0) {
-    throw createLifecycleRangeError(
+/** Canonical runtime check for scheduler-produced and scheduler-consumed numeric values. */
+export function validateSchedulerTime(value: unknown, label: string): number {
+  if (typeof value !== 'number') {
+    throw createLifecycleTypeError(
       LifecycleErrorCode.invalidOption,
-      `[lifecycle] ${label} must be a finite non-negative number`
+      LifecycleErrorText.schedulerNumberType,
+      {
+        detail: { field: label }
+      }
     );
   }
-};
+  if (!Number.isFinite(value)) {
+    throw createLifecycleRangeError(
+      LifecycleErrorCode.invalidOption,
+      LifecycleErrorText.schedulerNumberRange,
+      {
+        detail: { field: label }
+      }
+    );
+  }
+  return value;
+}
+
+/** Canonical runtime check for finite, non-negative scheduler delays. */
+export function validateSchedulerDelay(value: unknown, label = 'delayMs'): number {
+  const number = validateSchedulerTime(value, label);
+  if (number < 0) {
+    throw createLifecycleRangeError(
+      LifecycleErrorCode.invalidOption,
+      LifecycleErrorText.schedulerDelayRange,
+      {
+        detail: { field: label }
+      }
+    );
+  }
+  return number;
+}
+
+/** Rejects a scheduler time target when finite operands overflow during addition. */
+export function addSchedulerTime(base: number, delta: number, label: string): number {
+  /** Candidate absolute scheduler time produced by adding the validated increment. */
+  const target = base + delta;
+  if (!Number.isFinite(target)) {
+    throw createLifecycleRangeError(
+      LifecycleErrorCode.invalidOption,
+      LifecycleErrorText.schedulerTimeOverflow,
+      {
+        detail: { field: label, base, delta }
+      }
+    );
+  }
+  return target;
+}
 
 /** Manual scheduler 单次 advance 的最大 flush 任务数（runaway guard）。 */
 const MAX_ADVANCE_FLUSH = 10_000;
@@ -35,6 +84,113 @@ export type ILifecycleScheduler = {
   /** 排程一个回调；`delayMs` 有限、非负；回调至多执行一次。 */
   schedule(callback: () => void, delayMs: number): IScheduledTask;
 };
+
+/** Captured scheduler contract with stable methods and receiver. */
+export type ISchedulerSnapshot = ILifecycleScheduler;
+
+/** Read one scheduled task's cancel accessor once while preserving its original receiver. */
+function snapshotScheduledTask(value: unknown): IScheduledTask {
+  if (value === null || (typeof value !== 'object' && typeof value !== 'function')) {
+    throw createLifecycleError(
+      LifecycleErrorCode.invalidOption,
+      LifecycleErrorText.schedulerTaskInvalid
+    );
+  }
+  let cancel: unknown;
+  try {
+    cancel = (value as { cancel?: unknown }).cancel;
+  } catch (error) {
+    throw createLifecycleTypeError(
+      LifecycleErrorCode.invalidOption,
+      LifecycleErrorText.schedulerTaskCancelGetterFailed,
+      { cause: error }
+    );
+  }
+  if (typeof cancel !== 'function') {
+    throw createLifecycleError(
+      LifecycleErrorCode.invalidOption,
+      LifecycleErrorText.schedulerTaskInvalid
+    );
+  }
+  const receiver = value;
+  return {
+    cancel: () => Reflect.apply(cancel as () => void, receiver, [])
+  };
+}
+
+/** Read scheduler accessors once while preserving their original receiver. */
+export function snapshotScheduler(value: unknown): ISchedulerSnapshot | undefined {
+  if ((typeof value !== 'object' && typeof value !== 'function') || value === null) {
+    return undefined;
+  }
+  const receiver = value;
+  let now: unknown;
+  let schedule: unknown;
+  try {
+    now = (value as { now?: unknown }).now;
+    schedule = (value as { schedule?: unknown }).schedule;
+  } catch (error) {
+    throw createLifecycleTypeError(
+      LifecycleErrorCode.invalidOption,
+      LifecycleErrorText.schedulerAccessorFailed,
+      { cause: error }
+    );
+  }
+  if (typeof now !== 'function' || typeof schedule !== 'function') return undefined;
+  return {
+    now: () => validateSchedulerTime(Reflect.apply(now, receiver, []), 'now()'),
+    schedule: (callback, delayMs) => {
+      const validDelay = validateSchedulerDelay(delayMs);
+      return snapshotScheduledTask(Reflect.apply(schedule, receiver, [callback, validDelay]));
+    }
+  };
+}
+
+/**
+ * Reads one public scheduler option and snapshots its scheduler methods before a lifecycle object
+ * is created. A getter failure is an invalid-option boundary failure; the native `TypeError`
+ * preserves the exact thrown value through `cause` and prevents scheduler work from starting.
+ */
+export function resolveSchedulerOption(
+  options: { readonly scheduler?: unknown } | null | undefined,
+  fallback: ISchedulerSnapshot
+): ISchedulerSnapshot;
+
+/** Reads one optional public scheduler option without inventing a default scheduler. */
+export function resolveSchedulerOption(
+  options: { readonly scheduler?: unknown } | null | undefined
+): ISchedulerSnapshot | undefined;
+
+export function resolveSchedulerOption(
+  options: { readonly scheduler?: unknown } | null | undefined,
+  fallback?: ISchedulerSnapshot
+): ISchedulerSnapshot | undefined {
+  /** The single scheduler option value admitted from the caller-owned options object. */
+  let schedulerOption: unknown;
+  try {
+    schedulerOption = options?.scheduler;
+  } catch (error) {
+    throw createLifecycleTypeError(
+      LifecycleErrorCode.invalidOption,
+      LifecycleErrorText.schedulerAccessorFailed,
+      { cause: error, detail: { field: 'scheduler' } }
+    );
+  }
+  if (schedulerOption === undefined) return fallback;
+  return resolveScheduler(schedulerOption);
+}
+
+/** Resolve an injected scheduler at its factory boundary, retaining lifecycle error identity. */
+export function resolveScheduler(value: unknown): ISchedulerSnapshot {
+  const snapshot = snapshotScheduler(value);
+  if (snapshot === undefined) {
+    throw createLifecycleError(
+      LifecycleErrorCode.invalidOption,
+      LifecycleErrorText.schedulerInvalid
+    );
+  }
+  return snapshot;
+}
 
 /** Lifecycle 内部使用的宿主全局最小形状；不导出到公共接口。 */
 type ILifecycleHostGlobals = {
@@ -61,10 +217,10 @@ export const systemScheduler: ILifecycleScheduler = {
         'performance.now is unavailable'
       );
     }
-    return perf.now();
+    return validateSchedulerTime(perf.now(), 'performance.now()');
   },
   schedule(callback, delayMs) {
-    assertNonNegativeDelay(delayMs, 'delayMs');
+    validateSchedulerDelay(delayMs);
     const set = host.setTimeout;
     const clear = host.clearTimeout;
     if (set === undefined || clear === undefined) {
@@ -102,9 +258,10 @@ export function createManualScheduler(): IManualScheduler {
   return {
     now: () => nowMs,
     schedule(callback, delayMs) {
-      assertNonNegativeDelay(delayMs, 'delayMs');
+      const validDelay = validateSchedulerDelay(delayMs);
+      const dueAt = addSchedulerTime(nowMs, validDelay, 'schedule dueAt');
       const id = nextId++;
-      tasks.set(id, { callback, at: nowMs + delayMs });
+      tasks.set(id, { callback, at: dueAt });
       return {
         cancel() {
           tasks.delete(id);
@@ -112,8 +269,9 @@ export function createManualScheduler(): IManualScheduler {
       };
     },
     advance(ms) {
-      assertNonNegativeDelay(ms, 'advance');
-      nowMs += ms;
+      const validAdvance = validateSchedulerDelay(ms, 'advance');
+      const target = addSchedulerTime(nowMs, validAdvance, 'advance target');
+      nowMs = target;
       // 循环取下一个到期任务（按到期时刻升序、同刻按登记顺序），直到当前时间点无 due：到期 callback
       // 新排的 delayMs=0 任务也在本次 advance 内 flush（AF-21）。runaway guard 防止自排程挂死测试。
       let runs = 0;

@@ -2,6 +2,7 @@ import type { ILifecycleOwner, IReleaseDescriptor } from './types.js';
 import { ASYNC_OWNER_BRAND } from './types.js';
 import { createLifecycleError, tagLifecycleError } from './errors.js';
 import { LifecycleErrorCode } from './error-code.js';
+import { LifecycleErrorText } from './error-text.js';
 import { createDisposeTransaction } from './dispose-transaction.js';
 import { createAbortController, type IAbortSignal } from './abort.js';
 import {
@@ -40,16 +41,81 @@ type IEntry = {
 };
 
 /**
+ * Keeps cleanup failures reachable without replacing the primary construction or registration
+ * error.
+ */
+const attachCleanupErrors = (primary: unknown, cleanupErrors: readonly unknown[]): unknown => {
+  if (cleanupErrors.length === 0) return primary;
+  if (primary !== null && (typeof primary === 'object' || typeof primary === 'function')) {
+    try {
+      Object.defineProperty(primary, 'errors', {
+        value: Object.freeze([...cleanupErrors]),
+        enumerable: true
+      });
+      return primary;
+    } catch {
+      // Frozen / non-extensible primary — fall through to the aggregate wrapper.
+    }
+  }
+  const message =
+    primary instanceof Error ? primary.message : LifecycleErrorText.provisionalCleanupFailed;
+  return tagLifecycleError(
+    new AggregateError([primary, ...cleanupErrors], message),
+    LifecycleErrorCode.scopeDisposalFailed
+  );
+};
+
+/**
  * A two-phase ownership transaction for async `setup()` work: resources accumulate here first, then
  * either move to a real owner via prefix transfer + awaited compensation (`commitTo`) or get torn
  * down (`rollback`) — never both, never neither (§4.9).
  */
 export function createProvisionalScope(options: IProvisionalScopeOptions = {}): IProvisionalScope {
   const controller = createAbortController();
-  const forwardAbort = (): void => controller.abort(options.parentSignal?.reason);
-  const detachParent = (): void => options.parentSignal?.removeEventListener('abort', forwardAbort);
-  if (options.parentSignal?.aborted) controller.abort(options.parentSignal.reason);
-  else options.parentSignal?.addEventListener('abort', forwardAbort, { once: true });
+  const parentSignal = options.parentSignal;
+  let parentRegistrationAttempted = false;
+  let parentRegistrationReturned = false;
+  let parentForwardInvoked = false;
+  let parentRemovalAttempted = false;
+  const forwardAbort = (): void => {
+    parentForwardInvoked = true;
+    controller.abort(parentSignal?.reason);
+  };
+  const detachParent = (force = false): void => {
+    if (!parentSignal || parentRemovalAttempted) return;
+    if (!force && (!parentRegistrationAttempted || !parentRegistrationReturned)) return;
+    parentRemovalAttempted = true;
+    parentSignal.removeEventListener('abort', forwardAbort);
+  };
+  if (parentSignal?.aborted) {
+    controller.abort(parentSignal.reason);
+  } else if (parentSignal) {
+    try {
+      // Mark before calling: a hostile signal may store the listener and then throw, so rollback
+      // must still attempt removal even though registration did not return normally.
+      parentRegistrationAttempted = true;
+      parentSignal.addEventListener('abort', forwardAbort, { once: true });
+      parentRegistrationReturned = true;
+      // The signal can abort during addEventListener, including hosts that invoke before storing.
+      // Read state and reason after the host call returns, then force removal of any residual entry.
+      const parentAborted = parentSignal.aborted;
+      const parentReason = parentAborted ? parentSignal.reason : undefined;
+      if (parentAborted) {
+        controller.abort(parentReason);
+        detachParent(true);
+      } else if (parentForwardInvoked) {
+        detachParent(true);
+      }
+    } catch (error) {
+      const cleanupErrors: unknown[] = [];
+      try {
+        detachParent(true);
+      } catch (cleanupError) {
+        cleanupErrors.push(cleanupError);
+      }
+      throw attachCleanupErrors(error, cleanupErrors);
+    }
+  }
 
   let entries: IEntry[] = [];
   let nextId = 0;
@@ -108,37 +174,36 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
       return Promise.reject(error);
     }
     state = ProvisionalScopeState.rolledBack;
-    controller.abort('provisional scope rolled back');
+    let abortFailed = false;
+    let abortError: unknown;
+    try {
+      controller.abort('provisional scope rolled back');
+    } catch (error) {
+      abortFailed = true;
+      abortError = error;
+    }
     const remaining = entries;
     entries = [];
-    detachParent();
-    rollbackPromise = releaseEntries(remaining);
-    return rollbackPromise;
-  };
-
-  /**
-   * Makes cleanup failures reachable without replacing the primary error: attaches a frozen
-   * `errors` array when the primary is an extensible object; otherwise (primitive/frozen primary)
-   * wraps into a tagged `AggregateError` so the original stays `errors[0]`-reachable.
-   */
-  const attachCleanupErrors = (primary: unknown, cleanupErrors: readonly unknown[]): unknown => {
-    if (cleanupErrors.length === 0) return primary;
-    if (primary !== null && (typeof primary === 'object' || typeof primary === 'function')) {
-      try {
-        Object.defineProperty(primary, 'errors', {
-          value: Object.freeze([...cleanupErrors]),
-          enumerable: true
-        });
-        return primary;
-      } catch {
-        // Frozen / non-extensible primary — fall through to the aggregate wrapper.
+    try {
+      detachParent();
+    } catch (error) {
+      if (abortFailed) abortError = attachCleanupErrors(abortError, [error]);
+      else {
+        abortFailed = true;
+        abortError = error;
       }
     }
-    const message = primary instanceof Error ? primary.message : 'commitTo failed';
-    return tagLifecycleError(
-      new AggregateError([primary, ...cleanupErrors], message),
-      LifecycleErrorCode.scopeDisposalFailed
+    const releasePromise = releaseEntries(remaining);
+    rollbackPromise = releasePromise.then(
+      () => {
+        if (abortFailed) throw abortError;
+      },
+      (cleanupError: unknown) => {
+        if (abortFailed) throw attachCleanupErrors(abortError, [cleanupError]);
+        throw cleanupError;
+      }
     );
+    return rollbackPromise;
   };
 
   const commitTo = (parent: ILifecycleOwner): Promise<void> => {
@@ -148,9 +213,33 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
     const remaining = entries;
     entries = [];
     state = ProvisionalScopeState.committed;
-    controller.abort('provisional scope committed');
-    detachParent();
-    return commitEntries(parent, remaining);
+    let abortFailed = false;
+    let abortError: unknown;
+    try {
+      controller.abort('provisional scope committed');
+    } catch (error) {
+      abortFailed = true;
+      abortError = error;
+    }
+    try {
+      detachParent();
+    } catch (error) {
+      if (abortFailed) abortError = attachCleanupErrors(abortError, [error]);
+      else {
+        abortFailed = true;
+        abortError = error;
+      }
+    }
+    const transferPromise = commitEntries(parent, remaining);
+    if (!abortFailed) return transferPromise;
+    return transferPromise.then(
+      () => {
+        throw abortError;
+      },
+      (transferError: unknown) => {
+        throw attachCleanupErrors(transferError, [abortError]);
+      }
+    );
   };
 
   const commitEntries = async (

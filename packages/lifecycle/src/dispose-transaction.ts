@@ -9,11 +9,20 @@ import {
   containAsyncRejection,
   createErrorCollector,
   createLifecycleError,
-  probeThenable
+  probeThenable,
+  tagLifecycleError
 } from './errors.js';
 import { LifecycleErrorCode } from './error-code.js';
+import { LifecycleErrorText } from './error-text.js';
 import { boundedWait } from './bounded-wait.js';
-import { systemScheduler, type ILifecycleScheduler } from './scheduler.js';
+import {
+  resolveSchedulerOption,
+  addSchedulerTime,
+  systemScheduler,
+  validateSchedulerDelay,
+  validateSchedulerTime,
+  type ILifecycleScheduler
+} from './scheduler.js';
 import { createAbortController, type IAbortSignal } from './abort.js';
 import { DisposeTransactionKind, ThenableProbeKind } from './state-constants.js';
 
@@ -71,7 +80,7 @@ function computeEffectiveDeadline(
   now: number
 ): number | undefined {
   if (gracefulTimeoutMs === undefined) return sharedDeadlineAt;
-  const ownDeadline = now + gracefulTimeoutMs;
+  const ownDeadline = addSchedulerTime(now, gracefulTimeoutMs, 'graceful deadline');
   if (sharedDeadlineAt === undefined) return ownDeadline;
   return Math.min(ownDeadline, sharedDeadlineAt);
 }
@@ -142,27 +151,38 @@ export async function executeReleaseDescriptor(
   descriptor: IReleaseDescriptor,
   context: IReleaseContext
 ): Promise<readonly unknown[]> {
+  if (context.deadlineAt !== undefined) validateSchedulerTime(context.deadlineAt, 'deadlineAt');
+  const scheduler = resolveSchedulerOption(context);
+  const normalizedContext =
+    scheduler === undefined
+      ? context
+      : {
+          signal: context.signal,
+          deadlineAt: context.deadlineAt,
+          scheduler,
+          report: context.report
+        };
   if (descriptor.custom) {
-    const outcome = await runCallback(descriptor.custom, context);
+    const outcome = await runCallback(descriptor.custom, normalizedContext);
     return outcome.ok ? [] : [outcome.error];
   }
   const errors: unknown[] = [];
   if (descriptor.graceful) {
     const gracefulOutcome = await raceGraceful(
       descriptor.graceful,
-      context,
+      normalizedContext,
       descriptor.gracefulTimeoutMs
     );
     if (gracefulOutcome.ok) return [];
     if (!('timedOut' in gracefulOutcome)) errors.push(gracefulOutcome.error);
   }
-  const forceOutcome = await runCallback(descriptor.force, context);
+  const forceOutcome = await runCallback(descriptor.force, normalizedContext);
   if (!forceOutcome.ok) {
     // The collector keeps the raw, caller-produced error untouched (so `throw` policy's single-error
     // case still throws it exactly as-is) — this tagged wrapper is a parallel diagnostic channel
     // only, carrying `(source, code)` for callers that want that without losing the raw error's own
     // identity/type.
-    context.report(
+    normalizedContext.report(
       createLifecycleError(LifecycleErrorCode.releaseForceFailed, '[lifecycle] force() failed', {
         cause: forceOutcome.error
       })
@@ -175,6 +195,20 @@ export async function executeReleaseDescriptor(
 export type IDisposeItem = {
   readonly source: string;
   readonly descriptor: IReleaseDescriptor;
+};
+
+type IAdmittedDisposeItem = {
+  readonly source: string;
+  readonly descriptor: IReleaseDescriptor;
+};
+
+type IDescriptorAdmission =
+  | { readonly ok: true; readonly descriptor: IReleaseDescriptor }
+  | { readonly ok: false; readonly error: unknown };
+
+type IAdmissionBatch = {
+  readonly admitted: readonly IAdmittedDisposeItem[];
+  readonly rejected: readonly ICollectedError[];
 };
 
 /**
@@ -223,13 +257,128 @@ const safeReport = (report: ((error: unknown) => void) | undefined, error: unkno
   }
 };
 
-const orderedItems = (
+/** Creates one tagged lifecycle error for a descriptor value that violates admission shape. */
+const invalidDescriptor = (field: string): unknown =>
+  createLifecycleError(
+    LifecycleErrorCode.invalidOption,
+    LifecycleErrorText.disposeDescriptorInvalid,
+    {
+      detail: { field }
+    }
+  );
+
+/**
+ * Reads every descriptor value used by release exactly once and turns it into plain data. A getter
+ * failure remains the caller's original error; an invalid value receives the lifecycle
+ * invalid-option code. Order is read only for order-mode transactions, preserving plan-mode's
+ * order-blind contract.
+ */
+const admitDescriptor = (
+  descriptor: IReleaseDescriptor,
+  includeOrder: boolean
+): IDescriptorAdmission => {
+  let order: unknown;
+  let custom: unknown;
+  let graceful: unknown;
+  let gracefulTimeoutMs: unknown;
+  let force: unknown;
+  try {
+    if (includeOrder) order = descriptor.order;
+    custom = descriptor.custom;
+    graceful = descriptor.graceful;
+    gracefulTimeoutMs = descriptor.gracefulTimeoutMs;
+    force = descriptor.force;
+  } catch (error) {
+    return { ok: false, error };
+  }
+  if (
+    includeOrder &&
+    order !== undefined &&
+    (typeof order !== 'number' || !Number.isFinite(order))
+  ) {
+    return { ok: false, error: invalidDescriptor('order') };
+  }
+  if (custom !== undefined && typeof custom !== 'function') {
+    return { ok: false, error: invalidDescriptor('custom') };
+  }
+  if (graceful !== undefined && typeof graceful !== 'function') {
+    return { ok: false, error: invalidDescriptor('graceful') };
+  }
+  if (gracefulTimeoutMs !== undefined) {
+    try {
+      validateSchedulerDelay(gracefulTimeoutMs, 'gracefulTimeoutMs');
+    } catch (error) {
+      return { ok: false, error };
+    }
+  }
+  if (typeof force !== 'function') return { ok: false, error: invalidDescriptor('force') };
+
+  const admitted: IReleaseDescriptor = {
+    ...(includeOrder ? { order: (order as number | undefined) ?? 0 } : {}),
+    custom: custom as IReleaseDescriptor['custom'],
+    graceful: graceful as IReleaseDescriptor['graceful'],
+    gracefulTimeoutMs: gracefulTimeoutMs as IReleaseDescriptor['gracefulTimeoutMs'],
+    force: force as IReleaseDescriptor['force']
+  };
+  return { ok: true, descriptor: admitted };
+};
+
+/**
+ * Admits descriptors independently before any release callback runs. Rejected items are excluded
+ * from execution but retained as policy inputs; valid order-mode items are then stably sorted from
+ * their already-snapshotted numeric keys, so no hostile accessor can abort the batch.
+ */
+const admitItems = (
   items: readonly IDisposeItem[],
   mode: IDisposeTransactionMode
-): readonly IDisposeItem[] => {
-  if (mode.kind === 'plan') return items;
+): IAdmissionBatch => {
+  const admitted: IAdmittedDisposeItem[] = [];
+  const rejected: ICollectedError[] = [];
+  const includeOrder = mode.kind === 'order';
+  for (const item of items) {
+    let source = 'transaction';
+    try {
+      source = item.source;
+      const admission = admitDescriptor(item.descriptor, includeOrder);
+      if (!admission.ok) {
+        rejected.push({ source, error: admission.error });
+        continue;
+      }
+      admitted.push({ source, descriptor: admission.descriptor });
+    } catch (error) {
+      rejected.push({ source, error });
+    }
+  }
+  if (mode.kind === 'plan') return { admitted, rejected };
   // Stable sort: ties (equal order) keep the caller-supplied relative sequence.
-  return [...items].sort((a, b) => (b.descriptor.order ?? 0) - (a.descriptor.order ?? 0));
+  admitted.sort((a, b) => (b.descriptor.order ?? 0) - (a.descriptor.order ?? 0));
+  return { admitted, rejected };
+};
+
+/** Keeps transaction cleanup failures reachable without replacing an earlier primary failure. */
+const appendCleanupErrors = (primary: unknown, cleanupErrors: readonly unknown[]): unknown => {
+  if (cleanupErrors.length === 0) return primary;
+  if (primary !== null && (typeof primary === 'object' || typeof primary === 'function')) {
+    try {
+      const existing = (primary as { readonly errors?: unknown }).errors;
+      const errors = Array.isArray(existing) ? [...existing, ...cleanupErrors] : [...cleanupErrors];
+      Object.defineProperty(primary, 'errors', {
+        value: Object.freeze(errors),
+        enumerable: true,
+        configurable: true
+      });
+      return primary;
+    } catch {
+      // Frozen / non-extensible primary — fall through to the tagged aggregate wrapper.
+    }
+  }
+  return tagLifecycleError(
+    new AggregateError(
+      [primary, ...cleanupErrors],
+      primary instanceof Error ? primary.message : LifecycleErrorText.disposeTransactionFailed
+    ),
+    LifecycleErrorCode.scopeDisposalFailed
+  );
 };
 
 export function createDisposeTransaction(
@@ -237,33 +386,102 @@ export function createDisposeTransaction(
   options: IDisposeTransactionOptions = {}
 ): IDisposeTransaction {
   const errorPolicy = options.errorPolicy ?? 'throw';
+  const scheduler = resolveSchedulerOption(options);
   return {
     mode,
     async run(items) {
       const collector = createErrorCollector(errorPolicy, options.report);
+      const cleanupErrors: unknown[] = [];
+      let primaryRecorded = false;
+      const record = (source: string, error: unknown): void => {
+        primaryRecorded = true;
+        collector.add(source, error);
+      };
       // Mirrors `options.signal` into a signal every item's context can observe (L-T26). With no
       // `options.signal` given, `controller.signal` simply never aborts — a scope that wants items
       // to see "we're closing" passes its own close()-tied signal in.
       const controller = createAbortController();
       const forwardAbort = (): void => controller.abort(options.signal?.reason);
-      if (options.signal?.aborted) controller.abort(options.signal.reason);
-      else options.signal?.addEventListener('abort', forwardAbort, { once: true });
+      let registrationAttempted = false;
+      let registrationReturned = false;
+      let removalAttempted = false;
+      const removeSignalListener = (force = false): void => {
+        if (!options.signal || removalAttempted) return;
+        if (!force && (!registrationAttempted || !registrationReturned)) return;
+        removalAttempted = true;
+        options.signal.removeEventListener('abort', forwardAbort);
+      };
       try {
-        for (const item of orderedItems(items, mode)) {
+        if (options.signal?.aborted) {
+          controller.abort(options.signal.reason);
+        } else if (options.signal) {
+          // Mark before calling: a hostile signal may store the listener and then throw.
+          registrationAttempted = true;
+          options.signal.addEventListener('abort', forwardAbort, { once: true });
+          registrationReturned = true;
+          // Observe an abort that happened during registration and remove any residual listener.
+          if (options.signal.aborted) {
+            controller.abort(options.signal.reason);
+            try {
+              removeSignalListener(true);
+            } catch (error) {
+              cleanupErrors.push(error);
+            }
+          }
+        }
+      } catch (error) {
+        record('transaction-signal', error);
+        try {
+          removeSignalListener(true);
+        } catch (cleanupError) {
+          cleanupErrors.push(cleanupError);
+        }
+      }
+      try {
+        const admission = admitItems(items, mode);
+        for (const item of admission.rejected) record(item.source, item.error);
+        for (const item of admission.admitted) {
           const context: IReleaseContext = {
             signal: controller.signal,
             deadlineAt: options.deadlineAt,
-            scheduler: options.scheduler,
+            scheduler,
             report: (error) => safeReport(options.report, error)
           };
-          const errors = await executeReleaseDescriptor(item.descriptor, context);
-          for (const error of errors) collector.add(item.source, error);
+          try {
+            const errors = await executeReleaseDescriptor(item.descriptor, context);
+            for (const error of errors) record(item.source, error);
+          } catch (error) {
+            // Keep one unexpected item failure from preventing later admitted resources from release.
+            record(item.source, error);
+          }
         }
+      } catch (error) {
+        // Input iteration failures must not bypass pending drain or collector finalization.
+        record('transaction', error);
       } finally {
-        options.signal?.removeEventListener('abort', forwardAbort);
+        try {
+          removeSignalListener();
+        } catch (error) {
+          cleanupErrors.push(error);
+        }
       }
-      if (options.pending) await options.pending.drain();
-      return collector.finalize('[lifecycle] dispose transaction failed');
+      if (options.pending) {
+        try {
+          await options.pending.drain();
+        } catch (error) {
+          record('transaction-pending', error);
+        }
+      }
+      // Under `throw`, attach cleanup failures to an existing primary instead of turning them into
+      // a second primary. Other policies receive cleanup failures through their normal collector.
+      if (errorPolicy !== 'throw' || !primaryRecorded) {
+        for (const error of cleanupErrors) record('transaction-signal-cleanup', error);
+      }
+      try {
+        return collector.finalize(LifecycleErrorText.disposeTransactionFailed);
+      } catch (error) {
+        throw appendCleanupErrors(error, errorPolicy === 'throw' ? cleanupErrors : []);
+      }
     }
   };
 }

@@ -1,5 +1,7 @@
 import {
   SerializeCodecError,
+  encodeSerializeTextChunk,
+  validateSerializeChunk,
   type ISerializeAbortSignal,
   type ISerializeChunk,
   type ISerializeRegistry,
@@ -10,9 +12,455 @@ import {
   createSerializeError,
   createSerializeRangeError,
   createSerializeTypeError,
-  SerializeErrorCode
+  SerializeErrorCode,
+  SerializeErrorText,
+  SERIALIZE_SOURCE
 } from './errors.js';
 import { SerializeChunkKind, SerializePhase } from './format-constants.js';
+import { snapshotSerializeSignal } from './signal.js';
+
+type ISerializeScheduledTask = { cancel(): void };
+
+/** Fully admitted frame-budget options; no field reads remain when slicing begins. */
+type IFrameBudgetSnapshot = {
+  readonly targetMs: number;
+  readonly minItems: number;
+  readonly maxItems: number;
+  readonly initialItems: number;
+  readonly yieldTo?: () => Promise<void>;
+  readonly signal?: ISerializeAbortSignal;
+  readonly scheduler: ISerializeScheduler;
+};
+
+/** Fully admitted encode-stream options captured before the first slice or registry call. */
+type IEncodeStreamSnapshot = IFrameBudgetSnapshot & {
+  readonly type?: string;
+  readonly context: string;
+  readonly maxInFlight: number;
+};
+
+/** Fully admitted decode-stream options captured before the input iterator is touched. */
+type IDecodeStreamSnapshot = {
+  readonly type?: string;
+  readonly context: string;
+  readonly signal?: ISerializeAbortSignal;
+};
+
+/** Invoke one captured method with its original protocol receiver. */
+type ISerializeInvokable<TResult> = (...args: never[]) => TResult;
+
+/** Add a secondary cleanup failure without changing the earlier primary result. */
+const attachSerializeCleanupError = (primary: unknown, cleanupError: unknown): void => {
+  if (primary === null || (typeof primary !== 'object' && typeof primary !== 'function')) return;
+  try {
+    const existing = (primary as { readonly errors?: readonly unknown[] }).errors;
+    Object.defineProperty(primary, 'errors', {
+      value: Object.freeze([...(existing ?? []), cleanupError]),
+      enumerable: true
+    });
+  } catch {
+    // A frozen or hostile primary still wins; cleanup failure remains contained.
+  }
+};
+
+/** Keep an already-owned serialize INVALID_OPTION intact while wrapping a hostile failure. */
+const isSerializeInvalidOption = (error: unknown): boolean => {
+  try {
+    return (
+      error instanceof Error &&
+      (error as { readonly source?: unknown }).source === SERIALIZE_SOURCE &&
+      (error as { readonly code?: unknown }).code === SerializeErrorCode.invalidOption
+    );
+  } catch {
+    return false;
+  }
+};
+
+/** Extract hostile protocol-failure text without allowing diagnostics to replace the primary. */
+const streamFailureReason = (error: unknown): string => {
+  try {
+    if (error instanceof Error) {
+      try {
+        const message = error.message;
+        return typeof message === 'string' ? message : String(message);
+      } catch {
+        return SerializeErrorText.reasonUnavailable;
+      }
+    }
+    try {
+      return String(error);
+    } catch {
+      return SerializeErrorText.reasonUnavailable;
+    }
+  } catch {
+    return SerializeErrorText.reasonUnavailable;
+  }
+};
+
+/** Keep pre-existing serialize-owned invalid-chunk errors unchanged during stream cleanup. */
+const isSerializeInvalidChunk = (error: unknown): boolean => {
+  try {
+    return (
+      error instanceof Error &&
+      (error as { readonly source?: unknown }).source === SERIALIZE_SOURCE &&
+      (error as { readonly code?: unknown }).code === SerializeErrorCode.invalidChunk
+    );
+  } catch {
+    return false;
+  }
+};
+
+/** Wrap one encode admission failure with the slice index that owns the invocation. */
+const encodeStreamFailure = (
+  error: unknown,
+  sliceIndex: number,
+  type: string | undefined,
+  context: string,
+  registry: ISerializeRegistry
+): SerializeCodecError =>
+  new SerializeCodecError(
+    `encode stream failed at slice ${sliceIndex}: ${streamFailureReason(error)}`,
+    {
+      type: type ?? registry.primaryType,
+      phase: SerializePhase.encode,
+      context,
+      chunkIndex: sliceIndex,
+      bytesConsumed: 0,
+      code: SerializeErrorCode.encodeFailed,
+      cause: error
+    }
+  );
+
+/** Convert any stream-option getter, shape, or value failure to serialize INVALID_OPTION. */
+const streamOptionFailure = (error: unknown): never => {
+  if (isSerializeInvalidOption(error)) throw error;
+  throw createSerializeTypeError(
+    SerializeErrorCode.invalidOption,
+    SerializeErrorText.operationOptionInvalid,
+    { cause: error }
+  );
+};
+
+/** Translate a task-release failure without replacing its native TypeError semantics. */
+const translateTaskCancelFailure = (error: unknown): unknown =>
+  isSerializeInvalidOption(error)
+    ? error
+    : createSerializeTypeError(
+        SerializeErrorCode.invalidOption,
+        SerializeErrorText.schedulerTaskCancelFailed,
+        { cause: error }
+      );
+
+/** Read an operation signal's current state while keeping failures at serialize's boundary. */
+const readSerializeSignalAborted = (signal: ISerializeAbortSignal): boolean => {
+  try {
+    if (typeof signal.aborted !== 'boolean') throw new TypeError(SerializeErrorText.signalInvalid);
+    return signal.aborted;
+  } catch (error) {
+    if (isSerializeInvalidOption(error)) throw error;
+    throw createSerializeTypeError(
+      SerializeErrorCode.invalidOption,
+      SerializeErrorText.signalAccessorFailed,
+      { cause: error }
+    );
+  }
+};
+
+/** Read an operation abort reason only when cancellation wins the owned-yield race. */
+const readSerializeSignalReason = (signal: ISerializeAbortSignal): unknown => {
+  try {
+    return signal.reason;
+  } catch (error) {
+    throw createSerializeTypeError(
+      SerializeErrorCode.invalidOption,
+      SerializeErrorText.signalReasonReadFailed,
+      { cause: error }
+    );
+  }
+};
+
+/**
+ * Schedule one default frame yield and own its returned task until callback, cancellation, or
+ * failure. The state remains pending until `schedule()` returns so synchronous callbacks still
+ * release the handle; every cleanup failure is either the first failure or a contained secondary.
+ */
+const scheduleOwnedYield = (
+  scheduler: ISerializeScheduler,
+  signal: ISerializeAbortSignal | undefined
+): Promise<void> => {
+  let resolveYield!: () => void;
+  let rejectYield!: (error: unknown) => void;
+  const promise = new Promise<void>((resolve, reject) => {
+    resolveYield = resolve;
+    rejectYield = reject;
+  });
+  /** Task returned by scheduler, retained until exactly-once cleanup. */
+  let task: ISerializeScheduledTask | undefined;
+  /** Whether scheduler callback has fired, including synchronous reentrancy. */
+  let callbackFired = false;
+  /** Whether schedule invocation has returned or failed. */
+  let scheduleSettled = false;
+  /** Whether a primary outcome has been recorded. */
+  let hasPrimary = false;
+  /** First failure, which cleanup failures must not replace. */
+  let primaryError: unknown;
+  /** Whether task cancellation has been attempted already. */
+  let cancelAttempted = false;
+  /** Whether returned promise has been settled. */
+  let settled = false;
+  /** Whether abort listener registration was attempted. */
+  let listenerAttempted = false;
+  /** Whether abort listener removal was attempted. */
+  let listenerRemoved = false;
+  /** Captured signal listener methods preserve receiver and avoid repeated hostile reads. */
+  let addAbortListener: ISerializeInvokable<void> | undefined;
+  let removeAbortListener: ISerializeInvokable<void> | undefined;
+  const signalReceiver = signal as object | undefined;
+  /** Callback removes the owned listener and cancels the owned task before final settlement. */
+  const cleanup = (): void => {
+    if (task !== undefined && !cancelAttempted) {
+      cancelAttempted = true;
+      try {
+        task.cancel();
+      } catch (error) {
+        const cleanupError = translateTaskCancelFailure(error);
+        if (!hasPrimary) {
+          primaryError = cleanupError;
+          hasPrimary = true;
+        } else {
+          attachSerializeCleanupError(primaryError, cleanupError);
+        }
+      }
+    }
+    if (
+      signalReceiver !== undefined &&
+      addAbortListener !== undefined &&
+      removeAbortListener !== undefined &&
+      listenerAttempted &&
+      !listenerRemoved
+    ) {
+      listenerRemoved = true;
+      try {
+        Reflect.apply(removeAbortListener, signalReceiver, ['abort', onAbort]);
+      } catch (error) {
+        const cleanupError = isSerializeInvalidOption(error)
+          ? error
+          : createSerializeTypeError(
+              SerializeErrorCode.invalidOption,
+              SerializeErrorText.signalAccessorFailed,
+              { cause: error }
+            );
+        if (!hasPrimary) {
+          primaryError = cleanupError;
+          hasPrimary = true;
+        } else {
+          attachSerializeCleanupError(primaryError, cleanupError);
+        }
+      }
+    }
+  };
+  /** Settle only after the scheduler return boundary exposes the task handle. */
+  const finish = (): void => {
+    if (settled || !scheduleSettled || (!callbackFired && !hasPrimary)) return;
+    cleanup();
+    settled = true;
+    if (hasPrimary) rejectYield(primaryError);
+    else resolveYield();
+  };
+  /** Abort callback makes cancellation the primary outcome and releases any admitted task. */
+  function onAbort(): void {
+    if (settled || hasPrimary) return;
+    try {
+      primaryError = createSerializeError(SerializeErrorCode.aborted, 'serialize aborted', {
+        cause: signal === undefined ? undefined : readSerializeSignalReason(signal)
+      });
+    } catch (error) {
+      primaryError = error;
+    }
+    hasPrimary = true;
+    finish();
+  }
+  /**
+   * Recheck structural signal state after listener admission, including hosts that do not replay
+   * abort.
+   */
+  const recheckAbortAfterRegistration = (): void => {
+    if (signal === undefined || hasPrimary) return;
+    if (readSerializeSignalAborted(signal)) onAbort();
+  };
+
+  try {
+    if (signal !== undefined) {
+      if (readSerializeSignalAborted(signal)) {
+        onAbort();
+        scheduleSettled = true;
+        finish();
+        return promise;
+      }
+      const add = signal.addEventListener;
+      const remove = signal.removeEventListener;
+      if (typeof add !== 'function' || typeof remove !== 'function') {
+        throw new TypeError(SerializeErrorText.signalInvalid);
+      }
+      addAbortListener = add as ISerializeInvokable<void>;
+      removeAbortListener = remove as ISerializeInvokable<void>;
+      listenerAttempted = true;
+      try {
+        Reflect.apply(addAbortListener, signal, ['abort', onAbort, { once: true }]);
+      } catch (error) {
+        const registrationError = isSerializeInvalidOption(error)
+          ? error
+          : createSerializeTypeError(
+              SerializeErrorCode.invalidOption,
+              SerializeErrorText.signalRegistrationFailed,
+              { cause: error }
+            );
+        let recheckFailed = false;
+        let recheckError: unknown;
+        try {
+          recheckAbortAfterRegistration();
+        } catch (error) {
+          recheckFailed = true;
+          recheckError = error;
+        }
+        primaryError = registrationError;
+        hasPrimary = true;
+        if (recheckFailed) attachSerializeCleanupError(primaryError, recheckError);
+        scheduleSettled = true;
+        finish();
+        return promise;
+      }
+      recheckAbortAfterRegistration();
+      if (hasPrimary) {
+        scheduleSettled = true;
+        finish();
+        return promise;
+      }
+    }
+    task = scheduler.schedule(() => {
+      callbackFired = true;
+      finish();
+    }, 0);
+    scheduleSettled = true;
+  } catch (error) {
+    if (!hasPrimary) {
+      primaryError = isSerializeInvalidOption(error)
+        ? error
+        : createSerializeTypeError(
+            SerializeErrorCode.invalidOption,
+            SerializeErrorText.schedulerInvalid,
+            { cause: error }
+          );
+      hasPrimary = true;
+    } else {
+      attachSerializeCleanupError(primaryError, error);
+    }
+    scheduleSettled = true;
+  }
+  finish();
+  return promise;
+};
+
+/** Validate a scheduler clock value at the serialize core boundary. */
+const validateSchedulerNow = (value: unknown): number => {
+  if (typeof value !== 'number') {
+    throw createSerializeTypeError(
+      SerializeErrorCode.invalidOption,
+      SerializeErrorText.schedulerNowType
+    );
+  }
+  if (!Number.isFinite(value)) {
+    throw createSerializeRangeError(
+      SerializeErrorCode.invalidOption,
+      SerializeErrorText.schedulerNowRange
+    );
+  }
+  return value;
+};
+
+/** Capture one scheduler task and translate hostile task access into serialize ownership. */
+const snapshotScheduledTask = (value: unknown): ISerializeScheduledTask => {
+  if (value === null || (typeof value !== 'object' && typeof value !== 'function')) {
+    throw createSerializeTypeError(
+      SerializeErrorCode.invalidOption,
+      SerializeErrorText.schedulerTaskInvalid
+    );
+  }
+  let cancel: unknown;
+  try {
+    cancel = (value as { cancel?: unknown }).cancel;
+  } catch (error) {
+    throw createSerializeTypeError(
+      SerializeErrorCode.invalidOption,
+      SerializeErrorText.schedulerTaskCancelGetterFailed,
+      { cause: error }
+    );
+  }
+  if (typeof cancel !== 'function') {
+    throw createSerializeTypeError(
+      SerializeErrorCode.invalidOption,
+      SerializeErrorText.schedulerTaskInvalid
+    );
+  }
+  const receiver = value;
+  return { cancel: () => Reflect.apply(cancel as () => void, receiver, []) };
+};
+
+/** Capture scheduler methods once and translate every scheduler failure into serialize errors. */
+const snapshotSerializeScheduler = (value: unknown): ISerializeScheduler | undefined => {
+  if ((typeof value !== 'object' && typeof value !== 'function') || value === null) {
+    return undefined;
+  }
+  const receiver = value;
+  let now: unknown;
+  let schedule: unknown;
+  try {
+    now = (value as { now?: unknown }).now;
+    schedule = (value as { schedule?: unknown }).schedule;
+  } catch (error) {
+    throw createSerializeTypeError(
+      SerializeErrorCode.invalidOption,
+      SerializeErrorText.schedulerAccessorFailed,
+      { cause: error }
+    );
+  }
+  if (typeof now !== 'function' || typeof schedule !== 'function') return undefined;
+  const isOwnedInvalidOption = (error: unknown): boolean =>
+    error instanceof Error &&
+    (error as { readonly source?: unknown }).source === SERIALIZE_SOURCE &&
+    (error as { readonly code?: unknown }).code === SerializeErrorCode.invalidOption;
+  return {
+    now: () => {
+      try {
+        return validateSchedulerNow(Reflect.apply(now as () => unknown, receiver, []));
+      } catch (error) {
+        if (isOwnedInvalidOption(error)) throw error;
+        throw createSerializeTypeError(
+          SerializeErrorCode.invalidOption,
+          SerializeErrorText.schedulerNowType,
+          { cause: error }
+        );
+      }
+    },
+    schedule: (callback, delayMs) => {
+      try {
+        return snapshotScheduledTask(
+          Reflect.apply(schedule as (callback: () => void, delayMs: number) => unknown, receiver, [
+            callback,
+            delayMs
+          ])
+        );
+      } catch (error) {
+        if (isOwnedInvalidOption(error)) throw error;
+        throw createSerializeTypeError(
+          SerializeErrorCode.invalidOption,
+          SerializeErrorText.schedulerInvalid,
+          { cause: error }
+        );
+      }
+    }
+  };
+};
 
 /**
  * 帧预算切片。
@@ -68,6 +516,116 @@ function assertCount(value: number, name: string): void {
   }
 }
 
+/** Capture and validate frame-budget fields exactly once before any iterator side effect. */
+const snapshotFrameBudgetOptions = (options: unknown): IFrameBudgetSnapshot => {
+  try {
+    if (options === null || typeof options !== 'object') {
+      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+    }
+    const candidate = options as Record<string, unknown>;
+    const targetMsValue = candidate.targetMs;
+    const minItemsValue = candidate.minItems;
+    const maxItemsValue = candidate.maxItems;
+    const initialItemsValue = candidate.initialItems;
+    const yieldToValue = candidate.yieldTo;
+    const signalValue = candidate.signal;
+    const schedulerValue = candidate.scheduler;
+    const targetMs = targetMsValue === undefined ? 8 : targetMsValue;
+    const minItems = minItemsValue === undefined ? 64 : minItemsValue;
+    const maxItems = maxItemsValue === undefined ? 250_000 : maxItemsValue;
+    const initialItems = initialItemsValue === undefined ? 2_048 : initialItemsValue;
+    const yieldTo = yieldToValue === undefined ? undefined : (yieldToValue as () => Promise<void>);
+    if (typeof targetMs !== 'number')
+      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+    if (typeof minItems !== 'number')
+      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+    if (typeof maxItems !== 'number')
+      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+    if (typeof initialItems !== 'number')
+      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+    if (yieldTo !== undefined && typeof yieldTo !== 'function') {
+      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+    }
+    const scheduler = snapshotSerializeScheduler(schedulerValue);
+    if (scheduler === undefined) {
+      throw createSerializeTypeError(
+        SerializeErrorCode.invalidOption,
+        SerializeErrorText.schedulerInvalid
+      );
+    }
+    const signal = signalValue === undefined ? undefined : snapshotSerializeSignal(signalValue);
+    assertPositiveMs(targetMs, 'targetMs');
+    assertCount(minItems, 'minItems');
+    assertCount(maxItems, 'maxItems');
+    assertCount(initialItems, 'initialItems');
+    if (maxItems < minItems) {
+      throw createSerializeRangeError(
+        SerializeErrorCode.invalidOption,
+        'frame budget maxItems must be at least minItems'
+      );
+    }
+    return { targetMs, minItems, maxItems, initialItems, yieldTo, signal, scheduler };
+  } catch (error) {
+    return streamOptionFailure(error);
+  }
+};
+
+/** Capture encode-stream fields once, including all inherited frame-budget options. */
+const snapshotEncodeStreamOptions = (options: unknown): IEncodeStreamSnapshot => {
+  try {
+    if (options === null || typeof options !== 'object') {
+      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+    }
+    const candidate = options as Record<string, unknown>;
+    const typeValue = candidate.type;
+    const contextValue = candidate.context;
+    const maxInFlightValue = candidate.maxInFlight;
+    const frame = snapshotFrameBudgetOptions(options);
+    const type = typeValue === undefined ? undefined : typeValue;
+    const context = contextValue === undefined ? 'stream' : contextValue;
+    const maxInFlight = maxInFlightValue === undefined ? 1 : maxInFlightValue;
+    if (type !== undefined && typeof type !== 'string') {
+      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+    }
+    if (typeof context !== 'string') throw new TypeError(SerializeErrorText.operationOptionInvalid);
+    if (typeof maxInFlight !== 'number') {
+      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+    }
+    if (!Number.isSafeInteger(maxInFlight) || maxInFlight < 1) {
+      throw createSerializeRangeError(
+        SerializeErrorCode.invalidOption,
+        `maxInFlight must be a positive integer, got ${maxInFlight}`
+      );
+    }
+    return { ...frame, type, context, maxInFlight };
+  } catch (error) {
+    return streamOptionFailure(error);
+  }
+};
+
+/** Capture decode-stream fields once before the source iterator is requested. */
+const snapshotDecodeStreamOptions = (options: unknown): IDecodeStreamSnapshot => {
+  try {
+    if (options === null || typeof options !== 'object') {
+      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+    }
+    const candidate = options as Record<string, unknown>;
+    const typeValue = candidate.type;
+    const contextValue = candidate.context;
+    const signalValue = candidate.signal;
+    const type = typeValue === undefined ? undefined : typeValue;
+    const context = contextValue === undefined ? 'stream' : contextValue;
+    if (type !== undefined && typeof type !== 'string') {
+      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+    }
+    if (typeof context !== 'string') throw new TypeError(SerializeErrorText.operationOptionInvalid);
+    const signal = signalValue === undefined ? undefined : snapshotSerializeSignal(signalValue);
+    return { type, context, signal };
+  } catch (error) {
+    return streamOptionFailure(error);
+  }
+};
+
 /**
  * 按帧预算把一个大数组切成若干片，片间让出主线程。
  *
@@ -77,48 +635,18 @@ export async function* sliceByFrameBudget<T>(
   items: readonly T[],
   options: IFrameBudgetOptions
 ): AsyncGenerator<readonly T[], void, undefined> {
-  const {
-    targetMs = 8,
-    minItems = 64,
-    maxItems = 250_000,
-    initialItems = 2_048,
-    yieldTo,
-    signal,
-    scheduler
-  } = options;
-  // scheduler 必填（R-4）：core 无默认 timer，不直接触碰宿主 `setTimeout`/`performance`/`Date.now`。
-  if (
-    !scheduler ||
-    typeof scheduler.now !== 'function' ||
-    typeof scheduler.schedule !== 'function'
-  ) {
-    throw createSerializeTypeError(
-      SerializeErrorCode.invalidOption,
-      'frame budget scheduler must be { now, schedule }'
-    );
-  }
+  const { targetMs, minItems, maxItems, initialItems, yieldTo, signal, scheduler } =
+    snapshotFrameBudgetOptions(options);
   const now = (): number => scheduler.now();
-  const resolveYield =
-    yieldTo ?? (() => new Promise<void>((resolve) => void scheduler.schedule(resolve, 0)));
-  // NaN 必须显式挡掉：NaN <= 0 是 false，能穿过朴素的范围检查，然后
-  // clamp(NaN) 仍是 NaN、slice(0, NaN) 得到空数组、index += 0 —— while 永不结束。
-  // 这类参数常来自配置或远端下发，不能假定调用方给的是数字。
-  assertPositiveMs(targetMs, 'targetMs');
-  assertCount(minItems, 'minItems');
-  assertCount(maxItems, 'maxItems');
-  assertCount(initialItems, 'initialItems');
-  if (maxItems < minItems) {
-    throw createSerializeRangeError(
-      SerializeErrorCode.invalidOption,
-      'frame budget maxItems must be at least minItems'
-    );
-  }
+  const resolveYield = yieldTo ?? (() => scheduleOwnedYield(scheduler, signal));
 
   let size = clamp(initialItems, minItems, maxItems);
   let index = 0;
   while (index < items.length) {
-    if (signal?.aborted)
-      throw createSerializeError(SerializeErrorCode.aborted, 'serialize aborted');
+    if (signal !== undefined && readSerializeSignalAborted(signal))
+      throw createSerializeError(SerializeErrorCode.aborted, 'serialize aborted', {
+        cause: readSerializeSignalReason(signal)
+      });
     const slice = items.slice(index, index + size);
     const startedAt = now();
     yield slice;
@@ -154,15 +682,8 @@ export async function* encodeStream<T>(
   items: readonly T[],
   options: IEncodeStreamOptions
 ): AsyncGenerator<ISerializeChunk, void, undefined> {
-  const { type, context = 'stream', signal, maxInFlight = 1 } = options;
-  // NaN 会让 `inFlight.length >= maxInFlight` 恒为 false，背压彻底关闭，
-  // 在途请求无限堆积直到内存耗尽
-  if (!Number.isSafeInteger(maxInFlight) || maxInFlight < 1) {
-    throw createSerializeRangeError(
-      SerializeErrorCode.invalidOption,
-      `maxInFlight must be a positive integer, got ${maxInFlight}`
-    );
-  }
+  const streamOptions = snapshotEncodeStreamOptions(options);
+  const { type, context, signal, maxInFlight } = streamOptions;
   const inFlight: Promise<ISerializeChunk>[] = [];
   let sliceIndex = 0;
 
@@ -173,28 +694,31 @@ export async function* encodeStream<T>(
     } catch (error) {
       // 刻意不透传内层 SerializeCodecError：它的 chunkIndex 说的是「本次编码的第几段」，
       // 恒为 0，会把「流里的第几片」这个真正有用的位置盖掉。原错误挂在 cause 上。
-      throw new SerializeCodecError(
-        `encode stream failed at slice ${sliceIndex}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-        {
-          type: type ?? registry.primaryType,
-          phase: SerializePhase.encode,
-          context,
-          chunkIndex: sliceIndex,
-          bytesConsumed: 0,
-          code: SerializeErrorCode.encodeFailed,
-          cause: error
-        }
-      );
+      throw encodeStreamFailure(error, sliceIndex, type, context, registry);
     }
   };
 
   try {
-    for await (const slice of sliceByFrameBudget(items, options)) {
-      if (signal?.aborted)
-        throw createSerializeError(SerializeErrorCode.aborted, 'serialize aborted');
-      inFlight.push(registry.encode(slice, { type, signal, context }));
+    for await (const slice of sliceByFrameBudget(items, streamOptions)) {
+      if (signal !== undefined && readSerializeSignalAborted(signal)) {
+        throw createSerializeError(SerializeErrorCode.aborted, 'serialize aborted', {
+          cause: readSerializeSignalReason(signal)
+        });
+      }
+      let pending: Promise<ISerializeChunk>;
+      try {
+        // Promise.resolve preserves native Promise identity and assimilates thenables while the
+        // catch below is installed in the same admission turn.
+        pending = Promise.resolve(registry.encode(slice, { type, signal, context }));
+      } catch (error) {
+        // A synchronous registry failure is still an ordered admission. Queue its rejection so
+        // earlier work drains first and the same immediate observer prevents unhandled rejection.
+        pending = Promise.reject(error);
+      }
+      // Observe every queued rejection at admission; draining later must still await the original
+      // Promise so ordered output and exact error identity remain unchanged.
+      pending.catch(() => undefined);
+      inFlight.push(pending);
       // 背压：在途数达到上限就先把最早那笔排空，避免无限堆积
       while (inFlight.length >= maxInFlight) {
         yield await drainOne();
@@ -223,50 +747,107 @@ export async function* decodeStream(
     readonly signal?: ISerializeAbortSignal;
   } = {}
 ): AsyncGenerator<unknown, void, undefined> {
-  const { type, context = 'stream', signal } = options;
+  const { type, context, signal } = snapshotDecodeStreamOptions(options);
   let index = 0;
-  for await (const chunk of chunks as AsyncIterable<ISerializeChunk>) {
-    if (signal?.aborted)
-      throw createSerializeError(SerializeErrorCode.aborted, 'serialize aborted');
-    try {
-      yield await registry.decode(chunk, { type, signal, context });
-    } catch (error) {
-      // 同上：保留流位置，内层错误挂 cause
-      throw new SerializeCodecError(
-        `decode stream failed at chunk ${index}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-        {
-          type: type ?? registry.primaryType,
-          phase: SerializePhase.decode,
-          context,
-          chunkIndex: index,
-          bytesConsumed: 0,
-          code: SerializeErrorCode.decodeFailed,
-          cause: error
-        }
-      );
+  let ownedError: unknown;
+  try {
+    for await (const chunk of chunks as AsyncIterable<ISerializeChunk>) {
+      if (signal !== undefined && readSerializeSignalAborted(signal)) {
+        ownedError = createSerializeError(SerializeErrorCode.aborted, 'serialize aborted', {
+          cause: readSerializeSignalReason(signal)
+        });
+        throw ownedError;
+      }
+      try {
+        yield await registry.decode(chunk, { type, signal, context });
+      } catch (error) {
+        // 同上：保留流位置，内层错误挂 cause
+        ownedError = new SerializeCodecError(
+          `decode stream failed at chunk ${index}: ${streamFailureReason(error)}`,
+          {
+            type: type ?? registry.primaryType,
+            phase: SerializePhase.decode,
+            context,
+            chunkIndex: index,
+            bytesConsumed: 0,
+            code: SerializeErrorCode.decodeFailed,
+            cause: error
+          }
+        );
+        throw ownedError;
+      }
+      index++;
     }
-    index++;
+  } catch (error) {
+    if (error === ownedError) throw error;
+    throw new SerializeCodecError(
+      `decode stream failed at chunk ${index}: ${streamFailureReason(error)}`,
+      {
+        type: type ?? registry.primaryType,
+        phase: SerializePhase.decode,
+        context,
+        chunkIndex: index,
+        bytesConsumed: 0,
+        code: SerializeErrorCode.decodeFailed,
+        cause: error
+      }
+    );
   }
 }
 
 /** 把分段流合并成一整块。只在消费者确实需要完整 blob 时才用——它会把整份数据 同时驻留在内存里，正是流式想避免的那笔峰值。 */
 export async function collectStream(
-  chunks: AsyncIterable<ISerializeChunk>,
+  chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>,
   encoder?: ITextEncoder
 ): Promise<ISerializeChunk> {
   const collected: ISerializeChunk[] = [];
   let sawBytes = false;
-  for await (const chunk of chunks) {
-    if (chunk[0] === SerializeChunkKind.value) {
-      throw createSerializeTypeError(
-        SerializeErrorCode.invalidChunk,
-        'cannot collect a value chunk into a stream'
-      );
+  let bytesConsumed = 0;
+  let index = 0;
+  const chunkProgress: number[] = [];
+  let ownedError: unknown;
+  try {
+    for await (const chunk of chunks) {
+      const validatedChunk = validateSerializeChunk(chunk, {
+        type: 'stream',
+        phase: SerializePhase.encode,
+        context: 'stream',
+        chunkIndex: index,
+        bytesConsumed
+      });
+      chunkProgress.push(bytesConsumed);
+      if (validatedChunk[0] === SerializeChunkKind.value) {
+        ownedError = new SerializeCodecError('cannot collect a value chunk into a stream', {
+          type: 'stream',
+          phase: SerializePhase.encode,
+          context: 'stream',
+          chunkIndex: index,
+          bytesConsumed,
+          code: SerializeErrorCode.invalidChunk
+        });
+        throw ownedError;
+      }
+      if (validatedChunk[0] === SerializeChunkKind.bytes) {
+        sawBytes = true;
+        bytesConsumed += validatedChunk[1].byteLength;
+      }
+      collected.push(validatedChunk);
+      index++;
     }
-    if (chunk[0] === SerializeChunkKind.bytes) sawBytes = true;
-    collected.push(chunk);
+  } catch (error) {
+    if (error === ownedError || isSerializeInvalidChunk(error)) throw error;
+    throw new SerializeCodecError(
+      `collect stream failed at chunk ${index}: ${streamFailureReason(error)}`,
+      {
+        type: 'stream',
+        phase: SerializePhase.encode,
+        context: 'stream',
+        chunkIndex: index,
+        bytesConsumed,
+        code: SerializeErrorCode.encodeFailed,
+        cause: error
+      }
+    );
   }
   if (collected.length === 0) return ['text', ''];
   if (!sawBytes) {
@@ -279,8 +860,16 @@ export async function collectStream(
   if (enc === undefined) {
     throw createSerializeError(SerializeErrorCode.envUnsupported, 'TextEncoder is unavailable');
   }
-  const parts = collected.map((chunk) =>
-    chunk[0] === SerializeChunkKind.bytes ? chunk[1] : enc.encode(chunk[1] as string)
+  const parts = collected.map((chunk, chunkIndex) =>
+    chunk[0] === SerializeChunkKind.bytes
+      ? chunk[1]
+      : encodeSerializeTextChunk(enc, chunk[1] as string, {
+          type: 'stream',
+          phase: SerializePhase.encode,
+          context: 'stream',
+          chunkIndex,
+          bytesConsumed: chunkProgress[chunkIndex] ?? 0
+        })
   );
   let total = 0;
   for (const part of parts) total += part.byteLength;

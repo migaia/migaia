@@ -19,6 +19,7 @@ import { Scheduler } from '../src/runtime/scheduler.class';
 import type { IFlushable } from '../src/runtime/types';
 import { ReactiveErrorCode } from '../src/error-code';
 import { REACTIVE_SOURCE } from '../src/errors';
+import * as ts from 'typescript';
 
 const srcDir = fileURLToPath(new URL('../src', import.meta.url));
 
@@ -262,6 +263,12 @@ describe('M-T36 (§3.7.1) reverse direction: the table is exhaustive and does no
     expect(srcFiles.length).toBeGreaterThan(10);
   });
 
+  it('does not expose the pre-extraction store message prefix', () => {
+    expect(srcFiles.flatMap((file) => readFileSync(file, 'utf8')).join('\n')).not.toContain(
+      ['[', 'store', ']'].join('')
+    );
+  });
+
   it('no source module outside errors.ts still throws an untagged built-in error', () => {
     const offenders: string[] = [];
     for (const file of srcFiles) {
@@ -287,6 +294,50 @@ describe('M-T36 (§3.7.1) reverse direction: the table is exhaustive and does no
           offenders.push(`${relative(srcDir, file)}: inline '${code}'`);
         }
       }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('owns every production error message outside constructors and allows unrelated local data', () => {
+    const offenders: string[] = [];
+    for (const file of srcFiles) {
+      if (file.endsWith('/error-text.ts') || file.endsWith('/errors.ts')) continue;
+      const source = readFileSync(file, 'utf8');
+      const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+      const visit = (node: ts.Node): void => {
+        if (ts.isNewExpression(node)) {
+          const constructorName = node.expression.getText(ast);
+          const messageArgument =
+            constructorName === 'AggregateError' ? node.arguments?.[1] : node.arguments?.[0];
+          if (
+            (constructorName === 'Error' ||
+              constructorName === 'TypeError' ||
+              constructorName === 'RangeError' ||
+              constructorName === 'AggregateError') &&
+            messageArgument &&
+            (ts.isStringLiteral(messageArgument) ||
+              ts.isNoSubstitutionTemplateLiteral(messageArgument))
+          ) {
+            offenders.push(
+              `${relative(srcDir, file)}:${source.slice(0, messageArgument.getStart(ast)).split('\n').length}`
+            );
+          }
+        }
+        if (ts.isCallExpression(node) && node.expression.getText(ast) === 'createReactiveError') {
+          const messageArgument = node.arguments[1];
+          if (
+            messageArgument &&
+            (ts.isStringLiteral(messageArgument) ||
+              ts.isNoSubstitutionTemplateLiteral(messageArgument))
+          ) {
+            offenders.push(
+              `${relative(srcDir, file)}:${source.slice(0, messageArgument.getStart(ast)).split('\n').length}`
+            );
+          }
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(ast);
     }
     expect(offenders).toEqual([]);
   });

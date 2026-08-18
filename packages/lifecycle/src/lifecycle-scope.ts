@@ -13,7 +13,7 @@ import { createTerminalController } from './terminal-controller.js';
 import { DisposeTransactionKind, LifecycleState } from './state-constants.js';
 import { createDisposeTransaction } from './dispose-transaction.js';
 import { createAbortController } from './abort.js';
-import type { ILifecycleScheduler } from './scheduler.js';
+import { resolveSchedulerOption, type ILifecycleScheduler } from './scheduler.js';
 
 const asyncDisposeKey = (Symbol as typeof Symbol & { asyncDispose?: symbol }).asyncDispose;
 
@@ -50,12 +50,9 @@ export type ILifecycleScope = ILifecycleOwner & {
    * collected errors for the `collect` policy (empty for the other three, which throw/report
    * internally instead).
    *
-   * Concurrent calls reuse the same in-flight promise only while nothing is actually being released
-   * yet (an idle scope, or before the very first item starts). Once at least one owned resource's
-   * release is active, a second call is rejected as reentrant — this package cannot distinguish "a
-   * disposer calling back into its own scope" from "unrelated code that happens to call `dispose()`
-   * while release is in flight" without call-stack tracing, so it conservatively treats both the
-   * same way rather than risking a silent double-release.
+   * Concurrent external calls reuse the same published Promise even while release is in flight.
+   * Only a synchronous call from an active disposer callback is rejected as reentrant, preventing
+   * that callback from self-awaiting the Promise it is currently helping to settle.
    */
   dispose(): Promise<readonly ICollectedError[]>;
 };
@@ -67,6 +64,7 @@ export type ILifecycleScope = ILifecycleOwner & {
  */
 export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILifecycleScope {
   const errorPolicy = options.errorPolicy ?? 'throw';
+  const scheduler = resolveSchedulerOption(options);
   const terminal = createTerminalController();
   const closingController = createAbortController();
   const entries: Array<{
@@ -84,6 +82,63 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
    * call-stack unwinding — not per-item bookkeeping here — attributes the error to the right item.
    */
   let currentlyReleasing = false;
+  let activeDisposerCallback = false;
+
+  /** Invokes one user callback while marking only its synchronous call frame as active. */
+  const invokeDisposerCallback = (
+    callback: (context: IReleaseContext) => void | PromiseLike<void>,
+    context: IReleaseContext
+  ): void | PromiseLike<void> => {
+    activeDisposerCallback = true;
+    try {
+      return callback(context);
+    } finally {
+      activeDisposerCallback = false;
+    }
+  };
+
+  /**
+   * Wraps release callbacks lazily so self-dispose is fail-fast without rejecting external joiners.
+   * The facade must not read or spread descriptor fields here: DisposeTransaction owns the single
+   * per-item admission read and receives any hostile getter failure for policy handling.
+   */
+  const guardDescriptor = (descriptor: IReleaseDescriptor): IReleaseDescriptor => {
+    /** Lazy field facade consumed by DisposeTransaction's descriptor admission boundary. */
+    const guarded = {} as IReleaseDescriptor;
+    Object.defineProperties(guarded, {
+      order: {
+        get: () => descriptor.order
+      },
+      graceful: {
+        get: () => {
+          const graceful = descriptor.graceful;
+          return typeof graceful === 'function'
+            ? (context: IReleaseContext) => invokeDisposerCallback(graceful, context)
+            : graceful;
+        }
+      },
+      gracefulTimeoutMs: {
+        get: () => descriptor.gracefulTimeoutMs
+      },
+      force: {
+        get: () => {
+          const force = descriptor.force;
+          return typeof force === 'function'
+            ? (context: IReleaseContext) => invokeDisposerCallback(force, context)
+            : force;
+        }
+      },
+      custom: {
+        get: () => {
+          const custom = descriptor.custom;
+          return typeof custom === 'function'
+            ? (context: IReleaseContext) => invokeDisposerCallback(custom, context)
+            : custom;
+        }
+      }
+    });
+    return guarded;
+  };
 
   const assertOpen = (): void => {
     if (terminal.lifecycle === LifecycleState.terminal) {
@@ -174,12 +229,15 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
           errorPolicy,
           report: options.report,
           deadlineAt: options.deadlineAt,
-          scheduler: options.scheduler,
+          scheduler,
           signal: closingController.signal
         }
       );
       return await transaction.run(
-        snapshot.map((entry) => ({ source: entry.source, descriptor: entry.descriptor }))
+        snapshot.map((entry) => ({
+          source: entry.source,
+          descriptor: guardDescriptor(entry.descriptor)
+        }))
       );
     } finally {
       currentlyReleasing = false;
@@ -189,7 +247,7 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
 
   const dispose = (): Promise<readonly ICollectedError[]> => {
     if (disposePromise) {
-      if (currentlyReleasing) {
+      if (activeDisposerCallback) {
         throw createLifecycleError(
           LifecycleErrorCode.scopeReentrantDispose,
           '[lifecycle] cannot call dispose() re-entrantly on the same scope'

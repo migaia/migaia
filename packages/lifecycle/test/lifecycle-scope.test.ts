@@ -5,6 +5,14 @@ import type { IReleaseDescriptor } from '../src/types';
 
 const forceDescriptor = (force: IReleaseDescriptor['force']): IReleaseDescriptor => ({ force });
 
+const deferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void } => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+};
+
 describe('L-T2 LifecycleScope: own/release/dispose', () => {
   it('release() unregisters a resource without releasing it', async () => {
     const force = vi.fn();
@@ -60,6 +68,53 @@ describe('L-T2 LifecycleScope: own/release/dispose', () => {
       )
     ).toThrowError(expect.objectContaining({ code: LifecycleErrorCode.scopeTerminal }));
   });
+});
+
+describe('L-T56 Round18 LifecycleScope descriptor admission boundary', () => {
+  it.each(['throw', 'collect', 'report', 'firstError'] as const)(
+    'reads one hostile force getter and keeps later LIFO/order releases under %s policy',
+    async (errorPolicy) => {
+      const admissionError = new Error('hostile force getter failed');
+      const calls: string[] = [];
+      const report = vi.fn();
+      const hostile = { order: 0 } as Record<string, unknown>;
+      const forceGetter = vi.fn(() => {
+        throw admissionError;
+      });
+      Object.defineProperty(hostile, 'force', { get: forceGetter });
+      const scope = createLifecycleScope({ errorPolicy, report });
+
+      scope.own('low', {
+        order: 0,
+        force: () => {
+          calls.push('low');
+        }
+      });
+      scope.own('hostile', hostile as IReleaseDescriptor);
+      scope.own('high', {
+        order: 10,
+        force: () => {
+          calls.push('high');
+        }
+      });
+
+      expect(forceGetter).not.toHaveBeenCalled();
+      const promise = scope.dispose();
+
+      if (errorPolicy === 'collect') {
+        await expect(promise).resolves.toEqual([{ source: '1', error: admissionError }]);
+      } else if (errorPolicy === 'report') {
+        await expect(promise).resolves.toEqual([]);
+        expect(report).toHaveBeenCalledWith(admissionError);
+      } else {
+        await expect(promise).rejects.toBe(admissionError);
+      }
+
+      expect(forceGetter).toHaveBeenCalledTimes(1);
+      expect(calls).toEqual(['high', 'low']);
+      expect(scope.lifecycle).toBe('terminal');
+    }
+  );
 });
 
 describe('L-T3 LifecycleScope: sync/async reentrancy', () => {
@@ -126,8 +181,9 @@ describe('L-T3 LifecycleScope: sync/async reentrancy', () => {
     expect(errors[0]!.source).toBeDefined();
   });
 
-  it('an async disposer that reentrantly calls dispose() from its continuation is also rejected', async () => {
+  it('an async disposer continuation joins the existing dispose promise outside its active callback', async () => {
     const calls: string[] = [];
+    let joined: Promise<readonly unknown[]> | undefined;
     const scope = createLifecycleScope({ errorPolicy: 'collect' });
     scope.own(
       'a',
@@ -139,15 +195,14 @@ describe('L-T3 LifecycleScope: sync/async reentrancy', () => {
       force: async () => {
         await Promise.resolve();
         calls.push('async-reentrant');
-        scope.dispose();
+        joined = scope.dispose();
       }
     });
-    const errors = await scope.dispose();
+    const first = scope.dispose();
+    const errors = await first;
     expect(calls).toEqual(['async-reentrant', 'a']);
-    expect(errors).toHaveLength(1);
-    expect((errors[0]!.error as { code: string }).code).toBe(
-      LifecycleErrorCode.scopeReentrantDispose
-    );
+    expect(errors).toEqual([]);
+    expect(joined).toBe(first);
   });
 
   it('own() from within a disposer is rejected the same way (L-T37 shares this mechanism)', async () => {
@@ -293,10 +348,7 @@ describe('L-T29 dispose() promise identity', () => {
     expect(second).toEqual([]);
   });
 
-  it('user release code for one resource runs exactly once even under a synchronous double dispose() attempt', async () => {
-    // The second, synchronous call lands while the first item's release is actively in flight —
-    // by design this is treated as (indistinguishable from) reentrancy and rejected rather than
-    // silently joining, so release code can never run twice no matter which branch is taken.
+  it('user release code runs once when an external synchronous double dispose() joins', async () => {
     let callCount = 0;
     const scope = createLifecycleScope();
     scope.own(
@@ -307,9 +359,28 @@ describe('L-T29 dispose() promise identity', () => {
       })
     );
     const p1 = scope.dispose();
-    expect(() => scope.dispose()).toThrow();
+    const p2 = scope.dispose();
+    expect(p2).toBe(p1);
     await p1;
     expect(callCount).toBe(1);
+  });
+
+  it('external concurrent dispose() calls reuse the same promise outside an active disposer callback', async () => {
+    const gate = deferred<void>();
+    const scope = createLifecycleScope();
+    scope.own('x', {
+      force: async () => {
+        await gate.promise;
+      }
+    });
+
+    const first = scope.dispose();
+    await Promise.resolve();
+    const second = scope.dispose();
+    expect(second).toBe(first);
+
+    gate.resolve();
+    await first;
   });
 
   it('dispose() after terminal resolves to an empty array', async () => {

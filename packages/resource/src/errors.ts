@@ -11,10 +11,18 @@ export type IResourceError = Error & {
 };
 
 /** 构造一个携带 `(source, code)` 的普通 `Error`，从不改写 `stack`——引擎在构造时就已经填好， 本函数不会重新赋值，原始抛出点始终可见。 */
-export function createResourceError(code: string, message: string): IResourceError {
-  const error = new Error(message);
-  Object.defineProperty(error, 'source', { value: RESOURCE_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
+export function createResourceError(
+  code: string,
+  message: string,
+  options?: { readonly cause?: unknown }
+): IResourceError {
+  const error = new Error(message, options);
+  Object.defineProperty(error, 'source', {
+    value: RESOURCE_SOURCE,
+    enumerable: true,
+    configurable: true
+  });
+  Object.defineProperty(error, 'code', { value: code, enumerable: true, configurable: true });
   return error as IResourceError;
 }
 
@@ -25,7 +33,11 @@ export function createResourceError(code: string, message: string): IResourceErr
  * `Error`：TypeScript 的 `DOMException` 类型不是 `Error` 的子类型，但两者在运行时都是可挂只读属性的普通对象。
  */
 export function tagResourceError<E extends object>(error: E, code: string): E {
-  Object.defineProperty(error, 'source', { value: RESOURCE_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
+  Object.defineProperty(error, 'source', {
+    value: RESOURCE_SOURCE,
+    enumerable: true,
+    configurable: true
+  });
+  Object.defineProperty(error, 'code', { value: code, enumerable: true, configurable: true });
   return error;
 }

@@ -8,9 +8,9 @@ import type {
 } from '../runtime/types.js';
 import { internalsOf } from '../runtime/internals.js';
 import { claimOwnership } from '../runtime/ownership.js';
-import { describeObserver } from '../runtime/diagnostics.js';
+import { createObserverRunTrace, describeObserver } from '../runtime/diagnostics.js';
 import { registerDeps, registerDepVersions } from '../runtime/node-internals.js';
-import { ReactiveTracePhase, ReactiveTraceType } from '../runtime/trace-constants.js';
+import { ReactiveErrorPhase } from '../runtime/trace-constants.js';
 
 // 副作用：唯一真正"被执行"的观察者——Computed 只标脏不重跑，只有 Effect 会被调度器实际 tick
 export class Effect implements IObserver, IDisposable {
@@ -54,19 +54,27 @@ export class Effect implements IObserver, IDisposable {
     this.#forceRun = true;
     internalsOf(this.runtime).scheduler.enqueue(this);
   }
+  /**
+   * Runs cleanup and the effect body as one terminal-aware transaction. Cleanup may synchronously
+   * dispose this effect; that terminal transition must prevent both a rerun and dependency commit.
+   */
   run(): void {
     if (this.#disposed) return;
     const runtime = internalsOf(this.runtime);
     const tracing = runtime.traceEnabled();
-    const startedAt = tracing ? runtime.now() : 0;
-    if (tracing) {
-      runtime.emitTrace({
-        type: ReactiveTraceType.observerRun,
-        timestamp: runtime.timestamp(),
-        phase: ReactiveTracePhase.start,
-        observer: describeObserver(this)
-      });
-    }
+    const trace = tracing
+      ? createObserverRunTrace(describeObserver(this), {
+          now: runtime.now,
+          timestamp: runtime.timestamp,
+          emitTrace: runtime.emitTrace,
+          reportError: (error) =>
+            this.runtime.reportError(error, {
+              phase: ReactiveErrorPhase.traceListener,
+              observer: this
+            })
+        })
+      : undefined;
+    trace?.start();
     // 先摘掉旧 cleanup 再执行：否则若新 fn 抛错，赋值右侧未完成，this.cleanup 仍指向旧 cleanup，
     // 下次重跑/dispose 会重复执行旧 cleanup（重复 removeEventListener/释放资源/引用计数变负）。
     const previousCleanup = this.#cleanup;
@@ -75,28 +83,19 @@ export class Effect implements IObserver, IDisposable {
       if (typeof previousCleanup === 'function') {
         this.runtime.untracked(previousCleanup); // cleanup 执行期间不建立依赖
       }
-      this.#cleanup = runtime.tracker.runTracked(this, this.#fn);
-    } catch (error) {
-      if (tracing) {
-        runtime.emitTrace({
-          type: ReactiveTraceType.observerRun,
-          timestamp: runtime.timestamp(),
-          phase: ReactiveTracePhase.error,
-          observer: describeObserver(this),
-          durationMs: runtime.now() - startedAt,
-          error
-        });
+      if (this.#disposed) return;
+      /** Candidate cleanup returned by the current body; terminal effects must consume it locally. */
+      const nextCleanup = runtime.tracker.runTracked(this, this.#fn);
+      if (this.#disposed) {
+        if (typeof nextCleanup === 'function') this.runtime.untracked(nextCleanup);
+        return;
       }
+      this.#cleanup = nextCleanup;
+    } catch (error) {
+      trace?.error(error);
       throw error;
-    }
-    if (tracing) {
-      runtime.emitTrace({
-        type: ReactiveTraceType.observerRun,
-        timestamp: runtime.timestamp(),
-        phase: ReactiveTracePhase.end,
-        observer: describeObserver(this),
-        durationMs: runtime.now() - startedAt
-      });
+    } finally {
+      trace?.end();
     }
   }
   dispose(): void {

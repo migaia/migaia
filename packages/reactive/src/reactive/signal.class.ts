@@ -7,11 +7,16 @@ import type {
 } from '../runtime/types.js';
 import { internalsOf } from '../runtime/internals.js';
 import { claimOwnership } from '../runtime/ownership.js';
-import { describeObservable } from '../runtime/diagnostics.js';
+import { describeObservable, emitTraceSafely } from '../runtime/diagnostics.js';
 import { registerSubs } from '../runtime/node-internals.js';
 import { createReactiveError, tagReactiveError } from '../errors.js';
 import { ReactiveErrorCode } from '../error-code.js';
-import { ReactiveTraceReason, ReactiveTraceType } from '../runtime/trace-constants.js';
+import {
+  ReactiveErrorPhase,
+  ReactiveTraceReason,
+  ReactiveTraceType
+} from '../runtime/trace-constants.js';
+import { ReactiveErrorText } from '../error-text.js';
 
 // 可写原子——反应式图里唯一的"真值来源"，Computed/Effect 都是从它（或从彼此）派生。
 // 每个节点持有自己的 runtime：同一 runtime 内的节点才共享依赖图/版本时钟。
@@ -53,10 +58,7 @@ export class Signal<T> implements IObservable, IDisposable {
   }
   #assertActive(): void {
     if (this.#disposed) {
-      throw createReactiveError(
-        ReactiveErrorCode.nodeDisposed,
-        '[store] cannot use a disposed signal'
-      );
+      throw createReactiveError(ReactiveErrorCode.nodeDisposed, ReactiveErrorText.disposedSignal);
     }
   }
   get value(): T {
@@ -74,12 +76,23 @@ export class Signal<T> implements IObservable, IDisposable {
     this.#value = next;
     this.#version = nextVersion;
     if (runtime.traceEnabled()) {
-      runtime.emitTrace({
-        type: ReactiveTraceType.observableChange,
-        timestamp: runtime.timestamp(),
-        observable: describeObservable(this),
-        reason: ReactiveTraceReason.set
-      });
+      emitTraceSafely(
+        {
+          timestamp: runtime.timestamp,
+          emitTrace: runtime.emitTrace,
+          reportError: (error) =>
+            this.runtime.reportError(error, {
+              phase: ReactiveErrorPhase.traceListener,
+              observable: this
+            })
+        },
+        (timestamp) => ({
+          type: ReactiveTraceType.observableChange,
+          timestamp,
+          observable: describeObservable(this),
+          reason: ReactiveTraceReason.set
+        })
+      );
     }
     // 先快照 subs：同步 scheduler 可能在通知过程中重新追踪并改动 subs，直接迭代活 Set 会死循环
     runtime.scheduler.runDeferred(() => {
@@ -129,7 +142,7 @@ export class Signal<T> implements IObservable, IDisposable {
       if (errors.length === 1) throw errors[0];
       if (errors.length > 1) {
         throw tagReactiveError(
-          new AggregateError(errors, '[store] multiple observable lifecycle hooks failed'),
+          new AggregateError(errors, ReactiveErrorText.multipleLifecycleHooksFailed),
           ReactiveErrorCode.observerFailed
         );
       }

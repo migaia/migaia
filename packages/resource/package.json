@@ -6,8 +6,8 @@
   "license": "MIT",
   "type": "module",
   "files": ["dist", "README.md", "USEGUIDE.md"],
-  "main": "./dist/resource.class.js",
-  "types": "./dist/resource.class.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -21,7 +21,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
     "lint": "oxlint src test",
-    "test": "vitest run test"
+    "test": "vitest run test",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
   "dependencies": {
     "@migaia/lifecycle": "workspace:^",

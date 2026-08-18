@@ -18,6 +18,7 @@
  */
 import { createReactiveError } from '../errors.js';
 import { ReactiveErrorCode } from '../error-code.js';
+import { ReactiveErrorText } from '../error-text.js';
 
 /** 跨副本共享的键。函数化避免 import 时连全局 Symbol registry 都被触碰。 */
 const registryKey = (): symbol => Symbol.for('@morning-watch/store.runtime-copies');
@@ -70,7 +71,7 @@ function registryOf(create: boolean): IRegistry | undefined {
     if (!isRegistry(existing)) {
       throw createReactiveError(
         ReactiveErrorCode.copyConflict,
-        '[store] runtime copy registry is incompatible or corrupted'
+        ReactiveErrorText.copyRegistryInvalid
       );
     }
     return existing as IRegistry;
@@ -100,14 +101,11 @@ export function brandOwnedValue(value: object): void {
     if ('value' in descriptor && typeof descriptor.value === 'symbol') {
       noteRuntimeCopy(descriptor.value);
       noteRuntimeCopy();
-      throw createReactiveError(
-        ReactiveErrorCode.copyConflict,
-        '[store] this value was created by a different copy of this library'
-      );
+      throw createReactiveError(ReactiveErrorCode.copyConflict, ReactiveErrorText.foreignCopyValue);
     }
     throw createReactiveError(
       ReactiveErrorCode.brandCorrupted,
-      '[store] reactive ownership brand is corrupted'
+      ReactiveErrorText.ownershipBrandCorrupted
     );
   }
   Object.defineProperty(value, key, {
@@ -128,12 +126,12 @@ export function assertNoForeignOwnershipBrand(value: object): void {
     noteRuntimeCopy();
     throw createReactiveError(
       ReactiveErrorCode.copyConflict,
-      '[store] this value was created by a different copy of this library; deduplicate the dependency'
+      ReactiveErrorText.foreignCopyDependency
     );
   }
   throw createReactiveError(
     ReactiveErrorCode.brandCorrupted,
-    '[store] reactive ownership brand is corrupted'
+    ReactiveErrorText.ownershipBrandCorrupted
   );
 }
 
@@ -162,12 +160,7 @@ export function noteRuntimeCopy(copy: symbol = THIS_COPY): void {
   if (copy === THIS_COPY) thisCopyNoted = true;
   if (registry.copies.size > 1 && !registry.warned) {
     registry.warned = true;
-    pendingCopyWarning =
-      '[store] more than one copy of this library is live in this process. ' +
-      'Ownership tables and the synchronous tracking context are per copy, so: ' +
-      'nodes created by one copy are rejected as foreign by the other, and ' +
-      'cross-runtime dependency reads between copies are not detected. ' +
-      'Deduplicate the dependency, or call assertSingleRuntimeCopy() to fail loudly.';
+    pendingCopyWarning = ReactiveErrorText.multipleCopiesWarning;
   }
 }
 
@@ -186,7 +179,7 @@ export function assertSingleRuntimeCopy(): void {
   if (registry.copies.size > 1) {
     throw createReactiveError(
       ReactiveErrorCode.copyConflict,
-      `[store] expected a single copy of this library, found ${registry.copies.size}`
+      ReactiveErrorText.expectedSingleCopy(registry.copies.size)
     );
   }
 }
