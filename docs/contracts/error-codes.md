@@ -33,7 +33,7 @@ type IMigaiaError = Error & {
 
 ### 2.1 为什么是 `(source, code)` 二元组而不是全局前缀
 
-`@migaia/plugin-host` 已有 22 个裸码（`PLUGIN_INSTALL_FAILED` 等）被既有 UT 直接断言。加全局前缀会破坏这些断言，与「既有 UT 原样通过」的迁移口径冲突。二元组让既有码原样保留，同时消除跨包重名歧义。
+`@migaia/plugin-host` 已有一组历史裸码（`PLUGIN_INSTALL_FAILED` 等）被既有 UT 直接断言。加全局前缀会破坏这些断言，与「既有 UT 原样通过」的迁移口径冲突。二元组让既有码原样保留，同时消除跨包重名歧义。
 
 跨包重名是**允许**的，但必须语义可区分。例如 `@migaia/tray` 的 `TRAY_CROSS_RUNTIME`（能力图 registry 层）与 `@migaia/reactive` 的 `CROSS_RUNTIME`（响应式图节点层）是两层的不同检查，诊断信息必须能区分。
 
@@ -72,7 +72,7 @@ reach(e):
 | 形态 | 例 |
 | --- | --- |
 | 原样重抛（链长 0） | `store-wasm/array.ts` 的 `throw error` |
-| 顶层码改写、原错误在 `cause.errors[0]` | 形态上仍合法；`plugin-host` 的 `PLUGIN_INSTALL_ROLLBACK_FAILED` 已按 `migration.sdd.md` §3.7.4（M-T44）改为「原始错误保持 primary、回滚失败仅作诊断」，不再属于本例 |
+| 顶层码改写、原错误在 `cause.errors[0]` | 形态上仍合法；`plugin-host` 的 `PLUGIN_INSTALL_ROLLBACK_FAILED` 已按 `migration.sdd.md` §5.2（M-T44）改为「原始错误保持 primary、回滚失败仅作诊断」，不再属于本例 |
 
 **顶层码允许被领域改写**，只要原始错误仍在链上且排在首位。
 
@@ -146,7 +146,7 @@ export type ILifecycleErrorCode = (typeof LifecycleErrorCode)[keyof typeof Lifec
 
 | 包 | 现状 | 动作 |
 | --- | --- | --- |
-| `plugin-host` | 码表在 `src/typing.ts:25-44`，无逐条 JSDoc | 移到 `src/error-code.ts`，补 JSDoc；**码值一个不改**，`typing.ts` 改为 re-export 以免破坏既有导入 |
+| `plugin-host` | `src/error-code.ts` 已为单点码表，`typing.ts` 与公共入口 re-export；逐条 JSDoc、source/code 测试和 24 值表已落地 | 保持 **24 个码值不变**；继续以 `src/error-code.ts` 为权威声明处，`typing.ts` 仅为兼容 re-export |
 | `storage-web` | `StorageErrorCode` 在 `src/types/errors.ts` | `error-code-rollout.sdd.md` §4.1 搬到 `src/error-code.ts`，19 个码值保留（后由 `storage-web-integration.sdd.md` 拆分：5 契约级码迁 `@migaia/storage-contract`，落为 15 码，见 §4） |
 | `web-rpc` | 已有 `WebRpcErrorCode`（38 码）在 `src/errors.ts` + 12 个错误类 | `error-code-rollout.sdd.md` §4.1 搬到 `src/error-code.ts`，码值保留 |
 | 其余 14 个包 | 见 `error-code-rollout.sdd.md` §2 分档 | `error-code-rollout.sdd.md` §4.2～§4.4；建文件先于第一次使用 |
@@ -159,15 +159,16 @@ export type ILifecycleErrorCode = (typeof LifecycleErrorCode)[keyof typeof Lifec
 
 | source | 码数 | 权威定义位置 | 状态 |
 | --- | --- | --- | --- |
-| `@migaia/lifecycle` | 19 | `docs/lifecycle/lifecycle-extraction.sdd.md` §4.10.2 | **已实施**（`packages/lifecycle/src/error-code.ts`；L-T41；补登记 `ENV_UNSUPPORTED`/`INVALID_OPTION`，runtime-neutrality.sdd.md R-9/T-16） |
-| `@migaia/reactive` | 16 | `docs/lifecycle/migration.sdd.md` §3.7.1 | **已实施**（`packages/reactive/src/error-code.ts`；M-T36 / M-T41） |
-| `@migaia/resource` | 7 | `docs/lifecycle/migration.sdd.md` §3.7.2 | **已实施**（`packages/resource/src/error-code.ts`；M-T37 / M-T41；补登记 `SUSPENSE_PROBE_FAILED`） |
-| `@migaia/capability` | 9 | `docs/lifecycle/migration.sdd.md` §3.7.3 | **已实施**（`packages/capability/src/error-code.ts`；M-T41；补登记 `INVALID_OPTION`） |
-| `@migaia/plugin-host` | 24 | `docs/lifecycle/migration.sdd.md` §3.7.4 | **已实施**（码表已搬到 `src/error-code.ts`；`(source, code)` 补齐待批次 3；新增 `INVALID_OPTION`/`PIPELINE_FAILED`，落实 §7 裸抛扫描门禁） |
+| `@migaia/lifecycle` | 21 | `docs/lifecycle/lifecycle-extraction.sdd.md` §4.10.2 | **已实施**（`packages/lifecycle/src/error-code.ts`；L-T41；补登记 `ENV_UNSUPPORTED`/`INVALID_OPTION`/`ABORT_LISTENER_FAILED`/`GENERATION_CANCELLATION_FAILED`，runtime-neutrality.sdd.md R-9/T-16） |
+| `@migaia/reactive` | 16 | `docs/lifecycle/migration.sdd.md` §5.2 | **已实施**（`packages/reactive/src/error-code.ts`；M-T36 / M-T41） |
+| `@migaia/resource` | 8 | `docs/lifecycle/migration.sdd.md` §5.2 | **已实施**（`packages/resource/src/error-code.ts`；M-T37 / M-T41；补登记 `SUSPENSE_PROBE_FAILED`/`CANCELLATION_CLEANUP_FAILED`） |
+| `@migaia/capability` | 9 | `docs/lifecycle/migration.sdd.md` §5.2 | **已实施**（`packages/capability/src/error-code.ts`；M-T41；补登记 `INVALID_OPTION`） |
+| `@migaia/plugin-host` | 24 | `docs/lifecycle/migration.sdd.md` §5.2 | **已实施**（`packages/plugin-host/src/error-code.ts` 声明 24 个值并由 `typing.ts`/公共入口 re-export；`test/error-code-docs.test.ts` 遍历全部导出码并断言 `(source, code)`，包测试覆盖实际错误路径；新增 `INVALID_OPTION`/`PIPELINE_FAILED`，落实 §7 裸抛扫描门禁） |
 | `@migaia/middleware-pipeline` | 1 | `docs/middleware-pipeline/middleware-pipeline.sdd.md` MP-R08 | **已实施**（默认双失败 `AggregateError` 使用 `EXECUTION_FAILED`；host 可注入自己的组合策略） |
+| `@migaia/event-subscriber` | 12 | `docs/event-subscriber/event-subscriber.sdd.md` §4.7 | **已验证**（ES-E-01～ES-E-12；`src/error-code.ts` 与抛出点已接线，包级 55 tests、直接消费者与仓库门禁通过） |
 | `@migaia/capability/graph` | 9 | `docs/tray/tray.sdd.md` §6.4.1 | 已定案 |
 | `@migaia/tray` | 5 | `docs/tray/tray.sdd.md` §6.4.2 | 已定案 |
-| `@migaia/logger` | 7 | `error-code-rollout.sdd.md` §4.3 | **已实施**（含补登记 `EXTENDS_SELF`/`EXTENDS_CYCLE`；`HOOK_FAILED` 诊断码） |
+| `@migaia/logger` | 14 | `error-code-rollout.sdd.md` §4.3 | **已实施**（`src/error-code.ts` + `packages/logger/test/error-code.test.ts` LG-T16/LG-T26 逐码覆盖真实触发的 native type/source/code/cause 或 `AggregateError.errors`；`HOOK_FAILED` 由真实 reporter diagnostic 覆盖；卸载与 shutdown cleanup 使用独立码） |
 | `@migaia/serialize` | 8 | `error-code-rollout.sdd.md` §4.2 | **已实施**（`source` 改名 `context` 让位契约；`PARSER_DISPOSE_FAILED` 移除，委托 lifecycle `SCOPE_DISPOSAL_FAILED`；补登记 `ENV_UNSUPPORTED`，runtime-neutrality.sdd.md R-4） |
 | `@migaia/storage-contract` | 5 | `docs/store-persist/storage-web-integration.sdd.md` §4.2 | 已实施（新建包；契约级码 `INVALID_ARGUMENT` / `INVALID_KEY` / `UNSUPPORTED_CAPABILITY` / `STORE_DISPOSED` / `ABORTED`，从 storage-web 迁入） |
 | `@migaia/storage-web` | 15 | `docs/store-persist/storage-web-integration.sdd.md` §4.2 + `error-code-rollout.sdd.md` §4.1 | 已实施（原 19 码已实施；拆分后落为 15 码 = 14 保留 + 新增 `INVALID_CONFIG`，5 契约级码迁 `@migaia/storage-contract`） |
@@ -177,13 +178,13 @@ export type ILifecycleErrorCode = (typeof LifecycleErrorCode)[keyof typeof Lifec
 | `@migaia/store-keyed` | 11 | `error-code-rollout.sdd.md` §4.3 | **已实施**（含补登记 `INVALID_OPTION`） |
 | `@migaia/store-indexed` | 4 | `error-code-rollout.sdd.md` §4.3 | **已实施** |
 | `@migaia/store-shared` | 7 | `error-code-rollout.sdd.md` §4.3 | **已实施** |
-| `@migaia/store-middleware` | 5 | `error-code-rollout.sdd.md` §4.3 | **已实施**（含诊断码 `MIDDLEWARE_NOT_CHAINED`） |
+| `@migaia/store-middleware` | 6 | `error-code-rollout.sdd.md` §4.3 | **已实施**（含诊断码 `MIDDLEWARE_NOT_CHAINED`、清理聚合码 `CLEANUP_FAILED`） |
 | `@migaia/store-persist` | 8 | `error-code-rollout.sdd.md` §4.3 | **已实施** |
-| `@migaia/store-react` | 8 | `error-code-rollout.sdd.md` §4.3 | **已实施** |
-| `@migaia/store-ssr` | 11 | `error-code-rollout.sdd.md` §4.3 | **已实施**（含补登记 `CROSS_RUNTIME`/`CODEC_CONTRACT`/`RESOURCE_ROUND_LIMIT`） |
-| `@migaia/store-worker` | 5 | `error-code-rollout.sdd.md` §4.3 | **已实施**（复用 `SerializeError`，`source`/`code` 覆盖为 store-worker 自身） |
-| `@migaia/store-wasm` | 6 | `error-code-rollout.sdd.md` §4.3 | **已实施** |
-| `@migaia/store-devtools` | 2 | `error-code-rollout.sdd.md` §4.3 | **已实施** |
+| `@migaia/store-react` | 9 | `error-code-rollout.sdd.md` §4.3 | **已实施** |
+| `@migaia/store-ssr` | 12 | `error-code-rollout.sdd.md` §4.3 | **已实施**（含 `RESOURCE_TIMEOUT`、`CROSS_RUNTIME`/`CODEC_CONTRACT`/`RESOURCE_ROUND_LIMIT`） |
+| `@migaia/store-worker` | 6 | `error-code-rollout.sdd.md` §4.3 | **已实施**（复用 `SerializeError`，`source`/`code` 覆盖为 store-worker 自身；含 `CLEANUP_FAILED`） |
+| `@migaia/store-wasm` | 7 | `error-code-rollout.sdd.md` §4.3 | **已实施**（补登记多资源释放聚合码 `CLEANUP_FAILED`） |
+| `@migaia/store-devtools` | 4 | `error-code-rollout.sdd.md` §4.3 | **已实施** |
 
 **待定案的包**：新代码必须遵守 §2/§3 的结构与可追溯性契约，码先在本表登记再使用；不得等 `error-code-rollout.sdd.md` 落地才开始遵守。
 
@@ -192,7 +193,7 @@ export type ILifecycleErrorCode = (typeof LifecycleErrorCode)[keyof typeof Lifec
 | 不是码 | 是什么 | 归属 |
 | --- | --- | --- |
 | `blocked` / `failed` / `ready` | `IAvailability` 状态 | `tray.sdd.md` §4.2 |
-| `gated` | capability 闸门状态，`enable()` 返回值而非抛出物 | `migration.sdd.md` §3.7.3 |
+| `gated` | capability 闸门状态，`enable()` 返回值而非抛出物 | `migration.sdd.md` §5.2 |
 | `graceful` 超时进 `force` | 正常降级路径 | 诊断事件 |
 | 入队等待诊断（未配置拒绝阈值时） | 可观测性事件 | 诊断事件 |
 | `open` / `closing` / `terminal` | 容器存活态 | `lifecycle-extraction.sdd.md` §4.2 |
@@ -227,7 +228,7 @@ export type ILifecycleErrorCode = (typeof LifecycleErrorCode)[keyof typeof Lifec
 
 | 现状 | 处理 |
 | --- | --- |
-| `reactive` / `resource` / `capability` 的裸字符串 | 已在 `migration.sdd.md` §3.7 归纳成码，随 lifecycle 迁移落地 |
+| `reactive` / `resource` / `capability` 的裸字符串 | 已在 `migration.sdd.md` §5.2～§5.3 归纳成码，随 lifecycle 迁移落地 |
 | `storage-web` 的 `StorageErrorCode` | 已有独立体系，`error-code-rollout.sdd.md` 中并入 `(source, code)` 二元组，码名保留；后续按 `storage-web-integration.sdd.md` 拆分为 `@migaia/storage-contract` 5 码 + storage-web 15 码（见 §4） |
 | `web-rpc` 的错误类（`WebRpcLifecycleError` 等） | 已有 38 码，搬迁到 `src/error-code.ts` 并收紧 `IWebRpcError.code` 类型 |
 | 其余包的裸 `throw new Error('[store] …')` | `error-code-rollout.sdd.md` 统一处理。**在此之前，新增代码不得再产生新的裸抛** |
