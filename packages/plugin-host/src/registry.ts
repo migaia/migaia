@@ -14,6 +14,8 @@ export type IPluginDefinition<TCore> = {
   readonly update?: IPluginConstraint<TCore>['update'];
   readonly dispose?: IPluginConstraint<TCore>['dispose'];
   readonly shared?: IPluginConstraint<TCore>['shared'];
+  /** Symbol disposer captured with the plugin admission snapshot; never re-probe owner at cleanup. */
+  readonly disposer?: IPluginDisposer;
 };
 
 export type IRegistration<TDomainCore extends object, TValue> = {

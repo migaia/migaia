@@ -56,6 +56,13 @@ export type IMiddlewarePipelineOptions = {
   readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown;
 };
 
+type IAsyncControlPath = {
+  /** Marks an entry or post-stage active guard as runner control flow rather than a stage failure. */
+  hasActiveError: boolean;
+  /** Retains exact active guard value for control-path propagation. */
+  activeError: unknown;
+};
+
 /** Adapts a sync stage to async middleware while preserving next() violations. */
 export const adaptSyncStageToAsync =
   <TValue>(
@@ -66,14 +73,35 @@ export const adaptSyncStageToAsync =
     let downstream: Promise<void> | undefined;
     let called = false;
     let returned = false;
-    stage(value, (nextValue) => {
-      if (returned) return onViolation(MiddlewarePipelineViolation.late);
-      if (called) return onViolation(MiddlewarePipelineViolation.duplicate);
-      called = true;
-      downstream = next(nextValue);
-    });
+    let stageError: unknown;
+    let hasStageError = false;
+    try {
+      stage(value, (nextValue) => {
+        if (returned) return onViolation(MiddlewarePipelineViolation.late);
+        if (called) return onViolation(MiddlewarePipelineViolation.duplicate);
+        called = true;
+        downstream = next(nextValue);
+      });
+    } catch (error) {
+      stageError = error;
+      hasStageError = true;
+    }
     returned = true;
-    await downstream;
+    let downstreamError: unknown;
+    let hasDownstreamError = false;
+    if (downstream) {
+      try {
+        await downstream;
+      } catch (error) {
+        downstreamError = error;
+        hasDownstreamError = true;
+      }
+    }
+    // The runner owns stage+downstream composition. Standalone adapter calls preserve the
+    // stage's identity while still observing downstream, preventing a second AggregateError from
+    // entering the host combiner when this adapter is nested inside runAsyncMiddleware.
+    if (hasStageError) throw stageError;
+    if (hasDownstreamError) throw downstreamError;
   };
 
 /** Adapts a sync stage to generator middleware while preserving next() violations. */
@@ -103,9 +131,11 @@ export const runSyncMiddleware = <TValue>(
   done: (value: TValue) => void,
   onViolation: IMiddlewarePipelineViolationHandler
 ): void => {
+  /** Caller-stage identity snapshot; dispatch never observes later list mutation. */
+  const stageSnapshot = stages.slice();
   let current = value;
-  for (let index = 0; index < stages.length; index += 1) {
-    const stage = stages[index];
+  for (let index = 0; index < stageSnapshot.length; index += 1) {
+    const stage = stageSnapshot[index];
     let called = false;
     let returned = false;
     let nextValue = current;
@@ -129,19 +159,41 @@ export const runAsyncMiddleware = async <TValue>(
   done: (value: TValue) => void | Promise<void>,
   options: IMiddlewarePipelineOptions
 ): Promise<void> => {
+  /** Caller-stage identity snapshot; async dispatch never re-reads the mutable input list. */
+  const stageSnapshot = stages.slice();
   let index = -1;
   let completed = false;
-  const step = async (current: TValue): Promise<void> => {
-    options.assertActive?.();
+  /** Executes one stage and reports runner-owned active control to its parent. */
+  const step = async (current: TValue, parentControlPath?: IAsyncControlPath): Promise<void> => {
+    /** Records an exact entry or post-stage active guard failure on this frame's parent slot. */
+    const markParentActiveError = (error: unknown): void => {
+      if (!parentControlPath) return;
+      parentControlPath.hasActiveError = true;
+      parentControlPath.activeError = error;
+    };
+    try {
+      options.assertActive?.();
+    } catch (error) {
+      markParentActiveError(error);
+      throw error;
+    }
     index += 1;
-    const stage = stages[index];
-    if (!stage) {
+    const stage = stageSnapshot[index];
+    if (index >= stageSnapshot.length) {
       completed = true;
       return done(current);
     }
     let pending: Promise<void> | undefined;
     let called = false;
     let returned = false;
+    /** Control metadata owned by this frame for its directly started downstream step. */
+    const downstreamControlPath: IAsyncControlPath = {
+      hasActiveError: false,
+      activeError: undefined
+    };
+    /** Captured downstream rejection; observation starts before the stage settles. */
+    let downstreamError: unknown;
+    let hasDownstreamError = false;
     const next = (nextValue: TValue): Promise<void> => {
       if (returned) {
         options.onViolation(MiddlewarePipelineViolation.late);
@@ -152,8 +204,16 @@ export const runAsyncMiddleware = async <TValue>(
         return Promise.resolve();
       }
       called = true;
-      pending = Promise.resolve().then(() => step(nextValue));
-      return pending;
+      /** Internal downstream Promise retained for independent failure observation. */
+      const downstreamPromise = Promise.resolve().then(() =>
+        step(nextValue, downstreamControlPath)
+      );
+      pending = downstreamPromise;
+      void downstreamPromise.then(undefined, (error) => {
+        downstreamError = error;
+        hasDownstreamError = true;
+      });
+      return downstreamPromise;
     };
     let stageError: unknown;
     let hasStageError = false;
@@ -164,8 +224,6 @@ export const runAsyncMiddleware = async <TValue>(
       hasStageError = true;
     }
     returned = true;
-    let downstreamError: unknown;
-    let hasDownstreamError = false;
     if (pending) {
       try {
         await pending;
@@ -174,15 +232,34 @@ export const runAsyncMiddleware = async <TValue>(
         hasDownstreamError = true;
       }
     }
-    if (!completed) options.assertActive?.();
+    if (downstreamControlPath.hasActiveError) {
+      /** Exact runner-owned active guard value, kept separate from ordinary failures. */
+      const activeError = downstreamControlPath.activeError;
+      if (hasStageError) {
+        // A child control error is metadata only while it remains this frame's final error.
+        // An independently thrown stage error must not taint the parent frame's control slot.
+        if (stageError === activeError) markParentActiveError(activeError);
+        throw stageError;
+      }
+      markParentActiveError(activeError);
+      throw activeError;
+    }
     if (hasStageError && hasDownstreamError) {
-      throw (
-        options.combineStageAndDownstreamError?.(stageError, downstreamError) ??
-        createMiddlewarePipelineExecutionError(stageError, downstreamError)
-      );
+      if (options.combineStageAndDownstreamError) {
+        throw options.combineStageAndDownstreamError(stageError, downstreamError);
+      }
+      throw createMiddlewarePipelineExecutionError(stageError, downstreamError);
     }
     if (hasStageError) throw stageError;
     if (hasDownstreamError) throw downstreamError;
+    if (!completed) {
+      try {
+        options.assertActive?.();
+      } catch (error) {
+        markParentActiveError(error);
+        throw error;
+      }
+    }
   };
   await step(value);
 };
@@ -193,8 +270,10 @@ export const runGeneratorMiddleware = <TValue>(
   done: (value: TValue) => void,
   signals: IGeneratorMiddlewareSignals = MiddlewarePipelineGeneratorSignals
 ): void => {
+  /** Caller-stage identity snapshot; generator dispatch uses one fixed stage sequence. */
+  const stageSnapshot = stages.slice();
   let current = value;
-  for (const stage of stages) {
+  for (const stage of stageSnapshot) {
     const iterator = stage(current);
     let last = current;
     let step = iterator.next();

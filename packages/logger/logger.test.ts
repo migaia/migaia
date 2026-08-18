@@ -9,8 +9,10 @@ import { process as processPlugin } from './src/plugins/process';
 import { http } from './src/plugins/http';
 import { uuid } from './src/plugins/uuid';
 import { setLoggerRuntimeManager } from './src/runtime-manager';
+import { LoggerErrorCode } from './src/errors';
 import type { ILogEntry, ILoggerPlugin } from './src/typing';
 import { GENERATOR_CONTINUE, type IPipelineMode } from '@migaia/plugin-host';
+import { createManualScheduler } from '@migaia/lifecycle';
 
 describe('logger plugin host integration', () => {
   it('runs without process through the runtime manager', () => {
@@ -71,6 +73,182 @@ describe('logger plugin host integration', () => {
       const second = new Logger({ plugins: [processPlugin()] });
       expect(listeners.get('SIGINT')?.size).toBe(1);
       await second.unUse('process');
+    } finally {
+      restore();
+    }
+  });
+
+  it('intercepts exit with the captured function and receiver, then restores exact identity', async () => {
+    const exitCodes: number[] = [];
+    const exitReceivers: unknown[] = [];
+    const originalExit = function (this: unknown, code?: number): never {
+      exitCodes.push(code ?? 0);
+      exitReceivers.push(this);
+      return undefined as never;
+    };
+    const runtimeProcess = {
+      env: {},
+      stdout: { write: () => true },
+      on: () => undefined,
+      removeListener: () => undefined,
+      exit: originalExit
+    };
+    const restore = setLoggerRuntimeManager({
+      process: runtimeProcess,
+      randomUUID: () => 'intercept-id',
+      defer: (task) => task(),
+      write: () => undefined
+    });
+    try {
+      const first = new Logger({
+        plugins: [processPlugin({ interceptProcessExit: true, shutdownTimeoutMs: 50 })]
+      });
+      let flushes = 0;
+      first.onFlush(() => {
+        flushes += 1;
+      });
+      const interceptedExit = runtimeProcess.exit;
+      expect(interceptedExit).not.toBe(originalExit);
+      interceptedExit(23);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(exitCodes).toEqual([23]);
+      expect(exitReceivers).toEqual([runtimeProcess]);
+      expect(flushes).toBe(1);
+
+      await first.unUse('process');
+      expect(runtimeProcess.exit).toBe(originalExit);
+
+      const second = new Logger({
+        plugins: [processPlugin({ interceptProcessExit: true, shutdownTimeoutMs: 50 })]
+      });
+      expect(runtimeProcess.exit).not.toBe(originalExit);
+      runtimeProcess.exit(24);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(exitCodes).toEqual([23, 24]);
+      expect(exitReceivers).toEqual([runtimeProcess, runtimeProcess]);
+      await second.unUse('process');
+      expect(runtimeProcess.exit).toBe(originalExit);
+    } finally {
+      restore();
+    }
+  });
+
+  it('restores exit after a setter commits the wrapper and then throws during install rollback', async () => {
+    const originalExit = function (this: unknown, _code?: number): never {
+      return undefined as never;
+    };
+    let exitValue = originalExit;
+    let throwAfterCommit = false;
+    const runtimeProcess = {
+      env: {},
+      stdout: { write: () => true },
+      on: () => undefined,
+      removeListener: () => undefined,
+      get exit() {
+        return exitValue;
+      },
+      set exit(value: typeof originalExit) {
+        exitValue = value;
+        if (throwAfterCommit) throwAfterCommit = false;
+        else if (value !== originalExit) {
+          throwAfterCommit = true;
+          throw new Error('exit-setter-after-commit');
+        }
+      }
+    };
+    const restore = setLoggerRuntimeManager({
+      process: runtimeProcess,
+      randomUUID: () => 'exit-rollback-id',
+      defer: (task) => task(),
+      write: () => undefined
+    });
+    try {
+      expect(
+        () => new Logger({ plugins: [processPlugin({ interceptProcessExit: true })] })
+      ).toThrow('exit-setter-after-commit');
+      expect(runtimeProcess.exit).toBe(originalExit);
+      const reinstall = new Logger({ plugins: [processPlugin()] });
+      expect(runtimeProcess.exit).toBe(originalExit);
+      await reinstall.unUse('process');
+    } finally {
+      restore();
+    }
+  });
+
+  it('joins exit restoration failure with listener rollback errors without replacing install primary', () => {
+    const originalExit = (() => undefined as never) as (code?: number) => never;
+    let exitValue = originalExit;
+    const restorationError = new Error('exit-restore-failed');
+    const runtimeProcess = {
+      env: {},
+      stdout: { write: () => true },
+      on: () => undefined,
+      removeListener: (event: string) => {
+        if (event === 'SIGTERM') throw new Error('listener-rollback-failed');
+      },
+      get exit() {
+        return exitValue;
+      },
+      set exit(value: typeof originalExit) {
+        exitValue = value;
+        if (value === originalExit) throw restorationError;
+        throw new Error('exit-wrapper-commit-failed');
+      }
+    };
+    const restore = setLoggerRuntimeManager({
+      process: runtimeProcess,
+      randomUUID: () => 'exit-aggregate-id',
+      defer: (task) => task(),
+      write: () => undefined
+    });
+    try {
+      let failure: unknown;
+      try {
+        new Logger({ plugins: [processPlugin({ interceptProcessExit: true })] });
+      } catch (error) {
+        failure = error;
+      }
+      const aggregate = (failure as Error & { cause?: unknown }).cause as AggregateError;
+      expect(aggregate.errors).toEqual([
+        expect.objectContaining({ message: 'exit-wrapper-commit-failed' }),
+        restorationError,
+        expect.objectContaining({ message: 'listener-rollback-failed' })
+      ]);
+    } finally {
+      restore();
+    }
+  });
+
+  it('uses the logger scheduler for HTTP timeout and retry delays', async () => {
+    const scheduler = createManualScheduler();
+    let attempts = 0;
+    const restore = setLoggerRuntimeManager({
+      randomUUID: () => 'http-scheduler-id',
+      defer: (task) => task(),
+      write: () => undefined,
+      fetch: async (_input, init) => {
+        attempts += 1;
+        if (attempts === 1) throw new Error('retry-me');
+        expect(init.signal?.aborted).toBe(false);
+        return { ok: true, status: 200, headers: { get: () => null } };
+      }
+    });
+    try {
+      const logger = new Logger({
+        scheduler,
+        plugins: [http({ url: 'https://example.test/logs', retries: 1, requestTimeoutMs: 10 })]
+      });
+      logger.log('info', 'scheduler');
+      const flush = logger.flush();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(attempts).toBe(1);
+      scheduler.advance(199);
+      expect(attempts).toBe(1);
+      scheduler.advance(1);
+      await flush;
+      expect(attempts).toBe(2);
+      await logger.shutdown('manual');
     } finally {
       restore();
     }
@@ -272,15 +450,20 @@ describe('logger plugin host integration', () => {
     });
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
-      const failures: string[] = [];
+      const failures: Array<{ source: string; error: unknown }> = [];
       const logger = new Logger({
         plugins: [http({ url: 'https://example.test/logs', retries: 2 })]
       });
-      logger.onFailure((failure) => failures.push(failure.source));
+      logger.onFailure((failure) => failures.push(failure));
       logger.log('info', 'message');
       await logger.flush();
       expect(fetch).toHaveBeenCalledOnce();
-      expect(failures).toEqual(['sink']);
+      expect(failures).toHaveLength(1);
+      const failure = failures[0];
+      expect(failure?.source).toBe('sink');
+      expect((failure?.error as { code?: string } | undefined)?.code).toBe(
+        LoggerErrorCode.deliveryFailed
+      );
     } finally {
       error.mockRestore();
       restore();

@@ -1,6 +1,13 @@
 import type { IEmptyPluginExt, ILoggerPluginCore, ILoggerPlugin } from '../typing.js';
 import type { IPipelineMode } from '@migaia/plugin-host';
-import { boundedWait } from '@migaia/lifecycle';
+import { boundedWait, type IScheduledTask } from '@migaia/lifecycle';
+import {
+  createLoggerCleanupError,
+  createLoggerError,
+  LoggerErrorCode,
+  tagLoggerError
+} from '../errors.js';
+import { LoggerErrorText } from '../error-text.js';
 
 export type IBatchPluginConfig = {
   maxSize?: number;
@@ -21,6 +28,10 @@ export type ICreateBatcher = <T>(
 ) => IBatcher<T>;
 
 export type IBatchShared = { createBatcher: ICreateBatcher };
+
+type IBatchController<T> = IBatcher<T> & {
+  dispose(): readonly unknown[];
+};
 
 export const BATCH_PLUGIN_NAME = 'batch' as const;
 
@@ -44,9 +55,32 @@ class BatchPlugin implements ILoggerPlugin<
   shared(core: ILoggerPluginCore): IBatchShared {
     // 不读 this.config——统一通过 core.config.get() 读取
     const defaultConfig = core.config.get<IBatchPluginConfig>() ?? {};
+    /** Keeps every batcher created from this plugin-owned shared factory. */
+    const batchers = new Set<() => readonly unknown[]>();
+    /** Shared factory admission closes before any batcher cleanup runs. */
+    let available = true;
 
-    const createBatcher: ICreateBatcher = (perCallConfig, onBatch) =>
-      this.#buildBatcher(core, defaultConfig, perCallConfig, onBatch);
+    core.onDispose(() => {
+      available = false;
+      const cleanupErrors: unknown[] = [];
+      for (const dispose of batchers) cleanupErrors.push(...dispose());
+      batchers.clear();
+      if (cleanupErrors.length > 0) {
+        const tagged = createLoggerCleanupError(
+          LoggerErrorCode.pluginUninstallCleanupFailed,
+          LoggerErrorText.pluginUninstallCleanupFailed,
+          cleanupErrors
+        );
+        throw tagged;
+      }
+    });
+
+    const createBatcher: ICreateBatcher = (perCallConfig, onBatch) => {
+      if (!available) return this.#createDisposedBatcher();
+      const batcher = this.#buildBatcher(core, defaultConfig, perCallConfig, onBatch);
+      batchers.add(batcher.dispose);
+      return batcher;
+    };
 
     return { createBatcher };
   }
@@ -60,17 +94,24 @@ class BatchPlugin implements ILoggerPlugin<
     defaultConfig: IBatchPluginConfig,
     perCallConfig: IBatchPluginConfig,
     onBatch: (items: T[]) => void | Promise<void>
-  ): IBatcher<T> {
+  ): IBatchController<T> {
     const maxSize = perCallConfig.maxSize ?? defaultConfig.maxSize ?? 20;
     const maxWaitMs = perCallConfig.maxWaitMs ?? defaultConfig.maxWaitMs ?? 2000;
     const asyncOutput = perCallConfig.asyncOutput ?? defaultConfig.asyncOutput ?? true;
 
     let buffer: T[] = [];
-    let timer: ReturnType<typeof setTimeout> | null = null;
+    let timer: IScheduledTask | null = null;
+    /** Prevents one returned debounce task from being cancelled more than once. */
+    let timerCancelAttempted = false;
     const inFlight = new Set<Promise<void>>();
+    /** Completes async full-batch dispatch records when uninstall drops them. */
+    const pendingDispatchCompletions = new Set<() => void>();
     let flushing: Promise<void> | null = null;
+    /** False after plugin uninstall; late scheduler callbacks become inert. */
+    let active = true;
 
     const flush = async (): Promise<void> => {
+      if (!active) return;
       if (flushing) return flushing;
       flushing = (async () => {
         const deadline = core.scheduler.now() + 3000;
@@ -87,11 +128,41 @@ class BatchPlugin implements ILoggerPlugin<
       }
     };
 
-    const flushBatch = async (): Promise<void> => {
-      if (timer) {
-        clearTimeout(timer);
-        timer = null;
+    const reportCleanupFailure = (error: unknown): void => {
+      if (!active) return;
+      // Route timer cleanup failures through core tracking so direct timer callbacks cannot
+      // create an unhandled rejection or hide a scheduler failure from logger policy.
+      core.defer(() => {
+        throw error;
+      });
+    };
+
+    const cancelTimer = (cleanupErrors?: unknown[]): void => {
+      const scheduled = timer;
+      timer = null;
+      if (!scheduled) return;
+      if (timerCancelAttempted) return;
+      timerCancelAttempted = true;
+      try {
+        scheduled.cancel();
+      } catch (error) {
+        if (cleanupErrors)
+          cleanupErrors.push(
+            error instanceof Error
+              ? tagLoggerError(error, LoggerErrorCode.pluginUninstallCleanupFailed)
+              : createLoggerError(
+                  LoggerErrorCode.pluginUninstallCleanupFailed,
+                  LoggerErrorText.pluginUninstallCleanupFailed,
+                  { cause: error }
+                )
+          );
+        else reportCleanupFailure(error);
       }
+    };
+
+    const flushBatch = async (): Promise<void> => {
+      if (!active) return;
+      cancelTimer();
       if (buffer.length === 0) return;
       const batch = buffer;
       buffer = [];
@@ -99,19 +170,34 @@ class BatchPlugin implements ILoggerPlugin<
     };
 
     /** 执行一个已从 buffer 摘出的批次，并让 flush() 可观察其生命周期。 */
+    const reportBatchFailure = (error: unknown): void => {
+      if (!active) return;
+      core.defer(() => {
+        throw error;
+      });
+    };
+
     const runBatch = (batch: T[]): void => {
-      const task = Promise.resolve(onBatch(batch));
+      if (!active) return;
+      let result: void | Promise<void>;
+      try {
+        result = onBatch(batch);
+      } catch (error) {
+        reportBatchFailure(error);
+        return;
+      }
+      const task = Promise.resolve(result).catch((error) => {
+        reportBatchFailure(error);
+      });
       inFlight.add(task);
-      void task.then(
-        () => inFlight.delete(task),
-        () => inFlight.delete(task)
-      );
+      void task.then(() => inFlight.delete(task));
     };
 
     /** 先同步摘出满批次，避免 defer 窗口内后续 push 把多个批次意外合并。 */
     const dispatchFullBatch = (batch: T[]): void => {
+      if (!active) return;
       if (!asyncOutput) {
-        void runBatch(batch);
+        runBatch(batch);
         return;
       }
       let complete!: () => void;
@@ -119,23 +205,31 @@ class BatchPlugin implements ILoggerPlugin<
         complete = resolve;
       });
       inFlight.add(scheduled);
-      core.defer(async () => {
-        try {
-          await runBatch(batch);
-        } finally {
-          inFlight.delete(scheduled);
-          complete();
-        }
-      });
+      const finish = (): void => {
+        pendingDispatchCompletions.delete(finish);
+        inFlight.delete(scheduled);
+        complete();
+      };
+      pendingDispatchCompletions.add(finish);
+      try {
+        core.defer(() => {
+          try {
+            if (active) runBatch(batch);
+          } finally {
+            finish();
+          }
+        });
+      } catch (error) {
+        finish();
+        reportBatchFailure(error);
+      }
     };
 
     const push = (item: T): void => {
+      if (!active) return;
       buffer.push(item);
       if (buffer.length >= maxSize) {
-        if (timer) {
-          clearTimeout(timer);
-          timer = null;
-        }
+        cancelTimer();
         const fullBatch = buffer;
         buffer = [];
         dispatchFullBatch(fullBatch);
@@ -143,16 +237,57 @@ class BatchPlugin implements ILoggerPlugin<
       }
       if (!timer) {
         // 从缓冲区第一条数据进来起，最多等 maxWaitMs 就必须 flush 一次
-        timer = setTimeout(() => {
-          timer = null;
-          void flush();
-        }, maxWaitMs);
-        (timer as unknown as { unref?: () => void }).unref?.();
+        let callbackFired = false;
+        timerCancelAttempted = false;
+        try {
+          const scheduled = core.scheduler.schedule(() => {
+            callbackFired = true;
+            if (!active) return;
+            try {
+              core.defer(() => {
+                if (active) return flush();
+              });
+            } catch (error) {
+              reportBatchFailure(error);
+            } finally {
+              // If callback was asynchronous, returned task is already admitted here; if it was
+              // synchronous, the post-schedule check below performs the same cleanup.
+              cancelTimer();
+            }
+          }, maxWaitMs);
+          // Retain handle even when scheduler fired callback before returning it. The task may
+          // have independent armed work that still requires cancellation.
+          timer = scheduled;
+          if (callbackFired) cancelTimer();
+        } catch (error) {
+          reportBatchFailure(error);
+        }
       }
     };
 
+    const dispose = (): readonly unknown[] => {
+      if (!active) return [];
+      active = false;
+      const cleanupErrors: unknown[] = [];
+      cancelTimer(cleanupErrors);
+      buffer = [];
+      for (const complete of pendingDispatchCompletions) complete();
+      pendingDispatchCompletions.clear();
+      inFlight.clear();
+      return cleanupErrors;
+    };
+
     core.onFlush(flush);
-    return { push, flush };
+    return { push, flush, dispose };
+  }
+
+  /** Returns an inert batcher to retained factories after their plugin has been uninstalled. */
+  #createDisposedBatcher<T>(): IBatchController<T> {
+    return {
+      push: () => undefined,
+      flush: async () => undefined,
+      dispose: () => []
+    };
   }
 }
 

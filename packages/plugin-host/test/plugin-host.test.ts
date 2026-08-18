@@ -2,6 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { PluginHost } from '../src/host-runtime';
 import { PluginHostError } from '../src/error-text';
 import type { IPluginHostCore } from '../src/typing';
+import {
+  GENERATOR_CONTINUE as middlewareContinue,
+  GENERATOR_HALT as middlewareHalt,
+  GENERATOR_UNDEFINED as middlewareUndefined
+} from '@migaia/middleware-pipeline';
+import {
+  GENERATOR_CONTINUE as hostContinue,
+  GENERATOR_HALT as hostHalt,
+  GENERATOR_UNDEFINED as hostUndefined
+} from '../src/typing';
 
 type IExt = { marker?: string } & Pick<
   IPluginHostCore<number>,
@@ -27,6 +37,12 @@ const plugin = (
 ) => ({ name, install, ...extra }) as never;
 
 describe('PluginHost', () => {
+  it('re-exports generator signals with middleware-pipeline identity', () => {
+    expect(hostContinue).toBe(middlewareContinue);
+    expect(hostHalt).toBe(middlewareHalt);
+    expect(hostUndefined).toBe(middlewareUndefined);
+  });
+
   it('keeps plugin stage and resource registration available across async install', async () => {
     const host = new Host();
     await host.use(
@@ -48,7 +64,7 @@ describe('PluginHost', () => {
     await host.config.update('config-owned', () => ({ opts: shared }));
     shared.retries = 99;
     await host.config.update('config-owned', (previous) => {
-      expect((previous.opts as { retries: number }).retries).toBe(99);
+      expect((previous.opts as { retries: number }).retries).toBe(3);
       return {};
     });
   });
@@ -271,6 +287,28 @@ describe('PluginHost', () => {
     expect(host).toHaveProperty('marker', 'a');
   });
 
+  it('uses the admitted install snapshot when the mutation waits in the queue', async () => {
+    const host = new Host();
+    let release!: (value: unknown) => void;
+    const first = host.use({
+      name: 'blocking',
+      install: () =>
+        new Promise((resolve) => {
+          release = resolve;
+        })
+    } as never);
+    const secondPlugin = {
+      name: 'queued-snapshot',
+      install: () => ({ marker: 'admitted' })
+    };
+    const second = host.use(secondPlugin as never);
+    secondPlugin.install = () => ({ marker: 'mutated' });
+    release({});
+    await first;
+    await second;
+    expect(host).toHaveProperty('marker', 'admitted');
+  });
+
   it('rejects duplicate names in one use admission', async () => {
     const host = new Host();
     const first = plugin('same', () => ({}));
@@ -402,7 +440,7 @@ describe('PluginHost', () => {
     expect(updates).toEqual([{ enabled: true }]);
   });
 
-  it('reads nested config paths with shallow snapshots only', async () => {
+  it('reads nested config paths through readonly lazy proxies', async () => {
     const nested = { retries: 3 };
     const host = new Host();
     await host.use(
@@ -420,6 +458,31 @@ describe('PluginHost', () => {
       records: [{ enabled: true }]
     });
     expect(host.config.get('missing.value')).toBeUndefined();
+  });
+
+  it('isolates source config and applies update patches with copy-on-write', async () => {
+    const source = { options: { retries: 3 }, enabled: true };
+    const host = new Host();
+    await host.use(plugin('cow', () => ({}), { config: source }));
+    source.options.retries = 99;
+    expect(host.config.get('cow.options.retries')).toBe(3);
+    expect(() => {
+      (host.config.get('cow.options') as { retries: number }).retries = 4;
+    }).toThrow(/readonly/);
+
+    const patch = { options: { retries: 5 } };
+    await host.config.update('cow', (previous) => {
+      expect(() => {
+        (previous.options as { retries: number }).retries = 4;
+      }).toThrow(/readonly/);
+      return patch;
+    });
+    const updated = host.config.get('cow.options') as { retries: number };
+    expect(updated.retries).toBe(5);
+    patch.options.retries = 6;
+    expect((host.config.get('cow.options') as { retries: number }).retries).toBe(5);
+    source.options.retries = 100;
+    expect((host.config.get('cow.options') as { retries: number }).retries).toBe(5);
   });
 
   it('keeps special plugin names and config paths isolated from prototypes', async () => {
@@ -886,10 +949,24 @@ describe('PluginHost', () => {
     await closing;
   });
 
-  it('interrupts an async pipeline when disposal starts', async () => {
+  it('PH-T07a: propagates exact HOST_DISPOSING from an async entry guard', async () => {
     const host = new Host({ pipeline: { mode: 'async' } });
     let started: (() => void) | undefined;
     let release: (() => void) | undefined;
+    let disposalStarted: (() => void) | undefined;
+    let releaseDisposal: (() => void) | undefined;
+    const disposalReady = new Promise<void>((resolve) => {
+      disposalStarted = resolve;
+    });
+    await host.use(
+      plugin('closing-gate', () => ({}), {
+        dispose: () =>
+          new Promise<void>((resolve) => {
+            releaseDisposal = resolve;
+            disposalStarted?.();
+          })
+      })
+    );
     const stageStarted = new Promise<void>((resolve) => {
       started = resolve;
     });
@@ -903,9 +980,24 @@ describe('PluginHost', () => {
     const running = host.run(1);
     await stageStarted;
     const closing = host.dispose();
-    release?.();
-    await expect(running).rejects.toBeInstanceOf(PluginHostError);
-    await closing;
+    await disposalReady;
+    try {
+      release?.();
+      let caught: unknown;
+      try {
+        await running;
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(PluginHostError);
+      expect((caught as PluginHostError).source).toBe('@migaia/plugin-host');
+      expect((caught as PluginHostError).code).toBe('HOST_DISPOSING');
+      expect(caught).not.toBeInstanceOf(AggregateError);
+      expect(caught).not.toHaveProperty('errors');
+    } finally {
+      releaseDisposal?.();
+      await closing;
+    }
   });
 
   it('finishes synchronous install before dispose closes admission', async () => {
@@ -958,7 +1050,7 @@ describe('PluginHost', () => {
     await expect(host.use(plugin('broken', () => ({})))).resolves.toBe(host);
   });
 
-  it('uses shallow config snapshots for input, reads, and updates', async () => {
+  it('protects config snapshots and update candidates with readonly views', async () => {
     const initial = { enabled: false };
     let received: Record<string, unknown> | undefined;
     const host = new Host();
@@ -967,13 +1059,17 @@ describe('PluginHost', () => {
         config: initial,
         update: (next: Record<string, unknown>) => {
           received = next;
-          next.enabled = 'plugin-local-mutation';
+          expect(() => {
+            next.enabled = 'plugin-local-mutation';
+          }).toThrow(/readonly/);
         }
       })
     );
     initial.enabled = true;
-    await host.config.update('config-snapshot', () => ({ enabled: true }));
-    expect(received).toEqual({ enabled: 'plugin-local-mutation' });
+    await expect(
+      host.config.update('config-snapshot', () => ({ enabled: true }))
+    ).resolves.toBeUndefined();
+    expect(received).toEqual({ enabled: true });
   });
 
   it('preserves nested references without cloning config recursively', async () => {
@@ -994,8 +1090,8 @@ describe('PluginHost', () => {
         { config }
       )
     );
-    expect(observed?.self).toBe(config);
-    expect(observed?.nested).toBe(nested);
+    expect(observed?.self).toBe(observed);
+    expect(observed?.nested).not.toBe(nested);
     expect(observed?.nested).toBe(observed?.alias);
   });
 

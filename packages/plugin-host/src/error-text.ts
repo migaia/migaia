@@ -38,9 +38,13 @@ export function tagPluginHostError<E extends Error>(
 
 /** 入参校验错误：原生 `TypeError` + `INVALID_OPTION`（`docs/contracts/error-codes.md` §7 裸抛扫描门禁）。 */
 export function createPluginHostTypeError(
-  message: string
+  message: string,
+  options?: { readonly cause?: unknown }
 ): TypeError & { readonly source: string; readonly code: IPluginHostErrorCode } {
-  return tagPluginHostError(new TypeError(message), PluginHostErrorCode.invalidOption);
+  return tagPluginHostError(
+    new TypeError(message, options?.cause !== undefined ? { cause: options.cause } : undefined),
+    PluginHostErrorCode.invalidOption
+  );
 }
 
 const PREFIX = '[plugin-host] ';
@@ -63,6 +67,17 @@ const ERROR_TEXT = {
   },
   get INVALID_PIPELINE_MODE() {
     return localize('无效的 pipeline mode', 'invalid pipeline mode');
+  },
+  /** Admission 读取 plugin/resource getter 失败时使用，原始异常挂在 cause。 */
+  get INVALID_OPTION() {
+    return localize('plugin-host 选项读取失败', 'plugin-host option read failed');
+  },
+  /** Config callable admission rejects shapes whose function/proxy invariants cannot be preserved. */
+  CONFIG_CALLABLE_UNSUPPORTED: (reason: string) =>
+    localize(`config callable 不支持：${reason}`, `config callable is unsupported: ${reason}`),
+  /** Public readonly facades use this stable text for every attempted object mutation. */
+  get CONFIG_READONLY() {
+    return localize('config is readonly', 'config is readonly');
   },
   PIPELINE_MODE_MISMATCH: (hostMode: string, stageMode: string) =>
     localize(

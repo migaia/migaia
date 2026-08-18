@@ -6,12 +6,21 @@ import ERROR_TEXT, {
   type ILocaleKey
 } from './error-text.js';
 import { PluginHostErrorCode } from './error-code.js';
-import { copyConfig, parseConfigPath, readConfigPath, readPlainDataRecord } from './config.js';
-import { aggregateErrors, asyncDisposeKey, disposeKey, resolveDisposer } from './disposal.js';
+import {
+  copyConfig,
+  copyConfigWithPatch,
+  parseConfigPath,
+  readConfigPath,
+  readPlainDataRecord,
+  readonlyConfig
+} from './config.js';
+import { aggregateErrors, asyncDisposeKey, resolveDisposer, snapshotDisposer } from './disposal.js';
 import {
   createLifecycleScope,
   createMutationQueue,
+  assimilateCapturedThen,
   LifecycleErrorCode,
+  snapshotScheduler,
   systemScheduler,
   type ILifecycleScheduler,
   type IMutationQueue,
@@ -61,6 +70,14 @@ const assertTimeoutOption = (value: number | false | undefined, label: string): 
   if (value === undefined || value === false) return;
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
     throw createPluginHostTypeError(`${label} must be false or a non-negative finite number`);
+  }
+};
+/** Convert hostile resource disposer access into the plugin-host admission error boundary. */
+const resolveAdmittedDisposer = (resource: IPluginResource) => {
+  try {
+    return resolveDisposer(resource);
+  } catch (cause) {
+    throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION, { cause });
   }
 };
 const objectPrototypeKeys = new Set(Reflect.ownKeys(Object.prototype));
@@ -135,23 +152,27 @@ export abstract class PluginHost<
       assertTimeoutOption(value, label);
     // 只读取一次 scheduler 快照（AF-31）：校验、保存、传给 queue/dispose scope 都用这个局部快照。
     const schedulerOption = options.scheduler;
+    let schedulerSnapshot: ILifecycleScheduler | undefined;
     if (schedulerOption !== undefined) {
-      let now: unknown;
-      let schedule: unknown;
       try {
-        now = (schedulerOption as { now?: unknown }).now;
-        schedule = (schedulerOption as { schedule?: unknown }).schedule;
+        schedulerSnapshot = snapshotScheduler(schedulerOption);
       } catch (error) {
+        const lifecycleCause =
+          error && typeof error === 'object' && 'cause' in error
+            ? (error as { readonly cause?: unknown }).cause
+            : undefined;
         throw tagPluginHostError(
-          new TypeError('scheduler getter failed', { cause: error }),
+          new TypeError('scheduler getter failed', {
+            cause: lifecycleCause !== undefined ? lifecycleCause : error
+          }),
           PluginHostErrorCode.invalidOption
         );
       }
-      if (typeof now !== 'function' || typeof schedule !== 'function') {
+      if (schedulerSnapshot === undefined) {
         throw createPluginHostTypeError('scheduler must provide now() and schedule() functions');
       }
     }
-    this.#scheduler = schedulerOption ?? systemScheduler;
+    this.#scheduler = schedulerSnapshot ?? systemScheduler;
     this.#disposeStepTimeoutMs = options.disposeStepTimeoutMs ?? DEFAULT_DISPOSE_STEP_TIMEOUT_MS;
     this.#queueAdmissionTimeoutMs = options.queueAdmissionTimeoutMs;
     this.#queue = createMutationQueue({
@@ -250,7 +271,7 @@ export abstract class PluginHost<
             'RESOURCE_OUTSIDE_INSTALL',
             ERROR_TEXT.RESOURCE_OUTSIDE_INSTALL
           );
-        const disposer = resolveDisposer(resource);
+        const disposer = resolveAdmittedDisposer(resource);
         if (!disposer) throw createPluginHostTypeError('plugin resource must provide a disposer');
         registration.disposers.push(disposer);
       },
@@ -397,7 +418,7 @@ export abstract class PluginHost<
   }
 
   protected onDispose(resource: IPluginResource): void {
-    const dispose = resolveDisposer(resource);
+    const dispose = resolveAdmittedDisposer(resource);
     if (!dispose) throw createPluginHostTypeError('plugin resource must provide a disposer');
     if (this.#lifecycleRegistration?.lifecycle === PluginHostRegistrationLifecycle.install)
       this.#lifecycleRegistration.disposers.push(dispose);
@@ -405,7 +426,7 @@ export abstract class PluginHost<
   }
 
   protected trackPluginResourceIfInstalling(resource: IPluginResource): boolean {
-    const dispose = resolveDisposer(resource);
+    const dispose = resolveAdmittedDisposer(resource);
     if (!dispose) throw createPluginHostTypeError('plugin resource must provide a disposer');
     if (this.#lifecycleRegistration?.lifecycle !== PluginHostRegistrationLifecycle.install)
       return false;
@@ -458,34 +479,59 @@ export abstract class PluginHost<
   ): IPluginDefinition<TDomainCore & IPluginHostCore<TValue>>[] {
     const names = new Set<string>();
     return plugins.map((plugin) => {
-      const name = plugin?.name;
+      let captured: {
+        readonly name: unknown;
+        readonly config: unknown;
+        readonly install: unknown;
+        readonly update: unknown;
+        readonly dispose: unknown;
+        readonly shared: unknown;
+        readonly disposer: ReturnType<typeof snapshotDisposer>;
+      };
+      try {
+        captured = {
+          name: plugin?.name,
+          config: plugin?.config,
+          install: plugin?.install,
+          update: plugin?.update,
+          dispose: plugin?.dispose,
+          shared: plugin?.shared,
+          disposer: snapshotDisposer(plugin as IPluginResource)
+        };
+      } catch (cause) {
+        throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION, { cause });
+      }
+      const { name, config: rawConfig, install, update, dispose, shared, disposer } = captured;
       if (typeof name !== 'string' || name.length === 0)
         throw createPluginHostTypeError('plugin name must be a non-empty string');
       if (name.includes('.')) throw createPluginHostTypeError('plugin name must not contain "."');
-      if (typeof plugin.install !== 'function')
+      if (typeof install !== 'function')
         throw createPluginHostTypeError('plugin install must be a function');
       for (const [key, hook] of [
-        ['update', plugin.update],
-        ['dispose', plugin.dispose],
-        ['shared', plugin.shared],
-        ['asyncDispose', plugin[asyncDisposeKey]],
-        ['disposeSymbol', plugin[disposeKey]]
+        ['update', update],
+        ['dispose', dispose],
+        ['shared', shared]
       ] as const)
         if (hook !== undefined && typeof hook !== 'function')
           throw createPluginHostTypeError(`plugin ${key} must be a function`);
+      for (const candidate of [...disposer.asyncCandidates, ...disposer.disposeCandidates])
+        if (candidate.value !== undefined && typeof candidate.value !== 'function')
+          throw createPluginHostTypeError(
+            `plugin disposer ${String(candidate.key)} must be a function`
+          );
       if (names.has(name))
         throw new PluginHostError('PLUGIN_DUPLICATE', ERROR_TEXT.PLUGIN_DUPLICATE(name));
       names.add(name);
-      const rawConfig = plugin.config ?? {};
-      const config = copyConfig(rawConfig as IPluginConfig, 'plugin config');
+      const config = copyConfig((rawConfig ?? {}) as IPluginConfig, 'plugin config');
       return {
         owner: plugin,
         name,
         config,
-        install: plugin.install,
-        update: plugin.update,
-        dispose: plugin.dispose,
-        shared: plugin.shared
+        install: install as IPluginConstraint<any>['install'],
+        update: update as IPluginConstraint<any>['update'],
+        dispose: dispose as IPluginConstraint<any>['dispose'],
+        shared: shared as IPluginConstraint<any>['shared'],
+        disposer: disposer.disposer
       };
     });
   }
@@ -515,7 +561,7 @@ export abstract class PluginHost<
           this.#hookRegistration = registration;
           let installResult: unknown;
           try {
-            installResult = plugin.owner.install(this.#core(registration));
+            installResult = Reflect.apply(plugin.install, plugin.owner, [this.#core(registration)]);
           } finally {
             this.#hookRegistration = undefined;
           }
@@ -528,18 +574,24 @@ export abstract class PluginHost<
               'EXTENSION_RESERVED',
               ERROR_TEXT.EXTENSION_RESERVED(registration.name, 'then')
             );
-          const installedValue =
+          const installThen =
             installResult &&
-            typeof installResult === 'object' &&
-            typeof (installResult as { then?: unknown }).then === 'function'
-              ? await installResult
+            (typeof installResult === 'object' || typeof installResult === 'function')
+              ? (installResult as { then?: unknown }).then
+              : undefined;
+          const installedValue =
+            typeof installThen === 'function'
+              ? await assimilateCapturedThen(
+                  installThen as (...args: unknown[]) => void,
+                  installResult
+                )
               : installResult;
           const pendingShared: Array<[PropertyKey, unknown]> = [];
           if (plugin.shared) {
             this.#hookRegistration = registration;
             let sharedValue: unknown;
             try {
-              sharedValue = plugin.owner.shared!(this.#core(registration));
+              sharedValue = Reflect.apply(plugin.shared!, plugin.owner, [this.#core(registration)]);
             } finally {
               this.#hookRegistration = undefined;
             }
@@ -620,16 +672,22 @@ export abstract class PluginHost<
           this.#hookRegistration = registration;
           let installedValue: unknown;
           try {
-            installedValue = plugin.owner.install(this.#core(registration));
+            installedValue = Reflect.apply(plugin.install, plugin.owner, [
+              this.#core(registration)
+            ]);
           } finally {
             this.#hookRegistration = undefined;
           }
-          if (
+          const installedThen =
             installedValue &&
-            typeof installedValue === 'object' &&
-            typeof (installedValue as { then?: unknown }).then === 'function'
-          ) {
-            void Promise.resolve(installedValue).catch(() => undefined);
+            (typeof installedValue === 'object' || typeof installedValue === 'function')
+              ? (installedValue as { then?: unknown }).then
+              : undefined;
+          if (typeof installedThen === 'function') {
+            void assimilateCapturedThen(
+              installedThen as (...args: unknown[]) => void,
+              installedValue
+            ).catch(() => undefined);
             throw createPluginHostTypeError(
               `plugin ${registration.name} returned an awaitable during synchronous installation`
             );
@@ -639,7 +697,7 @@ export abstract class PluginHost<
             this.#hookRegistration = registration;
             let sharedValue: unknown;
             try {
-              sharedValue = plugin.owner.shared!(this.#core(registration));
+              sharedValue = Reflect.apply(plugin.shared!, plugin.owner, [this.#core(registration)]);
             } finally {
               this.#hookRegistration = undefined;
             }
@@ -737,8 +795,8 @@ export abstract class PluginHost<
   ): Promise<unknown[]> {
     if (!registration.installed) return [];
     const pluginDispose = registration.plugin.dispose
-      ? () => registration.plugin.owner.dispose?.()
-      : resolveDisposer(registration.plugin.owner as IPluginResource);
+      ? () => Reflect.apply(registration.plugin.dispose!, registration.plugin.owner, [])
+      : registration.plugin.disposer;
     if (!pluginDispose) return [];
     return this.#disposeGroup([pluginDispose], 'plugin dispose hook');
   }
@@ -794,24 +852,24 @@ export abstract class PluginHost<
       const registration = this.#registrations.get(name);
       if (!registration)
         throw new PluginHostError('PLUGIN_NOT_INSTALLED', ERROR_TEXT.PLUGIN_NOT_INSTALLED(name));
-      const previous = copyConfig(registration.config);
+      const previous = readonlyConfig(registration.config);
       const patch = readPlainDataRecord(
         recipe(previous as Readonly<T>),
         'config patch',
         true,
         true
       );
-      const next = { ...previous, ...patch } as IPluginConfig;
+      const next = copyConfigWithPatch(registration.config, patch);
       this.#lifecycleRegistration = registration;
       try {
         if (registration.plugin.update) {
           this.#hookRegistration = registration;
           let updateResult: void | Promise<void>;
           try {
-            updateResult = registration.plugin.owner.update!(
-              copyConfig(next) as never,
+            updateResult = Reflect.apply(registration.plugin.update!, registration.plugin.owner, [
+              readonlyConfig(next) as never,
               this.#core(registration)
-            );
+            ]);
           } finally {
             this.#hookRegistration = undefined;
           }
@@ -820,7 +878,7 @@ export abstract class PluginHost<
       } finally {
         this.#lifecycleRegistration = undefined;
       }
-      registration.config = copyConfig(next);
+      registration.config = next;
     });
   }
 
@@ -921,8 +979,8 @@ export abstract class PluginHost<
     errors.push(...(await this.#disposeGroup(registration.pipelineDisposers, 'pipeline disposer')));
     if (registration.installed) {
       const pluginDispose = registration.plugin.dispose
-        ? () => registration.plugin.owner.dispose?.()
-        : resolveDisposer(registration.plugin.owner as IPluginResource);
+        ? () => Reflect.apply(registration.plugin.dispose!, registration.plugin.owner, [])
+        : registration.plugin.disposer;
       if (pluginDispose)
         errors.push(
           ...(await this.#disposeGroup(

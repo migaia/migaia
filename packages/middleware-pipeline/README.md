@@ -116,7 +116,11 @@ await runAsyncMiddleware(
   - `code: 'EXECUTION_FAILED'`
   - `message: 'middleware stage and downstream failed'`
 
-plugin-host 会注入自己的组合器，因此从 plugin-host 路径抛出的仍是 `@migaia/plugin-host + PIPELINE_FAILED`，不会混入 middleware-pipeline 的错误归属，也不会自动添加 `[plugin-host]` 前缀。
+判断只看两个可观察结果：当前 stage 的执行结果和已由 `next()` 启动的 pending downstream。两者都 reject 时始终按 `[stageError, downstreamError]` 传给组合器，即使两者是同一 object 或 primitive；只 reject 一个时抛出其 exact value。`next()` 返回原生 Promise，不追踪消费、Promise lineage、constructor 或 species，因此 `await`、`return`、`catch`、`finally` 和 borrowed native Promise methods 都不会改变双失败判定。组合器返回的 `undefined`/`null` 也原样抛出。
+
+下游 stage 入口或成功但未调用 `next()` 后，`assertActive` 产生的 active error 属于 runner control path：`await next()` 或 `return next()` 只传播该 exact error，不把它作为第二个普通 failure slot；独立 stage failure 仍保持 exact，普通同一 identity 双失败仍组合。
+
+plugin-host 会为普通 stage/downstream 双失败注入自己的组合器，因此该路径抛出 `@migaia/plugin-host + PIPELINE_FAILED`；runner-owned entry/post-stage active control 不调用该组合器，不会被包装为 `PIPELINE_FAILED`。
 
 ## 6. Generator：显式控制传播
 

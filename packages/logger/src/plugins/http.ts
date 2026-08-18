@@ -2,7 +2,14 @@ import type { IEmptyPluginExt, ILogEntry, ILoggerPluginCore, ILoggerPlugin } fro
 import type { IBatchShared } from './batch.js';
 import type { IPipelineMode } from '@migaia/plugin-host';
 import { getLoggerRuntimeManager } from '../runtime-manager.js';
-import { createLoggerError, LoggerErrorCode } from '../errors.js';
+import {
+  createLoggerAggregateError,
+  createLoggerError,
+  ensureLoggerDeliveryError,
+  LoggerErrorCode
+} from '../errors.js';
+import { LoggerErrorText } from '../error-text.js';
+import type { ILifecycleScheduler, IScheduledTask } from '@migaia/lifecycle';
 
 export type IHttpPluginConfig = {
   url: string;
@@ -16,6 +23,38 @@ export type IHttpPluginConfig = {
 };
 
 export const HTTP_PLUGIN_NAME = 'http' as const;
+
+/** Marks scheduler/listener admission failures that must outrank an earlier transport failure. */
+const HTTP_WAIT_PRIMARY = Symbol('logger.http.wait.primary');
+
+/** Retains wait-admission classification without changing the public logger error contract. */
+function markHttpWaitPrimary(error: Error): Error {
+  Object.defineProperty(error, HTTP_WAIT_PRIMARY, { value: true });
+  return error;
+}
+
+/** Identifies wait admission failures that remain primary over an earlier retry error. */
+function isHttpWaitPrimary(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    Object.getOwnPropertyDescriptor(error, HTTP_WAIT_PRIMARY)?.value === true
+  );
+}
+
+/** Keeps a transport error primary while retaining every scheduler/listener cleanup failure. */
+function ensureHttpFailure(
+  hasPrimary: boolean,
+  primary: unknown,
+  cleanupErrors: readonly unknown[]
+): Error {
+  const errors = hasPrimary ? [primary, ...cleanupErrors] : [...cleanupErrors];
+  if (errors.length === 1) return ensureLoggerDeliveryError(errors[0]);
+  return createLoggerAggregateError(
+    LoggerErrorCode.deliveryFailed,
+    LoggerErrorText.httpTransportFailed,
+    errors
+  );
+}
 
 /**
  * 注意插件安装顺序：http 插件在 install() 时通过 core.getShared("createBatcher") 读取 batch 插件的 shared 能力，所以 plugins
@@ -39,14 +78,26 @@ class HttpPlugin implements ILoggerPlugin<
 
   #resolvedConfig!: IHttpPluginConfig;
   #controller: AbortController | undefined;
+  #scheduler!: ILifecycleScheduler;
 
   constructor(config: IHttpPluginConfig) {
+    if (
+      config.retries !== undefined &&
+      (!Number.isInteger(config.retries) || config.retries < 0 || !Number.isFinite(config.retries))
+    )
+      throw createLoggerError(LoggerErrorCode.invalidRetryCount, LoggerErrorText.invalidRetryCount);
+    if (
+      config.requestTimeoutMs !== undefined &&
+      (!Number.isFinite(config.requestTimeoutMs) || config.requestTimeoutMs < 0)
+    )
+      throw createLoggerError(LoggerErrorCode.invalidOption, LoggerErrorText.invalidRequestTimeout);
     this.config = config;
   }
 
   install(core: ILoggerPluginCore<IPipelineMode, Partial<IBatchShared>>): IEmptyPluginExt {
     // 不读 this.config——统一通过 core.config.get() 读取
     this.#resolvedConfig = core.config.get<IHttpPluginConfig>() ?? this.config;
+    this.#scheduler = core.scheduler;
     this.#controller = typeof AbortController === 'function' ? new AbortController() : undefined;
     core.onShutdown(() => this.#controller?.abort());
 
@@ -78,73 +129,297 @@ class HttpPlugin implements ILoggerPlugin<
     try {
       body = JSON.stringify({ entries });
     } catch (err) {
-      throw createLoggerError(LoggerErrorCode.serializeFailed, '[logger] http 日志序列化失败', {
-        cause: err
-      });
+      throw createLoggerError(
+        LoggerErrorCode.serializeFailed,
+        LoggerErrorText.httpSerializeFailed,
+        {
+          cause: err
+        }
+      );
     }
     const runtimeFetch = getLoggerRuntimeManager().fetch;
     if (!runtimeFetch)
       throw createLoggerError(
         LoggerErrorCode.transportUnavailable,
-        '[logger] HTTP transport is unavailable in this runtime'
+        LoggerErrorText.httpTransportUnavailable
       );
     let lastErr: unknown;
+    /** Retains each cleanup error once so a later status retry cannot make it unobservable. */
+    const cleanupErrorsSeen: unknown[] = [];
     for (let attempt = 0; attempt <= retries; attempt++) {
-      try {
-        const requestController =
-          typeof AbortController === 'function' ? new AbortController() : undefined;
-        const shutdownSignal = this.#controller?.signal;
-        const onShutdown = () => requestController?.abort();
-        shutdownSignal?.addEventListener('abort', onShutdown, { once: true });
-        const timeout = this.#resolvedConfig.requestTimeoutMs ?? 10000;
-        const timer = requestController
-          ? setTimeout(() => requestController.abort(), timeout)
-          : undefined;
-        let res: Awaited<ReturnType<NonNullable<typeof runtimeFetch>>>;
+      let requestError: unknown;
+      let requestFailed = false;
+      const cleanupErrors: unknown[] = [];
+      const requestController =
+        typeof AbortController === 'function' ? new AbortController() : undefined;
+      const shutdownSignal = this.#controller?.signal;
+      const onShutdown = () => requestController?.abort();
+      /**
+       * Conservatively owns cleanup once a signal exists, because hostile addEventListener
+       * implementations can retain the listener before throwing.
+       */
+      const listenerCleanupRequired = shutdownSignal !== undefined;
+      /** Prevents a throwing removeEventListener from causing a second cleanup attempt. */
+      let listenerRemoved = false;
+      /** Prevents retry after request admission itself failed before any POST was committed. */
+      let registrationFailed = false;
+      /** Prevents retry after timeout scheduler admission/callback failure before any POST. */
+      let requestAdmissionFailed = false;
+      let timer: IScheduledTask | undefined;
+      /** Prevents a returned request-timeout task from being cancelled more than once. */
+      let timerCancelAttempted = false;
+      /** Records an exception thrown by the timeout callback before schedule() returns. */
+      let timerCallbackFailed = false;
+      let timerCallbackError: unknown;
+      let res: Awaited<ReturnType<NonNullable<typeof runtimeFetch>>> | undefined;
+      /** Aborts request state after partial listener registration and retains abort failures. */
+      const abortRequestController = (reason?: unknown): void => {
+        if (!requestController || requestController.signal.aborted) return;
         try {
-          res = await runtimeFetch(this.#resolvedConfig.url, {
-            method: 'POST',
-            headers,
-            body,
-            signal: requestController?.signal ?? shutdownSignal
-          });
-        } finally {
-          if (timer) clearTimeout(timer);
-          shutdownSignal?.removeEventListener('abort', onShutdown);
+          requestController.abort(reason);
+        } catch (error) {
+          cleanupErrors.push(error);
         }
-        if (res.ok) return;
-        if (res.status !== 429 && res.status < 500) {
-          lastErr = new Error(`日志推送失败: HTTP ${res.status}`);
-          break;
+      };
+      /** Aborts a fresh request controller when shutdown was already published without replay. */
+      const rejectIfShutdownAborted = (): boolean => {
+        if (!shutdownSignal?.aborted) return false;
+        const reason = shutdownSignal.reason;
+        requestController?.abort(reason);
+        requestFailed = true;
+        requestError = reason;
+        return true;
+      };
+      try {
+        try {
+          shutdownSignal?.addEventListener('abort', onShutdown, { once: true });
+        } catch (error) {
+          registrationFailed = true;
+          requestFailed = true;
+          requestError = error;
+          abortRequestController(error);
         }
-        const retryAfter = res.headers.get('Retry-After');
-        const retryAfterMs = retryAfter ? Number(retryAfter) * 1000 : undefined;
-        lastErr = new Error(`日志推送失败: HTTP ${res.status}`);
-        if (attempt < retries) await this.#wait(retryAfterMs ?? 200 * 2 ** attempt);
+        if (!registrationFailed && !rejectIfShutdownAborted()) {
+          const timeout = this.#resolvedConfig.requestTimeoutMs ?? 10000;
+          if (requestController && !requestController.signal.aborted) {
+            const onTimeout = (): void => {
+              try {
+                requestController.abort();
+              } catch (error) {
+                timerCallbackFailed = true;
+                timerCallbackError = error;
+              }
+            };
+            try {
+              // Keep the returned handle even when a hostile scheduler fires onTimeout inline;
+              // the scheduler may already have armed independent work that still needs cancel().
+              timer = this.#scheduler.schedule(onTimeout, timeout);
+              if (timerCallbackFailed) {
+                requestAdmissionFailed = true;
+                requestFailed = true;
+                requestError = timerCallbackError;
+              }
+            } catch (error) {
+              requestAdmissionFailed = true;
+              requestFailed = true;
+              if (timerCallbackFailed) {
+                requestError = timerCallbackError;
+                if (error !== timerCallbackError) cleanupErrors.push(error);
+              } else {
+                requestError = error;
+              }
+            }
+          }
+          if (!requestFailed && !requestController?.signal.aborted && !rejectIfShutdownAborted()) {
+            try {
+              res = await runtimeFetch(this.#resolvedConfig.url, {
+                method: 'POST',
+                headers,
+                body,
+                signal: requestController?.signal ?? shutdownSignal
+              });
+            } catch (error) {
+              requestFailed = true;
+              requestError = error;
+            }
+          }
+        }
       } catch (err) {
-        lastErr = err;
-        if (this.#controller?.signal.aborted || attempt >= retries) break;
-        await this.#wait(200 * 2 ** attempt);
+        requestFailed = true;
+        requestError = err;
+      } finally {
+        if (timer && !timerCancelAttempted) {
+          timerCancelAttempted = true;
+          try {
+            timer.cancel();
+          } catch (error) {
+            cleanupErrors.push(error);
+          }
+        }
+        if (listenerCleanupRequired && !listenerRemoved) {
+          listenerRemoved = true;
+          try {
+            shutdownSignal?.removeEventListener('abort', onShutdown);
+          } catch (error) {
+            cleanupErrors.push(error);
+          }
+        }
+      }
+      for (const error of cleanupErrors) {
+        if (!cleanupErrorsSeen.includes(error)) cleanupErrorsSeen.push(error);
+      }
+      if (requestFailed) {
+        lastErr = ensureHttpFailure(requestFailed, requestError, cleanupErrorsSeen);
+        if (
+          registrationFailed ||
+          requestAdmissionFailed ||
+          this.#controller?.signal.aborted ||
+          attempt >= retries
+        )
+          break;
+        try {
+          await this.#wait(this.#backoffDelay(attempt));
+        } catch (error) {
+          if (isHttpWaitPrimary(error)) throw error;
+          throw ensureHttpFailure(true, lastErr, [error]);
+        }
+        continue;
+      }
+      if (!res) {
+        lastErr = ensureHttpFailure(
+          false,
+          undefined,
+          cleanupErrorsSeen.length > 0
+            ? cleanupErrorsSeen
+            : [new Error(LoggerErrorText.httpTransportFailed)]
+        );
+        break;
+      }
+      // A resolved response commits the POST. Cleanup belongs to the completed attempt and must
+      // not participate in transport retry; only response status decides whether another POST is
+      // allowed.
+      if (res.ok) {
+        if (cleanupErrorsSeen.length > 0)
+          throw ensureHttpFailure(false, undefined, cleanupErrorsSeen);
+        return;
+      }
+      const responseError = createLoggerError(
+        LoggerErrorCode.deliveryFailed,
+        LoggerErrorText.httpDeliveryFailed(res.status)
+      );
+      lastErr =
+        cleanupErrorsSeen.length > 0
+          ? ensureHttpFailure(true, responseError, cleanupErrorsSeen)
+          : responseError;
+      if (res.status !== 429 && res.status < 500) {
+        break;
+      }
+      const retryAfter = res.headers.get('Retry-After');
+      const parsedRetryAfterMs = retryAfter ? Number(retryAfter) * 1000 : NaN;
+      const retryAfterMs = Number.isFinite(parsedRetryAfterMs)
+        ? Math.max(0, parsedRetryAfterMs)
+        : undefined;
+      if (attempt < retries && !this.#controller?.signal.aborted) {
+        try {
+          await this.#wait(retryAfterMs ?? this.#backoffDelay(attempt));
+        } catch (error) {
+          if (isHttpWaitPrimary(error)) throw error;
+          throw ensureHttpFailure(true, lastErr, [error]);
+        }
       }
     }
-    throw lastErr;
+    throw ensureLoggerDeliveryError(lastErr);
   }
 
   #wait(delayMs: number): Promise<void> {
     const signal = this.#controller?.signal;
     if (signal?.aborted) return Promise.resolve();
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        signal?.removeEventListener('abort', onAbort);
-        resolve();
-      }, delayMs);
-      const onAbort = () => {
-        clearTimeout(timer);
-        signal?.removeEventListener('abort', onAbort);
+    return new Promise((resolve, reject) => {
+      /** Task returned by scheduler, retained until the schedule return boundary settles. */
+      let timer: IScheduledTask | undefined;
+      /** Whether the scheduler callback or abort path requested settlement. */
+      let callbackFired = false;
+      /** Whether schedule() returned or failed, allowing cleanup to observe the task. */
+      let scheduleSettled = false;
+      let settled = false;
+      /** Owns listener cleanup before registration can partially commit and throw. */
+      const listenerCleanupRequired = signal !== undefined;
+      /** Prevents removeEventListener failure from causing a second removal attempt. */
+      let listenerRemoved = false;
+      /** Delays abort settlement until registration throw can remain the primary error. */
+      let listenerRegistrationComplete = false;
+      /** Records callback delivery that happened before addEventListener threw. */
+      let abortObserved = false;
+      /** Preserves the first wait failure; cancellation/removal failures remain secondary. */
+      let primaryError: unknown;
+      /** Prevents a synchronous callback and final cleanup from cancelling twice. */
+      let cancelAttempted = false;
+      let onAbort: () => void;
+      const finish = (primary?: unknown, hasPrimary = false): void => {
+        if (settled || !scheduleSettled || (!callbackFired && !hasPrimary && !primaryError)) return;
+        const cleanupErrors: unknown[] = [];
+        const scheduled = timer;
+        timer = undefined;
+        if (scheduled && !cancelAttempted) {
+          cancelAttempted = true;
+          try {
+            scheduled.cancel();
+          } catch (error) {
+            cleanupErrors.push(error);
+          }
+        }
+        if (listenerCleanupRequired && !listenerRemoved) {
+          listenerRemoved = true;
+          try {
+            signal?.removeEventListener('abort', onAbort);
+          } catch (error) {
+            cleanupErrors.push(error);
+          }
+        }
+        settled = true;
+        if (hasPrimary || primaryError !== undefined || cleanupErrors.length > 0) {
+          const failure = ensureHttpFailure(
+            hasPrimary || primaryError !== undefined,
+            primary ?? primaryError,
+            cleanupErrors
+          );
+          reject(hasPrimary || primaryError !== undefined ? markHttpWaitPrimary(failure) : failure);
+          return;
+        }
         resolve();
       };
-      signal?.addEventListener('abort', onAbort, { once: true });
+      onAbort = () => {
+        abortObserved = true;
+        callbackFired = true;
+        if (listenerRegistrationComplete) finish();
+      };
+      try {
+        signal?.addEventListener('abort', onAbort, { once: true });
+        listenerRegistrationComplete = true;
+        if (settled || signal?.aborted || abortObserved) {
+          callbackFired = true;
+          scheduleSettled = true;
+          finish();
+          return;
+        }
+        timer = this.#scheduler.schedule(() => {
+          callbackFired = true;
+          finish();
+        }, delayMs);
+        scheduleSettled = true;
+      } catch (error) {
+        primaryError = error;
+        listenerRegistrationComplete = true;
+        scheduleSettled = true;
+        finish(error, true);
+      }
+      finish();
     });
+  }
+
+  /** Keeps exponential retry delays finite for arbitrarily large valid retry counts. */
+  #backoffDelay(attempt: number): number {
+    return Math.min(Number.MAX_SAFE_INTEGER, 200 * 2 ** Math.min(attempt, 52));
   }
 }
 

@@ -5,10 +5,11 @@ import type {
   IPluginConfig,
   IPluginResource,
   IPluginHostCore,
+  IReadonlyConfig,
   IPipelineMode,
   ISyncPipelineStage
 } from './typing.js';
-import { copyConfig } from './config.js';
+import { readonlyConfig } from './config.js';
 import { adaptSyncStageToAsync, adaptSyncStageToGenerator } from './pipeline.js';
 import type { IRegistration } from './registry.js';
 import { PluginHostPipelineMode, type IPluginHostPipelineViolation } from './state-constants.js';
@@ -59,7 +60,7 @@ export const createPluginCore = <TDomainCore extends object, TValue>(
   define('config', {
     get: <T extends IPluginConfig = IPluginConfig>() => {
       context.assertRegistrationValid();
-      return copyConfig(context.registration.config) as Readonly<T>;
+      return readonlyConfig(context.registration.config) as IReadonlyConfig<T>;
     }
   });
   define('getShared', (key: PropertyKey) => {

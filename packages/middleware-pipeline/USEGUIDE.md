@@ -24,7 +24,9 @@ async stage 的 `next()` 返回 Promise。`await next(value)` 会等待完整下
 
 `assertActive` 由宿主提供，用于在进入 stage 和下游完成后检查 host 是否仍然有效。执行器不认识 lifecycle 或 plugin-host 状态。
 
-如果当前 stage 和下游同时失败，执行器调用 `combineStageAndDownstreamError(stageError, downstreamError)`。plugin-host 在此处创建带 `PIPELINE_FAILED` 的错误；独立消费者使用默认 `AggregateError`，并获得 `@migaia/middleware-pipeline + EXECUTION_FAILED` 契约。
+如果当前 stage 和下游同时失败，执行器调用 `combineStageAndDownstreamError(stageError, downstreamError)`，参数顺序固定为 `[stageError, downstreamError]`，即使两个 rejection value/identity 相同。plugin-host 在此处创建带 `PIPELINE_FAILED` 的错误；独立消费者使用默认 `AggregateError`，并获得 `@migaia/middleware-pipeline + EXECUTION_FAILED` 契约。只失败一个 channel 时抛出 exact value；`next()` 返回原生 Promise，不追踪消费、constructor、species 或 Promise lineage，组合器返回 `undefined`/`null` 时也原样抛出。
+
+下游 stage 入口或成功但未调用 `next()` 后，`assertActive` 是 runner-owned control path。上游以 `await next()` 或 `return next()` 传播该 exact active error，不生成重复双失败 slots；普通同一 identity 双失败仍按上面的组合规则处理。plugin-host 的 `PIPELINE_FAILED` 组合器只处理普通双失败，不处理该 control path。
 
 ## 3. generator
 
