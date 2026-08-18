@@ -11,6 +11,10 @@
  * 有意**不含** `onabort`/`dispatchEvent`/`throwIfAborted` 等 DOM 独有字段——一旦声明它们，这个 接口又会被绑回 DOM 形状，破坏中立性。
  */
 
+import { LifecycleErrorCode } from './error-code.js';
+import { LifecycleErrorText } from './error-text.js';
+import { createLifecycleFailure, tagLifecycleError } from './errors.js';
+
 /** 结构化取消信号。`reason` 可选，对齐 WHATWG/Node 语义：`abort()` 不带参时为 `undefined`。 */
 export type IAbortSignal = {
   readonly aborted: boolean;
@@ -35,15 +39,14 @@ export type IAbortController = {
  * 不依赖任何全局 `AbortController`/`AbortSignal`，只在需要「一个可由本包主动中止、可被 `once` 监听、且能 `removeEventListener`
  * 原始引用」的信号时使用。对已中止的信号再 `addEventListener` 不会触发监听器（对齐 DOM 语义：abort 事件已经发生过）。
  *
- * `once` 监听器被包裹一层，但 `removeEventListener` 仍接收**原始**监听器引用，因此 「`addEventListener(listener, { once:
- * true })` 后 `removeEventListener(listener)`」能正确命中。
+ * 监听器按 callback 去重；本信号只派发一次 abort 事件，因此 `once` 不改变登记结果。 `removeEventListener` 直接接收原始
+ * callback，保证重复登记与移除都遵循结构化 signal 契约。
  */
 export function createAbortController(): IAbortController {
   let aborted = false;
   let reason: unknown;
+  /** Callback-keyed listener set; one callback can produce at most one abort invocation. */
   const listeners = new Set<() => void>();
-  // 原始监听器 → once 包裹，让 removeEventListener(原始) 能命中 once 包装。
-  const onceWrappers = new Map<() => void, () => void>();
 
   const signal: IAbortSignal = {
     get aborted() {
@@ -52,27 +55,12 @@ export function createAbortController(): IAbortController {
     get reason() {
       return reason;
     },
-    addEventListener(_type, listener, options) {
-      if (options?.once) {
-        const wrapper = (): void => {
-          listeners.delete(wrapper);
-          onceWrappers.delete(listener);
-          listener();
-        };
-        onceWrappers.set(listener, wrapper);
-        listeners.add(wrapper);
-      } else {
-        listeners.add(listener);
-      }
+    addEventListener(_type, listener, _options) {
+      if (aborted) return;
+      listeners.add(listener);
     },
     removeEventListener(_type, listener) {
-      const wrapper = onceWrappers.get(listener);
-      if (wrapper) {
-        listeners.delete(wrapper);
-        onceWrappers.delete(listener);
-      } else {
-        listeners.delete(listener);
-      }
+      listeners.delete(listener);
     }
   };
 
@@ -84,8 +72,27 @@ export function createAbortController(): IAbortController {
       reason = value;
       const pending = [...listeners];
       listeners.clear();
-      onceWrappers.clear();
-      for (const listener of pending) listener();
+      const errors: unknown[] = [];
+      for (const listener of pending) {
+        try {
+          listener();
+        } catch (error) {
+          errors.push(error);
+        }
+      }
+      if (errors.length === 1) {
+        throw createLifecycleFailure(
+          LifecycleErrorCode.abortListenerFailed,
+          LifecycleErrorText.abortListenerDispatchFailed,
+          errors[0]
+        );
+      }
+      if (errors.length > 1) {
+        throw tagLifecycleError(
+          new AggregateError(errors, LifecycleErrorText.abortListenerDispatchFailed),
+          LifecycleErrorCode.abortListenerFailed
+        );
+      }
     }
   };
 }

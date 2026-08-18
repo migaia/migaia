@@ -113,7 +113,7 @@ new Resource<T>(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IReso
 | `onDependencyDisconnected()` | `(): void` | 同步 | `IObserver` 接口方法，依赖被 dispose 时触发，会强制下一次重新求值（即使版本号看起来没变）。 |
 | `dispose()` | `(): void` | 同步 | 终结资源：中止在途请求、清理依赖登记与订阅、释放内部 Signal。幂等，重复调用是 no-op。 |
 
-`state`/`promise`/`read()`/`peek()`/`refetch()`/`invalidate()`/`cancel()`/`dehydrate()`/`hydrate()` 在 `dispose()` 之后调用一律抛出 `Error('[store] cannot use a disposed resource')`，见 [§9](#9-错误与异常完整参考)。
+`state`/`promise`/`read()`/`peek()`/`refetch()`/`invalidate()`/`cancel()`/`dehydrate()`/`hydrate()` 在 `dispose()` 之后调用一律抛出 `Error('cannot use a disposed resource')`，见 [§9](#9-错误与异常完整参考)。
 
 ---
 
@@ -167,7 +167,7 @@ type IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => 
 - **数字形式**：表示"失败后最多重试的次数"，不含首次尝试。`retry: 2` 意味着最多总共尝试 3 次（1 次首发 + 2 次重试）。第 `n` 次失败后，`nextFailureCount = n`，`n <= retry` 才会继续重试。
 - **函数形式**：`(failureCount, error) => boolean`，`failureCount` 从 1 开始计数（第几次失败），返回 `true` 继续重试。函数内部抛出的异常会直接作为这次请求的失败原因 reject，不会被当成"不重试"处理。
 
-`retryDelay` 决定每次重试前等待多久：数字表示固定毫秒数，函数 `(failureCount, error) => number` 按失败次数/错误动态计算。等待期间如果 `signal` 被中止，等待会立即以取消错误结束，不会等到计时器结束才响应取消。计算出的延迟必须是非负有限数，否则这次请求以 `RangeError('[store] resource retry delay must be a non-negative finite number')` 失败。
+`retryDelay` 决定每次重试前等待多久：数字表示固定毫秒数，函数 `(failureCount, error) => number` 按失败次数/错误动态计算。等待期间如果 `signal` 被中止，等待会立即以取消错误结束，不会等到计时器结束才响应取消。计算出的延迟必须是非负有限数，否则这次请求以 `RangeError('resource retry delay must be a non-negative finite number')` 失败；Resource 不会把 retry delay 与 scheduler 当前时间相加，实际排程仍由 scheduler 负责。
 
 **Suspense 兼容读取不计入重试预算**：如果 `fetcher` 内部读取了一个自身会 `throw` 一个 Promise 的 Suspense 兼容值（例如读取另一个尚未就绪的 `Computed`/`Resource`），`Resource` 会识别出这是一个"挂起"而不是"失败"——自动 `await` 这个 Promise，然后**用同样的 `failureCount` 重新执行一次 `fetcher`**，既不计入 `retry` 次数，也不会产生 `error` 状态。这让 `fetcher` 之间可以互相组合而不用担心互相污染对方的重试预算。
 
@@ -198,13 +198,15 @@ type IResourceCacheSnapshot<T> = {
 - 快照已过期：即使提供了快照也会照常发起一次请求（用来验证/刷新数据）——**如果这时 `staleWhileRevalidate` 是默认的 `false`，这次自动请求会把刚刚 `hydrate` 进来的数据立刻切换成 `pending`**，SSR 首屏可能因此"先显示服务端渲染的数据、瞬间又变成 loading"。为避免这种闪烁，**过期的 `initialSnapshot` 通常应该搭配 `staleWhileRevalidate: true`**，让刷新期间继续展示 hydrate 进来的旧值。
 - `autoStart: false`：无论快照是否过期都不会自动发起请求，需要显式调用 `refetch()`/`invalidate()`。
 
+有限 `ttl` 的成功结算还要求 `updatedAt + ttl` 保持有限。若 scheduler 返回 `Number.MAX_VALUE` 等边界时间并导致加法溢出，当前请求以 `RangeError('resource ttl expiration must remain finite')`、`INVALID_OPTION` 失败，状态进入 `error`，不会发布 `success`、写入缓存或让 `dehydrate()` 产生 `expiresAt: null`。刚好仍等于最大有限数的边界加法允许通过；`hydrate()` 同样拒绝非有限数值快照。
+
 ---
 
 ## 9. 错误与异常完整参考
 
 `Resource` **自己抛出**的每一个错误都携带 `(source, code)` 二元组：`source` 恒为 `'@migaia/resource'`，`code` 取自 `src/error-code.ts` 的 `ResourceErrorCode`（6 个码）。全仓契约见 `docs/contracts/error-codes.md`，本包码表的权威定义见 `docs/lifecycle/migration.sdd.md` §3.7.2。
 
-**码是附加字段，绝不替换错误类型**——选项校验仍是 `RangeError`，中止/取消仍是 `name === 'AbortError'` 的 `DOMException`，依赖 `instanceof` 或 `error.name` 判断的调用方（包括 `store-react` 的 suspension 路径）完全不受影响。`error.message` 也一律保留 `[store]` 前缀。
+**码是附加字段，绝不替换错误类型**——选项校验仍是 `RangeError`，中止/取消仍是 `name === 'AbortError'` 的 `DOMException`，依赖 `instanceof` 或 `error.name` 判断的调用方（包括 `store-react` 的 suspension 路径）完全不受影响。`error.message` 也一律保留 `` 前缀。
 
 ```ts
 import { ResourceErrorCode } from '@migaia/resource';
@@ -220,14 +222,15 @@ try {
 
 | 触发场景 | 异常类型 | `code` | `message` / `name` |
 | --- | --- | --- | --- |
-| 构造时 `ttl` 为负数或 `NaN` | `RangeError` | `INVALID_OPTION` | `[store] resource ttl must be non-negative` |
-| 构造时 `retry` 为负数或非整数（数字形式） | `RangeError` | `INVALID_OPTION` | `[store] resource retry count must be a non-negative integer` |
-| 计算出的重试延迟不是非负有限数 | `RangeError` | `INVALID_OPTION` | `[store] resource retry delay must be a non-negative finite number` |
-| `hydrate()` 传入形状不合法的快照 | `Error` | `INVALID_SNAPSHOT` | `[store] invalid resource cache snapshot` |
-| 已 `dispose()` 后调用任意方法 | `Error` | `RESOURCE_DISPOSED` | `[store] cannot use a disposed resource` |
-| 读 `promise` 但从未发起过任何请求（理论边界情况） | `Error` | `NO_ACTIVE_PROMISE` | `[store] resource has no active or cached promise` |
-| `fetcher` 的请求被依赖变化/`refetch()`/`invalidate()` 取代 | `DOMException` | `REQUEST_ABORTED` | `name: 'AbortError'`，`message: '[store] resource request aborted'` |
-| 显式调用 `cancel()` 中止一个 `pending` 请求 | `DOMException` | `REQUEST_CANCELLED` | `name: 'AbortError'`，`message: '[store] resource request cancelled'`（出现在 `state.error`，`state.status` 为 `cancelled`） |
+| 构造时 `ttl` 为负数或 `NaN` | `RangeError` | `INVALID_OPTION` | `resource ttl must be non-negative` |
+| 成功结算时 `updatedAt + finite ttl` 溢出有限数范围 | `RangeError` | `INVALID_OPTION` | `resource ttl expiration must remain finite` |
+| 构造时 `retry` 为负数或非整数（数字形式） | `RangeError` | `INVALID_OPTION` | `resource retry count must be a non-negative integer` |
+| 计算出的重试延迟不是非负有限数 | `RangeError` | `INVALID_OPTION` | `resource retry delay must be a non-negative finite number` |
+| `hydrate()` 传入形状不合法的快照 | `Error` | `INVALID_SNAPSHOT` | `invalid resource cache snapshot` |
+| 已 `dispose()` 后调用任意方法 | `Error` | `RESOURCE_DISPOSED` | `cannot use a disposed resource` |
+| 读 `promise` 但从未发起过任何请求（理论边界情况） | `Error` | `NO_ACTIVE_PROMISE` | `resource has no active or cached promise` |
+| `fetcher` 的请求被依赖变化/`refetch()`/`invalidate()` 取代 | `DOMException` | `REQUEST_ABORTED` | `name: 'AbortError'`，`message: 'resource request aborted'` |
+| 显式调用 `cancel()` 中止一个 `pending` 请求 | `DOMException` | `REQUEST_CANCELLED` | `name: 'AbortError'`，`message: 'resource request cancelled'`（出现在 `state.error`，`state.status` 为 `cancelled`） |
 | `fetcher` 自身抛出的业务错误 | 原样透传 | **无**（不是本包的错误） | 不做任何包装，按引用原样出现在 `state.error` |
 | `retry`/`retryDelay` 策略函数自身抛出的异常 | 原样透传 | **无**（同上） | 直接作为这次请求的失败原因，不会被误判成"不重试" |
 | 状态结算（`then`/`catch` 回调）内部再次抛出的框架级异常（极端情况） | 通过 `runtime.reportError(error, { phase: 'async-flush' })` 上报 | — | 不会作为 `Promise` rejection 抛给调用方，需要通过 runtime 的 `onError` 观察 |
@@ -240,7 +243,7 @@ try {
 
 ## 10. 生命周期与 dispose
 
-`dispose()` 做的事情：中止在途请求（不做任何"是否 pending"的状态改写，因为整个 `Resource` 都要终结了）、清空 `refreshScheduled`/`forceRefresh` 内部标记、清理响应式依赖登记、`dispose()` 内部的 `state` Signal、最终把生命周期标记为终态。之后任何方法调用（包括 `state`/`peek()` 这类只读访问）都会抛 `[store] cannot use a disposed resource`。
+`dispose()` 做的事情：中止在途请求（不做任何"是否 pending"的状态改写，因为整个 `Resource` 都要终结了）、清空 `refreshScheduled`/`forceRefresh` 内部标记、清理响应式依赖登记、`dispose()` 内部的 `state` Signal、最终把生命周期标记为终态。之后任何方法调用（包括 `state`/`peek()` 这类只读访问）都会抛 `cannot use a disposed resource`。
 
 `dispose()` 是幂等的——已经处于终态时再次调用直接返回，不会重复执行清理或抛错。
 

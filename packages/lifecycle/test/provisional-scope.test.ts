@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createProvisionalScope } from '../src/provisional-scope';
 import { createLifecycleScope } from '../src/lifecycle-scope';
 import { LifecycleErrorCode } from '../src/error-code';
-import type { ILifecycleOwner } from '../src/types';
+import type { ILifecycleOwner, IReleaseDescriptor } from '../src/types';
 
 describe('L-T11 ProvisionalScope: commit', () => {
   it('transfers every resource to the parent, in registration order', async () => {
@@ -179,10 +179,58 @@ describe('L-T12 ProvisionalScope: rollback/abort/expiry', () => {
     expect(released).toEqual(['c', 'a']);
   });
 
+  it('rollback keeps releasing resources after one descriptor fails admission', async () => {
+    const admissionError = new Error('rollback descriptor admission failed');
+    const released: string[] = [];
+    const hostile = { force: vi.fn() } as Record<string, unknown>;
+    Object.defineProperty(hostile, 'graceful', {
+      get: () => {
+        throw admissionError;
+      }
+    });
+    const provisional = createProvisionalScope();
+    provisional.own('first', {
+      force: () => {
+        released.push('first');
+      }
+    });
+    provisional.own('hostile', hostile as IReleaseDescriptor);
+    provisional.own('later', {
+      force: () => {
+        released.push('later');
+      }
+    });
+
+    await expect(provisional.rollback()).rejects.toBe(admissionError);
+    expect(released).toEqual(['later', 'first']);
+  });
+
   it('signal aborts once rollback is triggered', async () => {
     const provisional = createProvisionalScope();
     expect(provisional.signal.aborted).toBe(false);
     await provisional.rollback();
+    expect(provisional.signal.aborted).toBe(true);
+  });
+
+  it('AF-T61: abort listener failures do not prevent provisional cleanup or later listeners', async () => {
+    const provisional = createProvisionalScope();
+    const listenerError = new Error('provisional listener failed');
+    const calls: string[] = [];
+    provisional.signal.addEventListener('abort', () => {
+      calls.push('first');
+      throw listenerError;
+    });
+    provisional.signal.addEventListener('abort', () => {
+      calls.push('second');
+    });
+    provisional.own('resource', {
+      force: () => {
+        calls.push('cleanup');
+      }
+    });
+
+    await expect(provisional.rollback()).rejects.toBe(listenerError);
+    expect(calls).toEqual(['first', 'second', 'cleanup']);
     expect(provisional.signal.aborted).toBe(true);
   });
 });
@@ -249,5 +297,64 @@ describe('L-T39 ProvisionalScope: construction-failure rollback', () => {
     });
     await expect(provisional.rollback()).rejects.toThrow();
     expect(force).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('L-T49 ProvisionalScope: parent registration rollback', () => {
+  it('keeps addEventListener stored-then-throw primary and remove cleanup identities reachable', () => {
+    const registrationError = new Error('parent registration failed');
+    const removalError = new Error('parent removal failed');
+    let registeredListener: (() => void) | undefined;
+    const parent = {
+      aborted: false,
+      reason: 'parent reason',
+      addEventListener: (_type: 'abort', listener: () => void) => {
+        registeredListener = listener;
+        throw registrationError;
+      },
+      removeEventListener: (_type: 'abort', listener: () => void) => {
+        expect(listener).toBe(registeredListener);
+        throw removalError;
+      }
+    };
+
+    let thrown: unknown;
+    try {
+      createProvisionalScope({ parentSignal: parent });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBe(registrationError);
+    expect((thrown as { errors?: readonly unknown[] }).errors).toContain(removalError);
+  });
+
+  it('handles invoke-then-store and post-return abort by force-removing the listener', () => {
+    let aborted = false;
+    const reason = new Error('parent aborted');
+    let storedListener: (() => void) | undefined;
+    let removed = 0;
+    const parent = {
+      get aborted() {
+        return aborted;
+      },
+      reason,
+      addEventListener: (_type: 'abort', listener: () => void) => {
+        storedListener = listener;
+        aborted = true;
+        listener();
+        storedListener = listener;
+      },
+      removeEventListener: (_type: 'abort', listener: () => void) => {
+        expect(listener).toBe(storedListener);
+        removed++;
+        aborted = true;
+      }
+    };
+
+    const provisional = createProvisionalScope({ parentSignal: parent });
+    expect(provisional.signal.aborted).toBe(true);
+    expect(provisional.signal.reason).toBe(reason);
+    expect(removed).toBe(1);
   });
 });

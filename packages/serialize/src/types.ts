@@ -5,7 +5,13 @@
  * 故意在这里复制一份而不是从 `@migaia/web-rpc` 里借用同名类型：serialize 是 store-persist/store-ssr/store-worker 依赖的底层
  * codec 原语，web-rpc 是更上层的 传输库，反过来依赖它会把依赖方向倒过来，也会让只想用 codec、不碰 RPC 的消费方 在依赖图上被迫挂上整个 web-rpc 包。
  */
-import { SERIALIZE_SOURCE, createSerializeRangeError, SerializeErrorCode } from './errors.js';
+import {
+  SERIALIZE_SOURCE,
+  createSerializeRangeError,
+  createSerializeTypeError,
+  SerializeErrorCode,
+  SerializeErrorText
+} from './errors.js';
 import type { ISerializeErrorCode } from './error-code.js';
 import {
   SerializeChunkKind,
@@ -93,11 +99,64 @@ export function assertSerializeType(type: string): void {
 /**
  * 判定一个值是「单段」还是「多段容器」。
  *
- * 二者都是数组，必须靠首元素消歧：单段的首元素是形态标签字符串，多段容器的首 元素是另一个分段（数组）。这里刻意只查 typeof 而不查标签是否合法——非法标签 要落到 assertChunk
- * 里报出精确原因，而不是在这里被误判成多段容器。
+ * 二者都是数组，必须靠首元素消歧：单段的首元素是形态标签字符串，多段容器的首 元素是另一个分段（数组）。这里刻意只查 typeof 而不查标签是否合法——非法标签 要落到
+ * validateSerializeChunk 里报出精确原因，而不是在这里被误判成多段容器。
  */
 export const isChunkShape = (value: unknown): value is ISerializeChunk =>
   Array.isArray(value) && value.length === 2 && typeof value[0] === 'string';
+
+/**
+ * Validate one chunk at a package boundary and retain its stream position in any failure. Registry
+ * encoding and public stream collection share this validator so malformed tuples cannot escape as
+ * raw property-access failures or be misreported as transport failures.
+ */
+export function validateSerializeChunk(
+  candidate: unknown,
+  details: {
+    readonly type: string;
+    readonly phase: ISerializePhase;
+    readonly context: string;
+    readonly chunkIndex: number;
+    readonly bytesConsumed: number;
+  }
+): ISerializeChunk {
+  const fail = (message: string): never => {
+    throw new SerializeCodecError(message, {
+      ...details,
+      code: SerializeErrorCode.invalidChunk
+    });
+  };
+
+  try {
+    if (!Array.isArray(candidate) || candidate.length !== 2) {
+      fail('serialize chunk must be a [type, data] pair');
+    }
+    const tuple = candidate as readonly [unknown, unknown];
+    const kind = tuple[0];
+    const data = tuple[1];
+    if (kind === SerializeChunkKind.text) {
+      if (typeof data !== 'string') fail('text chunk data must be a string');
+      // Copy only the tuple container. Payload identity, including Uint8Array/value references,
+      // remains unchanged while later consumers cannot reread a hostile tuple.
+      return Object.freeze([kind, data]) as ISerializeChunk;
+    }
+    if (kind === SerializeChunkKind.bytes) {
+      if (!(data instanceof Uint8Array)) {
+        fail('bytes chunk data must be a Uint8Array');
+      }
+      return Object.freeze([kind, data]) as ISerializeChunk;
+    }
+    if (kind !== SerializeChunkKind.value) fail('unknown serialize chunk type');
+    return Object.freeze([kind, data]) as ISerializeChunk;
+  } catch (error) {
+    if (error instanceof SerializeCodecError) throw error;
+    throw new SerializeCodecError('serialize chunk validation failed', {
+      ...details,
+      code: SerializeErrorCode.invalidChunk,
+      cause: error
+    });
+  }
+}
 
 /**
  * Encode/decode 错误（`CODEC_NOT_FOUND`/`ENCODE_FAILED`/`DECODE_FAILED`/`INVALID_CHUNK`/`ABORTED`）：携带
@@ -140,6 +199,44 @@ export class SerializeCodecError<TCode extends string = ISerializeErrorCode> ext
     this.chunkIndex = details.chunkIndex;
     this.bytesConsumed = details.bytesConsumed;
   }
+}
+
+/**
+ * Encode one text chunk inside its collection boundary, preserving encoder receiver semantics and
+ * distinguishing a thrown encoder from a non-byte encoder result.
+ */
+export function encodeSerializeTextChunk(
+  encoder: ITextEncoder,
+  text: string,
+  details: {
+    readonly type: string;
+    readonly phase: ISerializePhase;
+    readonly context: string;
+    readonly chunkIndex: number;
+    readonly bytesConsumed: number;
+  }
+): Uint8Array {
+  let encoded: unknown;
+  try {
+    encoded = encoder.encode(text);
+  } catch (error) {
+    throw new SerializeCodecError(
+      `${SerializeErrorText.textEncodeFailed} at chunk ${details.chunkIndex}`,
+      { ...details, code: SerializeErrorCode.encodeFailed, cause: error }
+    );
+  }
+  if (encoded instanceof Uint8Array) return encoded;
+  const invalidReturn =
+    encoded === undefined
+      ? createSerializeTypeError(
+          SerializeErrorCode.invalidOption,
+          SerializeErrorText.textEncoderOutputInvalid
+        )
+      : encoded;
+  throw new SerializeCodecError(
+    `${SerializeErrorText.textEncoderOutputInvalid} at chunk ${details.chunkIndex}`,
+    { ...details, code: SerializeErrorCode.invalidChunk, cause: invalidReturn }
+  );
 }
 
 /** 结构化 Encoding API（`TextEncoder`/`TextDecoder` 鸭子类型），供 core/plugins/registry 注入使用。 */

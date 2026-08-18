@@ -322,6 +322,114 @@ describe('R-9 scheduler 注入（manualScheduler）', () => {
   });
 });
 
+describe('L-T51 MutationQueue: synchronous timeout task cancellation', () => {
+  it('cancels a synchronously fired timeout task exactly once and keeps queue usable', async () => {
+    const cancel = vi.fn();
+    const scheduler = {
+      now: () => 0,
+      schedule: (callback: () => void) => {
+        callback();
+        return { cancel };
+      }
+    };
+    const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10, scheduler });
+    const blocking = deferred<void>();
+    const first = queue.enqueue(() => blocking.promise);
+    const timedOut = queue.enqueue(() => 'timed out');
+
+    await expect(timedOut).rejects.toMatchObject({
+      code: LifecycleErrorCode.queueAdmissionTimeout
+    });
+    expect(cancel).toHaveBeenCalledTimes(1);
+
+    blocking.resolve();
+    await first;
+    await expect(queue.enqueue(() => 'usable')).resolves.toBe('usable');
+  });
+
+  it('keeps timeout primary and exposes returned-task cancel failure', async () => {
+    const cancelError = new Error('timeout task cancel failed');
+    const scheduler = {
+      now: () => 0,
+      schedule: (callback: () => void) => {
+        callback();
+        return {
+          cancel: () => {
+            throw cancelError;
+          }
+        };
+      }
+    };
+    const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10, scheduler });
+    const blocking = deferred<void>();
+    const first = queue.enqueue(() => blocking.promise);
+    const timedOut = queue.enqueue(() => 'timed out');
+
+    let thrown: unknown;
+    try {
+      await timedOut;
+    } catch (error) {
+      thrown = error;
+    }
+    expect((thrown as { code?: string }).code).toBe(LifecycleErrorCode.queueAdmissionTimeout);
+    expect((thrown as { errors?: readonly unknown[] }).errors).toContain(cancelError);
+
+    blocking.resolve();
+    await first;
+    await expect(queue.enqueue(() => 'usable')).resolves.toBe('usable');
+  });
+});
+
+describe('L-T54 MutationQueue: normal dequeue cancellation failure isolation', () => {
+  it('reports a dequeue watchdog cancel failure, still settles B, and runs C without unhandled rejection', async () => {
+    const cancelError = new Error('dequeue watchdog cancel failed');
+    const diagnostics = vi.fn();
+    const cancelers: Array<ReturnType<typeof vi.fn>> = [];
+    let scheduleCount = 0;
+    const scheduler = {
+      now: () => 0,
+      schedule: () => {
+        const shouldThrow = scheduleCount++ === 0;
+        const cancel = vi.fn(() => {
+          if (shouldThrow) throw cancelError;
+        });
+        cancelers.push(cancel);
+        return {
+          cancel
+        };
+      }
+    };
+    const queue = createMutationQueue({
+      queueAdmissionTimeoutMs: 100,
+      scheduler,
+      onAdmissionDiagnostic: diagnostics
+    });
+    const gate = deferred<void>();
+    const pA = queue.enqueue(
+      async () => {
+        await gate.promise;
+        return 'A';
+      },
+      { owner: 'A' }
+    );
+    const pB = queue.enqueue(() => 'B', { owner: 'B' });
+    const pC = queue.enqueue(() => 'C', { owner: 'C' });
+
+    gate.resolve();
+    await expect(pA).resolves.toBe('A');
+    await expect(pB).resolves.toBe('B');
+    await expect(pC).resolves.toBe('C');
+    expect(cancelers[0]).toHaveBeenCalledTimes(1);
+    expect(cancelers[1]).toHaveBeenCalledTimes(1);
+    expect(diagnostics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: 'B',
+        error: expect.objectContaining({ code: LifecycleErrorCode.queueAdmissionTimeout })
+      })
+    );
+  });
+});
+
 describe('AF-T32 mutation queue scheduling failure leaves no ghost task', () => {
   it('scheduler.now() throw removes the record and keeps the queue usable', async () => {
     const boom = new Error('now boom');
@@ -387,6 +495,34 @@ describe('AF-T32 mutation queue scheduling failure leaves no ghost task', () => 
 });
 
 describe('AF-T33 admission diagnostic callback isolation', () => {
+  it('rejects invalid diagnostic delay without retaining queued task', async () => {
+    const manual = createManualScheduler();
+    const queue = createMutationQueue({
+      scheduler: manual,
+      admissionDiagnosticMs: Number.NaN,
+      onAdmissionDiagnostic: () => {}
+    });
+    const blocking = deferred<void>();
+    void queue.enqueue(() => blocking.promise);
+    await expect(queue.enqueue(() => 'ghost')).rejects.toMatchObject({
+      code: LifecycleErrorCode.invalidOption
+    });
+    expect(queue.size).toBe(1);
+    blocking.resolve();
+  });
+
+  it('rejects invalid admission delay without retaining queued task', async () => {
+    const manual = createManualScheduler();
+    const queue = createMutationQueue({ scheduler: manual, queueAdmissionTimeoutMs: -1 });
+    const blocking = deferred<void>();
+    void queue.enqueue(() => blocking.promise);
+    await expect(queue.enqueue(() => 'ghost')).rejects.toMatchObject({
+      code: LifecycleErrorCode.invalidOption
+    });
+    expect(queue.size).toBe(1);
+    blocking.resolve();
+  });
+
   it('sync-throwing diagnostic does not break the queue or advance()', async () => {
     const manual = createManualScheduler();
     const diagnostics: string[] = [];

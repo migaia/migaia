@@ -53,6 +53,12 @@ export const LifecycleErrorCode = {
   scopeDisposalFailed: 'SCOPE_DISPOSAL_FAILED',
 
   /**
+   * 一个或多个 abort listener 在同一取消派发中失败。 取消信号必须跑完全部 listener 并保留每个失败，落实 lifecycle-extraction.sdd.md
+   * §4.10.2 的取消边界；调用方应检查单错本体或聚合错误的 `errors[]`，不要把取消当作未发生。
+   */
+  abortListenerFailed: 'ABORT_LISTENER_FAILED',
+
+  /**
    * `LifecycleUnit.start()` 返回的 thenable 被 reject，单元进入 `failed`。
    *
    * 调用方可以显式调用 `start()`/`restart()` 开启新 generation 重试，或调用 `close()`/`dispose()` 让单元到达
@@ -66,6 +72,12 @@ export const LifecycleErrorCode = {
    * 这不是失败，是正常的竞态处理信号：调用方通常只需要静默忽略，除非在诊断路径里需要感知它。
    */
   generationSuperseded: 'GENERATION_SUPERSEDED',
+
+  /**
+   * Generation 取消期间的 timer、parent listener 或 signal cleanup 失败。 generation 作废必须先完成状态收敛并按登记顺序保留所有
+   * cleanup 失败，落实 lifecycle-extraction.sdd.md §4.10.2；调用方应处理该错误并依赖新 generation，不得复活旧 generation。
+   */
+  generationCancellationFailed: 'GENERATION_CANCELLATION_FAILED',
 
   /**
    * 在已经 `dispose()` 过的 `GenerationController` 上调用 `begin()`。

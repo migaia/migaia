@@ -4,7 +4,7 @@
  * 契约见 `docs/contracts/error-codes.md`：错误由 `(source, code)` 二元组唯一定位，`source` 恒为
  * `'@migaia/reactive'`。抛出点必须引用本文件的常量，不得内联字面量。
  *
- * 迁移背景（`docs/lifecycle/migration.sdd.md` §3.7.1）：本表把包内原本裸 `throw new Error('[store] …')` 的字符串归纳成码；随
+ * 迁移背景（`docs/lifecycle/migration.sdd.md` §3.7.1）：本表把包内原本裸 `throw new Error('…')` 的字符串归纳成码；随
  * `lifecycle-primitives.ts` / `generation-controller.ts` 一并迁出的 `SCOPE_CLOSED` /
  * `SCOPE_REENTRANT_DISPOSE` / `SCOPE_SYNC_VIOLATION` / `GENERATION_DISPOSED` /
  * `SCOPE_DISPOSAL_FAILED` 五个码**不进本表**，归属 `@migaia/lifecycle`。

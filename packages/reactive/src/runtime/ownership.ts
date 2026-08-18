@@ -2,6 +2,7 @@ import type { IRuntime } from './types.js';
 import { assertNoForeignOwnershipBrand } from './copy-check.js';
 import { createReactiveError } from '../errors.js';
 import { ReactiveErrorCode } from '../error-code.js';
+import { ReactiveErrorText } from '../error-text.js';
 
 /**
  * 唯一所有权登记。
@@ -22,7 +23,7 @@ export function claimOwnership(value: object, runtime: IRuntime): void {
   if (existing && existing !== runtime) {
     throw createReactiveError(
       ReactiveErrorCode.ownershipConflict,
-      '[store] this node is already owned by another Runtime'
+      ReactiveErrorText.ownershipConflict
     );
   }
   OWNERS.set(value, runtime);
@@ -47,7 +48,7 @@ export function assertOwnedBy(value: unknown, runtime: IRuntime, what: string): 
   if (owner && owner !== runtime) {
     throw createReactiveError(
       ReactiveErrorCode.crossRuntime,
-      `[store] ${what} belongs to a different Runtime than this scope`
+      ReactiveErrorText.belongsToDifferentRuntime(what)
     );
   }
 }
@@ -62,13 +63,13 @@ export function assertReactiveOwnedBy(value: object, runtime: IRuntime, what: st
   if (!owner) {
     throw createReactiveError(
       ReactiveErrorCode.notRuntimeOwned,
-      `[store] ${what} is not a Runtime-owned reactive node`
+      ReactiveErrorText.notRuntimeOwned(what)
     );
   }
   if (owner !== runtime) {
     throw createReactiveError(
       ReactiveErrorCode.crossRuntime,
-      `[store] ${what} belongs to another Runtime`
+      ReactiveErrorText.belongsToAnotherRuntime(what)
     );
   }
 }

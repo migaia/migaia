@@ -5,6 +5,7 @@ import type { IObservable, IRuntime, IRuntimeTraceEvent } from './types.js';
 import { createReactiveError } from '../errors.js';
 import { ReactiveErrorCode } from '../error-code.js';
 import { noteRuntimeCopy } from './copy-check.js';
+import { ReactiveErrorText } from '../error-text.js';
 
 /**
  * 内核内部面。
@@ -48,7 +49,7 @@ export function registerInternals(runtime: IRuntime, internals: IRuntimeInternal
   if (INTERNALS.has(runtime)) {
     throw createReactiveError(
       ReactiveErrorCode.internalsRegistered,
-      '[store] runtime internals are already registered'
+      ReactiveErrorText.internalsAlreadyRegistered
     );
   }
   INTERNALS.set(runtime, internals);
@@ -66,7 +67,7 @@ export function internalsOf(runtime: IRuntime): IRuntimeInternals {
   noteRuntimeCopy();
   throw createReactiveError(
     ReactiveErrorCode.notRuntimeOwned,
-    '[store] this object is not a Runtime created by createRuntime()'
+    ReactiveErrorText.runtimeNotCreatedByFactory
   );
 }
 

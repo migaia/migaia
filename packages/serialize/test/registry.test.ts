@@ -6,9 +6,11 @@ import {
   chunkToText,
   createSerializeRegistry,
   type ISerializeChunk,
+  type ISerializeOutput,
   type ISerializeParser,
   type ISerializePlugin
 } from '../src/index';
+import type { ISerializeScheduler } from '../src/types.js';
 
 const textParser = (name = 'text'): ISerializeParser => ({
   name,
@@ -73,6 +75,265 @@ describe('T-21 构造 fail-fast + close/dispose', () => {
     expect(() => registry.encode('x')).rejects.toThrow(/disposed/);
     expect(disposed).toBe(false);
   });
+
+  it('registry options 构造期单读、捕获 receiver，后续 mutation 与 dispose 不再读 options', async () => {
+    const manual = createManualScheduler();
+    const schedulerOption = {} as Record<PropertyKey, unknown>;
+    const encoderOption = {} as Record<PropertyKey, unknown>;
+    const decoderOption = {} as Record<PropertyKey, unknown>;
+    const options = {} as Record<PropertyKey, unknown>;
+    const reads = new Map<PropertyKey, number>();
+    const count = (key: PropertyKey): void => {
+      reads.set(key, (reads.get(key) ?? 0) + 1);
+    };
+    let schedulerReceiver = false;
+    let encoderReceiver = false;
+    let reportReceiver = false;
+    let timeoutReceiver = false;
+    let reportCalls = 0;
+    let timeoutCalls = 0;
+    let rejectPending: ((reason: unknown) => void) | undefined;
+
+    const schedulerNow = function (this: object): number {
+      schedulerReceiver = this === schedulerOption;
+      return manual.now();
+    };
+    const schedulerSchedule = function (
+      this: object,
+      callback: () => void,
+      delayMs: number
+    ): { cancel(): void } {
+      schedulerReceiver = schedulerReceiver && this === schedulerOption;
+      return manual.schedule(callback, delayMs);
+    };
+    Object.defineProperties(schedulerOption, {
+      now: {
+        configurable: true,
+        get: () => {
+          count('scheduler.now');
+          return schedulerNow;
+        }
+      },
+      schedule: {
+        configurable: true,
+        get: () => {
+          count('scheduler.schedule');
+          return schedulerSchedule;
+        }
+      }
+    });
+
+    const encoderMethod = function (this: object, input: string): Uint8Array {
+      encoderReceiver = this === encoderOption;
+      return Uint8Array.from(input, (character) => character.charCodeAt(0));
+    };
+    Object.defineProperty(encoderOption, 'encode', {
+      configurable: true,
+      get: () => {
+        count('encoder.encode');
+        return encoderMethod;
+      }
+    });
+    Object.defineProperty(decoderOption, 'decode', {
+      configurable: true,
+      get: () => {
+        count('decoder.decode');
+        return function (this: object, input: Uint8Array): string {
+          expect(this).toBe(decoderOption);
+          return String.fromCharCode(...input);
+        };
+      }
+    });
+
+    const reportMethod = function (this: object): void {
+      reportReceiver = this === options;
+      reportCalls += 1;
+    };
+    const timeoutMethod = function (this: object): void {
+      timeoutReceiver = this === options;
+      timeoutCalls += 1;
+    };
+    Object.defineProperties(options, {
+      scheduler: {
+        configurable: true,
+        get: () => {
+          count('options.scheduler');
+          return schedulerOption;
+        }
+      },
+      encoder: {
+        configurable: true,
+        get: () => {
+          count('options.encoder');
+          return encoderOption;
+        }
+      },
+      decoder: {
+        configurable: true,
+        get: () => {
+          count('options.decoder');
+          return decoderOption;
+        }
+      },
+      report: {
+        configurable: true,
+        get: () => {
+          count('options.report');
+          return reportMethod;
+        }
+      },
+      onDrainTimeout: {
+        configurable: true,
+        get: () => {
+          count('options.onDrainTimeout');
+          return timeoutMethod;
+        }
+      },
+      cleanup: {
+        configurable: true,
+        get: () => {
+          count('options.cleanup');
+          return { policy: 'throw' };
+        }
+      }
+    });
+
+    const registry = createSerializeRegistry(
+      [
+        plugin('a', {
+          name: 'a',
+          encode: (value) => {
+            if (value === 'pending')
+              return new Promise<ISerializeChunk>((_, reject) => {
+                rejectPending = reject;
+              });
+            return [
+              ['text', 'x'],
+              ['bytes', new Uint8Array([1])]
+            ] as unknown as ISerializeChunk;
+          },
+          decode: (chunk) => chunk
+        })
+      ],
+      options as never
+    );
+
+    Object.defineProperties(schedulerOption, {
+      now: { configurable: true, value: () => -1 },
+      schedule: {
+        configurable: true,
+        value: () => {
+          throw new Error('scheduler was reread');
+        }
+      }
+    });
+    Object.defineProperty(encoderOption, 'encode', {
+      configurable: true,
+      value: () => new Uint8Array([99])
+    });
+    Object.defineProperties(options, {
+      report: {
+        configurable: true,
+        get: () => {
+          throw new Error('report option was reread');
+        }
+      },
+      onDrainTimeout: {
+        configurable: true,
+        get: () => {
+          throw new Error('onDrainTimeout option was reread');
+        }
+      }
+    });
+
+    await expect(registry.encode('value')).resolves.toEqual(['bytes', new Uint8Array([120, 1])]);
+    const pending = registry.encode('pending').catch(() => undefined);
+    const disposing = registry.dispose({ deadlineAt: 100 });
+    manual.advance(100);
+    await disposing;
+    rejectPending?.(new Error('late parser rejection'));
+    await pending;
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(reads.get('options.scheduler')).toBe(1);
+    expect(reads.get('options.encoder')).toBe(1);
+    expect(reads.get('options.decoder')).toBe(1);
+    expect(reads.get('options.report')).toBe(1);
+    expect(reads.get('options.onDrainTimeout')).toBe(1);
+    expect(reads.get('options.cleanup')).toBe(1);
+    expect(reads.get('scheduler.now')).toBe(1);
+    expect(reads.get('scheduler.schedule')).toBe(1);
+    expect(reads.get('encoder.encode')).toBe(1);
+    expect(reads.get('decoder.decode')).toBe(1);
+    expect(schedulerReceiver).toBe(true);
+    expect(encoderReceiver).toBe(true);
+    expect(reportReceiver).toBe(true);
+    expect(timeoutReceiver).toBe(true);
+    expect(reportCalls).toBe(1);
+    expect(timeoutCalls).toBe(1);
+  });
+
+  it('hostile/invalid registry options fail fast as serialize INVALID_OPTION with cause', () => {
+    const schedulerCause = new Error('scheduler option getter boom');
+    const schedulerOptions = {
+      get scheduler() {
+        throw schedulerCause;
+      }
+    };
+    expect(() => createSerializeRegistry([plugin('a')], schedulerOptions as never)).toThrowError(
+      expect.objectContaining({
+        source: '@migaia/serialize',
+        code: 'INVALID_OPTION',
+        cause: schedulerCause
+      })
+    );
+
+    const timeoutCause = new Error('timeout option getter boom');
+    let parserDisposeCalls = 0;
+    const timeoutOptions = {
+      get onDrainTimeout() {
+        throw timeoutCause;
+      }
+    };
+    expect(() =>
+      createSerializeRegistry(
+        [
+          plugin('a', {
+            name: 'a',
+            encode: (value) => ['text', String(value)],
+            decode: (chunk) => chunk,
+            dispose: () => {
+              parserDisposeCalls += 1;
+            }
+          })
+        ],
+        timeoutOptions as never
+      )
+    ).toThrowError(
+      expect.objectContaining({
+        source: '@migaia/serialize',
+        code: 'INVALID_OPTION',
+        cause: timeoutCause
+      })
+    );
+    expect(parserDisposeCalls).toBe(0);
+
+    for (const invalid of [
+      { encoder: { encode: 1 } },
+      { decoder: { decode: 1 } },
+      { report: 'not-a-function' },
+      { onDrainTimeout: 'not-a-function' }
+    ]) {
+      expect(() => createSerializeRegistry([plugin('a')], invalid as never)).toThrowError(
+        expect.objectContaining({
+          source: '@migaia/serialize',
+          code: 'INVALID_OPTION'
+        })
+      );
+    }
+  });
 });
 
 describe('createSerializeRegistry：构造校验', () => {
@@ -84,6 +345,160 @@ describe('createSerializeRegistry：构造校验', () => {
     expect(() => createSerializeRegistry([plugin('a'), plugin('a')])).toThrow(
       /duplicate serialize plugin type/
     );
+  });
+
+  it('同一个 parser 绑定多个 type 时只释放一次', async () => {
+    let disposeCount = 0;
+    const sharedParser: ISerializeParser = {
+      name: 'shared',
+      encode: (value) => ['value', value],
+      decode: (chunk) => chunk[1],
+      dispose: () => {
+        disposeCount += 1;
+      }
+    };
+    const registry = createSerializeRegistry([
+      plugin('a', sharedParser),
+      plugin('b', sharedParser)
+    ]);
+    await registry.dispose();
+    expect(disposeCount).toBe(1);
+  });
+
+  it('构造阶段只读取 plugin/parser 方法一次，并固定每个方法的 receiver', async () => {
+    let typeReads = 0;
+    let parserReads = 0;
+    let encodeReads = 0;
+    let decodeReads = 0;
+    let disposeReads = 0;
+    let encodeReceiverMatched = false;
+    let decodeReceiverMatched = false;
+    let disposeReceiverMatched = false;
+    let firstDisposeCalls = 0;
+    let replacementDisposeCalls = 0;
+    const parser = { name: 'snapshot-parser' } as Record<PropertyKey, unknown>;
+    const encodeMethod = function (this: object, value: unknown): ISerializeChunk {
+      encodeReceiverMatched = this === parser;
+      return ['text', String(value)];
+    };
+    const decodeMethod = function (this: object, chunk: ISerializeChunk): unknown {
+      decodeReceiverMatched = this === parser;
+      return chunk[1];
+    };
+    const firstDispose = function (this: object): void {
+      disposeReceiverMatched = this === parser;
+      firstDisposeCalls += 1;
+    };
+    const replacementDispose = (): void => {
+      replacementDisposeCalls += 1;
+    };
+    Object.defineProperties(parser, {
+      encode: {
+        configurable: true,
+        get: () => {
+          encodeReads += 1;
+          return encodeMethod;
+        }
+      },
+      decode: {
+        configurable: true,
+        get: () => {
+          decodeReads += 1;
+          return decodeMethod;
+        }
+      },
+      dispose: {
+        configurable: true,
+        get: () => {
+          disposeReads += 1;
+          return firstDispose;
+        }
+      }
+    });
+    const plugin = {} as Record<PropertyKey, unknown>;
+    Object.defineProperties(plugin, {
+      type: {
+        configurable: true,
+        get: () => {
+          typeReads += 1;
+          return 'snapshot';
+        }
+      },
+      parser: {
+        configurable: true,
+        get: () => {
+          parserReads += 1;
+          return parser;
+        }
+      }
+    });
+
+    const registry = createSerializeRegistry([plugin as unknown as ISerializePlugin]);
+    Object.defineProperty(parser, 'dispose', {
+      configurable: true,
+      value: replacementDispose,
+      writable: true
+    });
+
+    await expect(registry.encode('value')).resolves.toEqual(['text', 'value']);
+    await expect(registry.decode(['text', 'decoded'])).resolves.toBe('decoded');
+    await registry.dispose();
+
+    expect(typeReads).toBe(1);
+    expect(parserReads).toBe(1);
+    expect(encodeReads).toBe(1);
+    expect(decodeReads).toBe(1);
+    expect(disposeReads).toBe(1);
+    expect(encodeReceiverMatched).toBe(true);
+    expect(decodeReceiverMatched).toBe(true);
+    expect(disposeReceiverMatched).toBe(true);
+    expect(firstDisposeCalls).toBe(1);
+    expect(replacementDisposeCalls).toBe(0);
+  });
+
+  it('同一 parser 绑定多个 type 时方法 getter 也只读取一次', async () => {
+    let encodeReads = 0;
+    let decodeReads = 0;
+    let disposeReads = 0;
+    let disposeCalls = 0;
+    const parser = { name: 'shared-snapshot' } as Record<PropertyKey, unknown>;
+    Object.defineProperties(parser, {
+      encode: {
+        configurable: true,
+        get: () => {
+          encodeReads += 1;
+          return (value: unknown): ISerializeChunk => ['text', String(value)];
+        }
+      },
+      decode: {
+        configurable: true,
+        get: () => {
+          decodeReads += 1;
+          return (chunk: ISerializeChunk): unknown => chunk[1];
+        }
+      },
+      dispose: {
+        configurable: true,
+        get: () => {
+          disposeReads += 1;
+          return (): void => {
+            disposeCalls += 1;
+          };
+        }
+      }
+    });
+    const registry = createSerializeRegistry([
+      plugin('a', parser as unknown as ISerializeParser),
+      plugin('b', parser as unknown as ISerializeParser)
+    ]);
+
+    await expect(registry.encode('value', { type: 'b' })).resolves.toEqual(['text', 'value']);
+    await registry.dispose();
+
+    expect(encodeReads).toBe(1);
+    expect(decodeReads).toBe(1);
+    expect(disposeReads).toBe(1);
+    expect(disposeCalls).toBe(1);
   });
 
   it('拒绝不合法的 type 字符集（会写进 HTML 属性/存档头分隔字段）', () => {
@@ -354,6 +769,188 @@ describe('chunkToText / chunkToBytes', () => {
   });
 });
 
+describe('iterable admission failure containment', () => {
+  it('accepts callable objects with a sync iterator and preserves the callable receiver', async () => {
+    let receiverMatched = false;
+    const output = (() => undefined) as unknown as Record<PropertyKey, unknown>;
+    output[Symbol.iterator] = function (this: object): Iterator<ISerializeChunk> {
+      receiverMatched = this === output;
+      return [['text', 'callable-sync'] as ISerializeChunk][Symbol.iterator]();
+    };
+    const registry = createSerializeRegistry([
+      plugin('a', {
+        name: 'a',
+        encode: () => output as never,
+        decode: (chunk) => chunk
+      })
+    ]);
+
+    await expect(registry.encode('x')).resolves.toEqual(['text', 'callable-sync']);
+    expect(receiverMatched).toBe(true);
+  });
+
+  it('accepts callable objects with async precedence over sync iteration', async () => {
+    let asyncReceiverMatched = false;
+    let syncReads = 0;
+    const output = (() => undefined) as unknown as Record<PropertyKey, unknown>;
+    output[Symbol.asyncIterator] = function (this: object): AsyncIterator<ISerializeChunk> {
+      asyncReceiverMatched = this === output;
+      let done = false;
+      return {
+        next: async () => {
+          if (done) return { done: true, value: undefined };
+          done = true;
+          return { done: false, value: ['text', 'callable-async'] };
+        }
+      };
+    };
+    output[Symbol.iterator] = () => {
+      syncReads += 1;
+      throw new Error('sync iterator must not be read');
+    };
+    const registry = createSerializeRegistry([
+      plugin('a', {
+        name: 'a',
+        encode: () => output as never,
+        decode: (chunk) => chunk
+      })
+    ]);
+
+    await expect(registry.encode('x')).resolves.toEqual(['text', 'callable-async']);
+    expect(asyncReceiverMatched).toBe(true);
+    expect(syncReads).toBe(0);
+  });
+
+  it('direct protocol reads ignore a false has trap and preserve sync iterator receiver', async () => {
+    let receiverMatched = false;
+    const output = new Proxy(
+      {
+        [Symbol.iterator](this: object): Iterator<ISerializeChunk> {
+          receiverMatched = this === output;
+          return [['text', 'ok'] as ISerializeChunk][Symbol.iterator]();
+        }
+      },
+      { has: () => false }
+    );
+    const registry = createSerializeRegistry([
+      plugin('a', {
+        name: 'a',
+        encode: () => output as never,
+        decode: (chunk) => chunk
+      })
+    ]);
+
+    await expect(registry.encode('x')).resolves.toEqual(['text', 'ok']);
+    expect(receiverMatched).toBe(true);
+  });
+
+  it('reads async iterator once, gives it precedence, and never probes sync iterator', async () => {
+    let asyncReads = 0;
+    let syncReads = 0;
+    let receiverMatched = false;
+    const output = new Proxy(
+      {},
+      {
+        has: () => false,
+        get: (_target, property) => {
+          if (property === Symbol.asyncIterator) {
+            asyncReads += 1;
+            return function (this: object): AsyncIterator<ISerializeChunk> {
+              receiverMatched = this === output;
+              let done = false;
+              return {
+                next: async () => {
+                  if (done) return { done: true, value: undefined };
+                  done = true;
+                  return { done: false, value: ['text', 'async'] };
+                }
+              };
+            };
+          }
+          if (property === Symbol.iterator) {
+            syncReads += 1;
+            throw new Error('sync iterator must not be read');
+          }
+          return undefined;
+        }
+      }
+    );
+    const registry = createSerializeRegistry([
+      plugin('a', {
+        name: 'a',
+        encode: () => output as never,
+        decode: (chunk) => chunk
+      })
+    ]);
+
+    await expect(registry.encode('x')).resolves.toEqual(['text', 'async']);
+    expect(asyncReads).toBe(1);
+    expect(syncReads).toBe(0);
+    expect(receiverMatched).toBe(true);
+  });
+
+  it('async iterator getter 失败时进入 SerializeCodecError，并保留 cause', async () => {
+    const cause = new Error('async iterator getter failed');
+    const output = {} as Record<PropertyKey, unknown>;
+    Object.defineProperty(output, Symbol.asyncIterator, {
+      configurable: true,
+      get: () => {
+        throw cause;
+      }
+    });
+    const registry = createSerializeRegistry([
+      plugin('a', {
+        name: 'a',
+        encode: () => output as never,
+        decode: (chunk) => chunk
+      })
+    ]);
+
+    await expect(registry.encode('x')).rejects.toMatchObject({
+      source: '@migaia/serialize',
+      code: 'ENCODE_FAILED',
+      cause
+    });
+  });
+
+  it.each(['length', 'index'] as const)(
+    'hostile chunk Proxy %s getter stays inside the ENCODE_FAILED codec boundary',
+    async (access) => {
+      const cause = new Error(`chunk ${access} getter failed`);
+      const target = ['text', 'proxy'] as unknown as ISerializeChunk;
+      const output = new Proxy(target, {
+        get(value, property) {
+          if (
+            (access === 'length' && property === 'length') ||
+            (access === 'index' && property === '0')
+          ) {
+            throw cause;
+          }
+          return (value as unknown as Record<PropertyKey, unknown>)[property];
+        }
+      });
+      const registry = createSerializeRegistry([
+        plugin('a', {
+          name: 'a',
+          encode: () => output,
+          decode: (chunk) => chunk
+        })
+      ]);
+
+      await expect(registry.encode('x')).rejects.toSatisfy((error: unknown) => {
+        expect(error).toBeInstanceOf(SerializeCodecError);
+        expect(error).toMatchObject({
+          source: '@migaia/serialize',
+          code: 'ENCODE_FAILED',
+          cause
+        });
+        return true;
+      });
+      await registry.dispose();
+    }
+  );
+});
+
 describe('dispose：释放语义', () => {
   it('重复 dispose 是幂等的', async () => {
     const registry = createSerializeRegistry([plugin('a')]);
@@ -369,6 +966,28 @@ describe('dispose：释放语义', () => {
         source: '@migaia/serialize'
       });
     }
+  });
+
+  it('非法 deadlineAt 不毒化后续合法 dispose，parser 仍 exactly-once 释放', async () => {
+    let disposeCount = 0;
+    const registry = createSerializeRegistry([
+      plugin('a', {
+        name: 'a',
+        encode: (value) => ['text', String(value)],
+        decode: (chunk) => chunk,
+        dispose: () => {
+          disposeCount += 1;
+        }
+      })
+    ]);
+
+    await expect(registry.dispose({ deadlineAt: Number.NaN })).rejects.toMatchObject({
+      code: 'INVALID_OPTION',
+      source: '@migaia/serialize'
+    });
+    await expect(registry.dispose()).resolves.toBeUndefined();
+    await expect(registry.dispose()).resolves.toBeUndefined();
+    expect(disposeCount).toBe(1);
   });
 
   it('dispose 后 encode/decode 拒绝，且不再是可重试的瞬时错误', async () => {
@@ -394,14 +1013,17 @@ describe('dispose：释放语义', () => {
   });
 
   it('多个 parser dispose 失败时聚合成 AggregateError，且每个 parser 都被尝试释放', async () => {
-    let secondCalled = false;
+    const firstFailure = new Error('first');
+    const secondFailure = new Error('second');
+    const disposeOrder: string[] = [];
     const registry = createSerializeRegistry([
       plugin('a', {
         name: 'a',
         encode: (v) => ['text', String(v)],
         decode: (c) => c,
         dispose: () => {
-          throw new Error('first');
+          disposeOrder.push('a');
+          throw firstFailure;
         }
       }),
       plugin('b', {
@@ -409,17 +1031,306 @@ describe('dispose：释放语义', () => {
         encode: (v) => ['text', String(v)],
         decode: (c) => c,
         dispose: () => {
-          secondCalled = true;
-          throw new Error('second');
+          disposeOrder.push('b');
+          throw secondFailure;
         }
       })
     ]);
     await expect(registry.dispose()).rejects.toSatisfy((error: unknown) => {
-      expect(secondCalled).toBe(true);
       expect(error).toBeInstanceOf(AggregateError);
-      expect((error as AggregateError).errors).toHaveLength(2);
+      expect(disposeOrder).toEqual(['b', 'a']);
+      expect((error as AggregateError).errors).toEqual([secondFailure, firstFailure]);
+      expect((error as AggregateError).cause).toBeUndefined();
       return true;
     });
+  });
+});
+
+describe('Round18：deadline failure never skips parser cleanup', () => {
+  it('scheduler.now getter failure is wrapped at admission and owns no parser yet', () => {
+    const getterFailure = new Error('now getter failure');
+    let parserDisposeCalls = 0;
+    const scheduler = {
+      get now(): () => number {
+        throw getterFailure;
+      },
+      schedule: () => ({ cancel: () => {} })
+    };
+
+    try {
+      createSerializeRegistry(
+        [
+          plugin('a', {
+            name: 'a',
+            encode: (value) => ['text', String(value)],
+            decode: (chunk) => chunk,
+            dispose: () => {
+              parserDisposeCalls += 1;
+            }
+          })
+        ],
+        { scheduler }
+      );
+      throw new Error('expected scheduler admission failure');
+    } catch (error) {
+      expect(error).toMatchObject({ code: 'INVALID_OPTION', source: '@migaia/serialize' });
+      expect((error as Error & { cause?: Error }).cause).toMatchObject({ cause: getterFailure });
+    }
+    expect(parserDisposeCalls).toBe(0);
+  });
+
+  it('scheduler.now call failure remains primary, cleanup runs once, and dispose promise is stable', async () => {
+    const nowFailure = new Error('now call failure');
+    let parserDisposeCalls = 0;
+    const registry = createSerializeRegistry(
+      [
+        plugin('a', {
+          name: 'a',
+          encode: (value) => ['text', String(value)],
+          decode: (chunk) => chunk,
+          dispose: () => {
+            parserDisposeCalls += 1;
+          }
+        })
+      ],
+      {
+        scheduler: {
+          now: (): number => {
+            throw nowFailure;
+          },
+          schedule: () => ({ cancel: () => {} })
+        }
+      }
+    );
+
+    const first = registry.dispose({ deadlineAt: 10 });
+    const second = registry.dispose({ deadlineAt: 20 });
+    expect(second).toBe(first);
+    await expect(first).rejects.toBe(nowFailure);
+    expect(parserDisposeCalls).toBe(1);
+    await expect(registry.encode('x')).rejects.toThrow(/serialize registry is disposed/);
+  });
+
+  it('scheduler.schedule throw still disposes parser exactly once', async () => {
+    const scheduleFailure = new Error('schedule failure');
+    let parserDisposeCalls = 0;
+    const scheduler: ISerializeScheduler = {
+      now: (): number => 0,
+      schedule: () => {
+        throw scheduleFailure;
+      }
+    };
+    const registry = createSerializeRegistry(
+      [
+        plugin('a', {
+          name: 'a',
+          encode: (value) => ['text', String(value)],
+          decode: (chunk) => chunk,
+          dispose: () => {
+            parserDisposeCalls += 1;
+          }
+        })
+      ],
+      { scheduler }
+    );
+
+    await expect(registry.dispose({ deadlineAt: 10 })).rejects.toBe(scheduleFailure);
+    expect(parserDisposeCalls).toBe(1);
+  });
+
+  it('invalid scheduler task still disposes parser exactly once', async () => {
+    let parserDisposeCalls = 0;
+    const scheduler: ISerializeScheduler = {
+      now: (): number => 0,
+      schedule: () => ({}) as never
+    };
+    const registry = createSerializeRegistry(
+      [
+        plugin('a', {
+          name: 'a',
+          encode: (value) => ['text', String(value)],
+          decode: (chunk) => chunk,
+          dispose: () => {
+            parserDisposeCalls += 1;
+          }
+        })
+      ],
+      { scheduler }
+    );
+
+    await expect(registry.dispose({ deadlineAt: 10 })).rejects.toBeInstanceOf(Error);
+    expect(parserDisposeCalls).toBe(1);
+  });
+
+  it('scheduler task cancel getter throw still disposes parser exactly once', async () => {
+    let parserDisposeCalls = 0;
+    const scheduler: ISerializeScheduler = {
+      now: (): number => 0,
+      schedule: () =>
+        ({
+          get cancel() {
+            throw new Error('cancel getter failure');
+          }
+        }) as never
+    };
+    const registry = createSerializeRegistry(
+      [
+        plugin('a', {
+          name: 'a',
+          encode: (value) => ['text', String(value)],
+          decode: (chunk) => chunk,
+          dispose: () => {
+            parserDisposeCalls += 1;
+          }
+        })
+      ],
+      { scheduler }
+    );
+
+    await expect(registry.dispose({ deadlineAt: 10 })).rejects.toBeInstanceOf(Error);
+    expect(parserDisposeCalls).toBe(1);
+  });
+
+  it('synchronous deadline callback still cancels returned task and disposes parser', async () => {
+    let cancelCalls = 0;
+    let parserDisposeCalls = 0;
+    const registry = createSerializeRegistry(
+      [
+        plugin('a', {
+          name: 'a',
+          encode: (value) => ['text', String(value)],
+          decode: (chunk) => chunk,
+          dispose: () => {
+            parserDisposeCalls += 1;
+          }
+        })
+      ],
+      {
+        scheduler: {
+          now: () => 0,
+          schedule: (callback: () => void) => {
+            callback();
+            return {
+              cancel: () => {
+                cancelCalls += 1;
+              }
+            };
+          }
+        }
+      }
+    );
+
+    await expect(registry.dispose({ deadlineAt: 10 })).resolves.toBeUndefined();
+    expect(cancelCalls).toBe(1);
+    expect(parserDisposeCalls).toBe(1);
+  });
+
+  it('cancel call failure remains primary while parser cleanup failure stays reachable under throw policy', async () => {
+    const cancelFailure = new Error('cancel failure');
+    const cleanupFailure = new Error('parser cleanup failure');
+    const registry = createSerializeRegistry(
+      [
+        plugin('a', {
+          name: 'a',
+          encode: (value) => ['text', String(value)],
+          decode: (chunk) => chunk,
+          dispose: () => {
+            throw cleanupFailure;
+          }
+        })
+      ],
+      {
+        scheduler: {
+          now: () => 0,
+          schedule: () => ({
+            cancel: () => {
+              throw cancelFailure;
+            }
+          })
+        }
+      }
+    );
+
+    await expect(registry.dispose({ deadlineAt: 10 })).rejects.toSatisfy((error: unknown) => {
+      expect(error).toBe(cancelFailure);
+      expect((error as { errors?: readonly unknown[] }).errors).toEqual([cleanupFailure]);
+      return true;
+    });
+  });
+
+  it('schedule failure stays primary while report policy observes cleanup failure and contains reporter throw', async () => {
+    const scheduleFailure = new Error('schedule failure');
+    const cleanupFailure = new Error('parser cleanup failure');
+    const reported: unknown[] = [];
+    const registry = createSerializeRegistry(
+      [
+        plugin('a', {
+          name: 'a',
+          encode: (value) => ['text', String(value)],
+          decode: (chunk) => chunk,
+          dispose: () => {
+            throw cleanupFailure;
+          }
+        })
+      ],
+      {
+        scheduler: {
+          now: () => 0,
+          schedule: () => {
+            throw scheduleFailure;
+          }
+        },
+        cleanup: {
+          policy: 'report',
+          report: (diagnostic) => {
+            reported.push(diagnostic);
+            throw new Error('cleanup reporter failure');
+          }
+        }
+      }
+    );
+
+    await expect(registry.dispose({ deadlineAt: 10 })).rejects.toBe(scheduleFailure);
+    expect(reported).toHaveLength(1);
+    expect(reported[0]).toMatchObject({ kind: 'cleanup-error', error: cleanupFailure });
+  });
+
+  it('deadline primary plus detached parser rejection stays observed without unhandled rejection', async () => {
+    const scheduleFailure = new Error('schedule failure');
+    let rejectParser: ((error: unknown) => void) | undefined;
+    const reported: unknown[] = [];
+    const registry = createSerializeRegistry(
+      [
+        plugin('a', {
+          name: 'a',
+          encode: () =>
+            new Promise<ISerializeChunk>((_, reject) => {
+              rejectParser = reject;
+            }),
+          decode: (chunk) => chunk
+        })
+      ],
+      {
+        scheduler: {
+          now: (): number => 0,
+          schedule: () => {
+            throw scheduleFailure;
+          }
+        },
+        report: (error) => {
+          reported.push(error);
+        }
+      }
+    );
+
+    const pending = registry.encode('x');
+    await expect(registry.dispose({ deadlineAt: 10 })).rejects.toBe(scheduleFailure);
+    rejectParser?.(new Error('late parser rejection'));
+    await expect(pending).rejects.toThrow(/aborted/);
+    await Promise.resolve();
+    expect(
+      reported.some((error) => (error as Error).message.includes('late parser rejection'))
+    ).toBe(true);
   });
 });
 
@@ -444,6 +1355,127 @@ describe('SR-2：encode() 里同步抛错的 parser 必须走 SerializeCodecErro
     // 原始错误必须仍可追溯，不能在包装时丢掉根因
     await expect(rejection).rejects.toMatchObject({
       cause: expect.objectContaining({ message: 'Do not know how to serialize a BigInt' })
+    });
+  });
+
+  it('hostile Error.message getter cannot replace encode primary or cause identity', async () => {
+    const primary = new Error('hidden');
+    Object.defineProperty(primary, 'message', {
+      configurable: true,
+      get: () => {
+        throw new Error('message getter escaped');
+      }
+    });
+    const registry = createSerializeRegistry([
+      plugin('a', {
+        name: 'a',
+        encode: (): ISerializeChunk => {
+          throw primary;
+        },
+        decode: (chunk) => chunk
+      })
+    ]);
+
+    await expect(registry.encode('x')).rejects.toSatisfy((error: unknown) => {
+      expect(error).toBeInstanceOf(SerializeCodecError);
+      expect(error).toMatchObject({
+        code: 'ENCODE_FAILED',
+        message: 'serialize step failed: serialize failure reason unavailable',
+        cause: primary
+      });
+      expect((error as { cause?: unknown }).cause).toBe(primary);
+      return true;
+    });
+  });
+
+  it('primitive and hostile object coercion remain causes while wrapper text stays deterministic', async () => {
+    const hostileObject = Object.create(null) as object;
+    const cases: readonly [string, unknown][] = [
+      ['primitive failure', 'primitive failure'],
+      ['hostile object failure', hostileObject]
+    ];
+    for (const [label, primary] of cases) {
+      if (label === 'hostile object failure') {
+        Object.defineProperty(primary as object, 'toString', {
+          configurable: true,
+          value: () => {
+            throw new Error('toString escaped');
+          }
+        });
+      }
+      const registry = createSerializeRegistry([
+        plugin('a', {
+          name: 'a',
+          encode: (): ISerializeChunk => {
+            throw primary;
+          },
+          decode: (chunk) => chunk
+        })
+      ]);
+
+      await expect(registry.encode(label)).rejects.toSatisfy((error: unknown) => {
+        expect(error).toBeInstanceOf(SerializeCodecError);
+        expect(error).toMatchObject({ code: 'ENCODE_FAILED', cause: primary });
+        expect((error as { cause?: unknown }).cause).toBe(primary);
+        expect((error as Error).message).toBe(
+          `serialize step failed: ${label === 'primitive failure' ? label : 'serialize failure reason unavailable'}`
+        );
+        return true;
+      });
+    }
+  });
+
+  it('decode and iterator failures preserve hostile primary identity through the wrapper', async () => {
+    const decodePrimary = Object.create(null) as object;
+    Object.defineProperty(decodePrimary, 'toString', {
+      configurable: true,
+      value: () => {
+        throw new Error('decode coercion escaped');
+      }
+    });
+    const iteratorPrimary = new Error('iterator hidden');
+    Object.defineProperty(iteratorPrimary, 'message', {
+      configurable: true,
+      get: () => {
+        throw new Error('iterator message escaped');
+      }
+    });
+    const output = {
+      [Symbol.iterator](): Iterator<ISerializeChunk> {
+        return {
+          next(): IteratorResult<ISerializeChunk> {
+            throw iteratorPrimary;
+          }
+        };
+      }
+    };
+    const registry = createSerializeRegistry([
+      plugin('a', {
+        name: 'a',
+        encode: (): ISerializeOutput => output,
+        decode: () => {
+          throw decodePrimary;
+        }
+      })
+    ]);
+
+    await expect(registry.decode(['text', 'x'])).rejects.toSatisfy((error: unknown) => {
+      expect(error).toBeInstanceOf(SerializeCodecError);
+      expect(error).toMatchObject({
+        code: 'DECODE_FAILED',
+        message: 'deserialize failed: serialize failure reason unavailable',
+        cause: decodePrimary
+      });
+      return true;
+    });
+    await expect(registry.encode('x')).rejects.toSatisfy((error: unknown) => {
+      expect(error).toBeInstanceOf(SerializeCodecError);
+      expect(error).toMatchObject({
+        code: 'ENCODE_FAILED',
+        message: 'serialize stream failed at chunk 0: serialize failure reason unavailable',
+        cause: iteratorPrimary
+      });
+      return true;
     });
   });
 });

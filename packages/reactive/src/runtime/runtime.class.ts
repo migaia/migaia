@@ -8,6 +8,7 @@ import { setVersion } from './node-internals.js';
 import { consumePendingCopyWarning, noteRuntimeCopy } from './copy-check.js';
 import { createReactiveError, tagReactiveError } from '../errors.js';
 import { ReactiveErrorCode } from '../error-code.js';
+import { ReactiveErrorText } from '../error-text.js';
 import {
   ReactiveErrorPhase,
   ReactiveTracePhase,
@@ -17,9 +18,12 @@ import {
 import {
   containDiagnosticRejection,
   describeObservable,
+  emitTraceSafely,
+  readDiagnosticClock,
   sanitizeErrorContext,
   sanitizeTraceEvent
 } from './diagnostics.js';
+import { createReceiverCallback } from './receiver.js';
 import {
   RUNTIME_BRAND,
   type IDisposer,
@@ -30,6 +34,7 @@ import {
   type IRuntimeErrorContext,
   type IRuntimeErrorReportContext,
   type IRuntimeOptions,
+  type IReactiveRuntimeAdapter,
   type IRuntimeTraceEvent,
   type ISchedulerStrategy
 } from './types.js';
@@ -46,39 +51,110 @@ import { Effect } from '../reactive/effect.class.js';
 // 全局 signal()/computed()/effect()（kernel.ts）只是委派给 defaultRuntime 的便捷别名。
 export class Runtime implements IRuntime {
   readonly [RUNTIME_BRAND] = true as const;
-  #onError: (error: unknown, context: IRuntimeErrorContext) => void;
+  #onError: (error: unknown, context: IRuntimeErrorContext) => unknown;
   #traceListeners = new Set<(event: IRuntimeTraceEvent) => void>();
 
   constructor(options: IRuntimeOptions = {}) {
-    // 入口快照并校验 adapter 字段（AF-25/AF-28）：先 try/catch 读取自有字段（hostile getter 包装为
-    // INVALID_OPTION + cause），只把「函数」字段写入 resolved adapter——显式 `undefined` 视为 omitted、
-    // 不覆盖默认实现，杜绝「校验放行、spread 覆盖默认、首用裸抛」。
-    const adapter = { ...defaultRuntimeAdapter };
-    if (options.adapter !== undefined) {
-      for (const key of ['scheduleMicrotask', 'now', 'timestamp', 'reportError'] as const) {
-        let value: unknown;
-        try {
-          value = options.adapter[key];
-        } catch (error) {
-          throw tagReactiveError(
-            new TypeError(`[store] runtime adapter "${key}" getter failed`, { cause: error }),
-            ReactiveErrorCode.invalidOption
-          );
-        }
-        if (value === undefined) continue; // 显式 undefined = omitted，保留默认
-        if (typeof value !== 'function') {
-          throw tagReactiveError(
-            new TypeError(`[store] runtime adapter "${key}" must be a function`),
-            ReactiveErrorCode.invalidOption
-          );
-        }
-        adapter[key] = value as never;
+    /** Reads one option exactly once and converts getter failures into a package error. */
+    const readOption = <K extends keyof IRuntimeOptions>(key: K): IRuntimeOptions[K] => {
+      try {
+        return options[key];
+      } catch (error) {
+        throw tagReactiveError(
+          new TypeError(ReactiveErrorText.runtimeOptionGetterFailed(String(key)), {
+            cause: error
+          }),
+          ReactiveErrorCode.invalidOption
+        );
       }
+    };
+
+    /** Reads one adapter method once, retaining the source object as its receiver. */
+    const snapshotAdapterMethod = <K extends keyof IReactiveRuntimeAdapter>(
+      source: Partial<IReactiveRuntimeAdapter> | undefined,
+      key: K
+    ): { readonly fn: IReactiveRuntimeAdapter[K]; readonly receiver: unknown } => {
+      if (source === undefined) {
+        return { fn: defaultRuntimeAdapter[key], receiver: defaultRuntimeAdapter };
+      }
+      let value: unknown;
+      try {
+        value = source[key];
+      } catch (error) {
+        throw tagReactiveError(
+          new TypeError(ReactiveErrorText.runtimeAdapterGetterFailed(String(key)), {
+            cause: error
+          }),
+          ReactiveErrorCode.invalidOption
+        );
+      }
+      if (value === undefined) {
+        return { fn: defaultRuntimeAdapter[key], receiver: defaultRuntimeAdapter };
+      }
+      if (typeof value !== 'function') {
+        throw tagReactiveError(
+          new TypeError(ReactiveErrorText.runtimeAdapterMustBeFunction(String(key))),
+          ReactiveErrorCode.invalidOption
+        );
+      }
+      return { fn: value as IReactiveRuntimeAdapter[K], receiver: source };
+    };
+
+    /** Reads and validates the flush-loop bound before any Runtime graph state is allocated. */
+    const maxFlushPassesOption = readOption('maxFlushPasses');
+    if (
+      maxFlushPassesOption !== undefined &&
+      (!Number.isSafeInteger(maxFlushPassesOption) || maxFlushPassesOption < 1)
+    ) {
+      throw tagReactiveError(
+        new RangeError(ReactiveErrorText.maxFlushPassesInvalid),
+        ReactiveErrorCode.invalidOption
+      );
+    }
+
+    // All injected functions are admitted before graph state is allocated. Each method is read once,
+    // explicit undefined falls back to the default, and the wrapper keeps the original receiver.
+    const adapterSource = readOption('adapter');
+    const scheduleMicrotask = snapshotAdapterMethod(adapterSource, 'scheduleMicrotask');
+    const now = snapshotAdapterMethod(adapterSource, 'now');
+    const timestamp = snapshotAdapterMethod(adapterSource, 'timestamp');
+    const reportError = snapshotAdapterMethod(adapterSource, 'reportError');
+    const adapter: IReactiveRuntimeAdapter = {
+      scheduleMicrotask: createReceiverCallback(scheduleMicrotask.fn, scheduleMicrotask.receiver),
+      now: createReceiverCallback(now.fn, now.receiver),
+      timestamp: createReceiverCallback(timestamp.fn, timestamp.receiver),
+      reportError: createReceiverCallback(reportError.fn, reportError.receiver)
+    };
+    const onErrorOption = readOption('onError');
+    if (onErrorOption !== undefined && typeof onErrorOption !== 'function') {
+      throw tagReactiveError(
+        new TypeError(ReactiveErrorText.runtimeOptionMustBeFunction('onError')),
+        ReactiveErrorCode.invalidOption
+      );
+    }
+    const onTraceOption = readOption('onTrace');
+    if (onTraceOption !== undefined && typeof onTraceOption !== 'function') {
+      throw tagReactiveError(
+        new TypeError(ReactiveErrorText.runtimeOptionMustBeFunction('onTrace')),
+        ReactiveErrorCode.invalidOption
+      );
+    }
+    const scheduleIdleOption = readOption('scheduleIdle');
+    if (scheduleIdleOption !== undefined && typeof scheduleIdleOption !== 'function') {
+      throw tagReactiveError(
+        new TypeError(ReactiveErrorText.runtimeOptionMustBeFunction('scheduleIdle')),
+        ReactiveErrorCode.invalidOption
+      );
     }
     const clock = new VersionClock();
     const tracker = new DependencyTracker(this);
-    this.#onError = options.onError ?? adapter.reportError;
-    if (options.onTrace) this.#traceListeners.add(options.onTrace);
+    this.#onError =
+      onErrorOption === undefined
+        ? adapter.reportError
+        : createReceiverCallback(onErrorOption, options);
+    if (onTraceOption !== undefined) {
+      this.#traceListeners.add(createReceiverCallback(onTraceOption, options));
+    }
     const traceEnabled = (): boolean => this.#traceListeners.size > 0;
     const emitTrace = (event: IRuntimeTraceEvent): void => {
       const snapshot = sanitizeTraceEvent(event);
@@ -97,7 +173,7 @@ export class Runtime implements IRuntime {
     };
     const scheduler = new Scheduler(
       (error) => this.reportError(error, { phase: ReactiveErrorPhase.asyncFlush }),
-      options.maxFlushPasses,
+      maxFlushPassesOption,
       adapter.scheduleMicrotask
     );
     // 通知闭包只保存在 WeakMap 内部面。Runtime 实例本身没有 notify 方法，
@@ -106,12 +182,23 @@ export class Runtime implements IRuntime {
       assertReactiveOwnedBy(source, this, 'observable');
       setVersion(source, version);
       if (traceEnabled()) {
-        emitTrace({
-          type: ReactiveTraceType.observableChange,
-          timestamp: adapter.timestamp(),
-          observable: describeObservable(source),
-          reason: ReactiveTraceReason.notify
-        });
+        emitTraceSafely(
+          {
+            timestamp: adapter.timestamp,
+            emitTrace,
+            reportError: (error) =>
+              this.reportError(error, {
+                phase: ReactiveErrorPhase.traceListener,
+                observable: source
+              })
+          },
+          (timestamp) => ({
+            type: ReactiveTraceType.observableChange,
+            timestamp,
+            observable: describeObservable(source),
+            reason: ReactiveTraceReason.notify
+          })
+        );
       }
       scheduler.runDeferred(() => {
         for (const subscriber of Array.from(source.subs)) subscriber.markDirty();
@@ -130,7 +217,10 @@ export class Runtime implements IRuntime {
       return result;
     };
     // 内部面只经 WeakMap 暴露；拿到 Runtime 的第三方无法沿引用链摸到图。
-    const deferIdle = options.scheduleIdle ?? adapter.scheduleMicrotask;
+    const deferIdle =
+      scheduleIdleOption === undefined
+        ? adapter.scheduleMicrotask
+        : createReceiverCallback(scheduleIdleOption, options);
     registerInternals(this, {
       clock,
       tracker,
@@ -181,38 +271,64 @@ export class Runtime implements IRuntime {
   runTracedAction<T>(name: string, fn: () => T): T {
     if (typeof name !== 'string' || name.length === 0) {
       throw tagReactiveError(
-        new TypeError('[store] traced action name must be a non-empty string'),
+        new TypeError(ReactiveErrorText.tracedActionNameInvalid),
         ReactiveErrorCode.invalidOption
       );
     }
     const diagnostics = internalsOf(this);
     if (!diagnostics.traceEnabled()) return fn();
-    const startedAt = diagnostics.now();
-    diagnostics.emitTrace({
-      type: ReactiveTraceType.action,
-      timestamp: diagnostics.timestamp(),
-      phase: ReactiveTracePhase.start,
-      name
-    });
+    const reportTraceFailure = (error: unknown): void => {
+      this.reportError(error, { phase: ReactiveErrorPhase.traceListener });
+    };
+    const startedAt = readDiagnosticClock(diagnostics.now, 0, reportTraceFailure);
+    emitTraceSafely(
+      {
+        timestamp: diagnostics.timestamp,
+        emitTrace: diagnostics.emitTrace,
+        reportError: reportTraceFailure
+      },
+      (timestamp) => ({
+        type: ReactiveTraceType.action,
+        timestamp,
+        phase: ReactiveTracePhase.start,
+        name
+      })
+    );
     try {
       const result = fn();
-      diagnostics.emitTrace({
-        type: ReactiveTraceType.action,
-        timestamp: diagnostics.timestamp(),
-        phase: ReactiveTracePhase.end,
-        name,
-        durationMs: diagnostics.now() - startedAt
-      });
+      emitTraceSafely(
+        {
+          timestamp: diagnostics.timestamp,
+          emitTrace: diagnostics.emitTrace,
+          reportError: reportTraceFailure
+        },
+        (timestamp) => ({
+          type: ReactiveTraceType.action,
+          timestamp,
+          phase: ReactiveTracePhase.end,
+          name,
+          durationMs:
+            readDiagnosticClock(diagnostics.now, startedAt, reportTraceFailure) - startedAt
+        })
+      );
       return result;
     } catch (error) {
-      diagnostics.emitTrace({
-        type: ReactiveTraceType.action,
-        timestamp: diagnostics.timestamp(),
-        phase: ReactiveTracePhase.error,
-        name,
-        durationMs: diagnostics.now() - startedAt,
-        error
-      });
+      emitTraceSafely(
+        {
+          timestamp: diagnostics.timestamp,
+          emitTrace: diagnostics.emitTrace,
+          reportError: reportTraceFailure
+        },
+        (timestamp) => ({
+          type: ReactiveTraceType.action,
+          timestamp,
+          phase: ReactiveTracePhase.error,
+          name,
+          durationMs:
+            readDiagnosticClock(diagnostics.now, startedAt, reportTraceFailure) - startedAt,
+          error
+        })
+      );
       throw error;
     }
   }

@@ -1,6 +1,12 @@
 import { containAsyncRejection, createLifecycleError } from './errors.js';
 import { LifecycleErrorCode } from './error-code.js';
-import { systemScheduler, type ILifecycleScheduler, type IScheduledTask } from './scheduler.js';
+import { LifecycleErrorText } from './error-text.js';
+import {
+  resolveSchedulerOption,
+  systemScheduler,
+  type ILifecycleScheduler,
+  type IScheduledTask
+} from './scheduler.js';
 
 export type IMutationQueueOptions = {
   /**
@@ -39,6 +45,30 @@ type IMutationRecord = {
   readonly resolve: (value: unknown) => void;
   readonly reject: (reason: unknown) => void;
   admissionTimer: IScheduledTask | undefined;
+  admissionStartedAt: number | undefined;
+  admissionCancelAttempted: boolean;
+  timeoutError: unknown;
+  timeoutSettled: boolean;
+};
+
+/** Keeps a timeout task's cancellation failure attached to the timeout primary. */
+const appendCancellationError = (primary: unknown, cleanupError: unknown): unknown => {
+  if (primary !== null && (typeof primary === 'object' || typeof primary === 'function')) {
+    try {
+      Object.defineProperty(primary, 'errors', {
+        value: Object.freeze([cleanupError]),
+        enumerable: true
+      });
+      return primary;
+    } catch {
+      // Frozen primary — fall through to a wrapper that keeps both identities reachable.
+    }
+  }
+  return createLifecycleError(
+    LifecycleErrorCode.queueAdmissionTimeout,
+    primary instanceof Error ? primary.message : LifecycleErrorText.mutationAdmissionTimedOut,
+    { cause: primary, errors: [cleanupError] }
+  );
 };
 
 /**
@@ -51,15 +81,47 @@ type IMutationRecord = {
 export function createMutationQueue(options: IMutationQueueOptions = {}): IMutationQueue {
   const defaultAdmissionTimeoutMs = options.queueAdmissionTimeoutMs;
   const admissionDiagnosticMs = options.admissionDiagnosticMs ?? 1000;
-  const scheduler = options.scheduler ?? systemScheduler;
+  const scheduler = resolveSchedulerOption(options, systemScheduler);
   const queue: IMutationRecord[] = [];
   let running = false;
   let runningOwner: string | undefined;
 
   const disarmAdmission = (record: IMutationRecord): void => {
-    if (record.admissionTimer !== undefined) {
-      record.admissionTimer.cancel();
-      record.admissionTimer = undefined;
+    if (record.admissionTimer === undefined) return;
+    const cancelError = cancelAdmissionTask(record);
+    record.admissionTimer = undefined;
+    if (cancelError === undefined) return;
+    let waitedMs = 0;
+    try {
+      const startedAt = record.admissionStartedAt;
+      waitedMs = startedAt === undefined ? 0 : Math.max(0, scheduler.now() - startedAt);
+    } catch {
+      // A scheduler clock failure must not turn watchdog cleanup into a queue control-flow failure.
+    }
+    reportAdmissionDiagnostic(
+      record,
+      waitedMs,
+      createLifecycleError(
+        LifecycleErrorCode.queueAdmissionTimeout,
+        LifecycleErrorText.mutationAdmissionTimedOut,
+        {
+          cause: cancelError,
+          detail: { owner: record.owner, phase: 'dequeue-disarm', waitedMs }
+        }
+      )
+    );
+  };
+
+  /** Cancels one admission task at most once and returns its raw failure for timeout attribution. */
+  const cancelAdmissionTask = (record: IMutationRecord): unknown => {
+    const timer = record.admissionTimer;
+    if (timer === undefined || record.admissionCancelAttempted) return undefined;
+    record.admissionCancelAttempted = true;
+    try {
+      timer.cancel();
+      return undefined;
+    } catch (error) {
+      return error;
     }
   };
 
@@ -78,9 +140,17 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
   }
 
   /** 诊断回调隔离（AF-33）：同步抛/异步拒绝均被观测，不穿透 scheduler、不改变业务结果、不产生 unhandled rejection。 */
-  const reportAdmissionDiagnostic = (record: IMutationRecord, waitedMs: number): void => {
+  const reportAdmissionDiagnostic = (
+    record: IMutationRecord,
+    waitedMs: number,
+    error?: unknown
+  ): void => {
     try {
-      const result: unknown = options.onAdmissionDiagnostic?.({ owner: record.owner, waitedMs });
+      const result: unknown = options.onAdmissionDiagnostic?.({
+        owner: record.owner,
+        waitedMs,
+        ...(error === undefined ? {} : { error })
+      });
       containAsyncRejection(result, () => {
         // 诊断异步失败无更低一层可上报，在边界终止。
       });
@@ -92,6 +162,7 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
   const armAdmission = (record: IMutationRecord, timeoutMs: number | false | undefined): void => {
     if (timeoutMs === false) return;
     const startedAt = scheduler.now();
+    record.admissionStartedAt = startedAt;
     if (timeoutMs === undefined) {
       // nothing to diagnose to, or the diagnostic timer is explicitly disabled — don't burn a timer.
       if (!options.onAdmissionDiagnostic || admissionDiagnosticMs === false) return;
@@ -107,16 +178,32 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
       if (index < 0) return; // already dequeued to run, or already settled
       queue.splice(index, 1);
       const waitedMs = scheduler.now() - startedAt;
-      record.reject(
-        createLifecycleError(
-          LifecycleErrorCode.queueAdmissionTimeout,
-          `[lifecycle] mutation waited in the queue for more than ${timeoutMs}ms`,
-          { detail: { owner: record.owner, waitedMs } }
-        )
+      record.timeoutError = createLifecycleError(
+        LifecycleErrorCode.queueAdmissionTimeout,
+        `[lifecycle] mutation waited in the queue for more than ${timeoutMs}ms`,
+        { detail: { owner: record.owner, waitedMs } }
       );
+      if (record.admissionTimer !== undefined && !record.timeoutSettled) {
+        record.timeoutSettled = true;
+        const cancelError = cancelAdmissionTask(record);
+        record.reject(
+          cancelError === undefined
+            ? record.timeoutError
+            : appendCancellationError(record.timeoutError, cancelError)
+        );
+      }
     }, timeoutMs);
     validateScheduleHandle(timer);
     record.admissionTimer = timer;
+    if (record.timeoutError !== undefined && !record.timeoutSettled) {
+      record.timeoutSettled = true;
+      const cancelError = cancelAdmissionTask(record);
+      record.reject(
+        cancelError === undefined
+          ? record.timeoutError
+          : appendCancellationError(record.timeoutError, cancelError)
+      );
+    }
   };
 
   const runNext = (): void => {
@@ -170,7 +257,11 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
         owner,
         resolve: resolve as (value: unknown) => void,
         reject,
-        admissionTimer: undefined
+        admissionTimer: undefined,
+        admissionStartedAt: undefined,
+        admissionCancelAttempted: false,
+        timeoutError: undefined,
+        timeoutSettled: false
       };
       const queuedBehindWork = running || queue.length > 0;
       queue.push(record);

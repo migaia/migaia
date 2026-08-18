@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createAbortController, type IAbortSignal } from '../src/abort';
+import { LifecycleErrorCode } from '../src/error-code.js';
 
 describe('T-15 reason 行为', () => {
   it('abort(reason) 后 reason 经 signal.reason 保持 === 身份可达', () => {
@@ -23,6 +24,112 @@ describe('T-15 reason 行为', () => {
     controller.abort(first);
     controller.abort({ code: 'second' });
     expect(controller.signal.reason).toBe(first);
+  });
+
+  it('按 callback 去重 once listener，重复注册只执行一次', () => {
+    const controller = createAbortController();
+    let calls = 0;
+    const listener = (): void => {
+      calls++;
+    };
+
+    controller.signal.addEventListener('abort', listener, { once: true });
+    controller.signal.addEventListener('abort', listener, { once: true });
+    controller.abort();
+
+    expect(calls).toBe(1);
+  });
+
+  it('removeEventListener 按 callback 移除去重后的 once listener', () => {
+    const controller = createAbortController();
+    let calls = 0;
+    const listener = (): void => {
+      calls++;
+    };
+
+    controller.signal.addEventListener('abort', listener, { once: true });
+    controller.signal.addEventListener('abort', listener, { once: true });
+    controller.signal.removeEventListener('abort', listener);
+    controller.abort();
+
+    expect(calls).toBe(0);
+  });
+
+  it('单 listener Error 原位保留 identity 并标记 ABORT_LISTENER_FAILED', () => {
+    const controller = createAbortController();
+    const original = new Error('listener failed');
+    controller.signal.addEventListener('abort', () => {
+      throw original;
+    });
+
+    let caught: unknown;
+    try {
+      controller.abort();
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBe(original);
+    expect(original).toMatchObject({
+      source: '@migaia/lifecycle',
+      code: LifecycleErrorCode.abortListenerFailed
+    });
+  });
+
+  it('单 listener primitive 用 ABORT_LISTENER_FAILED wrapper 保留 cause', () => {
+    const controller = createAbortController();
+    const primitive = 'listener primitive failure';
+    controller.signal.addEventListener('abort', () => {
+      throw primitive;
+    });
+
+    let caught: unknown;
+    try {
+      controller.abort();
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toEqual(
+      expect.objectContaining({
+        source: '@migaia/lifecycle',
+        code: LifecycleErrorCode.abortListenerFailed,
+        cause: primitive
+      })
+    );
+  });
+
+  it('AF-T61: one throwing listener cannot stop later listeners, and every error stays reachable', () => {
+    const controller = createAbortController();
+    const firstError = new Error('first listener failed');
+    const secondError = new Error('second listener failed');
+    const calls: string[] = [];
+
+    controller.signal.addEventListener('abort', () => {
+      calls.push('first');
+      throw firstError;
+    });
+    controller.signal.addEventListener('abort', () => {
+      calls.push('second');
+      throw secondError;
+    });
+
+    let thrown: unknown;
+    try {
+      controller.abort('cancelled');
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(calls).toEqual(['first', 'second']);
+    expect(controller.signal.aborted).toBe(true);
+    expect(thrown).toEqual(
+      expect.objectContaining({
+        source: '@migaia/lifecycle',
+        code: LifecycleErrorCode.abortListenerFailed
+      })
+    );
+    expect((thrown as AggregateError).errors).toEqual([firstError, secondError]);
   });
 });
 

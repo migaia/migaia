@@ -4,7 +4,7 @@
  * 契约见 `docs/contracts/error-codes.md`：错误由 `(source, code)` 二元组唯一定位，`source` 恒为
  * `'@migaia/resource'`。抛出点必须引用本文件的常量，不得内联字面量。
  *
- * 迁移背景（`docs/lifecycle/migration.sdd.md` §3.7.2）：本表把包内原本裸 `throw new Error('[store] …')`
+ * 迁移背景（`docs/lifecycle/migration.sdd.md` §3.7.2）：本表把包内原本裸 `throw new Error('…')`
  * 的字符串归纳成码。`REQUEST_ABORTED` / `REQUEST_CANCELLED` 必须保持抛出值是 `DOMException` 且 `name ===
  * 'AbortError'`——调用方（含 `store-react` 的 suspension 路径）按 `AbortError` 判定；码只作为 附加字段挂上，不替换类型。
  *
@@ -33,6 +33,13 @@ export const ResourceErrorCode = {
    * 内部信号中止，一个是调用方显式取消。
    */
   requestCancelled: 'REQUEST_CANCELLED',
+
+  /**
+   * 请求取消已经完成状态收敛，但取消期间的 timer/listener cleanup 失败。 `REQUEST_CANCELLED` 专用于携带 `AbortError` 的
+   * cancelled state；本码落实 migration.sdd.md §3.7.2 的 cleanup 与状态错误分离，调用方应记录 cleanup 失败并继续把 Resource
+   * 视为已取消。
+   */
+  cancellationCleanupFailed: 'CANCELLATION_CLEANUP_FAILED',
 
   /**
    * 读取 `promise` 或在 `pending`/`idle` 状态下 `#materialize()` 时，内部没有一个正在进行或已缓存的 Promise 可返回。

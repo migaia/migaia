@@ -3,6 +3,7 @@ import { claimOwnership } from './ownership.js';
 import type { IObservable, IObserver, IRuntime } from './types.js';
 import { createReactiveError } from '../errors.js';
 import { ReactiveErrorCode } from '../error-code.js';
+import { ReactiveErrorText } from '../error-text.js';
 
 type IRuntimeFieldSource = {
   track(): void;
@@ -33,7 +34,7 @@ export function createFieldSource(runtime: IRuntime, debugName?: string): IRunti
     if (disposed)
       throw createReactiveError(
         ReactiveErrorCode.nodeDisposed,
-        '[store] reactive field source is disposed'
+        ReactiveErrorText.disposedFieldSource
       );
   };
 

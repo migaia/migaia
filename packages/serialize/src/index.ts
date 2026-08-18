@@ -6,6 +6,12 @@
 export * from './core.js';
 export * from './plugins.js';
 export { chunkToBytes, chunkToText, createSerializeRegistry } from './registry.js';
+export type {
+  ISerializeCleanupError,
+  ISerializeRegistryOptions,
+  ISerializeScheduler,
+  ISerializeTimeoutDiagnostic
+} from './registry.js';
 export {
   SerializeChunkKind,
   SerializeOutput,

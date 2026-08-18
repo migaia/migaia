@@ -2,6 +2,41 @@ import { describe, expect, it } from 'vitest';
 import { Signal, createRuntime } from '../src';
 
 describe('Signal', () => {
+  it('rebuilds conditional dependencies after an untracked preview', () => {
+    const runtime = createRuntime();
+    const branch = new Signal(true, runtime);
+    const left = new Signal(1, runtime);
+    const right = new Signal(10, runtime);
+    const computed = runtime.computed(() => (branch.value ? left.value : right.value));
+    expect(computed.value).toBe(1);
+    branch.value = false;
+    expect(computed.preview()).toBe(10);
+    expect(computed.value).toBe(10);
+    right.value = 20;
+    expect(computed.value).toBe(20);
+    computed.dispose();
+    branch.dispose();
+    left.dispose();
+    right.dispose();
+  });
+
+  it('commits a same-version preview without evaluating the derivation twice', () => {
+    const runtime = createRuntime();
+    const signal = new Signal(1, runtime);
+    let runs = 0;
+    const computed = runtime.computed(() => {
+      runs++;
+      return signal.value;
+    });
+    expect(computed.value).toBe(1);
+    signal.value = 2;
+    expect(computed.preview()).toBe(2);
+    expect(computed.value).toBe(2);
+    expect(runs).toBe(2);
+    computed.dispose();
+    signal.dispose();
+  });
+
   it('starts at the version consumed by construction and only advances on a real change', () => {
     const runtime = createRuntime();
     const s = new Signal(1, runtime);
@@ -61,11 +96,11 @@ describe('Signal', () => {
     const runtime = createRuntime();
     const s = new Signal(1, runtime);
     s.dispose();
-    expect(() => s.value).toThrow('[store] cannot use a disposed signal');
+    expect(() => s.value).toThrow('cannot use a disposed signal');
     expect(() => {
       s.value = 2;
-    }).toThrow('[store] cannot use a disposed signal');
-    expect(() => s.peek()).toThrow('[store] cannot use a disposed signal');
+    }).toThrow('cannot use a disposed signal');
+    expect(() => s.peek()).toThrow('cannot use a disposed signal');
   });
 
   it('addObservedHooks fires onObserved/onUnobserved exactly at first-subscriber/last-unsubscriber edges', () => {
@@ -137,7 +172,7 @@ describe('Signal', () => {
         expect(foreign.value).toBeDefined();
       })
     ).toThrow(
-      '[store] cross-runtime dependency is not allowed: a node was read while a node from another runtime was being tracked'
+      'cross-runtime dependency is not allowed: a node was read while a node from another runtime was being tracked'
     );
     foreign.dispose();
   });

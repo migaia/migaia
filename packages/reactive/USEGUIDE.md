@@ -55,7 +55,7 @@ class Signal<T> {
 | 成员 | 参数类型 | 同步/异步 | 行为 |
 | --- | --- | --- | --- |
 | `new Signal(v, runtime, options?)` | `v: T`；`runtime: IRuntime`；`options?: { debugName?: string }` | 同步 | 参数顺序是**值在前、`runtime` 在后**。`options.debugName` 用于诊断事件/错误信息里标识节点。 |
-| `get value` | 无参数（读取属性） | 同步 | 在有活跃追踪帧（正处在某个 `Computed`/`Effect` 求值中）时建立依赖边；已释放时抛 `[store] cannot use a disposed signal`。 |
+| `get value` | 无参数（读取属性） | 同步 | 在有活跃追踪帧（正处在某个 `Computed`/`Effect` 求值中）时建立依赖边；已释放时抛 `cannot use a disposed signal`。 |
 | `set value` | `value: T` | 同步 | 用 `Object.is` 做相等短路——写入相同值**不会**推进 `version`、不会通知任何订阅者。真正变化时：先领取新版本号，再写值，最后（异步地，见下）通知订阅者标脏。 |
 | `peek()` | 无参数 | 同步 | 读取当前值，**不建立依赖**——适合在 `Effect`/`Computed` 内"只读一次、不订阅"的场景。已释放同样抛错。 |
 | `dispose()` | 无参数 | 同步 | 幂等；标记 `disposed = true` 并断开全部下游订阅边。释放后的任何 `value`/`peek()` 读取都会抛错，不会返回旧值。 |
@@ -93,10 +93,10 @@ class Computed<T> {
 | `config.keepAlive` | `boolean`（构造参数字段，非独立可调用成员） | — | 默认 `false`。为 `true` 时，即使暂时没有任何订阅者也不会被自动挂起（依赖边持续保持），适合"每次都要花很久重算、宁可持续占用一点内存也不要频繁失效重建"的场景。 |
 | `get value` | 无参数（读取属性） | 同步 | 建立依赖边（供上层 `Computed`/`Effect` 追踪），并调用内部 `pull()` 完成惰性重算判定。 |
 | `peek()` | 无参数 | 同步 | 同样会触发惰性重算（保证读到的是最新值），但不建立依赖边。 |
-| `dispose()` | 无参数 | 同步 | 幂等；断开对全部上游的依赖 + 清空下游订阅。释放后的 `value`/`peek()`/`preview()` 一律抛 `[store] cannot read a disposed computed`。 |
-| 循环依赖（错误行为，非独立成员） | — | — | 求值过程中又读到了自己（直接或经过其它 `Computed` 间接形成环）会抛 `[store] circular computed dependency detected`，不会栈溢出。 |
+| `dispose()` | 无参数 | 同步 | 幂等；断开对全部上游的依赖 + 清空下游订阅。释放后的 `value`/`peek()`/`preview()` 一律抛 `cannot read a disposed computed`。 |
+| 循环依赖（错误行为，非独立成员） | — | — | 求值过程中又读到了自己（直接或经过其它 `Computed` 间接形成环）会抛 `circular computed dependency detected`，不会栈溢出。 |
 
-**投机求值 `preview()`**：为支持"可能被丢弃的渲染"（例如某些 UI 框架的并发渲染）设计——`preview()` 计算一次结果但**不提交缓存、不建立依赖边**。如果紧接着这次求值被真正提交（比如后续 `pull()` 命中同一版本号且依赖没变），内部会直接复用这次投机求值的结果，不会对同一版本重复调用 `fn` 两次。普通业务代码通常不需要直接调用它，它是给第 11 节的绑定原语用的。
+**投机求值 `preview()`**：为支持可能被丢弃的并发渲染设计。preview 使用 capture 记录依赖与版本，不建立正式订阅边；后续 `pull()` 只有在 capture 仍有效时才原子提交并复用结果，否则丢弃 capture 并重新 tracked 求值。普通业务代码通常不需要直接调用它。
 
 **自动挂起细节**：`Computed` 失去最后一个订阅者后，不是立刻挂起，而是登记一个"空闲时检查"（默认 `queueMicrotask`，可通过 `IRuntimeOptions.scheduleIdle` 配置）；如果在这之前又重新被订阅，挂起会被取消。真正挂起时会清空依赖边并标记为脏，下次读取时从头重新计算。`keepAlive: true` 完全跳过这套机制。
 
@@ -247,7 +247,7 @@ const runtime = createRuntime({
 | `subscription-listener` | 面向自定义订阅/监听场景的错误上报通道（供扩展层复用）。 |
 | `trace-listener` | `subscribeTrace`/`onTrace` 注册的监听器自身抛错，或返回的 Promise reject。 |
 
-默认 `onError`（不传时）把原始错误包进一个携带 `SCHEDULER_FAILED` 码的诊断错误再打印：`console.error('[store] reactive ${phase} error', tagged)`，原始错误挂在 `tagged.cause` 上按引用可达。错误不会被吞掉、也不会中断 Runtime，但**只会打印，不会自动上报到你的监控系统**，生产环境建议显式传 `onError`——传了之后拿到的就是**未经包装的原始错误**加一个 `context`，这条包装只发生在默认实现里。
+默认 `onError`（不传时）把原始错误包进一个携带 `SCHEDULER_FAILED` 码的诊断错误再打印：`console.error('reactive ${phase} error', tagged)`，原始错误挂在 `tagged.cause` 上按引用可达。错误不会被吞掉、也不会中断 Runtime，但**只会打印，不会自动上报到你的监控系统**，生产环境建议显式传 `onError`——传了之后拿到的就是**未经包装的原始错误**加一个 `context`，这条包装只发生在默认实现里。
 
 **同步路径 vs 异步路径的关键区别**：直接调用 `runtime.flush()`、`runtime.batch(fn)` 触发的冲刷，如果其中的 `Effect` 抛错，错误会**同步向上抛给调用方**（可以用 `try/catch` 直接捕获）；而由 `Signal` 写入自动触发的微任务冲刷，错误只会通过 `onError` 回调报告，不会变成一个未处理的 Promise 拒绝或全局异常——这是两条独立的路径，写业务代码时需要清楚当前的错误是从哪条路径来的。
 
@@ -287,9 +287,9 @@ stop();
 
 每个节点在构造时会登记归属于创建它的那个 `Runtime`（内部一张 `WeakMap`，不依赖字段名猜测）。三类边界会被显式检查：
 
-1. **依赖追踪跨界**：正在追踪某个 `Runtime` 的依赖时，读取了另一个 `Runtime` 的节点，抛 `[store] cross-runtime dependency is not allowed`。
-2. **图操作跨界**：把一个节点交给不属于它的 `Runtime` 做依赖/订阅相关操作，抛 `[store] ... belongs to another Runtime` 一类错误。
-3. **同一对象被登记到两个 `Runtime`**：视为编程错误（正常使用不会触发，只有手写扩展层伪造节点时才可能撞到），抛 `[store] this node is already owned by another Runtime`。
+1. **依赖追踪跨界**：正在追踪某个 `Runtime` 的依赖时，读取了另一个 `Runtime` 的节点，抛 `cross-runtime dependency is not allowed`。
+2. **图操作跨界**：把一个节点交给不属于它的 `Runtime` 做依赖/订阅相关操作，抛 `... belongs to another Runtime` 一类错误。
+3. **同一对象被登记到两个 `Runtime`**：视为编程错误（正常使用不会触发，只有手写扩展层伪造节点时才可能撞到），抛 `this node is already owned by another Runtime`。
 
 实践含义：**不要在多个 `Runtime` 之间传递 `Signal`/`Computed`/`Effect` 实例**。需要跨边界共享状态时，应该在边界处显式做"读取一个 Runtime 的值、写入另一个 Runtime 的 Signal"这样的同步逻辑，而不是直接复用节点对象。
 

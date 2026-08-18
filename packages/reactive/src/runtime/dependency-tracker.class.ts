@@ -1,9 +1,10 @@
 import type { IObservable, IObserver, IRuntime } from './types.js';
 import { internalsOf } from './internals.js';
 import { assertReactiveOwnedBy } from './ownership.js';
-import { describeObservable, describeObserver } from './diagnostics.js';
+import { describeObservable, describeObserver, emitTraceSafely } from './diagnostics.js';
 import { createReactiveError } from '../errors.js';
 import { ReactiveErrorCode } from '../error-code.js';
+import { ReactiveErrorText } from '../error-text.js';
 import {
   ReactiveDependencyKind,
   ReactiveErrorPhase,
@@ -112,7 +113,7 @@ export class DependencyTracker {
     if (activeTracker !== null && activeTracker.#hasActiveObserver()) {
       throw createReactiveError(
         ReactiveErrorCode.crossRuntime,
-        '[store] cross-runtime dependency is not allowed: a node was read while a node from another runtime was being tracked'
+        ReactiveErrorText.crossRuntimeDependency
       );
     }
     // 无人追踪（或对方处于 untracked）→ 无依赖可建，静默跳过
@@ -147,14 +148,26 @@ export class DependencyTracker {
       mutableNodeDeps(observer, observer.deps).delete(observable);
       mutableNodeVersions(observer, observer.depVersions).delete(observable);
       if (runtime.traceEnabled()) {
-        runtime.emitTrace({
-          type: ReactiveTraceType.dependency,
-          timestamp: runtime.timestamp(),
-          phase: ReactiveTracePhase.disconnect,
-          observable: describeObservable(observable),
-          observer: describeObserver(observer),
-          reason
-        });
+        emitTraceSafely(
+          {
+            timestamp: runtime.timestamp,
+            emitTrace: runtime.emitTrace,
+            reportError: (error) =>
+              observer.runtime.reportError(error, {
+                phase: ReactiveErrorPhase.traceListener,
+                observer,
+                observable
+              })
+          },
+          (timestamp) => ({
+            type: ReactiveTraceType.dependency,
+            timestamp,
+            phase: ReactiveTracePhase.disconnect,
+            observable: describeObservable(observable),
+            observer: describeObserver(observer),
+            reason
+          })
+        );
       }
     }
     for (const observer of observers) {
@@ -181,7 +194,7 @@ export class DependencyTracker {
     const prevTracker = swapActiveTracker(this);
     try {
       const result = fn();
-      this.#commit(observer, frame.nextDeps);
+      if (!observer.disposed) this.#commit(observer, frame.nextDeps);
       return result;
     } finally {
       this.#stack.pop();
@@ -220,7 +233,7 @@ export class DependencyTracker {
     if (internalsOf(observer.runtime).tracker !== this) {
       throw createReactiveError(
         ReactiveErrorCode.crossRuntime,
-        '[store] cannot commit a capture to an observer from another runtime'
+        ReactiveErrorText.captureDifferentRuntime
       );
     }
     // A Concurrent render may finish after its committed observer was
@@ -229,15 +242,12 @@ export class DependencyTracker {
     if (observer.disposed) {
       throw createReactiveError(
         ReactiveErrorCode.captureInvalid,
-        '[store] cannot commit a capture to a disposed observer'
+        ReactiveErrorText.captureDisposedObserver
       );
     }
     const state = this.#captures.get(capture);
     if (!state) {
-      throw createReactiveError(
-        ReactiveErrorCode.captureInvalid,
-        '[store] capture is invalid, already consumed, or belongs to another tracker'
-      );
+      throw createReactiveError(ReactiveErrorCode.captureInvalid, ReactiveErrorText.captureInvalid);
     }
     this.#captures.delete(capture);
     for (const [dep, recorded] of state.dependencies) {
@@ -255,12 +265,32 @@ export class DependencyTracker {
   }
 
   #commit(observer: IObserver, nextDeps: Set<IObservable>): void {
-    const prevDeps = observer.deps;
+    /** Stable pre-commit dependency snapshot; lifecycle callbacks may mutate the live view. */
+    const prevDeps = new Set(observer.deps);
+    /** Reverse edges added by this commit; terminal rollback removes only these edges. */
+    const newSubscriptions: IObservable[] = [];
     for (const dep of prevDeps) {
       if (!nextDeps.has(dep)) this.#unsubscribe(dep, observer);
+      if (observer.disposed) {
+        this.#rollbackTerminalCommit(observer, newSubscriptions);
+        return;
+      }
     }
     for (const dep of nextDeps) {
+      if (observer.disposed) {
+        this.#rollbackTerminalCommit(observer, newSubscriptions);
+        return;
+      }
       if (!prevDeps.has(dep)) this.#subscribe(dep, observer);
+      if (!prevDeps.has(dep)) newSubscriptions.push(dep);
+      if (observer.disposed) {
+        this.#rollbackTerminalCommit(observer, newSubscriptions);
+        return;
+      }
+    }
+    if (observer.disposed) {
+      this.#rollbackTerminalCommit(observer, newSubscriptions);
+      return;
     }
     const mutableDeps = mutableNodeDeps(observer, observer.deps);
     mutableDeps.clear();
@@ -270,6 +300,16 @@ export class DependencyTracker {
     const mutableVersions = mutableNodeVersions(observer, observer.depVersions);
     mutableVersions.clear();
     for (const [dep, version] of versions) mutableVersions.set(dep, version);
+  }
+
+  /**
+   * Rolls back newly installed reverse edges after a lifecycle callback terminally disposes
+   * observer.
+   */
+  #rollbackTerminalCommit(observer: IObserver, newSubscriptions: readonly IObservable[]): void {
+    for (const observable of newSubscriptions) this.#unsubscribe(observable, observer);
+    mutableNodeDeps(observer, observer.deps).clear();
+    mutableNodeVersions(observer, observer.depVersions).clear();
   }
 
   #subscribe(observable: IObservable, observer: IObserver): void {
@@ -290,13 +330,25 @@ export class DependencyTracker {
       }
     }
     if (runtime.traceEnabled()) {
-      runtime.emitTrace({
-        type: ReactiveTraceType.dependency,
-        timestamp: runtime.timestamp(),
-        phase: ReactiveTracePhase.connect,
-        observable: describeObservable(observable),
-        observer: describeObserver(observer)
-      });
+      emitTraceSafely(
+        {
+          timestamp: runtime.timestamp,
+          emitTrace: runtime.emitTrace,
+          reportError: (error) =>
+            observer.runtime.reportError(error, {
+              phase: ReactiveErrorPhase.traceListener,
+              observer,
+              observable
+            })
+        },
+        (timestamp) => ({
+          type: ReactiveTraceType.dependency,
+          timestamp,
+          phase: ReactiveTracePhase.connect,
+          observable: describeObservable(observable),
+          observer: describeObserver(observer)
+        })
+      );
     }
   }
 
@@ -305,14 +357,26 @@ export class DependencyTracker {
     if (!mutableSubs(observable).delete(observer)) return;
     const runtime = internalsOf(this.#runtime);
     if (runtime.traceEnabled()) {
-      runtime.emitTrace({
-        type: ReactiveTraceType.dependency,
-        timestamp: runtime.timestamp(),
-        phase: ReactiveTracePhase.disconnect,
-        observable: describeObservable(observable),
-        observer: describeObserver(observer),
-        reason: ReactiveTraceReason.retrack
-      });
+      emitTraceSafely(
+        {
+          timestamp: runtime.timestamp,
+          emitTrace: runtime.emitTrace,
+          reportError: (error) =>
+            observer.runtime.reportError(error, {
+              phase: ReactiveErrorPhase.traceListener,
+              observer,
+              observable
+            })
+        },
+        (timestamp) => ({
+          type: ReactiveTraceType.dependency,
+          timestamp,
+          phase: ReactiveTracePhase.disconnect,
+          observable: describeObservable(observable),
+          observer: describeObserver(observer),
+          reason: ReactiveTraceReason.retrack
+        })
+      );
     }
     if (observable.subs.size === 0) {
       try {

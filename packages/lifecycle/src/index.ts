@@ -24,12 +24,17 @@ export {
 export { createAbortController, type IAbortSignal, type IAbortController } from './abort.js';
 
 export { LifecycleErrorCode, type ILifecycleErrorCode } from './error-code.js';
+export { LifecycleErrorText, type ILifecycleErrorText } from './error-text.js';
 
 export {
   systemScheduler,
+  snapshotScheduler,
   createManualScheduler,
+  validateSchedulerDelay,
+  validateSchedulerTime,
   type IScheduledTask,
   type ILifecycleScheduler,
+  type ISchedulerSnapshot,
   type IManualScheduler
 } from './scheduler.js';
 

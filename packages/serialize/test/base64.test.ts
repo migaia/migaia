@@ -8,6 +8,17 @@ function randomBytes(length: number): Uint8Array {
 }
 
 describe('bytesToBase64 / base64ToBytes', () => {
+  it('rejects malformed padding, impossible lengths, and non-zero unused bits', () => {
+    for (const input of ['A', 'AAAA=', 'AAAA===', 'AB==', 'A===', 'AA=A']) {
+      expect(() => base64ToBytes(input), input).toThrow(
+        expect.objectContaining({
+          code: 'INVALID_OPTION',
+          source: '@migaia/serialize'
+        })
+      );
+    }
+  });
+
   it('round-trips empty input', () => {
     expect(base64ToBytes(bytesToBase64(new Uint8Array(0)))).toEqual(new Uint8Array(0));
   });

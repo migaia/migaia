@@ -7,9 +7,29 @@ import type {
   IRuntimeNodeKind,
   IRuntimeTraceEvent
 } from './types.js';
+import { ReactiveTracePhase, ReactiveTraceType } from './trace-constants.js';
 import { assimilateThenable } from './receiver.js';
 
 type INodeRole = 'observable' | 'observer';
+
+/** Host callbacks used to contain every trace clock and sink failure at the diagnostic boundary. */
+export type ITraceDiagnosticHost = {
+  readonly timestamp: () => number;
+  readonly emitTrace: (event: IRuntimeTraceEvent) => void;
+  readonly reportError: (error: unknown) => void;
+};
+
+/** Host callbacks needed to keep one observer-run trace span failure-contained. */
+export type IObserverRunTraceHost = ITraceDiagnosticHost & {
+  readonly now: () => number;
+};
+
+/** Controls one observer-run trace span and prevents duplicate terminal events. */
+export type IObserverRunTrace = {
+  start(): void;
+  end(): void;
+  error(error: unknown): void;
+};
 
 const nodeDescriptors = new WeakMap<object, IRuntimeNodeDescriptor>();
 const copiedDescriptors = new WeakMap<object, IRuntimeNodeDescriptor>();
@@ -52,6 +72,130 @@ export function containDiagnosticRejection(
       // This is the terminal diagnostic boundary.
     }
   });
+}
+
+/** Report a diagnostic failure without allowing a failing reporter to escape the boundary. */
+function reportDiagnosticFailure(host: ITraceDiagnosticHost, error: unknown): void {
+  try {
+    host.reportError(error);
+  } catch {
+    // Reporting is already the terminal diagnostic boundary.
+  }
+}
+
+/** Read one diagnostic clock and return a fallback sample when the host clock fails. */
+export function readDiagnosticClock(
+  read: () => number,
+  fallback: number,
+  reportFailure: (error: unknown) => void
+): number {
+  try {
+    return read();
+  } catch (error) {
+    try {
+      reportFailure(error);
+    } catch {
+      // Reporting is already the terminal diagnostic boundary.
+    }
+    return fallback;
+  }
+}
+
+/** Emit one diagnostic event with timestamp and sink containment; never changes caller control flow. */
+export function emitTraceSafely(
+  host: ITraceDiagnosticHost,
+  createEvent: (timestamp: number) => IRuntimeTraceEvent,
+  fallbackTimestamp = 0
+): void {
+  const timestamp = readDiagnosticClock(host.timestamp, fallbackTimestamp, (error) =>
+    reportDiagnosticFailure(host, error)
+  );
+  try {
+    host.emitTrace(createEvent(timestamp));
+  } catch (error) {
+    reportDiagnosticFailure(host, error);
+  }
+}
+
+/**
+ * Creates a failure-contained observer-run trace span. Clock and sink failures are reported through
+ * the existing diagnostic boundary, while fallback samples preserve a terminal event and never
+ * replace the observer's primary error or lifecycle result.
+ */
+export function createObserverRunTrace(
+  observer: IRuntimeNodeDescriptor,
+  host: IObserverRunTraceHost
+): IObserverRunTrace {
+  /** Reports a diagnostic failure without allowing a failing reporter to escape this boundary. */
+  const reportFailure = (error: unknown): void => {
+    reportDiagnosticFailure(host, error);
+  };
+
+  /** Reads one diagnostic clock and reports failures before returning its fallback sample. */
+  const readClock = (read: () => number, fallback: number): number => {
+    return readDiagnosticClock(read, fallback, reportFailure);
+  };
+
+  /** Attempts one trace emission and reports failures without changing observer control flow. */
+  const emit = (event: IRuntimeTraceEvent): void => {
+    try {
+      host.emitTrace(event);
+    } catch (error) {
+      reportFailure(error);
+    }
+  };
+
+  /** Tracks whether this controller attempted its single start emission. */
+  let started = false;
+  /** Prevents catch/finally or reentrant callers from emitting two terminal events. */
+  let terminal = false;
+  /** Last valid monotonic sample used to calculate or recover terminal duration. */
+  let startedAt = 0;
+  /** Last valid event timestamp used to recover terminal event timestamps. */
+  let startedTimestamp = 0;
+
+  /** Emits exactly one start event, using zero when either start clock is unavailable. */
+  const start = (): void => {
+    if (started) return;
+    started = true;
+    startedAt = readClock(host.now, 0);
+    startedTimestamp = readClock(host.timestamp, 0);
+    emit({
+      type: ReactiveTraceType.observerRun,
+      timestamp: startedTimestamp,
+      phase: ReactiveTracePhase.start,
+      observer
+    });
+  };
+
+  /** Emits one successful terminal event and ignores later terminal attempts. */
+  const end = (): void => {
+    if (!started || terminal) return;
+    terminal = true;
+    emit({
+      type: ReactiveTraceType.observerRun,
+      timestamp: readClock(host.timestamp, startedTimestamp),
+      phase: ReactiveTracePhase.end,
+      observer,
+      durationMs: readClock(host.now, startedAt) - startedAt
+    });
+  };
+
+  /** Emits one error terminal event while preserving the caller's original error identity. */
+  const error = (primaryError: unknown): void => {
+    if (!started || terminal) return;
+    terminal = true;
+    emit({
+      type: ReactiveTraceType.observerRun,
+      timestamp: readClock(host.timestamp, startedTimestamp),
+      phase: ReactiveTracePhase.error,
+      observer,
+      durationMs: readClock(host.now, startedAt) - startedAt,
+      error: primaryError
+    });
+  };
+
+  return { start, end, error };
 }
 
 /**

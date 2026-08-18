@@ -17,7 +17,10 @@ export {
   type ISerializeParser,
   type ISerializePhase,
   type ISerializePlugin,
-  type ISerializeRegistry
+  type ISerializeRegistry,
+  type ISerializeScheduler,
+  type ITextDecoder,
+  type ITextEncoder
 } from './types.js';
 
 export {

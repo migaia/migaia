@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createDisposeTransaction, executeReleaseDescriptor } from '../src/dispose-transaction';
+import { LifecycleErrorCode } from '../src/error-code.js';
+import { LIFECYCLE_SOURCE } from '../src/errors.js';
 import { systemScheduler } from '../src/scheduler.js';
 import type { IReleaseContext, IReleaseDescriptor } from '../src/types';
 
@@ -45,6 +47,38 @@ describe('L-T21 custom escape hatch', () => {
     };
     await executeReleaseDescriptor(descriptor, baseContext());
     expect(resolved).toBe(true);
+  });
+});
+
+describe('AF-T62 direct release descriptor scheduler boundary', () => {
+  it('snapshots a hostile context scheduler before invoking graceful', async () => {
+    let reads = 0;
+    const scheduler = {
+      now: () => 0,
+      schedule: () => ({ cancel: () => {} })
+    };
+    const context = {
+      signal: new AbortController().signal,
+      deadlineAt: undefined,
+      get scheduler() {
+        reads++;
+        if (reads > 1) throw new Error('scheduler context was re-read');
+        return scheduler;
+      },
+      report: () => {}
+    };
+
+    await executeReleaseDescriptor(
+      {
+        graceful: (received) => {
+          expect(received.scheduler).toBeDefined();
+        },
+        force: () => {}
+      },
+      context
+    );
+
+    expect(reads).toBe(1);
   });
 });
 
@@ -272,6 +306,107 @@ describe('L-T26 IReleaseContext: report and signal', () => {
   });
 });
 
+describe('L-T50 DisposeTransaction: signal registration and cleanup failures', () => {
+  it('releases items and drains pending work when signal registration throws after storing', async () => {
+    const registrationError = new Error('signal registration failed');
+    const removalError = new Error('signal removal failed');
+    const force = vi.fn();
+    const drain = vi.fn(async () => undefined);
+    let registeredListener: (() => void) | undefined;
+    const signal = {
+      aborted: false,
+      reason: 'closing',
+      addEventListener: (_type: 'abort', listener: () => void) => {
+        registeredListener = listener;
+        throw registrationError;
+      },
+      removeEventListener: (_type: 'abort', listener: () => void) => {
+        expect(listener).toBe(registeredListener);
+        throw removalError;
+      }
+    };
+    const transaction = createDisposeTransaction(
+      { kind: 'plan' },
+      { errorPolicy: 'throw', signal, pending: { drain } }
+    );
+
+    let thrown: unknown;
+    try {
+      await transaction.run([{ source: 'resource', descriptor: { force } }]);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(force).toHaveBeenCalledTimes(1);
+    expect(drain).toHaveBeenCalledTimes(1);
+    expect(thrown).toBe(registrationError);
+    expect((thrown as { errors?: readonly unknown[] }).errors).toContain(removalError);
+  });
+
+  it('keeps remove failure secondary to an item primary and still reaches pending/finalize', async () => {
+    const itemError = new Error('item failed');
+    const removalError = new Error('remove failed');
+    const drain = vi.fn(async () => undefined);
+    const signal = {
+      aborted: false,
+      reason: undefined,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(() => {
+        throw removalError;
+      })
+    };
+    const transaction = createDisposeTransaction(
+      { kind: 'plan' },
+      { errorPolicy: 'throw', signal, pending: { drain } }
+    );
+
+    let thrown: unknown;
+    try {
+      await transaction.run([
+        {
+          source: 'resource',
+          descriptor: {
+            force: () => {
+              throw itemError;
+            }
+          }
+        }
+      ]);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(drain).toHaveBeenCalledTimes(1);
+    expect(thrown).toBe(itemError);
+    expect((thrown as { errors?: readonly unknown[] }).errors).toContain(removalError);
+  });
+
+  it('preserves collect policy for registration and removal failures', async () => {
+    const registrationError = new Error('registration failed');
+    const removalError = new Error('removal failed');
+    let registeredListener: (() => void) | undefined;
+    const signal = {
+      aborted: false,
+      reason: undefined,
+      addEventListener: (_type: 'abort', listener: () => void) => {
+        registeredListener = listener;
+        throw registrationError;
+      },
+      removeEventListener: (_type: 'abort', listener: () => void) => {
+        expect(listener).toBe(registeredListener);
+        throw removalError;
+      }
+    };
+    const transaction = createDisposeTransaction(
+      { kind: 'plan' },
+      { errorPolicy: 'collect', signal }
+    );
+
+    const result = await transaction.run([{ source: 'resource', descriptor: { force: vi.fn() } }]);
+    expect(result.map((entry) => entry.error)).toEqual([registrationError, removalError]);
+  });
+});
+
 describe('L-T14 DisposeTransaction: order mode', () => {
   it('groups by descending order, releasing higher-order items first', async () => {
     const calls: string[] = [];
@@ -397,6 +532,287 @@ describe('L-T15 DisposeTransaction: ordered-plan mode', () => {
     // `order` values would reorder this in `order` mode; `plan` mode must ignore them entirely.
     expect(calls).toEqual(['first', 'second', 'third']);
   });
+});
+
+describe('L-T53 Luna descriptor admission isolation', () => {
+  it.each(['custom', 'graceful', 'force'] as const)(
+    'plan mode keeps releasing later items when %s getter throws',
+    async (field) => {
+      const admissionError = new Error(`${field} getter failed`);
+      const laterForce = vi.fn();
+      const hostile: Record<string, unknown> = { force: vi.fn() };
+      Object.defineProperty(hostile, field, {
+        get: () => {
+          throw admissionError;
+        }
+      });
+      const transaction = createDisposeTransaction({ kind: 'plan' }, { errorPolicy: 'collect' });
+
+      const result = await transaction.run([
+        { source: 'hostile', descriptor: hostile as IReleaseDescriptor },
+        { source: 'later', descriptor: { force: laterForce } }
+      ]);
+
+      expect(result).toEqual([{ source: 'hostile', error: admissionError }]);
+      expect(laterForce).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('plan mode never reads order and preserves input release order around hostile descriptors', async () => {
+    const orderGetter = vi.fn(() => {
+      throw new Error('plan order must not be read');
+    });
+    const calls: string[] = [];
+    const hostile = {
+      force: () => {
+        calls.push('hostile');
+      }
+    } as unknown as IReleaseDescriptor & {
+      readonly order: number;
+    };
+    Object.defineProperty(hostile, 'order', { get: orderGetter });
+    const transaction = createDisposeTransaction({ kind: 'plan' }, { errorPolicy: 'collect' });
+
+    const result = await transaction.run([
+      { source: 'first', descriptor: hostile },
+      {
+        source: 'second',
+        descriptor: {
+          force: () => {
+            calls.push('second');
+          }
+        }
+      }
+    ]);
+
+    expect(result).toEqual([]);
+    expect(calls).toEqual(['hostile', 'second']);
+    expect(orderGetter).not.toHaveBeenCalled();
+  });
+
+  it.each(['throw', 'collect', 'report', 'firstError'] as const)(
+    'plan admission failure follows %s policy while later release still runs',
+    async (errorPolicy) => {
+      const admissionError = new Error('descriptor admission failed');
+      const laterForce = vi.fn();
+      const report = vi.fn();
+      const hostile = {} as Record<string, unknown>;
+      Object.defineProperty(hostile, 'force', {
+        get: () => {
+          throw admissionError;
+        }
+      });
+      const transaction = createDisposeTransaction({ kind: 'plan' }, { errorPolicy, report });
+
+      const promise = transaction.run([
+        { source: 'hostile', descriptor: hostile as IReleaseDescriptor },
+        { source: 'later', descriptor: { force: laterForce } }
+      ]);
+      if (errorPolicy === 'collect') {
+        await expect(promise).resolves.toEqual([{ source: 'hostile', error: admissionError }]);
+      } else if (errorPolicy === 'report') {
+        await expect(promise).resolves.toEqual([]);
+        expect(report).toHaveBeenCalledWith(admissionError);
+      } else {
+        await expect(promise).rejects.toBe(admissionError);
+      }
+      expect(laterForce).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each(['throw', 'collect', 'report', 'firstError'] as const)(
+    'order mode excludes invalid order values, preserves numeric order, and follows %s policy',
+    async (errorPolicy) => {
+      const invalidForce = vi.fn();
+      const calls: string[] = [];
+      const report = vi.fn();
+      const invalid = { force: invalidForce, order: Number.NaN } as IReleaseDescriptor;
+      const transaction = createDisposeTransaction({ kind: 'order' }, { errorPolicy, report });
+
+      const promise = transaction.run([
+        { source: 'invalid', descriptor: invalid },
+        {
+          source: 'low',
+          descriptor: {
+            order: -1,
+            force: () => {
+              calls.push('low');
+            }
+          }
+        },
+        {
+          source: 'high',
+          descriptor: {
+            order: 10,
+            force: () => {
+              calls.push('high');
+            }
+          }
+        }
+      ]);
+      if (errorPolicy === 'collect') {
+        const result = await promise;
+        expect(result).toHaveLength(1);
+        expect(result[0]?.source).toBe('invalid');
+        expect(result[0]?.error).toMatchObject({ code: LifecycleErrorCode.invalidOption });
+      } else if (errorPolicy === 'report') {
+        await expect(promise).resolves.toEqual([]);
+        expect(report).toHaveBeenCalledWith(
+          expect.objectContaining({ code: LifecycleErrorCode.invalidOption })
+        );
+      } else {
+        await expect(promise).rejects.toMatchObject({ code: LifecycleErrorCode.invalidOption });
+      }
+      expect(invalidForce).not.toHaveBeenCalled();
+      expect(calls).toEqual(['high', 'low']);
+    }
+  );
+
+  it.each(['throw', 'collect', 'report', 'firstError'] as const)(
+    'order getter failure follows %s policy without aborting later release',
+    async (errorPolicy) => {
+      const orderError = new Error('order getter failed');
+      const invalidForce = vi.fn();
+      const laterForce = vi.fn();
+      const report = vi.fn();
+      const hostile = { force: invalidForce } as Record<string, unknown>;
+      Object.defineProperty(hostile, 'order', {
+        get: () => {
+          throw orderError;
+        }
+      });
+      const transaction = createDisposeTransaction({ kind: 'order' }, { errorPolicy, report });
+
+      const promise = transaction.run([
+        { source: 'hostile', descriptor: hostile as IReleaseDescriptor },
+        { source: 'later', descriptor: { order: 1, force: laterForce } }
+      ]);
+      if (errorPolicy === 'collect') {
+        await expect(promise).resolves.toEqual([{ source: 'hostile', error: orderError }]);
+      } else if (errorPolicy === 'report') {
+        await expect(promise).resolves.toEqual([]);
+        expect(report).toHaveBeenCalledWith(orderError);
+      } else {
+        await expect(promise).rejects.toBe(orderError);
+      }
+      expect(invalidForce).not.toHaveBeenCalled();
+      expect(laterForce).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('admission failures still drain pending work and finalize after all valid releases', async () => {
+    const admissionError = new Error('custom getter failed');
+    const laterForce = vi.fn();
+    const drain = vi.fn(async () => undefined);
+    const hostile = { force: vi.fn() } as Record<string, unknown>;
+    Object.defineProperty(hostile, 'custom', {
+      get: () => {
+        throw admissionError;
+      }
+    });
+    const transaction = createDisposeTransaction(
+      { kind: 'order' },
+      { errorPolicy: 'collect', pending: { drain } }
+    );
+
+    const result = await transaction.run([
+      { source: 'hostile', descriptor: hostile as IReleaseDescriptor },
+      { source: 'later', descriptor: { order: 1, force: laterForce } }
+    ]);
+
+    expect(result).toEqual([{ source: 'hostile', error: admissionError }]);
+    expect(laterForce).toHaveBeenCalledTimes(1);
+    expect(drain).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('L-T55 Luna descriptor timeout admission', () => {
+  it.each(['plan', 'order'] as const)(
+    '%s mode rejects invalid gracefulTimeoutMs per policy',
+    async (kind) => {
+      for (const gracefulTimeoutMs of [Number.NaN, Number.POSITIVE_INFINITY, -1, '10'] as const) {
+        for (const errorPolicy of ['throw', 'collect', 'report', 'firstError'] as const) {
+          const graceful = vi.fn();
+          const force = vi.fn();
+          const laterForce = vi.fn();
+          const report = vi.fn();
+          const events: string[] = [];
+          const drain = vi.fn(async () => {
+            events.push('drain');
+          });
+          const transaction = createDisposeTransaction(
+            { kind },
+            { errorPolicy, report, pending: { drain } }
+          );
+          const invalidDescriptor = {
+            order: 100,
+            graceful,
+            gracefulTimeoutMs,
+            force
+          } as unknown as IReleaseDescriptor;
+          const promise = transaction.run([
+            { source: 'invalid-timeout', descriptor: invalidDescriptor },
+            {
+              source: 'later',
+              descriptor: {
+                force: () => {
+                  events.push('later-force');
+                  laterForce();
+                }
+              }
+            }
+          ]);
+
+          let observedError: unknown;
+
+          if (errorPolicy === 'collect') {
+            const result = await promise;
+            expect(result).toHaveLength(1);
+            expect(result[0]).toMatchObject({
+              source: 'invalid-timeout',
+              error: {
+                source: LIFECYCLE_SOURCE,
+                code: LifecycleErrorCode.invalidOption
+              }
+            });
+            observedError = result[0]?.error;
+            expect((observedError as { cause?: unknown }).cause).toBeUndefined();
+          } else if (errorPolicy === 'report') {
+            await expect(promise).resolves.toEqual([]);
+            expect(report).toHaveBeenCalledTimes(1);
+            observedError = report.mock.calls[0]?.[0];
+            expect(observedError).toMatchObject({
+              source: LIFECYCLE_SOURCE,
+              code: LifecycleErrorCode.invalidOption
+            });
+            expect((observedError as { cause?: unknown }).cause).toBeUndefined();
+          } else {
+            try {
+              await promise;
+              expect.fail(`error policy ${errorPolicy} unexpectedly resolved`);
+            } catch (error) {
+              observedError = error;
+            }
+            expect(observedError).toMatchObject({
+              source: LIFECYCLE_SOURCE,
+              code: LifecycleErrorCode.invalidOption
+            });
+            expect((observedError as { cause?: unknown }).cause).toBeUndefined();
+          }
+
+          expect(observedError).toBeInstanceOf(
+            typeof gracefulTimeoutMs === 'number' ? RangeError : TypeError
+          );
+
+          expect(graceful).not.toHaveBeenCalled();
+          expect(force).not.toHaveBeenCalled();
+          expect(laterForce).toHaveBeenCalledTimes(1);
+          expect(events).toEqual(['later-force', 'drain']);
+          expect(drain).toHaveBeenCalledTimes(1);
+        }
+      }
+    }
+  );
 });
 
 describe('L-T32 DisposeTransaction: shared deadline across steps, not reset per step', () => {

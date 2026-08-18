@@ -28,7 +28,455 @@ type IRejectionHost = {
 };
 const rejectionHost = (globalThis as { process?: IRejectionHost }).process;
 
+type ITestAbortSignal = {
+  readonly aborted: boolean;
+  readonly reason: unknown;
+  addEventListener(
+    type: 'abort',
+    listener: () => void,
+    options?: { readonly once?: boolean }
+  ): void;
+  removeEventListener(type: 'abort', listener: () => void): void;
+};
+
+/** Await one hostile-signal result and verify its rejection is observed without a detached event. */
+const observeYieldResult = async (promise: Promise<unknown>): Promise<unknown> => {
+  const unhandled = vi.fn();
+  rejectionHost?.on('unhandledRejection', unhandled);
+  const result = await promise.catch((caught: unknown) => caught);
+  await Promise.resolve();
+  rejectionHost?.off('unhandledRejection', unhandled);
+  expect(unhandled).not.toHaveBeenCalled();
+  return result;
+};
+
 describe('sliceByFrameBudget：按实测耗时定片大小', () => {
+  it('owns scheduler getter and clock failures at the serialize core boundary', async () => {
+    const getterFailure = new Error('now getter failed');
+    const getterScheduler = {
+      get now(): () => number {
+        throw getterFailure;
+      },
+      schedule: () => ({ cancel() {} })
+    };
+    const callFailure = new Error('now call failed');
+    const callScheduler = {
+      now: () => {
+        throw callFailure;
+      },
+      schedule: () => ({ cancel() {} })
+    };
+
+    for (const schedulerOption of [getterScheduler, callScheduler]) {
+      const error = await sliceByFrameBudget(rows(1), {
+        scheduler: schedulerOption
+      })
+        .next()
+        .catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(TypeError);
+      expect(error).toMatchObject({
+        source: '@migaia/serialize',
+        code: 'INVALID_OPTION',
+        cause: schedulerOption === getterScheduler ? getterFailure : callFailure,
+        message:
+          schedulerOption === getterScheduler
+            ? 'serialize scheduler accessor could not be read'
+            : 'serialize scheduler now() must return a number'
+      });
+    }
+  });
+
+  it('owns non-finite scheduler clock values with native RangeError semantics', async () => {
+    for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      const error = await sliceByFrameBudget(rows(1), {
+        scheduler: { now: () => value, schedule: () => ({ cancel() {} }) }
+      })
+        .next()
+        .catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(RangeError);
+      expect(error).toMatchObject({
+        source: '@migaia/serialize',
+        code: 'INVALID_OPTION',
+        message: 'serialize scheduler now() must return a finite number'
+      });
+    }
+  });
+
+  it('owns scheduler schedule and task cancel-accessor failures with causes', async () => {
+    const scheduleFailure = new Error('schedule failed');
+    const scheduleThrowing = {
+      now: () => 0,
+      schedule: () => {
+        throw scheduleFailure;
+      }
+    };
+    const cancelGetterFailure = new Error('cancel getter failed');
+    const cancelGetterThrowing = {
+      now: () => 0,
+      schedule: () => ({
+        get cancel(): () => void {
+          throw cancelGetterFailure;
+        }
+      })
+    };
+
+    for (const schedulerOption of [scheduleThrowing, cancelGetterThrowing]) {
+      const iterator = sliceByFrameBudget(rows(2), {
+        initialItems: 1,
+        minItems: 1,
+        maxItems: 1,
+        scheduler: schedulerOption
+      });
+      await iterator.next();
+      const error = await iterator.next().catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(TypeError);
+      expect(error).toMatchObject({
+        source: '@migaia/serialize',
+        code: 'INVALID_OPTION',
+        cause: schedulerOption === scheduleThrowing ? scheduleFailure : cancelGetterFailure,
+        message:
+          schedulerOption === scheduleThrowing
+            ? 'serialize scheduler must be { now, schedule }'
+            : 'serialize scheduler task cancel accessor could not be read'
+      });
+    }
+  });
+
+  it('retains the default-yield task and cancels it once after asynchronous callback settlement', async () => {
+    let runCallback: (() => void) | undefined;
+    const cancel = vi.fn();
+    const iterator = sliceByFrameBudget(rows(2), {
+      initialItems: 1,
+      minItems: 1,
+      maxItems: 1,
+      scheduler: {
+        now: () => 0,
+        schedule: (callback) => {
+          runCallback = callback;
+          return { cancel };
+        }
+      }
+    });
+
+    await expect(iterator.next()).resolves.toMatchObject({ value: [{ id: 0 }], done: false });
+    const next = iterator.next();
+    await Promise.resolve();
+    expect(cancel).not.toHaveBeenCalled();
+    runCallback?.();
+    await expect(next).resolves.toMatchObject({ value: [{ id: 1 }], done: false });
+    expect(cancel).toHaveBeenCalledTimes(1);
+    await iterator.return(undefined);
+  });
+
+  it('cancels a task returned after a synchronous default-yield callback', async () => {
+    const cancel = vi.fn();
+    const iterator = sliceByFrameBudget(rows(2), {
+      initialItems: 1,
+      minItems: 1,
+      maxItems: 1,
+      scheduler: {
+        now: () => 0,
+        schedule: (callback) => {
+          callback();
+          return { cancel };
+        }
+      }
+    });
+
+    await iterator.next();
+    await expect(iterator.next()).resolves.toMatchObject({ value: [{ id: 1 }], done: false });
+    expect(cancel).toHaveBeenCalledTimes(1);
+    await iterator.return(undefined);
+  });
+
+  it('settles default yield on abort and preserves cancel failure as secondary', async () => {
+    const controller = new AbortController();
+    const cancelFailure = new Error('yield cancel failed');
+    let runCallback: (() => void) | undefined;
+    const iterator = sliceByFrameBudget(rows(2), {
+      initialItems: 1,
+      minItems: 1,
+      maxItems: 1,
+      signal: controller.signal,
+      scheduler: {
+        now: () => 0,
+        schedule: (callback) => {
+          runCallback = callback;
+          return {
+            cancel: () => {
+              throw cancelFailure;
+            }
+          };
+        }
+      }
+    });
+
+    await iterator.next();
+    const next = iterator.next();
+    await Promise.resolve();
+    controller.abort('stream disposed');
+    const error = await next.catch((caught: unknown) => caught);
+    expect(error).toMatchObject({
+      source: '@migaia/serialize',
+      code: 'ABORTED',
+      cause: 'stream disposed',
+      errors: [
+        expect.objectContaining({
+          source: '@migaia/serialize',
+          code: 'INVALID_OPTION',
+          cause: cancelFailure
+        })
+      ]
+    });
+    expect(cancelFailure).not.toBe(error);
+    runCallback?.();
+  });
+
+  it('translates default-yield cancel failure to serialize INVALID_OPTION', async () => {
+    const cancelFailure = new Error('cancel failed');
+    let runCallback: (() => void) | undefined;
+    const iterator = sliceByFrameBudget(rows(2), {
+      initialItems: 1,
+      minItems: 1,
+      maxItems: 1,
+      scheduler: {
+        now: () => 0,
+        schedule: (callback) => {
+          runCallback = callback;
+          return {
+            cancel: () => {
+              throw cancelFailure;
+            }
+          };
+        }
+      }
+    });
+
+    await iterator.next();
+    const next = iterator.next();
+    await Promise.resolve();
+    runCallback?.();
+    await expect(next).rejects.toMatchObject({
+      source: '@migaia/serialize',
+      code: 'INVALID_OPTION',
+      cause: cancelFailure,
+      message: 'serialize scheduler task cancel() failed'
+    });
+  });
+
+  it.each(['stored-then-abort', 'abort-then-store'] as const)(
+    'rechecks a signal that aborts synchronously during %s registration without scheduling',
+    async (registrationOrder) => {
+      const reason = `${registrationOrder} reason`;
+      let aborted = false;
+      let storedListener: (() => void) | undefined;
+      let removeCalls = 0;
+      let scheduleCalls = 0;
+      const signal: ITestAbortSignal = {
+        get aborted() {
+          return aborted;
+        },
+        get reason() {
+          return reason;
+        },
+        addEventListener(_type, listener) {
+          if (registrationOrder === 'abort-then-store') aborted = true;
+          storedListener = listener;
+          if (registrationOrder === 'stored-then-abort') aborted = true;
+        },
+        removeEventListener(_type, listener) {
+          removeCalls++;
+          expect(listener).toBe(storedListener);
+        }
+      };
+      const iterator = sliceByFrameBudget(rows(2), {
+        initialItems: 1,
+        minItems: 1,
+        maxItems: 1,
+        signal,
+        scheduler: {
+          now: () => 0,
+          schedule: () => {
+            scheduleCalls++;
+            return { cancel: vi.fn() };
+          }
+        }
+      });
+
+      await iterator.next();
+      const error = await observeYieldResult(iterator.next());
+      expect(error).toMatchObject({
+        source: '@migaia/serialize',
+        code: 'ABORTED',
+        cause: reason
+      });
+      expect(scheduleCalls).toBe(0);
+      expect(removeCalls).toBe(1);
+      expect(storedListener).toBeDefined();
+    }
+  );
+
+  it('preserves stored-then-throw registration failure and listener cleanup failure', async () => {
+    const registrationFailure = new Error('registration failed');
+    const removeFailure = new Error('remove failed');
+    let storedListener: (() => void) | undefined;
+    let removeCalls = 0;
+    let scheduleCalls = 0;
+    const signal: ITestAbortSignal = {
+      aborted: false,
+      reason: 'unused',
+      addEventListener(_type, listener) {
+        storedListener = listener;
+        throw registrationFailure;
+      },
+      removeEventListener(_type, listener) {
+        removeCalls++;
+        expect(listener).toBe(storedListener);
+        throw removeFailure;
+      }
+    };
+    const iterator = sliceByFrameBudget(rows(2), {
+      initialItems: 1,
+      minItems: 1,
+      maxItems: 1,
+      signal,
+      scheduler: {
+        now: () => 0,
+        schedule: () => {
+          scheduleCalls++;
+          return { cancel: vi.fn() };
+        }
+      }
+    });
+
+    await iterator.next();
+    const error = await observeYieldResult(iterator.next());
+    expect(error).toMatchObject({
+      source: '@migaia/serialize',
+      code: 'INVALID_OPTION',
+      message: 'serialize abort signal listener registration failed',
+      cause: registrationFailure,
+      errors: [
+        expect.objectContaining({
+          source: '@migaia/serialize',
+          code: 'INVALID_OPTION',
+          cause: removeFailure
+        })
+      ]
+    });
+    expect(scheduleCalls).toBe(0);
+    expect(removeCalls).toBe(1);
+  });
+
+  it.each([false, true] as const)(
+    'keeps registration primary when addEventListener invokes abort before it %s',
+    async (throwsAfterCallback) => {
+      const registrationFailure = new Error('registration failed after callback');
+      const reason = 'callback reason';
+      let storedListener: (() => void) | undefined;
+      let removeCalls = 0;
+      let scheduleCalls = 0;
+      const signal: ITestAbortSignal = {
+        get aborted() {
+          return storedListener !== undefined;
+        },
+        reason,
+        addEventListener(_type, listener) {
+          storedListener = listener;
+          listener();
+          if (throwsAfterCallback) throw registrationFailure;
+        },
+        removeEventListener(_type, listener) {
+          removeCalls++;
+          expect(listener).toBe(storedListener);
+        }
+      };
+      const iterator = sliceByFrameBudget(rows(2), {
+        initialItems: 1,
+        minItems: 1,
+        maxItems: 1,
+        signal,
+        scheduler: {
+          now: () => 0,
+          schedule: () => {
+            scheduleCalls++;
+            return { cancel: vi.fn() };
+          }
+        }
+      });
+
+      await iterator.next();
+      const error = await observeYieldResult(iterator.next());
+      if (throwsAfterCallback) {
+        expect(error).toMatchObject({
+          source: '@migaia/serialize',
+          code: 'INVALID_OPTION',
+          message: 'serialize abort signal listener registration failed',
+          cause: registrationFailure
+        });
+      } else {
+        expect(error).toMatchObject({
+          source: '@migaia/serialize',
+          code: 'ABORTED',
+          cause: reason
+        });
+      }
+      expect(scheduleCalls).toBe(0);
+      expect(removeCalls).toBe(1);
+    }
+  );
+
+  it('preserves abort primary when partial-registration listener removal fails', async () => {
+    const removeFailure = new Error('abort listener remove failed');
+    const reason = 'partial registration abort';
+    let storedListener: (() => void) | undefined;
+    let aborted = false;
+    let removeCalls = 0;
+    const signal: ITestAbortSignal = {
+      get aborted() {
+        return aborted;
+      },
+      reason,
+      addEventListener(_type, listener) {
+        storedListener = listener;
+        aborted = true;
+      },
+      removeEventListener(_type, listener) {
+        removeCalls++;
+        expect(listener).toBe(storedListener);
+        throw removeFailure;
+      }
+    };
+    const iterator = sliceByFrameBudget(rows(2), {
+      initialItems: 1,
+      minItems: 1,
+      maxItems: 1,
+      signal,
+      scheduler: {
+        now: () => 0,
+        schedule: () => {
+          throw new Error('schedule must not run');
+        }
+      }
+    });
+
+    await iterator.next();
+    const error = await observeYieldResult(iterator.next());
+    expect(error).toMatchObject({
+      source: '@migaia/serialize',
+      code: 'ABORTED',
+      cause: reason,
+      errors: [
+        expect.objectContaining({
+          source: '@migaia/serialize',
+          code: 'INVALID_OPTION',
+          cause: removeFailure
+        })
+      ]
+    });
+    expect(removeCalls).toBe(1);
+  });
+
   it('covers every item exactly once and in order', async () => {
     const items = rows(1000);
     const seen: number[] = [];
@@ -133,7 +581,7 @@ describe('sliceByFrameBudget：按实测耗时定片大小', () => {
 
   it('rejects a missing scheduler (R-4: core 无默认 timer)', async () => {
     await expect(sliceByFrameBudget(rows(1), {} as never).next()).rejects.toThrow(
-      'frame budget scheduler must be { now, schedule }'
+      'serialize scheduler must be { now, schedule }'
     );
   });
 
@@ -294,6 +742,53 @@ describe('encodeStream：不拼装地吐流', () => {
     expect(unhandled).not.toHaveBeenCalled();
     await registry.dispose();
   });
+
+  it('observes a rejecting queued encode immediately while draining in order', async () => {
+    let resolveFirst!: (chunk: ISerializeChunk) => void;
+    const first = new Promise<ISerializeChunk>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const secondFailure = new Error('second encode failed');
+    let encodeCalls = 0;
+    const registry = {
+      primaryType: 'test',
+      encode: () => (++encodeCalls === 1 ? first : Promise.reject(secondFailure)),
+      decode: async () => undefined,
+      close: () => undefined,
+      dispose: async () => undefined,
+      types: ['test'] as const,
+      has: () => true
+    };
+    const unhandled = vi.fn();
+    rejectionHost?.on('unhandledRejection', unhandled);
+    const stream = encodeStream(registry as never, rows(2), {
+      initialItems: 1,
+      minItems: 1,
+      maxItems: 1,
+      maxInFlight: 2,
+      yieldTo: immediateYield,
+      scheduler: scheduler()
+    });
+
+    const firstRead = stream.next();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(unhandled).not.toHaveBeenCalled();
+
+    resolveFirst(['text', 'first']);
+    await expect(firstRead).resolves.toMatchObject({
+      value: ['text', 'first'],
+      done: false
+    });
+    const secondError = await stream.next().catch((error: unknown) => error);
+    expect(secondError).toBeInstanceOf(SerializeCodecError);
+    expect(secondError).toMatchObject({
+      source: '@migaia/serialize',
+      code: 'ENCODE_FAILED',
+      cause: secondFailure
+    });
+    await stream.return(undefined);
+    rejectionHost?.off('unhandledRejection', unhandled);
+  });
 });
 
 describe('decodeStream 与 collectStream', () => {
@@ -358,5 +853,128 @@ describe('decodeStream 与 collectStream', () => {
       yield ['value', { a: 1 }];
     }
     await expect(collectStream(withValue())).rejects.toThrow('cannot collect a value chunk');
+  });
+
+  it('wraps hostile async and sync iterator protocol failures for decode and collect', async () => {
+    type IProtocolScenario = {
+      readonly name: string;
+      readonly cause: Error;
+      readonly make: () => unknown;
+      readonly cleanupCalls: { value: number };
+      readonly expectedCleanup: number;
+    };
+    const scenarios: IProtocolScenario[] = [];
+    const addGetterScenario = (
+      name: string,
+      key: typeof Symbol.asyncIterator | typeof Symbol.iterator
+    ) => {
+      const cause = new Error(`${name} getter failed`);
+      const cleanupCalls = { value: 0 };
+      scenarios.push({
+        name,
+        cause,
+        cleanupCalls,
+        expectedCleanup: 0,
+        make: () => {
+          const source: Record<PropertyKey, unknown> = {};
+          Object.defineProperty(source, key, {
+            get: () => {
+              throw cause;
+            }
+          });
+          return source;
+        }
+      });
+    };
+
+    addGetterScenario('async iterator', Symbol.asyncIterator);
+    addGetterScenario('sync iterator', Symbol.iterator);
+    for (const name of ['next', 'done', 'value', 'thenable'] as const) {
+      const kinds =
+        name === 'thenable' ? [Symbol.asyncIterator] : [Symbol.asyncIterator, Symbol.iterator];
+      for (const kind of kinds) {
+        const cause = new Error(
+          `${name}-${kind === Symbol.asyncIterator ? 'async' : 'sync'} failed`
+        );
+        const cleanupCalls = { value: 0 };
+        scenarios.push({
+          name: `${name}-${kind === Symbol.asyncIterator ? 'async' : 'sync'}`,
+          cause,
+          cleanupCalls,
+          expectedCleanup: kind === Symbol.asyncIterator ? 0 : 2,
+          make: () => ({
+            [kind]() {
+              return {
+                next: () => {
+                  if (name === 'next') throw cause;
+                  if (name === 'done')
+                    return {
+                      get done() {
+                        throw cause;
+                      }
+                    };
+                  if (name === 'value')
+                    return {
+                      done: false,
+                      get value() {
+                        throw cause;
+                      }
+                    };
+                  return {
+                    // oxlint-disable-next-line unicorn/no-thenable -- hostile protocol fixture.
+                    then: () => {
+                      throw cause;
+                    }
+                  };
+                },
+                return: () => {
+                  cleanupCalls.value += 1;
+                  return { done: true, value: undefined };
+                }
+              };
+            }
+          })
+        });
+      }
+    }
+
+    for (const scenario of scenarios) {
+      const decodeRegistry = createSerializeRegistry([jsonPlugin()]);
+      const decodeError = await decodeStream(decodeRegistry, scenario.make() as never, {
+        type: 'json',
+        context: 'hostile-protocol'
+      })
+        .next()
+        .catch((error: unknown) => error);
+      expect(decodeError, scenario.name).toBeInstanceOf(SerializeCodecError);
+      expect((decodeError as { readonly cause?: unknown }).cause, scenario.name).toBe(
+        scenario.cause
+      );
+      expect(decodeError, scenario.name).toMatchObject({
+        source: '@migaia/serialize',
+        code: 'DECODE_FAILED',
+        phase: 'decode',
+        type: 'json',
+        context: 'hostile-protocol',
+        chunkIndex: 0,
+        cause: scenario.cause
+      });
+      await decodeRegistry.dispose();
+
+      const collectError = await collectStream(scenario.make() as never).catch(
+        (error: unknown) => error
+      );
+      expect(collectError, scenario.name).toBeInstanceOf(SerializeCodecError);
+      expect(collectError, scenario.name).toMatchObject({
+        source: '@migaia/serialize',
+        code: 'ENCODE_FAILED',
+        phase: 'encode',
+        type: 'stream',
+        context: 'stream',
+        chunkIndex: 0,
+        cause: scenario.cause
+      });
+      expect(scenario.cleanupCalls.value, scenario.name).toBe(scenario.expectedCleanup);
+    }
   });
 });

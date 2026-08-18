@@ -4,6 +4,7 @@ import type { IDisposer, IReactiveNodeOptions, IRuntime } from './types.js';
 import { Effect } from '../reactive/effect.class.js';
 import { createReactiveError } from '../errors.js';
 import { ReactiveErrorCode } from '../error-code.js';
+import { ReactiveErrorText } from '../error-text.js';
 
 /**
  * 一次捕获提交的完整结果。
@@ -79,7 +80,7 @@ export function createObserverBinding(runtime: IRuntime): IObserverBinding {
       if (observer && !observer.disposed) {
         throw createReactiveError(
           ReactiveErrorCode.bindingDuplicate,
-          '[store] observer binding is already observed'
+          ReactiveErrorText.observerBindingAlreadyObserved
         );
       }
       const current = new Effect(fn, runtime, options);
@@ -102,6 +103,7 @@ export function createObserverBinding(runtime: IRuntime): IObserverBinding {
       if (!current || current.disposed) return 'no-observer';
       const before = new Map(current.depVersions);
       current.run();
+      if (current.disposed) return 'no-observer';
       return dependenciesChanged(before, current.depVersions) ? 'changed' : 'unchanged';
     }
   };
