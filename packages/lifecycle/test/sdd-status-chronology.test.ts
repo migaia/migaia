@@ -199,22 +199,6 @@ const currentEvidenceDocuments: readonly { packageName: string; documentPath: st
   }
 ];
 
-/**
- * Normative SDD paths that must be reproducible in a checkout despite docs being ignored by
- * default.
- */
-const normativeSddPaths = [
-  'docs/review/foundation-runtime-adversarial-audit.sdd.md',
-  'docs/lifecycle/lifecycle-extraction.sdd.md',
-  'docs/resource/admission-boundary.sdd.md',
-  'docs/capability/admission-boundary.sdd.md',
-  'docs/reactive/reactive.sdd.md',
-  'docs/serialize/serialize-registry.sdd.md',
-  'docs/middleware-pipeline/middleware-pipeline.sdd.md',
-  'docs/plugin-host/runtime-neutral-foundation.sdd.md',
-  'docs/logger/logger-lifecycle-and-reliability.sdd.md'
-] as const;
-
 /** Stable Round30 finding/case pairs recorded in the foundation umbrella. */
 const round30Mappings = Array.from({ length: 11 }, (_, index) => {
   const number = index + 234;
@@ -373,41 +357,18 @@ describe('cross-SDD status chronology', () => {
     }
 
     const ignoreFile = readWorkspaceDocument('../../../.gitignore');
+    const ignoreRules = ignoreFile
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line !== '' && !line.startsWith('#'));
     const negatedPaths = ignoreFile
       .split('\n')
       .map((line) => line.trim())
       .filter((line) => line.startsWith('!'))
       .map((line) => line.slice(1));
-    expect(normativeSddPaths.every((path) => negatedPaths.includes(path))).toBe(true);
-    expect(negatedPaths.filter((path) => path.startsWith('docs/'))).toEqual([
-      'docs/utils/',
-      'docs/utils/public-utilities.sdd.md',
-      'docs/review/',
-      'docs/review/foundation-runtime-adversarial-audit.sdd.md',
-      'docs/lifecycle/',
-      'docs/lifecycle/lifecycle-extraction.sdd.md',
-      'docs/resource/',
-      'docs/resource/admission-boundary.sdd.md',
-      'docs/capability/',
-      'docs/capability/admission-boundary.sdd.md',
-      'docs/capability/capability-graph.sdd.md',
-      'docs/capability/capability-graph-readiness.sdd.md',
-      'docs/capability/capability-graph-notification.sdd.md',
-      'docs/capability/capability-graph-dynamic.sdd.md',
-      'docs/capability/capability-graph-cross-realm.sdd.md',
-      'docs/reactive/',
-      'docs/reactive/reactive.sdd.md',
-      'docs/serialize/',
-      'docs/serialize/serialize-registry.sdd.md',
-      'docs/middleware-pipeline/',
-      'docs/middleware-pipeline/middleware-pipeline.sdd.md',
-      'docs/plugin-host/',
-      'docs/plugin-host/runtime-neutral-foundation.sdd.md',
-      'docs/logger/',
-      'docs/logger/logger-lifecycle-and-reliability.sdd.md',
-      'docs/tray/',
-      'docs/tray/tray.sdd.md',
-      'docs/tray/tray-domain-adapters.sdd.md'
+    expect(ignoreRules.filter((path) => path === 'docs/' || path.startsWith('docs/'))).toEqual([
+      'docs/'
     ]);
+    expect(negatedPaths.filter((path) => path.startsWith('docs/'))).toEqual([]);
   });
 });
