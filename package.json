@@ -5,10 +5,11 @@
     "fmt": "pnpm -r --if-present run fmt",
     "build": "pnpm -r run build",
     "typecheck": "pnpm -r run typecheck",
-    "typecheck:consumers": "tsc --noEmit -p fixtures/consumers/tsconfig.node.json && tsc --noEmit -p fixtures/consumers/tsconfig.bun.json && tsc --noEmit -p fixtures/consumers/tsconfig.deno.json && tsc --noEmit -p fixtures/consumers/tsconfig.browser.json && tsc --noEmit -p fixtures/consumers/tsconfig.worker.json && tsc --noEmit -p fixtures/consumers/tsconfig.electron-main.json && tsc --noEmit -p fixtures/consumers/tsconfig.electron-renderer.json && tsc --noEmit -p fixtures/consumers/tsconfig.mini-program.json",
+    "typecheck:consumers": "bun scripts/typecheck-consumers.ts",
     "test": "pnpm run build && pnpm -r run test",
     "lint": "pnpm -r --if-present run lint",
     "@logger": "pnpm --filter ./packages/logger run",
+    "@event-subscriber": "pnpm --filter ./packages/event-subscriber run",
     "@web-rpc": "pnpm --filter ./packages/web-rpc run",
     "@plugin-host": "pnpm --filter ./packages/plugin-host run",
     "@storage-web": "pnpm --filter ./packages/storage-web run"

@@ -1,4 +1,4 @@
-import { createWebWorkerTransport } from '@migaia/web-rpc/web-worker'
+import { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'
 import { indexedDb, memoryStorage } from '@migaia/storage-web'
 import { WorkerAdapter } from '@migaia/store-worker'
 import { sharedInt32 } from '@migaia/store-shared'

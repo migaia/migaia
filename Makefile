@@ -1,15 +1,30 @@
 SHELL := /bin/sh
 export CI := true
 
-RELEASE_PACKAGES := middleware-pipeline plugin-host logger web-rpc storage-web
+# Topological order: every workspace dependency is published before its consumers.
+RELEASE_PACKAGES := lifecycle reactive middleware-pipeline event-subscriber serialize resource storage-contract plugin-host web-rpc logger storage-web
 GITHUB_PACKAGES_REGISTRY := https://npm.pkg.github.com
 
-.PHONY: middleware-pipeline plugin-host logger web-rpc storage-web \
+.PHONY: middleware-pipeline event-subscriber plugin-host logger web-rpc storage-web reactive resource lifecycle serialize storage-contract \
 	middleware-pipeline-check middleware-pipeline-patch middleware-pipeline-publish \
+	event-subscriber-check event-subscriber-patch event-subscriber-publish \
 	plugin-host-check logger-check web-rpc-check storage-web-check \
 	plugin-host-patch logger-patch web-rpc-patch storage-web-patch \
 	plugin-host-publish logger-publish web-rpc-publish storage-web-publish \
-	check-package release-check auth-check patch publish
+	reactive-check reactive-patch reactive-publish \
+	resource-check resource-patch resource-publish \
+	lifecycle-check lifecycle-patch lifecycle-publish \
+	serialize-check serialize-patch serialize-publish \
+	storage-contract-check storage-contract-patch storage-contract-publish \
+	check-package release-check auth-check patch publish ship
+
+ship:
+	@set -eu; \
+	for package in $(RELEASE_PACKAGES); do \
+		echo "==> shipping $$package"; \
+		$(MAKE) "$$package"; \
+	done; \
+	echo "==> all release packages shipped"
 
 check-package:
 	@if [ -z "$(PACKAGE)" ]; then \
@@ -17,7 +32,7 @@ check-package:
 		exit 2; \
 	fi; \
 	case "$(PACKAGE)" in \
-		middleware-pipeline|plugin-host|logger|web-rpc|storage-web) ;; \
+		middleware-pipeline|event-subscriber|plugin-host|logger|web-rpc|storage-web|reactive|resource|lifecycle|serialize|storage-contract) ;; \
 		*) echo "Unsupported PACKAGE=$(PACKAGE)" >&2; exit 2 ;; \
 	esac
 
@@ -25,9 +40,10 @@ release-check: check-package
 	@set -eu; \
 	package="$(PACKAGE)"; \
 	echo "==> checking @migaia/$$package"; \
+	pnpm @$$package fmt; \
 	pnpm @$$package lint; \
 	pnpm @$$package typecheck; \
-	if [ "$$package" = "middleware-pipeline" ] || [ "$$package" = "plugin-host" ] || [ "$$package" = "logger" ]; then \
+	if [ "$$package" = "middleware-pipeline" ] || [ "$$package" = "event-subscriber" ] || [ "$$package" = "plugin-host" ] || [ "$$package" = "logger" ] || [ "$$package" = "reactive" ] || [ "$$package" = "resource" ] || [ "$$package" = "lifecycle" ] || [ "$$package" = "serialize" ] || [ "$$package" = "storage-contract" ]; then \
 		pnpm @$$package typecheck:test; \
 	fi; \
 	if [ "$$package" = "logger" ]; then \
@@ -105,6 +121,78 @@ storage-web: release-check auth-check patch publish
 
 middleware-pipeline: PACKAGE := middleware-pipeline
 middleware-pipeline: release-check auth-check patch publish
+
+event-subscriber: PACKAGE := event-subscriber
+event-subscriber: release-check auth-check patch publish
+
+reactive: PACKAGE := reactive
+reactive: release-check auth-check patch publish
+
+resource: PACKAGE := resource
+resource: release-check auth-check patch publish
+
+lifecycle: PACKAGE := lifecycle
+lifecycle: release-check auth-check patch publish
+
+serialize: PACKAGE := serialize
+serialize: release-check auth-check patch publish
+
+storage-contract: PACKAGE := storage-contract
+storage-contract: release-check auth-check patch publish
+
+event-subscriber-check: PACKAGE := event-subscriber
+event-subscriber-check: release-check
+
+event-subscriber-patch: PACKAGE := event-subscriber
+event-subscriber-patch: patch
+
+event-subscriber-publish: PACKAGE := event-subscriber
+event-subscriber-publish: publish
+
+reactive-check: PACKAGE := reactive
+reactive-check: release-check
+
+reactive-patch: PACKAGE := reactive
+reactive-patch: patch
+
+reactive-publish: PACKAGE := reactive
+reactive-publish: publish
+
+resource-check: PACKAGE := resource
+resource-check: release-check
+
+resource-patch: PACKAGE := resource
+resource-patch: patch
+
+resource-publish: PACKAGE := resource
+resource-publish: publish
+
+lifecycle-check: PACKAGE := lifecycle
+lifecycle-check: release-check
+
+lifecycle-patch: PACKAGE := lifecycle
+lifecycle-patch: patch
+
+lifecycle-publish: PACKAGE := lifecycle
+lifecycle-publish: publish
+
+serialize-check: PACKAGE := serialize
+serialize-check: release-check
+
+serialize-patch: PACKAGE := serialize
+serialize-patch: patch
+
+serialize-publish: PACKAGE := serialize
+serialize-publish: publish
+
+storage-contract-check: PACKAGE := storage-contract
+storage-contract-check: release-check
+
+storage-contract-patch: PACKAGE := storage-contract
+storage-contract-patch: patch
+
+storage-contract-publish: PACKAGE := storage-contract
+storage-contract-publish: publish
 
 plugin-host-check: PACKAGE := plugin-host
 plugin-host-check: release-check
