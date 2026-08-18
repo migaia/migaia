@@ -7,6 +7,10 @@ import {
   createStoreKeyedRangeError,
   StoreKeyedErrorCode
 } from '../errors.js';
+import { StoreKeyedErrorText } from '../error-text.js';
+
+/** Maximum delay accepted by Web/Node timers; longer TTLs are re-armed in segments. */
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 /** Keys with deterministic Map/LRU semantics and no accidental object retention. */
 export type IFamilyKey = string | number | bigint | boolean | symbol | null | undefined | object;
@@ -48,19 +52,65 @@ type IFamilyNodeOptions<K extends IFamilyKey, V extends IDisposable> = IFamilyOp
   isObserved(value: V): boolean;
 };
 
-function validateOptions(options: IFamilyOptions): void {
-  const { maxSize, ttl = Infinity } = options;
-  if (maxSize !== undefined && (!Number.isInteger(maxSize) || maxSize < 1)) {
+type INormalizedFamilyOptions = {
+  readonly maxSize: number;
+  readonly ttl: number;
+  readonly now: (() => number) | undefined;
+};
+
+function validateOptions(options: IFamilyOptions): INormalizedFamilyOptions {
+  if (options === null || typeof options !== 'object') {
     throw createStoreKeyedRangeError(
       StoreKeyedErrorCode.invalidOption,
-      '[store] family maxSize must be a positive integer'
+      StoreKeyedErrorText.familyCapacity
     );
   }
-  if (ttl < 0 || Number.isNaN(ttl)) {
+  let maxSize: number | undefined;
+  let ttl: number | undefined;
+  let now: (() => number) | undefined;
+  try {
+    maxSize = options.maxSize;
+    ttl = options.ttl;
+    now = options.now;
+  } catch (error) {
+    throw createStoreKeyedError(
+      StoreKeyedErrorCode.invalidOption,
+      StoreKeyedErrorText.familyCapacity,
+      { cause: error }
+    );
+  }
+  ttl ??= Infinity;
+  if (maxSize !== undefined && (!Number.isSafeInteger(maxSize) || maxSize < 1)) {
     throw createStoreKeyedRangeError(
       StoreKeyedErrorCode.invalidOption,
-      '[store] family ttl must be non-negative'
+      StoreKeyedErrorText.familyCapacity
     );
+  }
+  if (typeof ttl !== 'number' || (ttl !== Infinity && (!Number.isFinite(ttl) || ttl < 0))) {
+    throw createStoreKeyedRangeError(
+      StoreKeyedErrorCode.invalidOption,
+      StoreKeyedErrorText.familyTtl
+    );
+  }
+  if (now !== undefined && typeof now !== 'function') {
+    throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, StoreKeyedErrorText.familyNow);
+  }
+  return { maxSize: maxSize ?? Infinity, ttl, now };
+}
+
+/** Reports timer cleanup failures without allowing a hostile reporter to escape the timer. */
+function reportFamilyTimerFailure(error: unknown): void {
+  try {
+    defaultRuntime.reportError(error, { phase: 'async-flush' });
+    return;
+  } catch (reporterError) {
+    const host = (globalThis as { reportError?: (value: unknown) => void }).reportError;
+    try {
+      if (host) host(reporterError);
+      else console.error(reporterError);
+    } catch {
+      // No diagnostic sink may turn an asynchronous cleanup report into an uncaught exception.
+    }
   }
 }
 
@@ -72,11 +122,42 @@ function validateOptions(options: IFamilyOptions): void {
 export function createFamily<K extends IFamilyKey, V extends IDisposable>(
   options: IFamilyNodeOptions<K, V>
 ): IFamily<K, V> {
-  validateOptions(options);
+  const normalizedOptions = validateOptions(options);
+  let createCallback: unknown;
+  let observedCallback: unknown;
+  try {
+    createCallback = options.create;
+    observedCallback = options.isObserved;
+  } catch (error) {
+    throw createStoreKeyedError(
+      StoreKeyedErrorCode.invalidOption,
+      StoreKeyedErrorText.familyCallback('create/isObserved'),
+      { cause: error }
+    );
+  }
+  if (typeof createCallback !== 'function') {
+    throw createStoreKeyedError(
+      StoreKeyedErrorCode.invalidOption,
+      StoreKeyedErrorText.familyCallback('create')
+    );
+  }
+  if (typeof observedCallback !== 'function') {
+    throw createStoreKeyedError(
+      StoreKeyedErrorCode.invalidOption,
+      StoreKeyedErrorText.familyCallback('isObserved')
+    );
+  }
+  const create = createCallback as (key: K) => V;
+  const isObserved = observedCallback as (value: V) => boolean;
+  const familyOptions = {
+    ...normalizedOptions,
+    create,
+    isObserved
+  };
   if (typeof WeakRef !== 'function' || typeof FinalizationRegistry !== 'function') {
     throw createStoreKeyedError(
       StoreKeyedErrorCode.envUnsupported,
-      '[store] createFamily() requires WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox'
+      StoreKeyedErrorText.createFamilyWeakRef
     );
   }
   const primitiveEntries = new Map<Exclude<K, object>, IFamilyEntry<V>>();
@@ -90,10 +171,10 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
   const dropObjectReference = (reference: WeakRef<IFamilyEntry<V>>): void => {
     if (objectEntryRefs.delete(reference)) liveEntryCount--;
   };
-  const now = options.now ?? Date.now;
-  const wallClock = options.now === undefined;
-  const ttl = options.ttl ?? Infinity;
-  const maxSize = options.maxSize ?? Infinity;
+  const now = familyOptions.now ?? Date.now;
+  const wallClock = familyOptions.now === undefined;
+  const ttl = familyOptions.ttl;
+  const maxSize = familyOptions.maxSize;
   let disposed = false;
   let accessClock = 0;
   let ttlTimer: ReturnType<typeof setTimeout> | undefined;
@@ -102,7 +183,7 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
     if (disposed)
       throw createStoreKeyedError(
         StoreKeyedErrorCode.familyDisposed,
-        '[store] cannot use a disposed family'
+        StoreKeyedErrorText.disposedFamily
       );
   };
 
@@ -138,7 +219,7 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
         // An expired observed entry is intentionally retained, but it must
         // not keep a proactive timer alive forever. It will be reconsidered
         // on the next family operation or when the caller stops observing it.
-        entry.expiresAt <= currentTime && options.isObserved(entry.value)
+        entry.expiresAt <= currentTime && familyOptions.isObserved(entry.value)
           ? earliest
           : Math.min(earliest, entry.expiresAt),
       Infinity
@@ -147,15 +228,18 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
     // An observed expired entry is intentionally retained. Keep checking at a
     // bounded cadence so it can be reclaimed after becoming unobserved, but
     // never turn an already-expired observed entry into a 0ms busy loop.
-    ttlTimer = setTimeout(
-      () => {
-        ttlTimer = undefined;
-        if (disposed) return;
+    const delay = Math.min(MAX_TIMER_DELAY_MS, Math.max(16, nextExpiry - currentTime));
+    ttlTimer = setTimeout(() => {
+      ttlTimer = undefined;
+      if (disposed) return;
+      try {
         prune();
-        armTtlTimer();
-      },
-      Math.max(16, nextExpiry - currentTime)
-    );
+      } catch (error) {
+        // Timer callbacks have no caller to receive a synchronous disposer
+        // failure; route it to the runtime diagnostics channel.
+        reportFamilyTimerFailure(error);
+      }
+    }, delay);
   };
 
   const touch = (entry: IFamilyEntry<V>): void => {
@@ -184,7 +268,7 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
     // 没有上限就永远淘汰不掉任何条目，但 liveEntries() 是全量拷贝 + 逐条 isObserved，
     // 而 get() 每次插入都会调用它——不在这里短路，建 n 个 key 就是 O(n²)。
     if (maxSize === Infinity) return 0;
-    const candidates = liveEntries().filter((entry) => !options.isObserved(entry.value));
+    const candidates = liveEntries().filter((entry) => !familyOptions.isObserved(entry.value));
     if (candidates.length <= maxSize) return 0;
     // 一次定序即可：原先每淘汰一个都要重扫最小值并复制整个候选集。
     // 被观察的条目不计入上限，与此前语义一致。
@@ -203,7 +287,7 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
       throw createStoreKeyedAggregateError(
         StoreKeyedErrorCode.evictionFailed,
         errors,
-        '[store] family capacity eviction failed for multiple entries'
+        StoreKeyedErrorText.evictionFailed
       );
     }
     return evictions;
@@ -212,22 +296,44 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
   const prune = (): number => {
     assertUsable();
     let removed = 0;
-    for (const entry of liveEntries()) {
-      if (expired(entry) && !options.isObserved(entry.value)) {
-        disposeEntry(entry);
-        removed++;
+    const errors: unknown[] = [];
+    try {
+      for (const entry of liveEntries()) {
+        if (expired(entry) && !familyOptions.isObserved(entry.value)) {
+          try {
+            disposeEntry(entry);
+          } catch (error) {
+            errors.push(error);
+          } finally {
+            // disposeEntry removes ownership before calling hostile cleanup.
+            removed++;
+          }
+        }
       }
+      try {
+        removed += enforceCapacity();
+      } catch (error) {
+        errors.push(error);
+      }
+    } finally {
+      armTtlTimer();
     }
-    const result = removed + enforceCapacity();
-    armTtlTimer();
-    return result;
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) {
+      throw createStoreKeyedAggregateError(
+        StoreKeyedErrorCode.disposalFailed,
+        errors,
+        StoreKeyedErrorText.familyDisposalFailed
+      );
+    }
+    return removed;
   };
 
   const get = (key: K): V => {
     assertUsable();
     const existing = entryFor(key);
     if (existing) {
-      if (expired(existing) && !options.isObserved(existing.value)) {
+      if (expired(existing) && !familyOptions.isObserved(existing.value)) {
         disposeEntry(existing);
       } else {
         touch(existing);
@@ -235,7 +341,7 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
       }
     }
 
-    const value = options.create(key);
+    const value = familyOptions.create(key);
     const weak = isObjectKey(key);
     const entry: IFamilyEntry<V> = {
       value,
@@ -278,7 +384,7 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
     assertUsable();
     const entry = entryFor(key);
     if (!entry) return undefined;
-    if (expired(entry) && !options.isObserved(entry.value)) {
+    if (expired(entry) && !familyOptions.isObserved(entry.value)) {
       disposeEntry(entry);
       armTtlTimer();
       return undefined;
@@ -346,7 +452,7 @@ function disposeAll(values: IDisposable[]): void {
     throw createStoreKeyedAggregateError(
       StoreKeyedErrorCode.disposalFailed,
       errors,
-      '[store] family disposal failed for multiple entries'
+      StoreKeyedErrorText.familyDisposalFailed
     );
   }
 }
@@ -355,14 +461,42 @@ export type IComputedFamilyOptions<T> = IFamilyOptions & {
   computed?: IComputedConfig<T>;
 };
 
+/** Materializes computed-family configuration once so entry creation never rereads user accessors. */
+function snapshotComputedFamilyOptions<T>(options: IComputedFamilyOptions<T>): {
+  readonly family: INormalizedFamilyOptions;
+  readonly computed: IComputedConfig<T> | undefined;
+} {
+  const family = validateOptions(options);
+  let computed: IComputedConfig<T> | undefined;
+  try {
+    computed = options.computed;
+  } catch (error) {
+    throw createStoreKeyedError(
+      StoreKeyedErrorCode.invalidOption,
+      StoreKeyedErrorText.familyComputedOptions,
+      { cause: error }
+    );
+  }
+  return { family, computed };
+}
+
 export function computedFamily<K extends IFamilyKey, T>(
   derive: (key: K) => T,
   runtime: IRuntime = defaultRuntime,
   options: IComputedFamilyOptions<T> = {}
 ): IFamily<K, IComputedValue<T>> {
+  if (typeof derive !== 'function') {
+    throw createStoreKeyedError(
+      StoreKeyedErrorCode.invalidOption,
+      StoreKeyedErrorText.familyCallback('derive')
+    );
+  }
+  const snapshot = snapshotComputedFamilyOptions(options);
   return createFamily({
-    ...options,
-    create: (key) => runtime.computed(() => derive(key), options.computed),
+    ...(snapshot.family.maxSize === Infinity ? {} : { maxSize: snapshot.family.maxSize }),
+    ttl: snapshot.family.ttl,
+    now: snapshot.family.now,
+    create: (key) => runtime.computed(() => derive(key), snapshot.computed),
     isObserved: (value) => value.observed
   });
 }

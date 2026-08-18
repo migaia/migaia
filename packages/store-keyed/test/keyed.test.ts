@@ -16,4 +16,13 @@ describe('store-keyed', () => {
     first.dispose();
     second.dispose();
   });
+
+  it('fails closed when an initial object cannot be independently cloned', () => {
+    const definition = atomDef({ callback: () => 1 });
+    const store = createAtomStore(createRuntime());
+    expect(() => store.get(definition)).toThrow(
+      expect.objectContaining({ code: 'INVALID_OPTION', cause: expect.anything() })
+    );
+    store.dispose();
+  });
 });

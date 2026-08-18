@@ -27,7 +27,12 @@ export function createStoreSharedError(
 /** Builds a `(source, code)`-tagged `RangeError`, preserving the runtime type. */
 export function createStoreSharedRangeError(
   code: IStoreSharedErrorCode,
-  message: string
+  message: string,
+  options?: { readonly cause?: unknown }
 ): RangeError {
-  return tagStoreSharedError(new RangeError(message), code);
+  const error = new RangeError(
+    message,
+    options?.cause !== undefined ? { cause: options.cause } : undefined
+  );
+  return tagStoreSharedError(error, code);
 }

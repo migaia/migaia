@@ -64,7 +64,7 @@ SSR 场景里最危险的错误是"两个并发请求共享了同一份可变状
 2. **`register()`/`registerResource()` 会强制校验归属**:传入的 Store/Resource 必须满足 `store.$runtime === this.runtime`(或 `resource.runtime === this.runtime`),否则直接抛错拒绝注册。这意味着即使不小心把一个挂在全局默认 Runtime、或另一个请求的 Runtime 上的 Store 传进来,也无法注册成功——校验在注册那一刻就拦下,不会等到脱水阶段才发现串数据。
 3. **`scope.runtime` 本身也向 `@migaia/reactive` 的所有权表登记**(内部调用 `claimOwnership`),防止同一个 Runtime 被两个 scope 同时声明所有权。
 
-因此正确的用法永远是:**为每个请求调用一次 `createSSRRequestScope()`,用 `scope.runtime` 创建这个请求要用的全部 Store/Resource,请求结束后 `scope.dispose()`**。把 Store 创建在进程级单例 Runtime 上再注册进 scope,是这个库明确设计为要拒绝的用法。
+因此正确的用法永远是:**为每个请求调用一次 `createSSRRequestScope()`,用 `scope.runtime` 创建这个请求要用的全部 Store/Resource,请求结束后 `await scope.disposeAsync()`**。只需同步关闭入口时可调用 `scope.dispose()`；真实 Store 的异步 `$dispose()` 仍由 `disposeAsync()` 等待。把 Store 创建在进程级单例 Runtime 上再注册进 scope,是这个库明确设计为要拒绝的用法。
 
 ---
 
@@ -103,7 +103,7 @@ type ISSRStore = {
   readonly $disposed: boolean;
   $plain(): Record<string, unknown>;       // 导出可脱水的纯数据快照
   $hydrate(state: Record<string, unknown>): void; // 应用一份快照
-  $dispose(): void;
+  $dispose(): void | PromiseLike<void>;
 };
 ```
 
@@ -139,11 +139,13 @@ const user = new Resource(fetchUser, scope.runtime, { ttl: 30_000 }); // 满足 
 | API | 参数 | 返回值 | 同步/异步 | 作用 |
 | --- | --- | --- | --- | --- |
 | `register(key, store, options?)` | `key: string`；`store: ISSRStore`；`options.owned?: boolean`(默认 `true`) | `void` | 同步 | 登记一个 Store。 |
-| `unregister(key, disposeOwned?)` | `key: string`；`disposeOwned: boolean`(默认 `true`) | `boolean`(是否存在过) | 同步 | 移除登记;`disposeOwned` 为真且该注册是 owned 时连带调用 `$dispose()`。 |
+| `unregister(key, disposeOwned?)` | `key: string`；`disposeOwned: boolean`(默认 `true`) | `boolean`(是否存在过) | 同步 | 移除登记;`disposeOwned` 为真且该注册是 owned 时启动 `$dispose()`；异步结果由 scope 观察。 |
 | `detach(key)` | `key: string` | `ISSRStore \| undefined` | 同步 | 移除登记但**不** dispose,所有权转交给调用方。 |
 | `registerResource(key, resource, options?)` | 同 `register` | `void` | 同步 | Resource 版的 `register`。 |
 | `unregisterResource(key, disposeOwned?)` | 同 `unregister` | `boolean` | 同步 | Resource 版的 `unregister`。 |
 | `detachResource(key)` | `key: string` | `ISSRResource \| undefined` | 同步 | Resource 版的 `detach`。 |
+| `dispose()` | 无 | `void` | 同步 | 关闭 scope、启动全部 owned cleanup；不等待 Store thenable。 |
+| `disposeAsync()` | 无 | `Promise<void>` | 异步 single-flight | 关闭并等待全部 cleanup，稳定重放完成或失败。 |
 
 `key` 不能为空字符串,也不能是 `'__proto__'`,否则抛 `Error('[store] invalid SSR store key')`——这条限制对 Store 和 Resource 的 key 都生效,是防止原型污染的第一道关卡。
 
@@ -233,9 +235,12 @@ const state = await scope.dehydrateAsync({
 
 ```ts
 scope.dispose();
+await scope.disposeAsync(); // 请求结束的推荐边界：等待所有异步 Store cleanup
 ```
 
 重复调用是安全的(`disposed` 已为真时直接返回,不重复执行)。销毁顺序:先按注册顺序的**逆序**销毁 owned 的 Resource,再逆序销毁 owned 的 Store(未标记 `owned: false`、且尚未 `disposed`/`$disposed` 的才会被销毁)。所有内部表(`registrations`、`resources`、待处理 hydrate)会先清空,再逐个尝试销毁——某一个 `$dispose()`/`dispose()` 抛错不会阻止其余条目继续销毁,错误收集起来最后统一抛出:一个失败直接抛出原始 error,多个失败抛出 `AggregateError('[store] SSR request scope disposal failed')`。
+
+`disposeAsync()` 是 single-flight 的最终释放边界：首次调用会触发 `dispose()`（若尚未调用），等待所有 Store `$dispose()` thenable settle，并按同一单错/多错规则拒绝；并发、完成后或失败后重复调用均返回同一 Promise。`dispose()` 保持同步关闭语义，但不能证明异步 Store cleanup 已完成。
 
 `dispose()` 还会 resolve 一个内部信号(`#disposedSignal`),这正是 `awaitResources()` 能在等待期间被 dispose 打断的机制——不需要等到当前这一轮 `Promise.allSettled` 结束才发现请求已经断开。
 

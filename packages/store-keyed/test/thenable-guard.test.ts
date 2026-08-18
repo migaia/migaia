@@ -1,3 +1,4 @@
+/* oxlint-disable unicorn/no-thenable -- adversarial fixtures verify thenable admission. */
 import { describe, expect, it } from 'vitest';
 import { createRuntime } from '@migaia/reactive';
 import { atomDef, atomDefFactory, createAtomStore, previewSafeAtomDefFactory } from '../src';
@@ -17,6 +18,34 @@ describe('thenable guard', () => {
 
     it('still accepts a plain, non-thenable init', () => {
       expect(() => atomDef(42)).not.toThrow();
+    });
+
+    it('contains a hostile then getter with one read and the original cause', () => {
+      const failure = new Error('then getter failed');
+      let reads = 0;
+      const hostile = Object.defineProperty({}, 'then', {
+        get() {
+          reads++;
+          throw failure;
+        }
+      });
+      expect(() => atomDef(hostile)).toThrow(
+        expect.objectContaining({
+          source: '@migaia/store-keyed',
+          code: 'INVALID_OPTION',
+          cause: failure
+        })
+      );
+      expect(reads).toBe(1);
+    });
+
+    it('rejects callable thenables instead of storing them as sync values', () => {
+      const callable = Object.assign(() => 42, {
+        then: () => undefined
+      });
+      expect(() => atomDef(callable)).toThrow(
+        expect.objectContaining({ source: '@migaia/store-keyed', code: 'INVALID_OPTION' })
+      );
     });
   });
 

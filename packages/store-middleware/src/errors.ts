@@ -23,3 +23,12 @@ export function createStoreMiddlewareError(
   );
   return tagStoreMiddlewareError(error, code);
 }
+
+/** Builds a tagged AggregateError while retaining every cleanup failure. */
+export function createStoreMiddlewareAggregateError(
+  code: IStoreMiddlewareErrorCode,
+  errors: readonly unknown[],
+  message: string
+): AggregateError {
+  return tagStoreMiddlewareError(new AggregateError(errors, message), code);
+}

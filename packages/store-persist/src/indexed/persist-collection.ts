@@ -2,6 +2,7 @@ import type { IRuntime } from '@migaia/reactive';
 import { persistUnit } from '../core/persist-unit.js';
 import type { ICodec } from '@migaia/storage-web';
 import type { IPersistHandle, IPersistStorage, IPersistUnit } from '../core/types.js';
+import { snapshotPersistOptions } from '../core/options.js';
 
 /**
  * `persistCollection()` 支持的四种 store-indexed 集合。全部都有 `snapshot()`（tracked 读， 内部读了一个结构性 Signal，包进
@@ -53,15 +54,16 @@ export function persistCollection<TState>(
   collection: IPersistableCollection<TState>,
   options: IPersistCollectionOptions<TState>
 ): IPersistHandle {
+  const snapshot = snapshotPersistOptions(options);
   return persistUnit(toPersistUnit(collection), {
-    key: options.key,
+    key: snapshot.key,
     runtime: collection.runtime,
-    storage: options.storage,
-    codec: options.codec,
-    version: options.version,
-    migrate: options.migrate,
-    partialize: options.partialize,
-    merge: options.merge,
-    debounceMs: options.debounceMs
+    storage: snapshot.storage,
+    codec: snapshot.codec,
+    version: snapshot.version,
+    migrate: snapshot.migrate,
+    partialize: snapshot.partialize,
+    merge: snapshot.merge,
+    debounceMs: snapshot.debounceMs
   });
 }

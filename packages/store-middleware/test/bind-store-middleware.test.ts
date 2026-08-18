@@ -1,8 +1,71 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { createRuntime } from '@migaia/reactive';
 import { createStore } from '@migaia/store-light';
-import { bindStoreMiddleware, createMutationPolicy, type IMiddlewareEvent } from '../src/index';
+import {
+  bindStoreMiddleware,
+  createMutationPolicy,
+  StoreMiddlewareHost,
+  type IMiddlewareEvent
+} from '../src/index';
 
 describe('bindStoreMiddleware', () => {
+  it('contains rollback reporter failure when host disposal also rejects', async () => {
+    const runtime = createRuntime();
+    let reporterCalled = false;
+    vi.spyOn(runtime, 'reportError').mockImplementation(() => {
+      reporterCalled = true;
+      throw new Error('runtime reporter failed');
+    });
+    vi.spyOn(runtime, 'subscribeTrace').mockImplementation(() => {
+      throw new Error('trace setup failed');
+    });
+    const disposeSpy = vi
+      .spyOn(StoreMiddlewareHost.prototype, 'dispose')
+      .mockRejectedValue(new Error('host cleanup failed'));
+    const cleanup = new Error('store unsubscribe failed');
+    const fakeStore = {
+      $runtime: runtime,
+      $plain: () => ({}),
+      $subscribe: () => () => {
+        throw cleanup;
+      }
+    } as never;
+
+    expect(() => bindStoreMiddleware(fakeStore)).toThrow();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(reporterCalled).toBe(true);
+    disposeSpy.mockRestore();
+  });
+
+  it('rolls back the store subscription when trace subscription construction fails', () => {
+    const runtime = createRuntime();
+    const cleanup = new Error('store unsubscribe failed');
+    let unsubscribeCalls = 0;
+    vi.spyOn(runtime, 'subscribeTrace').mockImplementation(() => {
+      throw new Error('trace setup failed');
+    });
+    const fakeStore = {
+      $runtime: runtime,
+      $plain: () => ({}),
+      $subscribe: () => () => {
+        unsubscribeCalls++;
+        throw cleanup;
+      }
+    } as never;
+
+    let thrown: unknown;
+    try {
+      bindStoreMiddleware(fakeStore);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(unsubscribeCalls).toBe(1);
+    expect(thrown).toMatchObject({
+      code: 'CLEANUP_FAILED',
+      errors: [expect.any(Error), cleanup]
+    });
+  });
+
   it('default clone (structuredClone) produces independent previous/next snapshots', () => {
     const store = createStore({ value: 1 });
     const host = bindStoreMiddleware(store);

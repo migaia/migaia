@@ -17,6 +17,124 @@ import {
 } from '../src';
 import type { ISSRStore, ISSRResource, ISSRState, ISSRDocument, ITrustedSSRState } from '../src';
 
+describe('SSR request scope runtime input boundary', () => {
+  it('contains revoked scope and registration options proxies', () => {
+    const scopeOptions = Proxy.revocable({}, {});
+    scopeOptions.revoke();
+    expect(() => new SSRRequestScope(scopeOptions.proxy as never)).toThrow(
+      expect.objectContaining({
+        source: '@migaia/store-ssr',
+        code: 'INVALID_OPTION',
+        cause: expect.any(Error)
+      })
+    );
+    const scope = createSSRRequestScope();
+    const registrationOptions = Proxy.revocable({}, {});
+    registrationOptions.revoke();
+    expect(() =>
+      scope.register('app', fakeStore(scope.runtime), registrationOptions.proxy as never)
+    ).toThrow(
+      expect.objectContaining({
+        source: '@migaia/store-ssr',
+        code: 'INVALID_OPTION',
+        cause: expect.any(Error)
+      })
+    );
+    scope.dispose();
+  });
+
+  it('snapshots request-scope runtime options exactly once', () => {
+    const runtimeOptions = {};
+    let reads = 0;
+    const options = {} as { readonly runtimeOptions?: typeof runtimeOptions };
+    Object.defineProperty(options, 'runtimeOptions', {
+      enumerable: true,
+      get: () => {
+        reads++;
+        if (reads > 1) throw new Error('runtimeOptions reread');
+        return runtimeOptions;
+      }
+    });
+    const scope = new SSRRequestScope(options);
+    expect(reads).toBe(1);
+    scope.dispose();
+  });
+  it('rejects non-boolean registration ownership flags', () => {
+    const scope = createSSRRequestScope();
+    expect(() =>
+      scope.register('app', fakeStore(scope.runtime), { owned: 'yes' as never })
+    ).toThrow(expect.objectContaining({ source: '@migaia/store-ssr', code: 'INVALID_OPTION' }));
+    scope.dispose();
+  });
+
+  it('snapshots registration ownership accessor exactly once', () => {
+    const scope = new SSRRequestScope();
+    const store = fakeStore(scope.runtime);
+    let reads = 0;
+    const options = {} as { readonly owned?: boolean };
+    Object.defineProperty(options, 'owned', {
+      get: () => {
+        reads++;
+        if (reads > 1) throw new Error('owned reread');
+        return false;
+      }
+    });
+    scope.register('accessor', store, options);
+    expect(reads).toBe(1);
+    scope.unregister('accessor');
+    scope.dispose();
+  });
+  it('rejects non-string registration keys before Map/object coercion', () => {
+    const scope = createSSRRequestScope();
+    const store = fakeStore(scope.runtime);
+    expect(() => scope.register(42 as never, store)).toThrow('[store] invalid SSR store key');
+    scope.dispose();
+  });
+
+  it('rejects null options with a tagged configuration error', () => {
+    expect(() => createSSRRequestScope(null as never)).toThrow(
+      '[store] SSR request scope options must be an object'
+    );
+  });
+
+  it('rejects timeout budgets that exceed the host timer maximum', async () => {
+    const scope = createSSRRequestScope();
+    await expect(scope.awaitResources({ timeoutMs: 2_147_483_648 })).rejects.toThrow(
+      '[store] SSR awaitResources timeoutMs must be finite and non-negative'
+    );
+    scope.dispose();
+  });
+
+  it('rejects null options at registration and codec-script boundaries', async () => {
+    const scope = createSSRRequestScope();
+    const store = fakeStore(scope.runtime);
+    expect(() => scope.register('store', store, null as never)).toThrow(
+      '[store] SSR request scope options must be an object'
+    );
+    expect(() =>
+      scope.registerResource(
+        'resource',
+        {
+          runtime: scope.runtime,
+          disposed: false,
+          promise: Promise.resolve(undefined),
+          dehydrate: () => undefined,
+          hydrate: () => undefined,
+          dispose: () => undefined
+        },
+        null as never
+      )
+    ).toThrow('[store] SSR request scope options must be an object');
+    await expect(
+      createSSRStateScriptWith({ version: 1, stores: {} }, null as never)
+    ).rejects.toThrow('[store] SSR request scope options must be an object');
+    await expect(readSSRStateFromDocumentWith(null as never)).rejects.toThrow(
+      '[store] SSR request scope options must be an object'
+    );
+    await scope.disposeAsync();
+  });
+});
+
 // ---- Test doubles ---------------------------------------------------------
 
 /** Minimal ISSRStore double. `data` is the live backing record returned by $plain(). */
@@ -218,6 +336,29 @@ describe('register()', () => {
     const retry = fakeStore(scope.runtime, { count: 0 });
     scope.register('app', retry);
     expect(retry.hydrateCalls).toEqual([{ count: 9 }]);
+    scope.dispose();
+  });
+
+  it('contains a snapshot getter that fails during hydration replay', () => {
+    const scope = createSSRRequestScope();
+    let reads = 0;
+    const state = {
+      version: 1 as const,
+      stores: {
+        get app() {
+          reads++;
+          if (reads > 1) throw new Error('snapshot replay failed');
+          return { count: 1 };
+        }
+      }
+    };
+    expect(() => scope.hydrate(state as never)).toThrow(
+      expect.objectContaining({
+        source: '@migaia/store-ssr',
+        code: 'INVALID_SNAPSHOT',
+        cause: expect.any(Error)
+      })
+    );
     scope.dispose();
   });
 
@@ -573,6 +714,23 @@ describe('dehydrateTrusted()', () => {
 // ---- awaitResources() / dehydrateAsync() -----------------------------------
 
 describe('awaitResources()', () => {
+  it('snapshots timeoutMs after validation', async () => {
+    const scope = new SSRRequestScope();
+    let reads = 0;
+    const options = {} as { readonly timeoutMs?: number };
+    Object.defineProperty(options, 'timeoutMs', {
+      enumerable: true,
+      get: () => {
+        reads++;
+        if (reads > 1) throw new Error('timeoutMs reread');
+        return 0;
+      }
+    });
+    expect(await scope.awaitResources(options)).toEqual([]);
+    expect(reads).toBe(1);
+    scope.dispose();
+  });
+
   it('rejects a negative timeoutMs synchronously', async () => {
     // `awaitResources()` is `async`, so even a throw on its very first line — before any
     // `await` — never escapes as a synchronous exception from the call expression; the async
@@ -710,6 +868,67 @@ describe('awaitResources()', () => {
 });
 
 describe('dehydrateAsync()', () => {
+  it('snapshots onResourceError accessor exactly once', async () => {
+    const scope = new SSRRequestScope();
+    let reads = 0;
+    const options = {} as { readonly onResourceError?: (failure: unknown) => void };
+    Object.defineProperty(options, 'onResourceError', {
+      enumerable: true,
+      get: () => {
+        reads++;
+        if (reads > 1) throw new Error('reporter reread');
+        return () => undefined;
+      }
+    });
+    await scope.dehydrateAsync(options);
+    expect(reads).toBe(1);
+    scope.dispose();
+  });
+
+  it('contains reporter failures and still reports remaining failures and dehydrates', async () => {
+    const scope = createSSRRequestScope();
+    scope.registerResource(
+      'bad-1',
+      fakeResource(scope.runtime, { promise: Promise.reject(new Error('one')) })
+    );
+    scope.registerResource(
+      'bad-2',
+      fakeResource(scope.runtime, { promise: Promise.reject(new Error('two')) })
+    );
+    const reported: string[] = [];
+    const state = await scope.dehydrateAsync({
+      onResourceError: (failure) => {
+        reported.push(failure.key);
+        throw new Error(`reporter-${failure.key}`);
+      }
+    });
+    expect(reported).toEqual(['bad-1', 'bad-2']);
+    expect(state.resources).toEqual({});
+    scope.dispose();
+  });
+
+  it('contains both user and runtime reporter failures at the final boundary', async () => {
+    const scope = new SSRRequestScope({
+      runtimeOptions: {
+        onError: () => {
+          throw new Error('runtime reporter failed');
+        }
+      }
+    });
+    scope.registerResource(
+      'bad',
+      fakeResource(scope.runtime, { promise: Promise.reject(new Error('resource failed')) })
+    );
+    await expect(
+      scope.dehydrateAsync({
+        onResourceError: () => {
+          throw new Error('user reporter failed');
+        }
+      })
+    ).resolves.toEqual({ version: 1, stores: {}, resources: {} });
+    scope.dispose();
+  });
+
   it('reports resource failures to Runtime.reportError by default and omits them from the payload', async () => {
     const onError = vi.fn();
     const scope = new SSRRequestScope({ runtimeOptions: { onError } });
@@ -750,6 +969,43 @@ describe('dehydrateAsync()', () => {
 // ---- dispose() --------------------------------------------------------------
 
 describe('dispose()', () => {
+  it('disposeAsync is single-flight and waits for asynchronous Store cleanup', async () => {
+    const scope = createSSRRequestScope();
+    const store = fakeStore(scope.runtime);
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    store.$dispose = () => pending;
+    scope.register('app', store);
+
+    const first = scope.disposeAsync();
+    const second = scope.disposeAsync();
+    expect(second).toBe(first);
+    let settled = false;
+    void second.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    release();
+    await first;
+    expect(scope.disposeAsync()).toBe(first);
+  });
+
+  it('disposeAsync replays an asynchronous Store cleanup rejection by identity', async () => {
+    const scope = createSSRRequestScope();
+    const store = fakeStore(scope.runtime);
+    const cleanupError = new Error('async store cleanup failed');
+    store.$dispose = () => Promise.reject(cleanupError);
+    scope.register('app', store);
+
+    const disposal = scope.disposeAsync();
+    await expect(disposal).rejects.toBe(cleanupError);
+    expect(scope.disposeAsync()).toBe(disposal);
+  });
+
   it('is idempotent', () => {
     const scope = createSSRRequestScope();
     const store = fakeStore(scope.runtime);
@@ -763,9 +1019,13 @@ describe('dispose()', () => {
     const scope = createSSRRequestScope();
     const order: string[] = [];
     const s1 = fakeStore(scope.runtime);
-    s1.$dispose = () => order.push('s1');
+    s1.$dispose = () => {
+      order.push('s1');
+    };
     const s2 = fakeStore(scope.runtime);
-    s2.$dispose = () => order.push('s2');
+    s2.$dispose = () => {
+      order.push('s2');
+    };
     const r1 = fakeResource(scope.runtime);
     r1.dispose = () => order.push('r1');
     const r2 = fakeResource(scope.runtime);
@@ -997,6 +1257,19 @@ function valueChunkPlugin(): ISerializePlugin {
 describe('createSSRStateScriptWith() / readSSRStateFromDocumentWith()', () => {
   const state: ISSRState = { version: 1, stores: { app: { count: 5 } } };
 
+  it('contains revoked options proxies as tagged errors', async () => {
+    const { proxy, revoke } = Proxy.revocable(
+      { codecs: createSerializeRegistry([jsonPlugin()]) },
+      {}
+    );
+    revoke();
+    await expect(createSSRStateScriptWith(state, proxy as never)).rejects.toMatchObject({
+      source: '@migaia/store-ssr',
+      code: 'INVALID_OPTION',
+      cause: expect.any(Error)
+    });
+  });
+
   it('routes a JSON codec through the same HTML-safe text path as createSSRStateScript', async () => {
     const codecs = createSerializeRegistry([jsonPlugin()]);
     const html = await createSSRStateScriptWith(state, { codecs });
@@ -1144,6 +1417,27 @@ describe('assertSSRState()', () => {
     const stores: Record<string, unknown> = {};
     Object.defineProperty(stores, '', { value: {}, enumerable: true });
     expect(() => assertSSRState({ version: 1, stores })).toThrow('[store] invalid SSR store key');
+  });
+
+  it('contains hostile snapshot getters as tagged invalid snapshots', () => {
+    const stores: Record<string, unknown> = {};
+    Object.defineProperty(stores, 'hostile', {
+      enumerable: true,
+      get: () => {
+        throw new Error('getter failure');
+      }
+    });
+    try {
+      assertSSRState({ version: 1, stores });
+      throw new Error('expected assertion to fail');
+    } catch (error) {
+      expect(error).toMatchObject({
+        source: '@migaia/store-ssr',
+        code: 'INVALID_SNAPSHOT',
+        message: '[store] stores could not be read safely'
+      });
+      expect((error as Error).cause).toBeInstanceOf(Error);
+    }
   });
 
   it('rejects a non-plain-object "resources"', () => {

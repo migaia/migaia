@@ -16,6 +16,37 @@ import {
   StoreSsrErrorCode
 } from './errors.js';
 import { SsrWireType, SsrWorkOutcome } from './ssr-constants.js';
+import { StoreSsrErrorText } from './error-text.js';
+
+/** Rejects null/non-object public options before SSR entry points read their fields. */
+function assertOptionObject(options: unknown): asserts options is object {
+  if (options === null || typeof options !== 'object')
+    throw createStoreSsrError(StoreSsrErrorCode.invalidOption, StoreSsrErrorText.optionsObject);
+  try {
+    Object.getOwnPropertyDescriptors(options);
+  } catch (error) {
+    throw createStoreSsrError(StoreSsrErrorCode.invalidOption, StoreSsrErrorText.optionsObject, {
+      cause: error
+    });
+  }
+}
+
+/** Reads registration ownership once so validation and commit share one stable decision. */
+function readRegistrationOwned(options: unknown): boolean {
+  assertOptionObject(options);
+  try {
+    const owned = (options as { readonly owned?: unknown }).owned;
+    if (owned !== undefined && typeof owned !== 'boolean') {
+      throw createStoreSsrError(StoreSsrErrorCode.invalidOption, StoreSsrErrorText.ownedOption);
+    }
+    return owned ?? true;
+  } catch (error) {
+    if (error instanceof Error && 'code' in error) throw error;
+    throw createStoreSsrError(StoreSsrErrorCode.invalidOption, StoreSsrErrorText.ownedOption, {
+      cause: error
+    });
+  }
+}
 
 export type IJSONPrimitive = string | number | boolean | null;
 export type IJSONValue =
@@ -44,7 +75,7 @@ export type ISSRStore = {
   readonly $disposed: boolean;
   $plain(): Record<string, unknown>;
   $hydrate(state: Record<string, unknown>): void;
-  $dispose(): void;
+  $dispose(): void | PromiseLike<void>;
 };
 
 export type ISSRResource = {
@@ -100,6 +131,8 @@ export type IAwaitResourcesOptions = {
 const MAX_RESOURCE_ROUNDS = 64;
 const MAX_JSON_DEPTH = 256;
 const MAX_JSON_NODES = 1_000_000;
+/** Host timer maximum; larger SSR budgets are rejected rather than truncated by the runtime. */
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 /**
  * `0` is explicitly allowed — see the call site's comment for what it means (expire immediately).
@@ -108,13 +141,17 @@ const MAX_JSON_NODES = 1_000_000;
  * defined meaning; `Infinity` silently means "never times out" via unbounded arithmetic. Both are
  * corruption-shaped inputs, not edge cases to tolerate.
  */
-function assertTimeoutMs(timeoutMs: number | undefined): void {
-  if (timeoutMs !== undefined && (!Number.isFinite(timeoutMs) || timeoutMs < 0)) {
+function assertTimeoutMs(timeoutMs: number | undefined): number | undefined {
+  if (
+    timeoutMs !== undefined &&
+    (!Number.isFinite(timeoutMs) || timeoutMs < 0 || timeoutMs > MAX_TIMEOUT_MS)
+  ) {
     throw createStoreSsrRangeError(
       StoreSsrErrorCode.invalidOption,
-      '[store] SSR awaitResources timeoutMs must be finite and non-negative'
+      StoreSsrErrorText.timeoutOption
     );
   }
+  return timeoutMs;
 }
 
 type IRaceOutcome<T> =
@@ -164,6 +201,12 @@ export class SSRRequestScope {
   #pendingHydration = new Map<string, Record<string, unknown>>();
   #pendingResourceHydration = new Map<string, IResourceCacheSnapshot<unknown>>();
   #disposed = false;
+  /** Async store cleanup jobs started by unregister/dispose and observed until settlement. */
+  #pendingDisposals = new Set<Promise<void>>();
+  /** Sync and async cleanup failures retained for `disposeAsync()` replay. */
+  #disposalErrors: unknown[] = [];
+  /** Stable completion returned by every `disposeAsync()` call. */
+  #disposePromise: Promise<void> | undefined;
   // Resolved from dispose(); lets awaitResources() race a genuinely pending
   // resource against "the request disconnected" instead of only noticing
   // dispose *between* rounds, after whatever was already in flight settles.
@@ -173,13 +216,24 @@ export class SSRRequestScope {
   });
 
   constructor(options: ISSRRequestScopeOptions = {}) {
-    if (options.runtime && options.runtimeOptions) {
+    assertOptionObject(options);
+    let runtime: IRuntime | undefined;
+    let runtimeOptions: IRuntimeOptions | undefined;
+    try {
+      runtime = options.runtime;
+      runtimeOptions = options.runtimeOptions;
+    } catch (error) {
+      throw createStoreSsrError(StoreSsrErrorCode.invalidOption, StoreSsrErrorText.optionsObject, {
+        cause: error
+      });
+    }
+    if (runtime && runtimeOptions) {
       throw createStoreSsrError(
         StoreSsrErrorCode.invalidOption,
-        '[store] SSR scope accepts runtime or runtimeOptions, not both'
+        StoreSsrErrorText.runtimeOptionsExclusive
       );
     }
-    this.runtime = options.runtime ?? createRuntime(options.runtimeOptions);
+    this.runtime = runtime ?? createRuntime(runtimeOptions);
     claimOwnership(this, this.runtime);
   }
 
@@ -189,17 +243,18 @@ export class SSRRequestScope {
 
   register(key: string, store: ISSRStore, options: ISSRRegistrationOptions = {}): void {
     this.#assertActive();
+    const owned = readRegistrationOwned(options);
     assertStoreKey(key);
     if (store.$runtime !== this.runtime) {
       throw createStoreSsrError(
         StoreSsrErrorCode.crossRuntime,
-        `[store] SSR store "${key}" belongs to a different Runtime`
+        StoreSsrErrorText.differentRuntime('store', key)
       );
     }
     if (this.#registrations.has(key)) {
       throw createStoreSsrError(
         StoreSsrErrorCode.invalidOption,
-        `[store] duplicate SSR store key: ${key}`
+        StoreSsrErrorText.duplicate('store', key)
       );
     }
     // Hydrate before committing the registration: if $hydrate() throws, a
@@ -209,7 +264,7 @@ export class SSRRequestScope {
     if (hydration) store.$hydrate(hydration);
     this.#registrations.set(key, {
       store,
-      owned: options.owned ?? true,
+      owned,
       order: 1
     });
     if (hydration) this.#pendingHydration.delete(key);
@@ -220,7 +275,9 @@ export class SSRRequestScope {
     const registration = this.#registrations.get(key);
     if (!registration) return false;
     this.#registrations.delete(key);
-    if (disposeOwned && registration.owned) registration.store.$dispose();
+    if (disposeOwned && registration.owned) {
+      this.#trackDisposal(registration.store.$dispose());
+    }
     return true;
   }
 
@@ -239,17 +296,18 @@ export class SSRRequestScope {
     options: ISSRRegistrationOptions = {}
   ): void {
     this.#assertActive();
+    const owned = readRegistrationOwned(options);
     assertStoreKey(key);
     if (resource.runtime !== this.runtime) {
       throw createStoreSsrError(
         StoreSsrErrorCode.crossRuntime,
-        `[store] SSR resource "${key}" belongs to a different Runtime`
+        StoreSsrErrorText.differentRuntime('resource', key)
       );
     }
     if (this.#resources.has(key)) {
       throw createStoreSsrError(
         StoreSsrErrorCode.invalidOption,
-        `[store] duplicate SSR resource key: ${key}`
+        StoreSsrErrorText.duplicate('resource', key)
       );
     }
     // Same ordering as register(): hydrate before committing, so a throw
@@ -258,7 +316,7 @@ export class SSRRequestScope {
     if (hydration) resource.hydrate(hydration);
     this.#resources.set(key, {
       resource,
-      owned: options.owned ?? true,
+      owned,
       order: 0
     });
     if (hydration) this.#pendingResourceHydration.delete(key);
@@ -301,8 +359,8 @@ export class SSRRequestScope {
     assertSSRState(state);
     const errors: unknown[] = [];
     const pending = new Map<string, Record<string, unknown>>();
-    for (const [key, snapshot] of Object.entries(state.stores)) {
-      const plain = jsonObjectToUnknownRecord(snapshot);
+    for (const [key, snapshot] of readSnapshotEntries(state.stores, 'stores')) {
+      const plain = jsonObjectToUnknownRecord(snapshot as Readonly<Record<string, IJSONValue>>);
       const registration = this.#registrations.get(key);
       if (!registration) {
         pending.set(key, plain);
@@ -316,10 +374,10 @@ export class SSRRequestScope {
     }
     this.#pendingHydration = pending;
     const pendingResources = new Map<string, IResourceCacheSnapshot<unknown>>();
-    for (const [key, snapshot] of Object.entries(state.resources ?? {})) {
+    for (const [key, snapshot] of readSnapshotEntries(state.resources ?? {}, 'resources')) {
       const hydration: IResourceCacheSnapshot<unknown> = {
-        ...snapshot,
-        data: jsonValueToUnknown(snapshot.data)
+        ...(snapshot as IResourceCacheSnapshot<unknown>),
+        data: jsonValueToUnknown((snapshot as IResourceCacheSnapshot<IJSONValue>).data)
       };
       const registration = this.#resources.get(key);
       if (!registration) {
@@ -338,7 +396,7 @@ export class SSRRequestScope {
       throw createStoreSsrAggregateError(
         StoreSsrErrorCode.hydrateFailed,
         errors,
-        '[store] SSR hydrate() failed for one or more stores/resources; entries that could apply were still applied (best-effort, not atomic)'
+        StoreSsrErrorText.hydrateFailed
       );
     }
   }
@@ -427,21 +485,22 @@ export class SSRRequestScope {
     options: IAwaitResourcesOptions = {}
   ): Promise<readonly ISSRResourceFailure[]> {
     this.#assertActive();
-    assertTimeoutMs(options.timeoutMs);
+    const timeoutMs = assertTimeoutMs(options.timeoutMs);
     const failures: ISSRResourceFailure[] = [];
     // 记录每个 key 上一次被等待的 promise 身份；getter 抛错的 key 记一个
     // 哨兵值，避免同一个持续抛错的 key 每轮重复报错。
     const observed = new Map<string, Promise<unknown>>();
     // timeoutMs: 0 是合法值，语义是"立刻过期"——deadline 就是此刻，第一轮
     // 检查 remaining 时几乎必然已经 <= 0，等价于完全不等待任何在途 resource。
-    const deadline = options.timeoutMs === undefined ? undefined : Date.now() + options.timeoutMs;
+    const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
     const timeoutFailures = (
       pending: ReadonlyArray<readonly [string, Promise<unknown>]>
     ): ISSRResourceFailure[] =>
       pending.map(([key]) => ({
         key,
-        error: new Error(
-          `[store] SSR resource "${key}" did not settle within ${options.timeoutMs}ms`
+        error: createStoreSsrError(
+          StoreSsrErrorCode.resourceTimeout,
+          StoreSsrErrorText.resourceTimeout(key, timeoutMs)
         )
       }));
     // 轮次上限：resource 的完成回调里无限注册新 resource 属于调用方的 bug，
@@ -487,7 +546,7 @@ export class SSRRequestScope {
     }
     throw createStoreSsrError(
       StoreSsrErrorCode.resourceRoundLimit,
-      `[store] SSR resources kept registering new resources past ${MAX_RESOURCE_ROUNDS} rounds`
+      StoreSsrErrorText.resourceRoundLimit(MAX_RESOURCE_ROUNDS)
     );
   }
 
@@ -498,12 +557,32 @@ export class SSRRequestScope {
    * 就以它为准。
    */
   async dehydrateAsync(options: IDehydrateAsyncOptions = {}): Promise<ISSRState> {
+    let onResourceError: IDehydrateAsyncOptions['onResourceError'];
+    let timeoutMs: number | undefined;
+    try {
+      onResourceError = options.onResourceError;
+      timeoutMs = options.timeoutMs;
+    } catch (error) {
+      throw createStoreSsrError(StoreSsrErrorCode.invalidOption, StoreSsrErrorText.optionsObject, {
+        cause: error
+      });
+    }
     const failures = await this.awaitResources({
-      timeoutMs: options.timeoutMs
+      timeoutMs
     });
     for (const failure of failures) {
-      if (options.onResourceError) options.onResourceError(failure);
-      else this.runtime.reportError(failure.error, { phase: ReactiveErrorPhase.ssrResource });
+      try {
+        if (onResourceError) onResourceError(failure);
+        else this.runtime.reportError(failure.error, { phase: ReactiveErrorPhase.ssrResource });
+      } catch (reporterError) {
+        // A user reporter is diagnostic-only; it cannot prevent remaining
+        // failures from being reported or the payload from being dehydrated.
+        try {
+          this.runtime.reportError(reporterError, { phase: ReactiveErrorPhase.ssrResource });
+        } catch {
+          // The runtime sink itself is the final best-effort boundary.
+        }
+      }
     }
     return this.dehydrate();
   }
@@ -524,8 +603,10 @@ export class SSRRequestScope {
       })),
       ...[...this.#registrations.values()].reverse().map((registration) => ({
         order: registration.order,
-        dispose: () => {
-          if (registration.owned && !registration.store.$disposed) registration.store.$dispose();
+        dispose: (): void | PromiseLike<void> => {
+          if (registration.owned && !registration.store.$disposed) {
+            return registration.store.$dispose();
+          }
         }
       }))
     ].sort((a, b) => a.order - b.order);
@@ -536,27 +617,62 @@ export class SSRRequestScope {
     const errors: unknown[] = [];
     for (const entry of entries) {
       try {
-        entry.dispose();
+        this.#trackDisposal(entry.dispose());
       } catch (error) {
         errors.push(error);
       }
     }
+    this.#disposalErrors.push(...errors);
     if (errors.length === 1) throw errors[0];
     if (errors.length > 1) {
       throw createStoreSsrAggregateError(
         StoreSsrErrorCode.scopeDisposalFailed,
         errors,
-        '[store] SSR request scope disposal failed'
+        StoreSsrErrorText.scopeDisposalFailed
       );
     }
   }
 
+  /**
+   * Awaitable teardown boundary for real Store Light instances whose `$dispose()` is asynchronous.
+   * Concurrent and repeated callers share the same completion and failure replay.
+   */
+  disposeAsync(): Promise<void> {
+    this.#disposePromise ??= (async () => {
+      try {
+        this.dispose();
+      } catch {
+        // Synchronous failures were recorded by dispose() and are replayed below.
+      }
+      await Promise.all(this.#pendingDisposals);
+      if (this.#disposalErrors.length === 1) throw this.#disposalErrors[0];
+      if (this.#disposalErrors.length > 1) {
+        throw createStoreSsrAggregateError(
+          StoreSsrErrorCode.scopeDisposalFailed,
+          this.#disposalErrors,
+          StoreSsrErrorText.scopeDisposalFailed
+        );
+      }
+    })();
+    return this.#disposePromise;
+  }
+
+  /** Observes a thenable cleanup without allowing a rejection to escape globally. */
+  #trackDisposal(result: void | PromiseLike<void>): void {
+    if (result === undefined) return;
+    const tracked = Promise.resolve(result).then(
+      () => undefined,
+      (error: unknown) => {
+        this.#disposalErrors.push(error);
+      }
+    );
+    this.#pendingDisposals.add(tracked);
+    void tracked.finally(() => this.#pendingDisposals.delete(tracked));
+  }
+
   #assertActive(): void {
     if (this.#disposed) {
-      throw createStoreSsrError(
-        StoreSsrErrorCode.scopeDisposed,
-        '[store] SSR request scope is disposed'
-      );
+      throw createStoreSsrError(StoreSsrErrorCode.scopeDisposed, StoreSsrErrorText.scopeDisposed);
     }
   }
 }
@@ -611,7 +727,7 @@ export function createSSRStateScript(state: ISSRState, elementId = '__STORE_STAT
   if (!SSR_ID_PATTERN.test(elementId)) {
     throw createStoreSsrError(
       StoreSsrErrorCode.invalidStateScript,
-      '[store] invalid SSR state script id'
+      StoreSsrErrorText.invalidScriptId
     );
   }
   return `<script type="application/json" id="${elementId}">${serializeSSRState(state)}</script>`;
@@ -655,7 +771,7 @@ function assertElementId(elementId: string): void {
   if (!SSR_ID_PATTERN.test(elementId)) {
     throw createStoreSsrError(
       StoreSsrErrorCode.invalidStateScript,
-      '[store] invalid SSR state script id'
+      StoreSsrErrorText.invalidScriptId
     );
   }
 }
@@ -677,6 +793,7 @@ export async function createSSRStateScriptWith(
   state: ISSRState,
   options: ISSRScriptOptions
 ): Promise<string> {
+  assertOptionObject(options);
   const { codecs, elementId = '__STORE_STATE__', signal } = options;
   assertElementId(elementId);
   assertSSRState(state);
@@ -689,7 +806,7 @@ export async function createSSRStateScriptWith(
   if (chunk[0] === SerializeChunkKind.value) {
     throw createStoreSsrTypeError(
       StoreSsrErrorCode.codecContract,
-      `[store] SSR codec ${type} must produce wire data, not a value chunk`
+      StoreSsrErrorText.codecOutput(type)
     );
   }
 
@@ -717,6 +834,7 @@ export type ISSRReadOptions = {
 export async function readSSRStateFromDocumentWith(
   options: ISSRReadOptions
 ): Promise<ISSRState | undefined> {
+  assertOptionObject(options);
   const { codecs, elementId = '__STORE_STATE__', document: documentValue, signal } = options;
   const element = documentValue?.getElementById(elementId);
   const text = element?.textContent;
@@ -727,7 +845,7 @@ export async function readSSRStateFromDocumentWith(
   if (!codecs.has(type)) {
     throw createStoreSsrError(
       StoreSsrErrorCode.codecContract,
-      `[store] SSR payload was written by codec "${type}", which is not registered`
+      StoreSsrErrorText.codecMissing(type)
     );
   }
   const chunk: ISerializeChunk =
@@ -742,8 +860,21 @@ export async function readSSRStateFromDocumentWith(
 }
 
 function assertStoreKey(key: string): void {
-  if (key.length === 0 || key === '__proto__') {
-    throw createStoreSsrError(StoreSsrErrorCode.invalidStoreKey, '[store] invalid SSR store key');
+  if (typeof key !== 'string' || key.length === 0 || key === '__proto__') {
+    throw createStoreSsrError(StoreSsrErrorCode.invalidStoreKey, StoreSsrErrorText.invalidStoreKey);
+  }
+}
+
+/** Reads enumerable snapshot fields while preserving hostile getter failures as tagged errors. */
+function readSnapshotEntries(value: object, path: string): [string, unknown][] {
+  try {
+    return Object.entries(value);
+  } catch (error) {
+    throw createStoreSsrError(
+      StoreSsrErrorCode.invalidSnapshot,
+      StoreSsrErrorText.propertyAccess(path),
+      { cause: error }
+    );
   }
 }
 
@@ -751,16 +882,16 @@ export function assertSSRState(value: unknown): asserts value is ISSRState {
   if (!isPlainObject(value) || value.version !== 1) {
     throw createStoreSsrError(
       StoreSsrErrorCode.invalidStateScript,
-      '[store] invalid SSR state version'
+      StoreSsrErrorText.invalidStateVersion
     );
   }
   if (!isPlainObject(value.stores)) {
     throw createStoreSsrError(
       StoreSsrErrorCode.invalidSnapshot,
-      '[store] invalid SSR stores snapshot'
+      StoreSsrErrorText.invalidStoresSnapshot
     );
   }
-  for (const [key, store] of Object.entries(value.stores)) {
+  for (const [key, store] of readSnapshotEntries(value.stores, 'stores')) {
     assertStoreKey(key);
     assertJSONObject(store, `stores.${key}`);
   }
@@ -768,10 +899,10 @@ export function assertSSRState(value: unknown): asserts value is ISSRState {
     if (!isPlainObject(value.resources)) {
       throw createStoreSsrError(
         StoreSsrErrorCode.invalidSnapshot,
-        '[store] invalid SSR resources snapshot'
+        StoreSsrErrorText.invalidResourcesSnapshot
       );
     }
-    for (const [key, snapshot] of Object.entries(value.resources)) {
+    for (const [key, snapshot] of readSnapshotEntries(value.resources, 'resources')) {
       assertStoreKey(key);
       if (
         !isPlainObject(snapshot) ||
@@ -783,7 +914,7 @@ export function assertSSRState(value: unknown): asserts value is ISSRState {
       ) {
         throw createStoreSsrError(
           StoreSsrErrorCode.invalidSnapshot,
-          `[store] invalid SSR resource snapshot: ${key}`
+          StoreSsrErrorText.invalidResourceSnapshot(key)
         );
       }
       assertJSONValue(snapshot.data, `resources.${key}.data`, new WeakSet());
@@ -803,7 +934,7 @@ function assertJSONObject(value: unknown, path: string): void {
   if (!isPlainObject(value)) {
     throw createStoreSsrTypeError(
       StoreSsrErrorCode.serializeUnsupported,
-      `[store] ${path} must be a plain object`
+      StoreSsrErrorText.plainObject(path)
     );
   }
   assertJSONValue(value, path, new WeakSet<object>());
@@ -826,13 +957,13 @@ function walkJSONValue<T>(
   if (++state.nodes > MAX_JSON_NODES) {
     throw createStoreSsrTypeError(
       StoreSsrErrorCode.serializeUnsupported,
-      `[store] ${path} exceeds the JSON node limit`
+      StoreSsrErrorText.nodeLimit(path)
     );
   }
   if (depth > MAX_JSON_DEPTH) {
     throw createStoreSsrTypeError(
       StoreSsrErrorCode.serializeUnsupported,
-      `[store] ${path} exceeds the JSON depth limit`
+      StoreSsrErrorText.depthLimit(path)
     );
   }
   if (value === null || typeof value === 'string' || typeof value === 'boolean') {
@@ -842,7 +973,7 @@ function walkJSONValue<T>(
     if (!Number.isFinite(value)) {
       throw createStoreSsrTypeError(
         StoreSsrErrorCode.serializeUnsupported,
-        `[store] ${path} contains a non-finite number`
+        StoreSsrErrorText.nonFinite(path)
       );
     }
     return walker.primitive(value);
@@ -850,13 +981,13 @@ function walkJSONValue<T>(
   if (typeof value !== 'object') {
     throw createStoreSsrTypeError(
       StoreSsrErrorCode.serializeUnsupported,
-      `[store] ${path} is not JSON serializable`
+      StoreSsrErrorText.notSerializable(path)
     );
   }
   if (seen.has(value)) {
     throw createStoreSsrTypeError(
       StoreSsrErrorCode.serializeUnsupported,
-      `[store] ${path} contains a cycle`
+      StoreSsrErrorText.cycle(path)
     );
   }
   seen.add(value);
@@ -870,10 +1001,10 @@ function walkJSONValue<T>(
     if (!isPlainObject(value)) {
       throw createStoreSsrTypeError(
         StoreSsrErrorCode.serializeUnsupported,
-        `[store] ${path} contains a non-plain object`
+        StoreSsrErrorText.nonPlain(path)
       );
     }
-    const entries = Object.entries(value).map(
+    const entries = readSnapshotEntries(value, path).map(
       ([key, entry]) =>
         [key, walkJSONValue(entry, `${path}.${key}`, seen, walker, depth + 1, state)] as const
     );
@@ -908,7 +1039,7 @@ function toJSONObject(value: unknown, path: string): Readonly<Record<string, IJS
   if (!isPlainObject(value)) {
     throw createStoreSsrTypeError(
       StoreSsrErrorCode.serializeUnsupported,
-      `[store] ${path} must be a plain object`
+      StoreSsrErrorText.plainObject(path)
     );
   }
   const seen = new WeakSet<object>();
@@ -964,7 +1095,7 @@ function jsonObjectToUnknownRecord(
   value: Readonly<Record<string, IJSONValue>>
 ): Record<string, unknown> {
   const result: Record<string, unknown> = Object.create(null);
-  for (const [key, entry] of Object.entries(value)) result[key] = entry;
+  for (const [key, entry] of readSnapshotEntries(value, 'snapshot')) result[key] = entry;
   return result;
 }
 
@@ -972,8 +1103,8 @@ function jsonValueToUnknown(value: IJSONValue): unknown {
   if (value === null || typeof value !== 'object') return value;
   if (Array.isArray(value)) return value.map(jsonValueToUnknown);
   const result: Record<string, unknown> = Object.create(null);
-  for (const [key, entry] of Object.entries(value)) {
-    result[key] = jsonValueToUnknown(entry);
+  for (const [key, entry] of readSnapshotEntries(value, 'value')) {
+    result[key] = jsonValueToUnknown(entry as IJSONValue);
   }
   return result;
 }

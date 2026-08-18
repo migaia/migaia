@@ -6,9 +6,33 @@ import {
   observableObject,
   observableArray
 } from '@migaia/store-indexed';
-import { persistCollection } from '../src';
+import { persistCollection } from '../src/indexed-index';
 
 describe('persistCollection（store-indexed）', () => {
+  it('snapshots accessor-backed options exactly once', () => {
+    const map = observableMap<string, number>();
+    const storage = memoryStorage();
+    let reads = 0;
+    const options = { storage } as { key: string; storage: typeof storage };
+    Object.defineProperty(options, 'key', {
+      enumerable: false,
+      get: () => {
+        reads++;
+        if (reads > 1) throw new Error('key reread');
+        return 'snapshot-key';
+      }
+    });
+    const handle = persistCollection(map, options);
+    expect(reads).toBe(1);
+    handle.dispose();
+  });
+
+  it('rejects null options with a tagged configuration error', () => {
+    const map = observableMap<string, number>();
+    expect(() => persistCollection(map, null as never)).toThrow(
+      '[store] persist options must be an object'
+    );
+  });
   it('ObservableMap：写入后 flush 落盘，hydrate 命中时整体 replace 回内存', async () => {
     const storage = memoryStorage();
     const map = observableMap<string, number>();

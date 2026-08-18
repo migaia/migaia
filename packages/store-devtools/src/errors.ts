@@ -25,6 +25,15 @@ export function createStoreDevtoolsError(
   return tagStoreDevtoolsError(error, code);
 }
 
+/** Builds a tagged AggregateError while retaining every subscription failure. */
+export function createStoreDevtoolsAggregateError(
+  code: IStoreDevtoolsErrorCode,
+  errors: readonly unknown[],
+  message: string
+): AggregateError {
+  return tagStoreDevtoolsError(new AggregateError(errors, message), code);
+}
+
 /**
  * Builds a `(source, code)`-tagged `RangeError`. The error type matters to callers that branch on
  * `instanceof RangeError`, so this preserves it instead of producing a plain `Error`.

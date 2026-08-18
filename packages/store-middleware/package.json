@@ -10,7 +10,7 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./*": { "types": "./dist/*.d.ts", "default": "./dist/*.js" }
+    "./tolerant-clone": { "types": "./dist/tolerant-clone.d.ts", "default": "./dist/tolerant-clone.js" }
   },
   "sideEffects": false,
   "scripts": {

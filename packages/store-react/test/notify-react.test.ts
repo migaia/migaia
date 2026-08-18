@@ -48,4 +48,29 @@ describe('notifyReact', () => {
     expect(onChange).not.toHaveBeenCalled();
     expect(runtime.reportError).toHaveBeenCalledWith(boom, { phase: 'subscription-listener' });
   });
+
+  it('contains a runtime reporter failure at the listener boundary', () => {
+    const reported: unknown[] = [];
+    const previous = (globalThis as { reportError?: (error: unknown) => void }).reportError;
+    (globalThis as { reportError?: (error: unknown) => void }).reportError = (error) => {
+      reported.push(error);
+    };
+    const runtime = fakeRuntime({
+      untracked: vi.fn(() => {
+        throw new Error('listener exploded');
+      }),
+      reportError: vi.fn(() => {
+        throw new Error('runtime reporter failed');
+      })
+    });
+    try {
+      expect(() => notifyReact(runtime, () => undefined)).not.toThrow();
+      expect(reported).toHaveLength(1);
+      expect(reported[0]).toMatchObject({ message: 'runtime reporter failed' });
+    } finally {
+      if (previous)
+        (globalThis as { reportError?: (error: unknown) => void }).reportError = previous;
+      else delete (globalThis as { reportError?: (error: unknown) => void }).reportError;
+    }
+  });
 });

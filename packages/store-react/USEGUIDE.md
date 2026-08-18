@@ -26,12 +26,12 @@
 
 `createStore(shape)` 产出的对象是"甜 API"：普通字段是 Signal，`get` 访问器是惰性缓存的 Computed，方法是自动 batch 的 Action。除了业务字段，实例上还挂了几个以 `$` 开头的元字段，本包的 hook 会用到：
 
-| 字段/方法 | 参数类型 | 同步/异步 | 用途 |
-| --- | --- | --- | --- |
-| `store.$runtime` | —（只读字段，无参数） | 同步 | 这个 Store 所属的 Runtime；`useStore` 用它作为 `useTracked` 的第三个参数 |
-| `store.$async` | —（只读字段，无参数） | 同步 | 是否含有异步初始化字段；为 `true` 时 `useStore` 会先 `use(storeReady(store))` |
-| `store.$snapshot()` | 无 | 同步 | 取当前状态的一份普通对象快照（非响应式） |
-| `store.$batch(recipe)` | `recipe: (draft: IStoreShape<S>) => void` | 同步 | 手动合并多次写操作为一次通知 |
+| 字段/方法              | 参数类型                                  | 同步/异步 | 用途                                                                          |
+| ---------------------- | ----------------------------------------- | --------- | ----------------------------------------------------------------------------- |
+| `store.$runtime`       | —（只读字段，无参数）                     | 同步      | 这个 Store 所属的 Runtime；`useStore` 用它作为 `useTracked` 的第三个参数      |
+| `store.$async`         | —（只读字段，无参数）                     | 同步      | 是否含有异步初始化字段；为 `true` 时 `useStore` 会先 `use(storeReady(store))` |
+| `store.$snapshot()`    | 无                                        | 同步      | 取当前状态的一份普通对象快照（非响应式）                                      |
+| `store.$batch(recipe)` | `recipe: (draft: IStoreShape<S>) => void` | 同步      | 手动合并多次写操作为一次通知                                                  |
 
 ### 1.3 Atom 定义 vs AtomStore：定义是 token，不含状态
 
@@ -39,9 +39,9 @@
 
 ```ts
 const store = createAtomStore(runtime);
-store.get(countDef);              // 首次访问才实例化
+store.get(countDef); // 首次访问才实例化
 store.set(countDef, (n) => n + 1);
-store.sub(countDef, () => {});    // 订阅
+store.sub(countDef, () => {}); // 订阅
 ```
 
 这个设计的意义是**作用域化**：同一份 `countDef` 在不同的 `AtomStore`（比如不同 `StoreProvider`、不同 SSR 请求）下各自独立实例化、互不污染。`useAtomDefinition`/`useSetAtomDefinition` 固定走 `StoreProvider` 自带的 `registry.atomStore`；`useAtomValue`/`useSetAtom`/`useAtom` 则是更通用的协议 hook，见 [3.6](#36-useatomvalueatom--usesetatomatom--useatomatom)。
@@ -50,10 +50,10 @@ store.sub(countDef, () => {});    // 订阅
 
 本包同时对接两种不同来源的异步容器，名字很像但不是一回事：
 
-| | 来自 | 对应 hook | 语义 |
-| --- | --- | --- | --- |
-| `Resource<T>` | `@migaia/resource` | `useResource`、`useResourceValue`、`useAsyncAtomValue`（读 `atom.resource`） | 独立的、可取消可重试的异步值容器，天然支持 Suspense |
-| `IStoreResource<T>` | `@migaia/store-light`（Store 内部的异步字段） | `useStoreResource` | Store 定义里声明出的异步字段，带渲染期版本租约（`captureSnapshot`/`commitCapture`），避免并发渲染读到"已经被释放"的版本 |
+|                     | 来自                                          | 对应 hook                                                                    | 语义                                                                                                                    |
+| ------------------- | --------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `Resource<T>`       | `@migaia/resource`                            | `useResource`、`useResourceValue`、`useAsyncAtomValue`（读 `atom.resource`） | 独立的、可取消可重试的异步值容器，天然支持 Suspense                                                                     |
+| `IStoreResource<T>` | `@migaia/store-light`（Store 内部的异步字段） | `useStoreResource`                                                           | Store 定义里声明出的异步字段，带渲染期版本租约（`captureSnapshot`/`commitCapture`），避免并发渲染读到"已经被释放"的版本 |
 
 两者都能配合 `<Suspense>` 使用，但订阅协议、返回形状都不同，不能互换：`useStoreResource` 需要一个实现了 `read/preload/retry/captureSnapshot/commitCapture/...` 完整协议的 `IStoreResource`，`useResource`/`useResourceValue` 需要的是 `@migaia/resource` 的 `Resource` 实例。
 
@@ -95,7 +95,10 @@ type IStoreProviderProps = {
 
 ```ts
 type IStoreProviderConfig = {
-  readonly features?: { readonly wasm?: boolean; readonly experimental?: Readonly<Record<string, boolean>> };
+  readonly features?: {
+    readonly wasm?: boolean;
+    readonly experimental?: Readonly<Record<string, boolean>>;
+  };
   readonly ready?: readonly (Promise<unknown> | (() => Promise<unknown> | unknown))[];
   readonly fallback?: ReactNode;
   readonly defaults?: { readonly warnAsyncActions?: boolean };
@@ -112,7 +115,7 @@ type IStoreProviderConfig = {
 
 - **元素身份在挂载后被锁定**。`config.ready` 数组第一次渲染时的值会被存入 `ref`，后续渲染即使传入新数组，只要按元素浅比较（`===`，逐项）与旧数组相等就视为同一份；只要有一项引用变了，就会触发身份变化处理——但**新数组不会生效**，Provider 继续用挂载时那份旧屏障，同时在开发环境 `console.warn`、生产环境 `console.error` 一条 `[store] StoreProvider ready barriers changed identity; ...`。这意味着内联字面量 `config={{ ready: [fetchUser()] }}` 每次 render 都会打印警告且不会重新等待——**务必**用 `useMemo` 或模块级常量稳住 `ready` 数组与其元素的引用。
 - **工厂函数只执行一次（按屏障列表身份缓存）**。`ready: [() => ensureWasm()]` 里的工厂在同一个 barrier 数组的生命周期内只会被调用一次，结果被 `WeakMap` 缓存复用；但缓存 key 是"归一化后的屏障数组"本身，不是全局按工厂函数缓存——不同的 Provider/SSR 请求作用域各自独立执行一次，互不共享。工厂执行不保证在"React 放弃的渲染"下恰好执行一次；非幂等的初始化逻辑应该自己用一个模块级 memoized Promise，而不是依赖这里的缓存语义。
-- **reject 会变成一个真实抛出的 `Error`**。非 `Error` 类型的 reject 原因会被包装成 `new Error(\`[store] ready barrier rejected: ${String(reason)}\`)`；`ReadyBoundary` 在 render 阶段 `throw` 它，只能被外层 React Error Boundary 捕获，`StoreProvider` 自己不提供错误 UI。
+- **reject 会变成一个真实抛出的 `Error`**。非 `Error` 类型的 reject 原因会被包装成 `new Error(\`[store] ready barrier rejected: ${String(reason)}\`)`；`ReadyBoundary`在 render 阶段`throw` 它，只能被外层 React Error Boundary 捕获，`StoreProvider` 自己不提供错误 UI。
 - **已经 settle 的 Promise 不保证首帧同步生效**。`ITrackedReady.status()` 是同步查询，但 track 逻辑是在 Promise then 回调（微任务）里更新状态，所以哪怕传入的 Promise 已经 resolve，`ReadyBoundary` 首次渲染仍可能读到 `pending`，随后一个 effect 里同步刷新到 `ready`——多数场景感知不到，但如果你依赖"reload 后立刻同步渲染最终内容、不闪 fallback"，需要注意这个微任务延迟。
 
 ## 3. Hook 完整参考
@@ -146,7 +149,7 @@ function useSignal<T>(s: ISignal<T>): readonly [T, (next: T) => void];
 function useTracked<T>(
   read: () => T,
   isEqual?: (a: T, b: T) => boolean, // 默认 Object.is
-  runtime?: IRuntime                  // 默认 defaultRuntime
+  runtime?: IRuntime // 默认 defaultRuntime
 ): T;
 ```
 
@@ -244,7 +247,7 @@ function useNodeValue<T>(node: IStableNode<T>, runtime: IRuntime, enabled?: bool
 
 ```ts
 function useStoreRegistry(): StoreRegistry; // 无 Provider 抛错
-function useStoreRuntime(): IRuntime;        // = useStoreRegistry().runtime
+function useStoreRuntime(): IRuntime; // = useStoreRegistry().runtime
 ```
 
 取当前 `StoreProvider` 提供的 Registry / 其所属 Runtime。都**必须有 Provider**，否则抛 `[store] hook requires a StoreProvider`。
@@ -317,25 +320,26 @@ function createStoreRegistry(runtime?: IRuntime): StoreRegistry;
 - **跨 Runtime 校验**：`register`/`replace` 时会检查 `value` 自己声明的所属 Runtime（通过唯一所有权协议 `ownerOf`，不是靠约定字段名，伪造不了也不会漏判新节点类型）是否与 `registry.runtime` 一致，不一致直接抛 `[store] provider store "X" belongs to a different Runtime`——防止把属于别的 Runtime 的 Store/Atom 注册进一个不相关的 Registry。
 - `dispose()` 是同步、幂等的：反向遍历已注册的 owned 实体逐个释放，再释放 `atomStore`；某个实体的 `dispose()` 若返回一个 thenable，`dispose()` 不会等它（本身是同步方法），但会跟踪这个 Promise 并在其 reject 时经 `runtime.reportError` 上报，不会变成未处理的 rejection。多个实体报错时抛 `AggregateError('[store] provider registry disposal failed')`。
 - `disposeAsync()` 是异步、单飞（多次并发调用共享同一次执行）的对应版本：会真正 `await` 每个 thenable 释放结果；对一个已经同步 `dispose()` 过的 Registry 调用，不会当作"已经完成"直接 resolve，而是等待 `dispose()` 当时来不及等待、仍在跑的那些异步释放全部 settle。
+- thenable 采用 lifecycle 的统一接纳语义：只读取一次 `then` getter，并以原 thenable 作为 receiver 调用捕获到的函数。getter 抛出的原始异常不会被替换；同步 `dispose()` 会原样抛出，之后的 `disposeAsync()` 会通过其稳定 Promise 原样重放。
 - `whenTerminal()` / `lifecycle`：暴露统一的 `AsyncLifecycle` 形状（`open` → `closing` → `terminal`），`whenTerminal()` 在真正走到 `terminal`（含所有异步释放都 settle）才 resolve。
 
 ## 5. 错误处理完整参考
 
-| 消息 | 触发条件 | 处理方式 |
-| --- | --- | --- |
-| `[store] StoreProvider registry/runtime ownership mismatch` | 同时传 `registry` 与 `runtime` 且二者不属于同一 Runtime | 只传其中一个，或保证 `registry.runtime === runtime` |
-| `[store] StoreProvider ready barriers changed identity; ...`（console.warn/console.error，不抛） | `config.ready` 数组在挂载后按元素比较发生了变化 | 用 `useMemo`/模块级常量稳住 `ready` 数组与元素引用 |
-| `[store] features.wasm is true but config.ready is empty; pass ensureWasm from @migaia/store-wasm (e.g. ready: [ensureWasm])` | `features.wasm: true` 但没提供 `ready` | 传入 `ready: [ensureWasm]`（来自 `@migaia/store-wasm`）或其它就绪 Promise |
-| `[store] ready barrier rejected: ...` | 某个 `ready` 屏障 reject 且原因不是 `Error` 实例 | 检查具体屏障的失败原因；这个 Error 会从 `ReadyBoundary` 的 render 抛出，需要外层 Error Boundary 捕获 |
-| `[store] hook requires a StoreProvider` | `useStoreRegistry`/`useStoreRuntime`/`useStoreFromProvider`/`useProvidedStore`/`useAtomDefinition`/`useSetAtomDefinition` 在没有 `StoreProvider` 的树里调用 | 在组件树更靠上的位置套一层 `<StoreProvider>` |
-| `[store] ${apiName} requires a StoreProvider (feature "X")` | `useAssertStoreFeature`/`assertStoreFeature` 在没有 Provider 的树里调用 | 套 `StoreProvider` |
-| `[store] ${apiName} requires feature "X" to be explicitly enabled on StoreProvider config` | 有 Provider，但对应 feature 未在 `config.features` 里显式置 `true` | 在 `StoreProvider` 的 `config.features` 里显式开启 |
-| `[store] provider registry is disposed` | Registry 已 `dispose()`/`disposeAsync()` 后，仍调用 `register`/`replace`/`get`/`require`/`has`/`remove` | 检查是否有代码在组件卸载后仍持有并调用 registry 引用 |
-| `[store] duplicate provider store token: X` | 同一个 `StoreToken` 被 `register` 两次 | 改用 `replace`，或确认没有重复挂载注册逻辑 |
-| `[store] missing provider store: X` | `require(token)`/`useStoreFromProvider(token)` 在对应实例注册之前调用 | 确认注册逻辑先于消费者渲染执行；或先用 `has`/`get` 判断 |
-| `[store] provider store "X" belongs to a different Runtime` | 注册进 Registry 的值所属 Runtime 与 `registry.runtime` 不同 | 用同一个 Runtime 创建要注册的实例，或换一个 Registry |
-| `[store] StoreToken requires a debug name` | `createStoreToken('')` | 传一个非空的调试名 |
-| `AggregateError('[store] provider registry disposal failed')` | `dispose()`/`disposeAsync()` 时多个 owned 实体的释放各自抛错 | 展开 `error.errors` 逐个排查；单个实体报错时会直接抛出那个原始 error，不包一层 |
+| 消息                                                                                                                          | 触发条件                                                                                                                                                    | 处理方式                                                                                             |
+| ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `[store] StoreProvider registry/runtime ownership mismatch`                                                                   | 同时传 `registry` 与 `runtime` 且二者不属于同一 Runtime                                                                                                     | 只传其中一个，或保证 `registry.runtime === runtime`                                                  |
+| `[store] StoreProvider ready barriers changed identity; ...`（console.warn/console.error，不抛）                              | `config.ready` 数组在挂载后按元素比较发生了变化                                                                                                             | 用 `useMemo`/模块级常量稳住 `ready` 数组与元素引用                                                   |
+| `[store] features.wasm is true but config.ready is empty; pass ensureWasm from @migaia/store-wasm (e.g. ready: [ensureWasm])` | `features.wasm: true` 但没提供 `ready`                                                                                                                      | 传入 `ready: [ensureWasm]`（来自 `@migaia/store-wasm`）或其它就绪 Promise                            |
+| `[store] ready barrier rejected: ...`                                                                                         | 某个 `ready` 屏障 reject 且原因不是 `Error` 实例                                                                                                            | 检查具体屏障的失败原因；这个 Error 会从 `ReadyBoundary` 的 render 抛出，需要外层 Error Boundary 捕获 |
+| `[store] hook requires a StoreProvider`                                                                                       | `useStoreRegistry`/`useStoreRuntime`/`useStoreFromProvider`/`useProvidedStore`/`useAtomDefinition`/`useSetAtomDefinition` 在没有 `StoreProvider` 的树里调用 | 在组件树更靠上的位置套一层 `<StoreProvider>`                                                         |
+| `[store] ${apiName} requires a StoreProvider (feature "X")`                                                                   | `useAssertStoreFeature`/`assertStoreFeature` 在没有 Provider 的树里调用                                                                                     | 套 `StoreProvider`                                                                                   |
+| `[store] ${apiName} requires feature "X" to be explicitly enabled on StoreProvider config`                                    | 有 Provider，但对应 feature 未在 `config.features` 里显式置 `true`                                                                                          | 在 `StoreProvider` 的 `config.features` 里显式开启                                                   |
+| `[store] provider registry is disposed`                                                                                       | Registry 已 `dispose()`/`disposeAsync()` 后，仍调用 `register`/`replace`/`get`/`require`/`has`/`remove`                                                     | 检查是否有代码在组件卸载后仍持有并调用 registry 引用                                                 |
+| `[store] duplicate provider store token: X`                                                                                   | 同一个 `StoreToken` 被 `register` 两次                                                                                                                      | 改用 `replace`，或确认没有重复挂载注册逻辑                                                           |
+| `[store] missing provider store: X`                                                                                           | `require(token)`/`useStoreFromProvider(token)` 在对应实例注册之前调用                                                                                       | 确认注册逻辑先于消费者渲染执行；或先用 `has`/`get` 判断                                              |
+| `[store] provider store "X" belongs to a different Runtime`                                                                   | 注册进 Registry 的值所属 Runtime 与 `registry.runtime` 不同                                                                                                 | 用同一个 Runtime 创建要注册的实例，或换一个 Registry                                                 |
+| `[store] StoreToken requires a debug name`                                                                                    | `createStoreToken('')`                                                                                                                                      | 传一个非空的调试名                                                                                   |
+| `AggregateError('[store] provider registry disposal failed')`                                                                 | `dispose()`/`disposeAsync()` 时多个 owned 实体的释放各自抛错                                                                                                | 展开 `error.errors` 逐个排查；单个实体报错时会直接抛出那个原始 error，不包一层                       |
 
 ## 6. 生命周期与资源释放细节
 
@@ -355,11 +359,7 @@ function createStoreRegistry(runtime?: IRuntime): StoreRegistry;
 
 ### 6.3 被丢弃的并发渲染不会泄漏
 
-`OwnedRegistryBoundary` 在真正创建一份 owned Registry 候选时会调用 `registry.prepareForRender(armInitial)`，为它armed一个"如果这次渲染从未提交（`retain()` 从未被调用过），就把这份候选 Registry 释放掉"的兜底定时器：
-
-- 没有 `ready` 屏障（`armInitial` 为 `undefined`）：`setTimeout(check, 0)`，下一轮宏任务检查一次。
-- 有 `ready` 屏障：先 arm 一个 `ABANDONED_RENDER_FALLBACK_MS`（4000ms）的兜底定时器；一旦屏障 settle（无论成功失败）就取消兜底、改为 16ms 后再查一次——已经 settle 的屏障通常意味着渲染在正常推进，尽快复查更划算；但屏障永远不 settle 的情况也不能让清理机制永久失效，所以兜底定时器始终存在。
-- 这纯粹是内存清理，不是所有权判断：`check()` 只会释放 `retainCount === 0` 的候选——凡是 `retain()` 已经跑过（也就是 React 已经真正 commit 过）的 Registry，这个检查永远是空操作，不存在"正在用的 Registry 被这套机制错误释放"的路径。时机判断得"不够准"，代价也只是多留一会儿垃圾，或者回收了一个原本几毫秒后就会被 retain 的候选，从不会影响正确性。
+`OwnedRegistryBoundary` 不再调用 `registry.prepareForRender()` 通过 wall-clock 猜测 abandoned render。React 没有可靠的“该 render 永久放弃”回调，任何定时器都可能在合法的 Suspense/concurrent commit 之前 dispose Registry，导致后续 `retain()` 失败。Registry 由可观察的 commit/unmount owner 释放；未提交候选的确定性回收需由外层 owner 或未来 GC-backed 机制承接。
 
 ### 6.4 owned 实体的释放顺序
 
@@ -405,12 +405,16 @@ function restoreSession(): Promise<void> {
 function App() {
   // ready 数组的引用必须稳定，否则每次渲染都会命中 §2.3 的身份检查警告。
   const ready = useMemo(() => [restoreSession], []);
-  const sessionStore = useMemo(() => createStore<ISession>({
-    userId: '',
-    setUserId(id) {
-      this.userId = id;
-    }
-  }), []);
+  const sessionStore = useMemo(
+    () =>
+      createStore<ISession>({
+        userId: '',
+        setUserId(id) {
+          this.userId = id;
+        }
+      }),
+    []
+  );
 
   return (
     <StoreProvider config={{ ready, fallback: <FullPageSpinner /> }}>

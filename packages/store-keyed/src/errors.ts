@@ -28,14 +28,25 @@ export function createStoreKeyedError(
 /** Builds a `(source, code)`-tagged `RangeError`, preserving the runtime type. */
 export function createStoreKeyedRangeError(
   code: IStoreKeyedErrorCode,
-  message: string
+  message: string,
+  options?: { readonly cause?: unknown }
 ): RangeError {
-  return tagStoreKeyedError(new RangeError(message), code);
+  return tagStoreKeyedError(
+    new RangeError(message, options?.cause !== undefined ? { cause: options.cause } : undefined),
+    code
+  );
 }
 
 /** Builds a `(source, code)`-tagged `TypeError`, preserving the runtime type. */
-export function createStoreKeyedTypeError(code: IStoreKeyedErrorCode, message: string): TypeError {
-  return tagStoreKeyedError(new TypeError(message), code);
+export function createStoreKeyedTypeError(
+  code: IStoreKeyedErrorCode,
+  message: string,
+  options?: { readonly cause?: unknown }
+): TypeError {
+  return tagStoreKeyedError(
+    new TypeError(message, options?.cause !== undefined ? { cause: options.cause } : undefined),
+    code
+  );
 }
 
 /** Builds a `(source, code)`-tagged `AggregateError`; `errors[]` stays reachable. */

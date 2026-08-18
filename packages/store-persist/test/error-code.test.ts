@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { memoryStorage } from '@migaia/storage-web';
 import { createStore } from '@migaia/store-light';
-import { persist } from '../src';
+import { persist } from '../src/light-index';
 import { StorePersistErrorCode, STORE_PERSIST_SOURCE } from '../src/errors';
 
 describe('store-persist error-code contract (E-T9)', () => {

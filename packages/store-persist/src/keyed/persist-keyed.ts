@@ -2,6 +2,10 @@ import type { IAtomStore, IWritableAtomDefinition } from '@migaia/store-keyed';
 import { persistUnit } from '../core/persist-unit.js';
 import type { ICodec } from '@migaia/storage-web';
 import type { IPersistStorage, IPersistUnit } from '../core/types.js';
+import { snapshotPersistOptions, assertPersistString } from '../core/options.js';
+import { createStorePersistTypeError } from '../errors.js';
+import { StorePersistErrorCode } from '../error-code.js';
+import { StorePersistErrorText } from '../error-text.js';
 
 export type IPersistKeyedOptions<T> = {
   /** Storage key 前缀，格式 `${namespace}:${id}`——必填，clearFamily() 靠它过滤。 */
@@ -44,16 +48,19 @@ export function persistKeyed<T>(
   id: string,
   options: IPersistKeyedOptions<T>
 ): IPersistKeyedHandle<T> {
+  const snapshot = snapshotPersistOptions(options);
+  assertPersistString(snapshot.namespace, 'namespace');
+  assertPersistString(id, 'id');
   const value = atomStore.get(def);
   const handle = persistUnit(toPersistUnit(atomStore, def), {
-    key: storageKey(options.namespace, id),
+    key: storageKey(snapshot.namespace, id),
     runtime: atomStore.runtime,
-    storage: options.storage,
-    codec: options.codec,
-    version: options.version,
-    partialize: options.partialize,
-    merge: options.merge,
-    debounceMs: options.debounceMs
+    storage: snapshot.storage,
+    codec: snapshot.codec,
+    version: snapshot.version,
+    partialize: snapshot.partialize,
+    merge: snapshot.merge,
+    debounceMs: snapshot.debounceMs
   });
   return {
     value,
@@ -67,6 +74,23 @@ export function persistKeyed<T>(
  * 因为存档被删掉就重新触发一次写回（下一次它们自己的 subscribe 触发时才会覆盖写回一条新记录）。
  */
 export async function clearFamily(storage: IPersistStorage, namespace: string): Promise<number> {
+  assertPersistString(namespace, 'namespace');
+  try {
+    if (
+      storage === null ||
+      typeof storage !== 'object' ||
+      typeof storage.keys !== 'function' ||
+      typeof storage.remove !== 'function'
+    ) {
+      throw new Error(StorePersistErrorText.storageInvalid(namespace));
+    }
+  } catch (error) {
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.invalidOption,
+      StorePersistErrorText.storageInvalid(namespace),
+      { cause: error }
+    );
+  }
   const prefix = `${namespace}:`;
   const allKeys = await storage.keys();
   const matching = allKeys.filter((k) => k.startsWith(prefix));

@@ -2,9 +2,55 @@ import { describe, expect, it } from 'vitest';
 import { memoryStorage } from '@migaia/storage-web';
 import { createAtomStore, familyDef } from '@migaia/store-keyed';
 import { createRuntime } from '@migaia/reactive';
-import { persistKeyed, clearFamily } from '../src';
+import { persistKeyed, clearFamily } from '../src/keyed-index';
 
 describe('persistKeyed（store-keyed）', () => {
+  it('snapshots accessor-backed options exactly once', () => {
+    const runtime = createRuntime();
+    const atomStore = createAtomStore(runtime);
+    const definition = familyDef(() => ({ name: '' }));
+    const storage = memoryStorage();
+    let reads = 0;
+    const options = { storage } as { namespace: string; storage: typeof storage };
+    Object.defineProperty(options, 'namespace', {
+      enumerable: false,
+      get: () => {
+        reads++;
+        if (reads > 1) throw new Error('namespace reread');
+        return 'snapshot';
+      }
+    });
+    const handle = persistKeyed(atomStore, definition('u1'), 'u1', options);
+    expect(reads).toBe(1);
+    handle.dispose();
+  });
+
+  it('rejects null options with a tagged configuration error', () => {
+    const runtime = createRuntime();
+    const atomStore = createAtomStore(runtime);
+    const userProfile = familyDef(() => ({ name: '' }));
+    expect(() => persistKeyed(atomStore, userProfile('u1'), 'u1', null as never)).toThrow(
+      '[store] persist options must be an object'
+    );
+  });
+  it('rejects non-string namespace and id before deriving a storage key', () => {
+    const runtime = createRuntime();
+    const atomStore = createAtomStore(runtime);
+    const userProfile = familyDef(() => ({ name: '' }));
+    const storage = memoryStorage();
+    expect(() =>
+      persistKeyed(atomStore, userProfile('u1'), undefined as never, {
+        namespace: 'users',
+        storage
+      })
+    ).toThrow('[store] persist id must be a string');
+    expect(() =>
+      persistKeyed(atomStore, userProfile('u1'), 'u1', {
+        namespace: undefined as never,
+        storage
+      })
+    ).toThrow('[store] persist namespace must be a string');
+  });
   it('立即同步返回默认值，hydrate 命中后异步覆盖', async () => {
     const storage = memoryStorage();
     await storage.set('users:u1', JSON.stringify({ version: 0, state: { name: 'Ada' } }));
@@ -64,6 +110,15 @@ describe('persistKeyed（store-keyed）', () => {
 });
 
 describe('clearFamily', () => {
+  it('contains revoked storage proxies before reading keys', async () => {
+    const { proxy, revoke } = Proxy.revocable({}, {});
+    revoke();
+    await expect(clearFamily(proxy as never, 'users')).rejects.toMatchObject({
+      source: '@migaia/store-persist',
+      code: 'INVALID_OPTION',
+      cause: expect.any(Error)
+    });
+  });
   it('只删除匹配 namespace 前缀的 key，不影响其他 namespace', async () => {
     const storage = memoryStorage();
     await storage.set('users:u1', 'a');

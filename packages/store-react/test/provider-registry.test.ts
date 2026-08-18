@@ -1,3 +1,4 @@
+/* oxlint-disable unicorn/no-thenable -- adversarial fixtures verify lifecycle thenable admission. */
 import { describe, expect, it, vi } from 'vitest';
 import { createRuntime } from '@migaia/reactive';
 import { claimOwnership } from '@migaia/reactive/ownership';
@@ -8,6 +9,15 @@ describe('createStoreToken', () => {
     expect(() => createStoreToken('')).toThrow('[store] IStoreToken requires a debug name');
   });
 
+  it('rejects runtime values that bypass the TypeScript string contract', () => {
+    expect(() => createStoreToken(null as never)).toThrow(
+      '[store] IStoreToken requires a debug name'
+    );
+    expect(() => createStoreToken({ length: 1 } as never)).toThrow(
+      '[store] IStoreToken requires a debug name'
+    );
+  });
+
   it('produces a frozen token carrying the debug name', () => {
     const token = createStoreToken<number>('count');
     expect(token.debugName).toBe('count');
@@ -16,6 +26,58 @@ describe('createStoreToken', () => {
 });
 
 describe('StoreRegistry register/replace/get/require/has/remove', () => {
+  it('contains revoked registration options proxies as tagged errors', () => {
+    const registry = new StoreRegistry();
+    const token = createStoreToken<number>('revoked-options');
+    const { proxy, revoke } = Proxy.revocable({}, {});
+    revoke();
+    expect(() => registry.register(token, 1, proxy as never)).toThrow(
+      expect.objectContaining({
+        source: '@migaia/store-react',
+        code: 'INVALID_CONFIG',
+        cause: expect.any(Error)
+      })
+    );
+    registry.dispose();
+  });
+  it('rejects non-boolean ownership flags before registration', () => {
+    const registry = new StoreRegistry();
+    const token = createStoreToken<number>('invalid-owned');
+    expect(() => registry.register(token, 1, { owned: 'yes' as never })).toThrow(
+      expect.objectContaining({ source: '@migaia/store-react', code: 'INVALID_CONFIG' })
+    );
+    registry.dispose();
+  });
+
+  it('snapshots accessor-backed ownership exactly once', () => {
+    const token = createStoreToken<number>('accessor-owned');
+    const registry = new StoreRegistry();
+    const value = 1;
+    let reads = 0;
+    const options = {} as { readonly owned?: boolean };
+    Object.defineProperty(options, 'owned', {
+      get: () => {
+        reads++;
+        if (reads > 1) throw new Error('owned reread');
+        return true;
+      }
+    });
+    const unregister = registry.register(token, value, options);
+    expect(reads).toBe(1);
+    unregister();
+    registry.dispose();
+  });
+  it('rejects null registration options with a tagged configuration error', () => {
+    const registry = new StoreRegistry();
+    const token = createStoreToken<number>('count');
+    expect(() => registry.register(token, 1, null as never)).toThrow(
+      '[store] store registry options must be an object'
+    );
+    expect(() => registry.replace(token, 1, null as never)).toThrow(
+      '[store] store registry options must be an object'
+    );
+    registry.dispose();
+  });
   it('registers a value and reads it back via get/require/has', () => {
     const registry = createStoreRegistry();
     const token = createStoreToken<number>('count');
@@ -281,9 +343,85 @@ describe('StoreRegistry.dispose() ordering and error aggregation', () => {
       expect(reportError).toHaveBeenCalledWith(boom, { phase: 'lifecycle-hook' })
     );
   });
+
+  it('contains a throwing runtime reporter for an observed per-entry rejection', async () => {
+    const hostReportError = vi.fn();
+    vi.stubGlobal('reportError', hostReportError);
+    try {
+      const reporterFailure = new Error('runtime reporter failed');
+      const rejection = new Error('entry disposal failed');
+      const runtime = createRuntime();
+      vi.spyOn(runtime, 'reportError').mockImplementation(() => {
+        throw reporterFailure;
+      });
+      const registry = new StoreRegistry(runtime);
+      const unregister = registry.register(
+        createStoreToken('observed-rejection'),
+        { dispose: () => Promise.reject(rejection) },
+        { owned: true }
+      );
+
+      expect(() => unregister()).not.toThrow();
+      await vi.waitFor(() => expect(hostReportError).toHaveBeenCalledWith(reporterFailure));
+      registry.dispose();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
 
 describe('StoreRegistry.disposeAsync()', () => {
+  it('reads a stateful then getter once and invokes it with the original receiver', async () => {
+    const registry = createStoreRegistry();
+    let reads = 0;
+    let calls = 0;
+    let receiverMatches = false;
+    const thenable = {} as PromiseLike<void>;
+    Object.defineProperty(thenable, 'then', {
+      get: () => {
+        reads++;
+        if (reads > 1) throw new Error('then getter reread');
+        return function (this: unknown, resolve: () => void) {
+          calls++;
+          receiverMatches = this === thenable;
+          resolve();
+        };
+      }
+    });
+    registry.register(
+      createStoreToken('stateful-thenable'),
+      { dispose: () => thenable },
+      { owned: true }
+    );
+
+    await registry.disposeAsync();
+
+    expect(reads).toBe(1);
+    expect(calls).toBe(1);
+    expect(receiverMatches).toBe(true);
+  });
+
+  it('keeps a hostile then-getter failure identical across dispose and disposeAsync', async () => {
+    const registry = createStoreRegistry();
+    const failure = new Error('then getter failed');
+    const thenable = {} as PromiseLike<void>;
+    Object.defineProperty(thenable, 'then', {
+      get: () => {
+        throw failure;
+      }
+    });
+    registry.register(
+      createStoreToken('hostile-thenable'),
+      { dispose: () => thenable },
+      { owned: true }
+    );
+
+    expect(() => registry.dispose()).toThrow(failure);
+    const completion = registry.disposeAsync();
+    await expect(completion).rejects.toBe(failure);
+    expect(registry.disposeAsync()).toBe(completion);
+  });
+
   it('awaits thenable disposer results before resolving', async () => {
     const registry = createStoreRegistry();
     let released = false;
@@ -320,15 +458,21 @@ describe('StoreRegistry.disposeAsync()', () => {
       { owned: true }
     );
 
-    const [a, b] = await Promise.all([registry.disposeAsync(), registry.disposeAsync()]);
-    expect(a).toBe(b);
+    const first = registry.disposeAsync();
+    const second = registry.disposeAsync();
+    expect(second).toBe(first);
+    await Promise.all([first, second]);
     expect(disposeCalls).toHaveLength(1);
   });
 
-  it('resolves immediately for an already-terminal registry', async () => {
+  it('replays one completion promise for an already-terminal registry', async () => {
     const registry = createStoreRegistry();
     registry.dispose();
-    await expect(registry.disposeAsync()).resolves.toBeUndefined();
+    const first = registry.disposeAsync();
+    const second = registry.disposeAsync();
+    expect(second).toBe(first);
+    await expect(first).resolves.toBeUndefined();
+    expect(registry.disposeAsync()).toBe(first);
   });
 
   it('after a prior sync dispose(), waits for disposers still in flight instead of resolving early', async () => {
@@ -352,6 +496,26 @@ describe('StoreRegistry.disposeAsync()', () => {
     resolvePending!();
     await asyncDone;
     expect(settled).toBe(true);
+  });
+
+  it('replays sync disposer rejection through disposeAsync while reporting it once', async () => {
+    const reportError = vi.fn();
+    const registry = createStoreRegistry(createRuntime({ onError: reportError }));
+    const rejection = new Error('async dispose failed');
+    let rejectPending!: (error: unknown) => void;
+    const pending = new Promise<void>((_, reject) => {
+      rejectPending = reject;
+    });
+    registry.register(createStoreToken('rejecting'), { dispose: () => pending }, { owned: true });
+
+    registry.dispose();
+    const completion = registry.disposeAsync();
+    rejectPending(rejection);
+
+    await expect(completion).rejects.toBe(rejection);
+    expect(registry.disposeAsync()).toBe(completion);
+    expect(reportError).toHaveBeenCalledTimes(1);
+    expect(reportError).toHaveBeenCalledWith(rejection, { phase: 'lifecycle-hook' });
   });
 });
 
@@ -426,15 +590,46 @@ describe('StoreRegistry lifecycle: whenTerminal()/retain()/prepareForRender() (S
     }
   });
 
-  it('prepareForRender() with no barrier disposes an unretained candidate on the next tick', async () => {
+  it('prepareForRender() does not guess that an unretained render was abandoned', async () => {
     vi.useFakeTimers();
     try {
       const registry = createStoreRegistry();
       registry.prepareForRender();
       expect(registry.disposed).toBe(false);
       await vi.advanceTimersByTimeAsync(0);
-      expect(registry.disposed).toBe(true);
+      expect(registry.disposed).toBe(false);
+      registry.dispose();
     } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not invoke disposal reporters from render preparation', async () => {
+    vi.useFakeTimers();
+    const hostReportError = vi.fn();
+    vi.stubGlobal('reportError', hostReportError);
+    try {
+      const reporterFailure = new Error('runtime reporter failed');
+      const runtime = createRuntime();
+      vi.spyOn(runtime, 'reportError').mockImplementation(() => {
+        throw reporterFailure;
+      });
+      const registry = new StoreRegistry(runtime);
+      registry.register(
+        createStoreToken('candidate'),
+        {
+          dispose: () => undefined
+        },
+        { owned: true }
+      );
+      registry.prepareForRender();
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(registry.disposed).toBe(false);
+      expect(hostReportError).not.toHaveBeenCalled();
+      registry.dispose();
+    } finally {
+      vi.unstubAllGlobals();
       vi.useRealTimers();
     }
   });
@@ -458,26 +653,22 @@ describe('StoreRegistry lifecycle: whenTerminal()/retain()/prepareForRender() (S
     expect(() => registry.prepareForRender()).not.toThrow();
   });
 
-  it('prepareForRender(after) arms a bounded fallback timer independent of "after" ever settling', async () => {
+  it('prepareForRender(after) does not dispose a candidate while the barrier is pending', async () => {
     vi.useFakeTimers();
     try {
       const registry = createStoreRegistry();
       const neverSettles = new Promise<void>(() => {});
       registry.prepareForRender(neverSettles);
 
-      // Before the documented ABANDONED_RENDER_FALLBACK_MS bound, nothing happens yet.
-      await vi.advanceTimersByTimeAsync(3999);
+      await vi.advanceTimersByTimeAsync(4001);
       expect(registry.disposed).toBe(false);
-
-      // At the bound, the candidate is reclaimed even though `after` never resolved.
-      await vi.advanceTimersByTimeAsync(2);
-      expect(registry.disposed).toBe(true);
+      registry.dispose();
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('prepareForRender(after) arms a fast recheck shortly after "after" settles', async () => {
+  it('prepareForRender(after) does not dispose before a delayed React commit', async () => {
     vi.useFakeTimers();
     try {
       const registry = createStoreRegistry();
@@ -491,7 +682,9 @@ describe('StoreRegistry lifecycle: whenTerminal()/retain()/prepareForRender() (S
       await vi.advanceTimersByTimeAsync(0); // let the .then() microtask arm the fast-path timer
       expect(registry.disposed).toBe(false);
       await vi.advanceTimersByTimeAsync(16);
-      expect(registry.disposed).toBe(true);
+      expect(registry.disposed).toBe(false);
+      registry.retain(false);
+      registry.dispose();
     } finally {
       vi.useRealTimers();
     }

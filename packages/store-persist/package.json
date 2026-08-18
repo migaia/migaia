@@ -8,7 +8,12 @@
   "files": ["dist", "README.md", "USEGUIDE.md"],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./light": { "types": "./dist/light-index.d.ts", "default": "./dist/light-index.js" },
+    "./indexed": { "types": "./dist/indexed-index.d.ts", "default": "./dist/indexed-index.js" },
+    "./keyed": { "types": "./dist/keyed-index.d.ts", "default": "./dist/keyed-index.js" }
+  },
   "sideEffects": false,
   "scripts": {
     "fmt": "oxfmt src test",

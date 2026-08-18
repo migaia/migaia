@@ -21,6 +21,25 @@ function makeStore(runtimeOverrides?: Parameters<typeof createRuntime>[0]) {
 }
 
 describe('createStoreDevTools', () => {
+  it('rejects null options with a tagged configuration error', () => {
+    const store = createStore({ count: 0 });
+    expect(() => createStoreDevTools(store, null as never)).toThrow(
+      '[store] DevTools options must be an object'
+    );
+    store.$dispose();
+  });
+
+  it('rejects non-function now and clone callbacks before subscribing', () => {
+    const { store } = makeStore();
+    expect(() => createStoreDevTools(store, { now: 1 as never })).toThrow(
+      '[store] DevTools now must be a function'
+    );
+    expect(() => createStoreDevTools(store, { clone: 1 as never })).toThrow(
+      '[store] DevTools clone must be a function'
+    );
+    store.$dispose();
+  });
+
   it('records an initial snapshot synchronously at construction time', () => {
     const { store } = makeStore();
     const tools = createStoreDevTools(store);
@@ -108,15 +127,28 @@ describe('createStoreDevTools', () => {
     tools.dispose();
   });
 
-  it('forces non-positive maxHistory/maxTrace up to a minimum of 1', () => {
+  it('rejects non-positive maxHistory/maxTrace instead of disabling bounds', () => {
     const { store } = makeStore();
-    const tools = createStoreDevTools(store, { maxHistory: 0, maxTrace: -5 });
-    store.increment();
-    store.increment();
+    expect(() => createStoreDevTools(store, { maxHistory: 0 })).toThrow(
+      expect.objectContaining({ code: 'INVALID_OPTION' })
+    );
+    expect(() => createStoreDevTools(store, { maxTrace: -5 })).toThrow(
+      expect.objectContaining({ code: 'INVALID_OPTION' })
+    );
+    store.$dispose();
+  });
 
-    expect(tools.history.length).toBe(1);
-    expect(tools.trace.length).toBeLessThanOrEqual(1);
-    tools.dispose();
+  it('rejects non-finite and fractional queue limits before subscribing', () => {
+    const { store } = makeStore();
+    for (const value of [Number.NaN, Number.POSITIVE_INFINITY, 1.5]) {
+      expect(() => createStoreDevTools(store, { maxHistory: value })).toThrow(
+        expect.objectContaining({ code: 'INVALID_OPTION' })
+      );
+      expect(() => createStoreDevTools(store, { maxTrace: value })).toThrow(
+        expect.objectContaining({ code: 'INVALID_OPTION' })
+      );
+    }
+    store.$dispose();
   });
 
   it('trace never exceeds maxTrace even under many runtime events', () => {
@@ -258,6 +290,48 @@ describe('createStoreDevTools', () => {
     tools.dispose();
   });
 
+  it('keeps all diagnostic queues unchanged when clear cannot create its replacement snapshot', () => {
+    const { store } = makeStore();
+    let shouldThrow = false;
+    const tools = createStoreDevTools(store, {
+      clone: (state) => {
+        if (shouldThrow) throw new Error('clear snapshot failed');
+        return { ...state };
+      }
+    });
+    tools.recordAction({ name: 'before-clear' });
+    const historyBefore = [...tools.history];
+    const actionsBefore = [...tools.actions];
+    const traceBefore = [...tools.trace];
+    shouldThrow = true;
+
+    expect(() => tools.clear()).toThrow('clear snapshot failed');
+    expect(tools.history).toEqual(historyBefore);
+    expect(tools.actions).toEqual(actionsBefore);
+    expect(tools.trace).toEqual(traceBefore);
+    tools.dispose();
+  });
+
+  it('retains non-Error construction failure and unsubscribe cleanup failure in order', () => {
+    const { runtime, store } = makeStore();
+    const primary = Symbol('trace subscription failed');
+    const cleanup = Symbol('unsubscribe failed');
+    vi.spyOn(runtime, 'subscribeTrace').mockImplementation(() => {
+      throw primary;
+    });
+    vi.spyOn(store, '$subscribe').mockReturnValue(() => {
+      throw cleanup;
+    });
+
+    try {
+      createStoreDevTools(store);
+      throw new Error('expected construction to fail');
+    } catch (error) {
+      expect(error).toBeInstanceOf(AggregateError);
+      expect((error as AggregateError).errors).toEqual([primary, cleanup]);
+    }
+  });
+
   it('a throwing clone() during an auto-triggered record is isolated via runtime.reportError, not thrown to business code', () => {
     const onError = vi.fn();
     const { store } = makeStore({ onError });
@@ -279,4 +353,79 @@ describe('createStoreDevTools', () => {
     expect(context).toMatchObject({ phase: 'trace-listener' });
     tools.dispose();
   });
+
+  it('isolates a throwing diagnostic clock in runtime trace capture', () => {
+    const onError = vi.fn();
+    const { store } = makeStore({ onError });
+    let calls = 0;
+    const tools = createStoreDevTools(store, {
+      now: () => {
+        calls++;
+        if (calls > 1) throw new Error('clock failed');
+        return calls;
+      }
+    });
+    expect(() => store.increment()).not.toThrow();
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'clock failed' }),
+      expect.objectContaining({ phase: 'trace-listener' })
+    );
+    tools.dispose();
+  });
+
+  it('contains a runtime reporter failure during auto-record diagnostics', () => {
+    const reported: unknown[] = [];
+    const previous = (globalThis as { reportError?: (error: unknown) => void }).reportError;
+    (globalThis as { reportError?: (error: unknown) => void }).reportError = (error) => {
+      reported.push(error);
+    };
+    const { store, runtime } = makeStore();
+    vi.spyOn(runtime, 'reportError').mockImplementation(() => {
+      throw new Error('runtime reporter failed');
+    });
+    let shouldThrow = false;
+    const tools = createStoreDevTools(store, {
+      clone: (state) => {
+        if (shouldThrow) throw new Error('diagnostic clone failed');
+        return { ...state };
+      }
+    });
+    try {
+      shouldThrow = true;
+      expect(() => store.increment()).not.toThrow();
+      expect(reported).toHaveLength(1);
+      expect(reported[0]).toMatchObject({ message: 'runtime reporter failed' });
+    } finally {
+      tools.dispose();
+      if (previous)
+        (globalThis as { reportError?: (error: unknown) => void }).reportError = previous;
+      else delete (globalThis as { reportError?: (error: unknown) => void }).reportError;
+    }
+  });
+});
+
+it('contains revoked and throwing options getters as tagged configuration errors', () => {
+  const { store } = makeStore();
+  const revoked = Proxy.revocable({}, {});
+  revoked.revoke();
+  expect(() => createStoreDevTools(store, revoked.proxy as never)).toThrow(
+    expect.objectContaining({
+      source: '@migaia/store-devtools',
+      code: 'INVALID_OPTION',
+      cause: expect.any(Error)
+    })
+  );
+  expect(() =>
+    createStoreDevTools(store, {
+      get maxHistory() {
+        throw new Error('limit getter failed');
+      }
+    } as never)
+  ).toThrow(
+    expect.objectContaining({
+      source: '@migaia/store-devtools',
+      code: 'INVALID_OPTION',
+      cause: expect.any(Error)
+    })
+  );
 });

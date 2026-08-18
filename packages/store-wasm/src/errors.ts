@@ -31,6 +31,23 @@ export function createStoreWasmRangeError(code: IStoreWasmErrorCode, message: st
 }
 
 /** Builds a `(source, code)`-tagged `TypeError`, preserving the runtime type. */
-export function createStoreWasmTypeError(code: IStoreWasmErrorCode, message: string): TypeError {
-  return tagStoreWasmError(new TypeError(message), code);
+export function createStoreWasmTypeError(
+  code: IStoreWasmErrorCode,
+  message: string,
+  options?: { readonly cause?: unknown }
+): TypeError {
+  const error = new TypeError(
+    message,
+    options?.cause !== undefined ? { cause: options.cause } : undefined
+  );
+  return tagStoreWasmError(error, code);
+}
+
+/** Builds a tagged aggregate while preserving every original cleanup error by identity. */
+export function createStoreWasmAggregateError(
+  code: IStoreWasmErrorCode,
+  errors: readonly unknown[],
+  message: string
+): AggregateError {
+  return tagStoreWasmError(new AggregateError(errors, message), code);
 }

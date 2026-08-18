@@ -44,6 +44,8 @@ reactive/family.ts     —— 与 key 无关的通用可释放值缓存：create
 | 构造器 | 签名 | 参数类型 | 同步/异步 | `kind` | 说明 |
 | --- | --- | --- | --- | --- | --- |
 | `atomDef` | `<T>(init: T, debugLabel?: string) => IPrimitiveDefinition<T>` | `init: T`；`debugLabel?: string` | 同步 | `'primitive'` | 源定义，只存初值。每个 `AtomStore` 首次实例化时都会对 `init` 跑一次 `cloneInitial`（见 [§9](#9-生命周期与资源释放细节)），因此同一个 `atomDef({ list: [] })` 在多个 store 下互不共享同一个对象引用。 |
+
+同步 Atom 禁止 Promise/thenable 初值。守卫覆盖 object 与 function thenable，并通过 lifecycle probe 只读取一次 `then`；hostile getter 失败同步转换为 Store Keyed tagged `INVALID_OPTION`，原异常保留在 `cause`。Factory 定义在首次 `get`/`peek`/`preview` 执行返回值时应用同一守卫。
 | `atomDefFactory` | `<T>(create: () => T, debugLabel?: string) => IPrimitiveFactoryDefinition<T>` | `create: () => T`；`debugLabel?: string` | 同步 | `'primitive-factory'` | 源定义，用工厂函数代替静态初值；`create()` 在每个 store 首次实例化时调用一次。`previewSafe` 固定为 `false`——`store.preview()` 遇到它会直接抛错，除非改用下面的 `previewSafeAtomDefFactory`。 |
 | `previewSafeAtomDefFactory` | 同上 | 同上 | 同步 | `'primitive-factory'` | 与 `atomDefFactory` 唯一区别是 `previewSafe: true`。只应包装纯函数、无副作用的 `create`——React 的 speculative preview 可能被放弃，`create()` 却已经真实执行过了。 |
 | `derivedDef` | `<T>(read: IAtomRead<T>, debugLabel?: string, equals?: (a: T, b: T) => boolean) => IDerivedDefinition<T>` | `read: IAtomRead<T>`；`debugLabel?: string`；`equals?: (a: T, b: T) => boolean` | 同步 | `'derived'` | 只读派生，`read(get)` 里的 `get` 只能读同一个 store 内的其它定义。`equals` 默认走底层 Computed 的默认比较（`Object.is`），传自定义 `equals` 可以避免"值语义相等但引用不同"时的多余下游通知。 |
@@ -320,7 +322,7 @@ type IFamily<K, V extends IDisposable> = {
 | 构造函数 | 签名 | 参数类型 | 同步/异步 | 说明 |
 | --- | --- | --- | --- | --- |
 | `createFamily` | `<K, V extends IDisposable>(options: IFamilyOptions & { create(key: K): V; isObserved(value: V): boolean }) => IFamily<K, V>` | `options: IFamilyOptions & { create(key: K): V; isObserved(value: V): boolean }` | 同步 | 通用版本，`create`/`isObserved` 必填——调用方自己决定"这个值是什么、怎么判断它还被使用"。 |
-| `computedFamily` | `<K, T>(derive: (key: K) => T, runtime?: IRuntime, options?: IFamilyOptions & { computed?: IComputedConfig<T> }) => IFamily<K, IComputedValue<T>>` | `derive: (key: K) => T`；`runtime?: IRuntime`；`options?: IFamilyOptions & { computed?: IComputedConfig<T> }` | 同步 | `createFamily` 的特化：`create` 用 `runtime.computed(() => derive(key), options.computed)`，`isObserved` 用 `value.observed`。`runtime` 默认 `defaultRuntime`。 |
+| `computedFamily` | `<K, T>(derive: (key: K) => T, runtime?: IRuntime, options?: IFamilyOptions & { computed?: IComputedConfig<T> }) => IFamily<K, IComputedValue<T>>` | `derive: (key: K) => T`；`runtime?: IRuntime`；`options?: IFamilyOptions & { computed?: IComputedConfig<T> }` | 同步 | `createFamily` 的特化：构造期一次性快照 family/`computed` 选项；每个 key 用同一份稳定 `computed` 配置建立节点，运行期不重读用户 accessor。`runtime` 默认 `defaultRuntime`。 |
 
 行为要点：
 
@@ -357,6 +359,8 @@ type IFamily<K, V extends IDisposable> = {
 | `familyDef` / `derivedFamilyDef` | `Error` | `family definitions require WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox` | 宿主环境缺少这两个全局能力。 |
 | `createFamily` | `Error` | `createFamily() requires WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox` | 同上，通用 family 版本。 |
 | `createFamily` | `RangeError` | `family maxSize must be a positive integer` / `family ttl must be non-negative` | 选项非法。 |
+| `computedFamily` | `Error` | `computed family options could not be read` | `computed` 或基础 family 选项 accessor 抛错；错误带 `INVALID_OPTION`，原异常保留在 `cause`。 |
+| `computedFamily` | `Error` | `family derive must be a function` | JavaScript 调用者传入非函数 derive；在 family 建立前同步拒绝并带 `INVALID_OPTION`。 |
 | `createFamily` 产出的 family | `Error` | `cannot use a disposed family` | family 已 `dispose()` 后继续使用。 |
 | `atomGetter(runtime)` / `atomSetter(runtime)` | `Error` | `cross-runtime atom access is not allowed` | 实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。 |
 | `AtomStore` 内部所有权登记（继承自 `@migaia/reactive`） | `Error` | `this node is already owned by another Runtime` | 同一个 store 对象被 `claimOwnership` 到两个不同的 Runtime——正常使用路径下不会触发，出现即说明把同一个 store 错误地跨 Runtime 复用了。 |

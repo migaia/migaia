@@ -22,10 +22,11 @@ export class PersistEnvelopeError extends TypeError {
 
 import { STORE_PERSIST_SOURCE } from '../errors.js';
 import { StorePersistErrorCode } from '../error-code.js';
+import { StorePersistErrorText } from '../error-text.js';
 
 export function assertEnvelope<TState>(value: unknown, key: string): IEnvelope<TState> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    throw new PersistEnvelopeError(`[store] persist archive "${key}" is not an envelope`);
+    throw new PersistEnvelopeError(StorePersistErrorText.archiveEnvelope(key));
   }
   const envelope = value as Record<string, unknown>;
   if (
@@ -33,10 +34,10 @@ export function assertEnvelope<TState>(value: unknown, key: string): IEnvelope<T
     !Number.isSafeInteger(envelope.version) ||
     envelope.version < 0
   ) {
-    throw new PersistEnvelopeError(`[store] persist archive "${key}" has no usable version`);
+    throw new PersistEnvelopeError(StorePersistErrorText.archiveVersion(key));
   }
   if (!('state' in envelope) || envelope.state === null || envelope.state === undefined) {
-    throw new PersistEnvelopeError(`[store] persist archive "${key}" carries no state`);
+    throw new PersistEnvelopeError(StorePersistErrorText.archiveState(key));
   }
   return { version: envelope.version, state: envelope.state as TState };
 }

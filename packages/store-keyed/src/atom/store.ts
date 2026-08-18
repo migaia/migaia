@@ -18,6 +18,7 @@ import {
   createStoreKeyedTypeError,
   StoreKeyedErrorCode
 } from '../errors.js';
+import { StoreKeyedErrorText } from '../error-text.js';
 import {
   assertNotThenable,
   isAtomDefinition,
@@ -32,6 +33,26 @@ import {
   type IWritableDerivedDefinition
 } from './definition.js';
 import { AtomKind } from './kind-constants.js';
+
+/** Contains diagnostics when a Runtime reporter fails during atom lifecycle callbacks. */
+function reportAtomFailure(
+  runtime: IRuntime,
+  error: unknown,
+  phase: Parameters<IRuntime['reportError']>[1]['phase']
+): void {
+  try {
+    runtime.reportError(error, { phase });
+    return;
+  } catch (reporterError) {
+    const hostReportError = (globalThis as { reportError?: (error: unknown) => void }).reportError;
+    try {
+      if (hostReportError) hostReportError(reporterError);
+      else console.error(reporterError);
+    } catch {
+      // A diagnostic sink is best effort and must not invalidate the atom graph.
+    }
+  }
+}
 
 /**
  * 实例化层：把纯定义落到某个 Runtime 上。
@@ -64,40 +85,22 @@ type IPreview = {
  */
 function cloneInitial<T>(value: T): T {
   if (value === null || typeof value !== 'object') return value;
-  if (typeof structuredClone === 'function') {
-    try {
-      return structuredClone(value);
-    } catch {
-      // Fall back for class instances/functions embedded in legacy values.
-    }
+  if (typeof structuredClone !== 'function')
+    throw createStoreKeyedError(
+      StoreKeyedErrorCode.envUnsupported,
+      StoreKeyedErrorText.primitiveClone
+    );
+  try {
+    return structuredClone(value);
+  } catch (error) {
+    // A partial fallback would silently change prototypes and alias functions.
+    // Fail closed so the cross-scope clone guarantee remains truthful.
+    throw createStoreKeyedError(
+      StoreKeyedErrorCode.invalidOption,
+      StoreKeyedErrorText.primitiveCloneFailed,
+      { cause: error }
+    );
   }
-  // Older realms may not expose structuredClone. Recursively clone plain
-  // containers so nested mutable state is not shared across Provider scopes.
-  const seen = new WeakMap<object, unknown>();
-  const fallback = (input: unknown): unknown => {
-    if (input === null || typeof input !== 'object') return input;
-    const existing = seen.get(input);
-    if (existing) return existing;
-    if (Array.isArray(input)) {
-      const output: unknown[] = [];
-      seen.set(input, output);
-      for (const item of input) output.push(fallback(item));
-      return output;
-    }
-    const output: Record<PropertyKey, unknown> = {};
-    seen.set(input, output);
-    for (const key of Reflect.ownKeys(input)) {
-      const descriptor = Object.getOwnPropertyDescriptor(input, key);
-      if (descriptor && 'value' in descriptor) {
-        Object.defineProperty(output, key, {
-          ...descriptor,
-          value: fallback(descriptor.value)
-        });
-      }
-    }
-    return output;
-  };
-  return fallback(value) as T;
 }
 
 export type IAtomStore = {
@@ -194,7 +197,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     if (disposed)
       throw createStoreKeyedError(
         StoreKeyedErrorCode.atomStoreDisposed,
-        '[store] cannot use a disposed atom store'
+        StoreKeyedErrorText.disposedAtomStore
       );
   };
 
@@ -204,7 +207,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     if (!isAtomDefinition(definition)) {
       throw createStoreKeyedTypeError(
         StoreKeyedErrorCode.invalidOption,
-        '[store] not an atom definition'
+        StoreKeyedErrorText.notDefinition
       );
     }
   };
@@ -230,7 +233,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     }
     throw createStoreKeyedTypeError(
       StoreKeyedErrorCode.overrideContract,
-      '[store] atom override must preserve the original write contract'
+      StoreKeyedErrorText.writeContract
     );
   };
 
@@ -243,7 +246,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
       if (seen.has(current)) {
         throw createStoreKeyedError(
           StoreKeyedErrorCode.cyclicOverride,
-          '[store] cyclic atom override'
+          StoreKeyedErrorText.cyclicOverride
         );
       }
       seen.add(current);
@@ -269,10 +272,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
         try {
           observable.onUnobserved?.();
         } catch (error) {
-          runtime.reportError(error, {
-            phase: ReactiveErrorPhase.lifecycleHook,
-            observable
-          });
+          reportAtomFailure(runtime, error, ReactiveErrorPhase.lifecycleHook);
         }
       }
     }
@@ -342,7 +342,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     if (previewStack.has(key)) {
       throw createStoreKeyedError(
         StoreKeyedErrorCode.circularPreview,
-        '[store] circular atom preview detected'
+        StoreKeyedErrorText.circularPreview
       );
     }
     previewStack.add(key);
@@ -354,7 +354,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
         if (!target.previewSafe) {
           throw createStoreKeyedError(
             StoreKeyedErrorCode.previewUnsafe,
-            '[store] atom factory is not marked preview-safe'
+            StoreKeyedErrorText.previewUnsafe
           );
         }
         // A React snapshot can be abandoned before subscription commit. Do
@@ -438,7 +438,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
         if (target.kind === AtomKind.derived) {
           throw createStoreKeyedTypeError(
             StoreKeyedErrorCode.overrideContract,
-            '[store] atom override resolved to a read-only definition'
+            StoreKeyedErrorText.readonlyOverride
           );
         }
         const writable = target as IWritableDerivedDefinition<T, Args, Result>;
@@ -494,9 +494,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
         try {
           runtime.untracked(onChange);
         } catch (error) {
-          runtime.reportError(error, {
-            phase: ReactiveErrorPhase.subscriptionListener
-          });
+          reportAtomFailure(runtime, error, ReactiveErrorPhase.subscriptionListener);
         }
       }, runtime);
       let active = true;
@@ -599,7 +597,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
         throw createStoreKeyedAggregateError(
           StoreKeyedErrorCode.disposalFailed,
           errors,
-          '[store] atom store disposal failed'
+          StoreKeyedErrorText.atomDisposalFailed
         );
       }
     }

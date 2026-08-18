@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { createStoreReactError } from './errors.js';
 import { StoreReactErrorCode } from './error-code.js';
+import { StoreReactErrorText } from './error-text.js';
 import { EMPTY_EXPERIMENTAL_ENCODING, StoreProviderState } from './provider-state-constants.js';
 
 /**
@@ -71,22 +72,54 @@ export function normalizeStoreConfig(
   config?: IStoreProviderConfig,
   barrierScope: object = {}
 ): IStoreConfigValue {
-  const wasm = config?.features?.wasm === true;
-  const experimental = freezeExperimental(config?.features?.experimental);
-  const barriers = config?.ready ?? [];
+  let wasm = false;
+  let experimentalInput: IStoreFeatureExperimental | undefined;
+  let barriers: readonly IStoreReadyBarrier[] | undefined;
+  let defaults: IStoreProviderDefaults | undefined;
+  try {
+    const features = config?.features;
+    wasm = features?.wasm === true;
+    experimentalInput = features?.experimental;
+    barriers = config?.ready;
+    defaults = config?.defaults;
+  } catch (error) {
+    throw createStoreReactError(StoreReactErrorCode.invalidConfig, StoreReactErrorText.configRead, {
+      cause: error
+    });
+  }
+  const experimental = freezeExperimental(experimentalInput);
+  const validBarrier = (barrier: unknown): boolean => {
+    if (typeof barrier === 'function') return true;
+    if (barrier === null || typeof barrier !== 'object') return false;
+    try {
+      return typeof (barrier as { then?: unknown }).then === 'function';
+    } catch {
+      return false;
+    }
+  };
+  if (
+    barriers !== undefined &&
+    (!Array.isArray(barriers) || barriers.some((barrier) => !validBarrier(barrier)))
+  ) {
+    throw createStoreReactError(
+      StoreReactErrorCode.invalidConfig,
+      StoreReactErrorText.readyInvalid
+    );
+  }
+  const normalizedBarriers = barriers ?? [];
 
   const effectiveBarriers =
-    wasm && barriers.length === 0
+    wasm && normalizedBarriers.length === 0
       ? ([
           () =>
             Promise.reject(
               createStoreReactError(
                 StoreReactErrorCode.invalidConfig,
-                '[store] features.wasm is true but config.ready is empty; pass ensureWasm from @migaia/store-wasm (e.g. ready: [ensureWasm])'
+                StoreReactErrorText.featureReady
               )
             )
         ] as const)
-      : barriers;
+      : normalizedBarriers;
 
   const ready =
     effectiveBarriers.length === 0
@@ -96,7 +129,7 @@ export function normalizeStoreConfig(
   return {
     features: { wasm, experimental },
     defaults: {
-      warnAsyncActions: config?.defaults?.warnAsyncActions === true
+      warnAsyncActions: defaults?.warnAsyncActions === true
     },
     ready
   };
@@ -162,18 +195,26 @@ function freezeExperimental(
  */
 export function encodeStoreExperimental(input: IStoreFeatureExperimental | undefined): string {
   if (!input) return '[]';
-  const cacheable = Object.isFrozen(input);
-  const cached = cacheable ? EXPERIMENTAL_ENCODING_CACHE.get(input) : undefined;
-  if (cached !== undefined) return cached;
-  const entries: Array<readonly [string, boolean]> = [];
-  for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(input))) {
-    if (!descriptor.enumerable || !('value' in descriptor)) continue;
-    entries.push([key, descriptor.value === true]);
+  try {
+    const cacheable = Object.isFrozen(input);
+    const cached = cacheable ? EXPERIMENTAL_ENCODING_CACHE.get(input) : undefined;
+    if (cached !== undefined) return cached;
+    const entries: Array<readonly [string, boolean]> = [];
+    for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(input))) {
+      if (!descriptor.enumerable || !('value' in descriptor)) continue;
+      entries.push([key, descriptor.value === true]);
+    }
+    entries.sort(([left], [right]) => left.localeCompare(right));
+    const encoded = JSON.stringify(entries);
+    if (cacheable) EXPERIMENTAL_ENCODING_CACHE.set(input, encoded);
+    return encoded;
+  } catch (error) {
+    throw createStoreReactError(
+      StoreReactErrorCode.invalidConfig,
+      StoreReactErrorText.experimentalInvalid,
+      { cause: error }
+    );
   }
-  entries.sort(([left], [right]) => left.localeCompare(right));
-  const encoded = JSON.stringify(entries);
-  if (cacheable) EXPERIMENTAL_ENCODING_CACHE.set(input, encoded);
-  return encoded;
 }
 
 export function decodeStoreExperimental(encoded: string): Readonly<Record<string, boolean>> {
@@ -233,13 +274,13 @@ export function assertStoreFeature(
   if (!config) {
     throw createStoreReactError(
       StoreReactErrorCode.providerRequired,
-      `[store] ${apiName} requires a StoreProvider (feature "${path}")`
+      StoreReactErrorText.apiProvider(apiName, path)
     );
   }
   if (!readStoreFeature(config, path)) {
     throw createStoreReactError(
       StoreReactErrorCode.featureDisabled,
-      `[store] ${apiName} requires feature "${path}" to be explicitly enabled on StoreProvider config`
+      StoreReactErrorText.apiFeature(apiName, path)
     );
   }
 }

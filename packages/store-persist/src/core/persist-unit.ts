@@ -3,6 +3,7 @@ import { readEnvelope, removeEnvelope, writeEnvelope } from '../storage/codec.js
 import { defaultJsonCodec } from '../storage/codec.js';
 import { assertEnvelope, type IEnvelope } from './envelope.js';
 import {
+  createStorePersistAbortError,
   createStorePersistAggregateError,
   createStorePersistError,
   createStorePersistTypeError
@@ -17,14 +18,56 @@ import type {
   IWriteStatus
 } from './types.js';
 import { PersistState } from '../state-constants.js';
+import { StorePersistErrorText } from '../error-text.js';
+import { assertPersistString } from './options.js';
 
-function disposedError(): Error {
-  const error = createStorePersistError(
+/** Maximum single delay accepted by Web/Node timers. */
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
+function disposedError(cause?: unknown): Error {
+  return createStorePersistAbortError(
     StorePersistErrorCode.abortedByDispose,
-    '[store] persist operation was aborted by dispose'
+    StorePersistErrorText.aborted,
+    cause
   );
-  error.name = 'AbortError';
-  return error;
+}
+
+/** Reconciles plain-object hydration using startup snapshot as the local-write baseline. */
+function mergePersistedPlainState<TState>(
+  persisted: Partial<TState>,
+  current: TState,
+  start: TState
+): TState {
+  /** Accepts ordinary dictionaries regardless of whether they inherit from `Object.prototype`. */
+  const isPlainPrototype = (value: object): boolean => {
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+  };
+  if (
+    persisted === null ||
+    typeof persisted !== 'object' ||
+    current === null ||
+    typeof current !== 'object' ||
+    start === null ||
+    typeof start !== 'object' ||
+    Array.isArray(persisted) ||
+    Array.isArray(current) ||
+    Array.isArray(start) ||
+    !isPlainPrototype(persisted) ||
+    !isPlainPrototype(current) ||
+    !isPlainPrototype(start)
+  )
+    return persisted as TState;
+
+  const result: Record<string, unknown> = { ...(current as object) };
+  for (const key of Object.keys(persisted as object)) {
+    const locallyChanged = !Object.is(
+      (current as Record<string, unknown>)[key],
+      (start as Record<string, unknown>)[key]
+    );
+    if (!locallyChanged) result[key] = (persisted as Record<string, unknown>)[key];
+  }
+  return result as TState;
 }
 
 /**
@@ -36,6 +79,36 @@ export function persistUnit<TState>(
   unit: IPersistUnit<TState>,
   options: IPersistUnitOptions<TState>
 ): IPersistHandle {
+  let extracted: {
+    key: string;
+    runtime: IPersistUnitOptions<TState>['runtime'];
+    storage: IPersistUnitOptions<TState>['storage'];
+    codec: IPersistUnitOptions<TState>['codec'];
+    version: IPersistUnitOptions<TState>['version'];
+    migrate: IPersistUnitOptions<TState>['migrate'];
+    partialize: IPersistUnitOptions<TState>['partialize'];
+    merge: IPersistUnitOptions<TState>['merge'];
+    debounceMs: IPersistUnitOptions<TState>['debounceMs'];
+  };
+  try {
+    extracted = {
+      key: options.key,
+      runtime: options.runtime,
+      storage: options.storage,
+      codec: options.codec,
+      version: options.version,
+      migrate: options.migrate,
+      partialize: options.partialize,
+      merge: options.merge,
+      debounceMs: options.debounceMs
+    };
+  } catch (error) {
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.invalidOption,
+      StorePersistErrorText.optionsObject,
+      { cause: error }
+    );
+  }
   const {
     key,
     runtime,
@@ -64,17 +137,75 @@ export function persistUnit<TState>(
       return persisted as TState;
     },
     debounceMs = 0
-  } = options;
+  } = extracted;
 
+  assertPersistString(key, 'key');
   if (!codec)
     throw createStorePersistTypeError(
       StorePersistErrorCode.codecNotResolved,
-      `[store] persist "${key}" resolved no codec`
+      StorePersistErrorText.noCodec(key)
     );
+  let codecShapeValid = false;
+  try {
+    codecShapeValid =
+      typeof codec === 'object' &&
+      typeof codec.encode === 'function' &&
+      typeof codec.decode === 'function';
+  } catch (error) {
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.invalidOption,
+      StorePersistErrorText.codecInvalid(key),
+      { cause: error }
+    );
+  }
+  if (!codecShapeValid) {
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.invalidOption,
+      StorePersistErrorText.codecInvalid(key)
+    );
+  }
+  try {
+    if (
+      storage === null ||
+      typeof storage !== 'object' ||
+      typeof storage.get !== 'function' ||
+      typeof storage.set !== 'function' ||
+      typeof storage.remove !== 'function' ||
+      typeof storage.keys !== 'function' ||
+      storage.capabilities === null ||
+      typeof storage.capabilities !== 'object'
+    ) {
+      throw new Error(StorePersistErrorText.storageInvalid(key));
+    }
+  } catch (error) {
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.invalidOption,
+      StorePersistErrorText.storageInvalid(key),
+      { cause: error }
+    );
+  }
+  for (const [name, callback] of [
+    ['migrate', migrate],
+    ['partialize', partialize],
+    ['merge', merge]
+  ] as const) {
+    if (callback !== undefined && typeof callback !== 'function') {
+      throw createStorePersistTypeError(
+        StorePersistErrorCode.invalidOption,
+        StorePersistErrorText.callback(key, name)
+      );
+    }
+  }
   if (!Number.isSafeInteger(version) || version < 0) {
     throw createStorePersistTypeError(
       StorePersistErrorCode.invalidOption,
-      `[store] persist "${key}" version must be a safe, non-negative integer`
+      StorePersistErrorText.invalidVersion(key)
+    );
+  }
+  if (!Number.isFinite(debounceMs) || debounceMs < 0 || debounceMs > MAX_TIMER_DELAY_MS) {
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.invalidOption,
+      StorePersistErrorText.debounce(key)
     );
   }
 
@@ -99,7 +230,7 @@ export function persistUnit<TState>(
       return createStorePersistAggregateError(
         StorePersistErrorCode.hydrateAndWriteFailed,
         [hydration, write],
-        '[store] persist hydration and write both failed'
+        StorePersistErrorText.hydrationWriteFailed
       );
     }
     return hydration ?? write ?? undefined;
@@ -114,6 +245,7 @@ export function persistUnit<TState>(
   let hydrationSettled = false;
   let hydrating = false;
   let dirtyDuringHydrate = false;
+  const hydrationStartSnapshot = unit.snapshot();
   // 串行写队列：所有写入排成一条链，避免异步存储下"慢的旧写入后完成、覆盖新写入"的乱序问题。
   let writeChain: Promise<void> = Promise.resolve();
   let writeDrain: Promise<void> | undefined;
@@ -134,7 +266,7 @@ export function persistUnit<TState>(
       assertActive();
       return result;
     } catch (caught) {
-      if (disposed) throw disposedError();
+      if (disposed) throw disposedError(caught);
       throw caught;
     } finally {
       activeOperations.delete(controller);
@@ -222,7 +354,7 @@ export function persistUnit<TState>(
           if (!migrate) {
             throw createStorePersistError(
               StorePersistErrorCode.envelopeInvalid,
-              `[store] persist archive "${key}" is version ${envelope.version}, but this store is version ${version}; provide migrate() to convert it`
+              StorePersistErrorText.versionMismatch(key, envelope.version, version)
             );
           }
           state = migrate(state as TState, envelope.version) as Partial<TState>;
@@ -232,7 +364,12 @@ export function persistUnit<TState>(
         // async read was in flight; custom store shapes can provide their own merge.
         hydrating = true;
         try {
-          unit.restore(merge(state, unit.snapshot()));
+          const current = unit.snapshot();
+          const reconciled =
+            options.merge === undefined
+              ? mergePersistedPlainState(state, current, hydrationStartSnapshot)
+              : merge(state, current);
+          unit.restore(reconciled);
         } finally {
           hydrating = false;
         }
@@ -267,11 +404,16 @@ export function persistUnit<TState>(
     settled,
     async flush() {
       assertActive();
+      const pendingWrite = writeDrain;
       if (timer) {
         clearTimeout(timer);
         timer = undefined;
       }
       await settled;
+      // Capture the write already observed by this flush before checking the
+      // lifecycle again. If dispose wins while the adapter ignores abort, its
+      // late storage failure must remain reachable as the AbortError cause.
+      if (pendingWrite) await pendingWrite;
       assertActive();
       await enqueueWrite(true);
       assertActive();

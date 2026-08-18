@@ -11,6 +11,7 @@ import { claimOwnership } from '@migaia/reactive/ownership';
 import { registerSubs, registerVersion, readVersion } from '@migaia/reactive/node-internals';
 import { createStoreSharedError, createStoreSharedRangeError } from './errors.js';
 import { StoreSharedErrorCode } from './error-code.js';
+import { StoreSharedErrorText } from './error-text.js';
 
 /**
  * SharedArrayBuffer 支撑的跨线程状态。
@@ -29,6 +30,22 @@ import { StoreSharedErrorCode } from './error-code.js';
  */
 
 const SPIN_LIMIT = 1 << 16;
+
+/** Keeps waitAsync callback diagnostics from escaping the cross-thread promise boundary. */
+function reportSharedWatchFailure(runtime: IRuntime, error: unknown): void {
+  try {
+    runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush });
+    return;
+  } catch (reporterError) {
+    const hostReportError = (globalThis as { reportError?: (error: unknown) => void }).reportError;
+    try {
+      if (hostReportError) hostReportError(reporterError);
+      else console.error(reporterError);
+    } catch {
+      // Diagnostics are best effort; a failing sink must not create another unhandled failure.
+    }
+  }
+}
 
 /**
  * 一致读：value 与 version 同源。
@@ -49,7 +66,7 @@ function readConsistent(
   }
   throw createStoreSharedError(
     StoreSharedErrorCode.contentionLimit,
-    '[store] shared cell did not settle before the contention limit; a writer may still be active or may have abandoned the seqlock'
+    StoreSharedErrorText.cellUnsettled
   );
 }
 
@@ -64,7 +81,7 @@ function acquire(view: Int32Array, seqSlot: number): number {
   }
   throw createStoreSharedError(
     StoreSharedErrorCode.contentionLimit,
-    '[store] shared cell lock was not acquired before the contention limit; another writer may still be active or may have abandoned it'
+    StoreSharedErrorText.lockUnacquired
   );
 }
 
@@ -103,6 +120,9 @@ const SIGNAL_VALUE_SLOT = 0;
 const SIGNAL_SEQ_SLOT = 1;
 const SIGNAL_SLOTS = 2;
 
+/** The largest slot index supported by the ECMAScript typed-array index space. */
+const MAX_INT32_ARRAY_SLOTS = 0xffffffff;
+
 /**
  * Int32 值域校验。
  *
@@ -113,7 +133,7 @@ function asInt32(value: number, what: string): number {
   if (!Number.isInteger(value) || value < -2147483648 || value > 2147483647) {
     throw createStoreSharedRangeError(
       StoreSharedErrorCode.invalidOption,
-      `[store] ${what} must be an int32, received ${String(value)}`
+      StoreSharedErrorText.int32(what, value)
     );
   }
   return value;
@@ -148,7 +168,7 @@ function watchSlot(
   if (!hasWaitAsync()) {
     throw createStoreSharedError(
       StoreSharedErrorCode.envUnsupported,
-      '[store] Atomics.waitAsync is unavailable; pump sync() from your own message loop instead'
+      StoreSharedErrorText.waitAsyncUnavailable
     );
   }
   const waitAsync = (
@@ -197,6 +217,7 @@ function watchSlot(
 
   loop();
   return () => {
+    if (stopped) return;
     stopped = true;
     // Wake a pending waitAsync so its promise/callback can release the
     // captured SharedArrayBuffer view promptly instead of waiting for a
@@ -225,12 +246,18 @@ export class SharedInt32Signal implements IObservable, IDisposable {
   #stopWatching?: IDisposer;
 
   constructor(runtime: IRuntime, initialValue = 0, buffer?: SharedArrayBuffer) {
+    if (buffer !== undefined && !(buffer instanceof SharedArrayBuffer)) {
+      throw createStoreSharedRangeError(
+        StoreSharedErrorCode.invalidOption,
+        StoreSharedErrorText.bufferType
+      );
+    }
     this.runtime = runtime;
     this.buffer = buffer ?? new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * SIGNAL_SLOTS);
     if (this.buffer.byteLength < Int32Array.BYTES_PER_ELEMENT * SIGNAL_SLOTS) {
       throw createStoreSharedRangeError(
         StoreSharedErrorCode.bufferTooSmall,
-        '[store] shared signal buffer is too small'
+        StoreSharedErrorText.signalBufferSmall
       );
     }
     this.#view = new Int32Array(this.buffer, 0, SIGNAL_SLOTS);
@@ -297,13 +324,14 @@ export class SharedInt32Signal implements IObservable, IDisposable {
       () => {
         if (!this.#disposed) this.sync();
       },
-      (error) => this.runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })
+      (error) => reportSharedWatchFailure(this.runtime, error)
     );
-    this.#stopWatching = () => {
+    const disposer = () => {
       stop();
-      this.#stopWatching = undefined;
+      if (this.#stopWatching === disposer) this.#stopWatching = undefined;
     };
-    return this.#stopWatching;
+    this.#stopWatching = disposer;
+    return disposer;
   }
 
   peek(): number {
@@ -332,7 +360,7 @@ export class SharedInt32Signal implements IObservable, IDisposable {
     if (this.#disposed)
       throw createStoreSharedError(
         StoreSharedErrorCode.signalDisposed,
-        '[store] shared signal is disposed'
+        StoreSharedErrorText.signalDisposed
       );
   }
 }
@@ -456,34 +484,77 @@ export class SharedInt32Array implements IDisposable {
       readonly initialValues?: Iterable<number>;
     } = {}
   ) {
+    if (options === null || typeof options !== 'object') {
+      throw createStoreSharedRangeError(
+        StoreSharedErrorCode.invalidOption,
+        StoreSharedErrorText.optionsObject
+      );
+    }
+    let buffer: SharedArrayBuffer | undefined;
+    let initialValues: Iterable<number> | undefined;
+    try {
+      buffer = options.buffer;
+      initialValues = options.initialValues;
+    } catch (error) {
+      throw createStoreSharedRangeError(
+        StoreSharedErrorCode.invalidOption,
+        StoreSharedErrorText.optionsRead,
+        { cause: error }
+      );
+    }
+    if (buffer !== undefined && !(buffer instanceof SharedArrayBuffer)) {
+      throw createStoreSharedRangeError(
+        StoreSharedErrorCode.invalidOption,
+        StoreSharedErrorText.bufferType
+      );
+    }
     if (!Number.isInteger(length) || length < 0) {
       throw createStoreSharedRangeError(
         StoreSharedErrorCode.invalidOption,
-        '[store] shared array length must be a non-negative integer'
+        StoreSharedErrorText.arrayLength
       );
+    }
+    let preparedInitialValues: number[] | undefined;
+    if (!buffer && initialValues) {
+      try {
+        preparedInitialValues = [];
+        for (const value of initialValues) {
+          if (preparedInitialValues.length >= length) break;
+          preparedInitialValues.push(asInt32(value, 'shared cell value'));
+        }
+      } catch (error) {
+        throw createStoreSharedRangeError(
+          StoreSharedErrorCode.invalidOption,
+          StoreSharedErrorText.initialValuesInvalid,
+          { cause: error }
+        );
+      }
     }
     this.runtime = runtime;
     this.length = length;
     this.#bitmapWords = dirtyBitmapWords(length);
     const headerSlots = ARRAY_HEADER_BASE_SLOTS + this.#bitmapWords;
     const slots = headerSlots + length * ARRAY_ENTRY_SLOTS;
+    if (!Number.isSafeInteger(slots) || slots > MAX_INT32_ARRAY_SLOTS) {
+      throw createStoreSharedRangeError(
+        StoreSharedErrorCode.invalidOption,
+        StoreSharedErrorText.arrayLengthTooLarge
+      );
+    }
     const requiredBytes = slots * Int32Array.BYTES_PER_ELEMENT;
-    this.buffer = options.buffer ?? new SharedArrayBuffer(requiredBytes);
+    this.buffer = buffer ?? new SharedArrayBuffer(requiredBytes);
     if (this.buffer.byteLength < requiredBytes) {
       throw createStoreSharedRangeError(
         StoreSharedErrorCode.bufferTooSmall,
-        '[store] shared array buffer is too small'
+        StoreSharedErrorText.arrayBufferSmall
       );
     }
     this.#view = new Int32Array(this.buffer, 0, slots);
     this.#observedVersions = new Int32Array(length);
     this.#observedEpoch = Atomics.load(this.#view, ARRAY_EPOCH_SLOT);
-    if (!options.buffer && options.initialValues) {
-      let index = 0;
-      for (const value of options.initialValues) {
-        if (index >= length) break;
-        Atomics.store(this.#view, this.#valueSlot(index), asInt32(value, 'shared cell value'));
-        index++;
+    if (preparedInitialValues) {
+      for (let index = 0; index < preparedInitialValues.length; index++) {
+        Atomics.store(this.#view, this.#valueSlot(index), preparedInitialValues[index]);
       }
     }
     // Do not scan every seqlock during construction. Cells establish their
@@ -526,6 +597,12 @@ export class SharedInt32Array implements IDisposable {
    */
   update(index: number, update: (current: number) => number): number {
     this.#assertIndex(index);
+    if (typeof update !== 'function') {
+      throw createStoreSharedRangeError(
+        StoreSharedErrorCode.invalidOption,
+        StoreSharedErrorText.updateFunction
+      );
+    }
     const cell = this.#cells.get(index);
     for (let spins = 0; spins < SPIN_LIMIT; spins++) {
       this.assertActive();
@@ -542,7 +619,7 @@ export class SharedInt32Array implements IDisposable {
     }
     throw createStoreSharedError(
       StoreSharedErrorCode.contentionLimit,
-      `[store] shared array update at ${index} kept losing the race; another writer never settled`
+      StoreSharedErrorText.arrayRace(index)
     );
   }
 
@@ -607,13 +684,14 @@ export class SharedInt32Array implements IDisposable {
       () => {
         if (!this.#disposed) this.sync();
       },
-      (error) => this.runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })
+      (error) => reportSharedWatchFailure(this.runtime, error)
     );
-    this.#stopWatching = () => {
+    const disposer = () => {
       stop();
-      this.#stopWatching = undefined;
+      if (this.#stopWatching === disposer) this.#stopWatching = undefined;
     };
-    return this.#stopWatching;
+    this.#stopWatching = disposer;
+    return disposer;
   }
 
   snapshot(): Int32Array {
@@ -651,7 +729,7 @@ export class SharedInt32Array implements IDisposable {
     if (this.#disposed) {
       throw createStoreSharedError(
         StoreSharedErrorCode.arrayDisposed,
-        '[store] shared array is disposed'
+        StoreSharedErrorText.arrayDisposed
       );
     }
   }
@@ -711,7 +789,7 @@ export class SharedInt32Array implements IDisposable {
     if (!Number.isInteger(index) || index < 0 || index >= this.length) {
       throw createStoreSharedRangeError(
         StoreSharedErrorCode.indexOutOfRange,
-        `[store] shared array index out of range: ${index}`
+        StoreSharedErrorText.arrayIndex(index)
       );
     }
   }

@@ -1,4 +1,5 @@
 import { createStoreLightError, StoreLightErrorCode } from './errors.js';
+import { StoreLightErrorText } from './error-text.js';
 
 const CAPTURES = Symbol('store-resource-captures');
 
@@ -62,7 +63,7 @@ export class ResourceCaptureRegistry {
     if (typeof WeakRef !== 'function' || typeof FinalizationRegistry !== 'function')
       throw createStoreLightError(
         StoreLightErrorCode.envUnsupported,
-        '[store] ResourceCaptureRegistry requires WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox'
+        StoreLightErrorText.captureRegistryWeakRef
       );
     this.#onChanged = onChanged ?? (() => undefined);
     // Leak telemetry only: by the time this fires (if it ever does), the
@@ -156,7 +157,7 @@ export class ResourceCaptureRegistry {
     if (!this.#captures.has(token) || this.#committed.has(token) || captured.version === undefined)
       throw createStoreLightError(
         StoreLightErrorCode.captureInvalid,
-        '[store] invalid or consumed resource capture'
+        StoreLightErrorText.invalidCapture
       );
     return captured.version;
   }

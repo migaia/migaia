@@ -23,6 +23,35 @@ function makeRuntime() {
 }
 
 describe('StoreMiddlewareHost construction', () => {
+  it('rejects an invalid DevTools adapter before plugin installation', async () => {
+    const { runtime } = makeRuntime();
+    const host = createStoreMiddlewareHost({
+      runtime,
+      getState: () => ({ value: 0 })
+    });
+    await expect(host.connectDevTools(null as never)).rejects.toThrow(
+      '[store] DevTools adapter must provide init/send functions'
+    );
+    await host.dispose();
+  });
+
+  it('rejects null options with a tagged configuration error', () => {
+    expect(() => createStoreMiddlewareHost(null as never)).toThrow(
+      '[store] middleware host options must be an object'
+    );
+  });
+
+  it('contains revoked host options proxies before PluginHost construction', () => {
+    const { proxy, revoke } = Proxy.revocable({}, {});
+    revoke();
+    expect(() => createStoreMiddlewareHost(proxy as never)).toThrow(
+      expect.objectContaining({
+        source: '@migaia/store-middleware',
+        code: 'INVALID_OPTION',
+        cause: expect.any(Error)
+      })
+    );
+  });
   it('diagnostic clone keeps non-cloneable leaves without throwing', () => {
     const handler = () => 1;
     const snapshot = ClonePolicy.diagnostic({ handler, value: 1 });
@@ -79,6 +108,25 @@ describe('StoreMiddlewareHost construction', () => {
   });
 });
 
+it('snapshots accessor-backed host options before construction reuses them', async () => {
+  const { runtime } = makeRuntime();
+  const options = {
+    runtime,
+    getState: () => ({ value: 0 })
+  } as Record<string, unknown>;
+  let pipelineReads = 0;
+  Object.defineProperty(options, 'pipeline', {
+    get: () => {
+      pipelineReads++;
+      if (pipelineReads > 1) throw new Error('pipeline reread');
+      return { mode: 'async' };
+    }
+  });
+  const host = createStoreMiddlewareHost(options as never);
+  expect(pipelineReads).toBe(1);
+  await host.dispose();
+});
+
 describe('StoreMiddlewareHost.emit', () => {
   it('reports a trace-listener error when a pipeline stage never calls next()', async () => {
     const { runtime, errors } = makeRuntime();
@@ -115,6 +163,34 @@ describe('StoreMiddlewareHost.emit', () => {
     expect(errors).toHaveLength(0);
     expect(seen).toHaveLength(1);
     await host.dispose();
+  });
+
+  it('contains a throwing Runtime reporter at the trace boundary', async () => {
+    const runtime = createRuntime();
+    const reporterFailure = new Error('runtime reporter failed');
+    const hostReportError = vi.fn();
+    vi.spyOn(runtime, 'reportError').mockImplementation(() => {
+      throw reporterFailure;
+    });
+    vi.stubGlobal('reportError', hostReportError);
+    try {
+      const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => ({ value: 0 }) });
+      await host.use({
+        name: 'swallow-hostile-reporter',
+        install: (core) => {
+          core.usePipeline(() => {
+            throw new Error('pipeline failure');
+          });
+          return {};
+        }
+      });
+
+      expect(() => host.recordState('test', { value: 0 }, { value: 1 })).not.toThrow();
+      expect(hostReportError).toHaveBeenCalledWith(reporterFailure);
+      await host.dispose();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 
@@ -261,6 +337,21 @@ describe('StoreMiddlewareHost.recordState / recordError', () => {
 });
 
 describe('StoreMiddlewareHost.attachBindingDisposer / dispose', () => {
+  it('is single-flight and replays binding cleanup failure to every caller', async () => {
+    const { runtime } = makeRuntime();
+    const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => ({ value: 0 }) });
+    const cleanupError = new Error('binding cleanup failed');
+    host.attachBindingDisposer(() => {
+      throw cleanupError;
+    });
+
+    const first = host.dispose();
+    const second = host.dispose();
+    expect(second).toBe(first);
+    await expect(first).rejects.toBe(cleanupError);
+    expect(host.dispose()).toBe(first);
+  });
+
   it('runs attached disposers in LIFO order before super.dispose() tears down plugins', async () => {
     const { runtime } = makeRuntime();
     const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => ({ value: 0 }) });
@@ -337,6 +428,18 @@ describe('loggerMiddleware', () => {
 });
 
 describe('StoreMiddlewareHost.connectDevTools', () => {
+  it('contains revoked adapter proxies as tagged configuration errors', async () => {
+    const { runtime } = makeRuntime();
+    const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => ({ value: 0 }) });
+    const { proxy, revoke } = Proxy.revocable({}, {});
+    revoke();
+    await expect(host.connectDevTools(proxy as never)).rejects.toMatchObject({
+      source: '@migaia/store-middleware',
+      code: 'INVALID_OPTION',
+      cause: expect.any(Error)
+    });
+    await host.dispose();
+  });
   function makeAdapter(_getState: () => IState) {
     const initCalls: IState[] = [];
     const sendCalls: Array<{ event: IMiddlewareEvent<IState>; state: IState }> = [];

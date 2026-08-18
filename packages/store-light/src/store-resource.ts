@@ -1,13 +1,20 @@
 import { ResourceCachePolicy } from './store-resource-cache-policy.js';
 import { ResourceOwnershipRegistry, type IVersionToken } from './store-resource-ownership.js';
 import type { IStoreResourceLoadContext } from './store-resource-request.js';
-import { createGenerationController } from '@migaia/lifecycle';
+import {
+  assimilateCapturedThen,
+  createGenerationController,
+  probeThenable,
+  ThenableProbeKind
+} from '@migaia/lifecycle';
 import { ResourceStateController } from './store-resource-state.js';
 import { StoreResourceKind } from './resource-state-constants.js';
 import type { IResourceVersion } from './store-resource-state.js';
 import { ResourceVersionRegistry } from './store-resource-versions.js';
 import { ResourceCaptureRegistry, type IResourceCapture } from './store-resource-captures.js';
 import { createStoreLightError, createStoreLightTypeError, StoreLightErrorCode } from './errors.js';
+import { StoreLightErrorText } from './error-text.js';
+import { createEventChannel } from '@migaia/event-subscriber';
 
 export type { IStoreResourceLoadContext } from './store-resource-request.js';
 export type { IResourceCapture } from './store-resource-captures.js';
@@ -47,48 +54,45 @@ export type IStoreResourceErrorPhase = 'load' | 'dispose' | 'listener';
 export type IStoreResourceOptions<T> = {
   /** Cache TTL only; React render safety comes from capture/commit leases. */
   keepAliveMs?: number;
-  dispose?: (value: T) => void;
+  dispose?: (value: T) => void | PromiseLike<void>;
   onError?: (error: unknown, phase: IStoreResourceErrorPhase) => void;
   onTerminal?: () => void;
 };
 export type IStoreResourceFactory<T> = (context: IStoreResourceLoadContext) => Promise<T> | T;
+/** Object-form Resource factory with the same options accepted by the function overload. */
+export type IStoreResourceConfig<T> = IStoreResourceOptions<T> & {
+  load: IStoreResourceFactory<T>;
+};
 export type IStoreResourceScope = {
   resource<T>(
-    factory:
-      | IStoreResourceFactory<T>
-      | { load: IStoreResourceFactory<T>; dispose?: (value: T) => void },
+    factory: IStoreResourceFactory<T> | IStoreResourceConfig<T>,
     options?: IStoreResourceOptions<T>
   ): IStoreResource<T>;
   dispose(): void;
 };
 
+/** Known option keys copied from hostile inputs without enumerating unrelated user properties. */
+const RESOURCE_OPTION_KEYS = ['keepAliveMs', 'dispose', 'onError', 'onTerminal'] as const;
+
+/** Reads each own enumerable Resource option at most once, preserving object-spread precedence. */
+function snapshotResourceOptions<T>(source: object): IStoreResourceOptions<T> {
+  const snapshot = {} as Record<string, unknown>;
+  for (const key of RESOURCE_OPTION_KEYS) {
+    if (Object.getOwnPropertyDescriptor(source, key)?.enumerable)
+      snapshot[key] = Reflect.get(source, key, source);
+  }
+  return snapshot as IStoreResourceOptions<T>;
+}
+
 export function createStoreResourceScope(): IStoreResourceScope {
   const resources = new Set<IStoreResource<unknown>>();
   return {
     resource(factory, options) {
-      let registered!: IStoreResource<unknown>;
-      const terminal = () => {
-        try {
-          options?.onTerminal?.();
-        } finally {
-          resources.delete(registered);
-        }
-      };
-      const resource =
-        typeof factory === 'function'
-          ? createStoreResource(factory, { ...options, onTerminal: terminal })
-          : createStoreResource({ ...factory, ...options, onTerminal: terminal });
-      registered = resource;
+      const resource = createStoreResource(factory, options);
       resources.add(resource);
-      const dispose = resource.dispose;
-      const forceDispose = resource.forceDispose;
-      resource.dispose = () => {
-        dispose();
-      };
-      resource.forceDispose = () => {
-        forceDispose();
+      void resource.whenTerminal().then(() => {
         resources.delete(resource);
-      };
+      });
       return resource;
     },
     dispose() {
@@ -103,19 +107,76 @@ export function createStoreResourceScope(): IStoreResourceScope {
  * explicit disposers must have reference identity.
  */
 export function createStoreResource<T>(
-  factory:
-    | IStoreResourceFactory<T>
-    | {
-        load: IStoreResourceFactory<T>;
-        dispose?: (value: T) => void;
-        keepAliveMs?: number;
-        onError?: (error: unknown, phase: IStoreResourceErrorPhase) => void;
-        onTerminal?: () => void;
-      },
+  factory: IStoreResourceFactory<T> | IStoreResourceConfig<T>,
   options?: IStoreResourceOptions<T>
 ): IStoreResource<T> {
-  const load = typeof factory === 'function' ? factory : factory.load;
-  const config = typeof factory === 'function' ? (options ?? {}) : { ...factory, ...options };
+  const factoryIsFunction = typeof factory === 'function';
+  try {
+    if (!factoryIsFunction && (factory === null || typeof factory !== 'object')) {
+      throw createStoreLightTypeError(
+        StoreLightErrorCode.invalidOption,
+        StoreLightErrorText.resourceFactory
+      );
+    }
+  } catch (error) {
+    if (error instanceof Error && 'code' in error) throw error;
+    throw createStoreLightTypeError(
+      StoreLightErrorCode.invalidOption,
+      StoreLightErrorText.resourceFactory,
+      { cause: error }
+    );
+  }
+  if (options !== undefined && (options === null || typeof options !== 'object')) {
+    throw createStoreLightTypeError(
+      StoreLightErrorCode.invalidOption,
+      StoreLightErrorText.optionsObject
+    );
+  }
+  let explicitOptions: IStoreResourceOptions<T> = {};
+  if (options !== undefined) {
+    try {
+      explicitOptions = snapshotResourceOptions<T>(options);
+    } catch (error) {
+      throw createStoreLightTypeError(
+        StoreLightErrorCode.invalidOption,
+        StoreLightErrorText.optionsObject,
+        { cause: error }
+      );
+    }
+  }
+  let load: IStoreResourceFactory<T>;
+  let config: IStoreResourceOptions<T>;
+  try {
+    const loadCandidate = factoryIsFunction
+      ? factory
+      : Reflect.get(factory as object, 'load', factory as object);
+    if (typeof loadCandidate !== 'function') {
+      throw createStoreLightTypeError(
+        StoreLightErrorCode.invalidOption,
+        StoreLightErrorText.resourceFactory
+      );
+    }
+    load = loadCandidate as IStoreResourceFactory<T>;
+    const factoryOptions = factoryIsFunction ? {} : snapshotResourceOptions<T>(factory as object);
+    config = { ...factoryOptions, ...explicitOptions };
+  } catch (error) {
+    if (error instanceof Error && 'code' in error) throw error;
+    throw createStoreLightTypeError(
+      StoreLightErrorCode.invalidOption,
+      StoreLightErrorText.optionsObject,
+      { cause: error }
+    );
+  }
+  if (
+    (config.dispose !== undefined && typeof config.dispose !== 'function') ||
+    (config.onError !== undefined && typeof config.onError !== 'function') ||
+    (config.onTerminal !== undefined && typeof config.onTerminal !== 'function')
+  ) {
+    throw createStoreLightTypeError(
+      StoreLightErrorCode.invalidOption,
+      StoreLightErrorText.optionsInvalid
+    );
+  }
   const requests = createGenerationController();
   const state = new ResourceStateController<T>();
   const ownership = new ResourceOwnershipRegistry<T>();
@@ -140,21 +201,37 @@ export function createStoreResource<T>(
     return token;
   };
   let revision = 0;
-  const listeners = new Set<() => void>();
+  /** Owns transient revision notifications while preserving the legacy Set dedupe contract. */
+  const listenerChannel = createEventChannel<void>({
+    report: ({ error }) => report(error, 'listener')
+  });
+  /** Maps each legacy listener identity to its event-subscriber registration. */
+  const listenerRegistrations = new Map<() => void, () => void>();
   const activeLeaseTokens = new WeakMap<object, number>();
   const report = (error: unknown, phase: IStoreResourceErrorPhase) => {
     try {
       config.onError?.(error, phase);
-    } catch {
-      /* reporter cannot affect state */
+    } catch (reporterError) {
+      // A reporter is diagnostic-only, but its own failure must remain
+      // observable. Prefer the host's standard reportError sink and fall back
+      // to console.error without allowing either sink to affect resource state.
+      try {
+        const reportError = (globalThis as { reportError?: (error: unknown) => void }).reportError;
+        if (reportError) reportError(reporterError);
+        else console.error(reporterError);
+      } catch {
+        // No reporting sink is available; preserve state and avoid recursion.
+      }
     }
   };
   const notify = () => {
     revision++;
-    for (const listener of Array.from(listeners)) {
-      try {
-        listener();
-      } catch (error) {
+    try {
+      listenerChannel.publish(undefined);
+    } catch (error) {
+      if (error instanceof AggregateError) {
+        for (const failure of error.errors) report(failure, 'listener');
+      } else {
         report(error, 'listener');
       }
     }
@@ -173,7 +250,7 @@ export function createStoreResource<T>(
     )
       throw createStoreLightTypeError(
         StoreLightErrorCode.identityRequired,
-        '[store] disposable resource values must use reference identity'
+        StoreLightErrorText.disposableIdentity
       );
   };
   const resolveDisposer = (value: T): (() => void | PromiseLike<void>) | undefined => {
@@ -181,8 +258,11 @@ export function createStoreResource<T>(
     if (value == null || (typeof value !== 'object' && typeof value !== 'function'))
       return undefined;
     try {
-      const dispose = (value as { $dispose?: unknown }).$dispose;
-      return typeof dispose === 'function' ? () => Reflect.apply(dispose, value, []) : undefined;
+      const candidate = value as { $dispose?: () => void | PromiseLike<void> };
+      const dispose = candidate.$dispose;
+      return typeof dispose === 'function'
+        ? () => Reflect.apply(dispose, candidate, [])
+        : undefined;
     } catch (error) {
       report(error, 'dispose');
       return undefined;
@@ -205,9 +285,12 @@ export function createStoreResource<T>(
       // disposer's rejection has nobody positioned to await it, but must
       // still be reported instead of becoming an unhandled rejection.
       const result = disposer();
-      if (result && typeof (result as PromiseLike<void>).then === 'function') {
-        Promise.resolve(result).catch((error: unknown) => report(error, 'dispose'));
-      }
+      const probe = probeThenable(result);
+      if (probe.kind === ThenableProbeKind.failed) report(probe.error, 'dispose');
+      else if (probe.kind === ThenableProbeKind.thenable)
+        void assimilateCapturedThen(probe.thenFn, result).catch((error: unknown) =>
+          report(error, 'dispose')
+        );
     } catch (error) {
       report(error, 'dispose');
     }
@@ -297,7 +380,8 @@ export function createStoreResource<T>(
     ];
     state.dispose();
     if (!wasDisposed) notify();
-    listeners.clear();
+    listenerChannel.clear();
+    listenerRegistrations.clear();
     cleanupUnique(values);
     versionTokens.clear();
     try {
@@ -344,7 +428,7 @@ export function createStoreResource<T>(
     )
       throw createStoreLightError(
         StoreLightErrorCode.resourceDisposed,
-        '[store] resource is disposed'
+        StoreLightErrorText.resourceDisposed
       );
     if (state.current.kind !== StoreResourceKind.idle) return;
     const context = requests.begin();
@@ -365,7 +449,7 @@ export function createStoreResource<T>(
         if (ownership.isDisposed(next))
           throw createStoreLightError(
             StoreLightErrorCode.resourceDisposed,
-            '[store] resource factory returned a disposed value'
+            StoreLightErrorText.disposedResourceValue
           );
         const stale = versions.takeStale();
         const sameIdentity = stale !== undefined && Object.is(next, stale.value);
@@ -421,7 +505,7 @@ export function createStoreResource<T>(
         return snapshot(current.current.value, current.current.id);
       throw createStoreLightError(
         StoreLightErrorCode.resourceDisposed,
-        '[store] resource is disposed'
+        StoreLightErrorText.resourceDisposed
       );
     }
     if (current.kind === StoreResourceKind.failed) throw current.error;
@@ -432,7 +516,7 @@ export function createStoreResource<T>(
     if (loading.kind === StoreResourceKind.loading) throw loading.operation;
     throw createStoreLightError(
       StoreLightErrorCode.resourceDisposed,
-      '[store] resource is disposed'
+      StoreLightErrorText.resourceDisposed
     );
   };
   const captureSnapshot = (existingLease?: object) => {
@@ -456,7 +540,7 @@ export function createStoreResource<T>(
       )
         throw createStoreLightError(
           StoreLightErrorCode.resourceDisposed,
-          '[store] resource is disposed'
+          StoreLightErrorText.resourceDisposed
         );
       return { snapshot: snapshot(current.current.value, current.current.id), capture: undefined };
     }
@@ -483,7 +567,7 @@ export function createStoreResource<T>(
     if (loading.kind === StoreResourceKind.loading) throw loading.operation;
     throw createStoreLightError(
       StoreLightErrorCode.resourceDisposed,
-      '[store] resource is disposed'
+      StoreLightErrorText.resourceDisposed
     );
   };
   const retainResourceLease = () => {
@@ -493,7 +577,7 @@ export function createStoreResource<T>(
     )
       throw createStoreLightError(
         StoreLightErrorCode.resourceDisposed,
-        '[store] resource is disposed'
+        StoreLightErrorText.resourceDisposed
       );
     cancelEviction();
     start();
@@ -522,7 +606,7 @@ export function createStoreResource<T>(
     if (id === undefined)
       throw createStoreLightError(
         StoreLightErrorCode.unknownVersion,
-        '[store] unknown resource version'
+        StoreLightErrorText.unknownResourceVersion
       );
     if (
       state.current.kind === StoreResourceKind.disposed ||
@@ -530,12 +614,12 @@ export function createStoreResource<T>(
     )
       throw createStoreLightError(
         StoreLightErrorCode.resourceDisposed,
-        '[store] resource is disposed'
+        StoreLightErrorText.resourceDisposed
       );
     if (id !== version && !versions.hasRetired(id) && versions.stale?.id !== id)
       throw createStoreLightError(
         StoreLightErrorCode.unknownVersion,
-        '[store] unknown resource version'
+        StoreLightErrorText.unknownResourceVersion
       );
     cancelEviction();
     start();
@@ -548,12 +632,12 @@ export function createStoreResource<T>(
     )
       throw createStoreLightError(
         StoreLightErrorCode.resourceDisposed,
-        '[store] resource is disposed'
+        StoreLightErrorText.resourceDisposed
       );
     if (id !== version && !versions.hasRetired(id) && versions.stale?.id !== id)
       throw createStoreLightError(
         StoreLightErrorCode.unknownVersion,
-        '[store] unknown resource version'
+        StoreLightErrorText.unknownResourceVersion
       );
     return captures.capture(id);
   };
@@ -562,7 +646,7 @@ export function createStoreResource<T>(
     if (state.current.kind === StoreResourceKind.disposed)
       throw createStoreLightError(
         StoreLightErrorCode.resourceDisposed,
-        '[store] resource is disposed'
+        StoreLightErrorText.resourceDisposed
       );
     if (
       id !== version &&
@@ -572,7 +656,7 @@ export function createStoreResource<T>(
     )
       throw createStoreLightError(
         StoreLightErrorCode.unknownVersion,
-        '[store] unknown resource version'
+        StoreLightErrorText.unknownResourceVersion
       );
     captures.commit(capture);
     cancelEviction();
@@ -586,7 +670,7 @@ export function createStoreResource<T>(
       if (state.current.kind === StoreResourceKind.closing)
         throw createStoreLightError(
           StoreLightErrorCode.resourceDisposed,
-          '[store] resource is disposed'
+          StoreLightErrorText.resourceDisposed
         );
       start();
     },
@@ -598,7 +682,7 @@ export function createStoreResource<T>(
       )
         throw createStoreLightError(
           StoreLightErrorCode.resourceDisposed,
-          '[store] resource is disposed'
+          StoreLightErrorText.resourceDisposed
         );
       cancelEviction();
       requests.supersede();
@@ -661,8 +745,22 @@ export function createStoreResource<T>(
     getSnapshot: () => revision,
     subscribe(listener) {
       if (state.current.kind === StoreResourceKind.disposed) return () => {};
-      listeners.add(listener);
-      return () => listeners.delete(listener);
+      const existing = listenerRegistrations.get(listener);
+      if (existing) {
+        return () => {
+          if (listenerRegistrations.get(listener) !== existing) return;
+          listenerRegistrations.delete(listener);
+          existing();
+        };
+      }
+      const registration = listenerChannel.subscribe(() => listener());
+      listenerRegistrations.set(listener, registration);
+      return () => {
+        const current = listenerRegistrations.get(listener);
+        if (current !== registration) return;
+        listenerRegistrations.delete(listener);
+        registration();
+      };
     }
   };
   return api;

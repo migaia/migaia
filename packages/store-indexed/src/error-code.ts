@@ -7,6 +7,8 @@
  * 码值是公开 API 的一部分，改名等同破坏性变更（`docs/contracts/error-code-rollout.sdd.md` §1.2）。
  */
 export const StoreIndexedErrorCode = {
+  /** Collection constructor options were not an object at the JavaScript boundary. */
+  invalidOption: 'INVALID_OPTION',
   /**
    * 集合已 `dispose()` 后继续读写。
    *

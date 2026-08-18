@@ -87,6 +87,8 @@ new ObservableSet<T>(initial?: Iterable<T>, runtime?: IRuntime, options?: IObser
 
 **`ObservableObject<T extends Record<string, unknown>>` 的类型参数由 `initial` 推导**，之后 `get`/`set`/`update`/`delete`/`keys` 的 key 都被约束为 `T` 的字面量 key（`keyof T & string`）——不能用它添加初始对象里没有的新 key（`set` 的类型签名不允许，但 `delete` 接受 `keyof T & string` 中的任意合法 key）。
 
+Iterable 输入采用统一的前置物化契约：`Symbol.iterator` getter 与捕获函数各调用一次，函数 receiver 为原 iterable；getter/call/`next()`/Map 条目形状任一失败都会在 ownership 或 replace mutation 前转换为 tagged `INVALID_OPTION`，原错误保留在 `cause`。Array/Set 接受字符串并按字符物化；Map 只接受 `[K, V]` entry iterable，字符串同步拒绝。
+
 ---
 
 ## 3. `ObservableObject` 完整参考
@@ -115,7 +117,7 @@ class ObservableObject<T extends Record<string, unknown>> implements IDisposable
 | `peek(key)` | `key: K` | `T[K]` | 非追踪读 | 同步 | 无，不建 cell |
 | `has(key)` | `key: keyof T & string` | `boolean` | 追踪读（依赖结构信号） | 同步 | 无 |
 | `set(key, value)` | `key: K, value: T[K]` | `void` | 写 | 同步 | 若 key 是新增的，触发结构信号；若值真的变了（`Object.is` 判定），触发修订信号；已建 cell 的 key 会同步更新 cell 值。整个操作在一次 `runtime.batch()` 内完成 |
-| `update(key, updater)` | `key: K, updater: (value: T[K]) => T[K]` | `void` | 写 | 同步 | 等价于 `set(key, updater(peek(key)))` |
+| `update(key, updater)` | `key: K, updater: (value: T[K]) => T[K]` | `void` | 写 | 同步 | 先通过 mutation guard，再执行 updater 并提交结果；guard 拒绝时 updater 不执行 |
 | `delete(key)` | `key: keyof T & string` | `boolean`（key 是否存在过） | 写 | 同步 | key 不存在直接返回 `false` 且不触发任何信号；存在则清空值、置 cell 为缺失、触发结构信号与修订信号，并尝试 tombstone 对应 cell |
 | `keys()` | 无 | 当前全部 key 的数组 | 追踪读（依赖结构信号） | 同步 | 无 |
 | `snapshot()` | 无 | 冻结的、`Object.create(null)` 起始的浅拷贝对象 | 追踪读（依赖修订信号），非追踪上下文不建依赖 | 同步 | 无。使用空原型对象是为了让来自外部数据的 `__proto__` 之类 key 被当成普通数据 key，不触发 `Object.prototype` 的 setter |
@@ -180,6 +182,7 @@ class ObservableMap<K, V> implements IDisposable {
   set(key: K, value: V): this;
   delete(key: K): boolean;
   clear(): void;
+  replace(next: ReadonlyMap<K, V> | Iterable<readonly [K, V]>): void;
   keys(): readonly K[];
   valuesArray(): readonly V[];
   entries(): readonly (readonly [K, V])[];
@@ -198,6 +201,7 @@ class ObservableMap<K, V> implements IDisposable {
 | `set(key, value)` | `key: K, value: V` | `this` | 写 | 同步 | 已存在且 `Object.is` 判定值未变时直接跳过；否则更新 cell、按需触发结构信号，始终触发迭代信号 |
 | `delete(key)` | `key: K` | `boolean`（key 是否存在过） | 写 | 同步 | 不存在直接返回 `false`；存在则置 cell 缺失、触发结构信号与迭代信号，并尝试 tombstone |
 | `clear()` | 无 | `void` | 写 | 同步 | 空表直接跳过；否则遍历**已物化**的 cell 逐个置缺失并 tombstone，一次性触发结构信号与迭代信号（不是逐 key 调用 `delete()`，避免为每个 key 各触发一轮信号） |
+| `replace(next)` | `ReadonlyMap<K, V> \| Iterable<readonly [K, V]>` | `void` | 写 | 同步 | 完整物化并验证后原子替换；失败保持旧 Map；整次替换最多各触发一次结构/迭代通知，内容相同则不通知 |
 | `keys()` | 无 | 当前 key 数组 | 追踪读（依赖结构信号） | 同步 | 无 |
 | `valuesArray()` | 无 | 冻结的值数组 | 追踪读（依赖迭代信号） | 同步 | 无 |
 | `entries()` | 无 | 冻结的 `[K, V]` 元组数组，元组本身也被冻结 | 追踪读（依赖迭代信号） | 同步 | 无 |
@@ -220,6 +224,7 @@ class ObservableSet<T> implements IDisposable {
   add(value: T): this;
   delete(value: T): boolean;
   clear(): void;
+  replace(next: Iterable<T>): void;
   valuesArray(): readonly T[];
   snapshot(): ReadonlySet<T>;
   prune(): number;
@@ -234,6 +239,7 @@ class ObservableSet<T> implements IDisposable {
 | `add(value)` | `value: T` | `this` | 写 | 同步 | 已存在直接跳过；否则更新 cell 为 `true`，触发结构信号 |
 | `delete(value)` | `value: T` | `boolean`（是否存在过） | 写 | 同步 | 不存在返回 `false`；存在则更新 cell 为 `false`，触发结构信号，并尝试 tombstone |
 | `clear()` | 无 | `void` | 写 | 同步 | 空集合直接跳过；否则对当前每个成员调用一次 `delete()`（走同一个 `batch()`） |
+| `replace(next)` | `Iterable<T>` | `void` | 写 | 同步 | 完整物化后原子替换；失败保持旧 Set；整次替换最多触发一次结构通知，成员集合相同则不通知 |
 | `valuesArray()` | 无 | 冻结的成员数组 | 追踪读（依赖结构信号） | 同步 | 无 |
 | `snapshot()` | 无 | 新建的原生 `Set` 副本 | 追踪读（依赖结构信号） | 同步 | 无 |
 | `prune()` | 无 | 本次回收的 cell 数 | — | 同步 | 对每个已不在当前成员集合里的 cell 尝试 tombstone |

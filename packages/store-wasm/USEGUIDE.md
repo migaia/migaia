@@ -257,7 +257,8 @@ type IWasmRecordField<Shape> = { [K in keyof Shape]: number } & {
 | `array()` 分配地址未按 8 字节对齐（防御性校验，正常不会触发） | `Error` | `` wasm.array: allocation not 8-byte aligned (ptr=${ptr}) `` |
 | `array().at(i)` / `setAt(i, ...)` 的 `i` 越界或非安全整数 | `RangeError` | `` wasm.array: index out of bounds (${i}) `` |
 | `array().setRange(lo, hi, ...)` 的区间不合法 | `RangeError` | `` wasm.array: invalid range [${lo}, ${hi}) `` |
-| `array().setRange()` 的 `values.length !== hi - lo` | `RangeError` | `wasm.array: values length must match the target range` |
+| `array().setRange()` 的 `values` 不是 array-like | `TypeError` | `wasm.array: values must be array-like` |
+| `array().setRange()` 的 `values.length !== hi - lo` | `RangeError` | `wasm.array: values length must match the target range`（由 `StoreWasmErrorText` 统一维护） |
 | `string()` 的 `maxBytes` 超出 `[0, 0xffff_ffff - 4]` | `RangeError` | `wasm.string: maxBytes exceeds the Wasm32 allocation limit` |
 | `string()` 字段写入的字符串编码后超过 `maxBytes` | `Error` | `` wasm.string: value exceeds maxBytes (${实际字节数} > ${maxBytes}) `` |
 | `string()` 字段读取到存储长度大于 `maxBytes`（数据损坏，正常不会触发） | `Error` | `wasm.string: corrupted byte length` |

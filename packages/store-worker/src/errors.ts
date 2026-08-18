@@ -24,3 +24,12 @@ export function createStoreWorkerError(
   );
   return tagStoreWorkerError(error, code);
 }
+
+/** Builds a tagged aggregate while preserving cleanup error order and identity. */
+export function createStoreWorkerAggregateError(
+  code: IStoreWorkerErrorCode,
+  errors: readonly unknown[],
+  message: string
+): AggregateError {
+  return tagStoreWorkerError(new AggregateError(errors, message), code);
+}
