@@ -2,6 +2,7 @@
 
 ## Design Documents
 
+- **Git tracking boundary:** every file under `docs/` is workspace-local documentation and must remain ignored by Git. Never add, stage, commit, or push any `docs/` path; SDDs are read and maintained locally only.
 - Store every package-specific Software Design Document under `docs/<package>/` at the workspace root.
 - Name each SDD `<document-name>.sdd.md`; the complete path must follow `docs/<package>/<document-name>.sdd.md`.
 - Use the workspace package directory name for `<package>`, for example `docs/store/`, `docs/worker/`, or `docs/store-web/`.
