@@ -13,16 +13,19 @@ describe('PluginHost configuration properties', () => {
     );
   });
 
-  it('copies only the selected object level', () => {
+  it('returns a cached readonly lazy view of the selected object', () => {
     fc.assert(
       fc.property(fc.string(), (value) => {
         const nested = { value };
         const config = { options: { nested } };
         const result = readConfigPath(config, parseConfigPath('plugin.options')) as {
-          nested: typeof nested;
+          nested: Readonly<typeof nested>;
         };
         expect(result).not.toBe(config.options);
-        expect(result.nested).toBe(nested);
+        expect(result.nested).not.toBe(nested);
+        expect(() => {
+          (result.nested as { value: string }).value = 'mutated';
+        }).toThrow(/readonly/);
       })
     );
   });

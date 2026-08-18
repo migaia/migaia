@@ -1,6 +1,6 @@
 import { PluginHost } from '@migaia/plugin-host';
 import type { IPluginHostOptions, IPipelineMode, ISyncPipelineStage } from '@migaia/plugin-host';
-import { createLoggerError, LoggerErrorCode } from './errors.js';
+import { createLoggerError, createLoggerTypeError, LoggerErrorCode } from './errors.js';
 import type {
   IFlusher,
   ILogFailureHook,
@@ -29,8 +29,16 @@ type ILoggerExtendsTarget<TMode extends IPipelineMode> = Omit<
 const loggerInternalState = Symbol('logger.internal.state');
 type ILoggerInternalState = { extendPath: string[]; topicChain: string[] };
 import { getLoggerRuntimeManager } from './runtime-manager.js';
-import { boundedWait, systemScheduler, type ILifecycleScheduler } from '@migaia/lifecycle';
+import {
+  boundedWait,
+  snapshotScheduler,
+  systemScheduler,
+  type ILifecycleScheduler
+} from '@migaia/lifecycle';
 import { LoggerStatus, type ILoggerStatus } from './state-constants.js';
+import { LoggerErrorText } from './error-text.js';
+import { registerLoggerSchedulerDomain } from './scheduler-domain.js';
+import { captureLoggerPromiseLike, observeLoggerReporterResult } from './thenable.js';
 
 /**
  * Cross-realm-safe check for "awaitable", so a Promise constructed in another realm (an iframe, a
@@ -38,10 +46,71 @@ import { LoggerStatus, type ILoggerStatus } from './state-constants.js';
  * current realm's Promise constructor — see LG-R3-2 in
  * docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
  */
-const isPromiseLike = (value: unknown): value is PromiseLike<unknown> =>
-  (typeof value === 'object' || typeof value === 'function') &&
-  value !== null &&
-  typeof (value as { then?: unknown }).then === 'function';
+/** Resolves one immutable scheduler facade before PluginHost or logger code can observe it. */
+function resolveLoggerScheduler(value: unknown): ILifecycleScheduler {
+  if (value === undefined) return registerLoggerSchedulerDomain(systemScheduler, systemScheduler);
+  try {
+    const snapshot = snapshotScheduler(value);
+    if (snapshot !== undefined) return registerLoggerSchedulerDomain(value as object, snapshot);
+  } catch (error) {
+    throw createLoggerTypeError(
+      LoggerErrorCode.invalidOption,
+      LoggerErrorText.schedulerGetterFailed,
+      {
+        cause:
+          error instanceof Error && 'cause' in error
+            ? (error as Error & { readonly cause?: unknown }).cause
+            : error
+      }
+    );
+  }
+  throw createLoggerTypeError(LoggerErrorCode.invalidOption, LoggerErrorText.invalidScheduler);
+}
+
+type ILoggerConstructorSnapshot = {
+  readonly scheduler: unknown;
+  readonly context: string[];
+  readonly topic: string;
+  readonly onEntries: readonly (readonly [string, ILogHookFn])[];
+  readonly options: Record<string, unknown>;
+  readonly pipeline: IPluginHostOptions['pipeline'] | undefined;
+  readonly plugins: readonly ILoggerPluginConstraint[];
+};
+
+/** Reads every public constructor option before LoggerCore can install a resource-owning plugin. */
+function snapshotLoggerOptions(options: unknown): ILoggerConstructorSnapshot {
+  let scheduler: unknown;
+  try {
+    scheduler = (options as Record<string, unknown> | undefined)?.scheduler;
+  } catch (error) {
+    throw createLoggerTypeError(
+      LoggerErrorCode.invalidOption,
+      LoggerErrorText.schedulerGetterFailed,
+      { cause: error }
+    );
+  }
+
+  try {
+    const source = (options ?? {}) as Record<string, unknown>;
+    const rawContext = source.context as string[] | undefined;
+    const rawOn = source.on as Record<string, ILogHookFn> | undefined;
+    const rawOptions = source.options as Record<string, unknown> | undefined;
+    const rawPlugins = source.plugins as readonly ILoggerPluginConstraint[] | undefined;
+    return {
+      scheduler,
+      context: rawContext === undefined ? [] : [...rawContext],
+      topic: (source.topic as string | undefined) ?? '',
+      onEntries: rawOn === undefined ? [] : Object.entries(rawOn),
+      options: rawOptions === undefined ? {} : { ...rawOptions },
+      pipeline: source.pipeline as IPluginHostOptions['pipeline'] | undefined,
+      plugins: rawPlugins === undefined ? [] : [...rawPlugins]
+    };
+  } catch (error) {
+    throw createLoggerTypeError(LoggerErrorCode.invalidOption, LoggerErrorText.invalidOption, {
+      cause: error
+    });
+  }
+}
 
 /**
  * 一个插件通过 install() 注册的所有东西的登记簿，unUse() 靠这个精确撤销， 不需要每种注册类型各自发明一套"怎么撤销"的逻辑——集中记录、集中回滚。
@@ -69,6 +138,8 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   #failureHooks: ILogFailureHook[] = [];
   /** Every asynchronous path enters this registry before it can affect flush completion. */
   #pending = new Set<Promise<void>>();
+  /** Normal dispatch stays open for shutdown handlers, then closes before PluginHost disposal. */
+  #dispatchAdmissionOpen = true;
   #status: ILoggerStatus = LoggerStatus.active;
   #flushPromise: Promise<void> | undefined;
   #shutdownPromise: Promise<void> | undefined;
@@ -89,7 +160,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     plugins: readonly ILoggerPluginConstraint[] = [],
     scheduler: ILifecycleScheduler = systemScheduler
   ) {
-    super(hostOptions);
+    super({ ...hostOptions, scheduler });
     this.#scheduler = scheduler;
     // Freeze the top-level context containers. Nested option values and Date remain
     // identity-preserving and mutable by contract; callers own that trade-off.
@@ -151,7 +222,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   }
 
   dispatchRaw(input: IRawEntryInput, options: ILogDispatchOptions = {}): void {
-    if (this.#status === 'closed') return;
+    if (!this.#dispatchAdmissionOpen || this.#status === 'closed') return;
     const entry = this.#buildEntry(input);
     if (options.asyncOutput) this.defer(() => this.#process(entry));
     else this.#process(entry);
@@ -200,11 +271,22 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     const failure: ILogFailure = { source, error };
     for (const hook of this.#failureHooks.slice()) {
       try {
-        hook(failure);
+        const pending = captureLoggerPromiseLike(hook(failure));
+        if (pending) {
+          const observed = pending.then(
+            () => undefined,
+            (hookError) => {
+              try {
+                this.#reportFailureHookError(hookError);
+              } catch {
+                // Failure reporting is the terminal boundary; a reporter must never escape it.
+              }
+            }
+          );
+          void observed.catch(() => undefined);
+        }
       } catch (hookError) {
-        const runtime = getLoggerRuntimeManager();
-        if (runtime.console) runtime.console.error('[logger] failure hook threw:', hookError);
-        else runtime.write(`[logger] failure hook threw: ${String(hookError)}`);
+        this.#reportFailureHookError(hookError);
       }
     }
     const labels: Record<ILogFailure['source'], string> = {
@@ -216,9 +298,33 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
       forward: 'extends 转发异常',
       shutdown: 'shutdown 异常'
     };
-    const runtime = getLoggerRuntimeManager();
-    if (runtime.console) runtime.console.error(`[logger] ${labels[source]}:`, error);
-    else runtime.write(`[logger] ${labels[source]}: ${String(error)}`);
+    try {
+      const runtime = getLoggerRuntimeManager();
+      const result = runtime.console
+        ? runtime.console.error(`[logger] ${labels[source]}:`, error)
+        : runtime.write(`[logger] ${labels[source]}: ${String(error)}`);
+      observeLoggerReporterResult(result);
+    } catch {
+      // Console/write are the final observer. Their own failure must not escape or recurse.
+    }
+  }
+
+  /** Reports a failure-hook failure without re-entering the business failure hooks. */
+  #reportFailureHookError(hookError: unknown): void {
+    const reported = createLoggerError(
+      LoggerErrorCode.hookFailed,
+      LoggerErrorText.failureHookThrew,
+      { cause: hookError }
+    );
+    try {
+      const runtime = getLoggerRuntimeManager();
+      const result = runtime.console
+        ? runtime.console.error(reported, hookError)
+        : runtime.write(`${LoggerErrorText.failureHookThrew} ${String(hookError)}`);
+      observeLoggerReporterResult(result);
+    } catch {
+      // This is intentionally the last containment boundary.
+    }
   }
 
   /**
@@ -231,22 +337,51 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     for (const fn of list) {
       try {
         const result = fn(entry);
-        if (isPromiseLike(result)) {
-          this.#track('hook', Promise.resolve(result));
-        }
+        const pending = captureLoggerPromiseLike(result);
+        if (pending) this.#track('hook', pending);
       } catch (err) {
         this.#reportFailure('hook', err);
       }
     }
   }
 
+  /** Runs a hook phase in registration order and waits for asynchronous hooks. */
+  #runHookPhase(name: string, entry: ILogEntry): Promise<void> | undefined {
+    const list = this.#hooks.get(name);
+    if (!list || list.length === 0) return undefined;
+    let chain: Promise<void> | undefined;
+    for (const fn of list.slice()) {
+      const run = (): Promise<void> | undefined => {
+        try {
+          const pending = captureLoggerPromiseLike(fn(entry));
+          return pending?.catch((error) => {
+            this.#reportFailure('hook', error);
+          });
+        } catch (error) {
+          this.#reportFailure('hook', error);
+          return undefined;
+        }
+      };
+      if (chain) {
+        chain = chain.then(() => run());
+      } else {
+        chain = run();
+      }
+    }
+    return chain;
+  }
+
   defer(task: () => void | Promise<void>): void {
+    // Shutdown handlers may defer final work until the pre-dispose drain. Once normal admission
+    // closes, a disposer must not add a task that the completed shutdown can no longer drain.
+    if (!this.#dispatchAdmissionOpen || this.#status === LoggerStatus.closed) return;
     const run = new Promise<void>((resolve, reject) => {
       getLoggerRuntimeManager().defer(() => {
         try {
           const result = task();
-          if (isPromiseLike(result)) {
-            Promise.resolve(result).then(resolve, reject);
+          const pending = captureLoggerPromiseLike(result);
+          if (pending) {
+            pending.then(resolve, reject);
           } else {
             resolve();
           }
@@ -296,7 +431,10 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
             scheduler: this.#scheduler
           }))
         ) {
-          this.#reportFailure('flush', new Error('flush deadline reached'));
+          this.#reportFailure(
+            'flush',
+            createLoggerError(LoggerErrorCode.lifecycleDeadline, LoggerErrorText.flushDeadline)
+          );
           break;
         }
       } catch (error) {
@@ -307,7 +445,10 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     for (const target of this.#extendTargets) {
       try {
         if (!(await boundedWait(target.flush(), deadlineAt, { scheduler: this.#scheduler }))) {
-          this.#reportFailure('forward', new Error('extends flush deadline reached'));
+          this.#reportFailure(
+            'forward',
+            createLoggerError(LoggerErrorCode.lifecycleDeadline, LoggerErrorText.forwardDeadline)
+          );
           break;
         }
       } catch (error) {
@@ -316,7 +457,13 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     }
     await this.#drain(deadlineAt);
     if (this.#pending.size > 0)
-      this.#reportFailure('flush', new Error('flush deadline reached with pending work remaining'));
+      this.#reportFailure(
+        'flush',
+        createLoggerError(
+          LoggerErrorCode.lifecycleDeadline,
+          LoggerErrorText.pendingAfterFlushDeadline
+        )
+      );
   }
 
   onShutdown(fn: IShutdownHandler): () => void {
@@ -365,13 +512,23 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
               scheduler: this.#scheduler
             }))
           ) {
-            this.#reportFailure('shutdown', new Error('shutdown handler deadline reached'));
+            this.#reportFailure(
+              'shutdown',
+              createLoggerError(
+                LoggerErrorCode.lifecycleDeadline,
+                LoggerErrorText.shutdownHandlerDeadline
+              )
+            );
           }
         } catch (error) {
           this.#reportFailure('shutdown', error);
         }
       }
       await this.flush(deadlineAt);
+      // Shutdown handlers are allowed to enqueue final work; that work was drained above. Close
+      // normal dispatch before PluginHost invokes plugin disposers so disposer-era logs cannot
+      // enter a host whose lifecycle is already being torn down and create late #pending work.
+      this.#dispatchAdmissionOpen = false;
       await super.dispose();
       this.#status = LoggerStatus.closed;
     })().then(
@@ -379,8 +536,8 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
       (error) => {
         // PluginHost disposal is terminal even when one disposer fails. Keep Logger
         // terminal too; accepting new entries would route them into a disposed host.
+        this.#dispatchAdmissionOpen = false;
         this.#status = LoggerStatus.closed;
-        this.#shutdownPromise = undefined;
         fail?.(error);
       }
     );
@@ -392,7 +549,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   }
 
   raw(text: string, options: ILogDispatchOptions = {}): void {
-    if (this.#status === LoggerStatus.closed) return;
+    if (!this.#dispatchAdmissionOpen || this.#status === LoggerStatus.closed) return;
     const write = () => {
       getLoggerRuntimeManager().write(text);
     };
@@ -406,7 +563,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
       if (other === (this as unknown as ILoggerCore)) {
         throw createLoggerError(
           LoggerErrorCode.extendsSelf,
-          `[logger] extends() 不能传入自己 (id=${this.ctx.id})`
+          LoggerErrorText.extendsSelf(this.ctx.id)
         );
       }
       // 主动检测：如果 other 沿着它自己已有的 extends 链路能转发回 this，
@@ -415,8 +572,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
       if (other instanceof LoggerCore && LoggerCore.#canReach(other, this.ctx.id, new Set())) {
         throw createLoggerError(
           LoggerErrorCode.extendsCycle,
-          `[logger] extends() 会形成循环引用：目标 logger 已经能沿着它自己的 extends 链路` +
-            ` 转发回当前 logger (id=${this.ctx.id})，已阻止这次调用`
+          LoggerErrorText.extendsCycle(this.ctx.id)
         );
       }
       this.#extendTargets.push(other);
@@ -437,7 +593,10 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   #track(source: ILogFailure['source'], promise: Promise<void>): void {
     const observed = promise.catch((error) => this.#reportFailure(source, error));
     this.#pending.add(observed);
-    void observed.finally(() => this.#pending.delete(observed));
+    void observed.then(
+      () => this.#pending.delete(observed),
+      () => this.#pending.delete(observed)
+    );
   }
 
   /**
@@ -467,7 +626,15 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
         // Same timer-leak hazard as boundedWait() (LG-R5-2): without this, every round that resolves
         // via #pending settling first — the common, happy-path case — leaves its deadline timer
         // dangling until it fires on its own up to `remainingMs` later.
-        if (timer !== undefined) timer.cancel();
+        if (timer !== undefined) {
+          try {
+            timer.cancel();
+          } catch (error) {
+            // A cleanup failure must not replace a settled drain or leave flush pending. Keep it
+            // observable through the logger failure policy while preserving flush settlement.
+            this.#reportFailure('flush', error);
+          }
+        }
       }
     }
   }
@@ -475,33 +642,85 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   #process(entry: ILogEntry): void {
     // Pipeline and hooks intentionally share the live entry; sinks receive a shallow snapshot,
     // but after hooks may update the value that extends() forwards.
-    this.fireHook('before', entry);
-    this.fireHook(`before:${entry.tag}`, entry);
+    const before = this.#runHookPhase('before', entry);
+    if (before) {
+      this.#track('hook', before);
+      this.#track(
+        'hook',
+        before.then(
+          () => this.#processTagBefore(entry),
+          () => undefined
+        )
+      );
+      return;
+    }
+    this.#processTagBefore(entry);
+  }
 
+  #processTagBefore(entry: ILogEntry): void {
+    const tagBefore = this.#runHookPhase(`before:${entry.tag}`, entry);
+    if (tagBefore) {
+      this.#track('hook', tagBefore);
+      this.#track(
+        'hook',
+        tagBefore.then(
+          () => this.#processAfterBefore(entry),
+          () => undefined
+        )
+      );
+      return;
+    }
+    this.#processAfterBefore(entry);
+  }
+
+  #processAfterBefore(entry: ILogEntry): void {
     try {
       const pipeline = this.runPipeline(entry, (finalEntry) => {
+        const committedEntry = finalEntry && finalEntry.time instanceof Date ? finalEntry : entry;
         for (const sink of this.#sinks.slice()) {
           try {
-            const result = sink(this.#snapshotEntry(finalEntry));
-            if (isPromiseLike(result)) {
+            const result = sink(this.#snapshotEntry(committedEntry));
+            const pending = captureLoggerPromiseLike(result);
+            if (pending) {
               // 关键修复：sink 返回的 Promise 现在会被纳入 #pending 追踪，
               // flush()/shutdown() 会真正等它完成，不再是单纯 fire-and-forget。
               // 这直接关系到 http 插件没接 batch 时，进程退出前有没有可能把
               // 还在飞行中的请求弄丢——之前这里只 .catch() 不追踪，
               // flush() 完全不知道这个请求还没发完就已经"完成"了。
-              this.#track('sink', Promise.resolve(result));
+              this.#track('sink', pending);
             }
           } catch (err) {
             this.#reportFailure('sink', err);
           }
         }
-        this.fireHook('after', finalEntry);
-        this.fireHook(`after:${finalEntry.tag}`, finalEntry);
-        this.#forwardToExtendTargets(finalEntry);
+        const after = this.#runHookPhase('after', committedEntry);
+        const forward = () => {
+          const tagAfter = this.#runHookPhase(`after:${committedEntry.tag}`, committedEntry);
+          if (tagAfter) {
+            this.#track('hook', tagAfter);
+            this.#track(
+              'hook',
+              tagAfter.then(
+                () => this.#forwardToExtendTargets(committedEntry),
+                () => undefined
+              )
+            );
+            return;
+          }
+          this.#forwardToExtendTargets(committedEntry);
+        };
+        if (after) {
+          this.#track('hook', after);
+          this.#track(
+            'hook',
+            after.then(forward, () => undefined)
+          );
+        } else {
+          forward();
+        }
       });
-      if (isPromiseLike(pipeline)) {
-        this.#track('pipeline', Promise.resolve(pipeline));
-      }
+      const pending = captureLoggerPromiseLike(pipeline);
+      if (pending) this.#track('pipeline', pending);
     } catch (err) {
       this.#reportFailure('pipeline', err);
     }
@@ -617,18 +836,21 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
  */
 class LoggerImpl<const P extends readonly ILoggerPluginConstraint[] = []> {
   constructor(options: ILoggerOptions<P> = {}) {
+    const snapshot = snapshotLoggerOptions(options);
+    const scheduler = resolveLoggerScheduler(snapshot.scheduler);
     const core = new LoggerCore(
-      options.options ?? {},
-      options.context ?? [],
-      options.topic ?? '',
+      snapshot.options,
+      snapshot.context,
+      snapshot.topic,
       {
-        pipeline: options.pipeline
+        pipeline: snapshot.pipeline,
+        scheduler
       },
-      options.plugins ?? [],
-      options.scheduler ?? systemScheduler
+      snapshot.plugins,
+      scheduler
     );
 
-    for (const [name, fn] of Object.entries(options.on ?? {})) {
+    for (const [name, fn] of snapshot.onEntries) {
       core.hook(name, fn);
     }
 

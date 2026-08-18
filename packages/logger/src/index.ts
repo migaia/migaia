@@ -1,6 +1,8 @@
 export type { IDimFn, IPaintFn } from './typing.js';
 
 export { Logger } from './log.js';
+export { LoggerErrorCode, type ILoggerErrorCode } from './error-code.js';
+export { LOGGER_SOURCE } from './errors.js';
 export { LoggerStatus, type ILoggerStatus } from './state-constants.js';
 export {
   LoggerLevel,

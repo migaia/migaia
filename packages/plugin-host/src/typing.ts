@@ -10,8 +10,15 @@ export type IPluginResource =
 
 export type IPluginConfig = Record<string, unknown>;
 
+/** Recursive readonly view exposed by the lazy configuration proxy. */
+export type IReadonlyConfig<T> = T extends (...args: never[]) => unknown
+  ? T
+  : T extends object
+    ? { readonly [K in keyof T]: IReadonlyConfig<T[K]> }
+    : T;
+
 export type IPluginLifecycleConfig<TConfig extends IPluginConfig = IPluginConfig> = {
-  get(): Readonly<TConfig>;
+  get(): IReadonlyConfig<TConfig>;
 };
 
 /** Plugin-facing config capability; TConfig is fixed by the plugin declaration. */
@@ -28,13 +35,20 @@ export { PluginHostErrorCode, type IPluginHostErrorCode } from './error-code.js'
 // 本文件自身也引用该类型（见 IPluginHostOptions.diagnostic）；re-export 不会把名字带进本地作用域。
 import type { IPluginHostErrorCode } from './error-code.js';
 import { PluginHostPipelineMode } from './state-constants.js';
+import {
+  GENERATOR_CONTINUE,
+  GENERATOR_HALT,
+  GENERATOR_UNDEFINED
+} from '@migaia/middleware-pipeline';
 
 export type IPipelineMode = (typeof PluginHostPipelineMode)[keyof typeof PluginHostPipelineMode];
 export type IPipelineConfig = { mode?: IPipelineMode };
 /** Explicit generator return value for a final `undefined` payload. */
-export const GENERATOR_UNDEFINED = Symbol('plugin-host.generator-undefined');
-export const GENERATOR_HALT = Symbol('plugin-host.generator-halt');
-export const GENERATOR_CONTINUE = Symbol('plugin-host.generator-continue');
+/**
+ * Generator signals are re-exported from middleware-pipeline so adapters and runners share
+ * identity.
+ */
+export { GENERATOR_CONTINUE, GENERATOR_HALT, GENERATOR_UNDEFINED };
 type IGeneratorUndefinedSignal<TValue> = undefined extends TValue
   ? typeof GENERATOR_UNDEFINED
   : never;
@@ -73,7 +87,7 @@ export type IPlugin<
   shared?: (core: TCore & IPluginLifecycleCore<TConfig>) => TShared;
   install: (core: TCore & IPluginLifecycleCore<TConfig>) => TExt | Promise<TExt>;
   update?: (
-    next: Readonly<TConfig>,
+    next: IReadonlyConfig<TConfig>,
     core: TCore & IPluginLifecycleCore<TConfig>
   ) => void | Promise<void>;
   dispose?: () => void | Promise<void>;
@@ -116,12 +130,12 @@ export type IPluginHostConfigFor<TPlugins extends readonly unknown[]> = {
   update<TName extends Extract<TPlugins[number], { readonly name: string }>['name']>(
     name: TName,
     recipe: (
-      previous: Readonly<IExtractPluginConfig<IPluginByName<TPlugins, TName>>>
+      previous: IReadonlyConfig<IExtractPluginConfig<IPluginByName<TPlugins, TName>>>
     ) => Partial<IExtractPluginConfig<IPluginByName<TPlugins, TName>>>
   ): Promise<void>;
   update(
     name: string,
-    recipe: (previous: Readonly<IPluginConfig>) => Partial<IPluginConfig>
+    recipe: (previous: IReadonlyConfig<IPluginConfig>) => Partial<IPluginConfig>
   ): Promise<void>;
 };
 

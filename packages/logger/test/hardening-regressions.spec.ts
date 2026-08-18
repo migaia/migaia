@@ -1,9 +1,42 @@
 /** Hardening regression cases for logger lifecycle and dispatch invariants. */
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { Logger } from '../src/log';
 import { batch } from '../src/plugins/batch';
-import { boundedWait as waitUntil, systemScheduler } from '@migaia/lifecycle';
+import { http } from '../src/plugins/http';
+import { process as processPlugin } from '../src/plugins/process';
+import { setLoggerRuntimeManager } from '../src/runtime-manager';
+import {
+  boundedWait as waitUntil,
+  createManualScheduler,
+  systemScheduler
+} from '@migaia/lifecycle';
 import type { ILogEntry } from '../src/typing';
+import { LoggerErrorCode, LOGGER_SOURCE } from '../src/errors.js';
+import { LoggerErrorText } from '../src/error-text.js';
+
+/** Finds a logger-tagged error through both cause and AggregateError branches. */
+const findLoggerError = (value: unknown, code: string): (Error & { code?: string }) | undefined => {
+  const visited = new Set<unknown>();
+  const visit = (candidate: unknown): (Error & { code?: string }) | undefined => {
+    if (visited.has(candidate)) return undefined;
+    visited.add(candidate);
+    if (candidate instanceof Error && (candidate as Error & { code?: string }).code === code)
+      return candidate as Error & { code?: string };
+    if (candidate instanceof AggregateError) {
+      for (const nested of candidate.errors) {
+        const found = visit(nested);
+        if (found) return found;
+      }
+    }
+    if (candidate instanceof Error) {
+      const found = visit((candidate as Error & { cause?: unknown }).cause);
+      if (found) return found;
+    }
+    return undefined;
+  };
+  return visit(value);
+};
 
 describe('#1 shutting-down 期间 raw() 拒绝但 dispatchRaw() 照收', () => {
   it('两条入口对同一状态的判定不一致', async () => {
@@ -120,8 +153,247 @@ describe('#6 shutdown 失败会把实例卡在 shutting-down', () => {
     expect(seen).toEqual([]);
     expect(failures).toHaveLength(0);
 
-    // 再次 shutdown 只是拿到同一个已 reject 的 promise，无法恢复
-    await expect(log.shutdown('manual')).resolves.toBeUndefined();
+    // 终态失败仍复用同一个 rejected promise，不伪装成成功。
+    await expect(log.shutdown('manual')).rejects.toThrow();
+  });
+});
+
+describe('third adversarial pass', () => {
+  it('rejects invalid HTTP retry counts before installation', () => {
+    // LG-T6-8
+    for (const retries of [-1, Infinity]) {
+      try {
+        http({ url: 'https://example.test/logs', retries });
+        throw new Error('expected http() to reject invalid retries');
+      } catch (error) {
+        expect(error).toMatchObject({ code: 'INVALID_RETRY_COUNT' });
+      }
+    }
+  });
+
+  it('rolls back process listeners when runtime installation fails partway through', async () => {
+    // LG-T6-9
+    const listeners = new Map<string, Set<(...args: any[]) => void>>();
+    const runtimeProcess = {
+      env: {},
+      stdout: { write: () => true },
+      on: (event: string, listener: (...args: any[]) => void) => {
+        if (event === 'beforeExit') throw new Error('listener-boom');
+        const group = listeners.get(event) ?? new Set();
+        group.add(listener);
+        listeners.set(event, group);
+      },
+      removeListener: (event: string, listener: (...args: any[]) => void) =>
+        listeners.get(event)?.delete(listener),
+      exit: (() => undefined as never) as (code?: number) => never
+    };
+    const restore = setLoggerRuntimeManager({
+      process: runtimeProcess,
+      randomUUID: () => 'rollback-id',
+      defer: (task) => task(),
+      write: () => undefined
+    });
+    try {
+      expect(() => new Logger({ plugins: [processPlugin()] })).toThrow('listener-boom');
+      expect([...listeners.values()].every((group) => group.size === 0)).toBe(true);
+    } finally {
+      restore();
+    }
+  });
+  it('keeps the primary install error reachable when listener rollback also fails', () => {
+    const listeners = new Map<string, Set<(...args: any[]) => void>>();
+    const runtimeProcess = {
+      env: {},
+      stdout: { write: () => true },
+      on: (event: string, listener: (...args: any[]) => void) => {
+        if (event === 'beforeExit') throw new Error('install-primary');
+        const group = listeners.get(event) ?? new Set();
+        group.add(listener);
+        listeners.set(event, group);
+      },
+      removeListener: (event: string, listener: (...args: any[]) => void) => {
+        if (event === 'SIGTERM') throw new Error('rollback-secondary');
+        listeners.get(event)?.delete(listener);
+      },
+      exit: (() => undefined as never) as (code?: number) => never
+    };
+    const restore = setLoggerRuntimeManager({
+      process: runtimeProcess,
+      randomUUID: () => 'rollback-primary',
+      defer: (task) => task(),
+      write: () => undefined
+    });
+    try {
+      let failure: unknown;
+      try {
+        new Logger({ plugins: [processPlugin()] });
+      } catch (error) {
+        failure = error;
+      }
+      const aggregate = (failure as Error & { cause?: unknown }).cause;
+      expect(aggregate).toBeInstanceOf(AggregateError);
+      expect(aggregate).toMatchObject({
+        source: '@migaia/logger',
+        code: 'PROCESS_INSTALL_ROLLBACK_FAILED'
+      });
+      expect((aggregate as AggregateError).errors[0]).toMatchObject({
+        message: expect.stringContaining('install-primary')
+      });
+      expect((aggregate as AggregateError).errors[1]).toMatchObject({
+        message: 'rollback-secondary'
+      });
+    } finally {
+      restore();
+    }
+  });
+
+  it('runs async before hooks in registration order', async () => {
+    const log: any = new Logger();
+    const seen: boolean[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    log.hook('before', async (entry: ILogEntry) => {
+      await gate;
+      entry.data.ready = true;
+    });
+    log.hook('before', (entry: ILogEntry) => {
+      seen.push(entry.data.ready === true);
+    });
+    log.useSink((entry: ILogEntry) => {
+      seen.push(entry.data.ready === true);
+    });
+    log.log('info', 'ordered-hooks');
+    await Promise.resolve();
+    expect(seen).toEqual([]);
+    release();
+    await log.flush();
+    expect(seen).toEqual([true, true]);
+  });
+  it('waits for asynchronous before hooks before entering the sink', async () => {
+    const log: any = new Logger();
+    const seen: unknown[] = [];
+    log.hook('before', async (entry: ILogEntry) => {
+      await Promise.resolve();
+      entry.data.ready = true;
+    });
+    log.useSink((entry: ILogEntry) => seen.push(entry.data.ready));
+
+    log.log('info', 'async-before');
+    expect(seen).toEqual([]);
+    await log.flush();
+    expect(seen).toEqual([true]);
+  });
+
+  it('does not retain a logger when process plugin configuration conflicts', async () => {
+    const listeners = new Map<string, Set<(...args: any[]) => void>>();
+    const runtimeProcess = {
+      env: {},
+      stdout: { write: () => true },
+      on: (event: string, listener: (...args: any[]) => void) => {
+        const group = listeners.get(event) ?? new Set();
+        group.add(listener);
+        listeners.set(event, group);
+      },
+      removeListener: (event: string, listener: (...args: any[]) => void) => {
+        listeners.get(event)?.delete(listener);
+      },
+      exit: (() => undefined as never) as (code?: number) => never
+    };
+    const restore = setLoggerRuntimeManager({
+      process: runtimeProcess,
+      randomUUID: () => 'conflict-id',
+      defer: (task) => task(),
+      write: () => undefined
+    });
+    try {
+      const first: any = new Logger({ plugins: [processPlugin({ shutdownTimeoutMs: 10 })] });
+      expect(() => new Logger({ plugins: [processPlugin({ shutdownTimeoutMs: 20 })] })).toThrow();
+      await first.shutdown('manual');
+      expect(listeners.get('SIGINT')?.size ?? 0).toBe(0);
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe('shutdown dispatch admission', () => {
+  it('drains handler-era work, then blocks disposer-era logs before PluginHost disposal', async () => {
+    const seen: string[] = [];
+    let releaseInitial!: () => void;
+    let initialStarted = false;
+    let disposerRan = false;
+    let disposerLogRouted = false;
+    let deferredDisposerWorkRan = false;
+    let installedCore: any;
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    const log: any = new Logger({
+      plugins: [
+        {
+          name: 'disposer-log',
+          install: (core: any) => {
+            installedCore = core;
+            return {};
+          },
+          dispose: () => {
+            disposerRan = true;
+            installedCore.log('late', 'disposer-log');
+            installedCore.defer(() => {
+              deferredDisposerWorkRan = true;
+              installedCore.log('late', 'deferred-disposer-log');
+            });
+          }
+        }
+      ]
+    });
+    log.useSink((entry: ILogEntry) => {
+      seen.push(entry.message);
+      if (entry.message === 'initial') {
+        initialStarted = true;
+        return new Promise<void>((resolve) => {
+          releaseInitial = resolve;
+        });
+      }
+      if (entry.message === 'disposer-log') disposerLogRouted = true;
+      return Promise.resolve();
+    });
+    log.onShutdown(() => {
+      log.log('info', 'handler-work');
+    });
+
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      log.log('info', 'initial');
+      const shutdown = log.shutdown('manual');
+      let settled = false;
+      void shutdown.then(() => {
+        settled = true;
+      });
+      await Promise.resolve();
+
+      expect(initialStarted).toBe(true);
+      expect(settled).toBe(false);
+      expect(log.shutdown('signal')).toBe(shutdown);
+
+      releaseInitial();
+      await shutdown;
+
+      expect(disposerRan).toBe(true);
+      expect(seen).toEqual(['initial', 'handler-work']);
+      expect(disposerLogRouted).toBe(false);
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      expect(deferredDisposerWorkRan).toBe(false);
+      expect(settled).toBe(true);
+      log.log('info', 'after-close');
+      expect(seen).toEqual(['initial', 'handler-work']);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+    expect(unhandled).toEqual([]);
   });
 });
 
@@ -351,5 +623,899 @@ describe('fifth adversarial pass', () => {
       process.off('unhandledRejection', onUnhandled);
     }
     expect(unhandled).toEqual([]);
+  });
+});
+
+describe('AF-66/AF-67 scheduler and terminal reporter boundaries', () => {
+  it('uses one scheduler snapshot for the host disposer, logger lifecycle, and plugin core', async () => {
+    vi.useFakeTimers();
+    const schedulerReads = { now: 0, schedule: 0 };
+    const receivers: unknown[] = [];
+    const pendingTasks: Array<() => void> = [];
+    const scheduler = {
+      get now() {
+        schedulerReads.now += 1;
+        return function (this: unknown): number {
+          receivers.push(this);
+          return 0;
+        };
+      },
+      get schedule() {
+        schedulerReads.schedule += 1;
+        return function (this: unknown, callback: () => void, _delayMs: number) {
+          receivers.push(this);
+          pendingTasks.push(callback);
+          return { cancel: () => undefined };
+        };
+      }
+    };
+    let optionReads = 0;
+    let pluginScheduler: unknown;
+    const options = {
+      get scheduler() {
+        optionReads += 1;
+        return scheduler;
+      },
+      plugins: [
+        {
+          name: 'scheduler-observer',
+          install: (core: any) => {
+            pluginScheduler = core.scheduler;
+            return {};
+          }
+        },
+        {
+          name: 'stuck-disposer',
+          install: () => ({}),
+          dispose: () => new Promise<void>(() => undefined)
+        }
+      ] as const
+    };
+    try {
+      const log: any = new Logger(options as any);
+      expect(optionReads).toBe(1);
+      expect(schedulerReads).toEqual({ now: 1, schedule: 1 });
+      expect(pluginScheduler).toBe(log.scheduler);
+
+      const shutdown = log.shutdown('manual');
+      for (let index = 0; index < 20 && pendingTasks.length === 0; index += 1)
+        await Promise.resolve();
+      expect(pendingTasks.length).toBeGreaterThan(0);
+      for (const callback of pendingTasks.splice(0)) callback();
+      await expect(shutdown).rejects.toThrow();
+      expect(receivers.length).toBeGreaterThan(0);
+      expect(receivers.every((receiver) => receiver === scheduler)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('contains synchronous, asynchronous, console, and write reporter failures', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      for (const withConsole of [true, false]) {
+        const restore = setLoggerRuntimeManager({
+          randomUUID: () => `reporter-${withConsole}`,
+          defer: (task) => task(),
+          write: () => {
+            if (!withConsole) throw new Error('writer-failed');
+          },
+          ...(withConsole
+            ? {
+                console: {
+                  log: () => undefined,
+                  warn: () => undefined,
+                  error: () => {
+                    throw new Error('console-failed');
+                  }
+                }
+              }
+            : {})
+        });
+        try {
+          const log: any = new Logger();
+          log.onFailure(() => {
+            throw new Error('sync-hook-failed');
+          });
+          log.onFailure(async () => {
+            throw new Error('async-hook-failed');
+          });
+          log.useSink(() => Promise.reject(new Error('sink-failed')));
+          log.log('error', 'reporter-boundary');
+          await expect(log.flush()).resolves.toBeUndefined();
+        } finally {
+          restore();
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+    expect(unhandled).toEqual([]);
+  });
+});
+
+describe('Round18 logger scheduler and uninstall regressions', () => {
+  it('LG-T19 / AF-126 aggregates uninstall cleanup failures, resets runtime state, and permits reinstall', async () => {
+    const listeners = new Map<string, Set<(...args: any[]) => void>>();
+    const originalExit = (() => undefined as never) as (code?: number) => never;
+    let exitValue = originalExit;
+    let failRestore = true;
+    let failRemove = true;
+    const removeAttempts: string[] = [];
+    const runtimeProcess = {
+      env: {},
+      stdout: { write: () => true },
+      on: (event: string, listener: (...args: any[]) => void) => {
+        const group = listeners.get(event) ?? new Set();
+        group.add(listener);
+        listeners.set(event, group);
+      },
+      removeListener: (event: string, listener: (...args: any[]) => void) => {
+        removeAttempts.push(event);
+        if (failRemove && (event === 'SIGINT' || event === 'SIGTERM'))
+          throw new Error(`${event}-remove-failed`);
+        listeners.get(event)?.delete(listener);
+      },
+      get exit() {
+        return exitValue;
+      },
+      set exit(value: typeof originalExit) {
+        exitValue = value;
+        if (value === originalExit && failRestore) {
+          failRestore = false;
+          throw new Error('exit-restore-failed');
+        }
+      }
+    };
+    const restore = setLoggerRuntimeManager({
+      process: runtimeProcess,
+      randomUUID: () => 'round18-uninstall',
+      defer: (task) => task(),
+      write: () => undefined
+    });
+    try {
+      const first = new Logger({ plugins: [processPlugin({ interceptProcessExit: true })] });
+      await expect(first.unUse('process')).rejects.toThrow();
+      expect(removeAttempts).toEqual([
+        'SIGINT',
+        'SIGTERM',
+        'beforeExit',
+        'uncaughtException',
+        'unhandledRejection'
+      ]);
+      expect(runtimeProcess.exit).toBe(originalExit);
+
+      failRemove = false;
+      const second = new Logger({ plugins: [processPlugin({ interceptProcessExit: true })] });
+      expect(runtimeProcess.exit).not.toBe(originalExit);
+      await second.unUse('process');
+      expect(runtimeProcess.exit).toBe(originalExit);
+    } finally {
+      failRemove = false;
+      restore();
+    }
+  });
+
+  it('LG-T20 / AF-128 settles HTTP flush when scheduler task cancellation throws and reports once', async () => {
+    const cancelError = new Error('http-timer-cancel-failed');
+    const scheduled: Array<() => void> = [];
+    let cancelCalls = 0;
+    const scheduler = {
+      now: () => 0,
+      schedule: (callback: () => void) => {
+        scheduled.push(callback);
+        return {
+          cancel: () => {
+            cancelCalls += 1;
+            if (cancelCalls === 1) throw cancelError;
+          }
+        };
+      }
+    };
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    const failures: unknown[] = [];
+    const restore = setLoggerRuntimeManager({
+      randomUUID: () => 'round18-http-cancel',
+      defer: (task) => task(),
+      write: () => undefined,
+      fetch: async () => ({ ok: true, status: 200, headers: { get: () => null } })
+    });
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      const logger: any = new Logger({
+        scheduler,
+        plugins: [http({ url: 'https://example.test/logs', retries: 0 })]
+      });
+      logger.onFailure(({ error }: { error: unknown }) => failures.push(error));
+      logger.log('info', 'cancel failure');
+      await expect(logger.flush()).resolves.toBeUndefined();
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toMatchObject({ code: LoggerErrorCode.deliveryFailed });
+      expect((failures[0] as Error & { cause?: unknown }).cause).toBe(cancelError);
+      expect(scheduled.length).toBeGreaterThan(0);
+      await logger.shutdown('manual');
+      await Promise.resolve();
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+      restore();
+    }
+    expect(unhandled).toEqual([]);
+  });
+
+  it('LG-T21/LG-T22/LG-T23 / AF-129 drives process, batch, and HTTP timers through one manual scheduler', async () => {
+    const scheduler = createManualScheduler();
+    const processListeners = new Map<string, (...args: any[]) => void>();
+    const exits: number[] = [];
+    let fetchAttempts = 0;
+    const batches: string[][] = [];
+    const runtimeProcess = {
+      env: {},
+      stdout: { write: () => true },
+      on: (event: string, listener: (...args: any[]) => void) =>
+        processListeners.set(event, listener),
+      removeListener: () => undefined,
+      exit: ((code?: number) => {
+        exits.push(code ?? 0);
+        return undefined as never;
+      }) as (code?: number) => never
+    };
+    const restore = setLoggerRuntimeManager({
+      process: runtimeProcess,
+      randomUUID: () => 'round18-manual',
+      defer: (task) => task(),
+      write: () => undefined,
+      fetch: async () => {
+        fetchAttempts += 1;
+        if (fetchAttempts === 1) throw new Error('retry-on-manual-clock');
+        return { ok: true, status: 200, headers: { get: () => null } };
+      }
+    });
+    try {
+      const batchLogger: any = new Logger({ scheduler, plugins: [batch()] });
+      const createBatcher = batchLogger.getShared('createBatcher');
+      const batcher = createBatcher({ maxSize: 2, maxWaitMs: 10 }, (items: string[]) => {
+        batches.push(items);
+      });
+      batcher.push('debounced');
+      expect(batches).toEqual([]);
+      scheduler.advance(10);
+      await Promise.resolve();
+      await batcher.flush();
+      expect(batches).toEqual([['debounced']]);
+      await batchLogger.shutdown('manual');
+
+      const httpLogger: any = new Logger({
+        scheduler,
+        plugins: [http({ url: 'https://example.test/logs', retries: 1, requestTimeoutMs: 100 })]
+      });
+      httpLogger.log('info', 'http-manual');
+      const httpFlush = httpLogger.flush();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(fetchAttempts).toBe(1);
+      scheduler.advance(200);
+      await httpFlush;
+      expect(fetchAttempts).toBe(2);
+      await httpLogger.shutdown('manual');
+
+      const processLogger: any = new Logger({
+        scheduler,
+        plugins: [processPlugin({ shutdownTimeoutMs: 25 })]
+      });
+      let pendingProcessFlush = true;
+      let releaseProcessFlush!: () => void;
+      processLogger.onFlush(() =>
+        pendingProcessFlush
+          ? new Promise<void>((resolve) => {
+              releaseProcessFlush = () => {
+                pendingProcessFlush = false;
+                resolve();
+              };
+            })
+          : undefined
+      );
+      processListeners.get('beforeExit')?.();
+      scheduler.advance(25);
+      await Promise.resolve();
+      expect(pendingProcessFlush).toBe(true);
+      releaseProcessFlush();
+      scheduler.advance(3000);
+      await Promise.resolve();
+      await processLogger.unUse('process');
+      expect(exits).toEqual([]);
+      await processLogger.shutdown('manual');
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe('Round21 ProcessPlugin scheduler-domain admission', () => {
+  it('accepts two cores from one injected scheduler source despite separate snapshots', async () => {
+    const listeners = new Map<string, Set<(...args: any[]) => void>>();
+    const runtimeProcess = {
+      env: {},
+      stdout: { write: () => true },
+      on: (event: string, listener: (...args: any[]) => void) => {
+        const group = listeners.get(event) ?? new Set();
+        group.add(listener);
+        listeners.set(event, group);
+      },
+      removeListener: (event: string, listener: (...args: any[]) => void) =>
+        listeners.get(event)?.delete(listener),
+      exit: (() => undefined as never) as (code?: number) => never
+    };
+    const scheduler = createManualScheduler();
+    const restore = setLoggerRuntimeManager({
+      process: runtimeProcess,
+      randomUUID: () => 'round21-same-source',
+      defer: (task) => task(),
+      write: () => undefined
+    });
+    try {
+      const first = new Logger({ scheduler, plugins: [processPlugin()] });
+      const second = new Logger({ scheduler, plugins: [processPlugin()] });
+      expect(first.scheduler).not.toBe(second.scheduler);
+      expect(listeners.get('SIGINT')?.size).toBe(1);
+
+      let flushed = 0;
+      first.onFlush(() => {
+        flushed += 1;
+      });
+      await first.flush();
+      expect(flushed).toBe(1);
+
+      await second.unUse('process');
+      await first.unUse('process');
+    } finally {
+      restore();
+    }
+  });
+
+  it('rejects a different scheduler domain before adding the second core', async () => {
+    const listeners = new Map<string, Set<(...args: any[]) => void>>();
+    const runtimeProcess = {
+      env: {},
+      stdout: { write: () => true },
+      on: (event: string, listener: (...args: any[]) => void) => {
+        const group = listeners.get(event) ?? new Set();
+        group.add(listener);
+        listeners.set(event, group);
+      },
+      removeListener: (event: string, listener: (...args: any[]) => void) =>
+        listeners.get(event)?.delete(listener),
+      exit: (() => undefined as never) as (code?: number) => never
+    };
+    const firstScheduler = createManualScheduler();
+    const secondScheduler = createManualScheduler();
+    const restore = setLoggerRuntimeManager({
+      process: runtimeProcess,
+      randomUUID: () => 'round21-different-domain',
+      defer: (task) => task(),
+      write: () => undefined
+    });
+    try {
+      const first = new Logger({ scheduler: firstScheduler, plugins: [processPlugin()] });
+      const before = [...(listeners.get('SIGINT') ?? [])];
+      let failure: unknown;
+      try {
+        new Logger({ scheduler: secondScheduler, plugins: [processPlugin()] });
+      } catch (error) {
+        failure = error;
+      }
+      expect(findLoggerError(failure, LoggerErrorCode.pluginConfigConflict)).toMatchObject({
+        source: LOGGER_SOURCE,
+        code: LoggerErrorCode.pluginConfigConflict
+      });
+      expect([...(listeners.get('SIGINT') ?? [])]).toEqual(before);
+
+      let flushed = 0;
+      first.onFlush(() => {
+        flushed += 1;
+      });
+      await first.flush();
+      expect(flushed).toBe(1);
+
+      await first.unUse('process');
+      const replacement = new Logger({ scheduler: secondScheduler, plugins: [processPlugin()] });
+      expect(listeners.get('SIGINT')?.size).toBe(1);
+      await replacement.unUse('process');
+    } finally {
+      restore();
+    }
+  });
+
+  it('keeps scheduler source admission single-read while preserving the source domain', async () => {
+    const scheduler = createManualScheduler();
+    let schedulerReads = 0;
+    const options = {
+      get scheduler() {
+        schedulerReads += 1;
+        return scheduler;
+      }
+    };
+    const runtimeProcess = {
+      env: {},
+      stdout: { write: () => true },
+      on: () => undefined,
+      removeListener: () => undefined,
+      exit: (() => undefined as never) as (code?: number) => never
+    };
+    const restore = setLoggerRuntimeManager({
+      process: runtimeProcess,
+      randomUUID: () => 'round21-hostile-option',
+      defer: (task) => task(),
+      write: () => undefined
+    });
+    try {
+      const logger = new Logger({ ...options, plugins: [processPlugin()] });
+      expect(schedulerReads).toBe(1);
+      await logger.unUse('process');
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe('Round23 HTTP response-commit cleanup failures', () => {
+  /** Installs an AbortController whose listener removal fails without affecting abort state. */
+  const stubRemovalFailure = (
+    removeError: Error,
+    shouldThrow: (call: number) => boolean = () => true
+  ): (() => void) => {
+    const originalAbortController = globalThis.AbortController;
+    let removeCalls = 0;
+    class ThrowingAbortController {
+      readonly signal = {
+        aborted: false,
+        addEventListener: (
+          _type: string,
+          _listener: () => void,
+          _options?: { readonly once?: boolean }
+        ): void => undefined,
+        removeEventListener: (_type: string, _listener: () => void): void => {
+          removeCalls += 1;
+          if (shouldThrow(removeCalls)) throw removeError;
+        }
+      };
+
+      abort(): void {
+        this.signal.aborted = true;
+      }
+    }
+    vi.stubGlobal('AbortController', ThrowingAbortController);
+    return () => vi.stubGlobal('AbortController', originalAbortController);
+  };
+
+  it('LG-T28 does not retry a successful POST when timer and listener cleanup both fail', async () => {
+    const cancelError = new Error('round23-timer-cancel');
+    const removeError = new Error('round23-listener-remove');
+    const fetch = vi.fn(async () => ({ ok: true, status: 200, headers: { get: () => null } }));
+    const scheduler = {
+      now: () => 0,
+      schedule: (callback: () => void, delay: number) => {
+        if (delay <= 400) callback();
+        return {
+          cancel: () => {
+            if (delay === 10000) throw cancelError;
+          }
+        };
+      }
+    };
+    const unhandled: unknown[] = [];
+    const failures: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    const restoreAbortController = stubRemovalFailure(removeError);
+    const restoreRuntime = setLoggerRuntimeManager({
+      randomUUID: () => 'round23-success-cleanup',
+      defer: (task) => task(),
+      write: () => undefined,
+      fetch
+    });
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      const logger: any = new Logger({
+        scheduler,
+        plugins: [http({ url: 'https://example.test/logs', retries: 2 })]
+      });
+      logger.onFailure(({ error }: { error: unknown }) => failures.push(error));
+      logger.log('info', 'round23-success');
+
+      await expect(logger.flush()).resolves.toBeUndefined();
+      expect(fetch).toHaveBeenCalledOnce();
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toMatchObject({
+        source: LOGGER_SOURCE,
+        code: LoggerErrorCode.deliveryFailed
+      });
+      expect((failures[0] as AggregateError).errors).toEqual([cancelError, removeError]);
+      await logger.shutdown('manual');
+      await Promise.resolve();
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+      restoreRuntime();
+      restoreAbortController();
+    }
+    expect(unhandled).toEqual([]);
+  });
+
+  it('LG-T29 keeps status retry count while retaining 503 primary and cleanup errors', async () => {
+    const cancelError = new Error('round23-status-timer-cancel');
+    const removeError = new Error('round23-status-listener-remove');
+    const fetch = vi.fn(async () => ({ ok: false, status: 503, headers: { get: () => '0' } }));
+    const scheduler = {
+      now: () => 0,
+      schedule: (callback: () => void, delay: number) => {
+        if (delay <= 400) callback();
+        return {
+          cancel: () => {
+            if (delay === 10000) throw cancelError;
+          }
+        };
+      }
+    };
+    const unhandled: unknown[] = [];
+    const failures: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    const restoreAbortController = stubRemovalFailure(removeError, (call) => call % 2 === 1);
+    const restoreRuntime = setLoggerRuntimeManager({
+      randomUUID: () => 'round23-status-cleanup',
+      defer: (task) => task(),
+      write: () => undefined,
+      fetch
+    });
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      const logger: any = new Logger({
+        scheduler,
+        plugins: [http({ url: 'https://example.test/logs', retries: 1 })]
+      });
+      logger.onFailure(({ error }: { error: unknown }) => failures.push(error));
+      logger.log('info', 'round23-status');
+
+      await expect(logger.flush()).resolves.toBeUndefined();
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(failures).toHaveLength(1);
+      const failure = failures[0] as AggregateError;
+      expect(failure).toMatchObject({
+        source: LOGGER_SOURCE,
+        code: LoggerErrorCode.deliveryFailed
+      });
+      expect(failure.errors[0]).toMatchObject({ message: '日志推送失败: HTTP 503' });
+      expect(failure.errors.slice(1)).toEqual([cancelError, removeError]);
+      await logger.shutdown('manual');
+      await Promise.resolve();
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+      restoreRuntime();
+      restoreAbortController();
+    }
+    expect(unhandled).toEqual([]);
+  });
+});
+
+describe('Logger-owned scheduler option admission', () => {
+  it('keeps stable public error text out of logger implementation modules', () => {
+    const sources = [
+      readFileSync(new URL('../src/log.ts', import.meta.url), 'utf8'),
+      readFileSync(new URL('../src/plugins/http.ts', import.meta.url), 'utf8'),
+      readFileSync(new URL('../src/plugins/process.ts', import.meta.url), 'utf8')
+    ].join('\n');
+    for (const text of [
+      '[logger] process runtime is shutting down',
+      '[logger] process plugin already installed with different configuration',
+      '[logger] http 日志序列化失败',
+      '[logger] HTTP transport is unavailable in this runtime',
+      '未捕获异常，进程即将退出',
+      '未处理的 Promise rejection，进程即将退出'
+    ]) {
+      expect(sources).not.toContain(text);
+    }
+  });
+
+  it('wraps an options.scheduler getter failure as logger TypeError with the original cause', () => {
+    const getterError = new Error('scheduler-option-getter');
+    const options = {
+      get scheduler(): never {
+        throw getterError;
+      }
+    };
+    let failure: unknown;
+    try {
+      new Logger(options as any);
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(TypeError);
+    expect(failure).toMatchObject({
+      source: LOGGER_SOURCE,
+      code: LoggerErrorCode.invalidOption,
+      message: LoggerErrorText.schedulerGetterFailed
+    });
+    expect((failure as { cause?: unknown }).cause).toBe(getterError);
+    expect((failure as { source?: string }).source).not.toBe('@migaia/plugin-host');
+  });
+
+  it('rejects an invalid scheduler shape with logger TypeError and no foreign error owner', () => {
+    let failure: unknown;
+    try {
+      new Logger({ scheduler: { now: () => 0 } } as any);
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(TypeError);
+    expect(failure).toMatchObject({
+      source: LOGGER_SOURCE,
+      code: LoggerErrorCode.invalidOption,
+      message: LoggerErrorText.invalidScheduler
+    });
+    expect((failure as { cause?: unknown }).cause).toBeUndefined();
+    expect((failure as { source?: string }).source).not.toBe('@migaia/plugin-host');
+  });
+
+  it('preserves a scheduler capability getter failure directly as the logger TypeError cause', () => {
+    const accessorError = new Error('scheduler-now-getter');
+    const scheduler = {
+      get now(): never {
+        throw accessorError;
+      },
+      schedule: () => ({ cancel: () => undefined })
+    };
+    let failure: unknown;
+    try {
+      new Logger({ scheduler } as any);
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(TypeError);
+    expect(failure).toMatchObject({
+      source: LOGGER_SOURCE,
+      code: LoggerErrorCode.invalidOption,
+      message: LoggerErrorText.schedulerGetterFailed
+    });
+    expect((failure as { cause?: unknown }).cause).toBe(accessorError);
+  });
+});
+
+describe('Round20 logger uninstall isolation', () => {
+  it('LG-T24 / LG-R23 drops buffered items, cancels every batcher, and isolates reinstall', async () => {
+    const scheduled: Array<() => void> = [];
+    const cancelError = new Error('batch-cancel-failed');
+    let cancelCalls = 0;
+    let deferCalls = 0;
+    const scheduler = {
+      now: () => 0,
+      schedule: (callback: () => void, delay: number) => {
+        if (delay === 10) scheduled.push(callback);
+        return {
+          cancel: () => {
+            if (delay === 10) {
+              cancelCalls += 1;
+              throw cancelError;
+            }
+          }
+        };
+      }
+    };
+    const oldBatches: string[][] = [];
+    const newBatches: string[][] = [];
+    const restore = setLoggerRuntimeManager({
+      randomUUID: () => `round20-${scheduled.length}`,
+      defer: (task) => {
+        deferCalls += 1;
+        task();
+      },
+      write: () => undefined
+    });
+    try {
+      const logger: any = new Logger({ scheduler, plugins: [batch()] });
+      const oldFactory = logger.getShared('createBatcher');
+      const oldBatcher = oldFactory({ maxSize: 3, maxWaitMs: 10 }, (items: string[]) =>
+        oldBatches.push(items)
+      );
+      const secondOldBatcher = oldFactory({ maxSize: 3, maxWaitMs: 10 }, (items: string[]) =>
+        oldBatches.push(items)
+      );
+      oldBatcher.push('drop-one');
+      secondOldBatcher.push('drop-two');
+      expect(scheduled).toHaveLength(2);
+
+      let uninstallFailure: unknown;
+      try {
+        await logger.unUse('batch');
+      } catch (error) {
+        uninstallFailure = error;
+      }
+      expect(uninstallFailure).toBeDefined();
+      const taggedUninstall = findLoggerError(
+        uninstallFailure,
+        LoggerErrorCode.pluginUninstallCleanupFailed
+      );
+      expect(taggedUninstall).toMatchObject({
+        source: LOGGER_SOURCE,
+        code: LoggerErrorCode.pluginUninstallCleanupFailed
+      });
+      expect((taggedUninstall as Error & { cause?: AggregateError }).cause?.errors).toEqual([
+        cancelError,
+        cancelError
+      ]);
+      expect(cancelCalls).toBe(2);
+
+      const deferredBeforeLateCallbacks = deferCalls;
+      for (const callback of scheduled) callback();
+      oldBatcher.push('late-old');
+      await oldBatcher.flush();
+      expect(oldBatches).toEqual([]);
+      expect(deferCalls).toBe(deferredBeforeLateCallbacks);
+      expect(scheduled).toHaveLength(2);
+
+      const inertBatcher = oldFactory({ maxSize: 1 }, (items: string[]) => oldBatches.push(items));
+      inertBatcher.push('retained-factory');
+      expect(scheduled).toHaveLength(2);
+
+      const reinstalled: any = new Logger({ scheduler, plugins: [batch()] });
+      const newFactory = reinstalled.getShared('createBatcher');
+      const newBatcher = newFactory({ maxSize: 2, maxWaitMs: 10 }, (items: string[]) =>
+        newBatches.push(items)
+      );
+      newBatcher.push('new-install');
+      expect(scheduled).toHaveLength(3);
+      scheduled[2]!();
+      await newBatcher.flush();
+      expect(newBatches).toEqual([['new-install']]);
+      expect(oldBatches).toEqual([]);
+      await reinstalled.shutdown('manual');
+      await logger.shutdown('manual');
+    } finally {
+      restore();
+    }
+  });
+
+  it('LG-T25 / LG-R23 contains synchronous batch callback failure without throwing from push', async () => {
+    const callbackError = new Error('batch-callback-failed');
+    const failures: Array<{ source: string; error: unknown }> = [];
+    const logger: any = new Logger({ plugins: [batch()] });
+    logger.onFailure((failure: { source: string; error: unknown }) => failures.push(failure));
+    const createBatcher = logger.getShared('createBatcher');
+    const batcher = createBatcher({ maxSize: 1, asyncOutput: false }, () => {
+      throw callbackError;
+    });
+
+    expect(() => batcher.push('sync-failure')).not.toThrow();
+    await expect(batcher.flush()).resolves.toBeUndefined();
+    await Promise.resolve();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(failures).toContainEqual({ source: 'defer', error: callbackError });
+    await logger.shutdown('manual');
+  });
+});
+
+describe('phase transition continuation containment', () => {
+  it('tracks a before continuation rejection and drains it without unhandled rejection', async () => {
+    const unhandled: unknown[] = [];
+    const failures: Array<{ source: string; error: unknown }> = [];
+    const continuationError = new Error('before-continuation');
+    const tag = {
+      [Symbol.toPrimitive]: () => {
+        throw continuationError;
+      }
+    } as unknown as string;
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      const log: any = new Logger();
+      log.onFailure((failure: { source: string; error: unknown }) => failures.push(failure));
+      log.hook('before', async () => undefined);
+      log.dispatchRaw({ tag, message: 'before-continuation' });
+
+      await expect(log.flush()).resolves.toBeUndefined();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+
+    expect(unhandled).toEqual([]);
+    expect(failures).toContainEqual({ source: 'hook', error: continuationError });
+  });
+
+  it('drains tagBefore, after, and tagAfter continuation chains in order', async () => {
+    const order: string[] = [];
+    const log: any = new Logger();
+    log.hook('before', async () => {
+      order.push('before-start');
+      await Promise.resolve();
+      order.push('before-end');
+    });
+    log.hook('before:info', async () => {
+      order.push('tag-before-start');
+      await Promise.resolve();
+      order.push('tag-before-end');
+    });
+    log.useSink(() => order.push('sink'));
+    log.hook('after', async () => {
+      order.push('after-start');
+      await Promise.resolve();
+      order.push('after-end');
+    });
+    log.hook('after:info', async () => {
+      order.push('tag-after-start');
+      await Promise.resolve();
+      order.push('tag-after-end');
+    });
+
+    log.log('info', 'phase-order');
+    await log.flush();
+
+    expect(order).toEqual([
+      'before-start',
+      'before-end',
+      'tag-before-start',
+      'tag-before-end',
+      'sink',
+      'after-start',
+      'after-end',
+      'tag-after-start',
+      'tag-after-end'
+    ]);
+  });
+
+  it('contains after and tagAfter continuation callback failures and drains pending work', async () => {
+    const unhandled: unknown[] = [];
+    const failures: Array<{ source: string; error: unknown }> = [];
+    const afterError = new Error('after-continuation');
+    const tagAfterError = new Error('tag-after-continuation');
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      const makeTarget = (error: Error): any => {
+        let reads = 0;
+        return {
+          get ctx() {
+            reads += 1;
+            if (reads > 1) throw error;
+            return { id: `target-${error.message}`, topic: 'target' };
+          },
+          dispatchRaw: () => undefined,
+          flush: () => Promise.resolve()
+        };
+      };
+      const afterLog: any = new Logger();
+      afterLog.onFailure((failure: { source: string; error: unknown }) => failures.push(failure));
+      afterLog.extends(makeTarget(afterError));
+      afterLog.hook('after', async () => undefined);
+      afterLog.log('info', 'after-continuation');
+
+      const tagAfterLog: any = new Logger();
+      tagAfterLog.onFailure((failure: { source: string; error: unknown }) =>
+        failures.push(failure)
+      );
+      tagAfterLog.extends(makeTarget(tagAfterError));
+      tagAfterLog.hook('after:info', async () => undefined);
+      tagAfterLog.log('info', 'tag-after-continuation');
+
+      await expect(afterLog.flush()).resolves.toBeUndefined();
+      await expect(tagAfterLog.flush()).resolves.toBeUndefined();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+
+    expect(unhandled).toEqual([]);
+    expect(failures).toContainEqual({ source: 'hook', error: afterError });
+    expect(failures).toContainEqual({ source: 'hook', error: tagAfterError });
   });
 });
