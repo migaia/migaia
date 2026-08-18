@@ -4,7 +4,7 @@
  * 契约见 `docs/contracts/error-codes.md`：错误由 `(source, code)` 二元组唯一定位，`source` 恒为
  * `'@migaia/capability'`。抛出点必须引用本文件的常量，不得内联字面量。
  *
- * 迁移背景（`docs/lifecycle/migration.sdd.md` §3.7.3）：本表把包内原本裸 `throw new Error('[store] …')`
+ * 迁移背景（`docs/lifecycle/migration.sdd.md` §3.7.3）：本表把包内原本裸 `throw new Error('…')`
  * 的字符串归纳成码。`INVALID_NAME` / `INVALID_ACTIVATE` / `INVALID_HANDLE` 必须保持抛出值是 `TypeError`
  * ——码只作为附加字段挂上，不替换类型。
  *
@@ -22,7 +22,8 @@ export const CapabilityErrorCode = {
 
   /**
    * 在某个 disposer/reporter 的重入窗口内（`transitionDepth > 0`）尝试
-   * `register`/`setFlag`/`setFlags`/`enable`/`disable`/`dispose` 时抛出。
+   * `register`/`setFlag`/`setFlags`/`enable`/`disable`/`dispose`，或在首次 `dispose()` 完成前再次 调用
+   * `dispose()` 时抛出/拒绝。
    *
    * 落实 `docs/lifecycle/migration.sdd.md` §3.7.3 的重入门禁；防止一个正在运行的回退回调把外层正在进行的开关快照重写掉。调用方应把 mutation
    * 移到生命周期回调之外。

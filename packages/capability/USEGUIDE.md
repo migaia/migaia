@@ -55,7 +55,7 @@ import {
 
 ## 3. 开关快照与 fail-closed
 
-`createCapabilityHost(context, options)` 的 `options.flags` 只在**创建时**被复制一份快照——之后修改传入的原始对象不会影响 host，必须调用 `setFlag()`/`setFlags()`。
+`createCapabilityHost(context, options)` 在创建时对 options 做 admission snapshot（AF-86）：`flags`、`onError` 及其 receiver 只从这一份快照取得，之后修改或替换传入的 options 对象不会改变 host 行为。`options.flags` 只在**创建时**被复制一份快照，必须调用 `setFlag()`/`setFlags()` 才能改变开关。
 
 复制逻辑只接受**自有、可枚举、值严格等于 `true` 的数据属性**：
 
@@ -117,7 +117,7 @@ import {
 | `enable(name)` | `string` | `Promise<ICapabilityEnableResult>` | 异步 | 幂等启用：并发调用共享同一次 `activate()`。开关为假时直接返回 `{ status: 'blocked' }`，不会"偷偷打开"。 |
 | `enableResult(name)` | `string` | `Promise<ICapabilityEnableResult>` | 异步 | 当前是 `enable()` 的别名，语义完全一致。 |
 | `disable(name)` | `string` | `Promise<boolean>` | 异步 | 关闭并等待 handle 的 `dispose()`（含异步）真正完成后再 resolve；返回是否确实关掉了一个此前处于启用/在途状态的能力。 |
-| `dispose()` | 无 | `Promise<void>` | 异步 | 唯一异步释放入口：按真实激活顺序反向（LIFO）关闭全部能力，并等待全部释放工作结束。 |
+| `dispose()` | 无 | `Promise<void>` | 异步 | 唯一异步释放入口：首次调用按真实激活顺序反向（LIFO）关闭全部能力并等待全部释放工作结束；完成前重复调用立即以 `HOST_TRANSITIONING` 拒绝，完成后返回首个 canonical Promise。 |
 | `enableLegacyBoolean(name)` | `string` | `Promise<boolean>` | 异步 | 语义与 `enable()` 相同，但只返回布尔值，用于接入尚未迁移到结构化结果的旧调用点。 |
 | `disableNow(name)` | `string` | `boolean` | 同步 | 同步版本：立即触发关闭和释放，但**不等待**异步 `dispose()` 完成即返回；确定要等清理完成用 `disable()`。 |
 | `disposed` | 无 | `boolean`（只读） | 同步 | host 是否已经整体关闭；`true` 之后所有变更类方法都会抛错或拒绝。 |
@@ -130,7 +130,7 @@ import {
 
 - `dispose()` 按**真实激活完成顺序**反向（LIFO）释放，具体规则见 [§4](#4-generation竞态与作废的激活)。
 - `setFlags()` 替换快照导致的批量回退，同样按这个顺序释放；`disable(name)` 只影响单个条目，不触碰其余能力的顺序表位置。
-- 单个能力释放失败（`dispose()` 抛错或拒绝）不会阻断其余能力继续关闭——LIFO 回退路径必须能走完，一个失败不能连累其它已启用能力泄漏。
+- 单个能力释放失败（`dispose()` 抛错或拒绝）不会阻断其余能力继续关闭（AF-81）——LIFO 回退路径必须能走完，一个失败不能连累其它已启用能力泄漏；清理结束后 host/disposed/state 必须收敛，不残留 `activating`/`on` 假状态。
 - `dispose()` 之后 `disposed` 变为 `true`，host 永久不可用：`register`/`setFlag`/`setFlags` 直接抛错，`enable` 类方法返回被拒绝的 Promise（错误信息 `capability host is disposed`）。不要把同一个 host 复用给下一次请求或下一个租户，需要新的一轮应该创建新的 host。
 
 ---
@@ -166,6 +166,8 @@ String(host.error('worker')); // 包含 'chunk 404'
 
 - **变更类方法之间互斥**：`register`/`setFlag`/`setFlags`/`disableNow`（及其别名 `disable`/`dispose` 触发的同步阶段）内部通过一个"事务深度"计数器互相保护——在这些方法内部（例如一个能力自己的 `dispose()` 回调）再去调用任何一个变更方法，会立即抛出 `capability host cannot mutate during a lifecycle transition`。这防止了"回退过程中被自己的清理逻辑打乱开关快照"这类难以复现的 bug。
 - `enable()`/`enableLegacyBoolean()` 在重入时不会同步抛错（它们是 async 语义），而是返回一个带上述错误信息的被拒绝 Promise。
+- **Round26 breaking change**：disposer 在同步释放阶段调用同一 host 的 `dispose()` 时，立即同步抛出带 `HOST_TRANSITIONING` 的错误；调用延迟到当前栈之后时，也立即返回带 `HOST_TRANSITIONING` 的 rejected Promise。旧行为让所有进行中的调用复用首个 Promise；新行为禁止任何进行中的重复调用加入该 Promise，避免 disposer 自等待死锁。
+- 外部并发调用方必须保留并等待首次 `dispose()` 返回的 Promise；首次 Promise 完成后，重复 `dispose()` 才返回同一个已完成的 canonical Promise。不要用第二次调用来“加入”正在进行的释放。
 - `dispose()`/`disable()` 内部用"循环直到稳定"的方式等待清理完成：因为一次释放本身可能在等待期间又产生新的、此前快照里不存在的释放任务（比如一个仍在进行中的激活，在 `disposeSync()` 跑完之后才拿到 handle，随即需要被就地释放），单次 `await` 可能错过这类"迟到"的清理工作。`disable()`/`dispose()` 都会持续等到与该能力（或整个 host）相关的在途激活和在途释放都清零为止才真正 resolve。
 
 ---
@@ -240,7 +242,7 @@ await globex.enable('experimental-ai'); // { status: 'blocked' }
 **Q：`setFlags({})` 之后所有能力都被关掉了，但我只想改一个。**
 `setFlags()` 是整份快照的原子替换，不是"打补丁"。只想改一个开关用 `setFlag(name, enabled)`；确实要批量替换，记得把所有仍需保留的能力都显式列进新快照。
 
-**Q：为什么错误信息里都是 `[store]` 前缀，这个包不是叫 `capability` 吗？**
+**Q：为什么错误信息里都是 `` 前缀，这个包不是叫 `capability` 吗？**
 这是历史遗留的前缀（本包是从更大的 store 相关代码中拆分出来的独立包），不影响任何行为；用 `error(name)`/`onError` 拿到的错误对象，按信息里的关键字（如 `"is not registered"`、`"already registered"`）匹配即可，不需要关心前缀本身。
 
 **Q：能不能声明能力之间的依赖关系，让 host 自动按顺序启停？**

@@ -22,6 +22,7 @@ import {
   type IGenerationController
 } from '@migaia/lifecycle';
 import { CapabilityErrorCode } from './error-code.js';
+import { CapabilityErrorText } from './error-text.js';
 import { createCapabilityError, tagCapabilityError } from './errors.js';
 import { CapabilityEnableStatus, CapabilityState } from './state-constants.js';
 export * from './state-constants.js';
@@ -96,7 +97,10 @@ export type ICapabilityHost<Context> = {
   enableResult(name: string): Promise<ICapabilityEnableResult>;
   /** 关闭并释放 handle。返回是否确实关掉了一个启用态的能力。 */
   disable(name: string): Promise<boolean>;
-  /** 关闭全部（后进先出）并使 host 不可用。唯一异步释放入口。 */
+  /**
+   * 关闭全部（后进先出）并使 host 不可用。首次调用返回唯一 completion Promise；该 Promise 完成前的后续调用 fail-fast with
+   * `HOST_TRANSITIONING`，完成后才恢复 canonical Promise identity。
+   */
   dispose(): Promise<void>;
   /** Synchronous compatibility adapter for integrations that require a boolean. */
   enableLegacyBoolean(name: string): Promise<boolean>;
@@ -111,6 +115,8 @@ type IEntry<Context> = {
   readonly activate: (context: Context) => ICapabilityHandle | Promise<ICapabilityHandle>;
   state: ICapabilityState;
   handle?: ICapabilityHandle;
+  /** Disposer captured at adoption; later mutation of the public handle cannot replace ownership. */
+  disposer?: ICapabilityHandle['dispose'];
   error?: unknown;
   /** 在途激活。用于幂等：并发 enable 共享它。 */
   pending?: Promise<boolean>;
@@ -127,7 +133,72 @@ export function createCapabilityHost<Context>(
   context: Context,
   options: ICapabilityHostOptions = {}
 ): ICapabilityHost<Context> {
-  const { onError } = options;
+  if (options === null || (typeof options !== 'object' && typeof options !== 'function')) {
+    throw tagCapabilityError(
+      new TypeError(CapabilityErrorText.invalidOptions),
+      CapabilityErrorCode.invalidOption
+    );
+  }
+  const optionsReceiver = options;
+  let onError: ICapabilityHostOptions['onError'];
+  let flags: ICapabilityHostOptions['flags'];
+  try {
+    onError = options.onError;
+  } catch (error) {
+    throw createCapabilityError(
+      CapabilityErrorCode.invalidOption,
+      CapabilityErrorText.optionsSnapshotFailed,
+      { cause: error }
+    );
+  }
+  if (onError !== undefined && typeof onError !== 'function') {
+    throw tagCapabilityError(
+      new TypeError(CapabilityErrorText.invalidOnError),
+      CapabilityErrorCode.invalidOption
+    );
+  }
+  try {
+    flags = options.flags;
+  } catch (error) {
+    throw createCapabilityError(
+      CapabilityErrorCode.invalidOption,
+      CapabilityErrorText.optionsSnapshotFailed,
+      { cause: error }
+    );
+  }
+
+  /**
+   * 只复制自有、可枚举的数据属性。
+   *
+   * Map 让 `__proto__` / `constructor` 没有原型链特权；读取 descriptor 而非属性值， 也避免配置对象的 getter 在建 Host
+   * 或热回退时执行用户代码。
+   */
+  const copyFlags = (
+    source: Readonly<Record<string, boolean>> | undefined
+  ): Map<string, boolean> => {
+    const copied = new Map<string, boolean>();
+    if (!source) return copied;
+    let descriptors: PropertyDescriptorMap;
+    try {
+      descriptors = Object.getOwnPropertyDescriptors(source);
+    } catch (error) {
+      // hostile Proxy ownKeys/getOwnPropertyDescriptor trap — surface with (source, code), cause
+      // keeps the original Proxy exception === reachable (AF-09).
+      throw createCapabilityError(
+        CapabilityErrorCode.invalidOption,
+        CapabilityErrorText.flagsSnapshotFailed,
+        { cause: error }
+      );
+    }
+    for (const [name, descriptor] of Object.entries(descriptors)) {
+      if (descriptor.enumerable && 'value' in descriptor && descriptor.value === true) {
+        copied.set(name, true);
+      }
+    }
+    return copied;
+  };
+
+  let flagValues = copyFlags(flags);
   const entries = new Map<string, IEntry<Context>>();
   /**
    * 排空的双视图（`migration.sdd.md` §3.3）：`ALL_KEY` 给 `dispose()` 的全局排空， `entry` 对象自身给 `disable()`
@@ -166,53 +237,21 @@ export function createCapabilityHost<Context>(
   const activationOrder: IEntry<Context>[] = [];
   let disposed = false;
   let transitionDepth = 0;
-
-  /**
-   * 只复制自有、可枚举的数据属性。
-   *
-   * Map 让 `__proto__` / `constructor` 没有原型链特权；读取 descriptor 而非属性值， 也避免配置对象的 getter 在建 Host
-   * 或热回退时执行用户代码。
-   */
-  const copyFlags = (
-    source: Readonly<Record<string, boolean>> | undefined
-  ): Map<string, boolean> => {
-    const copied = new Map<string, boolean>();
-    if (!source) return copied;
-    let descriptors: PropertyDescriptorMap;
-    try {
-      descriptors = Object.getOwnPropertyDescriptors(source);
-    } catch (error) {
-      // hostile Proxy ownKeys/getOwnPropertyDescriptor trap — surface with (source, code), cause
-      // keeps the original Proxy exception === reachable (AF-09).
-      throw createCapabilityError(
-        CapabilityErrorCode.invalidOption,
-        '[store] capability flags snapshot failed',
-        { cause: error }
-      );
-    }
-    for (const [name, descriptor] of Object.entries(descriptors)) {
-      if (descriptor.enumerable && 'value' in descriptor && descriptor.value === true) {
-        copied.set(name, true);
-      }
-    }
-    return copied;
-  };
-
-  let flagValues = copyFlags(options.flags);
+  /** The one completion promise published before the first synchronous cleanup starts. */
+  let disposePromise: Promise<void> | undefined;
+  /** Whether the published dispose completion promise has settled. */
+  let disposeCompleted = false;
 
   const assertUsable = (): void => {
     if (disposed)
-      throw createCapabilityError(
-        CapabilityErrorCode.hostDisposed,
-        '[store] capability host is disposed'
-      );
+      throw createCapabilityError(CapabilityErrorCode.hostDisposed, 'capability host is disposed');
   };
 
   const assertNotTransitioning = (): void => {
     if (transitionDepth > 0) {
       throw createCapabilityError(
         CapabilityErrorCode.hostTransitioning,
-        '[store] capability host cannot mutate during a lifecycle transition'
+        CapabilityErrorText.hostTransitioning
       );
     }
   };
@@ -230,8 +269,8 @@ export function createCapabilityHost<Context>(
    * Keep immediate API failures observable to awaiters without host-level unhandled rejection
    * noise.
    */
-  const rejectedOperation = (error: unknown): Promise<boolean> => {
-    const rejected = Promise.reject<boolean>(error);
+  const rejectedOperation = <T>(error: unknown): Promise<T> => {
+    const rejected = Promise.reject<T>(error);
     void rejected.catch(() => {
       // The original promise remains rejected for callers; this marks it handled
       // when a reentrant disposer necessarily cannot await it.
@@ -244,7 +283,7 @@ export function createCapabilityHost<Context>(
     if (!entry) {
       throw createCapabilityError(
         CapabilityErrorCode.notRegistered,
-        `[store] capability "${name}" is not registered`
+        `capability "${name}" is not registered`
       );
     }
     return entry;
@@ -255,7 +294,9 @@ export function createCapabilityHost<Context>(
   /** 错误上报属于诊断路径，绝不能反向改变能力生命周期。 */
   const reportError = (name: string, error: unknown): void => {
     try {
-      const result: unknown = onError?.(name, error);
+      const result: unknown = onError
+        ? Reflect.apply(onError, optionsReceiver, [name, error])
+        : undefined;
       containAsyncRejection(result, () => {
         // Reporter 的异步失败没有更低一层可上报，只能在边界终止。
       });
@@ -264,10 +305,21 @@ export function createCapabilityHost<Context>(
     }
   };
 
+  /**
+   * Preserve a generation-controller cleanup failure for terminal diagnostics without allowing it
+   * to stop disposal of another entry. The capability contract reports cleanup failures and keeps
+   * `dispose()` resolved; it does not synthesize a second aggregate error contract here.
+   */
+  const recordDisposeCleanupError = (entry: IEntry<Context>, error: unknown): void => {
+    entry.error = error;
+    reportError(entry.name, error);
+  };
+
   const release = (
     entry: IEntry<Context>,
     handle: ICapabilityHandle,
-    ownerGeneration = entry.generationController.generation
+    ownerGeneration = entry.generationController.generation,
+    disposer?: ICapabilityHandle['dispose']
   ): void => {
     const recordCleanupError = (error: unknown): void => {
       const inactiveWithoutReplacement =
@@ -284,7 +336,8 @@ export function createCapabilityHost<Context>(
     };
     runTransition(() => {
       try {
-        const result: unknown = handle.dispose();
+        const releaseDisposer = disposer ?? handle.dispose;
+        const result: unknown = Reflect.apply(releaseDisposer, handle, []);
         const thenable = asPromiseLike(result);
         if (thenable) {
           const pending = thenable.then(
@@ -312,10 +365,12 @@ export function createCapabilityHost<Context>(
 
   const releaseHandle = (entry: IEntry<Context>): void => {
     const handle = entry.handle;
+    const disposer = entry.disposer;
     entry.handle = undefined;
+    entry.disposer = undefined;
     if (!handle) return;
     // 释放失败不得阻断其余能力的关闭：回退路径必须能走完
-    release(entry, handle);
+    release(entry, handle, entry.generationController.generation, disposer);
   };
 
   const forgetActivation = (entry: IEntry<Context>): void => {
@@ -374,12 +429,29 @@ export function createCapabilityHost<Context>(
     const { generation, token } = entry.generationController.begin();
     entry.state = CapabilityState.activating;
     entry.error = undefined;
-    const pending = (async () => {
+    let resolvePending!: (enabled: boolean) => void;
+    const pending = new Promise<boolean>((resolve) => {
+      resolvePending = resolve;
+    });
+    // Publish activation before invoking user code. Synchronous activate() callbacks may call
+    // host.dispose(); that disposal must retain this promise until late handle cleanup finishes.
+    entry.pending = pending;
+    trackPending(entry, pending);
+    void (async () => {
       try {
         const handle = await entry.activate(context);
-        if (!handle || typeof handle.dispose !== 'function') {
+        let disposer: ICapabilityHandle['dispose'] | undefined;
+        try {
+          disposer = handle?.dispose;
+        } catch (error) {
           throw tagCapabilityError(
-            new TypeError(`[store] capability "${name}" returned an invalid handle`),
+            new TypeError(CapabilityErrorText.invalidHandle(name), { cause: error }),
+            CapabilityErrorCode.invalidHandle
+          );
+        }
+        if (!handle || typeof disposer !== 'function') {
+          throw tagCapabilityError(
+            new TypeError(CapabilityErrorText.invalidHandle(name)),
             CapabilityErrorCode.invalidHandle
           );
         }
@@ -388,10 +460,11 @@ export function createCapabilityHost<Context>(
         // began) and the whole host having been disposed meanwhile (the controller itself is
         // disposed too, see `disposeSync()`).
         const adopted = entry.generationController.adopt(token, handle, (adoptedHandle) =>
-          release(entry, adoptedHandle, generation)
+          release(entry, adoptedHandle, generation, disposer)
         );
         if (!adopted) return false;
         entry.handle = handle;
+        entry.disposer = disposer;
         entry.state = CapabilityState.on;
         activationOrder.push(entry);
         return true;
@@ -405,9 +478,7 @@ export function createCapabilityHost<Context>(
       } finally {
         if (entry.generationController.isCurrent(token)) entry.pending = undefined;
       }
-    })();
-    entry.pending = pending;
-    trackPending(entry, pending);
+    })().then(resolvePending, () => resolvePending(false));
     return pending;
   };
 
@@ -421,27 +492,93 @@ export function createCapabilityHost<Context>(
   const disposeSync = (): void => {
     assertNotTransitioning();
     if (disposed) return;
+    // Publish the terminal host state before any controller or user disposer can run. This makes
+    // synchronous observers see a disposed host even when the first cleanup reports a failure.
     disposed = true;
     for (const entry of entries.values()) {
-      entry.generationController.dispose();
-      entry.pending = undefined;
+      runTransition(() => {
+        try {
+          entry.generationController.dispose();
+        } catch (error) {
+          // One controller's cancellation cleanup must not prevent later controllers from closing.
+          recordDisposeCleanupError(entry, error);
+        } finally {
+          entry.pending = undefined;
+        }
+      });
     }
     for (const entry of [...activationOrder].reverse()) {
-      releaseHandle(entry);
-      entry.state = CapabilityState.off;
+      runTransition(() => {
+        try {
+          releaseHandle(entry);
+        } catch (error) {
+          // `release()` contains normal disposer failures; keep this boundary defensive so a
+          // future release-path change still cannot stop the remaining LIFO cleanup.
+          recordDisposeCleanupError(entry, error);
+        } finally {
+          entry.state = CapabilityState.off;
+        }
+      });
     }
     activationOrder.length = 0;
     for (const entry of entries.values()) entry.state = CapabilityState.off;
   };
 
-  const disposeAll = async (): Promise<void> => {
-    disposeSync();
+  const drainPending = async (): Promise<void> => {
     // `whenZeroOnce()` loops until the count is actually zero the instant it resolves — draining a
     // still-in-flight activation can itself enqueue a new release promise under the same key, and
     // this must not resolve until that settles too (§8.2 "排空循环在冒出新待排空项时不提前返回").
     while (pendingTracker.count(ALL_KEY) > 0) {
       await pendingTracker.whenZeroOnce(ALL_KEY);
     }
+  };
+
+  /**
+   * Publishes one completion Promise before synchronous cleanup starts, then drains every tracked
+   * activation/release. A synchronous callback during cleanup is rejected by the transition guard;
+   * any later call while completion remains pending is rejected with `HOST_TRANSITIONING`, because
+   * it cannot safely join the first Promise: a disposer-origin call could otherwise await itself.
+   * After completion, the first Promise becomes the idempotent canonical result.
+   */
+  const disposeAll = (): Promise<void> => {
+    if (disposePromise) {
+      if (transitionDepth > 0) {
+        assertNotTransitioning();
+      }
+      if (!disposeCompleted) {
+        return rejectedOperation<void>(
+          createCapabilityError(
+            CapabilityErrorCode.hostTransitioning,
+            CapabilityErrorText.hostTransitioning
+          )
+        );
+      }
+      return disposePromise;
+    }
+    assertNotTransitioning();
+
+    let resolvePromise!: () => void;
+    let rejectPromise!: (error: unknown) => void;
+    disposePromise = new Promise<void>((resolve, reject) => {
+      resolvePromise = resolve;
+      rejectPromise = reject;
+    });
+    try {
+      disposeSync();
+      void drainPending().then(
+        () => {
+          disposeCompleted = true;
+          resolvePromise();
+        },
+        (error) => {
+          disposeCompleted = true;
+          rejectPromise(error);
+        }
+      );
+    } catch (error) {
+      rejectPromise(error);
+    }
+    return disposePromise;
   };
 
   const host: ICapabilityHost<Context> = {
@@ -458,19 +595,19 @@ export function createCapabilityHost<Context>(
           // hostile Proxy getter on definition — surface with (source, code) + cause reachable (AF-09).
           throw createCapabilityError(
             CapabilityErrorCode.invalidOption,
-            '[store] capability definition snapshot failed',
+            'capability definition snapshot failed',
             { cause: error }
           );
         }
         if (typeof name !== 'string' || name.trim().length === 0) {
           throw tagCapabilityError(
-            new TypeError('[store] capability name must be a non-empty string'),
+            new TypeError('capability name must be a non-empty string'),
             CapabilityErrorCode.invalidName
           );
         }
         if (typeof activate !== 'function') {
           throw tagCapabilityError(
-            new TypeError(`[store] capability "${name}" activate must be a function`),
+            new TypeError(`capability "${name}" activate must be a function`),
             CapabilityErrorCode.invalidActivate
           );
         }
@@ -490,7 +627,7 @@ export function createCapabilityHost<Context>(
       if (entries.has(snapshot.name)) {
         throw createCapabilityError(
           CapabilityErrorCode.alreadyRegistered,
-          `[store] capability "${snapshot.name}" is already registered`
+          `capability "${snapshot.name}" is already registered`
         );
       }
       entries.set(snapshot.name, {

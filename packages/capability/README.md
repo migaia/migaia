@@ -30,7 +30,7 @@
 - **竞态不会让关掉的东西自己回来**：异步 `activate()` 还没跑完，开关就被关掉——迟到的结果会被就地释放，而不是"晚几毫秒又亮起来"。
 - **失败不会卡在半开状态**：`activate()` 抛错或返回的 handle 无效，能力直接进入 `failed` 态，`error(name)` 能查到原因，不会留下一个看似启用、实际没有 handle 的假状态。
 - **安全默认拒绝的开关表**：只有严格等于 `true` 的自有数据属性才会被当作"允许"；继承属性、getter、`__proto__` 这类都不生效，配置来源不可信时也不会被绕过。
-- **两条 API 轨道**：`enable`/`disable`/`dispose` 返回结构化结果并等待异步清理完成；`enableLegacyBoolean`/`disableNow` 是同步/布尔风格的兼容适配器，接旧调用点不用重写。
+- **两条 API 轨道**：`enable`/`disable`/`dispose` 返回结构化结果并等待异步清理完成；`enableLegacyBoolean`/`disableNow` 是同步/布尔风格的兼容适配器，接旧调用点不用重写。`dispose()` 首次调用发布唯一完成 Promise；完成前的重复调用 fail-fast 为 `HOST_TRANSITIONING`，完成后才恢复幂等 Promise。
 - **租户互不可见**：不同 host 实例的 context、开关表、状态机完全独立。
 
 ## 4. 安装
@@ -87,6 +87,8 @@ await capabilities.dispose(); // 整个 host 收尾，之后不可再用
 | 状态查询 | `state` / `handle` / `error` / `disposed` | 只读查询，不触发任何副作用 |
 | 整体回收 | `dispose` | 按真实启用顺序反向（LIFO）关闭全部能力 |
 
+`dispose()` 是 Round26 的显式 breaking behavior change：旧行为会让进行中的重复调用共享首个 Promise；新行为要求外部并发调用方保留并等待首个 Promise，完成前再次调用会立即以 `HOST_TRANSITIONING` 拒绝。这样 disposer-origin 调用不会把 host 卡在自等待循环中。
+
 每个成员的精确签名、参数和边界行为见 [USEGUIDE.md](./USEGUIDE.md)。
 
 ## 8. 最容易踩的坑
@@ -96,6 +98,7 @@ await capabilities.dispose(); // 整个 host 收尾，之后不可再用
 3. **兼容适配器不等待异步清理**：`enableLegacyBoolean`/`disableNow` 是同步/尽快返回的接口；确定要等 `dispose()` 完全跑完，用 `enable`/`disable`/`dispose`。
 4. **`dispose()` 之后 host 永久不可用**，不要把同一个 host 实例复用给下一个租户或下一次请求。
 5. **能力自己的 `dispose()` 里不能再调用 `setFlag`/`enable` 等变更方法**——重入会立即抛错，防止回退过程中状态被自己写乱。
+6. **不要在首次 `dispose()` 完成前再次调用 `dispose()`**——包括 disposer 延迟回调；重复调用会以 `HOST_TRANSITIONING` 立即拒绝。外部并发调用方必须保留并等待首次返回的 Promise。
 
 ## 9. 深入参考
 
