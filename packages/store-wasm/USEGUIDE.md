@@ -16,6 +16,7 @@
 10. [错误信息完整参考](#10-错误信息完整参考)
 11. [扩展：基于 arena 自定义 WASM 字段](#11-扩展基于-arena-自定义-wasm-字段)
 12. [常见问题排查](#12-常见问题排查)
+13. [构建、格式化与测试](#13-构建格式化与测试)
 
 ---
 
@@ -268,9 +269,9 @@ type IWasmRecordField<Shape> = { [K in keyof Shape]: number } & {
 
 ## 11. 扩展：基于 arena 自定义 WASM 字段
 
-`number()`/`boolean()`/`string()`/`array()`/`record()` 内部都构建在同一套底层分配原语之上，这些原语位于 `src/arena.ts`，可以通过子路径 `@migaia/store-wasm/arena` 单独导入（`package.json` 的 `exports` 声明了 `./*` 通配子路径，`index.ts` 主导出面本身不包含它们）：
+`number()`/`boolean()`/`string()`/`array()`/`record()` 内部都构建在同一套底层分配原语之上，这些原语位于 `src/arena.ts`。它们是包内实现细节：当前 `package.json` 只公开根入口，消费方不能从 `@migaia/store-wasm/arena`、`@migaia/store-wasm/field` 或其他子路径导入。
 
-| 导出 | 参数类型 | 同步/异步 | 作用 |
+| 内部符号（非公开导出） | 参数类型 | 同步/异步 | 作用 |
 | --- | --- | --- | --- |
 | `allocateOwnedSync(byteLen)` | `byteLen: number` | 同步 | 同步分配一块内存并返回 `IWasmAllocation`（`memory`/`id`/`ptr`/`register`/`unregister`/`dispose`），供字段构造器在自己的 `create()` 里使用 |
 | `allocate(byteLen)` | `byteLen: number` | 异步 | 异步分配：内部先 `await ensureWasm()` 再分配，适合在 WASM 尚未就绪时也能发起分配请求的场景 |
@@ -279,7 +280,7 @@ type IWasmRecordField<Shape> = { [K in keyof Shape]: number } & {
 | `registry` | 不适用（非函数导出） | 不适用 | 对 `FinalizationRegistry` 的薄封装（`register`/`unregister`），运行时不支持时静默降级为 no-op |
 | `IWasmAllocation` | 不适用（类型定义） | 不适用 | 一块分配的类型：`memory`、`id`、`ptr`，以及 `register`/`unregister`/`dispose` |
 
-如果要实现一个新的 wasm 字段类型（比如别的数值精度、别的编码格式），可以参照 `src/number.ts`/`src/string.ts` 的写法：用 `allocateOwnedSync` 拿到一块内存，用 `context.createSource(debugName)` 创建响应式 Source，把读写包进 `source.track()`/`source.commit()`，并实现 `FieldBuilder`（从 `@migaia/store-wasm/field` 或 `@migaia/store-light` 导入 `FIELD_BUILDER`/`FieldContext` 类型）。这一层是内部实现细节直接暴露出来的扩展点，不是刻意设计的公开插件系统——升级本包版本时这些子路径的兼容性不像 `index.ts` 主导出面那样被优先保证。
+如果需要新的字段类型（例如另一种数值精度或编码），当前做法是向本包贡献实现并由根入口正式导出；不要依赖 `src/arena.ts`、`src/number.ts` 或 `src/string.ts` 的深层路径。它们没有版本化的外部兼容承诺。
 
 ---
 
@@ -302,3 +303,18 @@ type IWasmRecordField<Shape> = { [K in keyof Shape]: number } & {
 
 **Q：忘记调用 `dispose()` 会不会内存泄漏？**
 如果字段是通过 `createStore()` 创建的，`store.$dispose()` 会自动帮你释放，正常使用不会泄漏。如果是绕开 Store 手写 `builder.create(context)` 又忘记 `dispose()`，`FinalizationRegistry` 兜底会在字段对象被 GC 时异步释放——但这只是兜底，时机不确定，不要依赖它作为常规释放手段。
+
+## 13. 构建、格式化与测试
+
+在仓库根目录运行：
+
+```bash
+pnpm --filter @migaia/store-wasm fmt
+pnpm --filter @migaia/store-wasm lint
+pnpm --filter @migaia/store-wasm typecheck
+pnpm --filter @migaia/store-wasm typecheck:test
+pnpm --filter @migaia/store-wasm test
+pnpm --filter @migaia/store-wasm build
+```
+
+这些测试使用假的 WASM provider 验证字段布局、释放顺序、数组重入和公开导出；它们不替代 `@migaia/wasm` 的 Rust 测试。

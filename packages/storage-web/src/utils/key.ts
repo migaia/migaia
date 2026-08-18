@@ -1,6 +1,7 @@
 import type { IBackendKind } from '../types/capabilities.js';
 import { StorageError, StorageErrorCode } from '../types/errors.js';
 import { normalizeError } from '../core/errors.js';
+import { utf8ByteLength } from '@migaia/utils/bytes';
 
 /** Namespace/key codec boundary. Custom codecs own migration and collision safety. */
 export type INamespaceCodec = {
@@ -12,7 +13,7 @@ export type INamespaceCodec = {
 export const lengthPrefixedNamespaceCodec: INamespaceCodec = Object.freeze({
   encode: (namespace, key) => {
     const encodedNamespace = encodeURIComponent(namespace);
-    return `sw1:${new TextEncoder().encode(namespace).byteLength}:${encodedNamespace}:${key}`;
+    return `sw1:${utf8ByteLength(namespace)}:${encodedNamespace}:${key}`;
   },
   decode: (namespace, physicalKey) => {
     if (!physicalKey.startsWith('sw1:')) return undefined;
@@ -25,7 +26,7 @@ export const lengthPrefixedNamespaceCodec: INamespaceCodec = Object.freeze({
     if (namespaceSeparator < 0) return undefined;
     const decodedNamespace = decodeURIComponent(encoded.slice(0, namespaceSeparator));
     if (decodedNamespace !== namespace) return undefined;
-    if (new TextEncoder().encode(decodedNamespace).byteLength !== byteLength) return undefined;
+    if (utf8ByteLength(decodedNamespace) !== byteLength) return undefined;
     return encoded.slice(namespaceSeparator + 1);
   }
 });

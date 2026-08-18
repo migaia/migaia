@@ -10,7 +10,9 @@
     "directory": "packages/web-rpc"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "USEGUIDE.md"
   ],
   "type": "module",
   "sideEffects": false,
@@ -83,7 +85,8 @@
   },
   "dependencies": {
     "@migaia/event-subscriber": "workspace:^",
-    "@migaia/lifecycle": "workspace:^"
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
     "typescript": "~6.0.2",

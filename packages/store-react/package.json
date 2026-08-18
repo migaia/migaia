@@ -28,7 +28,8 @@
     "@migaia/reactive": "workspace:^",
     "@migaia/resource": "workspace:^",
     "@migaia/store-keyed": "workspace:^",
-    "@migaia/store-light": "workspace:^"
+    "@migaia/store-light": "workspace:^",
+    "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

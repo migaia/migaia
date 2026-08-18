@@ -15,7 +15,7 @@
 9. [错误码完整参考](#9-错误码完整参考)
 10. [资源清理协议](#10-资源清理协议)
 11. [完整示例](#11-完整示例)
-12. [常见问题排查](#12-常见问题排查)
+12. [构建、测试与常见问题排查](#12-构建测试与常见问题排查)
 
 ---
 
@@ -325,7 +325,17 @@ await host.handle({ path: '/users' });
 
 ---
 
-## 12. 常见问题排查
+## 12. 构建、测试与常见问题排查
+
+在仓库根目录运行以下包级门禁；`test` 会先执行本包的 `build`。
+
+```bash
+pnpm --filter @migaia/plugin-host fmt
+pnpm --filter @migaia/plugin-host lint
+pnpm --filter @migaia/plugin-host typecheck
+pnpm --filter @migaia/plugin-host typecheck:test
+pnpm --filter @migaia/plugin-host test
+```
 
 **Q：`await host.use(plugin)` 卡住不返回。**
 检查插件的 `install()` 是否在自己内部同步等待了当前宿主的另一个 `use()`/`unUse()`/`config.update()` 调用——这会形成自等待死锁，见 [§8](#8-生命周期与错误)。打开 `diagnostic` 回调观察是否有排队超时提示。

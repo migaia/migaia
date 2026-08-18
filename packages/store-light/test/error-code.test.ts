@@ -3,7 +3,7 @@ import { createRuntime } from '@migaia/reactive';
 import { claimOwnership } from '@migaia/reactive/ownership';
 import type { IDisposable } from '@migaia/reactive';
 import { createLegacyStore, storeReady, FIELD_BUILDER, type IFieldBuilder } from '../src';
-import { StoreLightErrorCode, STORE_LIGHT_SOURCE } from '../src/errors';
+import { createStoreLightRangeError, StoreLightErrorCode, STORE_LIGHT_SOURCE } from '../src/errors';
 
 describe('store-light error-code contract (E-T9)', () => {
   it('declares 12 unique codes under the package source', () => {
@@ -11,6 +11,13 @@ describe('store-light error-code contract (E-T9)', () => {
     expect(codes).toHaveLength(12);
     expect(new Set(codes).size).toBe(12);
     expect(STORE_LIGHT_SOURCE).toBe('@migaia/store-light');
+  });
+
+  it('preserves native RangeError identity through shared attachment', () => {
+    const error = createStoreLightRangeError(StoreLightErrorCode.invalidOption, 'invalid option');
+    expect(error).toBeInstanceOf(RangeError);
+    expect(error).toMatchObject({ source: STORE_LIGHT_SOURCE, code: 'INVALID_OPTION' });
+    expect(error.stack).toContain('invalid option');
   });
 });
 

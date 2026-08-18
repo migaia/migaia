@@ -18,7 +18,7 @@ import { VersionClock } from '../src/runtime/version-clock.class';
 import { Scheduler } from '../src/runtime/scheduler.class';
 import type { IFlushable } from '../src/runtime/types';
 import { ReactiveErrorCode } from '../src/error-code';
-import { REACTIVE_SOURCE } from '../src/errors';
+import { createReactiveError, REACTIVE_SOURCE } from '../src/errors';
 import * as ts from 'typescript';
 
 const srcDir = fileURLToPath(new URL('../src', import.meta.url));
@@ -44,6 +44,15 @@ function stripComments(source: string): string {
 
 // M-T36 正向：§3.7.1 的每个码都要有一个真实、可验证的触发点。
 describe('M-T36 (§3.7.1): every declared code has a real trigger', () => {
+  it('shared attachment preserves native Error identity, cause, and stack', () => {
+    const cause = new Error('cause');
+    const error = createReactiveError('TEST_CODE', 'message', { cause });
+    expect(error).toBeInstanceOf(Error);
+    expect(error.source).toBe(REACTIVE_SOURCE);
+    expect(error.code).toBe('TEST_CODE');
+    expect(error.cause).toBe(cause);
+    expect(error.stack).toBeTruthy();
+  });
   it('NODE_DISPOSED: reading a disposed Signal', () => {
     const runtime = createRuntime();
     const signal = new Signal(1, runtime);

@@ -1,4 +1,5 @@
 import { StoreSharedErrorCode, type IStoreSharedErrorCode } from './error-code.js';
+import { attachErrorIdentity } from '@migaia/utils/error';
 
 export { StoreSharedErrorCode, type IStoreSharedErrorCode };
 
@@ -6,9 +7,7 @@ export { StoreSharedErrorCode, type IStoreSharedErrorCode };
 export const STORE_SHARED_SOURCE = '@migaia/store-shared';
 
 function tagStoreSharedError<E extends Error>(error: E, code: IStoreSharedErrorCode): E {
-  Object.defineProperty(error, 'source', { value: STORE_SHARED_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
-  return error;
+  return attachErrorIdentity(error, { source: STORE_SHARED_SOURCE, code });
 }
 
 /** Builds a `(source, code)`-tagged `Error` without touching `stack`. */

@@ -536,6 +536,11 @@ describe('runAsyncMiddleware', () => {
       message: 'middleware stage and downstream failed',
       errors: [stageError, downstreamError]
     });
+    await expect(rejected).rejects.toBeInstanceOf(AggregateError);
+    await expect(rejected).rejects.toSatisfy((error: unknown) => {
+      const value = error as AggregateError & { readonly stack?: string };
+      return value.stack !== undefined && value.stack.length > 0;
+    });
   });
 
   it('preserves undefined throws and rejections as failures', async () => {

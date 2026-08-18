@@ -1,4 +1,5 @@
 import { StoreMiddlewareErrorCode, type IStoreMiddlewareErrorCode } from './error-code.js';
+import { attachErrorIdentity } from '@migaia/utils/error';
 
 export { StoreMiddlewareErrorCode, type IStoreMiddlewareErrorCode };
 
@@ -6,9 +7,7 @@ export { StoreMiddlewareErrorCode, type IStoreMiddlewareErrorCode };
 export const STORE_MIDDLEWARE_SOURCE = '@migaia/store-middleware';
 
 function tagStoreMiddlewareError<E extends Error>(error: E, code: IStoreMiddlewareErrorCode): E {
-  Object.defineProperty(error, 'source', { value: STORE_MIDDLEWARE_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
-  return error;
+  return attachErrorIdentity(error, { source: STORE_MIDDLEWARE_SOURCE, code });
 }
 
 /** Builds a `(source, code)`-tagged `Error` without touching `stack`. */

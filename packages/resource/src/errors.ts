@@ -17,13 +17,7 @@ export function createResourceError(
   options?: { readonly cause?: unknown }
 ): IResourceError {
   const error = new Error(message, options);
-  Object.defineProperty(error, 'source', {
-    value: RESOURCE_SOURCE,
-    enumerable: true,
-    configurable: true
-  });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true, configurable: true });
-  return error as IResourceError;
+  return attachErrorIdentity(error, { source: RESOURCE_SOURCE, code }) as IResourceError;
 }
 
 /**
@@ -33,11 +27,6 @@ export function createResourceError(
  * `Error`：TypeScript 的 `DOMException` 类型不是 `Error` 的子类型，但两者在运行时都是可挂只读属性的普通对象。
  */
 export function tagResourceError<E extends object>(error: E, code: string): E {
-  Object.defineProperty(error, 'source', {
-    value: RESOURCE_SOURCE,
-    enumerable: true,
-    configurable: true
-  });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true, configurable: true });
-  return error;
+  return attachErrorIdentity(error as Error, { source: RESOURCE_SOURCE, code }) as E;
 }
+import { attachErrorIdentity } from '@migaia/utils/error';

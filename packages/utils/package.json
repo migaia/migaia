@@ -1,0 +1,61 @@
+{
+  "name": "@migaia/utils",
+  "version": "0.0.1",
+  "description": "Runtime-neutral reusable utility primitives.",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "USEGUIDE.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./promise": {
+      "types": "./dist/promise.d.ts",
+      "default": "./dist/promise.js"
+    },
+    "./error": {
+      "types": "./dist/error.d.ts",
+      "default": "./dist/error.js"
+    },
+    "./bytes": {
+      "types": "./dist/bytes.d.ts",
+      "default": "./dist/bytes.js"
+    },
+    "./object": {
+      "types": "./dist/object.d.ts",
+      "default": "./dist/object.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "default": "./dist/config.js"
+    },
+    "./function": {
+      "types": "./dist/function.d.ts",
+      "default": "./dist/function.js"
+    }
+  },
+  "scripts": {
+    "fmt": "oxfmt src test",
+    "lint": "oxlint src test",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:test": "tsc -p tsconfig.test.json",
+    "test": "pnpm run build && vitest run",
+    "build": "vite build && tsc -p tsconfig.json --emitDeclarationOnly",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.2",
+    "typescript": "~6.0.2",
+    "vitest": "4.1.10"
+  }
+}

@@ -31,7 +31,7 @@
 pnpm add @migaia/store-react react react-dom
 ```
 
-`react`/`react-dom` 是 peer dependency（`>=18`）。本包与 `@migaia/reactive`、`@migaia/resource`、`@migaia/store-keyed`、`@migaia/store-light` 配合使用，这几个包按需装即可，不是全部都要用到。产物是纯 ESM，同时支持子路径导入（如 `@migaia/store-react/useAtom`）。
+`react`/`react-dom` 是 peer dependency（`>=18`）。本包与 `@migaia/reactive`、`@migaia/resource`、`@migaia/store-keyed`、`@migaia/store-light` 配合使用，这几个包按需装即可，不是全部都要用到。产物是纯 ESM；当前 `package.json` 只公开根入口，所有公开 API 都从 `@migaia/store-react` 导入。
 
 ## 5. 五分钟上手
 

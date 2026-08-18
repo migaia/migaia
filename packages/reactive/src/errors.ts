@@ -20,9 +20,7 @@ export function createReactiveError(
     message,
     options?.cause !== undefined ? { cause: options.cause } : undefined
   );
-  Object.defineProperty(error, 'source', { value: REACTIVE_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
-  return error as IReactiveError;
+  return attachErrorIdentity(error, { source: REACTIVE_SOURCE, code }) as IReactiveError;
 }
 
 /**
@@ -30,7 +28,6 @@ export function createReactiveError(
  * `message`/`stack`/构造函数带来的其它字段——用于类型本身对调用方有意义、不能被 `createReactiveError` 的纯 `Error` 替代的场景。
  */
 export function tagReactiveError<E extends Error>(error: E, code: string): E {
-  Object.defineProperty(error, 'source', { value: REACTIVE_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
-  return error;
+  return attachErrorIdentity(error, { source: REACTIVE_SOURCE, code });
 }
+import { attachErrorIdentity } from '@migaia/utils/error';

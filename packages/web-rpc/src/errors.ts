@@ -1,4 +1,5 @@
 import { WebRpcErrorCode, type IWebRpcErrorCode } from './error-code.js';
+import { attachErrorIdentity } from '@migaia/utils/error';
 export { WebRpcErrorCode, type IWebRpcErrorCode };
 
 /** `source` value stamped onto every error this package throws locally. */
@@ -33,9 +34,8 @@ export function tagWebRpcError<E extends Error>(
   error: E,
   code: IWebRpcErrorCode
 ): E & Pick<IWebRpcError, 'source' | 'code'> {
-  Object.defineProperty(error, 'source', { value: WEBRPC_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
-  return error as E & Pick<IWebRpcError, 'source' | 'code'>;
+  return attachErrorIdentity(error, { source: WEBRPC_SOURCE, code }) as E &
+    Pick<IWebRpcError, 'source' | 'code'>;
 }
 export class WebRpcSchemaValidationError extends WebRpcError {
   readonly data: unknown;

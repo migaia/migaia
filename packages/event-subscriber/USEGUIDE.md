@@ -8,6 +8,14 @@ registration owner → immutable dispatch snapshot → explicit settlement
 
 channel 拥有 registration；每次发布取得固定快照；调用方根据场景选择同步 fire-and-forget、并行等待、串行等待或唯一 task 结算。
 
+## 目录
+
+- [安装与入口](#1-安装与入口)
+- [Channel、快照与事件控制](#2-核心类型与心智模型)
+- [订阅与异步发布](#6-订阅-helper)
+- [taskId、Hub 与错误契约](#9-taskid-与定向结算)
+- [资源边界、排查与 Public API](#13-生命周期与资源所有权)
+
 ## 1. 安装与入口
 
 ```bash
@@ -542,3 +550,14 @@ event-subscriber 的 parallel/serial 只改变 listener 调用与等待顺序，
 - `IFilteredEventChannel`
 - `IListenerResult`
 - `IUnsubscribe`
+
+## 18. 排查与构建门禁
+
+- 异步 listener rejection 未见于调用方：`channel.publish()` 是 fire-and-forget；配置 `report`，或使用 settled/throwing async helper。
+- 本次 publish 调到已退订 listener：符合入口快照语义；退订只影响下一次 publish。
+- `publishTask*` 同步失败：检查 `taskId` 是否恰好匹配一个 registration；0 个为 `TASK_NOT_FOUND`，多个为 `TASK_NOT_UNIQUE`。
+- 需要 close、排空、资源释放或超时预算：把 unsubscribe/resource 交给 `@migaia/lifecycle`，不要把状态塞进 channel。
+
+```bash
+pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
+```

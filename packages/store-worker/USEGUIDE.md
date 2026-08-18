@@ -15,6 +15,7 @@
 9. [性能特征](#9-性能特征)
 10. [完整场景示例](#10-完整场景示例)
 11. [常见问题排查](#11-常见问题排查)
+12. [构建、格式化与测试](#12-构建格式化与测试)
 
 ---
 
@@ -421,3 +422,20 @@ registry.dispose(); // 连带 dispose workerParser 的端点,并 terminate worke
 ---
 
 如果本文没有回答你的问题,`@migaia/web-rpc` 的 [USEGUIDE.md](../web-rpc/USEGUIDE.md) 覆盖了协议层(超时、取消、错误码、生命周期)的完整细节;`@migaia/resource`、`@migaia/serialize` 各自的文档覆盖 `Resource`/序列化注册表本身的行为。
+
+## 12. 构建、格式化与测试
+
+在仓库根目录运行：
+
+```bash
+pnpm --filter @migaia/store-worker fmt
+pnpm --filter @migaia/store-worker lint
+pnpm --filter @migaia/store-worker typecheck
+pnpm --filter @migaia/store-worker typecheck:test
+pnpm --filter @migaia/store-worker test
+pnpm --filter @migaia/store-worker typecheck:e2e
+pnpm --filter @migaia/store-worker test:e2e
+pnpm --filter @migaia/store-worker build
+```
+
+`test` 覆盖 adapter、handler、序列化与错误契约；`test:e2e` 用真实 Worker 通信验证浏览器路径，运行前需有 Playwright 浏览器。

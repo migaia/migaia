@@ -408,6 +408,32 @@ describe('L-T50 DisposeTransaction: signal registration and cleanup failures', (
 });
 
 describe('L-T14 DisposeTransaction: order mode', () => {
+  it('uses an inert signal without allocating a controller when no external signal exists', async () => {
+    const original = globalThis.AbortController;
+    let allocations = 0;
+    class CountingAbortController extends AbortController {
+      constructor() {
+        super();
+        allocations += 1;
+      }
+    }
+    vi.stubGlobal('AbortController', CountingAbortController);
+    try {
+      let received: IReleaseContext | undefined;
+      const transaction = createDisposeTransaction({ kind: 'order' });
+      await transaction.run([
+        {
+          source: 'test',
+          descriptor: { graceful: (context) => void (received = context), force: () => undefined }
+        }
+      ]);
+      expect(allocations).toBe(0);
+      expect(received?.signal.aborted).toBe(false);
+    } finally {
+      vi.stubGlobal('AbortController', original);
+    }
+  });
+
   it('groups by descending order, releasing higher-order items first', async () => {
     const calls: string[] = [];
     const transaction = createDisposeTransaction({ kind: 'order' }, { errorPolicy: 'throw' });

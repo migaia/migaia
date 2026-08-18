@@ -295,6 +295,11 @@ new ObservableArray([1, 2, 3], myRuntime);
 
 ## 8. 错误信息全表
 
+每个包边界错误保留原生 `Error`、`TypeError` 或 `RangeError`，并带
+`source: '@migaia/store-indexed'` 与稳定 `code`。主要代码为 `COLLECTION_DISPOSED`、
+`CROSS_RUNTIME`、`INDEX_OUT_OF_RANGE`、`INVALID_INDEX` 与 `INVALID_OPTION`；调用方应按
+`code` 判断语义，不应依赖消息文本。
+
 | 错误信息 | 抛出位置 | 触发条件 |
 | --- | --- | --- |
 | `[store] cross-runtime dependency is not allowed: collection read belongs to another Runtime` | 任意追踪型读方法 | 当前处于**另一个** Runtime 的追踪状态中，却读了本集合（本集合绑定的是不同的 Runtime） |
@@ -380,3 +385,7 @@ const rows = new ObservableArray([1, 2, 3], runtime);
 
 **Q：`mutationGuard` 抛出的错误会不会被本包吞掉？**
 不会。`assertMutation()` 直接调用 `mutationGuard.assertMutationAllowed(operation)`，抛出的错误原样从 `set`/`push`/`delete` 等调用里冒出来，调用方按普通异常处理即可。
+
+## 构建、测试与排查
+
+仓库根目录：`pnpm --filter @migaia/store-indexed fmt` → `lint` → `typecheck` → `typecheck:test` → `test` → `build`。浏览器集成路径另跑 `typecheck:e2e` 与 `test:e2e`。

@@ -37,8 +37,8 @@ function persistUnit<TState>(unit: IPersistUnit<TState>, options: IPersistUnitOp
 | --- | --- | --- | --- | --- |
 | `key` | `string` | 必填 | 无 | 存档在 storage 里的键 |
 | `runtime` | `IRuntime` | 必填 | 无 | `status`/`error`/`hydrated` 等信号挂在哪个 Runtime 上；三条适配路径都会自动传底层 store/collection/AtomStore 自己的 runtime |
-| `storage` | `IPersistKeyValueStore` | 必填 | 无 | storage-web 的 `IKeyValueStore`（或具备 `getBytes`/`setBytes` 的 `IRecordStore`） |
-| `codec` | `IPersistCodec` | 可选 | `defaultJsonCodec` | 见 [§7](#7-与-storage-web-的-codec-集成) |
+| `storage` | `{ capabilities, get, set, remove, keys }` | 必填 | 无 | 对应 `@migaia/storage-web` 键值能力；可选 `getBytes`/`setBytes` 启用 binary codec |
+| `codec` | `ICodec` | 可选 | `defaultJsonCodec` | 见 [§7](#7-与-storage-web-的-codec-集成) |
 | `version` | `number` | 可选 | `0` | schema 版本，必须是安全非负整数 |
 | `migrate` | `(persisted: TState, fromVersion: number) => TState` | 可选 | 无 | 见 [§5](#5-存档格式与版本迁移) |
 | `partialize` | `(state: TState) => Partial<TState>` | 可选 | 恒等函数 | 写入前裁剪 |
@@ -70,8 +70,8 @@ type IPersistableStore = {
 
 type IPersistOptions = {
   key: string;
-  storage: IPersistKeyValueStore;
-  codec?: IPersistCodec;
+  storage: IKeyValueStore;
+  codec?: ICodec;
   version?: number;
   migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;
   partialize?: (state: Record<string, unknown>) => Record<string, unknown>;
@@ -116,8 +116,8 @@ type IPersistableCollection<TState> = {
 
 type IPersistCollectionOptions<TState> = {
   key: string;
-  storage: IPersistKeyValueStore;
-  codec?: IPersistCodec;
+  storage: IKeyValueStore;
+  codec?: ICodec;
   version?: number;
   migrate?: (persisted: TState, fromVersion: number) => TState;
   partialize?: (state: TState) => Partial<TState>;
@@ -154,12 +154,12 @@ cart.set('sku-123', 2); // 防抖写回（默认 debounceMs: 0，下一次写队
 
 ```ts
 function persistKeyed<T>(atomStore: IAtomStore, def: IWritableAtomDefinition<T>, id: string, options: IPersistKeyedOptions<T>): IPersistKeyedHandle<T>;
-function clearFamily(storage: IPersistKeyValueStore, namespace: string): Promise<number>;
+function clearFamily(storage: IKeyValueStore, namespace: string): Promise<number>;
 
 type IPersistKeyedOptions<T> = {
   namespace: string; // 必填——storage key 格式 `${namespace}:${id}`
-  storage: IPersistKeyValueStore;
-  codec?: IPersistCodec;
+  storage: IKeyValueStore;
+  codec?: ICodec;
   version?: number;
   debounceMs?: number;
   partialize?: (value: T) => Partial<T>;
@@ -248,7 +248,9 @@ async function logout(userId: string) {
 
 ## 7. 与 storage-web 的 codec 集成
 
-`storage: IPersistKeyValueStore` 就是 storage-web 的 `IKeyValueStore`（或带 `getBytes`/`setBytes` 的 `IRecordStore`）——不需要任何适配层，直接传 `memoryStorage()`/`localStorage()`/`indexedDb()` 的返回值。
+`storage` 需要 storage-web 的 `capabilities`、`get`、`set`、`remove`、`keys`；直接传
+`memoryStorage()`、`localStorage()` 或 `indexedDb()` 的返回值即可。binary codec 另需
+`getBytes`/`setBytes`。
 
 `codec` 默认是本包自带的 `defaultJsonCodec`（`output: 'text'`，结构等价于 storage-web 的 `jsonCodec`，本包不 import 它的具体值，只按结构复刻，避免多一条运行时依赖）。这个默认 codec 额外处理了 `JSON.stringify` 原生不支持的两种形状：
 
@@ -257,23 +259,28 @@ async function logout(userId: string) {
 
 这不是可选的锦上添花——`JSON.stringify(new Map(...))` 产出 `"{}"`，**静默丢光内容而不报错**，`persistCollection()` 接的 `ObservableMap`/`ObservableSet` 的 `snapshot()` 就是真实的 `Map`/`Set` 实例，不处理这个坑会导致 keyed/indexed 场景下的 Map/Set 数据悄悄消失。
 
-传自定义 codec（比如要走 IndexedDB 的结构化直存、二进制压缩）：
+传 binary codec 时，后端必须具备字节通道：
 
 ```ts
-import { structuredCodec, selectCodec } from '@migaia/storage-web';
+import { binaryCodec } from '@migaia/storage-web';
 
 const handle = persistCollection(bigDataset, {
   key: 'big',
   storage: indexedDb({ dbName: 'app' }),
-  codec: structuredCodec // Map/Set/Date/Blob 原生存，不经过 JSON 往返
+  codec: binaryCodec
 });
 ```
 
-`codec.output === 'structured'` 要求后端 `capabilities.records === true`（IndexedDB 满足，localStorage/cookie 不满足）；`output === 'binary'` 遇到不支持字节通道的后端会抛错（本包目前不做自动 base64 降级，需要降级请用 storage-web 自己的 `selectCodec()` 包一层再传进来）。
+本包的最小 storage 协议不含 record 通道，`structured` codec 会以 `CODEC_OUTPUT_MISMATCH` 失败；`binary` 在缺 `getBytes`/`setBytes` 时以 `BACKEND_CAPABILITY` 失败。不会自动 base64 降级。
 
 ---
 
 ## 8. 错误参考
+
+所有包边界错误都带 `source: '@migaia/store-persist'` 与稳定 `code`。重点检查
+`ENVELOPE_INVALID`、`ENCODE_FAILED`、`BACKEND_CAPABILITY`、`CODEC_OUTPUT_MISMATCH` 和
+`ABORTED_BY_DISPOSE`；后者保留原生 `AbortError`。hydrate/write 同时失败时，`AggregateError.errors`
+保留两个原因。
 
 | 触发条件 | 错误类型 | 说明 |
 | --- | --- | --- |
@@ -343,3 +350,7 @@ async function logout(userId: string, activeHandle: { dispose(): void }) {
 
 **Q: `clearFamily()` 之后，页面上还显示着旧数据？**
 `clearFamily()` 只删 storage，不清内存——见 [§4](#4-persistkeyed--clearfamily-完整参考store-keyed)，需要调用方自己 `dispose()` 还持有的 handle。
+
+## 构建、测试与排查
+
+仓库根目录：`pnpm --filter @migaia/store-persist fmt` → `lint` → `typecheck` → `typecheck:test` → `test` → `build`。hydrate 失败检查 `handle.ready`/`hydrationError`；写入失败检查 `writeError`，并确认 codec output 与后端能力匹配。

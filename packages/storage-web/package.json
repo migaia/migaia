@@ -40,7 +40,8 @@
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
   "dependencies": {
-    "@migaia/storage-contract": "workspace:^"
+    "@migaia/storage-contract": "workspace:^",
+    "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
     "@migaia/web-rpc": "workspace:^",

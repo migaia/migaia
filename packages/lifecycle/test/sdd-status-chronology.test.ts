@@ -390,6 +390,11 @@ describe('cross-SDD status chronology', () => {
       'docs/resource/admission-boundary.sdd.md',
       'docs/capability/',
       'docs/capability/admission-boundary.sdd.md',
+      'docs/capability/capability-graph.sdd.md',
+      'docs/capability/capability-graph-readiness.sdd.md',
+      'docs/capability/capability-graph-notification.sdd.md',
+      'docs/capability/capability-graph-dynamic.sdd.md',
+      'docs/capability/capability-graph-cross-realm.sdd.md',
       'docs/reactive/',
       'docs/reactive/reactive.sdd.md',
       'docs/serialize/',
@@ -399,7 +404,10 @@ describe('cross-SDD status chronology', () => {
       'docs/plugin-host/',
       'docs/plugin-host/runtime-neutral-foundation.sdd.md',
       'docs/logger/',
-      'docs/logger/logger-lifecycle-and-reliability.sdd.md'
+      'docs/logger/logger-lifecycle-and-reliability.sdd.md',
+      'docs/tray/',
+      'docs/tray/tray.sdd.md',
+      'docs/tray/tray-domain-adapters.sdd.md'
     ]);
   });
 });

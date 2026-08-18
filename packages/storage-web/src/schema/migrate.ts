@@ -3,18 +3,14 @@ import {
   StorageContractErrorCode,
   isStorageContractError
 } from '@migaia/storage-contract';
+import { raceWithAbort, UtilsAbortError } from '@migaia/utils/promise';
+import { UtilsErrorCode } from '@migaia/utils/error';
 import {
   createStorageOperationRuntime,
   type IStorageOperationRuntime
 } from '../core/operation-reporter.js';
 import { StorageError, StorageErrorCode } from '../types/errors.js';
-import {
-  assertOperationContext,
-  readAbortReason,
-  subscribeToAbort,
-  throwIfAborted,
-  type IWebAbortSignal
-} from '../core/operation.js';
+import { assertOperationContext, throwIfAborted, type IWebAbortSignal } from '../core/operation.js';
 
 export type IMigrationContext = {
   readonly fromVersion: number;
@@ -55,6 +51,7 @@ export const runMigrationsWithRuntime = async (
   migrations: Record<number, IMigration> | undefined,
   signal?: IWebAbortSignal
 ): Promise<unknown> => {
+  void runtime;
   if (!Number.isSafeInteger(fromVersion) || fromVersion < 0)
     throw new StorageError(StorageErrorCode.invalidConfig, {
       cause: new RangeError('migration fromVersion must be a non-negative safe integer')
@@ -98,27 +95,23 @@ export const runMigrationsWithRuntime = async (
         current = await result;
         continue;
       }
-      /** Owns the shared race-safe abort subscription until this migration settles. */
-      let disposeAbort = (): void => {};
-      const aborted = new Promise<never>((_, reject) => {
-        disposeAbort = subscribeToAbort(
-          signal,
-          () => {
-            reject(
-              new StorageContractError(StorageContractErrorCode.aborted, {
-                cause: readAbortReason(signal)
-              })
-            );
-          },
-          runtime.reporter
-        );
+      current = await raceWithAbort(() => result, {
+        signal,
+        cleanupPolicy: 'report',
+        report: (cause) => runtime.reporter(cause)
       });
-      try {
-        current = await Promise.race([result, aborted]);
-      } finally {
-        disposeAbort();
-      }
     } catch (cause) {
+      if (cause instanceof UtilsAbortError)
+        throw new StorageContractError(StorageContractErrorCode.aborted, {
+          cause: cause.cause
+        });
+      if (
+        cause &&
+        typeof cause === 'object' &&
+        'code' in cause &&
+        cause.code === UtilsErrorCode.invalidArgument
+      )
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause });
       if (isStorageContractError(cause)) throw cause;
       if (cause instanceof StorageError && cause.code === StorageErrorCode.invalidConfig)
         throw cause;

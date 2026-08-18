@@ -71,15 +71,14 @@ const chunk = await collectStream(stream); // 只在确实需要完整 blob 时�
 | **Context（上下文）** | 每次 encode/decode 拿到的 `{ signal, source }` | 请求上下文 |
 | **SerializeError** | 带 `type`/`phase`/`source`/`chunkIndex`/`bytesConsumed` 的定位型异常 | 带堆栈定位信息的协议错误 |
 
-## 6. 模块能力一览
+## 6. 公开入口与模块能力
 
-| 模块 | 提供什么 |
+| 入口 | 提供什么 |
 | --- | --- |
-| **registry**（`createSerializeRegistry`） | 多 parser 注册、按 `type` 编解码、`chunkToText`/`chunkToBytes` 归一化辅助函数 |
-| **stream**（`encodeStream`/`decodeStream`/`sliceByFrameBudget`/`collectStream`） | 大数据的自适应分帧切片、不落地整块结果的流式编解码 |
-| **base64**（`bytesToBase64`/`base64ToBytes`/`streamBase64Chunks`） | 字节 ↔ 文本通道转换，内部分块避免大数据一次性占满内存 |
-| **plugins/json**（`jsonPlugin`/`jsonParser`） | 默认 JSON 编解码器，支持 `replacer`/`reviver`/`space` |
-| **types**（`ISerializeChunk` 等类型 + `SERIALIZE_TYPE_PATTERN`） | 协议的公开类型定义与插件类型名合法性校验 |
+| `@migaia/serialize` | 完整公共表面：core、JSON plugin、registry、stream、Base64 和格式常量。日常使用从这里导入。 |
+| `@migaia/serialize/core` | chunk/codec/parser contract、错误工具、stream 和 Base64；不导出 lifecycle 依赖的 registry。 |
+| `@migaia/serialize/plugins` | `jsonPlugin`、`jsonParser` 及 JSON 配置类型。 |
+| `@migaia/serialize/registry` | registry 实现面：`createSerializeRegistry`、`chunkToText`、`chunkToBytes` 与 registry 专属类型。 |
 
 ## 7. 安装
 
@@ -89,7 +88,7 @@ pnpm add @migaia/serialize
 
 依赖 `@migaia/web-rpc`（仅用到其结构化的 `IWebRpcAbortSignal` 类型，不引入 DOM/浏览器绑定）；不依赖 Store、Worker、WASM，二进制走文本通道用到的是运行时内建的 `btoa`/`atob`/`TextEncoder`/`TextDecoder`。
 
-## 8. 注意事项（最容易踩的坑）
+## 8. 生命周期、错误与边界
 
 1. **`value` 分段不能和其他分段混用**。一次 `encode()` 的输出如果包含 `['value', ...]`，它必须是唯一的一段——和 `text`/`bytes` 段混在一起会抛 `SerializeError`，因为 value 已经是成品对象，没有可拼接的语义。
 2. **`chunkToText`/`chunkToBytes` 对 `value` 段会抛 `TypeError`**，它们只处理 `text`/`bytes` 两种线材形态。

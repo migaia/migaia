@@ -1,4 +1,5 @@
 import { StoreReactErrorCode, type IStoreReactErrorCode } from './error-code.js';
+import { attachErrorIdentity } from '@migaia/utils/error';
 
 export { StoreReactErrorCode, type IStoreReactErrorCode };
 
@@ -6,9 +7,7 @@ export { StoreReactErrorCode, type IStoreReactErrorCode };
 export const STORE_REACT_SOURCE = '@migaia/store-react';
 
 function tagStoreReactError<E extends Error>(error: E, code: IStoreReactErrorCode): E {
-  Object.defineProperty(error, 'source', { value: STORE_REACT_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
-  return error;
+  return attachErrorIdentity(error, { source: STORE_REACT_SOURCE, code });
 }
 
 /** Builds a `(source, code)`-tagged `Error` without touching `stack`. */

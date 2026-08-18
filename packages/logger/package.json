@@ -8,7 +8,9 @@
     "directory": "packages/logger"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "USEGUIDE.md"
   ],
   "type": "module",
   "exports": {
@@ -39,6 +41,7 @@
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
   "dependencies": {
+    "@migaia/utils": "workspace:^",
     "@migaia/lifecycle": "workspace:^",
     "@migaia/plugin-host": "workspace:^",
     "ansis": "4.3.1"

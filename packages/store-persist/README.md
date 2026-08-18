@@ -14,7 +14,9 @@ Store 本身只管内存里的响应式状态，重启就没了。要让状态"�
 
 三个函数底下共用同一个核心引擎（`persistUnit()`）——hydrate、防抖写回、dispose 清理只实现一遍，各自只是把自己的原生 API 适配成核心引擎认的最小接口。
 
-存储后端直接对接 `@migaia/storage-web`：本包不做通用存储抽象，直接消费 `storage-web` 的 `IKeyValueStore` 与 `ICodec`/`selectCodec`——IndexedDB 的结构化直存、二进制自动降级这些能力都直接可用，不需要中间适配层。
+存储后端直接对接 `@migaia/storage-web`：本包要求具备 `capabilities`、`get`、`set`、`remove`、`keys`
+的键值存储能力，并接受 `ICodec`。默认 text codec 支持 Map/Set；binary codec 还要求
+`getBytes`/`setBytes`。本包的最小 storage 投影不支持 `structured` codec。
 
 ## 2. 适合什么场景
 
@@ -31,7 +33,7 @@ Store 本身只管内存里的响应式状态，重启就没了。要让状态"�
 ## 3. 用了之后能得到什么
 
 - **三种 store 形状统一心智**：不管是扁平 store、集合还是按 key 动态生成的状态，读写时机、防抖、dispose 语义完全一致——学一遍，三条路径都会用。
-- **真正用上 storage-web 的能力**：IndexedDB 的结构化直存（`structured` codec，Map/Set/Date/Blob 不用先序列化）、二进制自动 base64 降级、能力感知路由，全部直接可用，不是被压扁成"只会存字符串"。
+- **能力显式匹配**：默认 text codec 可安全往返 Map/Set；binary codec 只在后端提供字节通道时可用，`structured` codec 不属于本包的 storage 协议。
 - **局部字段持久化**：`partialize`/`merge` 让你只持久化状态里的一部分（比如 OAuth session 只存 refreshToken），其余字段保留在内存里。
 - **默认 codec 认得 Map/Set**：不用自己处理"`JSON.stringify(Map)` 静默丢数据"这种坑。
 - **版本迁移是显式的、不迁移就报错**：存档版本和当前 `version` 不一致又没提供 `migrate()`，直接失败，不会用未迁移的旧数据冒充新版本。
@@ -77,7 +79,7 @@ handle.dispose(); // 停止订阅
 | `light` | `persist()`——`@migaia/store-light` 适配层 |
 | `indexed` | `persistCollection()`——`@migaia/store-indexed` 四种集合适配层 |
 | `keyed` | `persistKeyed()` + `clearFamily()`——`@migaia/store-keyed` 动态编排 + 批量清空 |
-| `storage` | 对接 `@migaia/storage-web` 的 `ICodec`/`selectCodec`，含默认 JSON codec |
+| `storage` | 对接 `@migaia/storage-web` 的 `ICodec`，含默认 JSON codec |
 
 ## 7. 核心概念一览
 
@@ -90,14 +92,18 @@ handle.dispose(); // 停止订阅
 | **`partialize`/`merge`** | 只持久化状态的一部分（写）+ 把持久化的子集合并回完整状态（读），两者要配对提供 |
 | **`namespace`（仅 keyed）** | `persistKeyed()` 必填字段，storage key 格式 `${namespace}:${id}`，`clearFamily()` 靠它过滤 |
 
-## 8. 注意事项（最容易踩的坑）
+## 8. 生命周期、错误与资源边界
 
 1. **`version` 不匹配又没给 `migrate()` 会让 hydrate 直接失败**（`handle.ready` reject），内存状态保持不变——有意设计，不会用未迁移的旧数据冒充新版本。
-2. **默认 `merge` 是"整份替换"，不是"逐字段合并"**——只有你显式收窄了 `partialize`（只持久化子集），才需要显式提供匹配的 `merge`，否则未持久化的字段会被"替换"丢掉（`persist()` 是例外，见 USEGUIDE 的 hydrate 语义）。
+2. **默认 `merge` 只对 plain object 做启动快照三向合并**：hydrate 期间本地改过的字段优先；数组/Map/Set 等形状整体采用持久化值。收窄 `partialize` 或需要深层语义时，提供匹配的 `merge`。
 3. **`persistKeyed()` 的 `namespace` 是必填的**，不是可选项——它同时决定 storage key 格式和 `clearFamily()` 的过滤前缀。
 4. **`clearFamily()` 不会清理内存里已经实例化的 `AtomStore` 状态**——它只删 storage，调用方仍持有的 `persistKeyed()` handle 需要自己 `dispose()`。
 5. **`storage` 是必填项**（不像旧版本默认 `memoryStorage()`）——三个函数都要求显式传入 storage-web 的 store，避免"忘了传等于没生效"这种误用。
 6. **敏感数据不要无加密直接写 localStorage**——本包不提供加密，需要的话自己实现一个 `ICodec` 传给 `codec` 选项。
+
+`dispose()` 取消订阅、计时器和在途 I/O；随后 `flush()`/`clear()` 以原生 `AbortError`（
+`source: '@migaia/store-persist'`、`code: 'ABORTED_BY_DISPOSE'`）失败。hydrate/write 错误通过
+handle 状态与 Promise 暴露；双重失败为保留两个原因的 `AggregateError`。
 
 ## 9. 深入参考
 

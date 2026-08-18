@@ -14,6 +14,7 @@
 8. [错误一览表](#8-错误一览表)
 9. [生产环境完整示例](#9-生产环境完整示例)
 10. [常见问题排查](#10-常见问题排查)
+11. [构建、格式化与测试](#11-构建格式化与测试)
 
 ---
 
@@ -306,3 +307,18 @@ setInterval(() => {
 
 **Q：能不能用这个包存对象、字符串这些复杂数据？**
 不能。它只支持定长的 `int32` 布局，这是刻意的设计边界——`SharedArrayBuffer` 本身就是定长的原始内存，塞对象图需要自己实现序列化协议，超出了这个包的职责范围。
+
+## 11. 构建、格式化与测试
+
+在仓库根目录运行：
+
+```bash
+pnpm --filter @migaia/store-shared fmt
+pnpm --filter @migaia/store-shared lint
+pnpm --filter @migaia/store-shared typecheck
+pnpm --filter @migaia/store-shared typecheck:test
+pnpm --filter @migaia/store-shared test
+pnpm --filter @migaia/store-shared build
+```
+
+测试覆盖 seqlock 一致读、跨 Runtime 同步、`watch()` 生命周期、数组稀疏同步与错误码。

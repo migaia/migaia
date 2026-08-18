@@ -7,9 +7,7 @@ export const STORE_WORKER_SOURCE = '@migaia/store-worker';
 
 /** Attaches `(source, code)` onto an existing error object without touching its type or stack. */
 function tagStoreWorkerError<E extends Error>(error: E, code: IStoreWorkerErrorCode): E {
-  Object.defineProperty(error, 'source', { value: STORE_WORKER_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
-  return error;
+  return attachErrorIdentity(error, { source: STORE_WORKER_SOURCE, code });
 }
 
 /** Builds a `(source, code)`-tagged `Error` without touching `stack`. */
@@ -33,3 +31,4 @@ export function createStoreWorkerAggregateError(
 ): AggregateError {
   return tagStoreWorkerError(new AggregateError(errors, message), code);
 }
+import { attachErrorIdentity } from '@migaia/utils/error';

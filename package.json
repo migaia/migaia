@@ -5,6 +5,7 @@
     "fmt": "pnpm -r --if-present run fmt",
     "build": "pnpm -r run build",
     "typecheck": "pnpm -r run typecheck",
+    "typecheck:test": "pnpm -r --if-present run typecheck:test",
     "typecheck:consumers": "bun scripts/typecheck-consumers.ts",
     "test": "pnpm run build && pnpm -r run test",
     "lint": "pnpm -r --if-present run lint",

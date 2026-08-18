@@ -13,6 +13,7 @@
 7. [注意事项详解](#7-注意事项详解)
 8. [贴近生产的完整示例](#8-贴近生产的完整示例)
 9. [常见问题排查](#9-常见问题排查)
+10. [构建、格式化与测试](#10-构建格式化与测试)
 
 ## 1. 核心概念详解
 
@@ -504,3 +505,20 @@ A: 检查 `config.features.experimental` 里对应 key 的值是否严格是布�
 
 **Q: SSR 场景下每个请求要一份独立状态，`StoreProvider` 够用吗？**
 A: `StoreProvider` 是给单次渲染树用的；多请求隔离通常直接用 `createStoreRegistry(createRuntime())` 手动为每个请求建一份 Registry，渲染时通过 `registry` prop 传给 `StoreProvider`（此时 `disposeOnUnmount` 默认为 `false`，请求处理完毕后自己调用 `registry.disposeAsync()`）。具体的 SSR 集成方式请参考 `@migaia/store-ssr` 的文档。
+
+## 10. 构建、格式化与测试
+
+在仓库根目录运行：
+
+```bash
+pnpm --filter @migaia/store-react fmt
+pnpm --filter @migaia/store-react lint
+pnpm --filter @migaia/store-react typecheck
+pnpm --filter @migaia/store-react typecheck:test
+pnpm --filter @migaia/store-react test
+pnpm --filter @migaia/store-react typecheck:e2e
+pnpm --filter @migaia/store-react test:e2e
+pnpm --filter @migaia/store-react build
+```
+
+`test` 覆盖 hook、Provider、Registry 与错误边界；`test:e2e` 用 Playwright 验证真实 React 挂载路径。运行后者前需有 Playwright 浏览器。

@@ -47,7 +47,7 @@ import { createRuntime } from '@migaia/reactive';
 import { createStore } from '@migaia/store-light';
 import { createSSRRequestScope, createSSRStateScript } from '@migaia/store-ssr';
 
-function renderPage(): string {
+async function renderPage(): Promise<string> {
   const scope = createSSRRequestScope(); // 内部自带一个隔离 Runtime
   const app = createStore({ count: 1 }, { runtime: scope.runtime });
   scope.register('app', app);

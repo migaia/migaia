@@ -19,6 +19,7 @@
     "test": "vitest run test"
   },
   "dependencies": {
+    "@migaia/utils": "workspace:^",
     "@migaia/reactive": "workspace:^",
     "@migaia/resource": "workspace:^",
     "@migaia/serialize": "workspace:^"

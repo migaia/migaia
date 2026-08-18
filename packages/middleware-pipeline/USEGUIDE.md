@@ -1,52 +1,88 @@
 # `@migaia/middleware-pipeline` 使用指南
 
-## 1. sync
+本包执行一条已确定的 middleware 链。它不注册 stage、不拥有资源，也不创建后台队列；这些属于宿主。先看 [README](./README.md) 选择 sync、async 或 generator 模型。
+
+## 目录
+
+- [一次请求转换工作流](#request-workflow)
+- [API 与配置参考](#api-reference)
+- [执行、错误与生命周期边界](#execution-errors)
+- [排查与构建门禁](#troubleshooting-build)
+
+<a id="request-workflow"></a>
+
+## 一次请求转换工作流
 
 ```ts
-runSyncMiddleware(stages, value, done, onViolation);
+import {
+  MiddlewarePipelineViolation,
+  runAsyncMiddleware,
+  type IAsyncMiddlewareStage
+} from '@migaia/middleware-pipeline';
+
+type IRequest = { readonly path: string; readonly trace: readonly string[] };
+
+const stages: readonly IAsyncMiddlewareStage<IRequest>[] = [
+  async (request, next) => {
+    await next({ ...request, trace: [...request.trace, 'auth'] });
+  },
+  async (request, next) => {
+    if (request.path === '/health') return;
+    await next({ ...request, trace: [...request.trace, 'route'] });
+  }
+];
+
+await runAsyncMiddleware(
+  stages,
+  { path: '/users', trace: [] },
+  (request) => console.log(request.trace),
+  {
+    onViolation: (kind) => {
+      if (kind === MiddlewarePipelineViolation.duplicate) console.warn('next called twice');
+    }
+  }
+);
 ```
 
-sync stage 的 `next()` 只记录下一阶段输入。下游 stage 会在当前 stage 返回后执行，因此调用 `next()` 后没有下游返回值可等待。
+Async `next()` starts downstream immediately and returns its Promise. `await next()` produces onion-style post-processing. Stage array is snapshotted before execution, so later caller mutation cannot change an in-flight run.
 
-不调用 `next()` 会短路整条链；重复调用会触发 `duplicate`，stage 返回后调用会触发 `late`。具体如何记录或抛错由调用方提供 `onViolation`。
+<a id="api-reference"></a>
 
-## 2. async
+## API 与配置参考
 
-```ts
-await runAsyncMiddleware(stages, value, done, {
-  onViolation,
-  assertActive,
-  combineStageAndDownstreamError
-});
+All exports come from root `@migaia/middleware-pipeline`; manifest defines no subpaths.
+
+| API | Contract |
+| --- | --- |
+| `runSyncMiddleware(stages, value, done, onViolation)` | Each stage must call `next` before return to continue. First call wins; absent call short-circuits and skips `done`. |
+| `runAsyncMiddleware(stages, value, done, options)` | `options.onViolation` required; optional `assertActive` runs at stage boundaries; optional `combineStageAndDownstreamError` owns simultaneous stage/downstream error construction. |
+| `runGeneratorMiddleware(stages, value, done, signals?)` | Each generator returns next value, `GENERATOR_CONTINUE`, `GENERATOR_HALT`, `GENERATOR_UNDEFINED`, or implicit `undefined`. Continue uses last yield. |
+| `adaptSyncStageToAsync(stage, onViolation?)` | Bridges already synchronous stage; its `next` remains return-time-only. |
+| `adaptSyncStageToGenerator(stage, onViolation)` | Bridges one synchronous `next` into one yield; missing `next` becomes halt. |
+| `MiddlewarePipelineMode` / stage types | Stable mode values and `ISyncMiddlewareStage`, `IAsyncMiddlewareStage`, `IGeneratorMiddlewareStage`. |
+| `MiddlewarePipelineViolation` | Stable `late` and `duplicate` signals. Runner reports; caller decides policy. |
+| Generator signals | `GENERATOR_CONTINUE`, `GENERATOR_HALT`, `GENERATOR_UNDEFINED`, and `MiddlewarePipelineGeneratorSignals` / `IGeneratorMiddlewareSignals`. |
+| Error contract | `MIDDLEWARE_PIPELINE_SOURCE`, `MiddlewarePipelineErrorCode`, `IMiddlewarePipelineErrorCode`; default dual failure is `EXECUTION_FAILED`. |
+
+<a id="execution-errors"></a>
+
+## 执行、错误与生命周期边界
+
+Sync is not onion middleware: `next(value)` records next input, then next stage starts after current stage returns. Async is onion middleware: downstream begins at `next`, and caller may await it. Generator stages may yield many values, but `GENERATOR_CONTINUE` forwards only final yielded value. Ordinary `undefined` return halts; use `GENERATOR_UNDEFINED` to forward undefined deliberately.
+
+Calling `next` twice emits `duplicate`; calling captured `next` after stage returns emits `late`. Neither changes first accepted input. For async execution, exactly one ordinary failure is rethrown as original value. If current stage and started downstream both fail, optional combiner receives `(stageError, downstreamError)`; otherwise native `AggregateError` has `source: '@migaia/middleware-pipeline'`, code `EXECUTION_FAILED`, and both errors in `errors`. `assertActive` failure is runner control flow, not a second ordinary failure.
+
+Every call is isolated: no `dispose`, `close`, `drain`, cancellation, registration, or shared state exists here. Host owning stages or concurrent runs must provide lifecycle/admission semantics separately, commonly with `@migaia/lifecycle`.
+
+<a id="troubleshooting-build"></a>
+
+## 排查与构建门禁
+
+- `done` not called: stage omitted `next`, or generator returned halt/implicit undefined.
+- Duplicate diagnostic: stage called `next` more than once; retain one branch and await/return it in async code.
+- Late diagnostic: stage saved `next` for callback after return; use host-owned queue/lifecycle instead of reopening completed run.
+- Need fan-out rather than value flow: use `@migaia/event-subscriber`.
+
+```bash
+pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
-
-async stage 的 `next()` 返回 Promise。`await next(value)` 会等待完整下游链，因此可以执行后置逻辑。
-
-`assertActive` 由宿主提供，用于在进入 stage 和下游完成后检查 host 是否仍然有效。执行器不认识 lifecycle 或 plugin-host 状态。
-
-如果当前 stage 和下游同时失败，执行器调用 `combineStageAndDownstreamError(stageError, downstreamError)`，参数顺序固定为 `[stageError, downstreamError]`，即使两个 rejection value/identity 相同。plugin-host 在此处创建带 `PIPELINE_FAILED` 的错误；独立消费者使用默认 `AggregateError`，并获得 `@migaia/middleware-pipeline + EXECUTION_FAILED` 契约。只失败一个 channel 时抛出 exact value；`next()` 返回原生 Promise，不追踪消费、constructor、species 或 Promise lineage，组合器返回 `undefined`/`null` 时也原样抛出。
-
-下游 stage 入口或成功但未调用 `next()` 后，`assertActive` 是 runner-owned control path。上游以 `await next()` 或 `return next()` 传播该 exact active error，不生成重复双失败 slots；普通同一 identity 双失败仍按上面的组合规则处理。plugin-host 的 `PIPELINE_FAILED` 组合器只处理普通双失败，不处理该 control path。
-
-## 3. generator
-
-```ts
-runGeneratorMiddleware(stages, value, done);
-```
-
-- 普通 return value：作为下一 stage 输入。
-- `GENERATOR_CONTINUE`：使用最后一次 yield 的值继续。
-- `GENERATOR_HALT`：终止整条链且不调用 done。
-- `GENERATOR_UNDEFINED`：显式传递 undefined。
-
-generator stage 可以多次 yield，但只有最后一次 yield 参与 `GENERATOR_CONTINUE`。
-
-## 4. 生命周期边界
-
-执行器不创建后台任务，不保存跨调用资源，也不提供 `close()`/`drain()`。plugin-host 负责 stage registration 的 disposer 和运行期间的深度门禁。
-
-如果系统需要有界队列、并发槽位、超时、取消 in-flight 或 drain，应设计独立的 dispatcher，并使用 lifecycle 的 scope、pending tracker 和 deadline 语义；不要把这些能力添加到本包。
-
-## 5. tree-shaking
-
-所有执行器位于同一 ESM 入口且没有顶层副作用。消费方只 import 所需函数；构建级测试会打包一个 sync-only 入口，并断言 generator sentinel 与 async 双失败路径不进入产物。只有未来出现无法被 bundler 消除的跨模式依赖时，才考虑增加 `/sync`、`/async`、`/generator` 子路径，当前不为形式上的拆包增加公开入口。

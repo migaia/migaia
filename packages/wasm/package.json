@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "files": ["src", "rust"],
+  "files": ["src", "rust", "README.md", "USEGUIDE.md"],
   "exports": {
     ".": {
       "types": "./src/wasm_provider.d.ts",

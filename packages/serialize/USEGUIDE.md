@@ -15,7 +15,7 @@
 9. [编写自定义 parser / plugin](#9-编写自定义-parser--plugin)
 10. [插件 type 的安全约束](#10-插件-type-的安全约束)
 11. [完整组合示例](#11-完整组合示例)
-12. [常见问题排查](#12-常见问题排查)
+12. [构建、测试与常见问题排查](#12-构建测试与常见问题排查)
 
 ---
 
@@ -450,7 +450,18 @@ registry.dispose();
 
 ---
 
-## 12. 常见问题排查
+## 12. 构建、测试与常见问题排查
+
+在仓库根目录运行以下包级门禁。`serialize` 的 `test` 脚本直接运行 Vitest；构建需单独运行。
+
+```bash
+pnpm --filter @migaia/serialize fmt
+pnpm --filter @migaia/serialize lint
+pnpm --filter @migaia/serialize typecheck
+pnpm --filter @migaia/serialize typecheck:test
+pnpm --filter @migaia/serialize build
+pnpm --filter @migaia/serialize test
+```
 
 **Q：`encode()` 抛了 "a value chunk cannot be combined with other chunks"。**
 你的自定义 parser 在一次 `encode()` 里既产出了 `['value', ...]` 段，又产出了 `text`/`bytes` 段（或多个 `value` 段）。`value` 段的语义是"已经是成品对象，无需再编解码"，它必须是这次输出里唯一的一段，见 [§2.2](#22-parser-的输出可以是单段promise或流)。

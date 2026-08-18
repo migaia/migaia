@@ -73,7 +73,7 @@ await capabilities.dispose(); // 整个 host 收尾，之后不可再用
 | **Capability（能力）** | 用 `register()` 登记的一个可选功能定义：`{ name, activate(context) }` |
 | **Flag（开关）** | host 内部的允许表，决定某个能力当前能不能被 `enable()` |
 | **Handle** | `activate()` 返回的对象，唯一约束是必须有 `dispose()` |
-| **State（状态）** | `off` / `blocked` / `activating` / `on` / `failed` 五态之一 |
+| **State（状态）** | `off` / `gated` / `activating` / `on` / `failed` 五态之一 |
 | **Generation（激活代数）** | 每次开关变化或回退时递增的计数器，用来识别并丢弃"已经作废"的激活结果 |
 
 ## 7. API 一览

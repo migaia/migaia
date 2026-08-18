@@ -96,13 +96,21 @@ await host.dispose();
 | `host.useGeneratorPipeline(stage)` | `stage: (value) => Generator`                   | 同步      | 注册处理管线阶段（generator mode）                 |
 | `PluginHost.setLocale(locale)`     | `locale: 'en' \| 'zh'`                          | 同步      | 切换内置错误文案的语言                             |
 
-## 7. 支持环境
+## 7. 安装与公开入口
+
+```bash
+pnpm add @migaia/plugin-host
+```
+
+包只公开根入口 `@migaia/plugin-host`：`PluginHost`、插件/配置/pipeline 类型、`PluginHostStatus` 与 `PluginHostErrorCode`、pipeline 适配器和 dispose symbol 均从这里导入。没有稳定的深层子路径；不要依赖 `src`/`dist` 内部文件。
+
+## 8. 支持环境
 
 - Chrome 85+ / Edge 85+ / Firefox 79+ / Opera 71+ / Safari 14+
 - Node、Bun、Deno、Worker、小程序、Electron 主/渲染进程
 - 产物基线 ES2020，需要 `Promise`、`Map`、`Symbol`、`AggregateError`；`Symbol.dispose`/`Symbol.asyncDispose` 仅作为可用时的清理兜底，不强制要求 polyfill
 
-## 8. 注意事项（最容易踩的坑）
+## 9. 生命周期、错误与边界
 
 1. **构造函数只接受同步安装的插件**。`new Host({ plugins: [...] })` 里任何一个插件的 `install()` 返回 Promise 都会立即抛错；需要异步安装的插件要在宿主构造完成后用 `await host.use(plugin)`。
 2. **插件生命周期钩子内禁止调用当前宿主的 `use`/`unUse`/`config.update`/`dispose`**，这类调用会同步抛出 `LIFECYCLE_MUTATION`——插件的组合关系应该由应用层统一编排，不要在插件内部自己触发宿主变更。
@@ -111,7 +119,7 @@ await host.dispose();
 5. **`then` 不能作为 extension 方法名**（会被当成 thenable 处理，导致 `await host.use(...)` 的结果被错误地解包）；`catch`、`finally` 可以正常使用。
 6. **`unUse()` 之后 TypeScript 类型不会自动收窄**——已安装插件的类型记录只会随 `use()` 累加，这是当前实现的已知限制，见 USEGUIDE。
 
-## 9. 深入参考
+## 10. 深入参考
 
 插件对象/领域 core 完整字段参考、三种 pipeline 模型的精确执行顺序、配置系统的读写边界、shared 能力的依赖管理、生命周期与错误码完整表、`Symbol.dispose`/`Symbol.asyncDispose` 清理协议细节、以及更多贴近真实场景的组合示例，见 **[USEGUIDE.md](./USEGUIDE.md)**。
 

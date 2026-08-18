@@ -16,6 +16,19 @@ import {
   SSRRequestScope
 } from '../src';
 import type { ISSRStore, ISSRResource, ISSRState, ISSRDocument, ITrustedSSRState } from '../src';
+import { createStoreSsrRangeError, StoreSsrErrorCode } from '../src/errors.js';
+
+describe('SSR error identity boundary', () => {
+  it('preserves native error type while delegating source/code attachment', () => {
+    const error = createStoreSsrRangeError(StoreSsrErrorCode.invalidOption, 'invalid option');
+    expect(error).toBeInstanceOf(RangeError);
+    expect(error).toMatchObject({
+      source: '@migaia/store-ssr',
+      code: 'INVALID_OPTION'
+    });
+    expect(error.stack).toContain('invalid option');
+  });
+});
 
 describe('SSR request scope runtime input boundary', () => {
   it('contains revoked scope and registration options proxies', () => {

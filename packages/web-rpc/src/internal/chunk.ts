@@ -1,14 +1,10 @@
 import { createRuntimeTimer } from './async-control.js';
 import { tagWebRpcError, WebRpcErrorCode } from '../errors.js';
+import { utf8ByteLength as canonicalUtf8ByteLength } from '@migaia/utils/bytes';
 
 /** Measures encoded text in UTF-8 bytes. */
 export function utf8ByteLength(value: string): number {
-  let bytes = 0;
-  for (const character of value) {
-    const codePoint = character.codePointAt(0) ?? 0;
-    bytes += codePoint <= 0x7f ? 1 : codePoint <= 0x7ff ? 2 : codePoint <= 0xffff ? 3 : 4;
-  }
-  return bytes;
+  return canonicalUtf8ByteLength(value);
 }
 
 /** Splits text without cutting a Unicode code point or exceeding a byte budget. */

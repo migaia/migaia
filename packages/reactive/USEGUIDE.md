@@ -16,7 +16,7 @@
 10. [跨 Runtime 边界与所有权](#10-跨-runtime-边界与所有权)
 11. [扩展 API：面向 Store/框架适配层作者](#11-扩展-api面向-store框架适配层作者)
 12. [更贴近生产的完整示例](#12-更贴近生产的完整示例)
-13. [常见问题排查](#13-常见问题排查)
+13. [构建、测试与常见问题排查](#13-构建测试与常见问题排查)
 
 ---
 
@@ -387,7 +387,18 @@ scope.dispose(); // 按逆序释放 effect → results → query
 
 ---
 
-## 13. 常见问题排查
+## 13. 构建、测试与常见问题排查
+
+在仓库根目录运行以下包级门禁。`reactive` 的 `test` 脚本直接运行 Vitest；构建需单独运行。
+
+```bash
+pnpm --filter @migaia/reactive fmt
+pnpm --filter @migaia/reactive lint
+pnpm --filter @migaia/reactive typecheck
+pnpm --filter @migaia/reactive typecheck:test
+pnpm --filter @migaia/reactive build
+pnpm --filter @migaia/reactive test
+```
 
 **Q：`Effect` 明明依赖变了，但没有重新执行。**
 检查是否忘了调用 `runtime.flush()`（如果测试环境不会自动跑微任务），或者写入的值和旧值经 `Object.is` 判断相等（`Signal.value = 相同值`不会触发通知）。

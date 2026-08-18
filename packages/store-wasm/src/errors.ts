@@ -1,4 +1,5 @@
 import { StoreWasmErrorCode, type IStoreWasmErrorCode } from './error-code.js';
+import { attachErrorIdentity } from '@migaia/utils/error';
 
 export { StoreWasmErrorCode, type IStoreWasmErrorCode };
 
@@ -7,9 +8,7 @@ export const STORE_WASM_SOURCE = '@migaia/store-wasm';
 
 /** Attaches `(source, code)` onto an existing error object without touching its type or stack. */
 function tagStoreWasmError<E extends Error>(error: E, code: IStoreWasmErrorCode): E {
-  Object.defineProperty(error, 'source', { value: STORE_WASM_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
-  return error;
+  return attachErrorIdentity(error, { source: STORE_WASM_SOURCE, code });
 }
 
 /** Builds a `(source, code)`-tagged `Error` without touching `stack`. */

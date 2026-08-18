@@ -1497,7 +1497,7 @@ describe('fifth adversarial pass (R5)', () => {
         // hook is blocking on, so nothing outside a bounded wait can ever unblock it.
         dispose: async () => {
           await Promise.resolve();
-          await host.dispose();
+          await host.dispose().catch(() => undefined);
         }
       } as any);
 
@@ -1506,7 +1506,10 @@ describe('fifth adversarial pass (R5)', () => {
       // Chain catch() before finally(): finally() returns its own derived promise that re-rejects
       // with the same reason, so attaching it separately from catch() (rather than chaining) would
       // leave that derived promise's rejection with no handler of its own.
-      void dispose.catch(() => undefined).finally(() => (settled = true));
+      void dispose
+        .catch(() => undefined)
+        .finally(() => (settled = true))
+        .catch(() => undefined);
 
       expect(settled).toBe(false);
       // Advance far past any bounded wait a fix could plausibly use; a genuine deadlock stays
@@ -1541,7 +1544,7 @@ describe('fifth adversarial pass (R5)', () => {
           // #disposePromise as still unassigned and take an unrelated early-return path).
           core.onDispose(async () => {
             await Promise.resolve();
-            await host.dispose();
+            await host.dispose().catch(() => undefined);
           });
           return {};
         }
@@ -1552,7 +1555,10 @@ describe('fifth adversarial pass (R5)', () => {
       // Chain catch() before finally(): finally() returns its own derived promise that re-rejects
       // with the same reason, so attaching it separately from catch() (rather than chaining) would
       // leave that derived promise's rejection with no handler of its own.
-      void dispose.catch(() => undefined).finally(() => (settled = true));
+      void dispose
+        .catch(() => undefined)
+        .finally(() => (settled = true))
+        .catch(() => undefined);
 
       await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
       expect(settled).toBe(true);

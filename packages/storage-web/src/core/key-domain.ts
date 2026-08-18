@@ -1,4 +1,4 @@
-import { base64ToBytes, bytesToBase64 } from '../utils/base64.js';
+import { base64ToBytes, bytesToBase64 } from '@migaia/utils/bytes';
 import {
   KEY_DOMAIN_LIMITS,
   StorageContractError,

@@ -24,7 +24,6 @@
 | 大对象里只关心某个字段，且要能单独订阅/单独写 | `focusDef`/`opticDef` 把嵌套字段投影成独立的可写定义，不用手写不可变更新样板代码 |
 | 数组按 key 拆成可独立订阅/独立写的元素 | `splitDef` 把 `T[]` 拆成"按 key 稳定"的逐项可写定义，重排数组时未变化的元素仍是同一个订阅目标 |
 | 测试里需要替换某个 atom 的实现 | `store.override(definition, replacement)` 运行期换路由，不用改被测代码引用的 token |
-| 需要一个通用的、带 TTL/LRU 的可释放对象缓存 | 子路径 `@migaia/store-keyed/reactive/family` 的 `createFamily`/`computedFamily`，与上面的 definition family 是两回事，见下文 |
 
 不适合的场景：如果整个应用只有一份全局状态、永远不需要多作用域隔离，直接用 `@migaia/reactive` 的 `Signal`/`Computed` 或更薄的 atom 库即可，不需要 definition/store 两层间接。
 
@@ -78,15 +77,14 @@ store.dispose(); // 释放这个作用域建出的全部实例
 
 ## 6. 模块一览
 
-主入口 `@migaia/store-keyed` 导出定义层、`AtomStore`、definition optics 和 definition family。另外两个模块刻意不从主入口导出，只能按子路径引入：
+主入口 `@migaia/store-keyed` 导出定义层、`AtomStore`、definition optics 和 definition family。只发布以下三个子路径；不要依赖未列出的 `src/` 内部文件：
 
 | 导入路径 | 提供什么 |
 | --- | --- |
 | `@migaia/store-keyed`（主入口） | `atomDef`/`atomDefFactory`/`derivedDef`/`writableDef`、`createAtomStore`/`defaultAtomStore`、`selectDef`/`opticDef`/`focusDef`/`splitDef`、`familyDef`/`derivedFamilyDef`，以及 optics 底层工具函数 |
 | `@migaia/store-keyed/reactive/atom` | "实例式" atom 的协议类型（`IReadableAtom`/`IWritableAtom`）与 `atomGetter`/`atomSetter` 构造器——只有类型与跨 Runtime 校验，本包不提供具体实现 |
-| `@migaia/store-keyed/reactive/family` | `createFamily`/`computedFamily`：与 key 无关的、直接管理**可释放值**（而不是定义）的通用缓存，带 TTL + LRU |
-
-按需从子路径引入 `atom/*`、`reactive/*` 下的具体文件也可以（如 `@migaia/store-keyed/atom/store`），`@migaia/store-react` 内部就是这样按需引入类型的。
+| `@migaia/store-keyed/atom/store` | `IAtomStore`、`createAtomStore`、`defaultAtomStore`；和主入口对应导出相同的 Store API |
+| `@migaia/store-keyed/atom/definition` | atom definition 类型与构造器；和主入口对应导出相同的 definition API |
 
 ## 7. 安装
 
@@ -96,7 +94,7 @@ pnpm add @migaia/store-keyed @migaia/reactive
 
 `@migaia/reactive` 是唯一的运行时依赖，`AtomStore` 必须绑定一个 `IRuntime`（`createRuntime()` 或 `defaultRuntime`）。
 
-## 8. 注意事项（最容易踩的坑）
+## 8. 生命周期、错误与边界
 
 1. **`store.get()` 会建立依赖边，`peek()`/`preview()` 不会**。在 React 适配层的 `getSnapshot` 之类"不该记进别人依赖集合"的地方，用 `peek`/`preview`，别用 `get`。
 2. **`store.set()` 只接受 primitive / primitive-factory / writable-derived**；对纯只读的 `derivedDef` 调用 `set()`（包括通过 override 间接指向只读定义）会抛 `TypeError`。
@@ -104,8 +102,13 @@ pnpm add @migaia/store-keyed @migaia/reactive
 4. **`atomDefFactory` 的 `create()` 默认不允许在 `store.preview()` 里执行**，需要显式用 `previewSafeAtomDefFactory` 并保证该函数纯、无副作用。
 5. **`splitDef(...).prune(store)` 只清理 splitDef 自己的 key→token 缓存**，不会释放 `AtomStore` 里已经实例化的对应节点——那部分需要自己 `store.release(itemDef)`，或者依赖整个 store 的 `dispose()`。
 6. **释放粒度是"整个 store"，不是"单个定义"**：`store.release(def)` 只摘掉一个实例，真正回收内存要么显式 release 每个用过的 key，要么在作用域结束时 `store.dispose()` 整个 store。
-7. **`familyDef`/`createFamily` 都需要宿主支持 `WeakRef` 和 `FinalizationRegistry`**，缺失时会在调用时直接抛出说明性错误（而不是静默降级）。
+7. **`familyDef` 需要宿主支持 `WeakRef` 和 `FinalizationRegistry`**，缺失时会在调用时直接抛出说明性错误（而不是静默降级）。
+
+`AtomStore.dispose()` 幂等，已释放 Store 不可复活；包边界错误携带
+`source: '@migaia/store-keyed'` 和稳定 `code`，例如 `ATOM_STORE_DISPOSED`、
+`CROSS_RUNTIME`、`OVERRIDE_CONTRACT`。清理多项失败时为 `AggregateError`，逐项原因保留在
+`errors`。
 
 ## 9. 深入参考
 
-完整的定义类型、`AtomStore` 每个方法的精确语义与副作用、optics/split/family 的边界行为、全部错误类型及触发条件、`reactive/atom`、`reactive/family` 两个子路径模块的完整参考，见 **[USEGUIDE.md](./USEGUIDE.md)**。
+完整的定义类型、`AtomStore` 每个方法的精确语义与副作用、optics/split/family 的边界行为、全部错误类型及触发条件、以及 `reactive/atom` 子路径参考，见 **[USEGUIDE.md](./USEGUIDE.md)**。

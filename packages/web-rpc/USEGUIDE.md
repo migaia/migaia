@@ -18,6 +18,7 @@
 12. [性能特征与内置限制](#12-性能特征与内置限制)
 13. [完整场景示例](#13-完整场景示例)
 14. [常见问题排查](#14-常见问题排查)
+15. [构建、格式化与测试](#15-构建格式化与测试)
 
 ---
 
@@ -757,3 +758,23 @@ await endpoint.send('receiver', 'uploadFile', { name: 'video.mp4', bytes: largeU
 ---
 
 如果本文没有回答你的问题，欢迎查看 `packages/web-rpc/src` 下对应模块的源码注释——每一处非显而易见的行为都在代码里留了说明该行为存在的原因。
+
+## 15. 构建、格式化与测试
+
+在仓库根目录运行：
+
+```bash
+pnpm --filter @migaia/web-rpc fmt
+pnpm --filter @migaia/web-rpc lint
+pnpm --filter @migaia/web-rpc typecheck
+pnpm --filter @migaia/web-rpc typecheck:core
+pnpm --filter @migaia/web-rpc typecheck:node-adapter
+pnpm --filter @migaia/web-rpc typecheck:test
+pnpm --filter @migaia/web-rpc test
+pnpm --filter @migaia/web-rpc typecheck:e2e
+pnpm --filter @migaia/web-rpc test:e2e
+pnpm --filter @migaia/web-rpc build
+pnpm --filter @migaia/web-rpc test:packed
+```
+
+`test` 覆盖 endpoint、middleware、错误链和适配器；`test:e2e` 验证浏览器/Worker/跨窗口传输；`test:packed` 在构建后检查 package export map。后两者需要 Playwright 浏览器与可构建环境。

@@ -93,15 +93,15 @@ userId.value = 2; // fetcher 里对 userId.value 的同步读取已被登记为�
 | **TTL / 过期** | 成功值的新鲜时长；过期后下一次读取会触发新请求（除非正在 pending） |
 | **Suspense 读取** | `read()`：成功返回值、pending 抛 Promise、失败抛错误；`peek()` 是它的非追踪版本 |
 
-## 6. 安装
+## 6. 安装与公开入口
 
 ```bash
 pnpm add @migaia/resource
 ```
 
-依赖 `@migaia/reactive`（`workspace:^`），需要与其配套版本一起使用。
+依赖 `@migaia/reactive`（`workspace:^`），需要与其配套版本一起使用。包只公开根入口 `@migaia/resource`：`Resource`、`ResourceStatus`、资源状态/配置/快照类型及 `ResourceErrorCode` 都从此处导入；没有稳定深层子路径。
 
-## 7. 注意事项（最容易踩的坑）
+## 7. 生命周期、错误与边界
 
 1. **依赖追踪只认"首次 `await` 之前的同步读取"**。`await` 之后再读响应式值不会被自动追踪，需要的话应该把这部分读取挪进一个 `Computed` 或在 `await` 之前先读入局部变量。
 2. **`fetcher` 必须把 `signal` 交给真正可取消的 I/O**（比如 `fetch(url, { signal })`），否则 `cancel()`/依赖变化引发的取消只是让 `Resource` 忽略这次结果，底层请求仍会跑完。

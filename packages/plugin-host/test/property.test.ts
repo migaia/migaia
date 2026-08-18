@@ -29,4 +29,11 @@ describe('PluginHost configuration properties', () => {
       })
     );
   });
+
+  it('delegates the shared path grammar while preserving the plugin-host mutable array boundary', () => {
+    const segments = parseConfigPath('plugin.records.[0].value');
+    expect(segments).toEqual(['plugin', 'records', '0', 'value']);
+    expect(Object.isFrozen(segments)).toBe(false);
+    expect(() => parseConfigPath('plugin.records.[0')).toThrow(/invalid/);
+  });
 });

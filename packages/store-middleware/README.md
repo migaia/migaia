@@ -88,13 +88,17 @@ await host.dispose();
 | `store-middleware-host.ts` | `StoreMiddlewareHost`、`bindStoreMiddleware()`、`middlewarePlugin()`、`loggerMiddleware()` |
 | `tolerant-clone.ts` | `ClonePolicy` 三个克隆函数，供自定义 `bindStoreMiddleware({ clone })` 或中间件内部使用 |
 
-## 8. 踩坑清单
+## 8. 生命周期、错误与边界
 
 1. **`actions-only` 只在 `createStore` 和 `bindStoreMiddleware` 共享同一个 `MutationPolicy` 实例时才生效**——各自 `createMutationPolicy()` 出两个实例互不知道对方，策略形同虚设。
 2. **`StoreMiddlewareHost` 的 pipeline 模式固定是 `sync`**，构造时传的 `pipeline.mode` 会被强制覆盖；中间件只能用 `core.usePipeline`，不能用 `useAsyncPipeline`/`useGeneratorPipeline`。
 3. **`bindStoreMiddleware()` 已经在监听 Runtime action trace**，不要再用 `host.runAction()` 包一层同一个 Store 方法，否则同一个 action 会被记录两次。
 4. **`getState()` 默认每次都做一次 `structuredClone`**——大状态树、高频事件下这是实打实的开销，需要时用 `options.clone` 换成 `ClonePolicy.opaque`/`ClonePolicy.diagnostic`。
 5. **中间件抛错不会中断业务写入**，会被吞掉并通过 Runtime 上报；但 `runAction()` 包裹的业务函数本身抛错仍会正常向外传播。
+
+`host.dispose()` 返回稳定 Promise，释放 binding 后不释放 Store 本身；多项 cleanup 失败以
+`AggregateError` 返回。包边界错误携带 `source: '@migaia/store-middleware'` 与稳定 `code`，
+包括 `ACTION_SCOPE_REQUIRED`、`CLONE_UNSUPPORTED` 和 `CLEANUP_FAILED`。
 
 更完整的 API 参考、写入策略的精确语义、DevTools 集成细节、错误处理边界，见 **[USEGUIDE.md](./USEGUIDE.md)**。
 
