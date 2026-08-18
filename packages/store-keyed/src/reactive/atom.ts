@@ -1,6 +1,7 @@
 import type { IDisposable, IRuntime } from '@migaia/reactive';
 import type { IAtomDefinition } from '../atom/definition.js';
 import { createStoreKeyedError, StoreKeyedErrorCode } from '../errors.js';
+import { StoreKeyedErrorText } from '../error-text.js';
 
 /**
  * Atom 协议：只有形状与跨 Runtime 校验，没有实现。
@@ -48,10 +49,7 @@ export type IAtomUpdate<T> = T | ((previous: T) => T);
 
 function assertSameRuntime(runtime: IRuntime, atom: IReadableAtom<unknown>): void {
   if (atom.runtime !== runtime) {
-    throw createStoreKeyedError(
-      StoreKeyedErrorCode.crossRuntime,
-      '[store] cross-runtime atom access is not allowed'
-    );
+    throw createStoreKeyedError(StoreKeyedErrorCode.crossRuntime, StoreKeyedErrorText.crossRuntime);
   }
 }
 

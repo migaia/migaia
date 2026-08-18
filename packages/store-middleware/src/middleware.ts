@@ -2,6 +2,7 @@ import type { IDisposer, IRuntime } from '@migaia/reactive';
 import type { IMutationGuard } from '@migaia/store-light';
 import { createStoreMiddlewareError } from './errors.js';
 import { StoreMiddlewareErrorCode } from './error-code.js';
+import { StoreMiddlewareErrorText } from './error-text.js';
 import {
   MiddlewareCommandType,
   MiddlewareEventPhase,
@@ -29,7 +30,7 @@ export class MutationPolicy implements IMutationGuard {
     if (this.#mode === 'actions-only' && this.#actionDepth === 0) {
       throw createStoreMiddlewareError(
         StoreMiddlewareErrorCode.actionScopeRequired,
-        `[store] ${operation} is not allowed outside an action`
+        StoreMiddlewareErrorText.outsideAction(operation)
       );
     }
   }

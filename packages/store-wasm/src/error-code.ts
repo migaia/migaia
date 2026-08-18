@@ -47,7 +47,14 @@ export const StoreWasmErrorCode = {
    *
    * 调用方修正参数；这是永久性参数错误。
    */
-  invalidOption: 'INVALID_OPTION'
+  invalidOption: 'INVALID_OPTION',
+
+  /**
+   * 字段释放或构造回滚期间有多个 owned resource 清理失败。
+   *
+   * 调用方应检查 `AggregateError.errors`；所有原始清理错误均按执行顺序保留。
+   */
+  cleanupFailed: 'CLEANUP_FAILED'
 } as const;
 
 export type IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];

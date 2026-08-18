@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Effect, createRuntime } from '@migaia/reactive';
 import { sharedInt32, sharedInt32Array } from '../src/shared-state';
 
@@ -10,6 +10,20 @@ function syncRuntime() {
 
 const hasSharedArrayBuffer = typeof SharedArrayBuffer !== 'undefined';
 const describeShared = hasSharedArrayBuffer ? describe : describe.skip;
+
+describeShared('Shared buffer runtime input boundary', () => {
+  it('rejects an ArrayBuffer passed as a signal buffer', () => {
+    expect(() => sharedInt32(createRuntime(), 0, new ArrayBuffer(8) as never)).toThrow(
+      '[store] shared buffer must be a SharedArrayBuffer'
+    );
+  });
+
+  it('rejects null array options', () => {
+    expect(() => sharedInt32Array(createRuntime(), 1, null as never)).toThrow(
+      '[store] shared array options must be an object'
+    );
+  });
+});
 
 describeShared('SharedInt32Signal：跨 Runtime 共享一段内存', () => {
   it('prunes unobserved array cells after a high-churn observer is released', () => {
@@ -160,6 +174,18 @@ describeShared('SharedInt32Array：逐下标失效', () => {
     array.dispose();
   });
 
+  it('rejects a non-function update callback before entering the CAS loop', () => {
+    const runtime = syncRuntime();
+    const array = sharedInt32Array(runtime, 1, { initialValues: [7] });
+
+    expect(() => array.update(0, null as never)).toThrow(
+      'shared array update callback must be a function'
+    );
+    expect(array.get(0)).toBe(7);
+
+    array.dispose();
+  });
+
   it('rejects an out-of-range or non-integer index', () => {
     const runtime = syncRuntime();
     const array = sharedInt32Array(runtime, 2);
@@ -172,6 +198,41 @@ describeShared('SharedInt32Array：逐下标失效', () => {
     array.dispose();
   });
 
+  it('contains symbol indexes in the tagged range error', () => {
+    const array = sharedInt32Array(syncRuntime(), 1);
+    expect(() => array.get(Symbol('index') as never)).toThrow(
+      '[store] shared array index out of range: Symbol(index)'
+    );
+    array.dispose();
+  });
+
+  it('contains revoked array options proxies as tagged errors', () => {
+    const { proxy, revoke } = Proxy.revocable({ buffer: undefined }, {});
+    revoke();
+    try {
+      sharedInt32Array(syncRuntime(), 1, proxy as never);
+      throw new Error('expected options to fail');
+    } catch (error) {
+      expect(error).toMatchObject({
+        source: '@migaia/store-shared',
+        code: 'INVALID_OPTION',
+        cause: expect.any(Error)
+      });
+    }
+  });
+
+  it('materializes initial values before allocating and writing shared memory', () => {
+    const initialValues = {
+      *[Symbol.iterator](): IterableIterator<number> {
+        yield 7;
+        throw new Error('initial iterator failure');
+      }
+    };
+    expect(() => sharedInt32Array(syncRuntime(), 2, { initialValues })).toThrow(
+      '[store] shared array initialValues could not be materialized safely'
+    );
+  });
+
   it('rejects an invalid length or an undersized buffer', () => {
     const runtime = syncRuntime();
     expect(() => sharedInt32Array(runtime, -1)).toThrow('non-negative integer');
@@ -181,6 +242,9 @@ describeShared('SharedInt32Array：逐下标失效', () => {
         buffer: new SharedArrayBuffer(8)
       })
     ).toThrow('buffer is too small');
+    expect(() => sharedInt32Array(runtime, Number.MAX_SAFE_INTEGER)).toThrow(
+      'exceeds the Int32Array capacity'
+    );
   });
 
   it('shares one buffer between two runtimes', () => {
@@ -508,6 +572,32 @@ describeShared('waitAsync 推送：远端写入不必靠 pump', () => {
     reader.dispose();
   });
 
+  maybe('contains a throwing runtime reporter for waitAsync failures', async () => {
+    const runtime = syncRuntime();
+    const signal = sharedInt32(runtime, 0);
+    const reporterFailure = new Error('runtime reporter failed');
+    const waitFailure = new Error('waitAsync failed');
+    const hostReportError = vi.fn();
+    const atomics = Atomics as unknown as {
+      waitAsync: (view: Int32Array, index: number, value: number) => unknown;
+    };
+    const originalWaitAsync = atomics.waitAsync;
+    vi.spyOn(runtime, 'reportError').mockImplementation(() => {
+      throw reporterFailure;
+    });
+    vi.stubGlobal('reportError', hostReportError);
+    atomics.waitAsync = vi.fn(() => ({ async: true, value: Promise.reject(waitFailure) }));
+    try {
+      const stop = signal.watch();
+      await vi.waitFor(() => expect(hostReportError).toHaveBeenCalledWith(reporterFailure));
+      stop();
+    } finally {
+      atomics.waitAsync = originalWaitAsync;
+      vi.unstubAllGlobals();
+      signal.dispose();
+    }
+  });
+
   maybe('wakes one loop for the whole array and touches only the changed cell', async () => {
     // 一格一个 waiter 在长数组上不可行，所以等的是头部 epoch，醒来再扫。
     const writerRuntime = syncRuntime();
@@ -613,6 +703,20 @@ describeShared('waitAsync 推送：远端写入不必靠 pump', () => {
     firstArrayStop();
     signal.dispose();
     array.dispose();
+  });
+
+  maybe('makes the returned stop disposer idempotent', () => {
+    const notify = vi.spyOn(Atomics, 'notify');
+    const signal = sharedInt32(syncRuntime(), 0);
+    const stop = signal.watch();
+    notify.mockClear();
+
+    stop();
+    stop();
+
+    expect(notify).toHaveBeenCalledTimes(1);
+    signal.dispose();
+    notify.mockRestore();
   });
 
   it('throws instead of silently falling back to polling when Atomics.waitAsync is unavailable', () => {

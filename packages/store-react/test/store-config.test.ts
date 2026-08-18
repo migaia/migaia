@@ -5,10 +5,44 @@ import {
   encodeStoreExperimental,
   normalizeStoreConfig,
   readStoreFeature,
-  type IStoreConfigValue
+  type IStoreConfigValue,
+  type IStoreFeatureExperimental
 } from '../src/store-config';
 
 describe('normalizeStoreConfig', () => {
+  it('rejects invalid ready containers and barrier values at the public boundary', () => {
+    expect(() => normalizeStoreConfig({ ready: null as never })).toThrow(
+      'config.ready must be an array'
+    );
+    expect(() => normalizeStoreConfig({ ready: [42 as never] })).toThrow(
+      'config.ready must be an array'
+    );
+    const hostile = {};
+    Object.defineProperty(hostile, ['th' + 'en'].join(''), {
+      get: () => {
+        throw new Error('hostile then getter');
+      }
+    });
+    expect(() => normalizeStoreConfig({ ready: [hostile as never] })).toThrow(
+      'config.ready must be an array'
+    );
+  });
+
+  it('contains revoked config proxies as tagged configuration errors', () => {
+    const { proxy, revoke } = Proxy.revocable({ features: { wasm: true } }, {});
+    revoke();
+    try {
+      normalizeStoreConfig(proxy as never);
+      throw new Error('expected config normalization to fail');
+    } catch (error) {
+      expect(error).toMatchObject({
+        source: '@migaia/store-react',
+        code: 'INVALID_CONFIG',
+        cause: expect.any(TypeError)
+      });
+    }
+  });
+
   it('defaults to wasm off, no experimental flags, no ready barrier when called with no config', () => {
     const normalized = normalizeStoreConfig();
 
@@ -143,6 +177,20 @@ describe('encodeStoreExperimental / decodeStoreExperimental', () => {
   it('coerces non-boolean-true values to false during encoding', () => {
     const input = { flag: 1 as unknown as boolean };
     expect(encodeStoreExperimental(input)).toBe('[["flag",false]]');
+  });
+
+  it('contains hostile proxy traps as a tagged configuration error', () => {
+    const input = new Proxy(
+      {},
+      {
+        ownKeys: () => {
+          throw new Error('ownKeys failure');
+        }
+      }
+    ) as IStoreFeatureExperimental;
+    expect(() => encodeStoreExperimental(input)).toThrow(
+      '[store] config.features.experimental could not be read safely'
+    );
   });
 });
 

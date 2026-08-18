@@ -11,6 +11,23 @@ import {
 } from '../src';
 
 describe('AtomStore: reads', () => {
+  it('preserves cloneable prototypes and fails closed for non-cloneable initial values', () => {
+    const date = new Date('2020-01-02T03:04:05.000Z');
+    const dateStore = createAtomStore(createRuntime());
+    const dateDef = atomDef({ when: date });
+    const snapshot = dateStore.get(dateDef);
+    expect(snapshot.when).toBeInstanceOf(Date);
+    expect(snapshot.when).not.toBe(date);
+    dateStore.dispose();
+
+    const functionStore = createAtomStore(createRuntime());
+    const functionDef = atomDef({ run: () => 1 });
+    expect(() => functionStore.get(functionDef)).toThrow(
+      '[store] primitive initial value cannot be cloned independently'
+    );
+    functionStore.dispose();
+  });
+
   it('get() returns the primitive init value and reflects writes', () => {
     const store = createAtomStore(createRuntime());
     const count = atomDef(0);
@@ -196,6 +213,34 @@ describe('AtomStore: subscriptions', () => {
     expect(calls).toBe(2);
     unsubscribe();
     store.dispose();
+  });
+
+  it('contains a throwing runtime reporter without killing the subscription', () => {
+    const runtime = createRuntime();
+    const reporterFailure = new Error('runtime reporter failed');
+    const hostReportError = vi.fn();
+    vi.spyOn(runtime, 'reportError').mockImplementation(() => {
+      throw reporterFailure;
+    });
+    vi.stubGlobal('reportError', hostReportError);
+    try {
+      const store = createAtomStore(runtime);
+      const count = atomDef(0);
+      let calls = 0;
+      const unsubscribe = store.sub(count, () => {
+        calls++;
+        throw new Error('listener boom');
+      });
+
+      expect(() => store.set(count, 1)).not.toThrow();
+      expect(() => store.set(count, 2)).not.toThrow();
+      expect(calls).toBe(2);
+      expect(hostReportError).toHaveBeenCalledWith(reporterFailure);
+      unsubscribe();
+      store.dispose();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createRuntime } from '@migaia/reactive';
+import { createRuntime, defaultRuntime } from '@migaia/reactive';
 import type { IDisposable } from '@migaia/reactive';
 import { computedFamily, createFamily } from '../src/reactive/family';
 
@@ -26,6 +26,14 @@ function makeItemFactory(disposeImpl?: (key: unknown) => void) {
 }
 
 describe('createFamily: basic get/peek/has', () => {
+  it('rejects invalid family callbacks before creating entries', () => {
+    expect(() => createFamily({ create: null as never, isObserved: () => false })).toThrow(
+      expect.objectContaining({ source: '@migaia/store-keyed', code: 'INVALID_OPTION' })
+    );
+    expect(() =>
+      createFamily({ create: (() => ({ dispose() {} })) as never, isObserved: null as never })
+    ).toThrow(expect.objectContaining({ source: '@migaia/store-keyed', code: 'INVALID_OPTION' }));
+  });
   it('creates lazily on first get() and caches on repeat access', () => {
     const { create } = makeItemFactory();
     const family = createFamily<string, IItem>({ create, isObserved: () => false });
@@ -108,6 +116,42 @@ describe('createFamily: remove/clear/dispose', () => {
 });
 
 describe('createFamily: maxSize (unobserved-only LRU)', () => {
+  it('snapshots create and isObserved callbacks at the public boundary', () => {
+    const create = vi.fn((key: string): IItem => ({ key, disposed: false, dispose: vi.fn() }));
+    const isObserved = vi.fn(() => false);
+    const options = {} as {
+      create: typeof create;
+      isObserved: typeof isObserved;
+    };
+    let createReads = 0;
+    let observedReads = 0;
+    Object.defineProperties(options, {
+      create: {
+        get: () => {
+          createReads++;
+          if (createReads > 1) throw new Error('create reread');
+          return create;
+        }
+      },
+      isObserved: {
+        get: () => {
+          observedReads++;
+          if (observedReads > 1) throw new Error('isObserved reread');
+          return isObserved;
+        }
+      }
+    });
+    Object.defineProperty(options, 'maxSize', { value: 1 });
+    const family = createFamily<string, IItem>(options as never);
+
+    expect(family.get('a').key).toBe('a');
+    family.get('b');
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(isObserved).toHaveBeenCalled();
+    expect(createReads).toBe(1);
+    expect(observedReads).toBe(1);
+  });
+
   it('evicts the least-recently-accessed unobserved entry once over capacity', () => {
     const { create } = makeItemFactory();
     const family = createFamily<string, IItem>({ create, isObserved: () => false, maxSize: 2 });
@@ -211,9 +255,129 @@ describe('createFamily: ttl with an injected clock', () => {
       createFamily<string, IItem>({ create, isObserved: () => false, ttl: Number.NaN })
     ).toThrow(RangeError);
   });
+
+  it('rejects coerced ttl and unsafe maxSize values at the public boundary', () => {
+    const { create } = makeItemFactory();
+    expect(() =>
+      createFamily<string, IItem>({
+        create,
+        isObserved: () => false,
+        ttl: '10' as never
+      })
+    ).toThrow('[store] family ttl must be non-negative');
+    expect(() =>
+      createFamily<string, IItem>({
+        create,
+        isObserved: () => false,
+        maxSize: Number.MAX_SAFE_INTEGER + 1
+      })
+    ).toThrow('[store] family maxSize must be a positive integer');
+  });
+
+  it('rejects a non-function or hostile family clock at the public boundary', () => {
+    const { create } = makeItemFactory();
+    expect(() =>
+      createFamily<string, IItem>({ create, isObserved: () => false, now: 1 as never })
+    ).toThrow('[store] family now must be a function');
+    const { proxy, revoke } = Proxy.revocable(
+      { now: () => 0, create, isObserved: () => false },
+      {}
+    );
+    revoke();
+    expect(() => createFamily<string, IItem>(proxy as never)).toThrow(
+      '[store] family maxSize must be a positive integer'
+    );
+  });
+
+  it('rejects a null options object with a tagged configuration error', () => {
+    expect(() => createFamily(null as never)).toThrow(
+      '[store] family maxSize must be a positive integer'
+    );
+  });
+
+  it('segments TTL delays instead of passing an overflowing timer duration', () => {
+    const timer = vi.spyOn(globalThis, 'setTimeout');
+    try {
+      const { create } = makeItemFactory();
+      const family = createFamily<string, IItem>({
+        create,
+        isObserved: () => false,
+        ttl: 2_147_483_647 + 100
+      });
+      family.get('long-lived');
+      const delay = timer.mock.calls.at(-1)?.[1];
+      expect(delay).toBe(2_147_483_647);
+      family.dispose();
+    } finally {
+      timer.mockRestore();
+    }
+  });
+});
+
+describe('createFamily: ttl reporter containment', () => {
+  it('does not escape when the default runtime reporter throws', () => {
+    vi.useFakeTimers();
+    let reporterCalled = false;
+    const reporter = vi.spyOn(defaultRuntime, 'reportError').mockImplementation(() => {
+      reporterCalled = true;
+      throw new Error('runtime reporter failed');
+    });
+    const family = createFamily<string, IItem>({
+      create: () => ({
+        key: 'x',
+        disposed: false,
+        dispose: () => {
+          throw new Error('timer cleanup failed');
+        }
+      }),
+      isObserved: () => false,
+      ttl: 1
+    });
+    family.get('x');
+    expect(() => vi.advanceTimersByTime(20)).not.toThrow();
+    expect(reporterCalled).toBe(true);
+    reporter.mockRestore();
+    vi.useRealTimers();
+  });
 });
 
 describe('createFamily: aggregated disposal failures', () => {
+  it('prune attempts every expired entry before reporting cleanup failures', () => {
+    let clock = 0;
+    const calls: string[] = [];
+    const first = new Error('boom-a');
+    const second = new Error('boom-b');
+    const family = createFamily<string, IItem>({
+      create: (key) => ({
+        key,
+        disposed: false,
+        dispose: () => {
+          calls.push(key);
+          if (key === 'a') throw first;
+          if (key === 'b') throw second;
+        }
+      }),
+      isObserved: () => false,
+      ttl: 1,
+      now: () => clock
+    });
+    family.get('a');
+    family.get('b');
+    family.get('c');
+    clock = 2;
+
+    let thrown: unknown;
+    try {
+      family.prune();
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(calls).toEqual(['a', 'b', 'c']);
+    expect(thrown).toMatchObject({ errors: [first, second] });
+    expect(family.size).toBe(0);
+  });
+
   it('a single disposal failure during clear() is thrown as-is', () => {
     const create = (): IItem => ({
       key: 'x',
@@ -276,6 +440,53 @@ describe('createFamily: missing WeakRef/FinalizationRegistry', () => {
 });
 
 describe('computedFamily', () => {
+  it('rejects an invalid derive callback before creating a family', () => {
+    expect(() => computedFamily(null as never, createRuntime())).toThrow(
+      expect.objectContaining({
+        source: '@migaia/store-keyed',
+        code: 'INVALID_OPTION',
+        message: '[store] family derive must be a function'
+      })
+    );
+  });
+
+  it('snapshots computed options once before any keyed entry is created', () => {
+    let reads = 0;
+    const options = {} as { computed?: { debugName?: string } };
+    Object.defineProperty(options, 'computed', {
+      get: () => {
+        reads++;
+        if (reads > 1) throw new Error('computed options reread');
+        return { debugName: 'stable-computed-family' };
+      }
+    });
+    const family = computedFamily((key: number) => key * 2, createRuntime(), options);
+
+    expect(family.get(1).value).toBe(2);
+    expect(family.get(2).value).toBe(4);
+    expect(reads).toBe(1);
+    family.dispose();
+  });
+
+  it('contains a throwing computed-options getter before creating the family', () => {
+    const failure = new Error('computed options getter failed');
+    const options = {} as { computed?: never };
+    Object.defineProperty(options, 'computed', {
+      get: () => {
+        throw failure;
+      }
+    });
+
+    expect(() => computedFamily((key: number) => key, createRuntime(), options)).toThrow(
+      expect.objectContaining({
+        source: '@migaia/store-keyed',
+        code: 'INVALID_OPTION',
+        message: '[store] computed family options could not be read',
+        cause: failure
+      })
+    );
+  });
+
   it('derives a computed value per key from the given runtime', () => {
     const runtime = createRuntime();
     const family = computedFamily((multiplier: number) => multiplier * 2, runtime);

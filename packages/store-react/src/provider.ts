@@ -6,6 +6,7 @@ import type { IStoreToken } from './provider-registry.js';
 import { useStore } from './useStore.js';
 import { createStoreReactError } from './errors.js';
 import { StoreReactErrorCode } from './error-code.js';
+import { StoreReactErrorText } from './error-text.js';
 
 export { StoreProvider } from './StoreProvider.js';
 export type { IStoreProviderProps } from './StoreProvider.js';
@@ -34,7 +35,7 @@ export function useStoreRegistry() {
   if (!registry) {
     throw createStoreReactError(
       StoreReactErrorCode.providerRequired,
-      '[store] hook requires a StoreProvider'
+      StoreReactErrorText.requiresProvider
     );
   }
   return registry;

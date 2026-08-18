@@ -3,6 +3,28 @@ import { createRuntime } from '@migaia/reactive';
 import { atomDef, createAtomStore, derivedFamilyDef, familyDef } from '../src';
 
 describe('familyDef', () => {
+  it('contains revoked options proxies as tagged errors', () => {
+    const { proxy, revoke } = Proxy.revocable({}, {});
+    revoke();
+    expect(() => familyDef((id: string) => id, proxy as never)).toThrow(
+      expect.objectContaining({
+        source: '@migaia/store-keyed',
+        code: 'INVALID_OPTION',
+        cause: expect.any(Error)
+      })
+    );
+  });
+  it('rejects non-string debug labels before creating a definition', () => {
+    expect(() => familyDef((id: string) => id, { debugLabel: Symbol('label') as never })).toThrow(
+      expect.objectContaining({ source: '@migaia/store-keyed', code: 'INVALID_OPTION' })
+    );
+  });
+  it('rejects runtime null options with a tagged configuration error', () => {
+    expect(() => familyDef((id: string) => id, null as never)).toThrow(
+      '[store] family maxSize must be a positive integer'
+    );
+  });
+
   it('returns the same token for the same key (canonical identity)', () => {
     const family = familyDef((id: string) => ({ id }));
     expect(family('a')).toBe(family('a'));
@@ -78,6 +100,12 @@ describe('familyDef', () => {
 });
 
 describe('derivedFamilyDef', () => {
+  it('rejects runtime null options with a tagged configuration error', () => {
+    expect(() => derivedFamilyDef((id: string) => () => id, null as never)).toThrow(
+      '[store] family maxSize must be a positive integer'
+    );
+  });
+
   it('produces a read-only derived definition per key', () => {
     const source = atomDef(10);
     const family = derivedFamilyDef((multiplier: number) => (get) => get(source) * multiplier);

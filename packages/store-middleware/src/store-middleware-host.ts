@@ -7,8 +7,9 @@ import {
 import { ReactiveErrorPhase, type IDisposer, type IRuntime } from '@migaia/reactive';
 import type { IRuntimeErrorPhase } from '@migaia/reactive/runtime';
 import type { IReactiveStore } from '@migaia/store-light';
-import { createStoreMiddlewareError } from './errors.js';
+import { createStoreMiddlewareAggregateError, createStoreMiddlewareError } from './errors.js';
 import { StoreMiddlewareErrorCode } from './error-code.js';
+import { StoreMiddlewareErrorText } from './error-text.js';
 import {
   createMutationPolicy,
   type IDevToolsAdapter,
@@ -19,6 +20,26 @@ import {
 } from './middleware.js';
 import { ClonePolicy } from './tolerant-clone.js';
 import { MiddlewareEventPhase, MiddlewareEventType } from './event-constants.js';
+
+/** Reports middleware diagnostics without letting a hostile reporter escape the event boundary. */
+function reportMiddlewareFailure(
+  runtime: IRuntime,
+  error: unknown,
+  phase: IRuntimeErrorPhase
+): void {
+  try {
+    runtime.reportError(error, { phase });
+    return;
+  } catch (reporterError) {
+    const host = (globalThis as { reportError?: (value: unknown) => void }).reportError;
+    try {
+      if (host) host(reporterError);
+      else console.error(reporterError);
+    } catch {
+      // A failing diagnostic sink must not create an unhandled rejection.
+    }
+  }
+}
 
 export type IStoreMiddlewareCore<S> = {
   readonly runtime: IRuntime;
@@ -46,6 +67,46 @@ export type IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {
   readonly mutationPolicy?: MutationPolicy;
 };
 
+/** Rejects null/non-object host options before the constructor reads their fields. */
+function assertHostOptions(options: unknown): asserts options is object {
+  if (options === null || typeof options !== 'object')
+    throw createStoreMiddlewareError(
+      StoreMiddlewareErrorCode.invalidOption,
+      StoreMiddlewareErrorText.optionsObject
+    );
+  try {
+    Object.getOwnPropertyDescriptors(options);
+  } catch (error) {
+    throw createStoreMiddlewareError(
+      StoreMiddlewareErrorCode.invalidOption,
+      StoreMiddlewareErrorText.optionsObject,
+      { cause: error }
+    );
+  }
+}
+
+/**
+ * Snapshots host configuration once so construction and PluginHost admission observe identical
+ * values.
+ */
+function snapshotHostOptions<T>(
+  options: IStoreMiddlewareHostOptions<T>
+): IStoreMiddlewareHostOptions<T> {
+  assertHostOptions(options);
+  try {
+    return {
+      ...options,
+      pipeline: { ...options.pipeline, mode: PluginHostPipelineMode.sync }
+    };
+  } catch (error) {
+    throw createStoreMiddlewareError(
+      StoreMiddlewareErrorCode.invalidOption,
+      StoreMiddlewareErrorText.optionsObject,
+      { cause: error }
+    );
+  }
+}
+
 /** Store 专用事件 Host；通用插件生命周期和 pipeline 全部由 PluginHost 提供。 */
 export class StoreMiddlewareHost<S> extends PluginHost<
   IStoreMiddlewareCore<S>,
@@ -57,9 +118,11 @@ export class StoreMiddlewareHost<S> extends PluginHost<
   readonly #applyState?: (state: S) => void;
   #reportingError = false;
   #bindingDisposers: IDisposer[] = [];
+  /** Stable disposal completion shared by concurrent and repeated callers. */
+  #disposePromise: Promise<void> | undefined;
 
   constructor(options: IStoreMiddlewareHostOptions<S>) {
-    super({ ...options, pipeline: { ...options.pipeline, mode: PluginHostPipelineMode.sync } });
+    super((options = snapshotHostOptions(options)));
     this.#runtime = options.runtime;
     this.#getState = options.getState;
     this.#applyState = options.applyState;
@@ -74,12 +137,12 @@ export class StoreMiddlewareHost<S> extends PluginHost<
         if (!this.#applyState)
           throw createStoreMiddlewareError(
             StoreMiddlewareErrorCode.devtoolsCapability,
-            '[store] DevTools state command requires applyState'
+            StoreMiddlewareErrorText.applyState
           );
         this.#applyState(state);
       },
       reportError: (error, phase) =>
-        this.#runtime.reportError(error, { phase: phase as IRuntimeErrorPhase })
+        reportMiddlewareFailure(this.#runtime, error, phase as IRuntimeErrorPhase)
     };
   }
 
@@ -89,12 +152,13 @@ export class StoreMiddlewareHost<S> extends PluginHost<
       completed = true;
     });
     if (!completed) {
-      this.#runtime.reportError(
+      reportMiddlewareFailure(
+        this.#runtime,
         createStoreMiddlewareError(
           StoreMiddlewareErrorCode.middlewareNotChained,
-          '[store] middleware did not call next()'
+          StoreMiddlewareErrorText.missingNext
         ),
-        { phase: ReactiveErrorPhase.traceListener }
+        ReactiveErrorPhase.traceListener
       );
     }
   }
@@ -103,7 +167,7 @@ export class StoreMiddlewareHost<S> extends PluginHost<
     try {
       this.emit(event);
     } catch (error) {
-      this.#runtime.reportError(error, { phase: ReactiveErrorPhase.traceListener });
+      reportMiddlewareFailure(this.#runtime, error, ReactiveErrorPhase.traceListener);
     }
   }
 
@@ -159,7 +223,7 @@ export class StoreMiddlewareHost<S> extends PluginHost<
 
   recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void {
     if (this.#reportingError) {
-      this.#runtime.reportError(error, { phase: ReactiveErrorPhase.traceListener });
+      reportMiddlewareFailure(this.#runtime, error, ReactiveErrorPhase.traceListener);
       return;
     }
     this.#reportingError = true;
@@ -177,6 +241,27 @@ export class StoreMiddlewareHost<S> extends PluginHost<
   }
 
   async connectDevTools(adapter: IDevToolsAdapter<S>, name = 'store-devtools'): Promise<void> {
+    try {
+      if (
+        adapter === null ||
+        typeof adapter !== 'object' ||
+        typeof adapter.init !== 'function' ||
+        typeof adapter.send !== 'function' ||
+        (adapter.subscribe !== undefined && typeof adapter.subscribe !== 'function')
+      ) {
+        throw createStoreMiddlewareError(
+          StoreMiddlewareErrorCode.invalidOption,
+          StoreMiddlewareErrorText.adapterInvalid
+        );
+      }
+    } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error) throw error;
+      throw createStoreMiddlewareError(
+        StoreMiddlewareErrorCode.invalidOption,
+        StoreMiddlewareErrorText.adapterInvalid,
+        { cause: error }
+      );
+    }
     const plugin: IStoreMiddlewarePlugin<S> = {
       name,
       install: (core) => {
@@ -204,9 +289,33 @@ export class StoreMiddlewareHost<S> extends PluginHost<
     this.#bindingDisposers.push(disposer);
   }
 
-  override async dispose(): Promise<void> {
-    for (const disposer of this.#bindingDisposers.splice(0).reverse()) disposer();
-    await super.dispose();
+  override dispose(): Promise<void> {
+    this.#disposePromise ??= this.#disposeOnce();
+    return this.#disposePromise;
+  }
+
+  /** Releases Store bindings before delegating to PluginHost cleanup. */
+  async #disposeOnce(): Promise<void> {
+    const errors: unknown[] = [];
+    for (const disposer of this.#bindingDisposers.splice(0).reverse()) {
+      try {
+        disposer();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    try {
+      await super.dispose();
+    } catch (error) {
+      errors.push(error);
+    }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1)
+      throw createStoreMiddlewareAggregateError(
+        StoreMiddlewareErrorCode.cleanupFailed,
+        errors,
+        StoreMiddlewareErrorText.cleanupFailed
+      );
   }
 }
 
@@ -239,7 +348,7 @@ export function middlewarePlugin<S>(
 
 export function loggerMiddleware<S>(
   sink: (event: IMiddlewareEvent<unknown>, state: unknown) => void = (event, state) => {
-    console.log('[store]', event, state);
+    console.log(StoreMiddlewareErrorText.logPrefix, event, state);
   }
 ): IStoreMiddlewarePlugin<S> {
   return {
@@ -278,43 +387,70 @@ export function bindStoreMiddleware<S extends Record<string, unknown>>(
     applyState: (state) => store.$hydrate(state),
     mutationPolicy: options.mutationPolicy
   });
-  const unsubscribeStore = store.$subscribe(() => {
-    const next = clone(store.$plain());
-    host.recordState('store:update', previous, next);
-    previous = next;
-  });
-  const unsubscribeTrace = store.$runtime.subscribeTrace((event) => {
-    if (
-      event.type !== MiddlewareEventType.action ||
-      (options.actionPrefix && !event.name.startsWith(options.actionPrefix))
-    )
-      return;
-    if (event.phase === MiddlewareEventPhase.start)
-      host.emit({
-        type: MiddlewareEventType.action,
-        phase: MiddlewareEventPhase.start,
-        name: event.name,
-        timestamp: event.timestamp
-      });
-    else if (event.phase === MiddlewareEventPhase.end)
-      host.emit({
-        type: MiddlewareEventType.action,
-        phase: MiddlewareEventPhase.end,
-        name: event.name,
-        timestamp: event.timestamp,
-        durationMs: event.durationMs ?? 0
-      });
-    else
-      host.emit({
-        type: MiddlewareEventType.action,
-        phase: MiddlewareEventPhase.error,
-        name: event.name,
-        timestamp: event.timestamp,
-        durationMs: event.durationMs ?? 0,
-        error: event.error
-      });
-  });
-  host.attachBindingDisposer(unsubscribeTrace);
-  host.attachBindingDisposer(unsubscribeStore);
+  let unsubscribeStore: IDisposer | undefined;
+  let unsubscribeTrace: IDisposer | undefined;
+  try {
+    unsubscribeStore = store.$subscribe(() => {
+      const next = clone(store.$plain());
+      host.recordState('store:update', previous, next);
+      previous = next;
+    });
+    unsubscribeTrace = store.$runtime.subscribeTrace((event) => {
+      if (
+        event.type !== MiddlewareEventType.action ||
+        (options.actionPrefix && !event.name.startsWith(options.actionPrefix))
+      )
+        return;
+      if (event.phase === MiddlewareEventPhase.start)
+        host.emit({
+          type: MiddlewareEventType.action,
+          phase: MiddlewareEventPhase.start,
+          name: event.name,
+          timestamp: event.timestamp
+        });
+      else if (event.phase === MiddlewareEventPhase.end)
+        host.emit({
+          type: MiddlewareEventType.action,
+          phase: MiddlewareEventPhase.end,
+          name: event.name,
+          timestamp: event.timestamp,
+          durationMs: event.durationMs ?? 0
+        });
+      else
+        host.emit({
+          type: MiddlewareEventType.action,
+          phase: MiddlewareEventPhase.error,
+          name: event.name,
+          timestamp: event.timestamp,
+          durationMs: event.durationMs ?? 0,
+          error: event.error
+        });
+    });
+    host.attachBindingDisposer(unsubscribeTrace);
+    host.attachBindingDisposer(unsubscribeStore);
+  } catch (error) {
+    const cleanupErrors: unknown[] = [];
+    try {
+      unsubscribeTrace?.();
+    } catch (cleanupError) {
+      cleanupErrors.push(cleanupError);
+    }
+    try {
+      unsubscribeStore?.();
+    } catch (cleanupError) {
+      cleanupErrors.push(cleanupError);
+    }
+    void host.dispose().catch((cleanupError: unknown) => {
+      reportMiddlewareFailure(store.$runtime, cleanupError, ReactiveErrorPhase.asyncFlush);
+    });
+    if (cleanupErrors.length > 0) {
+      throw createStoreMiddlewareAggregateError(
+        StoreMiddlewareErrorCode.cleanupFailed,
+        [error, ...cleanupErrors],
+        StoreMiddlewareErrorText.cleanupFailed
+      );
+    }
+    throw error;
+  }
   return Object.assign(host, { store });
 }

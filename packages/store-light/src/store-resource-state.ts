@@ -7,6 +7,7 @@ import { LifecycleState } from '@migaia/lifecycle';
 import type { IVersionToken } from './store-resource-ownership.js';
 import { createStoreLightError, StoreLightErrorCode } from './errors.js';
 import { StoreResourceDataKind, StoreResourceKind } from './resource-state-constants.js';
+import { StoreLightErrorText } from './error-text.js';
 
 export type IResourceVersion<T> = {
   readonly id: number;
@@ -145,7 +146,7 @@ export class ResourceStateController<T> {
     if (this.#terminal.lifecycle !== LifecycleState.open)
       throw createStoreLightError(
         StoreLightErrorCode.resourceDisposed,
-        '[store] resource is disposed'
+        StoreLightErrorText.resourceDisposed
       );
   }
 }

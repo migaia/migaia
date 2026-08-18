@@ -249,6 +249,32 @@ describe('ObservableObject', () => {
     obj.dispose();
   });
 
+  it('update() guards before invoking a hostile updater or allowing reentrant mutation', () => {
+    const sideEffect = new ObservableObject({ value: 1 });
+    let updaterCalls = 0;
+    const obj = new ObservableObject({ value: 1 }, defaultRuntime, {
+      mutationGuard: {
+        assertMutationAllowed() {
+          throw new Error('not in an action');
+        }
+      }
+    });
+
+    expect(() =>
+      obj.update('value', (value) => {
+        updaterCalls++;
+        sideEffect.set('value', 2);
+        return value + 1;
+      })
+    ).toThrow('not in an action');
+    expect(updaterCalls).toBe(0);
+    expect(obj.peek('value')).toBe(1);
+    expect(sideEffect.peek('value')).toBe(1);
+
+    sideEffect.dispose();
+    obj.dispose();
+  });
+
   it('rejects a tracked read from a different Runtime, but allows peek() across Runtimes', () => {
     // A second, independent Runtime from the *same* module copy — this is the "same library,
     // two isolated graphs" scenario the cross-runtime guard exists for. Force-loading a second

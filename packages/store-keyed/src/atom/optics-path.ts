@@ -4,6 +4,7 @@ import {
   createStoreKeyedTypeError,
   StoreKeyedErrorCode
 } from '../errors.js';
+import { StoreKeyedErrorText } from '../error-text.js';
 
 export function readOpticPath(
   value: unknown,
@@ -15,7 +16,7 @@ export function readOpticPath(
     if (current === null || typeof current !== 'object') {
       throw createStoreKeyedTypeError(
         StoreKeyedErrorCode.invalidOption,
-        `[store] ${label} cannot read path segment ${String(key)}`
+        StoreKeyedErrorText.opticRead(label, key)
       );
     }
     current = Reflect.get(current, key);
@@ -33,7 +34,7 @@ export function writeOpticPath(
   if (value === null || typeof value !== 'object') {
     throw createStoreKeyedTypeError(
       StoreKeyedErrorCode.invalidOption,
-      `[store] ${label} cannot write path segment ${String(key)}`
+      StoreKeyedErrorText.opticWrite(label, key)
     );
   }
   const clone: Record<PropertyKey, unknown> | unknown[] = Array.isArray(value)
@@ -43,7 +44,7 @@ export function writeOpticPath(
   if (rest.length > 0 && (childSource === null || typeof childSource !== 'object')) {
     throw createStoreKeyedTypeError(
       StoreKeyedErrorCode.invalidOption,
-      `[store] ${label} cannot write path segment ${String(rest[0])}`
+      StoreKeyedErrorText.opticWrite(label, rest[0])
     );
   }
   const child = rest.length === 0 ? next : writeOpticPath(childSource, rest, next, label);
@@ -100,7 +101,7 @@ export function computeUniqueKeys<T, Key>(
     if (seen.has(key)) {
       throw createStoreKeyedError(
         StoreKeyedErrorCode.invalidOption,
-        `[store] ${label} keys must be unique`
+        StoreKeyedErrorText.opticUnique(label)
       );
     }
     seen.add(key);
@@ -117,7 +118,11 @@ export function requireKeyIndex<T, Key>(
   label: string
 ): number {
   const index = findKeyIndex(items, keyOf, key);
-  if (index < 0) throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, `[store] ${label}`);
+  if (index < 0)
+    throw createStoreKeyedError(
+      StoreKeyedErrorCode.invalidOption,
+      StoreKeyedErrorText.opticMissing(label)
+    );
   return index;
 }
 

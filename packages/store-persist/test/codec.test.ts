@@ -35,4 +35,24 @@ describe('defaultJsonCodec Map/Set 往返', () => {
     expect(decoded.set).toBeInstanceOf(Set);
     expect([...decoded.set.values()]).toEqual([1, 2, 3]);
   });
+
+  it('伪造 Map/Set constructor 不执行 hostile 成员', async () => {
+    let executed = false;
+    const fakeMap = Object.create({ constructor: { name: 'Map' } });
+    Object.defineProperty(fakeMap, 'entries', {
+      get() {
+        executed = true;
+        throw new Error('hostile entries');
+      }
+    });
+    const fakeSet = Object.create({ constructor: { name: 'Set' } });
+    Object.defineProperty(fakeSet, 'values', {
+      get() {
+        executed = true;
+        throw new Error('hostile values');
+      }
+    });
+    await expect(defaultJsonCodec.encode({ fakeMap, fakeSet })).resolves.toBeTypeOf('string');
+    expect(executed).toBe(false);
+  });
 });

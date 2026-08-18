@@ -19,6 +19,7 @@ vi.mock('@migaia/wasm', () => ({
 
 import { ensureWasm } from '../src/arena';
 import { array } from '../src/array';
+import { StoreWasmErrorCode, STORE_WASM_SOURCE } from '../src/errors';
 import { number } from '../src/number';
 
 describe('array setRange memory replacement', () => {
@@ -47,6 +48,87 @@ describe('array setRange memory replacement', () => {
 
     field.setRange(0, 4, [1, 2, 3, 4]);
     expect(Array.from(field.view())).toEqual([1, 2, 3, 4]);
+    field.dispose();
+  });
+
+  it('uses the canonical tagged diagnostic for a mismatched range payload', async () => {
+    const runtime = createRuntime();
+    const field = await array(number(), 4, 2).create({
+      runtime,
+      signal: new AbortController().signal,
+      createSource: () => ({
+        track: () => undefined,
+        notify: () => undefined,
+        observed: false,
+        commit: <T>(write: () => T): T => write(),
+        disposed: false,
+        dispose: () => undefined
+      })
+    });
+
+    expect(() => field.setRange(0, 2, [1])).toThrowError(
+      expect.objectContaining({
+        source: STORE_WASM_SOURCE,
+        code: StoreWasmErrorCode.invalidOption,
+        message: 'wasm.array: values length must match the target range'
+      })
+    );
+    field.dispose();
+  });
+
+  it('rejects non-array-like range payloads with a tagged TypeError', async () => {
+    const runtime = createRuntime();
+    const field = await array(number(), 4, 2).create({
+      runtime,
+      signal: new AbortController().signal,
+      createSource: () => ({
+        track: () => undefined,
+        notify: () => undefined,
+        observed: false,
+        commit: <T>(write: () => T): T => write(),
+        disposed: false,
+        dispose: () => undefined
+      })
+    });
+
+    expect(() => field.setRange(0, 1, null as unknown as ArrayLike<number>)).toThrowError(
+      expect.objectContaining({
+        source: STORE_WASM_SOURCE,
+        code: StoreWasmErrorCode.invalidOption,
+        message: 'wasm.array: values must be array-like'
+      })
+    );
+    field.dispose();
+  });
+
+  it('validates every range value before creating buckets or committing', async () => {
+    const runtime = createRuntime();
+    let sourceCount = 0;
+    const field = await array(number(), 4, 2).create({
+      runtime,
+      signal: new AbortController().signal,
+      createSource: () => {
+        sourceCount++;
+        return {
+          track: () => undefined,
+          notify: () => undefined,
+          observed: false,
+          commit: <T>(write: () => T): T => write(),
+          disposed: false,
+          dispose: () => undefined
+        };
+      }
+    });
+    const before = Array.from(field.view());
+    expect(() => field.setRange(0, 2, [1, 'bad' as never])).toThrowError(
+      expect.objectContaining({
+        source: STORE_WASM_SOURCE,
+        code: StoreWasmErrorCode.invalidOption,
+        message: 'wasm.array: value must be a number'
+      })
+    );
+    expect(sourceCount).toBe(0);
+    expect(Array.from(field.view())).toEqual(before);
     field.dispose();
   });
 });

@@ -7,6 +7,8 @@
  * 码值是公开 API 的一部分，改名等同破坏性变更（`docs/contracts/error-code-rollout.sdd.md` §1.2）。
  */
 export const StoreMiddlewareErrorCode = {
+  /** Host options were null or non-object at the JavaScript package boundary. */
+  invalidOption: 'INVALID_OPTION',
   /**
    * Middleware stage 没有调用 `next()`，事件链在此被过滤。
    *
@@ -40,7 +42,13 @@ export const StoreMiddlewareErrorCode = {
    *
    * 调用方提供 polyfill，或改用 `diagnostic`/`opaque`；这是部署能力缺失，不是逻辑错误。
    */
-  envUnsupported: 'ENV_UNSUPPORTED'
+  envUnsupported: 'ENV_UNSUPPORTED',
+
+  /**
+   * Binding or host cleanup failed after all cleanup actions were attempted. The caller must
+   * inspect `errors[]` and treat the host as terminal.
+   */
+  cleanupFailed: 'CLEANUP_FAILED'
 } as const;
 
 export type IStoreMiddlewareErrorCode =

@@ -111,7 +111,7 @@ const store = createStore(shape, {
 | `$batch(recipe)` | `(recipe: (draft) => void) => void` | `recipe: (draft: IStoreShape<S>) => void` | 同步 | 整个 recipe 在一次 `batch` 内执行，多次字段写入只触发一次通知；`draft` 就是 Store 本身；**不是事务**，recipe 中途抛错不回滚已写入的字段；写只读 computed 字段会自然抛错（属性只有 getter） |
 | `$set(patch)` | `(patch: IWritableStorePatch<S>) => void` | `patch: IWritableStorePatch<S>` | 同步 | 低层批量赋值；**编译期**只接受非 computed/非 FieldBuilder/非方法的字段（含 `raw()` 字段），**运行期**对每个 key 额外校验对应 signal 是否存在，不存在则抛 `[store] field is not settable: ${key}`（防御动态/非法输入） |
 | `$own(resource)` | `<T extends IDisposable>(resource: T) => T` | `resource: T extends IDisposable` | 同步 | 把外部资源纳入本 Store 的所有权作用域，`$dispose()` 时一并释放；资源必须未归属或已归属本 Runtime，跨 Runtime 直接拒绝（见 [§9](#9-错误信息全表)） |
-| `$dispose()` | `() => void` | 无 | 同步 | 释放全部内部节点（signal/computed/`$subscribe` Effect/已登记的 wasm 字段/`$own` 资源），中止在途的异步字段初始化；幂等，重复调用是 no-op |
+| `$dispose()` | `() => Promise<void>` | 无 | 异步、同步启动 | 首次调用同步切换 `$disposed`、中止在途异步字段初始化并启动全部内部节点清理；所有调用返回同一个 Promise，成功或失败均稳定重放，Promise settle 表示 owned cleanup 已完成 |
 
 `ISubscribeOptions`：`{ fireImmediately?: boolean }`，默认 `false`。
 `IHydrateOptions`：`{ unknown?: 'ignore' | 'report' | 'strict'; onUnknown?: (key: string) => void }`，默认 `unknown: 'ignore'`（向后兼容的部分 hydration）；`'strict'` 遇到未知 key 直接抛错；`'report'` 对每个未知 key 调用一次 `onUnknown`，写入过程本身继续。
@@ -280,6 +280,10 @@ ready/loading --dispose()（有持有者）--> closing --最后一个持有者�
 
 `factory` 既可以是函数 `(context) => T \| Promise<T>`，也可以是 `{ load, dispose?, keepAliveMs?, onError?, onTerminal? }` 对象形式（等价于把这些字段和 `options` 合并）。`StoreResourceLoadContext` 提供 `{ signal, generation, token }`，`signal` 在该次加载被取代/资源关闭时中止。
 
+构造时只读取上述已知字段并形成稳定快照：`load` 与每个已知 accessor 最多读取一次，不枚举或执行未知字段 getter；显式 `options` 的 own-enumerable 字段覆盖 factory 对象上的同名字段。`dispose`、`onError`、`onTerminal` 若存在必须是函数，否则在任何请求或 Resource 状态建立前同步抛出 tagged `INVALID_OPTION`。
+
+自动 `$dispose` 与自定义 disposer 的返回值遵循 lifecycle 的统一接纳语义：disposer getter、then getter 均只读取一次，捕获函数分别以原资源、原 thenable 作为 receiver 调用。getter、调用或异步 rejection 的原始异常通过 `onError(error, 'dispose')` 可达；重复 `forceDispose()` 不会重复清理同一值。
+
 ### 8.4 createStoreResourceScope
 
 ```ts
@@ -291,7 +295,7 @@ const settingsResource = scope.resource((ctx) => fetchSettings(ctx.signal));
 scope.dispose(); // 对组内每个资源调用 forceDispose()
 ```
 
-`scope.dispose()` 会强制释放（`forceDispose`）组内所有仍然存在的资源，不等待持有者释放——它假定"整个作用域要关闭了，个别资源的持有者不再重要"。资源终止（无论是自己终止还是被 scope 终止）会自动从组内摘除。
+`scope.resource()` 原样委托 `createStoreResource()` 的已知字段快照与 callback precedence，不会再次 spread/枚举 factory；用户的 effective `onTerminal` 保持不变。Scope 通过 `whenTerminal()` 从私有集合摘除自然终止的资源，不改写公开 disposer。`scope.dispose()` 会强制释放（`forceDispose`）组内所有仍然存在的资源，不等待持有者释放——它假定"整个作用域要关闭了，个别资源的持有者不再重要"。
 
 ---
 

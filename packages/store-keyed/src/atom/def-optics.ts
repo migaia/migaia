@@ -15,6 +15,7 @@ import {
   type IWritableDerivedDefinition
 } from './definition.js';
 import { createStoreKeyedError, StoreKeyedErrorCode } from '../errors.js';
+import { StoreKeyedErrorText } from '../error-text.js';
 import type { IAtomStore } from './store.js';
 import {
   readOpticPath,
@@ -89,10 +90,7 @@ export function focusDef<Source>(
   ...path: readonly PropertyKey[]
 ): IWritableDerivedDefinition<unknown, readonly [IAtomUpdate<unknown>], void> {
   if (path.length === 0) {
-    throw createStoreKeyedError(
-      StoreKeyedErrorCode.invalidOption,
-      '[store] focusDef requires at least one path segment'
-    );
+    throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, StoreKeyedErrorText.focusPath);
   }
   return opticDef(source, {
     get: (value) => readOpticPath(value, path, 'focusDef'),

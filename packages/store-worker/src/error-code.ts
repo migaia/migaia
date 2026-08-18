@@ -7,6 +7,8 @@
  * 码值是公开 API 的一部分，改名等同破坏性变更（`docs/contracts/error-code-rollout.sdd.md` §1.2）。
  */
 export const StoreWorkerErrorCode = {
+  /** Worker parser/adapter options were not an object at the JavaScript boundary. */
+  invalidOption: 'INVALID_OPTION',
   /**
    * Worker 适配器已释放后继续调用。
    *
@@ -40,7 +42,13 @@ export const StoreWorkerErrorCode = {
    *
    * 调用方检查 worker parser 的输出分段；这是 parser 实现错误。
    */
-  chunkMergeFailed: 'CHUNK_MERGE_FAILED'
+  chunkMergeFailed: 'CHUNK_MERGE_FAILED',
+
+  /**
+   * Endpoint and/or owned Worker cleanup failed during parser disposal. The caller must inspect
+   * `cause`/`errors[]` and treat the parser as terminal.
+   */
+  cleanupFailed: 'CLEANUP_FAILED'
 } as const;
 
 export type IStoreWorkerErrorCode =

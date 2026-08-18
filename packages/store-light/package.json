@@ -12,27 +12,28 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./*": {
-      "types": "./dist/*.d.ts",
-      "default": "./dist/*.js"
     }
   },
   "sideEffects": false,
   "scripts": {
-    "fmt": "oxfmt src test",
+    "fmt": "oxfmt src test e2e",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
-    "lint": "oxlint src test",
-    "test": "vitest run test"
+    "typecheck:e2e": "tsc -p tsconfig.e2e.json",
+    "lint": "oxlint src test e2e",
+    "test": "vitest run test",
+    "test:e2e": "playwright test --config=e2e/playwright.config.ts"
   },
   "dependencies": {
+    "@migaia/event-subscriber": "workspace:^",
     "@migaia/lifecycle": "workspace:^",
     "@migaia/reactive": "workspace:^"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "typescript": "~6.0.2",
+    "vite": "8.1.1",
     "vitest": "4.1.10"
   }
 }

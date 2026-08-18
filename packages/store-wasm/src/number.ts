@@ -1,8 +1,9 @@
 import type { IDisposable } from '@migaia/reactive';
-import { allocateOwnedSync } from './arena.js';
-import { createStoreWasmError, StoreWasmErrorCode } from './errors.js';
+import { allocateOwnedSync, disposeAllWasm, throwWasmConstructionFailure } from './arena.js';
+import { createStoreWasmError, createStoreWasmTypeError, StoreWasmErrorCode } from './errors.js';
 import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.js';
 import { WasmFieldMode } from './field-constants.js';
+import { StoreWasmErrorText } from './error-text.js';
 
 export type IWasmNumberField = IDisposable & {
   value: number;
@@ -19,10 +20,14 @@ export function number(): IFieldBuilder<IWasmNumberField> {
       let source: ReturnType<typeof createSource> | undefined;
       try {
         if (signal.aborted)
-          throw createStoreWasmError(StoreWasmErrorCode.initAborted, '[store] field init aborted');
+          throw createStoreWasmError(
+            StoreWasmErrorCode.initAborted,
+            StoreWasmErrorText.initAborted
+          );
         source = createSource('WasmNumber');
         const view = () => new DataView(memory.buffer);
         let disposed = false;
+        let disposing = false;
 
         const field: IWasmNumberField = {
           get observed() {
@@ -32,7 +37,7 @@ export function number(): IFieldBuilder<IWasmNumberField> {
             if (disposed)
               throw createStoreWasmError(
                 StoreWasmErrorCode.fieldDisposed,
-                '[store] cannot read a disposed wasm field'
+                StoreWasmErrorText.fieldDisposed
               );
             source!.track();
             return view().getFloat64(ptr, true);
@@ -41,7 +46,12 @@ export function number(): IFieldBuilder<IWasmNumberField> {
             if (disposed)
               throw createStoreWasmError(
                 StoreWasmErrorCode.fieldDisposed,
-                '[store] cannot write a disposed wasm field'
+                StoreWasmErrorText.fieldDisposed
+              );
+            if (typeof v !== 'number')
+              throw createStoreWasmTypeError(
+                StoreWasmErrorCode.invalidOption,
+                StoreWasmErrorText.valueType('number', 'number')
               );
             const memoryView = view();
             if (Object.is(memoryView.getFloat64(ptr, true), v)) return;
@@ -51,19 +61,26 @@ export function number(): IFieldBuilder<IWasmNumberField> {
             return disposed;
           },
           dispose() {
-            if (disposed) return;
-            disposed = true;
-            block.unregister(field);
-            // 逆序释放（migration.sdd.md §5.7）：先摘子资源边，再 dealloc block。
-            source!.dispose();
-            block.dispose();
+            if (disposed || disposing) return;
+            disposing = true;
+            try {
+              block.unregister(field);
+              // 逆序释放（migration.sdd.md §5.7）：先摘子资源边，再 dealloc block。
+              disposeAllWasm([() => source!.dispose(), () => block.dispose()]);
+              disposed = true;
+            } finally {
+              disposing = false;
+            }
           }
         };
         block.register(field);
         return field;
       } catch (error) {
-        source?.dispose();
-        block.dispose(); // 构造失败不泄漏分配
+        try {
+          disposeAllWasm([...(source ? [() => source!.dispose()] : []), () => block.dispose()]);
+        } catch (cleanupError) {
+          throwWasmConstructionFailure(error, cleanupError);
+        } // 构造失败不泄漏分配
         throw error;
       }
     }

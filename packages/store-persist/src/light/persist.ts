@@ -2,6 +2,7 @@ import type { IDisposer, IRuntime } from '@migaia/reactive';
 import { persistUnit } from '../core/persist-unit.js';
 import type { ICodec } from '@migaia/storage-web';
 import type { IPersistHandle, IPersistStorage, IPersistUnit } from '../core/types.js';
+import { snapshotPersistOptions } from '../core/options.js';
 
 /**
  * `persist()` 实际用到的 store 能力面，只有 4 个成员。
@@ -41,14 +42,15 @@ function toPersistUnit(store: IPersistableStore): IPersistUnit<Record<string, un
 }
 
 export function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle {
+  const snapshot = snapshotPersistOptions(options);
   return persistUnit(toPersistUnit(store), {
-    key: options.key,
+    key: snapshot.key,
     runtime: store.$runtime,
-    storage: options.storage,
-    codec: options.codec,
-    version: options.version,
-    migrate: options.migrate,
-    partialize: options.partialize,
-    debounceMs: options.debounceMs
+    storage: snapshot.storage,
+    codec: snapshot.codec,
+    version: snapshot.version,
+    migrate: snapshot.migrate,
+    partialize: snapshot.partialize,
+    debounceMs: snapshot.debounceMs
   });
 }

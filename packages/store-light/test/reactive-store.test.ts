@@ -50,6 +50,60 @@ function counterField(initial: number): IFieldBuilder<IDisposable & { value: num
   };
 }
 
+describe('$hydrate input boundary', () => {
+  it('contains hostile patch and hydration getters before mutation', () => {
+    const store = createStore({ count: 1 });
+    const { proxy, revoke } = Proxy.revocable({ count: 2 }, {});
+    revoke();
+    expect(() => store.$set(proxy as never)).toThrow(
+      expect.objectContaining({
+        source: '@migaia/store-light',
+        code: 'INVALID_OPTION',
+        cause: expect.any(Error)
+      })
+    );
+    expect(() => store.$hydrate(proxy as never)).toThrow(
+      expect.objectContaining({
+        source: '@migaia/store-light',
+        code: 'INVALID_OPTION',
+        cause: expect.any(Error)
+      })
+    );
+    expect(store.$plain()).toEqual({ count: 1 });
+    const optionsProxy = Proxy.revocable({}, {});
+    optionsProxy.revoke();
+    expect(() => store.$hydrate({ count: 2 }, optionsProxy.proxy as never)).toThrow(
+      expect.objectContaining({
+        source: '@migaia/store-light',
+        code: 'INVALID_OPTION',
+        cause: expect.any(Error)
+      })
+    );
+    expect(store.$plain()).toEqual({ count: 1 });
+    store.$dispose();
+  });
+  it('rejects null options with a tagged configuration error', () => {
+    const store = createStore({ count: 1 });
+    expect(() => store.$hydrate({}, null as never)).toThrow(
+      '[store] store options must be an object'
+    );
+    store.$dispose();
+  });
+
+  it('rejects null patches, partials, recipes, and listeners at the API boundary', () => {
+    const store = createStore({ count: 1 });
+    expect(() => store.$set(null as never)).toThrow('[store] $set patch must be an object');
+    expect(() => store.$hydrate(null as never)).toThrow(
+      '[store] $hydrate partial must be an object'
+    );
+    expect(() => store.$batch(null as never)).toThrow('[store] $batch recipe must be a function');
+    expect(() => store.$subscribe(null as never)).toThrow(
+      '[store] $subscribe listener must be a function'
+    );
+    store.$dispose();
+  });
+});
+
 // Async IFieldBuilder: resolves after a microtask, optionally rejecting, so tests can
 // exercise createAsyncStore()/createLegacyStore()/storeReady() and init-failure cleanup.
 function asyncCounterField(
@@ -93,6 +147,44 @@ function asyncCounterField(
 }
 
 describe('createStore: field classification', () => {
+  it('contains hostile definition proxies as tagged construction errors', () => {
+    const { proxy, revoke } = Proxy.revocable({ count: 1 }, {});
+    revoke();
+    try {
+      createStore(proxy as never);
+      throw new Error('expected store construction to fail');
+    } catch (error) {
+      expect(error).toMatchObject({
+        source: '@migaia/store-light',
+        code: 'INVALID_OPTION',
+        cause: expect.any(Error)
+      });
+    }
+  });
+
+  it('contains revoked store options proxies as tagged configuration errors', () => {
+    const { proxy, revoke } = Proxy.revocable({ debugName: 'hostile' }, {});
+    revoke();
+    try {
+      createStore({ count: 1 }, proxy as never);
+      throw new Error('expected store options to fail');
+    } catch (error) {
+      expect(error).toMatchObject({
+        source: '@migaia/store-light',
+        code: 'INVALID_OPTION',
+        cause: expect.any(Error)
+      });
+    }
+  });
+
+  it('rejects invalid debug and mutation policy option shapes before field setup', () => {
+    expect(() => createStore({ count: 1 }, { debugName: Symbol('name') as never })).toThrow(
+      '[store] store options have an invalid field shape'
+    );
+    expect(() =>
+      createStore({ count: 1 }, { mutationPolicy: { assertMutationAllowed: 1 } as never })
+    ).toThrow('[store] store options have an invalid field shape');
+  });
   it('treats plain values as signals: readable, writable, subscribable', () => {
     const runtime = createRuntime();
     const store = createStore({ count: 1 }, { runtime });
@@ -243,6 +335,46 @@ describe('createStore: IFieldBuilder protocol', () => {
 });
 
 describe('createAsyncStore / createLegacyStore / storeReady', () => {
+  it('contains cleanup reporter failure after synchronous construction failure', async () => {
+    const cleanup = new Error('sync cleanup failed');
+    let reporterCalled = false;
+    const reporter = () => {
+      reporterCalled = true;
+      throw new Error('runtime reporter failed');
+    };
+    const runtime = createRuntime();
+    vi.spyOn(runtime, 'reportError').mockImplementation(reporter);
+    const dirty: IFieldBuilder<IDisposable & { value: number }> = {
+      [FIELD_BUILDER]: true,
+      mode: 'sync',
+      create: () => ({
+        value: 1,
+        disposed: false,
+        dispose: () => {
+          throw cleanup;
+        }
+      })
+    };
+    expect(() =>
+      createLegacyStore(
+        {
+          dirty,
+          bad: {
+            [FIELD_BUILDER]: true,
+            mode: 'sync',
+            create: () => {
+              throw new Error('sync init failed');
+            }
+          } as IFieldBuilder<IDisposable & { value: number }>
+        },
+        { runtime }
+      )
+    ).toThrow('sync init failed');
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(reporterCalled).toBe(true);
+  });
+
   it('disposes an async field that resolves after a synchronous sibling failure', async () => {
     let disposed = false;
     const late: IFieldBuilder<IDisposable & { value: number }> = {
@@ -567,6 +699,68 @@ describe('$subscribe', () => {
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onError.mock.calls[0][0]).toBeInstanceOf(Error);
     store.$dispose();
+  });
+
+  it('contains a throwing runtime reporter and keeps the subscription alive', async () => {
+    const runtime = createRuntime();
+    const reporterFailure = new Error('runtime reporter failed');
+    const hostReportError = vi.fn();
+    vi.spyOn(runtime, 'reportError').mockImplementation(() => {
+      throw reporterFailure;
+    });
+    vi.stubGlobal('reportError', hostReportError);
+    try {
+      const store = createStore({ a: 1 }, { runtime });
+      let calls = 0;
+      store.$subscribe(() => {
+        calls++;
+        throw new Error('listener boom');
+      });
+
+      expect(() => {
+        store.a = 2;
+      }).not.toThrow();
+      await Promise.resolve();
+      expect(() => {
+        store.a = 3;
+      }).not.toThrow();
+      await Promise.resolve();
+      expect(calls).toBe(2);
+      expect(hostReportError).toHaveBeenCalledWith(reporterFailure);
+      store.$dispose();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe('$dispose lifecycle', () => {
+  it('is single-flight while asynchronous owned cleanup is still pending', async () => {
+    const store = createStore({ count: 1 });
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const resource = {
+      disposed: false,
+      dispose: () => pending
+    } as unknown as IDisposable;
+    store.$own(resource);
+
+    const first = store.$dispose();
+    const second = store.$dispose();
+    expect(second).toBe(first);
+
+    let settled = false;
+    void second.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    release();
+    await first;
+    expect(store.$dispose()).toBe(first);
   });
 });
 

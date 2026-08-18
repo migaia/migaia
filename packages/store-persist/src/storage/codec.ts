@@ -3,9 +3,25 @@ import type { IPersistStorage, IPersistByteStorage } from '../core/types.js';
 import { createStorePersistTypeError } from '../errors.js';
 import { StorePersistErrorCode } from '../error-code.js';
 import { PersistCodecOutput } from '../state-constants.js';
+import { StorePersistErrorText } from '../error-text.js';
 
 const MAP_TAG = '__migaia_persist_map__';
 const SET_TAG = '__migaia_persist_set__';
+
+/** Detects collections by structured-cloning into this realm; never reads a candidate constructor. */
+const intrinsicCollection = (value: unknown): Map<unknown, unknown> | Set<unknown> | undefined => {
+  if (value === null || typeof value !== 'object') return undefined;
+  try {
+    const clone = globalThis.structuredClone?.(value);
+    if (clone instanceof Map) return clone;
+    if (clone instanceof Set) return clone;
+    if (value instanceof Map) return value;
+    if (value instanceof Set) return value;
+  } catch {
+    return undefined;
+  }
+  return undefined;
+};
 
 /**
  * `JSON.stringify(new Map(...))` 产出 `"{}"`——Map/Set 不是 JSON 原生可表达的形状，裸调用会
@@ -14,12 +30,9 @@ const SET_TAG = '__migaia_persist_set__';
  * 必须自己认得这两种形状，用一个打了标签的普通对象过一趟，而不是要求每个使用方自己转数组。
  */
 function jsonReplacer(_key: string, value: unknown): unknown {
-  // Object.prototype.toString 走内部 slot：跨 realm 的 Map/Set 也能识别；`instanceof Map` 会拒跨 realm 值，
-  // 把真实数据静默序列化成 "{}"（与 storage-contract 的 ArrayBuffer/Date 分类同一规则）。
-  if (Object.prototype.toString.call(value) === '[object Map]')
-    return { [MAP_TAG]: [...(value as Map<unknown, unknown>).entries()] };
-  if (Object.prototype.toString.call(value) === '[object Set]')
-    return { [SET_TAG]: [...(value as Set<unknown>).values()] };
+  const collection = intrinsicCollection(value);
+  if (collection instanceof Map) return { [MAP_TAG]: [...collection.entries()] };
+  if (collection instanceof Set) return { [SET_TAG]: [...collection.values()] };
   return value;
 }
 
@@ -48,7 +61,7 @@ export const defaultJsonCodec: ICodec = Object.freeze({
     if (encoded === undefined) {
       throw createStorePersistTypeError(
         StorePersistErrorCode.encodeFailed,
-        '[store] json codec cannot serialize this value'
+        StorePersistErrorText.jsonSerialize
       );
     }
     return encoded;
@@ -57,7 +70,7 @@ export const defaultJsonCodec: ICodec = Object.freeze({
     if (typeof raw !== 'string') {
       throw createStorePersistTypeError(
         StorePersistErrorCode.envelopeInvalid,
-        '[store] json codec expects a string payload'
+        StorePersistErrorText.jsonPayload
       );
     }
     return JSON.parse(raw, jsonReviver);
@@ -75,7 +88,7 @@ function assertBinaryCapable(storage: IPersistStorage): asserts storage is IPers
   if (typeof storage.getBytes !== 'function' || typeof storage.setBytes !== 'function') {
     throw createStorePersistTypeError(
       StorePersistErrorCode.backendCapability,
-      '[store] binary codec output requires a storage-web store with getBytes/setBytes (an IRecordStore-capable backend)'
+      StorePersistErrorText.binaryBackend
     );
   }
 }
@@ -90,7 +103,7 @@ export async function writeEnvelope(
   if (codec.output === PersistCodecOutput.structured) {
     throw createStorePersistTypeError(
       StorePersistErrorCode.codecOutputMismatch,
-      `[store] codec "${codec.name}" produces structured output, which this storage adapter shape does not support`
+      StorePersistErrorText.structuredOutput(codec.name)
     );
   }
   const encoded = await codec.encode(value, ctx);
@@ -99,7 +112,7 @@ export async function writeEnvelope(
     if (!(encoded instanceof Uint8Array)) {
       throw createStorePersistTypeError(
         StorePersistErrorCode.codecOutputMismatch,
-        `[store] binary codec "${codec.name}" must encode to a Uint8Array`
+        StorePersistErrorText.binaryUint8(codec.name)
       );
     }
     await storage.setBytes(key, encoded, ctx);
@@ -108,7 +121,7 @@ export async function writeEnvelope(
   if (typeof encoded !== 'string') {
     throw createStorePersistTypeError(
       StorePersistErrorCode.codecOutputMismatch,
-      `[store] codec "${codec.name}" must encode to a string when the backend has no binary channel`
+      StorePersistErrorText.stringOutput(codec.name)
     );
   }
   await storage.set(key, encoded, ctx);
@@ -129,7 +142,7 @@ export async function readEnvelope(
   if (codec.output === PersistCodecOutput.binary) {
     throw createStorePersistTypeError(
       StorePersistErrorCode.codecOutputMismatch,
-      `[store] binary codec "${codec.name}" requires a storage backend with binary read support`
+      StorePersistErrorText.binaryRead(codec.name)
     );
   }
   const text = await storage.get(key, ctx);

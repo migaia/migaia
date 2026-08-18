@@ -24,12 +24,29 @@ export function createStorePersistError(
   return tagStorePersistError(error, code);
 }
 
+/** Builds a tagged native DOMException for cancellation after disposal. */
+export function createStorePersistAbortError(
+  code: IStorePersistErrorCode,
+  message: string,
+  cause?: unknown
+): DOMException {
+  const error = new DOMException(message, 'AbortError');
+  if (cause !== undefined)
+    Object.defineProperty(error, 'cause', { value: cause, configurable: true });
+  return tagStorePersistError(error, code);
+}
+
 /** Builds a `(source, code)`-tagged `TypeError`, preserving the runtime type. */
 export function createStorePersistTypeError(
   code: IStorePersistErrorCode,
-  message: string
+  message: string,
+  options?: { readonly cause?: unknown }
 ): TypeError {
-  return tagStorePersistError(new TypeError(message), code);
+  const error = new TypeError(
+    message,
+    options?.cause !== undefined ? { cause: options.cause } : undefined
+  );
+  return tagStorePersistError(error, code);
 }
 
 /** Builds a `(source, code)`-tagged `AggregateError`, preserving `errors[]` as a cause path. */

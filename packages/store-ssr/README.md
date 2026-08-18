@@ -54,7 +54,7 @@ function renderPage(): string {
 
   const state = scope.dehydrate();
   const html = `<body>${createSSRStateScript(state)}<div id="root"></div></body>`;
-  scope.dispose(); // 请求结束,连带释放 owned 的 store
+  await scope.disposeAsync(); // 请求结束，等待 owned store 的异步 cleanup
   return html;
 }
 ```

@@ -7,28 +7,45 @@ import {
 } from '@migaia/reactive';
 import { claimOwnership, ownerOf } from '@migaia/reactive/ownership';
 import {
+  assimilateCapturedThen,
   createTerminalController,
+  probeThenable,
+  ThenableProbeKind,
   type ITerminalController,
   type ILifecycleState
 } from '@migaia/lifecycle';
-import { LifecycleState } from '@migaia/lifecycle';
 import { createAtomStore, type IAtomStore } from '@migaia/store-keyed/atom/store';
 import { createStoreReactAggregateError, createStoreReactError } from './errors.js';
 import { StoreReactErrorCode } from './error-code.js';
+import { StoreReactErrorText } from './error-text.js';
 
 const STORE_TOKEN_VALUE = Symbol('store-token-value');
+
+/** Keeps lifecycle diagnostics from escaping timer and promise rejection boundaries. */
+function reportRegistryFailure(runtime: IRuntime, error: unknown): void {
+  try {
+    runtime.reportError(error, { phase: ReactiveErrorPhase.lifecycleHook });
+    return;
+  } catch (reporterError) {
+    const hostReportError = (globalThis as { reportError?: (error: unknown) => void }).reportError;
+    try {
+      if (hostReportError) hostReportError(reporterError);
+      else console.error(reporterError);
+    } catch {
+      // Host diagnostics are best effort and must not create a second unhandled failure.
+    }
+  }
+}
 
 /**
  * React gives no public hook for "this render/component instance was discarded before it committed"
  * — no callback fires for an effect that never ran. `prepareForRender()`'s timer is the only signal
  * available, and it is inherently a heuristic: too short risks disposing a candidate a legitimately
- * slow (not abandoned) render still needs; too long delays reclaiming a genuinely abandoned one.
- * This is the bound for the case that matters most — `armInitial` (a readiness barrier promise)
- * that never settles must not turn into a permanent leak just because the "check sooner once the
- * barrier resolves" path then never fires either.
+ * slow (not abandoned) render still needs; too long delays reclaiming a genuinely abandoned one. A
+ * pending readiness barrier is deliberately not reclaimed by wall-clock time: React may commit a
+ * legitimately slow render after an arbitrary delay. The owner must resolve/reject the barrier or
+ * explicitly dispose the candidate; correctness is more important than heuristic reclamation.
  */
-const ABANDONED_RENDER_FALLBACK_MS = 4000;
-
 export type IStoreToken<T> = Readonly<{
   key: symbol;
   debugName: string;
@@ -39,16 +56,51 @@ export type IStoreRegistrationOptions = {
   readonly owned?: boolean;
 };
 
+/** Rejects null/non-object registration options before reading ownership flags. */
+function readRegistrationOwned(options: unknown, fallback: boolean): boolean {
+  if (options === null || typeof options !== 'object')
+    throw createStoreReactError(
+      StoreReactErrorCode.invalidConfig,
+      StoreReactErrorText.optionsObject
+    );
+  try {
+    Object.getOwnPropertyDescriptors(options);
+  } catch (error) {
+    throw createStoreReactError(
+      StoreReactErrorCode.invalidConfig,
+      StoreReactErrorText.optionsObject,
+      { cause: error }
+    );
+  }
+  try {
+    const owned = 'owned' in options ? options.owned : undefined;
+    if (owned !== undefined && typeof owned !== 'boolean') {
+      throw createStoreReactError(
+        StoreReactErrorCode.invalidConfig,
+        StoreReactErrorText.ownedOption
+      );
+    }
+    return owned ?? fallback;
+  } catch (error) {
+    if (error instanceof Error && 'code' in error) throw error;
+    throw createStoreReactError(
+      StoreReactErrorCode.invalidConfig,
+      StoreReactErrorText.ownedOption,
+      { cause: error }
+    );
+  }
+}
+
 type IRegistryEntry = {
   readonly value: unknown;
   readonly owned: boolean;
 };
 
 export function createStoreToken<T>(debugName: string): IStoreToken<T> {
-  if (debugName.length === 0) {
+  if (typeof debugName !== 'string' || debugName.length === 0) {
     throw createStoreReactError(
       StoreReactErrorCode.invalidConfig,
-      '[store] IStoreToken requires a debug name'
+      StoreReactErrorText.tokenDebugName
     );
   }
   return Object.freeze({
@@ -66,7 +118,6 @@ export class StoreRegistry implements IDisposable {
   #disposed = false;
   #retainCount = 0;
   #lifecycleGeneration = 0;
-  #renderCommitted = false;
   #terminal: ITerminalController = createTerminalController();
   // Disposers invoked from the synchronous dispose() path whose return value
   // turned out to be a thenable. dispose() can't await them (it's sync),
@@ -74,6 +125,11 @@ export class StoreRegistry implements IDisposable {
   // become an unhandled rejection just because nothing was watching yet.
   #pendingSyncDisposals = new Set<Promise<void>>();
   #disposingAsync: Promise<void> | undefined;
+  /** Stable completion ledger for every disposer started by the terminal dispose operation. */
+  #disposeCompletion: Promise<void> | undefined;
+  #resolveDisposeCompletion: (() => void) | undefined;
+  #rejectDisposeCompletion: ((error: unknown) => void) | undefined;
+  #disposeErrors: unknown[] = [];
 
   constructor(runtime: IRuntime = createRuntime()) {
     this.runtime = runtime;
@@ -100,16 +156,17 @@ export class StoreRegistry implements IDisposable {
 
   register<T>(token: IStoreToken<T>, value: T, options: IStoreRegistrationOptions = {}): IDisposer {
     this.#assertActive();
+    const owned = readRegistrationOwned(options, false);
     this.#assertRuntime(token, value);
     if (this.#entries.has(token.key)) {
       throw createStoreReactError(
         StoreReactErrorCode.storeDuplicate,
-        `[store] duplicate provider store token: ${token.debugName}`
+        StoreReactErrorText.duplicateToken(token.debugName)
       );
     }
     const entry: IRegistryEntry = {
       value,
-      owned: options.owned ?? false
+      owned
     };
     this.#entries.set(token.key, entry);
     return () => {
@@ -122,11 +179,12 @@ export class StoreRegistry implements IDisposable {
 
   replace<T>(token: IStoreToken<T>, value: T, options: IStoreRegistrationOptions = {}): void {
     this.#assertActive();
+    const owned = readRegistrationOwned(options, false);
     this.#assertRuntime(token, value);
     const previous = this.#entries.get(token.key);
     this.#entries.set(token.key, {
       value,
-      owned: options.owned ?? false
+      owned
     });
     if (previous?.owned && previous.value !== value) {
       this.#disposeValueObserved(previous.value);
@@ -144,7 +202,7 @@ export class StoreRegistry implements IDisposable {
     if (!entry) {
       throw createStoreReactError(
         StoreReactErrorCode.storeMissing,
-        `[store] missing provider store: ${token.debugName}`
+        StoreReactErrorText.missingStore(token.debugName)
       );
     }
     return entry.value as T;
@@ -170,7 +228,6 @@ export class StoreRegistry implements IDisposable {
    */
   retain(disposeOnRelease: boolean, _deferTask = false): IDisposer {
     this.#assertActive();
-    this.#renderCommitted = true;
     this.#retainCount++;
     this.#lifecycleGeneration++;
     let retained = true;
@@ -192,9 +249,7 @@ export class StoreRegistry implements IDisposable {
           try {
             this.dispose();
           } catch (error) {
-            this.runtime.reportError(error, {
-              phase: ReactiveErrorPhase.lifecycleHook
-            });
+            reportRegistryFailure(this.runtime, error);
           }
         }
       };
@@ -205,53 +260,13 @@ export class StoreRegistry implements IDisposable {
   }
 
   /**
-   * Arm an internally-created registry for a concurrent render. If React abandons that render
-   * before RegistryBoundary commits, reclaim the candidate instead of leaking a detached
-   * runtime/atom graph forever.
-   *
-   * This is memory cleanup, not an ownership decision: `check()` only ever disposes a registry with
-   * `#retainCount === 0` — one that `retain()` (which only ever runs from `RegistryBoundary`'s
-   * `useEffect`, i.e. only after React actually committed) has never touched. Nothing holds this
-   * registry for correctness purposes until `retain()` runs; until then it's exactly as reclaimable
-   * as any other unused render-phase value. Once `retain()` does run, this check is permanently a
-   * no-op for that registry — there is no path where a retained, in-use registry gets disposed out
-   * from under its owner. So while the timing below is a heuristic (React gives no "this render was
-   * discarded" hook to react to instead), getting the timing "wrong" only ever costs memory, never
-   * correctness — a mistimed check can leave garbage a little longer or reclaim a candidate that
-   * would've been retained moments later, but never disposes something still in use.
-   *
-   * No `after` (no readiness barrier to wait on): a single short timer is the only check needed —
-   * there is nothing else worth waiting for first.
-   *
-   * With `after`: a short check is armed once `after` settles (the common case — a resolved
-   * readiness barrier is itself decent evidence the render is progressing normally, so checking
-   * again soon after is a reasonable bet), but that is only ever scheduled _after_ the barrier
-   * settles. A barrier that hangs forever must not silently disable cleanup entirely, so a
-   * generous, bounded fallback (`ABANDONED_RENDER_FALLBACK_MS`) is always armed too, independent of
-   * whether `after` ever settles — that's the bound this module actually guarantees; the short
-   * check is purely an optimization on top of it.
+   * Retained for source compatibility, but deliberately does not reclaim a render candidate. React
+   * exposes no reliable abandoned-render signal; any timer, including one armed after a readiness
+   * promise settles, can dispose a valid render before its effect commits. Candidate reclamation
+   * belongs to an observable owner or a future GC-backed mechanism.
    */
   prepareForRender(after?: Promise<void>): void {
-    if (this.#disposed || this.#renderCommitted) return;
-    const check = () => {
-      if (!this.#disposed && !this.#renderCommitted && this.#retainCount === 0) {
-        try {
-          this.dispose();
-        } catch (error) {
-          this.runtime.reportError(error, { phase: ReactiveErrorPhase.lifecycleHook });
-        }
-      }
-    };
-    if (!after) {
-      setTimeout(check, 0);
-      return;
-    }
-    const fallback = setTimeout(check, ABANDONED_RENDER_FALLBACK_MS);
-    const armFastPath = () => {
-      clearTimeout(fallback);
-      setTimeout(check, 16);
-    };
-    void after.then(armFastPath, armFastPath);
+    void after;
   }
 
   /**
@@ -263,34 +278,33 @@ export class StoreRegistry implements IDisposable {
    */
   dispose(): void {
     if (this.#disposed) return;
+    this.#createDisposeCompletion();
     this.#disposed = true;
     this.#terminal.close();
     this.#lifecycleGeneration++;
     const entries = [...this.#entries.values()].reverse();
     this.#entries.clear();
-    const errors: unknown[] = [];
     for (const entry of entries) {
       if (!entry.owned) continue;
       try {
         this.#disposeValueTracked(entry.value);
       } catch (error) {
-        errors.push(error);
+        this.#disposeErrors.push(error);
       }
     }
     try {
       this.atomStore.dispose();
     } catch (error) {
-      errors.push(error);
+      this.#disposeErrors.push(error);
     }
-    if (this.#pendingSyncDisposals.size === 0) this.#terminal.forceTerminal();
-    if (errors.length === 1) throw errors[0];
-    if (errors.length > 1) {
+    this.#finishDisposeIfReady();
+    if (this.#disposeErrors.length === 1) throw this.#disposeErrors[0];
+    if (this.#disposeErrors.length > 1)
       throw createStoreReactAggregateError(
         StoreReactErrorCode.registryDisposalFailed,
-        errors,
-        '[store] provider registry disposal failed'
+        this.#disposeErrors,
+        StoreReactErrorText.registryDisposalFailed
       );
-    }
   }
 
   /**
@@ -301,53 +315,45 @@ export class StoreRegistry implements IDisposable {
    */
   disposeAsync(): Promise<void> {
     if (this.#disposingAsync) return this.#disposingAsync;
-    if (this.#terminal.lifecycle === LifecycleState.terminal) return Promise.resolve();
-    this.#disposingAsync = this.#performDisposeAsync();
+    if (!this.#disposed) {
+      try {
+        this.dispose();
+      } catch {
+        // The stable completion below replays this failure to async callers.
+      }
+    }
+    this.#disposingAsync = this.#createDisposeCompletion();
     return this.#disposingAsync;
   }
 
-  async #performDisposeAsync(): Promise<void> {
-    if (!this.#disposed) {
-      this.#disposed = true;
-      this.#terminal.close();
-      this.#lifecycleGeneration++;
-      const entries = [...this.#entries.values()].reverse();
-      this.#entries.clear();
-      const errors: unknown[] = [];
-      for (const entry of entries) {
-        if (!entry.owned) continue;
-        try {
-          const result = disposeValue(entry.value);
-          const thenable = asPromiseLike(result);
-          if (thenable) await thenable;
-        } catch (error) {
-          errors.push(error);
-        }
-      }
-      try {
-        this.atomStore.dispose();
-      } catch (error) {
-        errors.push(error);
-      }
-      this.#terminal.forceTerminal();
-      if (errors.length === 1) throw errors[0];
-      if (errors.length > 1) {
-        throw createStoreReactAggregateError(
+  /** Creates the one completion promise shared by sync-started and async callers. */
+  #createDisposeCompletion(): Promise<void> {
+    if (this.#disposeCompletion) return this.#disposeCompletion;
+    this.#disposeCompletion = new Promise<void>((resolve, reject) => {
+      this.#resolveDisposeCompletion = resolve;
+      this.#rejectDisposeCompletion = reject;
+    });
+    void this.#disposeCompletion.catch(() => undefined);
+    return this.#disposeCompletion;
+  }
+
+  /** Settles the completion ledger once every tracked disposer has settled. */
+  #finishDisposeIfReady(): void {
+    if (this.#pendingSyncDisposals.size !== 0 || !this.#disposeCompletion) return;
+    this.#terminal.forceTerminal();
+    if (this.#disposeErrors.length === 0) this.#resolveDisposeCompletion?.();
+    else if (this.#disposeErrors.length === 1)
+      this.#rejectDisposeCompletion?.(this.#disposeErrors[0]);
+    else
+      this.#rejectDisposeCompletion?.(
+        createStoreReactAggregateError(
           StoreReactErrorCode.registryDisposalFailed,
-          errors,
-          '[store] provider registry disposal failed'
-        );
-      }
-      return;
-    }
-    // dispose() already ran synchronously; wait for whatever it left in
-    // flight rather than treating "already disposed" as "already settled".
-    if (this.#pendingSyncDisposals.size) {
-      await Promise.all(
-        [...this.#pendingSyncDisposals].map((pending) => pending.catch(() => undefined))
+          this.#disposeErrors,
+          StoreReactErrorText.registryDisposalFailed
+        )
       );
-    }
-    await this.#terminal.whenTerminal();
+    this.#resolveDisposeCompletion = undefined;
+    this.#rejectDisposeCompletion = undefined;
   }
 
   /**
@@ -361,16 +367,24 @@ export class StoreRegistry implements IDisposable {
     const tracked: Promise<void> = thenable.then(
       () => undefined,
       (error: unknown) => {
-        this.runtime.reportError(error, { phase: ReactiveErrorPhase.lifecycleHook });
+        this.#disposeErrors.push(error);
+        reportRegistryFailure(this.runtime, error);
+        throw error;
       }
     );
     this.#pendingSyncDisposals.add(tracked);
-    void tracked.finally(() => {
-      this.#pendingSyncDisposals.delete(tracked);
-      if (this.#disposed && this.#pendingSyncDisposals.size === 0) {
-        this.#terminal.forceTerminal();
-      }
-    });
+    void tracked.then(
+      () => this.#finishTrackedDisposal(tracked),
+      () => this.#finishTrackedDisposal(tracked)
+    );
+  }
+
+  /** Removes one settled sync disposer without creating an unhandled rejected finally-chain. */
+  #finishTrackedDisposal(tracked: Promise<void>): void {
+    this.#pendingSyncDisposals.delete(tracked);
+    if (this.#disposed && this.#pendingSyncDisposals.size === 0) {
+      this.#finishDisposeIfReady();
+    }
   }
 
   /**
@@ -383,7 +397,7 @@ export class StoreRegistry implements IDisposable {
     const thenable = asPromiseLike(result);
     if (!thenable) return;
     void thenable.catch((error: unknown) => {
-      this.runtime.reportError(error, { phase: ReactiveErrorPhase.lifecycleHook });
+      reportRegistryFailure(this.runtime, error);
     });
   }
 
@@ -392,7 +406,7 @@ export class StoreRegistry implements IDisposable {
     if (runtime && runtime !== this.runtime) {
       throw createStoreReactError(
         StoreReactErrorCode.crossRuntime,
-        `[store] provider store "${token.debugName}" belongs to a different Runtime`
+        StoreReactErrorText.differentRuntime(token.debugName)
       );
     }
   }
@@ -401,7 +415,7 @@ export class StoreRegistry implements IDisposable {
     if (this.#disposed) {
       throw createStoreReactError(
         StoreReactErrorCode.registryDisposed,
-        '[store] provider registry is disposed'
+        StoreReactErrorText.registryDisposed
       );
     }
   }
@@ -420,25 +434,17 @@ function disposeValue(value: unknown): unknown {
   if (value === null || (typeof value !== 'object' && typeof value !== 'function'))
     return undefined;
   const candidate = value as {
-    $dispose?: unknown;
-    dispose?: unknown;
+    $dispose?: () => void | PromiseLike<void>;
+    dispose?: () => void | PromiseLike<void>;
   };
-  const disposer =
-    typeof candidate.$dispose === 'function'
-      ? candidate.$dispose
-      : typeof candidate.dispose === 'function'
-        ? candidate.dispose
-        : undefined;
-  return disposer ? Reflect.apply(disposer, value, []) : undefined;
+  if (typeof candidate.$dispose === 'function') return candidate.$dispose();
+  if (typeof candidate.dispose === 'function') return candidate.dispose();
+  return undefined;
 }
 
 function asPromiseLike(value: unknown): Promise<unknown> | undefined {
-  if (value === null || (typeof value !== 'object' && typeof value !== 'function')) {
-    return undefined;
-  }
-  const then = (value as { then?: unknown }).then;
-  if (typeof then !== 'function') return undefined;
-  return new Promise((resolve, reject) => {
-    Reflect.apply(then, value, [resolve, reject]);
-  });
+  const probe = probeThenable(value);
+  if (probe.kind === ThenableProbeKind.failed) throw probe.error;
+  if (probe.kind === ThenableProbeKind.notThenable) return undefined;
+  return assimilateCapturedThen(probe.thenFn, value);
 }

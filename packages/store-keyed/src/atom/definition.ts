@@ -10,7 +10,9 @@
  */
 
 import { createStoreKeyedTypeError, StoreKeyedErrorCode } from '../errors.js';
+import { probeThenable, ThenableProbeKind } from '@migaia/lifecycle';
 import { AtomKind } from './kind-constants.js';
+import { StoreKeyedErrorText } from '../error-text.js';
 
 // Symbol.for keeps definitions recognizable when two copies of the package
 // coexist in one Realm (for example an app bundle plus a worker/devtools copy).
@@ -118,15 +120,18 @@ export const isAtomDefinition = (value: unknown): value is IAtomDefinition<unkno
  * error message.
  */
 export function assertNotThenable(value: unknown, context: string): void {
-  if (
-    value !== null &&
-    typeof value === 'object' &&
-    typeof (value as { then?: unknown }).then === 'function'
-  ) {
+  const probe = probeThenable(value);
+  if (probe.kind === ThenableProbeKind.failed) {
     throw createStoreKeyedTypeError(
       StoreKeyedErrorCode.invalidOption,
-      `[store] ${context} returned a thenable — async initial values are not supported here; ` +
-        `compose with @migaia/resource instead (e.g. \`familyDef((id) => createResource(() => fetch(id)))\`)`
+      StoreKeyedErrorText.thenable(context),
+      { cause: probe.error }
+    );
+  }
+  if (probe.kind === ThenableProbeKind.thenable) {
+    throw createStoreKeyedTypeError(
+      StoreKeyedErrorCode.invalidOption,
+      StoreKeyedErrorText.thenable(context)
     );
   }
 }

@@ -85,7 +85,7 @@ class WorkerAdapter {
 - **`port`**：满足 `IWorkerPort` 的对象，通常直接传 `new Worker(...)`。
 - **`options.clientId`**：本端在 web-rpc 拓扑里的 `id`，默认 `'main'`。同一个 Worker 如果被多个 `WorkerAdapter` 实例共用（不推荐，见下方注意事项），需要传不同的 `clientId` 区分。
 - **`options.timeoutMs`**：请求默认超时（毫秒）。省略时不设默认超时——单次 `request()` 一直等对方响应，可以在 `request()` 调用点传 `signal` 自行控制取消。
-- **`request<Input, Output>(payload, options)`**：发起一次 `'call'` RPC 调用，等价于 `endpoint.send('worker', 'call', payload, options)`。`options.signal` 用标准 `AbortSignal` 取消这次调用；`options.transfer` 传入这次调用要零拷贝转移的 `Transferable` 列表（比如 `Uint8Array.buffer`）。
+- **`request<Input, Output>(payload, options)`**：发起一次 `'call'` RPC 调用。入口会在返回 Promise 前一次性读取 `options.signal`/`options.transfer`，endpoint 尚未就绪期间不再读取调用者对象；getter 失败或非法 options 以带 `INVALID_OPTION` 的 rejected Promise 返回并保留 `cause`。`signal` 用于取消，`transfer` 指定零拷贝转移列表（比如 `Uint8Array.buffer`）。
 - **构造是异步的，但构造函数本身同步返回**：`createEndpoint()` 内部是异步的（要跑完中间件安装），`WorkerAdapter` 把这个 Promise 存在私有字段里，`request()` 会先 `await` 它再发请求——调用方不需要显式等待"连接就绪"，直接 `new WorkerAdapter(worker).request(...)` 就能用。
 - **`close()`**：同步标记不可用（`disposed = true`，幂等），此后 `request()` 立即拒绝，但**不**释放底层 endpoint。
 - **`dispose()`**：唯一异步释放入口——先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`。失败会 reject（**不吞错**），重复调用复用同一个 Promise。需要"立刻标记不可用、暂不关心清理完成"时用 `close()`；需要强一致的清理确认时 `await dispose()`。
@@ -128,7 +128,7 @@ await handler.dispose(); // 先 close()，再等底层端点初始化并 dispose
 ```
 
 - **`handler(message)`**：`disposed === true` 时直接返回 `Promise<void>`（resolve），不会处理也不会报错——这是有意的静默丢弃：`close()`/`dispose()` 之后 Worker 可能还会因为消息队列里的残留消息被再调用一次，不应该因此抛错。
-- **`pendingCount`**：每次调用 `handler(message)` 时 +1，处理结束（无论成功失败）后 -1。可以用它判断"当前是不是还有请求在处理中",比如在 Worker 准备被 `terminate()` 之前先等 `pendingCount` 归零。
+- **`pendingCount`**：每次调用 `handler(message)` admission 时 +1，等待 endpoint 并同步交付消息后 -1。它是 inbound dispatch 指标，**不代表 provider compute 已完成**，也不能作为 `Worker.terminate()` 的 quiescence 门禁；真正的 provider drain/cleanup 由 Web RPC endpoint 拥有，终止前必须等待 `handler.dispose()` 完成。
 - **`close()` vs `dispose()`**：`close()` 同步标记 `disposed = true`，只负责"停止接受新消息"，不触发任何用户清理；`dispose()` 是唯一异步释放入口，内部先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`，清理失败时会把错误 reject 出来（错误形态与 `@migaia/web-rpc` 的 `endpoint.dispose()` 一致，是 `WebRpcLifecycleError`，`cleanupErrors` 字段列出具体哪个资源没清理干净）。两者都是幂等的——`close()` 重复调用是无操作；`dispose()` 多次调用复用同一个 Promise，不会重复触发清理。
 
 ---
@@ -150,6 +150,8 @@ function workerComputed<Input, Output>(
 
 `workerComputed` 是 `WorkerAdapter.request()` 和 `@migaia/resource` 的 `Resource` 之间的一层薄粘合：
 
+构造入口会先验证 `adapter`、`selectInput` 与可选 `transfer`，并只读取 runtime/Resource 已知 options 一次；不会通过 object-rest 枚举未知属性。非法 callback 或 hostile getter 在 Resource ownership/auto-start 前同步抛带 `INVALID_OPTION` 的 Store Worker 错误，getter 原异常保留在 `cause`。
+
 ```ts
 new Resource<Output>(
   ({ signal }) => {
@@ -160,6 +162,8 @@ new Resource<Output>(
   resourceOptions
 );
 ```
+
+`compute` 与 `postMessage` 会在 transport/endpoint 创建前同步验证；非法 JavaScript 输入以 Store Worker `INVALID_OPTION` 拒绝，不会返回半构造 handler。
 
 - **`adapter`**：一个已经构造好的 `WorkerAdapter`，`workerComputed` 不管理它的生命周期——`adapter.dispose()` 需要调用方自己在合适的时机调用（通常晚于 `Resource.dispose()`，因为 Resource 释放时可能还有一次正在飞行的请求依赖这个 adapter）。
 - **`selectInput`**：同步函数，返回值作为 RPC 的 `payload`。它在 `Resource` 的 fetcher 里被同步调用一次——函数体里读取的响应式值（signal/computed）会被 `Resource` 记为依赖，依赖变化会让 `Resource` 重新发起请求。异步读取（比如 `await` 之后再读）不会被追踪到，这是 `@migaia/resource` 的通用限制，不是 `workerComputed` 特有的。
@@ -201,7 +205,7 @@ type IWorkerPluginOptions = {
 
 - `encode(value, context)`：如果 `value` 本身就是 `Uint8Array`，按 `['bytes', value]` 段发送（唯一能进 `transfer` 列表、走零拷贝的形态）；否则按 `['value', value]` 段发送（会退化为结构化克隆，整份数据先在主线程复制一遍再发出去）。
 - `decode(chunk, context)`：请求 Worker 解码，返回值取自结果段的负载（`result[1]`），调用方拿到的就是还原后的值本身，不是包一层的 `ISerializeChunk`。
-- `dispose()`：异步 dispose 底层端点（失败吞掉），`terminateOnDispose: true` 时额外 `worker.terminate?.()`。
+- `dispose()`：异步 dispose 底层端点，并在 `terminateOnDispose: true` 时继续尝试 `worker.terminate?.()`；两步都会执行。单个 cleanup 失败会被原样 reject，端点与 terminate 都失败时返回 `CLEANUP_FAILED` `AggregateError`，不会吞掉 parser/endpoint/terminate 错误。
 
 `context.signal` 会作为这次 RPC 调用的取消信号透传；调用被取消时，`request` 内部会把泛化的 `AbortError` 重新包装成 `SerializeError`（见 [§8](#8-错误处理)），带上 `type`/`phase`/`source`/`chunkIndex`/`bytesConsumed` 这些定位信息，而不是让调用方拿到一个语义模糊的通用 abort 错误。
 

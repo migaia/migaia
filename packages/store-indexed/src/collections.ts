@@ -15,15 +15,89 @@ import {
   createStoreIndexedTypeError
 } from './errors.js';
 import { StoreIndexedErrorCode } from './error-code.js';
+import { StoreIndexedErrorText } from './error-text.js';
 
 const ABSENT = Symbol('observable-collection-absent');
+
+/** Rejects JavaScript values that bypass the typed collection input contracts. */
+function assertCollectionInput(value: unknown, allowPrimitiveIterable = false): void {
+  if (
+    value === null ||
+    (typeof value !== 'object' &&
+      typeof value !== 'function' &&
+      !(allowPrimitiveIterable && typeof value === 'string'))
+  ) {
+    throw createStoreIndexedTypeError(
+      StoreIndexedErrorCode.invalidOption,
+      StoreIndexedErrorText.collectionInput
+    );
+  }
+}
+
+/**
+ * Materializes object entries before ownership admission so hostile input cannot leak partial
+ * construction.
+ */
+function readObjectEntries<T extends Record<string, unknown>>(initial: T): [string, unknown][] {
+  assertCollectionInput(initial);
+  try {
+    return Object.keys(initial).map((key) => [key, initial[key]]);
+  } catch (error) {
+    throw createStoreIndexedTypeError(
+      StoreIndexedErrorCode.invalidOption,
+      StoreIndexedErrorText.collectionInput,
+      { cause: error }
+    );
+  }
+}
+
+/** Materializes iterable input before ownership admission, preserving construction atomicity. */
+function materializeIterable<T>(initial: Iterable<T>, allowPrimitiveString = false): T[] {
+  assertCollectionInput(initial, allowPrimitiveString);
+  let iteratorMethod: unknown;
+  try {
+    iteratorMethod = (initial as { [Symbol.iterator]?: unknown })[Symbol.iterator];
+  } catch (error) {
+    throw createStoreIndexedTypeError(
+      StoreIndexedErrorCode.invalidOption,
+      StoreIndexedErrorText.collectionInput,
+      { cause: error }
+    );
+  }
+  if (typeof iteratorMethod !== 'function') {
+    throw createStoreIndexedTypeError(
+      StoreIndexedErrorCode.invalidOption,
+      StoreIndexedErrorText.collectionInput
+    );
+  }
+  try {
+    const iterator = Reflect.apply(iteratorMethod, initial, []);
+    return Array.from({ [Symbol.iterator]: () => iterator });
+  } catch (error) {
+    throw createStoreIndexedTypeError(
+      StoreIndexedErrorCode.invalidOption,
+      StoreIndexedErrorText.collectionInput,
+      { cause: error }
+    );
+  }
+}
+
+/** Enforces the string-key contract of ObservableObject after JavaScript type erasure. */
+function assertObjectKey(key: unknown): asserts key is string {
+  if (typeof key !== 'string') {
+    throw createStoreIndexedTypeError(
+      StoreIndexedErrorCode.invalidOption,
+      StoreIndexedErrorText.objectKey
+    );
+  }
+}
 
 function isTrackingIn(runtime: IRuntime): boolean {
   const tracking = isRuntimeTracking(runtime);
   if (!tracking && isAnyRuntimeTracking()) {
     throw createStoreIndexedError(
       StoreIndexedErrorCode.crossRuntime,
-      '[store] cross-runtime dependency is not allowed: collection read belongs to another Runtime'
+      StoreIndexedErrorText.crossRuntime
     );
   }
   return tracking;
@@ -51,10 +125,43 @@ abstract class ObservableCollectionBase implements IDisposable {
     options: IObservableCollectionOptions,
     defaultName: string
   ) {
+    if (options === null || typeof options !== 'object') {
+      throw createStoreIndexedTypeError(
+        StoreIndexedErrorCode.invalidOption,
+        StoreIndexedErrorText.optionsObject
+      );
+    }
+    try {
+      Object.getOwnPropertyDescriptors(options);
+    } catch (error) {
+      throw createStoreIndexedTypeError(
+        StoreIndexedErrorCode.invalidOption,
+        StoreIndexedErrorText.optionsObject,
+        { cause: error }
+      );
+    }
+    let mutationGuard: IMutationGuard | undefined;
+    let debugName: unknown;
+    try {
+      mutationGuard = options.mutationGuard;
+      debugName = options.debugName;
+    } catch (error) {
+      throw createStoreIndexedTypeError(
+        StoreIndexedErrorCode.invalidOption,
+        StoreIndexedErrorText.optionsObject,
+        { cause: error }
+      );
+    }
+    if (debugName !== undefined && typeof debugName !== 'string') {
+      throw createStoreIndexedTypeError(
+        StoreIndexedErrorCode.invalidOption,
+        StoreIndexedErrorText.debugName
+      );
+    }
     this.runtime = runtime;
     claimOwnership(this, runtime);
-    this.#mutationGuard = options.mutationGuard;
-    this.debugName = options.debugName ?? defaultName;
+    this.#mutationGuard = mutationGuard;
+    this.debugName = debugName ?? defaultName;
   }
 
   get disposed(): boolean {
@@ -75,7 +182,7 @@ abstract class ObservableCollectionBase implements IDisposable {
     if (this.#disposed) {
       throw createStoreIndexedError(
         StoreIndexedErrorCode.collectionDisposed,
-        `[store] ${this.debugName} is disposed`
+        StoreIndexedErrorText.disposed(this.debugName)
       );
     }
   }
@@ -109,8 +216,9 @@ export class ObservableObject<T extends Record<string, unknown>> extends Observa
     runtime: IRuntime = defaultRuntime,
     options: IObservableCollectionOptions = {}
   ) {
+    const initialEntries = readObjectEntries(initial);
     super(runtime, options, 'ObservableObject');
-    for (const key of Object.keys(initial)) this.#values.set(key, initial[key]);
+    for (const [key, value] of initialEntries) this.#values.set(key, value);
     this.#structure = this.own(
       internalRuntimeOf(runtime).signal(0, {
         debugName: `${this.debugName}.keys`
@@ -125,6 +233,7 @@ export class ObservableObject<T extends Record<string, unknown>> extends Observa
 
   get<K extends keyof T & string>(key: K): T[K] {
     this.assertActive();
+    assertObjectKey(key);
     if (!isTrackingIn(this.runtime)) {
       return this.#values.get(key) as T[K];
     }
@@ -137,6 +246,7 @@ export class ObservableObject<T extends Record<string, unknown>> extends Observa
   // 遍历十万个 key 做 peek 就会实体化十万个没人订阅的 Signal。
   peek<K extends keyof T & string>(key: K): T[K] {
     this.assertActive();
+    assertObjectKey(key);
     return this.#values.get(key) as T[K];
   }
 
@@ -144,39 +254,58 @@ export class ObservableObject<T extends Record<string, unknown>> extends Observa
   // 因此追踪 structure 比追踪值 cell 更精确，且同样不分配。
   has(key: keyof T & string): boolean {
     this.assertActive();
+    assertObjectKey(key);
     void this.#structure.value;
     return this.#values.has(key);
   }
 
   set<K extends keyof T & string>(key: K, value: T[K]): void {
+    this.assertActive();
+    assertObjectKey(key);
     this.assertMutation(`set(${key})`);
-    this.runtime.batch(() => {
-      const existed = this.#values.has(key);
-      const previous = this.#values.get(key);
-      this.#values.set(key, value);
-      const cell = this.#cells.get(key);
-      if (cell) cell.value = value;
-      if (!existed) this.#bumpStructure();
-      if (!Object.is(previous, value)) this.#revision.value = this.#revision.peek() + 1;
-    });
+    this.runtime.batch(() => this.#setInternal(key, value));
   }
 
   update<K extends keyof T & string>(key: K, updater: (value: T[K]) => T[K]): void {
-    this.set(key, updater(this.peek(key)));
+    this.assertActive();
+    assertObjectKey(key);
+    this.assertMutation(`update(${key})`);
+    if (typeof updater !== 'function') {
+      throw createStoreIndexedTypeError(
+        StoreIndexedErrorCode.invalidOption,
+        StoreIndexedErrorText.collectionInput
+      );
+    }
+    const nextValue = updater(this.peek(key));
+    this.runtime.batch(() => this.#setInternal(key, nextValue));
   }
 
   delete(key: keyof T & string): boolean {
+    this.assertActive();
+    assertObjectKey(key);
     this.assertMutation(`delete(${key})`);
     if (!this.#values.has(key)) return false;
-    this.runtime.batch(() => {
-      this.#values.delete(key);
-      const cell = this.#cells.get(key);
-      if (cell) cell.value = ABSENT;
-      this.#bumpStructure();
-      this.#revision.value = this.#revision.peek() + 1;
-    });
-    this.#cells.tombstone(key);
+    this.runtime.batch(() => this.#deleteInternal(key));
     return true;
+  }
+
+  #setInternal<K extends keyof T & string>(key: K, value: T[K]): void {
+    const existed = this.#values.has(key);
+    const previous = this.#values.get(key);
+    this.#values.set(key, value);
+    const cell = this.#cells.get(key);
+    if (cell) cell.value = value;
+    if (!existed) this.#bumpStructure();
+    if (!Object.is(previous, value)) this.#revision.value = this.#revision.peek() + 1;
+  }
+
+  #deleteInternal(key: keyof T & string): void {
+    this.#values.delete(key);
+    const cell = this.#cells.get(key);
+    if (cell) cell.value = ABSENT;
+    this.#bumpStructure();
+    this.#revision.value = this.#revision.peek() + 1;
+    this.#cells.tombstone(key);
   }
 
   keys(): readonly (keyof T & string)[] {
@@ -197,14 +326,27 @@ export class ObservableObject<T extends Record<string, unknown>> extends Observa
 
   replace(next: T): void {
     this.assertMutation('replace');
+    assertCollectionInput(next);
+    // Read every hostile getter before touching the current collection. A
+    // failed snapshot must leave the replacement atomic.
+    let nextEntries: readonly (readonly [string, unknown])[];
+    try {
+      nextEntries = Object.keys(next).map((key) => [key, next[key as keyof T]] as const);
+    } catch (error) {
+      throw createStoreIndexedTypeError(
+        StoreIndexedErrorCode.invalidOption,
+        StoreIndexedErrorText.collectionInput,
+        { cause: error }
+      );
+    }
+    const nextKeys = new Set(nextEntries.map(([key]) => key));
     this.runtime.batch(() => {
-      const nextKeys = new Set(Object.keys(next));
       for (const key of Array.from(this.#values.keys())) {
-        if (!nextKeys.has(key)) this.delete(key);
+        if (!nextKeys.has(key)) this.#deleteInternal(key);
       }
-      for (const key of nextKeys) {
+      for (const [key, value] of nextEntries) {
         const typedKey = key as keyof T & string;
-        this.set(typedKey, next[typedKey]);
+        this.#setInternal(typedKey, value as T[typeof typedKey]);
       }
     });
   }
@@ -244,8 +386,9 @@ export class ObservableArray<T> extends ObservableCollectionBase {
     runtime: IRuntime = defaultRuntime,
     options: IObservableCollectionOptions = {}
   ) {
+    const initialValues = materializeIterable(initial, true);
     super(runtime, options, 'ObservableArray');
-    this.#values = [...initial];
+    this.#values = initialValues;
     this.#structure = this.own(
       internalRuntimeOf(runtime).signal(0, {
         debugName: `${this.debugName}.structure`
@@ -297,7 +440,7 @@ export class ObservableArray<T> extends ObservableCollectionBase {
     if (index < 0 || index >= this.#values.length) {
       throw createStoreIndexedRangeError(
         StoreIndexedErrorCode.indexOutOfRange,
-        '[store] ObservableArray index out of range'
+        StoreIndexedErrorText.arrayIndex
       );
     }
     if (Object.is(this.#values[index], value)) return;
@@ -349,7 +492,7 @@ export class ObservableArray<T> extends ObservableCollectionBase {
 
   replace(values: Iterable<T>): void {
     this.assertMutation('replace');
-    this.#replaceInternal([...values]);
+    this.#replaceInternal(materializeIterable(values, true));
   }
 
   clear(): void {
@@ -418,8 +561,17 @@ export class ObservableMap<K, V> extends ObservableCollectionBase {
     runtime: IRuntime = defaultRuntime,
     options: IObservableCollectionOptions = {}
   ) {
+    const initialEntries = materializeIterable(initial);
     super(runtime, options, 'ObservableMap');
-    for (const [key, value] of initial) this.#values.set(key, value);
+    try {
+      for (const [key, value] of initialEntries) this.#values.set(key, value);
+    } catch (error) {
+      throw createStoreIndexedTypeError(
+        StoreIndexedErrorCode.invalidOption,
+        StoreIndexedErrorText.collectionInput,
+        { cause: error }
+      );
+    }
     this.#structure = this.own(
       internalRuntimeOf(runtime).signal(0, {
         debugName: `${this.debugName}.structure`
@@ -513,7 +665,18 @@ export class ObservableMap<K, V> extends ObservableCollectionBase {
    */
   replace(next: ReadonlyMap<K, V> | Iterable<readonly [K, V]>): void {
     this.assertMutation('replace');
-    this.#replaceInternal(new Map(next));
+    const entries = materializeIterable(next);
+    let materialized: Map<K, V>;
+    try {
+      materialized = new Map(entries);
+    } catch (error) {
+      throw createStoreIndexedTypeError(
+        StoreIndexedErrorCode.invalidOption,
+        StoreIndexedErrorText.collectionInput,
+        { cause: error }
+      );
+    }
+    this.#replaceInternal(materialized);
   }
 
   keys(): readonly K[] {
@@ -608,8 +771,9 @@ export class ObservableSet<T> extends ObservableCollectionBase {
     runtime: IRuntime = defaultRuntime,
     options: IObservableCollectionOptions = {}
   ) {
+    const initialValues = materializeIterable(initial, true);
     super(runtime, options, 'ObservableSet');
-    for (const value of initial) this.#values.add(value);
+    for (const value of initialValues) this.#values.add(value);
     this.#structure = this.own(
       internalRuntimeOf(runtime).signal(0, {
         debugName: `${this.debugName}.structure`
@@ -644,13 +808,7 @@ export class ObservableSet<T> extends ObservableCollectionBase {
   delete(value: T): boolean {
     this.assertMutation('delete');
     if (!this.#values.has(value)) return false;
-    this.runtime.batch(() => {
-      this.#values.delete(value);
-      const cell = this.#cells.get(value);
-      if (cell) cell.value = false;
-      this.#bumpStructure();
-    });
-    this.#cells.tombstone(value);
+    this.runtime.batch(() => this.#deleteInternal(value));
     return true;
   }
 
@@ -658,8 +816,16 @@ export class ObservableSet<T> extends ObservableCollectionBase {
     this.assertMutation('clear');
     if (this.#values.size === 0) return;
     this.runtime.batch(() => {
-      for (const value of Array.from(this.#values)) this.delete(value);
+      for (const value of Array.from(this.#values)) this.#deleteInternal(value);
     });
+  }
+
+  #deleteInternal(value: T): void {
+    this.#values.delete(value);
+    const cell = this.#cells.get(value);
+    if (cell) cell.value = false;
+    this.#bumpStructure();
+    this.#cells.tombstone(value);
   }
 
   /**
@@ -669,7 +835,7 @@ export class ObservableSet<T> extends ObservableCollectionBase {
    */
   replace(next: Iterable<T>): void {
     this.assertMutation('replace');
-    this.#replaceInternal(new Set(next));
+    this.#replaceInternal(new Set(materializeIterable(next, true)));
   }
 
   valuesArray(): readonly T[] {
@@ -759,7 +925,7 @@ function assertIntegerIndex(index: number): void {
   if (!Number.isInteger(index)) {
     throw createStoreIndexedTypeError(
       StoreIndexedErrorCode.invalidIndex,
-      '[store] ObservableArray index must be an integer'
+      StoreIndexedErrorText.arrayInteger
     );
   }
 }

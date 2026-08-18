@@ -34,8 +34,15 @@ export function createStoreLightRangeError(
 }
 
 /** Builds a `(source, code)`-tagged `TypeError`, preserving the runtime type. */
-export function createStoreLightTypeError(code: IStoreLightErrorCode, message: string): TypeError {
-  return tagStoreLightError(new TypeError(message), code);
+export function createStoreLightTypeError(
+  code: IStoreLightErrorCode,
+  message: string,
+  options?: { readonly cause?: unknown }
+): TypeError {
+  return tagStoreLightError(
+    new TypeError(message, options?.cause !== undefined ? { cause: options.cause } : undefined),
+    code
+  );
 }
 
 /** Builds a `(source, code)`-tagged `AggregateError`; `errors[]` stays reachable (E-T13). */

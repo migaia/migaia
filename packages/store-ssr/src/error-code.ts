@@ -82,7 +82,13 @@ export const StoreSsrErrorCode = {
    *
    * 调用方检查资源工厂/依赖是否形成了无限注册链。
    */
-  resourceRoundLimit: 'RESOURCE_ROUND_LIMIT'
+  resourceRoundLimit: 'RESOURCE_ROUND_LIMIT',
+
+  /**
+   * A registered resource did not settle before the SSR deadline. The caller may render without
+   * that resource or retry on the client.
+   */
+  resourceTimeout: 'RESOURCE_TIMEOUT'
 } as const;
 
 export type IStoreSsrErrorCode = (typeof StoreSsrErrorCode)[keyof typeof StoreSsrErrorCode];

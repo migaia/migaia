@@ -16,10 +16,68 @@ import {
   type IWebWorkerLikePort
 } from '@migaia/web-rpc/adapters/web-worker';
 import { toManagedRpcHandler, type IManagedRpcHandler } from './managed-rpc-handler.js';
-import { createStoreWorkerError, StoreWorkerErrorCode } from './errors.js';
+import { createStoreWorkerError, STORE_WORKER_SOURCE, StoreWorkerErrorCode } from './errors.js';
+import { StoreWorkerErrorText } from './error-text.js';
 
 export type { IManagedRpcHandler } from './managed-rpc-handler.js';
 export type IWorkerPort = IWebWorkerLikePort;
+
+/** Rejects JavaScript-boundary null/non-object option values before property access. */
+function assertWorkerOptions(options: unknown): asserts options is object {
+  if (options === null || typeof options !== 'object') {
+    throw createStoreWorkerError(
+      StoreWorkerErrorCode.invalidOption,
+      StoreWorkerErrorText.optionsObject
+    );
+  }
+  try {
+    Object.getOwnPropertyDescriptors(options);
+  } catch (error) {
+    throw createStoreWorkerError(
+      StoreWorkerErrorCode.invalidOption,
+      StoreWorkerErrorText.optionsObject,
+      { cause: error }
+    );
+  }
+}
+
+/** Captures client endpoint options once so endpoint setup cannot reread hostile accessors. */
+function snapshotWorkerClientOptions(options: object): {
+  readonly clientId?: string;
+  readonly timeoutMs?: number;
+} {
+  try {
+    return {
+      clientId: (options as { clientId?: string }).clientId,
+      timeoutMs: (options as { timeoutMs?: number }).timeoutMs
+    };
+  } catch (error) {
+    throw createStoreWorkerError(
+      StoreWorkerErrorCode.invalidOption,
+      StoreWorkerErrorText.optionsObject,
+      { cause: error }
+    );
+  }
+}
+
+/** Captures per-request cancellation and transfer policy before asynchronous endpoint admission. */
+function snapshotWorkerRequestOptions(options: object): {
+  readonly signal?: IWebRpcAbortSignal;
+  readonly transfer?: readonly Transferable[];
+} {
+  try {
+    return {
+      signal: (options as { readonly signal?: IWebRpcAbortSignal }).signal,
+      transfer: (options as { readonly transfer?: readonly Transferable[] }).transfer
+    };
+  } catch (error) {
+    throw createStoreWorkerError(
+      StoreWorkerErrorCode.invalidOption,
+      StoreWorkerErrorText.optionsObject,
+      { cause: error }
+    );
+  }
+}
 
 function createWorkerEndpoint(
   port: IWorkerPort,
@@ -48,7 +106,8 @@ export class WorkerAdapter {
     port: IWorkerPort,
     options: { readonly clientId?: string; readonly timeoutMs?: number } = {}
   ) {
-    this.#endpoint = createWorkerEndpoint(port, options);
+    assertWorkerOptions(options);
+    this.#endpoint = createWorkerEndpoint(port, snapshotWorkerClientOptions(options));
   }
 
   get disposed(): boolean {
@@ -61,13 +120,20 @@ export class WorkerAdapter {
   ): Promise<Output> {
     if (this.#disposed)
       return Promise.reject(
-        createStoreWorkerError(
-          StoreWorkerErrorCode.adapterDisposed,
-          '[store] worker adapter is disposed'
-        )
+        createStoreWorkerError(StoreWorkerErrorCode.adapterDisposed, StoreWorkerErrorText.disposed)
       );
+    let requestOptions: {
+      readonly signal?: IWebRpcAbortSignal;
+      readonly transfer?: readonly Transferable[];
+    };
+    try {
+      assertWorkerOptions(options);
+      requestOptions = snapshotWorkerRequestOptions(options);
+    } catch (error) {
+      return Promise.reject(error);
+    }
     return this.#endpoint.then((endpoint) =>
-      endpoint.send<Output>('worker', 'call', payload, options)
+      endpoint.send<Output>('worker', 'call', payload, requestOptions)
     );
   }
 
@@ -97,6 +163,20 @@ export function createWorkerHandler<Input, Output>(
   postMessage: (message: unknown) => void,
   options: { readonly timeoutMs?: number } = {}
 ): IManagedRpcHandler {
+  assertWorkerOptions(options);
+  if (typeof compute !== 'function') {
+    throw createStoreWorkerError(
+      StoreWorkerErrorCode.invalidOption,
+      StoreWorkerErrorText.workerHandlerCallback('compute')
+    );
+  }
+  if (typeof postMessage !== 'function') {
+    throw createStoreWorkerError(
+      StoreWorkerErrorCode.invalidOption,
+      StoreWorkerErrorText.workerHandlerCallback('postMessage')
+    );
+  }
+  const timeoutMs = snapshotWorkerClientOptions(options).timeoutMs;
   let deliver: (message: unknown) => void = () => undefined;
   const transport = {
     platform: WebRpcPlatform.worker,
@@ -114,12 +194,7 @@ export function createWorkerHandler<Input, Output>(
   const endpoint = createEndpoint({
     id: 'worker',
     transport,
-    middlewares: [
-      connect({ transport }),
-      protocol(),
-      abort(),
-      timeout({ timeoutMs: options.timeoutMs })
-    ],
+    middlewares: [connect({ transport }), protocol(), abort(), timeout({ timeoutMs })],
     provider: {
       call: async (context) =>
         context.success(await compute(context.data as Input, { signal: context.signal }))
@@ -133,18 +208,85 @@ export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & {
   readonly transfer?: (input: Input) => readonly Transferable[];
 };
 
+/** Stable worker/resource configuration captured before Resource ownership and auto-start. */
+type IWorkerComputedOptionSnapshot<Input, Output> = {
+  readonly runtime: IRuntime;
+  readonly transfer: ((input: Input) => readonly Transferable[]) | undefined;
+  readonly resource: IResourceOptions<Output>;
+};
+
+/** Reads only owned worker/resource option keys once and rejects hostile accessors at admission. */
+function snapshotWorkerComputedOptions<Input, Output>(
+  options: IWorkerComputedOptions<Input, Output>
+): IWorkerComputedOptionSnapshot<Input, Output> {
+  assertWorkerOptions(options);
+  try {
+    const runtime = options.runtime ?? defaultRuntime;
+    const transfer = options.transfer;
+    if (transfer !== undefined && typeof transfer !== 'function') {
+      throw createStoreWorkerError(
+        StoreWorkerErrorCode.invalidOption,
+        StoreWorkerErrorText.workerComputedCallback('transfer')
+      );
+    }
+    return {
+      runtime,
+      transfer,
+      resource: {
+        debugName: options.debugName,
+        ttl: options.ttl,
+        autoStart: options.autoStart,
+        staleWhileRevalidate: options.staleWhileRevalidate,
+        retry: options.retry,
+        retryDelay: options.retryDelay,
+        keepAlive: options.keepAlive,
+        initialSnapshot: options.initialSnapshot,
+        scheduler: options.scheduler
+      }
+    };
+  } catch (error) {
+    if (
+      error !== null &&
+      typeof error === 'object' &&
+      (error as { readonly source?: unknown }).source === STORE_WORKER_SOURCE
+    ) {
+      throw error;
+    }
+    throw createStoreWorkerError(
+      StoreWorkerErrorCode.invalidOption,
+      StoreWorkerErrorText.optionsObject,
+      { cause: error }
+    );
+  }
+}
+
 export function workerComputed<Input, Output>(
   adapter: WorkerAdapter,
   selectInput: () => Input,
   options: IWorkerComputedOptions<Input, Output> = {}
 ): Resource<Output> {
-  const { runtime = defaultRuntime, transfer, ...resourceOptions } = options;
+  const snapshot = snapshotWorkerComputedOptions(options);
+  if (!(adapter instanceof WorkerAdapter)) {
+    throw createStoreWorkerError(
+      StoreWorkerErrorCode.invalidOption,
+      StoreWorkerErrorText.workerComputedAdapter
+    );
+  }
+  if (typeof selectInput !== 'function') {
+    throw createStoreWorkerError(
+      StoreWorkerErrorCode.invalidOption,
+      StoreWorkerErrorText.workerComputedCallback('selectInput')
+    );
+  }
   return new Resource<Output>(
     ({ signal }) => {
       const input = selectInput();
-      return adapter.request<Input, Output>(input, { signal, transfer: transfer?.(input) });
+      return adapter.request<Input, Output>(input, {
+        signal,
+        transfer: snapshot.transfer?.(input)
+      });
     },
-    runtime,
-    resourceOptions
+    snapshot.runtime,
+    snapshot.resource
   );
 }

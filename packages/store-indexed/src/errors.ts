@@ -35,7 +35,12 @@ export function createStoreIndexedRangeError(
 /** Builds a `(source, code)`-tagged `TypeError`, preserving the runtime type. */
 export function createStoreIndexedTypeError(
   code: IStoreIndexedErrorCode,
-  message: string
+  message: string,
+  options?: { readonly cause?: unknown }
 ): TypeError {
-  return tagStoreIndexedError(new TypeError(message), code);
+  const error = new TypeError(
+    message,
+    options?.cause !== undefined ? { cause: options.cause } : undefined
+  );
+  return tagStoreIndexedError(error, code);
 }

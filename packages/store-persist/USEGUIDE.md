@@ -42,15 +42,15 @@ function persistUnit<TState>(unit: IPersistUnit<TState>, options: IPersistUnitOp
 | `version` | `number` | 可选 | `0` | schema 版本，必须是安全非负整数 |
 | `migrate` | `(persisted: TState, fromVersion: number) => TState` | 可选 | 无 | 见 [§5](#5-存档格式与版本迁移) |
 | `partialize` | `(state: TState) => Partial<TState>` | 可选 | 恒等函数 | 写入前裁剪 |
-| `merge` | `(persisted: Partial<TState>, current: TState) => TState` | 可选 | `(persisted) => persisted as TState` | 读取后合并回内存，见下方"默认 merge 的语义" |
+| `merge` | `(persisted: Partial<TState>, current: TState) => TState` | 可选 | 普通对象按启动快照做三向合并；数组/Map/Set 等非 plain shape 整体替换 | 读取后合并回内存，见下方"默认 merge 的语义" |
 | `debounceMs` | `number` | 可选 | `0`（不防抖） | 变化后延迟多久发起写入 |
 
 ### 默认 `merge` 的语义（容易踩的坑）
 
-默认 `merge` 是**"持久化状态整份替换当前状态"**（`(persisted) => persisted`），**不是**逐字段合并——早期设计想用 `{ ...current, ...persisted }` 当默认值，但这对 `Map`/`Set`（对象展开会丢光内容）和 `Array`（对象展开产出带数字字符串键的普通对象）都是错误结果，实现阶段改成了整份替换。
+默认 `merge` 对 plain object 使用**三向字段合并**：记录异步读取开始时的内存快照；读取期间本地改过的字段优先，本地未改过的字段接受持久化值。这样同字段启动竞态不会覆盖本地新写。数组、Map、Set 等非 plain shape 仍整体替换，避免对象展开破坏容器语义。
 
 - `partialize` 保持默认（恒等函数）时，"替换"和"合并"是同一件事，行为符合直觉。
-- 一旦你自定义 `partialize` 只持久化状态的一部分（比如 `persistKeyed()` 里"只存 refreshToken"这种场景），**必须**同时提供匹配的 `merge`，否则读回来的状态会用这个"子集"整份替换掉当前状态，未持久化的字段会变成 `undefined`。
+- 一旦你自定义 `partialize` 只持久化状态的一部分（比如 `persistKeyed()` 里"只存 refreshToken"这种场景），默认 plain-object 三向合并会保留未持久化字段；如果状态含数组、Map/Set 或需要深层语义，**必须**提供匹配的 `merge`。
 
 `persist()`（store-light）是个例外：它的 `restore()` 最终调用 `store.$hydrate()`，那本身就是"宽松写回、未知字段跳过"的部分合并语义，跟这里的 `merge` 默认值互不影响——即使只 `partialize` 出一部分字段，`$hydrate()` 也只会覆盖这些字段，不会动其余字段。
 

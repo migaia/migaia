@@ -15,6 +15,15 @@ const asObserver = (o: IMockObserver) => o as unknown as IObserver;
 const asObservable = (o: IMockObservable) => o as unknown as IObservable;
 
 describe('getDependencyTree', () => {
+  it('rejects non-finite or fractional maxDepth before traversal', () => {
+    const root = asObserver({ debugName: 'root', deps: new Set() });
+    for (const depth of [Number.NaN, Number.POSITIVE_INFINITY, -1, 1.5]) {
+      expect(() => getDependencyTree(root, depth)).toThrow(
+        '[store] DevTools dependency tree maxDepth must be a non-negative safe integer'
+      );
+    }
+  });
+
   it('returns a childless observer node when there are no deps', () => {
     const root = asObserver({ debugName: 'root', deps: new Set() });
     expect(getDependencyTree(root)).toEqual({ kind: 'observer', label: 'root', children: [] });
@@ -148,6 +157,15 @@ describe('getDependencyTree', () => {
 });
 
 describe('getObserverTree', () => {
+  it('rejects non-finite or fractional maxDepth before traversal', () => {
+    const root = asObservable({ debugName: 'root', version: 0, deps: new Set() });
+    for (const depth of [Number.NaN, Number.POSITIVE_INFINITY, -1, 1.5]) {
+      expect(() => getObserverTree(root, depth)).toThrow(
+        '[store] DevTools observer tree maxDepth must be a non-negative safe integer'
+      );
+    }
+  });
+
   it('returns a childless observable node when nothing subscribes', () => {
     const root = { debugName: 'root', version: 1, subs: new Set() } as unknown as IObservable;
     expect(getObserverTree(root)).toEqual({

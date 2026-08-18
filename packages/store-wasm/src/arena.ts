@@ -1,5 +1,11 @@
 import initWasm, { alloc_bytes, dealloc_bytes, ptr_of } from '@migaia/wasm';
-import { createStoreWasmError, createStoreWasmRangeError, StoreWasmErrorCode } from './errors.js';
+import {
+  createStoreWasmAggregateError,
+  createStoreWasmError,
+  createStoreWasmRangeError,
+  StoreWasmErrorCode
+} from './errors.js';
+import { StoreWasmErrorText } from './error-text.js';
 
 // 模块作用域缓存，只发起一次加载；重复调用（StrictMode 双渲染、父组件无关重渲染）拿到同一个 promise 引用，
 // 不会重复 fetch/instantiate，也不会导致 use() 每次渲染都重新挂起
@@ -37,6 +43,48 @@ export const registry = {
 // 显式释放一个分配（字段 dispose 时调用）。dealloc_bytes 对未知 id 是 no-op，天然抗重复。
 export function deallocate(id: number): void {
   dealloc_bytes(id);
+}
+
+/** Runs every cleanup action and preserves all failures for the caller. */
+export function disposeAllWasm(cleanups: ReadonlyArray<() => void>): void {
+  const errors: unknown[] = [];
+  for (const cleanup of cleanups) {
+    try {
+      cleanup();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1) {
+    throw createStoreWasmAggregateError(
+      StoreWasmErrorCode.cleanupFailed,
+      errors,
+      StoreWasmErrorText.cleanupFailed
+    );
+  }
+}
+
+/** Re-throws construction primary while retaining rollback failure for non-Error primaries too. */
+export function throwWasmConstructionFailure(primary: unknown, cleanup: unknown): never {
+  if (primary instanceof Error) {
+    try {
+      Object.defineProperty(primary, 'cause', { value: cleanup, configurable: true });
+      throw primary;
+    } catch (attachmentFailure) {
+      if (attachmentFailure === primary) throw attachmentFailure;
+      throw createStoreWasmAggregateError(
+        StoreWasmErrorCode.cleanupFailed,
+        [primary, cleanup],
+        StoreWasmErrorText.cleanupFailed
+      );
+    }
+  }
+  throw createStoreWasmAggregateError(
+    StoreWasmErrorCode.cleanupFailed,
+    [primary, cleanup],
+    StoreWasmErrorText.cleanupFailed
+  );
 }
 
 /** One owned allocation with a single explicit/GC cleanup boundary. */
@@ -79,7 +127,7 @@ export async function allocate(byteLen: number) {
   if (!Number.isSafeInteger(byteLen) || byteLen < 0 || byteLen > MAX_WASM32_ALLOCATION) {
     throw createStoreWasmRangeError(
       StoreWasmErrorCode.invalidOption,
-      'wasm.allocate: byteLen must fit an unsigned 32-bit integer'
+      StoreWasmErrorText.allocationLimit
     );
   }
   const memory = await ensureWasm();
@@ -92,14 +140,14 @@ export function allocateSync(byteLen: number) {
   if (!Number.isSafeInteger(byteLen) || byteLen < 0 || byteLen > MAX_WASM32_ALLOCATION) {
     throw createStoreWasmRangeError(
       StoreWasmErrorCode.invalidOption,
-      'wasm.allocate: byteLen must fit an unsigned 32-bit integer'
+      StoreWasmErrorText.allocationLimit
     );
   }
   const memory = wasmMemory;
   if (!memory)
     throw createStoreWasmError(
       StoreWasmErrorCode.notInitialized,
-      '[store] WASM is not initialized; await ensureWasm() or use StoreProvider'
+      StoreWasmErrorText.notInitialized
     );
   const id = alloc_bytes(byteLen);
   return { memory, id, ptr: ptr_of(id) };

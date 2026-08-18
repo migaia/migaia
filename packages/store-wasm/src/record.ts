@@ -1,10 +1,11 @@
 import type { IDisposable } from '@migaia/reactive';
 import type { IFieldSource } from '@migaia/store-light';
-import { allocateOwnedSync } from './arena.js';
+import { allocateOwnedSync, disposeAllWasm, throwWasmConstructionFailure } from './arena.js';
 import { createStoreWasmError, createStoreWasmTypeError, StoreWasmErrorCode } from './errors.js';
 import type { number as numberBuilder } from './number.js';
 import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.js';
 import { WasmFieldMode, WasmReservedKey } from './field-constants.js';
+import { StoreWasmErrorText } from './error-text.js';
 
 // 固定命名字段的结构体（Elm/Haskell record，不是 TS Record<K,V>）
 type IRecordShape = Record<string, ReturnType<typeof numberBuilder>>;
@@ -16,7 +17,51 @@ export type IWasmRecordField<Shape extends IRecordShape> = {
 export function record<Shape extends IRecordShape>(
   shape: Shape
 ): IFieldBuilder<IWasmRecordField<Shape>> {
-  const keys = Object.keys(shape);
+  let isArray = false;
+  try {
+    isArray = Array.isArray(shape);
+  } catch (error) {
+    throw createStoreWasmTypeError(
+      StoreWasmErrorCode.invalidOption,
+      StoreWasmErrorText.recordShapeInvalid,
+      { cause: error }
+    );
+  }
+  if (shape === null || typeof shape !== 'object' || isArray) {
+    throw createStoreWasmTypeError(
+      StoreWasmErrorCode.invalidOption,
+      StoreWasmErrorText.recordShapeInvalid
+    );
+  }
+  let keys: string[];
+  try {
+    keys = Object.keys(shape);
+  } catch (error) {
+    throw createStoreWasmTypeError(
+      StoreWasmErrorCode.invalidOption,
+      StoreWasmErrorText.recordShapeInvalid,
+      { cause: error }
+    );
+  }
+  if (
+    keys.some((key) => {
+      try {
+        const builder = shape[key as keyof Shape];
+        return builder === null || typeof builder !== 'object' || builder[FIELD_BUILDER] !== true;
+      } catch (error) {
+        throw createStoreWasmTypeError(
+          StoreWasmErrorCode.invalidOption,
+          StoreWasmErrorText.recordShapeInvalid,
+          { cause: error }
+        );
+      }
+    })
+  ) {
+    throw createStoreWasmTypeError(
+      StoreWasmErrorCode.invalidOption,
+      StoreWasmErrorText.recordShapeInvalid
+    );
+  }
   return {
     [FIELD_BUILDER]: true,
     mode: WasmFieldMode.sync,
@@ -25,7 +70,7 @@ export function record<Shape extends IRecordShape>(
         if (key === WasmReservedKey.dispose || key === WasmReservedKey.disposed) {
           throw createStoreWasmTypeError(
             StoreWasmErrorCode.reservedFieldName,
-            `[store] wasm.record field name is reserved: ${key}`
+            StoreWasmErrorText.reservedField(key)
           );
         }
       }
@@ -35,9 +80,13 @@ export function record<Shape extends IRecordShape>(
       const sources: IFieldSource[] = [];
       try {
         if (signal.aborted)
-          throw createStoreWasmError(StoreWasmErrorCode.initAborted, '[store] field init aborted');
+          throw createStoreWasmError(
+            StoreWasmErrorCode.initAborted,
+            StoreWasmErrorText.initAborted
+          );
         const view = () => new DataView(memory.buffer);
         let disposed = false;
+        let disposing = false;
 
         const field = {} as IWasmRecordField<Shape>;
         keys.forEach((key, index) => {
@@ -50,7 +99,7 @@ export function record<Shape extends IRecordShape>(
               if (disposed)
                 throw createStoreWasmError(
                   StoreWasmErrorCode.fieldDisposed,
-                  '[store] cannot read a disposed wasm field'
+                  StoreWasmErrorText.fieldDisposed
                 );
               source.track();
               return view().getFloat64(offset, true);
@@ -59,7 +108,7 @@ export function record<Shape extends IRecordShape>(
               if (disposed)
                 throw createStoreWasmError(
                   StoreWasmErrorCode.fieldDisposed,
-                  '[store] cannot write a disposed wasm field'
+                  StoreWasmErrorText.fieldDisposed
                 );
               const memoryView = view();
               if (Object.is(memoryView.getFloat64(offset, true), v)) return;
@@ -75,20 +124,33 @@ export function record<Shape extends IRecordShape>(
         Object.defineProperty(field, 'dispose', {
           enumerable: false,
           value: () => {
-            if (disposed) return;
-            disposed = true;
-            block.unregister(field);
-            // 逆序释放（migration.sdd.md §5.7）：先摘子资源边，再 dealloc block。
-            for (const source of sources) source.dispose();
-            block.dispose();
+            if (disposed || disposing) return;
+            disposing = true;
+            try {
+              block.unregister(field);
+              // 逆序释放（migration.sdd.md §5.7）：先摘子资源边，再 dealloc block。
+              disposeAllWasm([
+                ...sources.map((source) => () => source.dispose()),
+                () => block.dispose()
+              ]);
+              disposed = true;
+            } finally {
+              disposing = false;
+            }
           }
         });
 
         block.register(field);
         return field;
       } catch (error) {
-        for (const source of sources) source.dispose();
-        block.dispose();
+        try {
+          disposeAllWasm([
+            ...sources.map((source) => () => source.dispose()),
+            () => block.dispose()
+          ]);
+        } catch (cleanupError) {
+          throwWasmConstructionFailure(error, cleanupError);
+        }
         throw error;
       }
     }

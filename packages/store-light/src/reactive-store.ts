@@ -18,8 +18,78 @@ import { createLifecycleScope, type ILifecycleScope } from '@migaia/lifecycle';
 import {
   createStoreLightAggregateError,
   createStoreLightError,
+  createStoreLightTypeError,
   StoreLightErrorCode
 } from './errors.js';
+import { StoreLightErrorText } from './error-text.js';
+
+/** Re-throws construction primary while retaining cleanup failure for non-Error primaries. */
+function throwConstructionFailure(primary: unknown, cleanup: unknown): never {
+  if (primary instanceof Error) {
+    try {
+      Object.defineProperty(primary, 'cause', { value: cleanup, configurable: true });
+      throw primary;
+    } catch (attachmentFailure) {
+      if (attachmentFailure === primary) throw attachmentFailure;
+      throw createStoreLightAggregateError(
+        StoreLightErrorCode.initAndCleanupFailed,
+        [primary, cleanup],
+        StoreLightErrorText.cleanupFailed
+      );
+    }
+  }
+  throw createStoreLightAggregateError(
+    StoreLightErrorCode.initAndCleanupFailed,
+    [primary, cleanup],
+    StoreLightErrorText.cleanupFailed
+  );
+}
+
+/** Reports synchronous-construction cleanup failures without creating a late rejection. */
+function reportSynchronousCleanupFailure(runtime: IRuntime, error: unknown): void {
+  try {
+    runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush });
+    return;
+  } catch (reporterError) {
+    const host = (globalThis as { reportError?: (value: unknown) => void }).reportError;
+    try {
+      if (host) host(reporterError);
+      else console.error(reporterError);
+    } catch {
+      // A failing host sink cannot be allowed to turn cleanup observation into
+      // an unhandled rejection; the original cleanup error remains the input.
+    }
+  }
+}
+
+/** Contains subscription diagnostics when the Runtime reporter itself fails. */
+function reportStoreSubscriptionFailure(runtime: IRuntime, error: unknown): void {
+  try {
+    runtime.reportError(error, { phase: ReactiveErrorPhase.subscriptionListener });
+    return;
+  } catch (reporterError) {
+    const host = (globalThis as { reportError?: (value: unknown) => void }).reportError;
+    try {
+      if (host) host(reporterError);
+      else console.error(reporterError);
+    } catch {
+      // Subscriber and diagnostic failures must not escape the reactive Effect boundary.
+    }
+  }
+}
+
+/** Rejects JavaScript-boundary API values before internal reactive machinery sees them. */
+function assertStoreInput(value: unknown, name: string, expected: string): void {
+  const valid =
+    expected === 'function'
+      ? typeof value === 'function'
+      : value !== null && typeof value === 'object';
+  if (!valid)
+    throw createStoreLightTypeError(
+      StoreLightErrorCode.invalidOption,
+      StoreLightErrorText.inputType(name, expected)
+    );
+}
 import { StoreFieldMode } from './field-mode-constants.js';
 import { StoreInitializationStatus } from './resource-state-constants.js';
 export { createStoreResource, createStoreResourceScope } from './store-resource.js';
@@ -29,6 +99,7 @@ export type {
   IStoreResourceScope,
   IStoreResourceErrorPhase,
   IStoreResourceFactory,
+  IStoreResourceConfig,
   IStoreResourceLoadContext,
   IStoreResourceOptions
 } from './store-resource.js';
@@ -170,11 +241,37 @@ function createStoreCore<S extends Record<string, unknown>>(
   /** Internal descriptor snapshot; prevents Proxy TOCTOU during strict creation. */
   _descriptors?: Record<string, PropertyDescriptor>
 ): IReactiveStore<S> {
-  const runtime = options?.runtime ?? defaultRuntime;
+  let runtime: IRuntime = defaultRuntime;
+  let warnAsyncActions = false;
+  let mutationPolicy: IMutationPolicy | undefined;
+  let debugName = 'Store';
+  try {
+    runtime = options?.runtime ?? defaultRuntime;
+    warnAsyncActions = options?.warnAsyncActions ?? false;
+    mutationPolicy = options?.mutationPolicy;
+    debugName = options?.debugName ?? 'Store';
+  } catch (error) {
+    throw createStoreLightError(
+      StoreLightErrorCode.invalidOption,
+      StoreLightErrorText.optionsObject,
+      { cause: error }
+    );
+  }
+  if (
+    typeof debugName !== 'string' ||
+    typeof warnAsyncActions !== 'boolean' ||
+    (mutationPolicy !== undefined &&
+      (mutationPolicy === null ||
+        typeof mutationPolicy !== 'object' ||
+        typeof mutationPolicy.assertMutationAllowed !== 'function' ||
+        typeof mutationPolicy.runInAction !== 'function'))
+  ) {
+    throw createStoreLightError(
+      StoreLightErrorCode.invalidOption,
+      StoreLightErrorText.optionsInvalid
+    );
+  }
   const nodeRuntime = internalRuntimeOf(runtime);
-  const warnAsyncActions = options?.warnAsyncActions ?? false;
-  const mutationPolicy = options?.mutationPolicy;
-  const debugName = options?.debugName ?? 'Store';
   // Store 内部 Computed/Effect/wasm 字段的所有权作用域。混装纯 reactive 节点与 wasm 字段（真实外部
   // 资源），按 D-6 必须用异步 LifecycleScope，不能用 SyncLifecycleScope（migration.sdd.md §4.2）。
   const scope: ILifecycleScope = createLifecycleScope();
@@ -182,6 +279,7 @@ function createStoreCore<S extends Record<string, unknown>>(
     scope.own(resource, { syncSafe: true, force: () => resource.dispose() });
   const initAbort = new AbortController(); // $dispose 时中止在途的异步字段初始化
   const store = {} as Record<string, unknown>;
+  const contextMembers = new Set<PropertyKey>();
 
   // 分类后的底层节点
   const signals = new Map<string, Signal<unknown>>();
@@ -210,8 +308,8 @@ function createStoreCore<S extends Record<string, unknown>>(
     } catch (error) {
       try {
         field.dispose();
-      } catch {
-        /* the ownership error is what the caller needs to see */
+      } catch (cleanupError) {
+        throwConstructionFailure(error, cleanupError);
       }
       throw error;
     }
@@ -221,8 +319,8 @@ function createStoreCore<S extends Record<string, unknown>>(
     } catch (error) {
       try {
         field.dispose();
-      } catch {
-        /* the scope error is what the caller needs to see */
+      } catch (cleanupError) {
+        throwConstructionFailure(error, cleanupError);
       }
       throw error;
     }
@@ -232,11 +330,16 @@ function createStoreCore<S extends Record<string, unknown>>(
   let status: (typeof StoreInitializationStatus)[keyof typeof StoreInitializationStatus] =
     StoreInitializationStatus.pending;
   let disposed = false;
+  /** Stable completion shared by every `$dispose()` caller, including after rejection. */
+  let disposePromise: Promise<void> | undefined;
   let initializationFailed = false;
 
   function assertNotDisposed() {
     if (disposed)
-      throw createStoreLightError(StoreLightErrorCode.storeDisposed, '[store] store is disposed');
+      throw createStoreLightError(
+        StoreLightErrorCode.storeDisposed,
+        StoreLightErrorText.storeDisposed
+      );
   }
 
   function assertMutationAllowed(operation: string) {
@@ -247,7 +350,21 @@ function createStoreCore<S extends Record<string, unknown>>(
     return mutationPolicy ? mutationPolicy.runInAction(() => runtime.batch(fn)) : runtime.batch(fn);
   }
 
-  const descriptors = _descriptors ?? Object.getOwnPropertyDescriptors(shape);
+  let descriptors: Record<string, PropertyDescriptor>;
+  try {
+    descriptors = _descriptors ?? Object.getOwnPropertyDescriptors(shape);
+  } catch (error) {
+    disposed = true;
+    initAbort.abort();
+    void scope
+      .dispose()
+      .catch((cleanupError: unknown) => reportSynchronousCleanupFailure(runtime, cleanupError));
+    throw createStoreLightError(
+      StoreLightErrorCode.invalidOption,
+      StoreLightErrorText.shapeInvalid,
+      { cause: error }
+    );
+  }
   try {
     for (const key of Object.keys(descriptors)) {
       const desc = descriptors[key];
@@ -255,8 +372,11 @@ function createStoreCore<S extends Record<string, unknown>>(
       // get 访问器 → Computed。getter 里的 this 绑到 store，读到的都是响应式字段。
       if (typeof desc.get === 'function') {
         const getter = desc.get;
+        const contextKey = Symbol(key);
+        Object.defineProperty(store, contextKey, { configurable: true, get: getter });
+        contextMembers.add(contextKey);
         const node = ownReactiveNode(
-          nodeRuntime.computed(() => Reflect.apply(getter, store, []), {
+          nodeRuntime.computed(() => (store as Record<PropertyKey, unknown>)[contextKey], {
             debugName: `${debugName}.${key}`
           })
         );
@@ -300,12 +420,21 @@ function createStoreCore<S extends Record<string, unknown>>(
         // 方法 → Action：只自动 batch 同步执行片段 + untracked。async 方法跨过首个 await 后已离开 batch；
         // 需要合并后续写入时，调用方应在续体里显式使用 $batch。
         const fn = value as (...args: unknown[]) => unknown;
+        const contextKey = Symbol(key);
+        Object.defineProperty(store, contextKey, { configurable: true, value: fn });
+        contextMembers.add(contextKey);
         let warnedAsync = false;
         store[key] = (...args: unknown[]) => {
           assertNotDisposed();
           const actionName = `${debugName}.${key}`;
           const result = runtime.runTracedAction(actionName, () =>
-            runMutation(() => runtime.untracked(() => Reflect.apply(fn, store, args)))
+            runMutation(() =>
+              runtime.untracked(() =>
+                (store as Record<PropertyKey, (...values: unknown[]) => unknown>)[contextKey](
+                  ...args
+                )
+              )
+            )
           );
           if (warnAsyncActions && !warnedAsync && result !== null) {
             // 诊断必须不可观察：then 可能是会抛错的用户 getter，console 也可能被替换。
@@ -316,9 +445,7 @@ function createStoreCore<S extends Record<string, unknown>>(
                 typeof candidate.then === 'function'
               ) {
                 warnedAsync = true;
-                console.warn(
-                  `[store] async action "${key}" only batches work before the first await; use $batch() for later writes`
-                );
+                console.warn(StoreLightErrorText.asyncAction(key));
               }
             } catch {
               // 忽略所有诊断异常，保持 action 的 DEV/PROD 行为一致。
@@ -425,13 +552,13 @@ function createStoreCore<S extends Record<string, unknown>>(
     // of being attached as `error.cause` (which required a *synchronous* cleanup failure).
     void scope
       .dispose()
-      .catch((cleanupError: unknown) =>
-        runtime.reportError(cleanupError, { phase: ReactiveErrorPhase.asyncFlush })
-      );
+      .catch((cleanupError: unknown) => reportSynchronousCleanupFailure(runtime, cleanupError));
     signals.clear();
     computeds.clear();
     wasmFields.clear();
     fieldSources.clear();
+    for (const key of contextMembers) delete (store as Record<PropertyKey, unknown>)[key];
+    contextMembers.clear();
     throw error;
   }
 
@@ -460,11 +587,23 @@ function createStoreCore<S extends Record<string, unknown>>(
                 : createStoreLightAggregateError(
                     StoreLightErrorCode.initAndCleanupFailed,
                     [error.cause, cleanupError],
-                    '[store] initialization and cleanup both failed'
+                    StoreLightErrorText.cleanupFailed
                   );
           } catch {
-            // 冻结 Error 无法附加 cause；仍不得替换原始初始化错误。
+            // A frozen/non-configurable Error cannot carry cause; promote both values
+            // into a tagged aggregate instead of silently losing cleanup diagnostics.
+            throw createStoreLightAggregateError(
+              StoreLightErrorCode.initAndCleanupFailed,
+              [error, cleanupError],
+              StoreLightErrorText.cleanupFailed
+            );
           }
+        } else {
+          throw createStoreLightAggregateError(
+            StoreLightErrorCode.initAndCleanupFailed,
+            [error, cleanupError],
+            StoreLightErrorText.cleanupFailed
+          );
         }
       }
       throw error;
@@ -475,7 +614,7 @@ function createStoreCore<S extends Record<string, unknown>>(
     if (status !== StoreInitializationStatus.ready)
       throw createStoreLightError(
         StoreLightErrorCode.storeNotReady,
-        `[store] store is ${status}; use createAsyncStore() before accessing async fields`
+        StoreLightErrorText.asyncStore(status)
       );
   }
 
@@ -496,6 +635,7 @@ function createStoreCore<S extends Record<string, unknown>>(
     },
     $subscribe(fn, options) {
       assertNotDisposed();
+      assertStoreInput(fn, '$subscribe listener', 'function');
       let initialRun = true;
       // 粗粒度订阅只读取可变源字段。派生字段由这些源字段的变更
       // 间接触发；不在这里主动读取全部 Computed，避免一次持久化
@@ -509,9 +649,7 @@ function createStoreCore<S extends Record<string, unknown>>(
               try {
                 runtime.untracked(fn);
               } catch (error) {
-                runtime.reportError(error, {
-                  phase: ReactiveErrorPhase.subscriptionListener
-                });
+                reportStoreSubscriptionFailure(runtime, error);
               }
             }
             initialRun = false;
@@ -528,22 +666,34 @@ function createStoreCore<S extends Record<string, unknown>>(
     },
     $batch(recipe) {
       assertNotDisposed();
+      assertStoreInput(recipe, '$batch recipe', 'function');
       // batch（非事务，不回滚）；draft = store 本身，写只读 computed 字段会自然抛错。
       runMutation(() => recipe(store as unknown as IStoreShape<S>));
     },
     $set(patch) {
       assertNotDisposed();
+      assertStoreInput(patch, '$set patch', 'object');
+      let entries: Array<readonly [string, unknown]>;
+      try {
+        entries = Object.entries(patch);
+      } catch (error) {
+        throw createStoreLightError(
+          StoreLightErrorCode.invalidOption,
+          StoreLightErrorText.patchInvalid,
+          { cause: error }
+        );
+      }
       runMutation(() => {
-        const entries = Object.entries(patch).map(([key, value]) => {
+        const prepared = entries.map(([key, value]) => {
           const node = signals.get(key);
           if (!node)
             throw createStoreLightError(
               StoreLightErrorCode.invalidOption,
-              `[store] field is not settable: ${key}`
+              StoreLightErrorText.fieldNotSettable(key)
             );
           return [node, value] as const;
         });
-        for (const [node, value] of entries) node.value = value;
+        for (const [node, value] of prepared) node.value = value;
       });
     },
     $plain() {
@@ -556,12 +706,36 @@ function createStoreCore<S extends Record<string, unknown>>(
     },
     $hydrate(partial, options = {}) {
       assertNotDisposed();
-      const entries = Object.entries(partial);
+      assertStoreInput(partial, '$hydrate partial', 'object');
+      if (options === null || typeof options !== 'object')
+        throw createStoreLightError(
+          StoreLightErrorCode.invalidOption,
+          StoreLightErrorText.optionsObject
+        );
+      try {
+        Object.getOwnPropertyDescriptors(options);
+      } catch (error) {
+        throw createStoreLightError(
+          StoreLightErrorCode.invalidOption,
+          StoreLightErrorText.optionsObject,
+          { cause: error }
+        );
+      }
+      let entries: Array<[string, unknown]>;
+      try {
+        entries = Object.entries(partial);
+      } catch (error) {
+        throw createStoreLightError(
+          StoreLightErrorCode.invalidOption,
+          StoreLightErrorText.patchInvalid,
+          { cause: error }
+        );
+      }
       const unknown = entries.filter(([key]) => !signals.has(key)).map(([key]) => key);
       if (options.unknown === 'strict' && unknown.length > 0) {
         throw createStoreLightError(
           StoreLightErrorCode.invalidOption,
-          `[store] unknown hydration field: ${unknown[0]}`
+          StoreLightErrorText.unknownHydrationField(unknown[0])
         );
       }
       if (options.unknown === 'report') {
@@ -584,23 +758,27 @@ function createStoreCore<S extends Record<string, unknown>>(
       // 外部资源（典型：collections），来源不明，保守按 syncSafe: false 处理（§4.2）。
       return scope.own(resource, { syncSafe: false, force: () => resource.dispose() });
     },
-    async $dispose() {
-      if (disposed) return;
-      disposed = true;
-      initAbort.abort(); // 中止在途异步字段初始化
-      // scope 释放 Signal / Computed / $subscribe Effect / 已登记的 wasm 字段。总是异步
-      // （D-1：LifecycleScope 没有同步 dispose()）；失败时按 scope 的错误策略（默认 'throw'）
-      // 拒绝，与迁移前 scope.dispose() 同步抛错时 $dispose() 直接抛穿的行为一致，只是现在是
-      // 一个 rejected Promise 而不是同步 throw。
-      try {
-        await scope.dispose();
-      } finally {
-        // 丢掉强引用，避免「已 dispose 仍被 store 地图钉住」的假性常驻
-        signals.clear();
-        computeds.clear();
-        wasmFields.clear();
-        fieldSources.clear();
-      }
+    $dispose() {
+      disposePromise ??= (async () => {
+        disposed = true;
+        initAbort.abort(); // 中止在途异步字段初始化
+        // scope 释放 Signal / Computed / $subscribe Effect / 已登记的 wasm 字段。总是异步
+        // （D-1：LifecycleScope 没有同步 dispose()）；失败时按 scope 的错误策略（默认 'throw'）
+        // 拒绝，与迁移前 scope.dispose() 同步抛错时 $dispose() 直接抛穿的行为一致，只是现在是
+        // 一个 rejected Promise 而不是同步 throw。
+        try {
+          await scope.dispose();
+        } finally {
+          // 丢掉强引用，避免「已 dispose 仍被 store 地图钉住」的假性常驻
+          signals.clear();
+          computeds.clear();
+          wasmFields.clear();
+          fieldSources.clear();
+          for (const key of contextMembers) delete (store as Record<PropertyKey, unknown>)[key];
+          contextMembers.clear();
+        }
+      })();
+      return disposePromise;
     }
   };
 
@@ -648,7 +826,7 @@ export function storeReady(store: object): Promise<void> {
   if (!ready)
     throw createStoreLightError(
       StoreLightErrorCode.noAsyncInit,
-      '[store] store has no asynchronous initialization'
+      StoreLightErrorText.noAsyncInitialization
     );
   return ready;
 }
@@ -665,7 +843,16 @@ export function createStore<S extends Record<string, unknown>>(
   },
   options?: ICreateStoreOptions
 ): IReactiveStore<S> {
-  const descriptors = Object.getOwnPropertyDescriptors(shape);
+  let descriptors: Record<string, PropertyDescriptor>;
+  try {
+    descriptors = Object.getOwnPropertyDescriptors(shape);
+  } catch (error) {
+    throw createStoreLightError(
+      StoreLightErrorCode.invalidOption,
+      StoreLightErrorText.shapeInvalid,
+      { cause: error }
+    );
+  }
   for (const [key, descriptor] of Object.entries(descriptors)) {
     if (
       'value' in descriptor &&
@@ -674,7 +861,7 @@ export function createStore<S extends Record<string, unknown>>(
     ) {
       throw createStoreLightError(
         StoreLightErrorCode.syncFieldRequired,
-        `[store] createStore() only accepts synchronous fields; "${key}" is a IFieldBuilder. Use createAsyncStore().`
+        StoreLightErrorText.syncStoreField(key)
       );
     }
   }

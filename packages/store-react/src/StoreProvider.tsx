@@ -4,6 +4,7 @@ import { StoreRegistryContext } from './provider-context.js';
 import { createStoreRegistry, type StoreRegistry } from './provider-registry.js';
 import { createStoreReactError } from './errors.js';
 import { StoreReactErrorCode } from './error-code.js';
+import { StoreReactErrorText } from './error-text.js';
 import { StoreProviderState } from './provider-state-constants.js';
 import {
   decodeStoreExperimental,
@@ -23,6 +24,15 @@ function readyKey(promise: Promise<void>): number {
     READY_KEYS.set(promise, key);
   }
   return key;
+}
+
+/** Normalizes a ready rejection without coercing hostile reasons or replacing Error identity. */
+export function normalizeStoreReadyError(reason: unknown): Error {
+  return reason instanceof Error
+    ? reason
+    : createStoreReactError(StoreReactErrorCode.readyRejected, StoreReactErrorText.readyRejected, {
+        cause: reason
+      });
 }
 
 export type IStoreProviderProps = {
@@ -48,12 +58,31 @@ export function StoreProvider({
   if (registry && runtime && registry.runtime !== runtime) {
     throw createStoreReactError(
       StoreReactErrorCode.invalidConfig,
-      '[store] StoreProvider registry/runtime ownership mismatch'
+      StoreReactErrorText.ownershipMismatch
     );
   }
 
   // ready 数组字面量每次 render 都是新引用；按元素浅比较稳住 Promise，避免 use() 反复 suspend
-  const readyInput = config?.ready;
+  const configSnapshot = useMemo(() => {
+    try {
+      return {
+        ready: config?.ready,
+        wasm: config?.features?.wasm === true,
+        experimental: config?.features?.experimental,
+        warnAsyncActions: config?.defaults?.warnAsyncActions === true,
+        fallback: config?.fallback
+      };
+    } catch (error) {
+      throw createStoreReactError(
+        StoreReactErrorCode.invalidConfig,
+        StoreReactErrorText.configRead,
+        {
+          cause: error
+        }
+      );
+    }
+  }, [config]);
+  const readyInput = configSnapshot.ready;
   const barrierScope = useRef<object>(undefined);
   if (!barrierScope.current) barrierScope.current = {};
   const readyRef = useRef<{
@@ -68,21 +97,17 @@ export function StoreProvider({
   } else if (!sameBarrierList(readyRef.current.value, readyInput)) {
     const nodeProcess = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process;
     if (nodeProcess?.env?.NODE_ENV !== 'production') {
-      console.warn(
-        '[store] StoreProvider ready barriers changed identity; memoize config.ready to avoid resetting the provider tree'
-      );
+      console.warn(StoreReactErrorText.readyIdentity);
     } else {
-      console.error(
-        '[store] StoreProvider ready barriers changed identity; the initial barrier set is retained. Memoize config.ready to avoid stale initialization.'
-      );
+      console.error(StoreReactErrorText.readyRetained);
     }
   }
   const stableReady = readyRef.current.value;
-  const wasmEnabled = config?.features?.wasm === true;
-  const warnAsyncActions = config?.defaults?.warnAsyncActions === true;
+  const wasmEnabled = configSnapshot.wasm;
+  const warnAsyncActions = configSnapshot.warnAsyncActions;
   const experimentalKey = useMemo(
-    () => encodeStoreExperimental(config?.features?.experimental),
-    [config?.features?.experimental]
+    () => encodeStoreExperimental(configSnapshot.experimental),
+    [configSnapshot.experimental]
   );
   const experimental = useMemo<Readonly<Record<string, boolean>> | undefined>(
     () => decodeStoreExperimental(experimentalKey),
@@ -103,7 +128,7 @@ export function StoreProvider({
       ),
     [experimental, stableReady, warnAsyncActions, wasmEnabled]
   );
-  const fallback = config?.fallback ?? null;
+  const fallback = configSnapshot.fallback ?? null;
 
   const tree = registry ? (
     <RegistryBoundary registry={registry} disposeOnUnmount={disposeOnUnmount ?? false}>
@@ -147,14 +172,10 @@ function ReadyBoundary({
   children: ReactNode;
 }) {
   const initial = ready.status();
-  const normalizeReadyError = (reason: unknown): Error =>
-    reason instanceof Error
-      ? reason
-      : new Error(`[store] ready barrier rejected: ${String(reason)}`);
   const [status, setStatus] = useState(initial);
   const [error, setError] = useState<Error | null>(() => {
     const reason = ready.error();
-    return initial === StoreProviderState.error ? normalizeReadyError(reason) : null;
+    return initial === StoreProviderState.error ? normalizeStoreReadyError(reason) : null;
   });
 
   useEffect(() => {
@@ -167,7 +188,7 @@ function ReadyBoundary({
     }
     if (snap === StoreProviderState.error) {
       setStatus(StoreProviderState.error);
-      setError(normalizeReadyError(ready.error()));
+      setError(normalizeStoreReadyError(ready.error()));
       return;
     }
     setStatus(StoreProviderState.pending);
@@ -178,7 +199,7 @@ function ReadyBoundary({
       },
       (reason: unknown) => {
         if (live) {
-          setError(normalizeReadyError(reason));
+          setError(normalizeStoreReadyError(reason));
           setStatus(StoreProviderState.error);
         }
       }
@@ -247,7 +268,7 @@ function OwnedRegistryBoundary({
   if (!initial.current) {
     const ownedRuntime = runtime ?? createRuntime();
     const ownedRegistry = createStoreRegistry(ownedRuntime);
-    if (armInitial) ownedRegistry.prepareForRender(armInitial);
+    void armInitial;
     initial.current = {
       runtime,
       registry: ownedRegistry
@@ -266,7 +287,7 @@ function OwnedRegistryBoundary({
       // pending. Keep the candidate armed by that same barrier; otherwise
       // prepareForRender() would dispose it on the next timer before the
       // ReadyBoundary has a chance to commit the subtree.
-      if (armInitial) nextRegistry.prepareForRender(armInitial);
+      void armInitial;
       active = {
         runtime,
         registry: nextRegistry

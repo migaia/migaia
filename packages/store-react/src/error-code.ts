@@ -61,7 +61,13 @@ export const StoreReactErrorCode = {
    *
    * 调用方修正配置后重试；这是永久性配置错误。
    */
-  invalidConfig: 'INVALID_CONFIG'
+  invalidConfig: 'INVALID_CONFIG',
+
+  /**
+   * The provider readiness barrier rejected before rendering could continue. The caller should
+   * inspect `cause` and fix the underlying store/resource failure.
+   */
+  readyRejected: 'READY_REJECTED'
 } as const;
 
 export type IStoreReactErrorCode = (typeof StoreReactErrorCode)[keyof typeof StoreReactErrorCode];

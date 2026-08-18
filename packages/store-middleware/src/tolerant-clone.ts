@@ -20,6 +20,7 @@ export type IClonePolicyMode = 'immutable' | 'opaque' | 'diagnostic';
 
 import { createStoreMiddlewareError } from './errors.js';
 import { StoreMiddlewareErrorCode } from './error-code.js';
+import { StoreMiddlewareErrorText } from './error-text.js';
 
 /**
  * Real independent copy, or throw. Prefers `structuredClone`; the engine not having it at all is
@@ -29,7 +30,7 @@ export function immutableSnapshotClone<T>(value: T): T {
   if (typeof structuredClone !== 'function') {
     throw createStoreMiddlewareError(
       StoreMiddlewareErrorCode.envUnsupported,
-      '[store] ClonePolicy.immutable requires structuredClone support in this environment'
+      StoreMiddlewareErrorText.immutableClone
     );
   }
   try {
@@ -37,7 +38,7 @@ export function immutableSnapshotClone<T>(value: T): T {
   } catch (error) {
     throw createStoreMiddlewareError(
       StoreMiddlewareErrorCode.cloneUnsupported,
-      '[store] value contains something structuredClone cannot copy independently (e.g. a function, DOM handle, or class instance); use ClonePolicy.diagnostic or ClonePolicy.opaque instead',
+      StoreMiddlewareErrorText.cloneUnsupported,
       { cause: error }
     );
   }

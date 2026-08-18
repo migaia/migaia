@@ -10,6 +10,7 @@ import {
   createStoreKeyedRangeError,
   StoreKeyedErrorCode
 } from '../errors.js';
+import { StoreKeyedErrorText } from '../error-text.js';
 
 /**
  * 按键产出**定义**的 family。
@@ -74,10 +75,7 @@ function createDefinitionCache<K extends IFamilyKey, D extends object>(
   create: (key: K) => D
 ): IDefinitionCache<K, D> {
   if (typeof WeakRef !== 'function' || typeof FinalizationRegistry !== 'function') {
-    throw createStoreKeyedError(
-      StoreKeyedErrorCode.envUnsupported,
-      '[store] family definitions require WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox'
-    );
+    throw createStoreKeyedError(StoreKeyedErrorCode.envUnsupported, StoreKeyedErrorText.weakRef);
   }
   const entries = new Map<K, D>();
   const canonical = new Map<K, WeakRef<D>>();
@@ -145,11 +143,44 @@ export function familyDef<K extends IFamilyKey, T>(
   initial: (key: K) => T,
   options: IFamilyDefOptions = {}
 ): IFamilyDef<K, T, IWritableAtomDefinition<T>> {
-  const { maxSize = 4096, debugLabel = 'family' } = options;
+  if (options === null || typeof options !== 'object') {
+    throw createStoreKeyedRangeError(
+      StoreKeyedErrorCode.invalidOption,
+      StoreKeyedErrorText.familyCapacity
+    );
+  }
+  try {
+    Object.getOwnPropertyDescriptors(options);
+  } catch (error) {
+    throw createStoreKeyedRangeError(
+      StoreKeyedErrorCode.invalidOption,
+      StoreKeyedErrorText.familyCapacity,
+      { cause: error }
+    );
+  }
+  let maxSize: number | undefined;
+  let debugLabel: string | undefined;
+  try {
+    ({ maxSize, debugLabel } = options);
+  } catch (error) {
+    throw createStoreKeyedRangeError(
+      StoreKeyedErrorCode.invalidOption,
+      StoreKeyedErrorText.familyCapacity,
+      { cause: error }
+    );
+  }
+  maxSize ??= 4096;
+  debugLabel ??= 'family';
+  if (typeof debugLabel !== 'string') {
+    throw createStoreKeyedRangeError(
+      StoreKeyedErrorCode.invalidOption,
+      StoreKeyedErrorText.familyLabel
+    );
+  }
   if (!Number.isSafeInteger(maxSize) || maxSize < 1) {
     throw createStoreKeyedRangeError(
       StoreKeyedErrorCode.invalidOption,
-      '[store] family maxSize must be a positive integer'
+      StoreKeyedErrorText.familyCapacity
     );
   }
   const cache = createDefinitionCache<K, IWritableAtomDefinition<T>>(maxSize, (key) =>
@@ -168,11 +199,44 @@ export function derivedFamilyDef<K extends IFamilyKey, T>(
   read: (key: K) => (get: IAtomGet) => T,
   options: IFamilyDefOptions = {}
 ): IFamilyDef<K, T> {
-  const { maxSize = 4096, debugLabel = 'derived-family' } = options;
+  if (options === null || typeof options !== 'object') {
+    throw createStoreKeyedRangeError(
+      StoreKeyedErrorCode.invalidOption,
+      StoreKeyedErrorText.familyCapacity
+    );
+  }
+  try {
+    Object.getOwnPropertyDescriptors(options);
+  } catch (error) {
+    throw createStoreKeyedRangeError(
+      StoreKeyedErrorCode.invalidOption,
+      StoreKeyedErrorText.familyCapacity,
+      { cause: error }
+    );
+  }
+  let maxSize: number | undefined;
+  let debugLabel: string | undefined;
+  try {
+    ({ maxSize, debugLabel } = options);
+  } catch (error) {
+    throw createStoreKeyedRangeError(
+      StoreKeyedErrorCode.invalidOption,
+      StoreKeyedErrorText.familyCapacity,
+      { cause: error }
+    );
+  }
+  maxSize ??= 4096;
+  debugLabel ??= 'derived-family';
+  if (typeof debugLabel !== 'string') {
+    throw createStoreKeyedRangeError(
+      StoreKeyedErrorCode.invalidOption,
+      StoreKeyedErrorText.familyLabel
+    );
+  }
   if (!Number.isSafeInteger(maxSize) || maxSize < 1) {
     throw createStoreKeyedRangeError(
       StoreKeyedErrorCode.invalidOption,
-      '[store] family maxSize must be a positive integer'
+      StoreKeyedErrorText.familyCapacity
     );
   }
   const cache = createDefinitionCache<K, IAtomDefinition<T>>(maxSize, (key) =>
