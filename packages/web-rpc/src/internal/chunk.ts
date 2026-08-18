@@ -159,6 +159,16 @@ export class ChunkAssembler {
       this.#observe?.('chunk.rejected');
       return undefined;
     }
+    if (!existing) {
+      const peerCount = this.#peerCounts.get(peerKey) ?? 0;
+      if (
+        this.#chunks.size >= this.#maxConcurrentMessages ||
+        peerCount >= this.#maxConcurrentMessagesPerPeer
+      ) {
+        this.#observe?.('chunk.rejected');
+        return undefined;
+      }
+    }
     const current = existing ?? {
       peerKey,
       total: frame.total,
@@ -171,14 +181,6 @@ export class ChunkAssembler {
     };
     if (!existing) {
       const peerCount = this.#peerCounts.get(peerKey) ?? 0;
-      if (
-        this.#chunks.size >= this.#maxConcurrentMessages ||
-        peerCount >= this.#maxConcurrentMessagesPerPeer
-      ) {
-        current.timer.clear();
-        this.#observe?.('chunk.rejected');
-        return undefined;
-      }
       this.#peerCounts.set(peerKey, peerCount + 1);
     }
     if (

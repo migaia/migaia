@@ -23,6 +23,50 @@ describe('DiscoveryRegistry', () => {
     expect(resolved).toBe(true);
   });
 
+  it('settles automatic waiter synchronously before same-turn responses', () => {
+    const registry = new DiscoveryRegistry();
+    const createTimer = vi.fn(() => ({ clear: vi.fn() }));
+    registry.setWaiter('target', { settled: false, resolve: vi.fn() });
+
+    expect(registry.resolveAutomatic('target', createTimer)).toBe(true);
+    expect(registry.resolveAutomatic('target', createTimer)).toBe(false);
+    expect(createTimer).toHaveBeenCalledOnce();
+  });
+
+  it('rejects the actual automatic waiter and cleans all state when timer creation fails', async () => {
+    const registry = new DiscoveryRegistry();
+    const clear = vi.fn();
+    const primary = new Error('timer failed');
+    let resolvePromise!: () => void;
+    let rejectPromise!: (error: unknown) => void;
+    const reject = vi.fn((error: unknown) => rejectPromise(error));
+    const promise = new Promise<void>((resolve, reject) => {
+      resolvePromise = resolve;
+      rejectPromise = reject;
+    });
+    registry.setWaiter('target', {
+      settled: false,
+      taskId: 'task',
+      timer: { clear },
+      resolve: resolvePromise,
+      reject
+    });
+    registry.setTask('task', 'target');
+    registry.setTimer('task', { clear });
+    registry.setResponseCount('task', 1);
+
+    expect(() =>
+      registry.resolveAutomatic('target', () => {
+        throw primary;
+      })
+    ).toThrow(primary);
+    await expect(promise).rejects.toBe(primary);
+    expect(reject).toHaveBeenCalledOnce();
+    expect(registry.debugSnapshot()).toMatchObject({ waiters: 0, tasks: 0, timers: 0 });
+    expect(registry.getResponseCount('task')).toBeUndefined();
+    expect(registry.resolveAutomatic('target', () => ({ clear: vi.fn() }))).toBe(false);
+  });
+
   it('releases manual waiter resources on failure', () => {
     const registry = new DiscoveryRegistry();
     const clear = vi.fn();
@@ -39,6 +83,82 @@ describe('DiscoveryRegistry', () => {
     expect(clear).toHaveBeenCalledOnce();
     expect(remove).toHaveBeenCalledOnce();
     expect(reject).toHaveBeenCalledOnce();
+  });
+  it('settles a manual waiter before reporting timer cleanup failure', () => {
+    const timerError = new Error('manual timer cleanup failed');
+    const primaryError = new Error('send failed');
+    const report = vi.fn();
+    let settleReject!: (reason: unknown) => void;
+    const promise = new Promise<void>((_resolve, reject) => {
+      settleReject = reject;
+    });
+    let rejected = false;
+    const registry = new DiscoveryRegistry(undefined, report);
+    registry.setManualWaiter('query', {
+      timer: {
+        clear() {
+          expect(registry.getManualWaiter('query')).toBeUndefined();
+          expect(rejected).toBe(true);
+          throw timerError;
+        }
+      },
+      reject: (error: unknown) => {
+        rejected = true;
+        settleReject(error);
+      }
+    });
+
+    expect(registry.rejectManualWaiter('query', primaryError)).toBe(true);
+    return expect(promise)
+      .rejects.toBe(primaryError)
+      .then(() => {
+        expect(rejected).toBe(true);
+        expect(registry.getManualWaiter('query')).toBeUndefined();
+        expect(report).toHaveBeenCalledWith(timerError);
+      });
+  });
+  it('settles a manual waiter before reporting listener cleanup failure', () => {
+    const listenerError = new Error('manual listener cleanup failed');
+    const report = vi.fn();
+    const reject = vi.fn();
+    const registry = new DiscoveryRegistry(undefined, report);
+    registry.setManualWaiter('query', {
+      timer: { clear: vi.fn() },
+      reject,
+      signal: {
+        removeEventListener() {
+          throw listenerError;
+        }
+      },
+      onAbort: () => undefined
+    });
+
+    expect(registry.rejectManualWaiter('query', new Error('send failed'))).toBe(true);
+    expect(reject).toHaveBeenCalledOnce();
+    expect(registry.getManualWaiter('query')).toBeUndefined();
+    expect(report).toHaveBeenCalledWith(listenerError);
+  });
+  it('resolves a manual waiter even when listener cleanup reports an error', () => {
+    const cleanupError = new Error('manual listener cleanup failed');
+    const report = vi.fn();
+    const resolve = vi.fn();
+    const registry = new DiscoveryRegistry(undefined, report);
+    registry.setManualWaiter('query', {
+      timer: { clear: vi.fn() },
+      candidates: [{ value: 1 }],
+      resolve,
+      signal: {
+        removeEventListener() {
+          throw cleanupError;
+        }
+      },
+      onAbort: () => undefined
+    });
+
+    expect(registry.resolveManualWaiter('query')).toBe(true);
+    expect(resolve).toHaveBeenCalledWith([{ value: 1 }]);
+    expect(report).toHaveBeenCalledWith(cleanupError);
+    expect(registry.getManualWaiter('query')).toBeUndefined();
   });
   it('closes all manual waiters and releases their listeners', () => {
     const registry = new DiscoveryRegistry();
@@ -82,6 +202,64 @@ describe('DiscoveryRegistry', () => {
     expect(firstReject).toHaveBeenCalledOnce();
     expect(secondReject).toHaveBeenCalledOnce();
     expect(removeSecond).toHaveBeenCalledOnce();
+  });
+
+  it('detaches state, finishes every close cleanup, and preserves the first failure', () => {
+    const firstRejectError = new Error('first reject failed');
+    const secondRejectError = new Error('second reject failed');
+    const timerError = new Error('timer clear failed');
+    const releaseError = new Error('binding release failed');
+    const reported: unknown[] = [];
+    let observedDuringReject: ReturnType<DiscoveryRegistry['debugSnapshot']> | undefined;
+    const registry = new DiscoveryRegistry(
+      {
+        retain: () => true,
+        release: () => {
+          throw releaseError;
+        }
+      },
+      (error) => {
+        reported.push(error);
+        if (error === secondRejectError) throw new Error('reporter failed');
+      }
+    );
+    const waiterTimer = { clear: vi.fn() };
+    registry.setWaiter('first', {
+      taskId: 'first-task',
+      timer: waiterTimer,
+      reject: () => {
+        observedDuringReject = registry.debugSnapshot();
+        registry.close(new Error('reentrant close'));
+        throw firstRejectError;
+      }
+    });
+    registry.setTask('first-task', 'first');
+    registry.setTimer('first-task', {
+      clear: () => {
+        throw timerError;
+      }
+    });
+    registry.setWaiter('second', {
+      reject: () => {
+        throw secondRejectError;
+      }
+    });
+    registry.setRemoteWithBinding('remote', {}, 'binding');
+
+    expect(() => registry.close(new Error('closed'))).toThrow(firstRejectError);
+    expect(observedDuringReject).toEqual({
+      local: 0,
+      remote: 0,
+      waiters: 0,
+      tasks: 0,
+      timers: 0,
+      manualWaiters: 0,
+      inboundQueries: 0,
+      inboundTimers: 0
+    });
+    expect(registry.debugSnapshot()).toEqual(observedDuringReject);
+    expect(waiterTimer.clear).not.toHaveBeenCalled();
+    expect(reported).toEqual([secondRejectError, timerError, releaseError]);
   });
 
   it('rejects automatic waiters and releases their task resources on close', () => {
@@ -212,6 +390,28 @@ describe('DiscoveryRegistry', () => {
     expect(retained).toEqual(['first', 'second']);
     expect(released).toEqual(['first']);
     expect(registry.getRemoteBinding('remote')).toBe('second');
+  });
+
+  it('keeps replacement state when previous binding release fails', () => {
+    const released: string[] = [];
+    const registry = new DiscoveryRegistry({
+      retain: () => true,
+      release: (token) => {
+        released.push(token);
+        if (token === 'first') throw new Error('old release failed');
+      }
+    });
+    expect(registry.setRemoteWithBinding('remote', { version: 1 }, 'first')).toBe(true);
+
+    expect(() => registry.setRemoteWithBinding('remote', { version: 2 }, 'second')).toThrow(
+      'old release failed'
+    );
+    expect(registry.getRemote<{ version: number }>('remote')).toEqual({ version: 2 });
+    expect(registry.getRemoteBinding('remote')).toBe('second');
+    expect(released).toEqual(['first']);
+
+    registry.clear();
+    expect(released).toEqual(['first', 'second']);
   });
 
   it('releases remote identity leases during stale purge and close', () => {

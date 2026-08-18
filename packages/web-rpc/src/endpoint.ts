@@ -8,9 +8,12 @@ import {
   WebRpcLifecycleError,
   WebRpcRemoteError,
   WebRpcSchemaValidationError,
+  WebRpcSerializationError,
   WebRpcTransportError,
-  WebRpcTimeoutError
+  WebRpcTimeoutError,
+  tagWebRpcError
 } from './errors.js';
+import { deserializeError } from './error-serialization.js';
 import type {
   IWebRpcContractConfig,
   IWebRpcContractCapability,
@@ -215,10 +218,13 @@ export class WebRpcEndpoint<
    */
   #disposeReported = false;
   readonly #closing = new AbortController();
-  readonly #discovery = new DiscoveryRegistry({
-    retain: (token) => this.#resourceManager.retainPeer(token),
-    release: (token) => this.#resourceManager.releasePeer(token)
-  });
+  readonly #discovery = new DiscoveryRegistry(
+    {
+      retain: (token) => this.#resourceManager.retainPeer(token),
+      release: (token) => this.#resourceManager.releasePeer(token)
+    },
+    (error) => this.#emit({ name: 'failure', code: WebRpcErrorCode.internal, error })
+  );
   readonly #multipleReceiverSnapshots = new Map<TTargetId, string>();
   readonly #receiverStaleAfterMs = 300_000;
   readonly #maxReceiversPerTarget = 64;
@@ -686,24 +692,22 @@ export class WebRpcEndpoint<
     for (const [method, provider] of Object.entries(providers ?? {}))
       this.provide(method, provider);
     if (transportOwnership !== 'borrowed') {
-      const closeTransport = () => (transportClose as IWebRpcTransport['close'] | undefined)?.();
+      const closeTransport = () => this.#transport.close?.();
       this.#resources.add('transport close', async () => closeTransport(), 'critical');
     }
     try {
-      this.#unsubscribe = (transportSubscribe as IWebRpcTransport['subscribe'])((message) => {
+      this.#unsubscribe = this.#transport.subscribe((message) => {
         void this.#receive(message).catch((error) => {
           this.#emit({ name: 'receive.failure', code: WebRpcErrorCode.internal, error });
         });
       });
       this.#resources.addSync('transport subscription', this.#unsubscribe);
-      this.#unsubscribeTransportError = (
-        onTransportError as IWebRpcTransport['onTransportError'] | undefined
-      )?.((error) => this.#failTransport(error));
+      this.#unsubscribeTransportError = this.#transport.onTransportError?.((error) =>
+        this.#failTransport(error)
+      );
       if (this.#unsubscribeTransportError)
         this.#resources.addSync('transport error subscription', this.#unsubscribeTransportError);
-      this.#unsubscribeListenerError = (
-        onListenerError as IWebRpcTransport['onListenerError'] | undefined
-      )?.((error) =>
+      this.#unsubscribeListenerError = this.#transport.onListenerError?.((error) =>
         this.#emit({ name: 'transport.listener.failure', code: WebRpcErrorCode.transport, error })
       );
       if (this.#unsubscribeListenerError)
@@ -1099,10 +1103,22 @@ export class WebRpcEndpoint<
       operationAbort.abort();
       this.#resourceManager.getPingPending(taskId)?.settle(false);
     };
-    options?.signal?.addEventListener('abort', abortOperation, { once: true });
-    this.#closing.signal.addEventListener('abort', abortOperation, { once: true });
-    operationScope.signal.addEventListener('abort', abortOperation, { once: true });
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      const registeredSignals: IWebRpcAbortSignal[] = [];
+      let signalCleanupDone = false;
+      const cleanupSignals = (): void => {
+        if (signalCleanupDone) return;
+        signalCleanupDone = true;
+        for (const signal of registeredSignals.reverse()) {
+          try {
+            signal.removeEventListener('abort', abortOperation);
+          } catch (error) {
+            try {
+              this.#emit({ name: 'failure', code: WebRpcErrorCode.internal, error });
+            } catch {}
+          }
+        }
+      };
       let releaseControl = (): void => undefined;
       const control = new Promise<void>((resolveControl) => {
         releaseControl = resolveControl;
@@ -1121,18 +1137,44 @@ export class WebRpcEndpoint<
           this.#resourceManager.deletePingPending(taskId);
           operation.release();
           operationAbort.abort();
-          options?.signal?.removeEventListener('abort', abortOperation);
-          this.#closing.signal.removeEventListener('abort', abortOperation);
-          operationScope.signal.removeEventListener('abort', abortOperation);
+          cleanupSignals();
           operationScope.abort();
           pending.release?.();
         },
         resolve,
-        reject: () => resolve(false)
+        reject
       });
       pending.settle = settlement.resolve;
       this.#resourceManager.setPingPending(taskId, pending);
-      if (operationAbort.signal.aborted) pending.settle(false);
+      const registerSignal = (signal: IWebRpcAbortSignal | undefined): void => {
+        if (signal === undefined || settlement.isSettled()) return;
+        registeredSignals.push(signal);
+        signal.addEventListener('abort', abortOperation, { once: true });
+      };
+      try {
+        registerSignal(options?.signal);
+        registerSignal(this.#closing.signal);
+        registerSignal(operationScope.signal);
+        if (
+          operationAbort.signal.aborted ||
+          this.#disposed ||
+          this.#closing.signal.aborted ||
+          operationScope.signal.aborted
+        )
+          pending.settle(false);
+      } catch (error) {
+        const codedError =
+          error instanceof Error
+            ? tagWebRpcError(error, WebRpcErrorCode.invalidConfig)
+            : new WebRpcError(WebRpcErrorCode.invalidConfig, String(error), error);
+        // Registration may have synchronously invoked abortOperation before
+        // throwing. In that race cleanup already owns the id release; the late
+        // registration error is diagnostic-only and must remain observable.
+        if (!settlement.reject(codedError))
+          this.#emit({ name: 'failure', code: WebRpcErrorCode.internal, error: codedError });
+        return;
+      }
+      if (settlement.isSettled()) return;
       if (timeoutMs !== false) {
         void raceWithAsyncControl({
           operation: () => control,
@@ -1826,14 +1868,24 @@ export class WebRpcEndpoint<
       this.#discovery.setManualWaiter(taskId, waiter);
       if (options?.signal) {
         const onAbort = (): void => {
-          this.#discovery.rejectManualWaiter(
-            taskId,
-            new WebRpcError(WebRpcErrorCode.cancelled, 'Discovery aborted')
-          );
+          const abortError = new WebRpcError(WebRpcErrorCode.cancelled, 'Discovery aborted');
+          try {
+            this.#discovery.rejectManualWaiter(taskId, abortError);
+          } catch (error) {
+            // DiscoveryRegistry performs external timer/listener cleanup before settling.
+            // If that cleanup throws, finish the caller-owned promise here and report only
+            // the cleanup failure; the cancellation outcome remains authoritative.
+            if (this.#discovery.getManualWaiter(taskId) === waiter) {
+              this.#discovery.deleteManualWaiter(taskId);
+              settleReject(abortError);
+            }
+            this.#emit({ name: 'failure', code: WebRpcErrorCode.internal, error });
+          }
         };
         (waiter as { onAbort?: () => void }).onAbort = onAbort;
         try {
           options.signal.addEventListener('abort', onAbort, { once: true });
+          if (options.signal.aborted) onAbort();
         } catch (error) {
           this.#discovery.deleteManualWaiter(taskId);
           timer?.clear();
@@ -1857,7 +1909,15 @@ export class WebRpcEndpoint<
           });
         })
         .catch((error) => {
-          this.#discovery.rejectManualWaiter(taskId, error);
+          try {
+            this.#discovery.rejectManualWaiter(taskId, error);
+          } catch (cleanupError) {
+            if (this.#discovery.getManualWaiter(taskId) === waiter) {
+              this.#discovery.deleteManualWaiter(taskId);
+              settleReject(error);
+            }
+            this.#emit({ name: 'failure', code: WebRpcErrorCode.internal, error: cleanupError });
+          }
         });
     });
   }
@@ -2138,8 +2198,12 @@ export class WebRpcEndpoint<
         });
       };
       if (options.signal) {
+        let abortWon = false;
         const abort = () => {
-          if (pending.settleReject(new WebRpcAbortError())) notifyRemoteAbort();
+          if (pending.settleReject(new WebRpcAbortError())) {
+            abortWon = true;
+            notifyRemoteAbort();
+          }
         };
         try {
           options.signal.addEventListener('abort', abort, { once: true });
@@ -2149,7 +2213,13 @@ export class WebRpcEndpoint<
           try {
             options.signal.removeEventListener('abort', abort);
           } catch {}
-          pending.settleReject(error);
+          const codedError =
+            error instanceof Error
+              ? tagWebRpcError(error, WebRpcErrorCode.invalidConfig)
+              : new WebRpcError(WebRpcErrorCode.invalidConfig, String(error), error);
+          if (abortWon || settlement.isSettled())
+            this.#emit({ name: 'failure', code: WebRpcErrorCode.internal, error: codedError });
+          else pending.settleReject(codedError);
           return;
         }
       }
@@ -2895,14 +2965,30 @@ export class WebRpcEndpoint<
       } catch (error) {
         pending.settleReject(error);
       }
-    } else if (response.code === WebRpcErrorCode.schemaInvalid)
-      pending.settleReject(
-        new WebRpcSchemaValidationError(
-          response.message ?? 'Schema validation failed',
-          response.data
-        )
-      );
-    else
+    } else if (response.code === WebRpcErrorCode.schemaInvalid) {
+      if (response.serializedError) {
+        try {
+          pending.settleReject(deserializeError(response.serializedError));
+        } catch (error) {
+          let payloadError: WebRpcSerializationError;
+          try {
+            payloadError =
+              error instanceof WebRpcSerializationError
+                ? error
+                : new WebRpcSerializationError(response.message ?? 'Remote provider failed', error);
+          } catch {
+            payloadError = new WebRpcSerializationError('Remote provider failed', error);
+          }
+          pending.settleReject(payloadError);
+        }
+      } else
+        pending.settleReject(
+          new WebRpcSchemaValidationError(
+            response.message ?? 'Schema validation failed',
+            response.data
+          )
+        );
+    } else
       pending.settleReject(
         new WebRpcRemoteError(
           response.code ?? WebRpcErrorCode.internal,

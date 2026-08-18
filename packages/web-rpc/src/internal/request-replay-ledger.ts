@@ -16,7 +16,7 @@ export class RequestReplayLedger {
   readonly #maxEntries: number;
   readonly #maxEntriesPerPeer: number;
   readonly #ttlMs: number;
-  readonly #retain?: (peerKey: string) => void;
+  readonly #retain?: (peerKey: string) => boolean;
   readonly #release?: (peerKey: string) => void;
   /**
    * Per-peer completed-tombstone counts, owned by `@migaia/lifecycle`'s `LeaseRegistry` so
@@ -30,7 +30,7 @@ export class RequestReplayLedger {
     maxEntriesPerPeer = 1024,
     ttlMs = 310_000,
     lease?: {
-      readonly retain: (peerKey: string) => void;
+      readonly retain: (peerKey: string) => boolean;
       readonly release: (peerKey: string) => void;
     }
   ) {
@@ -62,13 +62,17 @@ export class RequestReplayLedger {
         this.#rejected.set(key, now + Math.min(this.#ttlMs, 1_000));
       return false;
     }
-    this.#completed.set(key, {
-      peerKey,
-      at: now,
-      releaseCount: this.#peerCounts.retain(peerKey)
-    });
-    this.#retain?.(peerKey);
-    return true;
+    if (this.#retain && !this.#retain(peerKey)) return false;
+    let releaseCount: (() => void) | undefined;
+    try {
+      releaseCount = this.#peerCounts.retain(peerKey);
+      this.#completed.set(key, { peerKey, at: now, releaseCount });
+      return true;
+    } catch (error) {
+      releaseCount?.();
+      this.#release?.(peerKey);
+      throw error;
+    }
   }
 
   /** Tests whether a fresh tombstone exists without changing it. */

@@ -3,7 +3,7 @@ import {
   observeListener,
   registerListeners,
   releaseListeners
-} from '../../src/internal/listener-safety';
+} from '../../src/internal/listener-safety.js';
 
 describe('listener safety', () => {
   it('reports synchronous listener failures without throwing', () => {

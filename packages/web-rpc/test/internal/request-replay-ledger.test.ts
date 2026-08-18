@@ -59,12 +59,59 @@ describe('RequestReplayLedger', () => {
     const retained: string[] = [];
     const released: string[] = [];
     const ledger = new RequestReplayLedger(2, 2, 10, {
-      retain: (peer) => retained.push(peer),
+      retain: (peer) => {
+        retained.push(peer);
+        return true;
+      },
       release: (peer) => released.push(peer)
     });
     expect(ledger.admit('a', 'peer', 0)).toBe(true);
     expect(retained).toEqual(['peer']);
     expect(ledger.has('other', 10)).toBe(false);
+    expect(released).toEqual(['peer']);
+  });
+
+  it('does not commit or consume peer capacity when external retain rejects', () => {
+    let available = false;
+    const retained: string[] = [];
+    const released: string[] = [];
+    const ledger = new RequestReplayLedger(1, 1, 100, {
+      retain: (peer) => {
+        if (!available) return false;
+        retained.push(peer);
+        return true;
+      },
+      release: (peer) => released.push(peer)
+    });
+
+    expect(ledger.admit('rejected', 'peer', 0)).toBe(false);
+    expect(ledger.has('rejected', 0)).toBe(false);
+    available = true;
+    expect(ledger.admit('rejected', 'peer', 1)).toBe(true);
+    expect(retained).toEqual(['peer']);
+    ledger.clear();
+    expect(released).toEqual(['peer']);
+  });
+
+  it('does not consume internal peer capacity when external retain throws', () => {
+    const retained: string[] = [];
+    const released: string[] = [];
+    let fail = true;
+    const ledger = new RequestReplayLedger(1, 1, 100, {
+      retain: (peer) => {
+        retained.push(peer);
+        if (fail) throw new Error('retain failed');
+        return true;
+      },
+      release: (peer) => released.push(peer)
+    });
+
+    expect(() => ledger.admit('first', 'peer', 0)).toThrow('retain failed');
+    expect(ledger.has('first', 0)).toBe(false);
+    fail = false;
+    expect(ledger.admit('second', 'peer', 1)).toBe(true);
+    expect(retained).toEqual(['peer', 'peer']);
+    ledger.clear();
     expect(released).toEqual(['peer']);
   });
 });

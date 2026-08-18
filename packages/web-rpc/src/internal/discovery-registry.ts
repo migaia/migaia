@@ -21,13 +21,18 @@ export class DiscoveryRegistry {
   readonly #manualCandidateUniqueIds = new WeakMap<object, string | undefined>();
   readonly #retainBinding: ((token: string) => boolean) | undefined;
   readonly #releaseBinding: ((token: string) => void) | undefined;
+  readonly #reportCleanupError: ((error: unknown) => void) | undefined;
 
-  constructor(lease?: {
-    readonly retain: (token: string) => boolean;
-    readonly release: (token: string) => void;
-  }) {
+  constructor(
+    lease?: {
+      readonly retain: (token: string) => boolean;
+      readonly release: (token: string) => void;
+    },
+    reportCleanupError?: (error: unknown) => void
+  ) {
     this.#retainBinding = lease?.retain;
     this.#releaseBinding = lease?.release;
+    this.#reportCleanupError = reportCleanupError;
   }
 
   /** Returns counts for package-level lifecycle assertions without exposing registry state. */
@@ -63,11 +68,26 @@ export class DiscoveryRegistry {
   /** Atomically commits a remote snapshot together with its verified identity lease. */
   setRemoteWithBinding(key: string, value: unknown, token: string, maxEntries = 4096): boolean {
     if (!this.#remoteTargets.has(key) && this.#remoteTargets.size >= maxEntries) return false;
+    const hadTarget = this.#remoteTargets.has(key);
+    const previousTarget = this.#remoteTargets.get(key);
     const previous = this.#remoteBindings.get(key);
     if (previous !== token && this.#retainBinding && !this.#retainBinding(token)) return false;
+    try {
+      this.#remoteTargets.set(key, value);
+      this.#remoteBindings.set(key, token);
+    } catch (error) {
+      if (!hadTarget) {
+        this.#remoteTargets.delete(key);
+        this.#remoteBindings.delete(key);
+      } else {
+        this.#remoteTargets.set(key, previousTarget);
+        if (previous === undefined) this.#remoteBindings.delete(key);
+        else this.#remoteBindings.set(key, previous);
+      }
+      if (previous !== token) this.#releaseBinding?.(token);
+      throw error;
+    }
     if (previous !== undefined && previous !== token) this.#releaseBinding?.(previous);
-    this.#remoteTargets.set(key, value);
-    this.#remoteBindings.set(key, token);
     return true;
   }
 
@@ -224,14 +244,33 @@ export class DiscoveryRegistry {
         }
       | undefined;
     if (!waiter) return false;
-    waiter.timer.clear();
     this.deleteManualWaiter(key);
-    if (waiter.signal && waiter.onAbort) waiter.signal.removeEventListener('abort', waiter.onAbort);
+    const cleanupErrors: unknown[] = [];
+    try {
+      waiter.timer.clear();
+    } catch (error) {
+      cleanupErrors.push(error);
+    }
+    if (waiter.signal && waiter.onAbort) {
+      try {
+        waiter.signal.removeEventListener('abort', waiter.onAbort);
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
     waiter.resolve(Object.freeze([...waiter.candidates]));
+    for (const cleanupError of cleanupErrors) {
+      try {
+        this.#reportCleanupError?.(cleanupError);
+      } catch {}
+    }
     return true;
   }
 
-  /** Rejects one manual query and releases its timer and abort listener. */
+  /**
+   * Detaches and rejects one manual query before attempting external cleanup. Cleanup failures are
+   * reported after settlement so they cannot leave the caller Promise or registry entry pending.
+   */
   rejectManualWaiter(key: string, error: unknown): boolean {
     const waiter = this.#manualQueryWaiters.get(key) as
       | {
@@ -242,18 +281,28 @@ export class DiscoveryRegistry {
         }
       | undefined;
     if (!waiter) return false;
-    waiter.timer.clear();
     this.deleteManualWaiter(key);
-    let cleanupError: unknown;
+    waiter.reject(error);
+    const cleanupErrors: unknown[] = [];
+    try {
+      waiter.timer.clear();
+    } catch (cleanupError) {
+      cleanupErrors.push(cleanupError);
+    }
     if (waiter.signal && waiter.onAbort) {
       try {
         waiter.signal.removeEventListener('abort', waiter.onAbort);
       } catch (error) {
-        cleanupError = error;
+        cleanupErrors.push(error);
       }
     }
-    waiter.reject(error);
-    if (cleanupError !== undefined) throw cleanupError;
+    for (const cleanupError of cleanupErrors) {
+      try {
+        this.#reportCleanupError?.(cleanupError);
+      } catch {
+        // The reporter is the final error boundary and must not interrupt settlement.
+      }
+    }
     return true;
   }
 
@@ -411,25 +460,62 @@ export class DiscoveryRegistry {
           taskId?: string;
           timer?: { readonly clear: () => void };
           resolve: () => void;
+          reject?: (error: unknown) => void;
         }
       | undefined;
     if (!waiter || waiter.settled) return false;
-    waiter.timer?.clear();
-    if (waiter.taskId) this.deleteTimer(waiter.taskId);
-    const collectionTimer = createCollectionTimer(() => {
-      if (this.#waiters.get(targetId) !== waiter) return;
-      this.deleteWaiter(targetId);
+    waiter.settled = true;
+    let collectionTimer: { readonly clear: () => void } | undefined;
+    let previousTimerCleared = false;
+    try {
+      waiter.timer?.clear();
+      previousTimerCleared = true;
+      if (waiter.taskId) this.deleteTimer(waiter.taskId);
+      collectionTimer = createCollectionTimer(() => {
+        if (this.#waiters.get(targetId) !== waiter) return;
+        this.deleteWaiter(targetId);
+        if (waiter.taskId) {
+          this.deleteTask(waiter.taskId);
+          this.deleteResponseCount(waiter.taskId);
+          this.deleteTimer(waiter.taskId);
+        }
+        waiter.timer = undefined;
+      });
+      waiter.timer = collectionTimer;
+      if (waiter.taskId) this.setTimer(waiter.taskId, collectionTimer);
+      waiter.resolve();
+      return true;
+    } catch (error) {
+      const cleanupErrors: unknown[] = [];
+      const clearTimer = (timer: { readonly clear: () => void } | undefined): void => {
+        if (!timer) return;
+        try {
+          timer.clear();
+        } catch (cleanupError) {
+          cleanupErrors.push(cleanupError);
+        }
+      };
+      if (!previousTimerCleared) clearTimer(waiter.timer);
+      clearTimer(collectionTimer);
+      waiter.timer = undefined;
+      if (this.#waiters.get(targetId) === waiter) this.deleteWaiter(targetId);
       if (waiter.taskId) {
         this.deleteTask(waiter.taskId);
         this.deleteResponseCount(waiter.taskId);
         this.deleteTimer(waiter.taskId);
       }
-      waiter.timer = undefined;
-    });
-    waiter.timer = collectionTimer;
-    if (waiter.taskId) this.setTimer(waiter.taskId, collectionTimer);
-    waiter.resolve();
-    return true;
+      try {
+        waiter.reject?.(error);
+      } catch (rejectError) {
+        cleanupErrors.push(rejectError);
+      }
+      for (const cleanupError of cleanupErrors) {
+        try {
+          this.#reportCleanupError?.(cleanupError);
+        } catch {}
+      }
+      throw error;
+    }
   }
 
   /** Clears registry-owned state after all externally owned timers are stopped. */
@@ -439,46 +525,100 @@ export class DiscoveryRegistry {
 
   /** Settles every outbound waiter and releases all registry-owned timers/listeners. */
   close(reason: unknown): void {
-    let cleanupError: unknown;
-    for (const [targetId, rawWaiter] of Array.from(this.#waiters.entries())) {
+    const automaticWaiters = Array.from(this.#waiters.values());
+    const manualWaiters = Array.from(this.#manualQueryWaiters.values());
+    const discoveryTimers = Array.from(this.#timers.values());
+    const trackedTaskIds = new Set(this.#timers.keys());
+    const inboundTimers = Array.from(this.#manualInboundQueryTimers.values());
+    const bindingTokens = Array.from(this.#remoteBindings.values());
+    let firstError: unknown;
+    let hasFirstError = false;
+    const clearedTimers = new Set<{ readonly clear: () => void }>();
+    const recordCleanupError = (error: unknown): void => {
+      if (!hasFirstError) {
+        firstError = error;
+        hasFirstError = true;
+        return;
+      }
+      try {
+        this.#reportCleanupError?.(error);
+      } catch {
+        // The reporter is the final error boundary and must not interrupt cleanup.
+      }
+    };
+    const clearTimer = (timer: { readonly clear: () => void } | undefined): void => {
+      if (!timer || clearedTimers.has(timer)) return;
+      clearedTimers.add(timer);
+      try {
+        timer.clear();
+      } catch (error) {
+        recordCleanupError(error);
+      }
+    };
+    const clearState = (): void => {
+      this.#localTargets.clear();
+      this.#remoteTargets.clear();
+      this.#remoteBindings.clear();
+      this.#pinnedReceivers.clear();
+      this.#lostPinnedReceivers.clear();
+      this.#waiters.clear();
+      this.#tasks.clear();
+      this.#timers.clear();
+      this.#responseCounts.clear();
+      this.#automaticAdmissions.clear();
+      this.#manualQueryWaiters.clear();
+      this.#manualInboundQueries.clear();
+      this.#manualInboundQueryTimers.clear();
+      this.#manualRevokedCandidates.clear();
+    };
+
+    // Detach every registry-owned collection before invoking any user-owned callback. A callback
+    // that re-enters close() must observe the terminal empty state, not half-cleaned state.
+    clearState();
+    for (const rawWaiter of automaticWaiters) {
       const waiter = rawWaiter as {
         readonly taskId?: string;
         readonly timer?: { readonly clear: () => void };
         readonly reject?: (error: unknown) => void;
       };
-      const trackedTimer = waiter.taskId ? this.#timers.get(waiter.taskId) : undefined;
-      if (!trackedTimer) waiter.timer?.clear();
-      if (waiter.taskId) {
-        this.#tasks.delete(waiter.taskId);
-        this.#responseCounts.delete(waiter.taskId);
-      }
-      this.#waiters.delete(targetId);
-      waiter.reject?.(reason);
-    }
-    for (const key of Array.from(this.#manualQueryWaiters.keys())) {
+      if (!waiter.taskId || !trackedTaskIds.has(waiter.taskId)) clearTimer(waiter.timer);
       try {
-        this.rejectManualWaiter(key, reason);
+        waiter.reject?.(reason);
       } catch (error) {
-        cleanupError ??= error;
+        recordCleanupError(error);
       }
     }
-    for (const timer of this.#timers.values()) timer.clear();
-    for (const timer of this.#manualInboundQueryTimers.values()) timer.clear();
-    this.#localTargets.clear();
-    this.#remoteTargets.clear();
-    for (const key of this.#remoteBindings.keys()) this.#releaseRemoteBinding(key);
-    this.#pinnedReceivers.clear();
-    this.#lostPinnedReceivers.clear();
-    this.#waiters.clear();
-    this.#tasks.clear();
-    this.#timers.clear();
-    this.#responseCounts.clear();
-    this.#automaticAdmissions.clear();
-    this.#manualQueryWaiters.clear();
-    this.#manualInboundQueries.clear();
-    this.#manualInboundQueryTimers.clear();
-    this.#manualRevokedCandidates.clear();
-    if (cleanupError !== undefined) throw cleanupError;
+    for (const rawWaiter of manualWaiters) {
+      const waiter = rawWaiter as {
+        readonly timer?: { readonly clear: () => void };
+        readonly signal?: IAbortSignal;
+        readonly onAbort?: () => void;
+        readonly reject?: (error: unknown) => void;
+      };
+      clearTimer(waiter.timer);
+      if (waiter.signal && waiter.onAbort) {
+        try {
+          waiter.signal.removeEventListener('abort', waiter.onAbort);
+        } catch (error) {
+          recordCleanupError(error);
+        }
+      }
+      try {
+        waiter.reject?.(reason);
+      } catch (error) {
+        recordCleanupError(error);
+      }
+    }
+    for (const timer of discoveryTimers) clearTimer(timer);
+    for (const timer of inboundTimers) clearTimer(timer);
+    for (const token of bindingTokens) {
+      try {
+        this.#releaseBinding?.(token);
+      } catch (error) {
+        recordCleanupError(error);
+      }
+    }
+    if (hasFirstError) throw firstError;
   }
 
   /** Releases the identity lease associated with one remote snapshot. */

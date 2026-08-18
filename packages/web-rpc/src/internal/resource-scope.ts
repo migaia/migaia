@@ -39,7 +39,6 @@ export class ResourceScope {
   /** Registers a synchronously-released resource and returns an idempotent unregister function. */
   addSync(name: string, release: () => void): () => void {
     const token = {};
-    this.#count++;
     this.#sync.own(token, {
       syncSafe: true,
       force: () => {
@@ -50,8 +49,12 @@ export class ResourceScope {
         }
       }
     });
+    this.#count++;
+    let registered = true;
     return () => {
-      this.#sync.release(token);
+      if (!registered) return;
+      registered = false;
+      if (this.#sync.release(token)) this.#count--;
     };
   }
 
@@ -62,7 +65,6 @@ export class ResourceScope {
     phase: IResourceReleasePhase = 'application'
   ): () => void {
     const token = {};
-    this.#count++;
     this.#async.own(token, {
       order: ORDER_BY_PHASE[phase],
       // `LifecycleScope`'s own error collection labels failures with an internal numeric id, not
@@ -77,23 +79,35 @@ export class ResourceScope {
         }
       }
     });
+    this.#count++;
+    let registered = true;
     return () => {
-      this.#async.release(token);
+      if (!registered) return;
+      registered = false;
+      if (this.#async.release(token)) this.#count--;
     };
   }
 
   /** Releases every resource, continuing after failures and preserving order. */
   releaseAll(): Promise<readonly IResourceReleaseError[]> {
     if (this.#releasePromise) return this.#releasePromise;
-    this.#releasePromise = (async () => {
+    let resolveRelease!: (errors: readonly IResourceReleaseError[]) => void;
+    let rejectRelease!: (error: unknown) => void;
+    this.#releasePromise = new Promise((resolve, reject) => {
+      resolveRelease = resolve;
+      rejectRelease = reject;
+    });
+    (async () => {
       // Synchronous resources detach in the same tick this method is called; async resources drain
       // afterwards. The endpoint constructor's failure path depends on the synchronous part having
       // already run by the time `releaseAll()` returns its promise.
       const syncErrors = this.#sync.dispose();
       const asyncErrors = await this.#async.dispose();
       this.#count = 0;
-      return [...syncErrors, ...asyncErrors].map((entry) => entry.error as IResourceReleaseError);
-    })();
+      resolveRelease(
+        [...syncErrors, ...asyncErrors].map((entry) => entry.error as IResourceReleaseError)
+      );
+    })().catch(rejectRelease);
     return this.#releasePromise;
   }
 }
