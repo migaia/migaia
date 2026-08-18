@@ -2,10 +2,11 @@ SHELL := /bin/sh
 export CI := true
 
 # Topological order: every workspace dependency is published before its consumers.
-RELEASE_PACKAGES := lifecycle reactive middleware-pipeline event-subscriber serialize resource storage-contract plugin-host web-rpc logger storage-web
+RELEASE_PACKAGES := utils lifecycle reactive middleware-pipeline event-subscriber serialize resource storage-contract plugin-host web-rpc logger storage-web
 GITHUB_PACKAGES_REGISTRY := https://npm.pkg.github.com
 
-.PHONY: middleware-pipeline event-subscriber plugin-host logger web-rpc storage-web reactive resource lifecycle serialize storage-contract \
+.PHONY: utils middleware-pipeline event-subscriber plugin-host logger web-rpc storage-web reactive resource lifecycle serialize storage-contract \
+	utils-check utils-patch utils-publish \
 	middleware-pipeline-check middleware-pipeline-patch middleware-pipeline-publish \
 	event-subscriber-check event-subscriber-patch event-subscriber-publish \
 	plugin-host-check logger-check web-rpc-check storage-web-check \
@@ -32,7 +33,7 @@ check-package:
 		exit 2; \
 	fi; \
 	case "$(PACKAGE)" in \
-		middleware-pipeline|event-subscriber|plugin-host|logger|web-rpc|storage-web|reactive|resource|lifecycle|serialize|storage-contract) ;; \
+		utils|middleware-pipeline|event-subscriber|plugin-host|logger|web-rpc|storage-web|reactive|resource|lifecycle|serialize|storage-contract) ;; \
 		*) echo "Unsupported PACKAGE=$(PACKAGE)" >&2; exit 2 ;; \
 	esac
 
@@ -43,7 +44,7 @@ release-check: check-package
 	pnpm @$$package fmt; \
 	pnpm @$$package lint; \
 	pnpm @$$package typecheck; \
-	if [ "$$package" = "middleware-pipeline" ] || [ "$$package" = "event-subscriber" ] || [ "$$package" = "plugin-host" ] || [ "$$package" = "logger" ] || [ "$$package" = "reactive" ] || [ "$$package" = "resource" ] || [ "$$package" = "lifecycle" ] || [ "$$package" = "serialize" ] || [ "$$package" = "storage-contract" ]; then \
+	if [ "$$package" = "utils" ] || [ "$$package" = "middleware-pipeline" ] || [ "$$package" = "event-subscriber" ] || [ "$$package" = "plugin-host" ] || [ "$$package" = "logger" ] || [ "$$package" = "reactive" ] || [ "$$package" = "resource" ] || [ "$$package" = "lifecycle" ] || [ "$$package" = "serialize" ] || [ "$$package" = "storage-contract" ]; then \
 		pnpm @$$package typecheck:test; \
 	fi; \
 	if [ "$$package" = "logger" ]; then \
@@ -64,6 +65,18 @@ release-check: check-package
 		pnpm @$$package test:e2e; \
 	fi; \
 	pnpm @$$package build
+
+utils: PACKAGE := utils
+utils: release-check
+
+utils-check: PACKAGE := utils
+utils-check: release-check
+
+utils-patch: PACKAGE := utils
+utils-patch: patch
+
+utils-publish: PACKAGE := utils
+utils-publish: publish
 
 patch: check-package
 	@set -eu; \

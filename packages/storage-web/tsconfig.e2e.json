@@ -5,6 +5,8 @@
     "rootDir": ".",
     "types": ["vite/client", "@playwright/test"],
     "paths": {
+      "@migaia/utils": ["../utils/dist/index.d.ts"],
+      "@migaia/utils/*": ["../utils/dist/*.d.ts"],
       "@migaia/store-light": ["../store-light/dist/index.d.ts"],
       "@migaia/store-persist": ["../store-persist/dist/index.d.ts"]
     }

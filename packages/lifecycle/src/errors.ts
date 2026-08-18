@@ -1,4 +1,5 @@
 import type { ICollectedError, IErrorPolicy } from './types.js';
+import { attachErrorIdentity } from '@migaia/utils/error';
 import { LifecycleErrorCode } from './error-code.js';
 import { ThenableProbeKind } from './state-constants.js';
 
@@ -75,6 +76,37 @@ export type ILifecycleError = Error & {
   readonly errors?: readonly unknown[];
 };
 
+/** Attaches lifecycle identity with configurable descriptors for same-package reclassification. */
+function attachLifecycleIdentity<T extends Error>(error: T, code: string): T {
+  /** Existing source descriptor used to reject cross-package identity replacement. */
+  const source = Object.getOwnPropertyDescriptor(error, 'source');
+  if (source !== undefined && source.value !== LIFECYCLE_SOURCE) {
+    return attachErrorIdentity(error, { source: LIFECYCLE_SOURCE, code });
+  }
+  if (source === undefined) {
+    Object.defineProperty(error, 'source', {
+      configurable: true,
+      enumerable: true,
+      value: LIFECYCLE_SOURCE,
+      writable: false
+    });
+  }
+  /** Existing lifecycle code descriptor, which may be reclassified at a later boundary. */
+  const existingCode = Object.getOwnPropertyDescriptor(error, 'code');
+  if (existingCode === undefined || existingCode.value !== code) {
+    if (existingCode !== undefined && existingCode.configurable !== true) {
+      return attachErrorIdentity(error, { source: LIFECYCLE_SOURCE, code });
+    }
+    Object.defineProperty(error, 'code', {
+      configurable: true,
+      enumerable: true,
+      value: code,
+      writable: false
+    });
+  }
+  return error;
+}
+
 /**
  * Builds a `(source, code)`-tagged error without ever touching `stack` — the engine populates it at
  * construction and this function never reassigns it, so the original throw site is always visible.
@@ -91,12 +123,7 @@ export function createLifecycleError(
 ): ILifecycleError {
   const hasCause = options !== undefined && 'cause' in options;
   const error = new Error(message, hasCause ? { cause: options.cause } : undefined);
-  Object.defineProperty(error, 'source', {
-    value: LIFECYCLE_SOURCE,
-    enumerable: true,
-    configurable: true
-  });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true, configurable: true });
+  attachLifecycleIdentity(error, code);
   if (options?.phase !== undefined) {
     Object.defineProperty(error, 'phase', { value: options.phase, enumerable: true });
   }
@@ -118,13 +145,28 @@ export function createLifecycleError(
  * matters to callers (`AggregateError`) so `createLifecycleError`'s plain `Error` cannot be used.
  */
 export function tagLifecycleError<E extends Error>(error: E, code: string): E {
-  Object.defineProperty(error, 'source', {
-    value: LIFECYCLE_SOURCE,
-    enumerable: true,
-    configurable: true
-  });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true, configurable: true });
-  return error;
+  /** Existing source descriptor used to distinguish lifecycle-local reclassification. */
+  const source = Object.getOwnPropertyDescriptor(error, 'source');
+  /** Existing code descriptor whose configurability determines whether identity can be preserved. */
+  const existingCode = Object.getOwnPropertyDescriptor(error, 'code');
+  if (
+    source?.value === LIFECYCLE_SOURCE &&
+    existingCode !== undefined &&
+    existingCode.value !== code &&
+    existingCode.configurable === true
+  ) {
+    // Lifecycle deliberately reclassifies one primary Error as it crosses cancellation
+    // boundaries (ABORT_LISTENER_FAILED -> GENERATION_CANCELLATION_FAILED). Preserve the
+    // historical object identity while keeping cross-source conflicts fail-closed in utils.
+    Object.defineProperty(error, 'code', {
+      configurable: true,
+      enumerable: true,
+      value: code,
+      writable: false
+    });
+    return error;
+  }
+  return attachLifecycleIdentity(error, code);
 }
 
 /**

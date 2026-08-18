@@ -28,11 +28,18 @@
 - **失控保护**：自触发无限循环会在超过 `maxFlushPasses`（默认 100 轮）后抛错并如实报告被丢弃了哪些待办，而不是让标签页卡死。
 - **诊断即观测，不侵入业务**：trace 事件、错误上报都走独立通道，不会成为业务状态的一部分。
 
-## 4. 安装
+## 4. 安装与公开入口
 
 ```bash
 pnpm add @migaia/reactive
 ```
+
+| 入口 | 内容与边界 |
+| --- | --- |
+| `@migaia/reactive` | 日常 API：`Signal`、`Computed`、`Effect`、`createRuntime`、`defaultRuntime` 和公开类型/错误码。 |
+| `@migaia/reactive/runtime` | Runtime、调度和 observer binding，供框架适配层使用。 |
+| `@migaia/reactive/ownership`、`/source` | 所有权断言与受控 source，供上层基础库使用。 |
+| `@migaia/reactive/internals`、`/node-internals`、`/node-factories`、`/copy-check`、`/reactive/*` | 内核扩展面；只在实现新的 reactive 基础设施时使用，不是一般应用 API。 |
 
 ## 5. 五分钟上手
 
@@ -82,7 +89,7 @@ count.dispose();
 
 > 通用的「一组资源集中释放」的所有权容器（原 `Scope`/`createScope()`）已随 `docs/lifecycle/migration.sdd.md` §4.1 整体移出本包，改用 `@migaia/lifecycle` 的 `LifecycleScope`/`SyncLifecycleScope`。
 
-## 8. 最容易踩的坑
+## 8. 生命周期、错误与边界
 
 1. **不要跨 `Runtime` 混用节点**——一个 `Runtime` 创建的 `Signal` 被另一个 `Runtime` 的 `Computed`/`Effect` 读取会直接抛错。
 2. **`Signal`/`Computed`/`Effect` 构造参数顺序是"先业务参数、后 `runtime`"**：`new Signal(value, runtime, options?)`、`new Computed(fn, runtime, config?)`、`new Effect(fn, runtime, options?)`。

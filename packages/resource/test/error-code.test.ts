@@ -6,6 +6,7 @@ import { createRuntime } from '@migaia/reactive';
 import { Resource } from '../src';
 import { ResourceErrorCode } from '../src/error-code';
 import { RESOURCE_SOURCE } from '../src/errors';
+import { createResourceError } from '../src/errors';
 import { deferred, flushAsync } from './helpers';
 
 const srcDir = fileURLToPath(new URL('../src', import.meta.url));
@@ -32,6 +33,15 @@ function stripComments(source: string): string {
 // M-T37（§3.7.2）：码表生效，且 REQUEST_ABORTED/REQUEST_CANCELLED 仍是 name === 'AbortError' 的
 // DOMException —— 码只是附加字段，不替换类型（store-react 的 suspension 判定依赖这一点）。
 describe('M-T37 (§3.7.2): every declared code has a real trigger', () => {
+  it('shared attachment preserves native Error identity, cause, and stack', () => {
+    const cause = new Error('cause');
+    const error = createResourceError('TEST_CODE', 'message', { cause });
+    expect(error).toBeInstanceOf(Error);
+    expect(error.source).toBe(RESOURCE_SOURCE);
+    expect(error.code).toBe('TEST_CODE');
+    expect(error.cause).toBe(cause);
+    expect(error.stack).toBeTruthy();
+  });
   it('RESOURCE_DISPOSED: reading state after dispose()', () => {
     const runtime = createRuntime();
     const resource = new Resource(() => 1, runtime, { autoStart: false });

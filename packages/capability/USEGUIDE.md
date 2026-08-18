@@ -7,7 +7,7 @@
 1. [导入](#1-导入)
 2. [状态机](#2-状态机)
 3. [开关快照与 fail-closed](#3-开关快照与-fail-closed)
-4. [Generation：竞态与作废的激活](#4-generation竞态与作废的激活)
+4. [Generation：竞态与作废的激活](#generation-races)
 5. [完整 API 参考](#5-完整-api-参考)
 6. [释放顺序与依赖](#6-释放顺序与依赖)
 7. [错误处理](#7-错误处理)
@@ -31,7 +31,7 @@ import {
 } from '@migaia/capability';
 ```
 
-本包不依赖 Store、React 或任何运行时全局对象（`package.json` 没有声明任何运行时依赖），可以在任意 JS 环境中使用。
+本包不依赖 Store、React 或运行时全局对象；它复用 `@migaia/lifecycle` 的竞态/排空原语和 `@migaia/utils`。可以在任意支持 ESM 的 JS 环境中使用。
 
 ---
 
@@ -42,12 +42,12 @@ import {
 | 状态 | 含义 | 进入条件 |
 | --- | --- | --- |
 | `off` | 开关允许，但尚未启用 | 注册时开关为 `true`；或开关从 `false` 变为 `true`；或成功 `disable()` 后（开关仍为 `true`） |
-| `blocked` | 开关明确拒绝 | 注册时开关不为 `true`；或 `setFlag`/`setFlags` 把某能力移出允许表 |
+| `gated` | 开关明确拒绝 | 注册时开关不为 `true`；或 `setFlag`/`setFlags` 把某能力移出允许表 |
 | `activating` | `activate()` 正在执行，尚未 settle | 调用 `enable()` 且当前不是 `on` |
 | `on` | 已启用，持有一个有效 handle | `activate()` 成功返回合法 handle，且期间没有被回退作废 |
 | `failed` | 上一次激活失败，或激活期间自身资源清理失败 | `activate()` 抛错、返回值不是带 `dispose()` 的对象；或代数匹配下的 release 出错 |
 
-把 `off` 和 `blocked` 分开是有意为之：控制台和调用方不会把"从未尝试启用"误报成"被灰度策略拦截"——两者的排查方向完全不同。
+把 `off` 和 `gated` 分开是有意为之：控制台和调用方不会把"从未尝试启用"误报成"被灰度策略拦截"——两者的排查方向完全不同。
 
 `state(name)` 对未注册的名字抛出 `capability "${name}" is not registered`；不要用 try/catch 探测名字是否存在，先看 `names`。
 
@@ -68,6 +68,8 @@ import {
 `setFlag(name, false)` 本身就是一次原子回退：它会同步作废该能力的在途激活并释放已有 handle，调用方不需要再额外调用一次 `disable()`。`setFlag(name, true)` 只是把开关打开，**不会自动启用**——启用仍然由调用方决定时机，调用 `enable(name)`。
 
 ---
+
+<a id="generation-races"></a>
 
 ## 4. Generation：竞态与作废的激活
 
@@ -93,8 +95,8 @@ import {
 | 类型 | 定义 | 说明 |
 | --- | --- | --- |
 | `ICapabilityHandle` | `{ dispose(): void \| PromiseLike<void> }` | 能力持有的资源句柄，唯一约束是必须有 `dispose()`；`activate()` 的返回值不满足此形状会被当作 `failed`。 |
-| `ICapabilityState` | `'off' \| 'blocked' \| 'activating' \| 'on' \| 'failed'` | 见 [§2](#2-状态机)。 |
-| `ICapabilityEnableResult` | `{ status: 'enabled' } \| { status: 'blocked' } \| { status: 'cancelled' } \| { status: 'failed'; error: unknown }` | `enable()`/`enableResult()` 的返回值。 |
+| `ICapabilityState` | `'off' \| 'gated' \| 'activating' \| 'on' \| 'failed'` | 见 [§2](#2-状态机)。 |
+| `ICapabilityEnableResult` | `{ status: 'enabled' } \| { status: 'gated' } \| { status: 'cancelled' } \| { status: 'failed'; error: unknown }` | `enable()`/`enableResult()` 的返回值。 |
 | `ICapabilityDefinition<Context, Handle>` | `{ name: string; activate(context: Context): Handle \| Promise<Handle> }` | `register()` 的入参；`activate` 允许异步，正是为了按需加载增强能力时那个 chunk 不进初始包。 |
 | `ICapabilityHostOptions` | `{ flags?: Readonly<Record<string, boolean>>; onError?: (name: string, error: unknown) => void }` | `createCapabilityHost()` 的第二个参数。 |
 | `ICapabilityHost<Context>` | 见下表 | `createCapabilityHost()` 的返回值。 |
@@ -114,7 +116,7 @@ import {
 | `error(name)` | `string` | `unknown` | 同步 | 上一次激活或释放失败的原因；成功重启或重新配置会清除。 |
 | `setFlag(name, enabled)` | `string`, `boolean` | `void` | 同步 | 更新单个开关。`enabled !== true` 一律视为拒绝（不接受 truthy，只接受严格 `true`）。 |
 | `setFlags(flags)` | `Readonly<Record<string, boolean>>` | `void` | 同步 | 原子替换整份快照，见 [§3](#3-开关快照与-fail-closed)。 |
-| `enable(name)` | `string` | `Promise<ICapabilityEnableResult>` | 异步 | 幂等启用：并发调用共享同一次 `activate()`。开关为假时直接返回 `{ status: 'blocked' }`，不会"偷偷打开"。 |
+| `enable(name)` | `string` | `Promise<ICapabilityEnableResult>` | 异步 | 幂等启用：并发调用共享同一次 `activate()`。开关为假时直接返回 `{ status: 'gated' }`，不会"偷偷打开"。 |
 | `enableResult(name)` | `string` | `Promise<ICapabilityEnableResult>` | 异步 | 当前是 `enable()` 的别名，语义完全一致。 |
 | `disable(name)` | `string` | `Promise<boolean>` | 异步 | 关闭并等待 handle 的 `dispose()`（含异步）真正完成后再 resolve；返回是否确实关掉了一个此前处于启用/在途状态的能力。 |
 | `dispose()` | 无 | `Promise<void>` | 异步 | 唯一异步释放入口：首次调用按真实激活顺序反向（LIFO）关闭全部能力并等待全部释放工作结束；完成前重复调用立即以 `HOST_TRANSITIONING` 拒绝，完成后返回首个 canonical Promise。 |
@@ -128,7 +130,7 @@ import {
 
 ## 6. 释放顺序与依赖
 
-- `dispose()` 按**真实激活完成顺序**反向（LIFO）释放，具体规则见 [§4](#4-generation竞态与作废的激活)。
+- `dispose()` 按**真实激活完成顺序**反向（LIFO）释放，具体规则见 [§4](#generation-races)。
 - `setFlags()` 替换快照导致的批量回退，同样按这个顺序释放；`disable(name)` 只影响单个条目，不触碰其余能力的顺序表位置。
 - 单个能力释放失败（`dispose()` 抛错或拒绝）不会阻断其余能力继续关闭（AF-81）——LIFO 回退路径必须能走完，一个失败不能连累其它已启用能力泄漏；清理结束后 host/disposed/state 必须收敛，不残留 `activating`/`on` 假状态。
 - `dispose()` 之后 `disposed` 变为 `true`，host 永久不可用：`register`/`setFlag`/`setFlags` 直接抛错，`enable` 类方法返回被拒绝的 Promise（错误信息 `capability host is disposed`）。不要把同一个 host 复用给下一次请求或下一个租户，需要新的一轮应该创建新的 host。
@@ -223,18 +225,18 @@ const acme = createTenantCapabilities('acme', { 'experimental-ai': true });
 const globex = createTenantCapabilities('globex', { 'experimental-ai': false });
 
 await acme.enable('experimental-ai'); // { status: 'enabled' }
-await globex.enable('experimental-ai'); // { status: 'blocked' }
+await globex.enable('experimental-ai'); // { status: 'gated' }
 ```
 
 ---
 
 ## 10. 常见问题排查
 
-**Q：`enable()` 返回 `{ status: 'blocked' }`，但我确实在 `flags` 里传了 `true`。**
+**Q：`enable()` 返回 `{ status: 'gated' }`，但我确实在 `flags` 里传了 `true`。**
 检查是不是在 `createCapabilityHost()` 之后又修改了传入的原始 `flags` 对象——host 只在创建时复制一份快照，之后必须调用 `setFlag()`/`setFlags()` 才会生效。另外确认值是严格的布尔 `true`，字符串 `'true'` 或数字 `1` 都不算。
 
 **Q：关掉一个能力之后，过了一会儿它又自动变成 `on` 了。**
-正常情况下不应该发生——这正是 generation 机制要防止的竞态（见 [§4](#4-generation竞态与作废的激活)）。如果观察到这个现象，检查是否绕过了 host 直接持有并调用了 `activate()` 的返回值，或者在能力的 `dispose()` 里手动调用了 `enable()`（这类重入会被 [§8](#8-重入与并发保护) 描述的机制直接拒绝，但请确认没有捕获这个拒绝并静默重试）。
+正常情况下不应该发生——这正是 generation 机制要防止的竞态（见 [§4](#generation-races)）。如果观察到这个现象，检查是否绕过了 host 直接持有并调用了 `activate()` 的返回值，或者在能力的 `dispose()` 里手动调用了 `enable()`（这类重入会被 [§8](#8-重入与并发保护) 描述的机制直接拒绝，但请确认没有捕获这个拒绝并静默重试）。
 
 **Q：`disableNow()` 之后资源好像还没释放干净。**
 `disableNow()` 是同步兼容接口，只是**触发**了 `disable()`，不等待异步清理完成。如果 handle 的 `dispose()` 是异步的，需要用 `disable()`/`dispose()` 的 Promise 版本并 `await`。
@@ -246,4 +248,10 @@ await globex.enable('experimental-ai'); // { status: 'blocked' }
 这是历史遗留的前缀（本包是从更大的 store 相关代码中拆分出来的独立包），不影响任何行为；用 `error(name)`/`onError` 拿到的错误对象，按信息里的关键字（如 `"is not registered"`、`"already registered"`）匹配即可，不需要关心前缀本身。
 
 **Q：能不能声明能力之间的依赖关系，让 host 自动按顺序启停？**
-不能，这是本包刻意不做的事，见 [§4](#4-generation竞态与作废的激活) 末尾的说明。有依赖关系的能力，调用方自己 `await enable('A')` 完成后再 `enable('B')` 即可获得正确的启停顺序。
+不能，这是本包刻意不做的事，见 [§4](#generation-races) 末尾的说明。有依赖关系的能力，调用方自己 `await enable('A')` 完成后再 `enable('B')` 即可获得正确的启停顺序。
+
+## 11. 构建门禁
+
+```bash
+pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
+```

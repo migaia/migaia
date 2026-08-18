@@ -209,6 +209,10 @@ type IDependencyTreeNode = {
 
 ## 8. dispose 与生命周期
 
+包边界错误保留 `Error`/`RangeError` 类型，并带 `source: '@migaia/store-devtools'` 与稳定
+`code`：已释放会话为 `SESSION_DISPOSED`、被裁剪或不存在的 history id 为
+`UNKNOWN_HISTORY_ENTRY`、清理多项失败为 `CLEANUP_FAILED`（`AggregateError.errors` 保留原因）。
+
 ```ts
 dispose(): void
 ```
@@ -247,3 +251,7 @@ dispose(): void
 
 **Q：多次 `dispose()` 会不会报错。**
 不会，`dispose()` 是幂等的，第二次及以后的调用直接返回。
+
+## 构建、测试与排查
+
+仓库根目录：`pnpm --filter @migaia/store-devtools fmt` → `lint` → `typecheck` → `typecheck:test` → `test` → `build`。排查快照/回放先检查 `maxHistory`、`captureRuntimeTrace` 与 `dispose()` 时机。

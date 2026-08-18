@@ -64,8 +64,8 @@ describe('Round27 serialize boundaries', () => {
     const dependencies = readPackageDependencies();
     const graph = collectCoreImports();
 
-    expect(graph.external).toEqual([]);
-    for (const dependency of dependencies) {
+    expect(graph.external).toEqual(['@migaia/utils/error', '@migaia/utils/bytes']);
+    for (const dependency of dependencies.filter((dependency) => dependency !== '@migaia/utils')) {
       expect(graph.external).not.toContain(dependency);
     }
     expect(graph.files).not.toContain(resolve(packageRoot, 'src/registry.ts'));
@@ -91,7 +91,7 @@ describe('Round27 serialize boundaries', () => {
       .join('\n');
 
     expect(bundle).not.toContain('@migaia/lifecycle');
-    for (const dependency of dependencies) {
+    for (const dependency of dependencies.filter((dependency) => dependency !== '@migaia/utils')) {
       expect(bundle).not.toContain(dependency);
     }
   });

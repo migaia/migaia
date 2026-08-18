@@ -3,6 +3,7 @@ import {
   MiddlewarePipelineErrorCode,
   type IMiddlewarePipelineErrorCode
 } from './error-code.js';
+import { attachErrorIdentity } from '@migaia/utils/error';
 import { MiddlewarePipelineErrorText } from './error-text.js';
 
 /** 同时保留 stage/downstream 原错误，并给默认 AggregateError 附加包边界契约。 */
@@ -18,15 +19,10 @@ export const createMiddlewarePipelineExecutionError = (
     [stageError, downstreamError],
     MiddlewarePipelineErrorText.executionFailed
   );
-  Object.defineProperty(error, 'source', {
-    value: MIDDLEWARE_PIPELINE_SOURCE,
-    enumerable: true
-  });
-  Object.defineProperty(error, 'code', {
-    value: MiddlewarePipelineErrorCode.executionFailed,
-    enumerable: true
-  });
-  return error as AggregateError & {
+  return attachErrorIdentity(error, {
+    source: MIDDLEWARE_PIPELINE_SOURCE,
+    code: MiddlewarePipelineErrorCode.executionFailed
+  }) as AggregateError & {
     readonly source: typeof MIDDLEWARE_PIPELINE_SOURCE;
     readonly code: IMiddlewarePipelineErrorCode;
   };

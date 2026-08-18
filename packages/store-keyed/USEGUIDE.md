@@ -10,12 +10,11 @@
 4. [Definition Optics 完整参考](#4-definition-optics-完整参考)
 5. [Definition Family 完整参考](#5-definition-family-完整参考)
 6. [子路径：reactive/atom](#6-子路径-reactiveatom)
-7. [子路径：reactive/family](#7-子路径-reactivefamily)
-8. [错误参考](#8-错误参考)
-9. [生命周期与资源释放细节](#9-生命周期与资源释放细节)
-10. [注意事项详细展开](#10-注意事项详细展开)
-11. [完整示例](#11-完整示例)
-12. [常见问题排查](#12-常见问题排查)
+7. [错误参考](#7-错误参考)
+8. [生命周期与资源释放细节](#8-生命周期与资源释放细节)
+9. [注意事项详细展开](#9-注意事项详细展开)
+10. [完整示例](#10-完整示例)
+11. [常见问题排查](#11-常见问题排查)
 
 ---
 
@@ -30,10 +29,9 @@ atom/def-optics.ts    —— definition 级 optics：selectDef/opticDef/focusDef
 atom/optics-path.ts   —— optics 与 split 共用的纯函数（路径读写、按 key 拆分的原语）
 family/definition.ts  —— definition 级 family：familyDef/derivedFamilyDef（按 key 缓存 token）
 reactive/atom.ts       —— "实例式" atom 协议类型，只有类型和跨 Runtime 校验，无实现
-reactive/family.ts     —— 与 key 无关的通用可释放值缓存：createFamily/computedFamily
 ```
 
-主入口 `@migaia/store-keyed` 只导出前五个文件的内容；`reactive/atom`、`reactive/family` 刻意不从主入口导出，必须按子路径 `@migaia/store-keyed/reactive/atom`、`@migaia/store-keyed/reactive/family` 引入——这两个模块解决的是不同的问题（协议类型 vs 通用缓存），混进主入口会让"这个包到底管什么"变得模糊。
+主入口导出前五个文件的内容；唯一额外发布子路径是 `@migaia/store-keyed/reactive/atom`。`reactive/family.ts` 是未发布的内部源码，不能作为应用依赖。
 
 ---
 
@@ -43,7 +41,7 @@ reactive/family.ts     —— 与 key 无关的通用可释放值缓存：create
 
 | 构造器 | 签名 | 参数类型 | 同步/异步 | `kind` | 说明 |
 | --- | --- | --- | --- | --- | --- |
-| `atomDef` | `<T>(init: T, debugLabel?: string) => IPrimitiveDefinition<T>` | `init: T`；`debugLabel?: string` | 同步 | `'primitive'` | 源定义，只存初值。每个 `AtomStore` 首次实例化时都会对 `init` 跑一次 `cloneInitial`（见 [§9](#9-生命周期与资源释放细节)），因此同一个 `atomDef({ list: [] })` 在多个 store 下互不共享同一个对象引用。 |
+| `atomDef` | `<T>(init: T, debugLabel?: string) => IPrimitiveDefinition<T>` | `init: T`；`debugLabel?: string` | 同步 | `'primitive'` | 源定义，只存初值。每个 `AtomStore` 首次实例化时都会对 `init` 跑一次 `cloneInitial`（见 [§8](#8-生命周期与资源释放细节)），因此同一个 `atomDef({ list: [] })` 在多个 store 下互不共享同一个对象引用。 |
 
 同步 Atom 禁止 Promise/thenable 初值。守卫覆盖 object 与 function thenable，并通过 lifecycle probe 只读取一次 `then`；hostile getter 失败同步转换为 Store Keyed tagged `INVALID_OPTION`，原异常保留在 `cause`。Factory 定义在首次 `get`/`peek`/`preview` 执行返回值时应用同一守卫。
 | `atomDefFactory` | `<T>(create: () => T, debugLabel?: string) => IPrimitiveFactoryDefinition<T>` | `create: () => T`；`debugLabel?: string` | 同步 | `'primitive-factory'` | 源定义，用工厂函数代替静态初值；`create()` 在每个 store 首次实例化时调用一次。`previewSafe` 固定为 `false`——`store.preview()` 遇到它会直接抛错，除非改用下面的 `previewSafeAtomDefFactory`。 |
@@ -62,7 +60,7 @@ type IAtomDefinition<T> =
   | IErasedWritableDerived<T>; // writable-derived 在读侧被擦除掉具体 Args
 ```
 
-只有 `primitive`、`primitive-factory`、`writable-derived` 三种可以传给 `store.set()`（`IWritableAtomDefinition`）；`derived` 是纯只读，`store.set()` 遇到它必抛 `TypeError`（见 [§8](#8-错误参考)）。
+只有 `primitive`、`primitive-factory`、`writable-derived` 三种可以传给 `store.set()`（`IWritableAtomDefinition`）；`derived` 是纯只读，`store.set()` 遇到它必抛 `TypeError`（见 [§7](#7-错误参考)）。
 
 `debugLabel` 只用于调试展示（会被底层 Signal/Computed 当作 `debugName`），不参与相等性判断，也不是 key——两个 `debugLabel` 相同的 `atomDef` 依然是两个独立的定义 token。
 
@@ -125,7 +123,7 @@ store.override(primitiveDef, replacementPrimitiveDef);
 store.override(writableDerivedDef, replacementWritableDerivedDef);
 ```
 
-三个重载对应三种"写契约必须保持不变"的规则（详细原因见 [§10](#10-注意事项详细展开) 第 3 条）；违反规则抛 `TypeError('[store] atom override must preserve the original write contract')`。
+三个重载对应三种"写契约必须保持不变"的规则（详细原因见 [§9](#9-注意事项详细展开) 第 3 条）；违反规则抛 `TypeError('[store] atom override must preserve the original write contract')`。
 
 行为细节：
 
@@ -142,7 +140,7 @@ store.override(writableDerivedDef, replacementWritableDerivedDef);
 | `store.isObserved(def)` | `<T>(definition: IAtomDefinition<T>) => boolean` | `definition: IAtomDefinition<T>` | 同步 | 该定义在本 store 内是否已建实例且有活跃订阅者；定义从未被 `get`/`sub` 过时返回 `false`，不会因为查询本身而建实例。 |
 | `store.release(def)` | `<T>(definition: IAtomDefinition<T>) => boolean` | `definition: IAtomDefinition<T>` | 同步 | 只摘掉这一个定义对应的实例（断开依赖边、dispose 底层节点），不牵连同一 store 里的其它定义；返回是否确实释放了什么。会同时尝试"override 解析后的目标"与"传入的原始定义"两个 key，兼容"实例是在 override 生效前建的"这种情况。 |
 | `store.size` | `number`（getter） | —（只读 getter，无参数） | 同步 | 当前已实例化的定义数量，可用作释放行为的可观测断言点。 |
-| `store.dispose()` | `() => void` | 无 | 同步 | 释放整个作用域，见 [§9](#9-生命周期与资源释放细节)。幂等，重复调用是无操作。 |
+| `store.dispose()` | `() => void` | 无 | 同步 | 释放整个作用域，见 [§8](#8-生命周期与资源释放细节)。幂等，重复调用是无操作。 |
 | `store.runtime` | `IRuntime`（只读） | —（只读属性，无参数） | 同步 | 创建时传入的 runtime，供适配层交叉校验。 |
 | `store.disposed` | `boolean`（getter） | —（只读 getter，无参数） | 同步 | 是否已经 dispose。 |
 
@@ -288,58 +286,12 @@ import { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom';
 
 ---
 
-## 7. 子路径：reactive/family
+## 7. 错误参考
 
-```ts
-import { createFamily, computedFamily } from '@migaia/store-keyed/reactive/family';
-```
-
-与上面"definition family"是两回事：这里管理的是**直接持有的可释放值**（`IDisposable`），不是定义 token；按 key 缓存、带 TTL + LRU，服务于"我想要一个通用的、会自动清理的对象池"这种需求（例如"每个对话一个订阅句柄"、"每个文档一个远端连接"）。
-
-```ts
-type IFamilyKey = string | number | bigint | boolean | symbol | null | undefined | object;
-
-type IFamilyOptions = {
-  maxSize?: number;      // 未观察条目的上限；被观察的条目永远不会被自动淘汰
-  ttl?: number;           // 条目自创建起的存活时长（毫秒），默认 Infinity
-  now?: () => number;     // 可注入的时钟，测试用；传入后不会启用后台定时淘汰
-};
-
-type IFamily<K, V extends IDisposable> = {
-  (key: K): V;
-  get(key: K): V;
-  peek(key: K): V | undefined; // 只读查询，不创建
-  has(key: K): boolean;
-  remove(key: K): boolean;      // 强制释放，即使当前被观察
-  clear(): void;                 // 释放全部可达条目（含被观察的）
-  prune(): number;               // 只清理"已过期且未被观察"的条目 + 超出 maxSize 的未观察条目
-  dispose(): void;
-  readonly disposed: boolean;
-  readonly size: number;
-};
-```
-
-| 构造函数 | 签名 | 参数类型 | 同步/异步 | 说明 |
-| --- | --- | --- | --- | --- |
-| `createFamily` | `<K, V extends IDisposable>(options: IFamilyOptions & { create(key: K): V; isObserved(value: V): boolean }) => IFamily<K, V>` | `options: IFamilyOptions & { create(key: K): V; isObserved(value: V): boolean }` | 同步 | 通用版本，`create`/`isObserved` 必填——调用方自己决定"这个值是什么、怎么判断它还被使用"。 |
-| `computedFamily` | `<K, T>(derive: (key: K) => T, runtime?: IRuntime, options?: IFamilyOptions & { computed?: IComputedConfig<T> }) => IFamily<K, IComputedValue<T>>` | `derive: (key: K) => T`；`runtime?: IRuntime`；`options?: IFamilyOptions & { computed?: IComputedConfig<T> }` | 同步 | `createFamily` 的特化：构造期一次性快照 family/`computed` 选项；每个 key 用同一份稳定 `computed` 配置建立节点，运行期不重读用户 accessor。`runtime` 默认 `defaultRuntime`。 |
-
-行为要点：
-
-- **原始类型 key**（string/number/bigint/boolean/symbol/null/undefined）存进一个普通 `Map`，走确定性的 LRU + TTL；**对象/函数 key** 存进 `WeakMap`，family 不会成为该 key 对象的唯一持有者——key 对象被外部 GC 后，对应条目也会通过 `FinalizationRegistry` 被动清理，与 `maxSize`/`ttl` 无关。
-- `maxSize` 只约束"未被观察"的条目；`get()` 每次插入新条目、以及 `prune()` 都会触发一次容量检查，超出部分按最久未访问（LRU）淘汰。
-- `ttl` 到期的条目不会立刻消失：只要 `isObserved(value)` 仍为真就保留，等真正不再被观察时才在下次访问或 `prune()` 时回收；使用真实挂钟时间（未传自定义 `now`）还会启用一个后台定时器主动触发 `prune()`，避免"没人再访问但一直不清理"。
-- `clear()`/`dispose()` 会强制释放**全部**可达条目，包括仍被观察的——这与 `prune()` 刻意保留被观察条目不同，语义上是"调用方明确要整体清空/整体收摊"。
-- 淘汰/清空调用条目的 `.dispose()`；多个条目释放失败会聚合成 `AggregateError('[store] family disposal failed for multiple entries')`（`clear`/`dispose` 路径）或 `AggregateError('[store] family capacity eviction failed for multiple entries')`（容量淘汰路径）；只有一个失败则直接抛出该错误本身。
-- 同 `familyDef`，需要宿主支持 `WeakRef` + `FinalizationRegistry`，否则 `createFamily(...)` 直接抛 `Error('[store] createFamily() requires WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox')`。
-- `maxSize`/`ttl` 校验：`maxSize` 必须是正整数，否则 `RangeError('[store] family maxSize must be a positive integer')`；`ttl` 必须非负，否则 `RangeError('[store] family ttl must be non-negative')`。
-- 已 `dispose()` 的 family 上调用 `get`/`peek`/`has`/`remove`/`clear`/`prune` 都会先抛 `Error('[store] cannot use a disposed family')`。
-
----
-
-## 8. 错误参考
-
-本包没有独立的错误码枚举体系（不像 `plugin-host` 那样有 `PluginHostErrorCode`），统一用 `Error`/`TypeError`/`RangeError`，message 都以 `[store]` 前缀标记来源，可以按前缀或按具体文案做断言。
+每个包边界错误保留原生 `Error`/`TypeError`/`RangeError` 类型，并带
+`source: '@migaia/store-keyed'` 与稳定 `code`。按 `code` 处理（而非 message）：例如
+`ATOM_STORE_DISPOSED`、`CROSS_RUNTIME`、`OVERRIDE_CONTRACT`、`PREVIEW_UNSAFE` 和
+`ENV_UNSUPPORTED`。多个释放失败时为 `AggregateError`，原因保留在 `errors`。
 
 | 抛出者 | 错误类型 | message | 触发条件 |
 | --- | --- | --- | --- |
@@ -357,17 +309,12 @@ type IFamily<K, V extends IDisposable> = {
 | `splitDef(...).items` 求值 | `Error` | `splitDef keys must be unique` | `keyOf` 对不同元素算出了相同的 key。 |
 | `familyDef` / `derivedFamilyDef` | `RangeError` | `family maxSize must be a positive integer` | `maxSize` 非正整数。 |
 | `familyDef` / `derivedFamilyDef` | `Error` | `family definitions require WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox` | 宿主环境缺少这两个全局能力。 |
-| `createFamily` | `Error` | `createFamily() requires WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox` | 同上，通用 family 版本。 |
-| `createFamily` | `RangeError` | `family maxSize must be a positive integer` / `family ttl must be non-negative` | 选项非法。 |
-| `computedFamily` | `Error` | `computed family options could not be read` | `computed` 或基础 family 选项 accessor 抛错；错误带 `INVALID_OPTION`，原异常保留在 `cause`。 |
-| `computedFamily` | `Error` | `family derive must be a function` | JavaScript 调用者传入非函数 derive；在 family 建立前同步拒绝并带 `INVALID_OPTION`。 |
-| `createFamily` 产出的 family | `Error` | `cannot use a disposed family` | family 已 `dispose()` 后继续使用。 |
 | `atomGetter(runtime)` / `atomSetter(runtime)` | `Error` | `cross-runtime atom access is not allowed` | 实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。 |
 | `AtomStore` 内部所有权登记（继承自 `@migaia/reactive`） | `Error` | `this node is already owned by another Runtime` | 同一个 store 对象被 `claimOwnership` 到两个不同的 Runtime——正常使用路径下不会触发，出现即说明把同一个 store 错误地跨 Runtime 复用了。 |
 
 ---
 
-## 9. 生命周期与资源释放细节
+## 8. 生命周期与资源释放细节
 
 ### 9.1 实例化与初值克隆
 
@@ -401,7 +348,7 @@ store.dispose();
 
 ---
 
-## 10. 注意事项详细展开
+## 9. 注意事项详细展开
 
 1. **`store.get()` 建依赖边，`peek()`/`preview()` 不建**。`get()` 在追踪上下文（Computed 的 `read`、Effect 的回调体）里调用才会真正建边；在普通同步代码里调用它和 `peek()` 效果一样，只是语义上更容易被误用成"以为在别处也会自动追踪"。React 适配层的 `getSnapshot`、`useSyncExternalStore` 的快照读必须用 `peek`/`preview`，用 `get` 会把这次读意外记进当前渲染帧之外某个别的 Computed 的依赖集合，产生难以复现的"串边"问题。
 
@@ -415,11 +362,11 @@ store.dispose();
 
 6. **释放粒度是"整个 store"，不是"单个定义"**。这是 `atom/store.ts` 顶部注释里明确纠正过的一处历史设计——旧版本的注释宣称"定义不再被引用时实例可回收"，但同时又用数组强引用着全部实例，两者自相矛盾，实际什么都回收不了。现在的诚实做法是：store 强引用它建出的一切，`release(def)` 是唯一的"提前释放单个"入口，真正的批量回收只发生在 `store.dispose()`。
 
-7. **`familyDef`/`createFamily` 都需要宿主支持 `WeakRef` 和 `FinalizationRegistry`**，缺失时在调用构造函数那一刻就直接抛出说明性错误，而不是静默降级成"每次都创建新 token / 永不回收"——后者会制造一个悄悄变慢或悄悄泄漏内存的包，比显式报错更难排查。少数嵌入式 JS 引擎或裁剪过的小程序沙箱可能缺这两个全局能力，需要确认目标运行环境或引入等价的 polyfill。
+7. **`familyDef`/`derivedFamilyDef` 需要宿主支持 `WeakRef` 和 `FinalizationRegistry`**，缺失时在调用构造函数那一刻就直接抛出说明性错误，而不是静默降级成"每次都创建新 token / 永不回收"——后者会制造一个悄悄变慢或悄悄泄漏内存的包，比显式报错更难排查。少数嵌入式 JS 引擎或裁剪过的小程序沙箱可能缺这两个全局能力，需要确认目标运行环境或引入等价的 polyfill。
 
 ---
 
-## 11. 完整示例
+## 10. 完整示例
 
 一个"每个会话（session）一份状态、字段可独立订阅、列表按 key 拆分、测试期可替身"的组合示例：
 
@@ -498,15 +445,15 @@ store.dispose(); // 释放这个作用域建出的全部实例
 
 ---
 
-## 12. 常见问题排查
+## 11. 常见问题排查
 
 **Q：`store.set(def, value)` 抛 `TypeError: [store] atom override resolved to a read-only definition`。**
 `def`（或它被 override 之后解析到的目标）是一个 `derivedDef`。只读派生没有写语义；如果是通过 `override()` 间接路由过去的，检查 override 链条上是否有一步把可写定义指向了只读定义。
 
 **Q：`store.override(a, b)` 抛 `TypeError: [store] atom override must preserve the original write contract`。**
-`a`、`b` 的写语义不匹配：primitive/primitive-factory 只能互相替换，writable-derived 只能被同 Args/Result 的 writable-derived 替换。只有"只读定义"这一侧没有这个限制，可以路由到任意同值类型的定义，见 [§10](#10-注意事项详细展开) 第 3 条的原因说明。
+`a`、`b` 的写语义不匹配：primitive/primitive-factory 只能互相替换，writable-derived 只能被同 Args/Result 的 writable-derived 替换。只有"只读定义"这一侧没有这个限制，可以路由到任意同值类型的定义，见 [§9](#9-注意事项详细展开) 第 3 条的原因说明。
 
-**Q：`familyDef(...)` 或 `createFamily(...)` 一调用就抛 `requires WeakRef and FinalizationRegistry`。**
+**Q：`familyDef(...)` 一调用就抛 `requires WeakRef and FinalizationRegistry`。**
 目标运行环境缺这两个 ES2021 全局能力（部分裁剪过的小程序/嵌入式 JS 引擎会缺）。需要确认宿主支持情况，或引入功能等价的 polyfill；这个错误不会静默吞掉，说明包作者刻意选择"宁可显式报错，也不要悄悄退化成不清理内存"。
 
 **Q：`store.preview(def)` 抛 `Error: [store] atom factory is not marked preview-safe`。**
@@ -520,3 +467,7 @@ store.dispose(); // 释放这个作用域建出的全部实例
 
 **Q：`familyDef(...).forget(key)` 之后，之前拿到的旧 token 还能用吗？**
 能，旧 token 依旧是一个合法的定义，已经用它实例化过的 `AtomStore` 状态不受影响。但 `forget` 之后同一个 key 再查会创建一个**新** token，新旧 token 互不相通——如果代码里还有地方持有旧 token 并继续用它读写，会和"新 token 那一份状态"永久分裂成两份。`forget` 之后应该确保调用方统一切换到新的查找结果，不要混用。
+
+## 构建、测试与排查
+
+仓库根目录：`pnpm --filter @migaia/store-keyed fmt` → `lint` → `typecheck` → `typecheck:test` → `test` → `build`。浏览器集成路径另跑 `typecheck:e2e` 与 `test:e2e`。

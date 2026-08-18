@@ -19,6 +19,7 @@
 13. [错误一览表](#13-错误一览表)
 14. [生产环境完整示例](#14-生产环境完整示例)
 15. [常见问题排查](#15-常见问题排查)
+16. [构建、格式化与测试](#16-构建格式化与测试)
 
 ---
 
@@ -435,3 +436,18 @@ Store/Resource 创建时用的 `runtime` 参数,必须是 `scope.runtime`,不能
 
 **Q:`awaitResources()` 一直不返回。**
 检查是否设置了 `timeoutMs`——不设置的话会一直等到所有 Resource 的 Promise 都 settle,如果某个 Resource 的 fetcher 本身挂死(既不 resolve 也不 reject),这个等待没有内建的兜底超时。生产环境建议总是传一个 `timeoutMs`。
+
+## 16. 构建、格式化与测试
+
+在仓库根目录运行：
+
+```bash
+pnpm --filter @migaia/store-ssr fmt
+pnpm --filter @migaia/store-ssr lint
+pnpm --filter @migaia/store-ssr typecheck
+pnpm --filter @migaia/store-ssr typecheck:test
+pnpm --filter @migaia/store-ssr test
+pnpm --filter @migaia/store-ssr build
+```
+
+测试覆盖请求隔离、脱水/复水、JSON 边界、资源等待、销毁顺序和错误码。

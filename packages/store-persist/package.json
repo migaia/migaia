@@ -25,7 +25,8 @@
   },
   "dependencies": {
     "@migaia/reactive": "workspace:^",
-    "@migaia/storage-web": "workspace:^"
+    "@migaia/storage-web": "workspace:^",
+    "@migaia/utils": "workspace:^"
   },
   "peerDependencies": {
     "@migaia/store-light": "workspace:^",

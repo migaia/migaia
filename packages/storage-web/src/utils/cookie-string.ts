@@ -1,6 +1,7 @@
 import { StorageError, StorageErrorCode } from '../types/errors.js';
 import { StorageBackend } from '../constants.js';
 import type { ICookieRemoveContext, ICookieScope, ICookieWriteContext } from '../types/cookie.js';
+import { utf8ByteLength } from '@migaia/utils/bytes';
 
 /** Cookie 单值上限；超出直接抛错，不静默截断。 */
 export const MAX_COOKIE_VALUE_BYTES = 4096;
@@ -38,8 +39,6 @@ export const parseCookieEntries = (cookieString: string): Array<readonly [string
 export const parseCookieString = (cookieString: string): Map<string, string> =>
   new Map(parseCookieEntries(cookieString));
 
-const byteLength = (value: string): number => new TextEncoder().encode(value).length;
-
 /** 构造一次 `document.cookie = ...` 写入用的字符串，附带 Set-Cookie 风格属性。 */
 export const serializeCookieAssignment = (
   name: string,
@@ -56,7 +55,7 @@ export const serializeCookieAssignment = (
   if (ctx?.secure) parts.push('secure');
   if (ctx?.partitioned) parts.push('partitioned');
   const serialized = parts.join('; ');
-  if (byteLength(serialized) > MAX_COOKIE_VALUE_BYTES)
+  if (utf8ByteLength(serialized) > MAX_COOKIE_VALUE_BYTES)
     throw new StorageError(StorageErrorCode.valueTooLarge, {
       backend: StorageBackend.cookie,
       key: name

@@ -1,5 +1,6 @@
 import ERROR_TEXT, { createPluginHostTypeError } from './error-text.js';
 import { assimilateCapturedThen, probeThenable } from '@migaia/lifecycle';
+import { parseConfigPath as parseUtilsConfigPath } from '@migaia/utils/config';
 import type { IPluginConfig } from './typing.js';
 
 const dangerousKeys = new Set(['__proto__', 'constructor', 'prototype']);
@@ -24,6 +25,7 @@ const intrinsicPrototypes = new Set<object>([
   Map.prototype,
   Set.prototype
 ]);
+
 /** Built-in constructors keep their prior prototype-object treatment during subclass cloning. */
 const intrinsicConstructors = new Set<Function>([
   Object,
@@ -1169,20 +1171,13 @@ export const readonlyConfig = <T>(value: T): Readonly<T> => {
 
 /** Parse `key.[0].nested` paths without accepting prototype-related segments. */
 export const parseConfigPath = (path: string): string[] => {
-  if (typeof path !== 'string' || path.length === 0)
-    throw createPluginHostTypeError('config path must be a non-empty string');
-  const segments: string[] = [];
-  for (const part of path.split('.')) {
-    if (part.length === 0) throw createPluginHostTypeError('config path contains an empty segment');
-    const match = /^\[(\d+)\]$/.exec(part);
-    const segment = match ? match[1] : part;
-    if (!segment || dangerousKeys.has(segment))
-      throw createPluginHostTypeError(`config path key "${segment}" is not allowed`);
-    if (!match && (segment.includes('[') || segment.includes(']')))
-      throw createPluginHostTypeError(`config path segment "${segment}" is invalid`);
-    segments.push(segment);
+  try {
+    return [...parseUtilsConfigPath(path)];
+  } catch {
+    if (typeof path !== 'string' || path.length === 0)
+      throw createPluginHostTypeError('config path must be a non-empty string');
+    throw createPluginHostTypeError(`config path "${path}" is invalid`);
   }
-  return segments;
 };
 
 /** Read one nested config value and expose objects through a cached readonly lazy proxy. */

@@ -39,7 +39,8 @@
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
   "dependencies": {
-    "@migaia/lifecycle": "workspace:^"
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
     "typescript": "~6.0.2",

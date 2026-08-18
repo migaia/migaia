@@ -1,4 +1,5 @@
 import { StoreIndexedErrorCode, type IStoreIndexedErrorCode } from './error-code.js';
+import { attachErrorIdentity } from '@migaia/utils/error';
 
 export { StoreIndexedErrorCode, type IStoreIndexedErrorCode };
 
@@ -6,9 +7,7 @@ export { StoreIndexedErrorCode, type IStoreIndexedErrorCode };
 export const STORE_INDEXED_SOURCE = '@migaia/store-indexed';
 
 function tagStoreIndexedError<E extends Error>(error: E, code: IStoreIndexedErrorCode): E {
-  Object.defineProperty(error, 'source', { value: STORE_INDEXED_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
-  return error;
+  return attachErrorIdentity(error, { source: STORE_INDEXED_SOURCE, code });
 }
 
 /** Builds a `(source, code)`-tagged `Error` without touching `stack`. */

@@ -3,9 +3,10 @@ import {
   systemScheduler,
   validateSchedulerDelay,
   validateSchedulerTime,
-  type ILifecycleScheduler,
-  type IScheduledTask
+  type ILifecycleScheduler
 } from './scheduler.js';
+import { withTimeout } from '@migaia/utils/promise';
+import { UtilsTimeoutError } from '@migaia/utils/error';
 
 /**
  * Waits for one awaitable until an existing absolute deadline, without cancelling it.
@@ -33,17 +34,15 @@ export const boundedWait = async (
   const remainingMs = deadlineAt - scheduler.now();
   if (remainingMs < 0) return false;
   const delayMs = validateSchedulerDelay(Math.max(0, remainingMs), 'deadline delay');
-  let timer: IScheduledTask | undefined;
-  const timeout = new Promise<false>((resolve) => {
-    timer = scheduler.schedule(() => resolve(false), delayMs);
-  });
   try {
-    return await Promise.race([observedTask.then(() => true), timeout]);
-  } finally {
-    // The deadline timer must be cleared whenever the tracked task wins the race — otherwise it
-    // keeps a timer slot alive for up to the full remaining budget on every successful bounded
-    // wait, accumulating dangling timers on any code path that calls this at high frequency
-    // (`LG-R5-2`).
-    timer?.cancel();
+    return await withTimeout(() => observedTask.then(() => true), {
+      timeoutMs: delayMs,
+      scheduler,
+      zeroTimeoutBehavior: 'start',
+      cooperativeCancellation: false
+    });
+  } catch (error) {
+    if (error instanceof UtilsTimeoutError) return false;
+    throw error;
   }
 };

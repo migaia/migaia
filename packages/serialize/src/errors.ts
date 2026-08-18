@@ -1,4 +1,5 @@
 import { SerializeErrorCode, type ISerializeErrorCode } from './error-code.js';
+import { attachErrorIdentity } from '@migaia/utils/error';
 
 export { SerializeErrorCode, type ISerializeErrorCode };
 
@@ -95,8 +96,7 @@ export function tagSerializeError<E extends Error>(
       `serialize error already tagged with a different (source, code): ${tagged.source}, ${tagged.code}`
     );
   }
-  Object.defineProperty(error, 'source', { value: SERIALIZE_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
+  attachErrorIdentity(error, { source: SERIALIZE_SOURCE, code });
   if (context !== undefined) {
     Object.defineProperty(error, 'context', { value: context, enumerable: true });
   }

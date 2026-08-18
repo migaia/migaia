@@ -25,7 +25,8 @@
   },
   "dependencies": {
     "@migaia/lifecycle": "workspace:^",
-    "@migaia/middleware-pipeline": "workspace:^"
+    "@migaia/middleware-pipeline": "workspace:^",
+    "@migaia/utils": "workspace:^"
   },
   "scripts": {
     "fmt": "oxfmt src test",

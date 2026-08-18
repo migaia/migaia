@@ -326,6 +326,10 @@ const tolerantClone: typeof diagnosticClone;
 
 ## 9. Pipeline 模式与错误边界
 
+包边界错误带 `source: '@migaia/store-middleware'` 与稳定 `code`。`actions-only` 越界写入为
+`ACTION_SCOPE_REQUIRED`；不可克隆值为 `CLONE_UNSUPPORTED`；遗漏 `next()` 只经 Runtime 报告
+`MIDDLEWARE_NOT_CHAINED`，不反向中断业务写入；多项清理失败为 `CLEANUP_FAILED`。
+
 `StoreMiddlewareHost` 的 pipeline 模式**固定是 `sync`**（见 [§4](#4-storemiddlewarehost-api-参考)），这决定了：
 
 - 中间件只能用 `core.usePipeline((event, next) => void)`，`next(event)` 必须在 stage 函数返回前调用。
@@ -379,3 +383,7 @@ const tolerantClone: typeof diagnosticClone;
 
 **Q：同一个 action 在中间件里被记录了两次。**
 检查是否在 `bindStoreMiddleware()` 已经转发了 Store 自身 action trace 的情况下，又手动用 `host.runAction()` 包了一遍同一个 Store 方法——两条路径都会各自派发一次 `action` 事件，见 [§5](#5-bindstoremiddleware-完整行为)。
+
+## 构建、测试与排查
+
+仓库根目录：`pnpm --filter @migaia/store-middleware fmt` → `lint` → `typecheck` → `typecheck:test` → `test` → `build`。`cleanup` 问题检查 `AggregateError.errors`；事件重复检查是否同时使用 trace binding 与 `runAction()`。

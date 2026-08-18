@@ -21,6 +21,6 @@
     "lint": "oxlint src test",
     "test": "vitest run test"
   },
-  "dependencies": { "@migaia/plugin-host": "workspace:^", "@migaia/reactive": "workspace:^", "@migaia/store-light": "workspace:^" },
+  "dependencies": { "@migaia/plugin-host": "workspace:^", "@migaia/reactive": "workspace:^", "@migaia/store-light": "workspace:^", "@migaia/utils": "workspace:^" },
   "devDependencies": { "typescript": "~6.0.2", "vitest": "4.1.10" }
 }

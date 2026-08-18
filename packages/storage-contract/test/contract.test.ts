@@ -36,6 +36,23 @@ describe('StorageContractError 家族', () => {
       (error as { code: string }).code = 'changed';
     }).toThrow(TypeError);
   });
+
+  it('领域错误在构造时完成 identity ownership，冻结后不需要 utils attachment', () => {
+    const error = new StorageContractError(StorageContractErrorCode.disposed);
+    expect(Object.getOwnPropertyDescriptor(error, 'source')).toMatchObject({
+      value: STORAGE_CONTRACT_SOURCE,
+      enumerable: true,
+      writable: false,
+      configurable: false
+    });
+    expect(Object.getOwnPropertyDescriptor(error, 'code')).toMatchObject({
+      value: StorageContractErrorCode.disposed,
+      enumerable: true,
+      writable: false,
+      configurable: false
+    });
+    expect(error).toBeInstanceOf(StorageContractError);
+  });
 });
 
 describe('assertStorageKey 伪造品牌防护（实现期安全回归）', () => {

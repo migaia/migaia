@@ -58,7 +58,7 @@ console.log(getDependencyTree(someEffect)); // 这个 Effect/Computed 依赖了�
 console.log(getObserverTree(someSignal)); // 这个 Signal 会通知哪些订阅者
 ```
 
-## 6. 概念速览
+## 6. 核心概念与公开 API 速览
 
 | 概念 | 是什么 |
 | --- | --- |
@@ -68,7 +68,7 @@ console.log(getObserverTree(someSignal)); // 这个 Signal 会通知哪些订阅
 | **Dependency tree（依赖树）** | `getDependencyTree`/`getObserverTree` 返回的普通对象树,`kind`（observable/observer）、`label`、`version`、`children`、`circular` |
 | **ClonePolicy** | 快照克隆策略,默认用 `@migaia/store-middleware` 的 `ClonePolicy.diagnostic`（尽力克隆、遇到不可克隆值不抛错） |
 
-## 7. 注意事项（浓缩版，详细原因见 USEGUIDE）
+## 7. 生命周期、错误与边界（详细原因见 USEGUIDE）
 
 1. `history` 只保存 `$plain()` 的标量字段——computed、方法、WASM 字段和外部资源不会被记录，也不会被 `jumpTo()` 恢复。
 2. `jumpTo()` 不是事务回滚，不能撤销网络请求、日志或已经发出的副作用。
@@ -76,6 +76,10 @@ console.log(getObserverTree(someSignal)); // 这个 Signal 会通知哪些订阅
 4. 只有 Store **自己定义的方法**会被 runtime 自动记为 action；`$batch`/`$set`/`$hydrate` 这类底层写入不会自动出现在 `actions` 里。
 5. 用完必须调用 `dispose()`，否则 Store 的订阅和 runtime trace 监听器不会被释放。
 6. 敏感字段不要留在 `$plain()` 里，或者通过 `clone` 选项自行脱敏。
+
+包边界抛出的错误保留原生 `Error`/`RangeError` 类型，并带有
+`source: '@migaia/store-devtools'` 与稳定 `code`；`dispose()` 后的变更方法会以
+`SESSION_DISPOSED` 失败，历史/trace 只读数组仍可检查。
 
 ## 8. 深入参考
 

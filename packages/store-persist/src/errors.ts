@@ -1,4 +1,5 @@
 import { StorePersistErrorCode, type IStorePersistErrorCode } from './error-code.js';
+import { attachErrorIdentity } from '@migaia/utils/error';
 
 export { StorePersistErrorCode, type IStorePersistErrorCode };
 
@@ -6,9 +7,7 @@ export { StorePersistErrorCode, type IStorePersistErrorCode };
 export const STORE_PERSIST_SOURCE = '@migaia/store-persist';
 
 function tagStorePersistError<E extends Error>(error: E, code: IStorePersistErrorCode): E {
-  Object.defineProperty(error, 'source', { value: STORE_PERSIST_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
-  return error;
+  return attachErrorIdentity(error, { source: STORE_PERSIST_SOURCE, code });
 }
 
 /** Builds a `(source, code)`-tagged `Error` without touching `stack`. */

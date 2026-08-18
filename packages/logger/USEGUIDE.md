@@ -16,7 +16,7 @@
 10. [extends：多 logger 转发](#10-extends多-logger-转发)
 11. [自定义 runtime manager](#11-自定义-runtime-manager)
 12. [完整组合示例](#12-完整组合示例)
-13. [常见问题排查](#13-常见问题排查)
+13. [构建、测试与常见问题排查](#13-构建测试与常见问题排查)
 
 ---
 
@@ -312,7 +312,17 @@ await log.flush();
 
 ---
 
-## 13. 常见问题排查
+## 13. 构建、测试与常见问题排查
+
+在仓库根目录运行以下包级门禁；`test` 会先执行本包的 `build`。
+
+```bash
+pnpm --filter @migaia/logger fmt
+pnpm --filter @migaia/logger lint
+pnpm --filter @migaia/logger typecheck
+pnpm --filter @migaia/logger typecheck:test
+pnpm --filter @migaia/logger test
+```
 
 **Q：日志明明报错了，但业务代码里 catch 不到。**
 这是设计如此——日志系统内部的失败不会从 `log()`/`dispatchRaw()` 抛出，避免日志问题拖垮业务逻辑。用 `log.onFailure(fn)` 接入监控，`fn` 会收到 `{ source, error }`，`source` 取值包括 `defer`/`hook`/`sink`/`pipeline`/`flush`/`forward`/`shutdown`。

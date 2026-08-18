@@ -1,4 +1,5 @@
 import { StoreKeyedErrorCode, type IStoreKeyedErrorCode } from './error-code.js';
+import { attachErrorIdentity } from '@migaia/utils/error';
 
 export { StoreKeyedErrorCode, type IStoreKeyedErrorCode };
 
@@ -7,9 +8,7 @@ export const STORE_KEYED_SOURCE = '@migaia/store-keyed';
 
 /** Attaches `(source, code)` onto an existing error object without touching its type or stack. */
 function tagStoreKeyedError<E extends Error>(error: E, code: IStoreKeyedErrorCode): E {
-  Object.defineProperty(error, 'source', { value: STORE_KEYED_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
-  return error;
+  return attachErrorIdentity(error, { source: STORE_KEYED_SOURCE, code });
 }
 
 /** Builds a `(source, code)`-tagged `Error` without touching `stack`. */

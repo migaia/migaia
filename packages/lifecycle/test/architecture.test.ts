@@ -25,9 +25,11 @@ const readSrcFiles = (): Map<string, string> => {
 };
 
 describe('§5.1 structural gates', () => {
-  it('package.json declares zero runtime dependencies', () => {
-    const pkg = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as { dependencies?: unknown };
-    expect(pkg.dependencies).toBeUndefined();
+  it('package.json declares only the runtime-neutral utils foundation dependency', () => {
+    const pkg = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
+      dependencies?: Record<string, string>;
+    };
+    expect(pkg.dependencies).toEqual({ '@migaia/utils': 'workspace:^' });
   });
 
   it('domain-noun scan: index.ts exports no identifier containing a forbidden domain noun', () => {

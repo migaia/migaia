@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CapabilityErrorCode, createCapabilityHost, type ICapabilityHandle } from '../src/index';
-import { CAPABILITY_SOURCE } from '../src/errors';
+import { CAPABILITY_SOURCE, createCapabilityError } from '../src/errors';
 
 const srcDir = fileURLToPath(new URL('../src', import.meta.url));
 
@@ -135,5 +135,15 @@ describe('M-T41 (§3.7.5): capability 码表穷尽 + 单点声明', () => {
     }
     expect((caught as { source?: string }).source).toBe(CAPABILITY_SOURCE);
     expect((caught as Error).stack).toBeTruthy();
+  });
+
+  it('shared attachment preserves native error identity, cause, and stack', () => {
+    const cause = new Error('cause');
+    const error = createCapabilityError('TEST_CODE', 'message', { cause });
+    expect(error).toBeInstanceOf(Error);
+    expect(error.source).toBe(CAPABILITY_SOURCE);
+    expect(error.code).toBe('TEST_CODE');
+    expect(error.cause).toBe(cause);
+    expect(error.stack).toBeTruthy();
   });
 });

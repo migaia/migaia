@@ -28,6 +28,13 @@ import { DisposeTransactionKind, ThenableProbeKind } from './state-constants.js'
 
 type ICallbackOutcome = { readonly ok: true } | { readonly ok: false; readonly error: unknown };
 
+/** Stable non-aborting signal for transactions without an external cancellation source. */
+const inertReleaseSignal: IAbortSignal = Object.freeze({
+  aborted: false,
+  addEventListener: (): void => undefined,
+  removeEventListener: (): void => undefined
+});
+
 /**
  * 一次读取的 thenable 归化：非 thenable → `not-thenable`；getter 失败 → `failed`（原 getter 错误）；否则把捕获的 `thenFn`
  * apply 一次成 Promise。禁止把探测异常静默改写（与 `probeThenable` 同一契约）。
@@ -400,8 +407,8 @@ export function createDisposeTransaction(
       // Mirrors `options.signal` into a signal every item's context can observe (L-T26). With no
       // `options.signal` given, `controller.signal` simply never aborts — a scope that wants items
       // to see "we're closing" passes its own close()-tied signal in.
-      const controller = createAbortController();
-      const forwardAbort = (): void => controller.abort(options.signal?.reason);
+      const controller = options.signal === undefined ? undefined : createAbortController();
+      const forwardAbort = (): void => controller?.abort(options.signal?.reason);
       let registrationAttempted = false;
       let registrationReturned = false;
       let removalAttempted = false;
@@ -413,7 +420,7 @@ export function createDisposeTransaction(
       };
       try {
         if (options.signal?.aborted) {
-          controller.abort(options.signal.reason);
+          controller?.abort(options.signal.reason);
         } else if (options.signal) {
           // Mark before calling: a hostile signal may store the listener and then throw.
           registrationAttempted = true;
@@ -421,7 +428,7 @@ export function createDisposeTransaction(
           registrationReturned = true;
           // Observe an abort that happened during registration and remove any residual listener.
           if (options.signal.aborted) {
-            controller.abort(options.signal.reason);
+            controller?.abort(options.signal.reason);
             try {
               removeSignalListener(true);
             } catch (error) {
@@ -442,7 +449,7 @@ export function createDisposeTransaction(
         for (const item of admission.rejected) record(item.source, item.error);
         for (const item of admission.admitted) {
           const context: IReleaseContext = {
-            signal: controller.signal,
+            signal: controller?.signal ?? inertReleaseSignal,
             deadlineAt: options.deadlineAt,
             scheduler,
             report: (error) => safeReport(options.report, error)

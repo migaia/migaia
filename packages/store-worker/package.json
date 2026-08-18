@@ -27,7 +27,8 @@
     "@migaia/reactive": "workspace:^",
     "@migaia/resource": "workspace:^",
     "@migaia/serialize": "workspace:^",
-    "@migaia/web-rpc": "workspace:^"
+    "@migaia/web-rpc": "workspace:^",
+    "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

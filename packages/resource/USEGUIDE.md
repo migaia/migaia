@@ -15,7 +15,7 @@
 9. [错误与异常完整参考](#9-错误与异常完整参考)
 10. [生命周期与 dispose](#10-生命周期与-dispose)
 11. [完整场景示例](#11-完整场景示例)
-12. [常见问题排查](#12-常见问题排查)
+12. [构建、测试与常见问题排查](#12-构建测试与常见问题排查)
 
 ---
 
@@ -339,7 +339,18 @@ search.dispose();
 
 ---
 
-## 12. 常见问题排查
+## 12. 构建、测试与常见问题排查
+
+在仓库根目录运行以下包级门禁。`resource` 的 `test` 脚本直接运行 Vitest；构建需单独运行。
+
+```bash
+pnpm --filter @migaia/resource fmt
+pnpm --filter @migaia/resource lint
+pnpm --filter @migaia/resource typecheck
+pnpm --filter @migaia/resource typecheck:test
+pnpm --filter @migaia/resource build
+pnpm --filter @migaia/resource test
+```
 
 **Q：依赖变了，但 Resource 没有自动重新请求。**
 检查这次响应式读取是不是发生在 `fetcher` 的第一个 `await` **之后**——那部分读取不会被追踪。把它挪到 `await` 之前，或者包进一个 `Computed` 并在 `await` 之前读一次。

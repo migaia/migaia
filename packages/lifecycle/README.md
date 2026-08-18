@@ -8,11 +8,35 @@
 
 设计文档：`docs/lifecycle/lifecycle-extraction.sdd.md`（SDD 1/3）。
 
+## 安装与最小示例
+
+```bash
+pnpm add @migaia/lifecycle
+```
+
+```ts
+import { createLifecycleScope } from '@migaia/lifecycle';
+
+const scope = createLifecycleScope();
+const connection = scope.own({ close: () => console.log('closed') }, {
+  force: () => connection.close()
+});
+
+scope.close();       // 同步拒绝后续 own()
+await scope.dispose(); // 异步、逆序执行 force()
+```
+
+适合需要明确资源所有权、关闭边界、代数失效、排空或释放事务的 runtime-neutral 库。它不适合事件广播、能力依赖图、业务队列策略或跨进程传输。
+
+## Public API map
+
+仅有 root export：`@migaia/lifecycle`。核心入口为 `createLifecycleScope`、`createSyncLifecycleScope`、`createLifecycleUnit`、`createGenerationController`、`createQuiescenceTracker` / lease registry、`createPendingTracker`、`createProvisionalScope`、`createMutationQueue`、`createDisposeTransaction`、`boundedWait`、scheduler 与 abort helpers。完整签名、配置和边界见 [USEGUIDE.md](./USEGUIDE.md)。
+
 ## 1. 它不是什么
 
 这三条是硬约束，不是风格偏好：
 
-- **零依赖叶子包。** `package.json` 里没有 `dependencies`，不会为了共用一个结构类型去 import 任何工作区包。
+- **runtime-neutral 基础包。** 只依赖同层的 `@migaia/utils` 时间/错误原语；不会为了共用一个结构类型去 import Store、UI、DOM、Worker 或任何领域包。
 - **不认识任何领域名词。** 公开 API 里不出现 store / plugin / capability / service / rpc / storage / sink /
   field / endpoint。它只知道「资源」和「怎么释放资源」。
 - **不做图算法。** 拓扑排序、环检测、依赖顺序推导都不在这里 —— 那些属于 `@migaia/capability/graph`。
@@ -93,3 +117,5 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 
 验收矩阵（L-T1 ~ L-T44）见 `docs/lifecycle/lifecycle-extraction.sdd.md` §5.4；每个 `L-T` 编号都能在
 `test/` 下检索到对应用例。
+
+完整 API、场景、错误与排查见 [USEGUIDE.md](./USEGUIDE.md)。

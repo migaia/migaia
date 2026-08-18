@@ -85,7 +85,7 @@ const rows = observableArray([{ id: 'a' }]);
 
 四个类共享同一套生命周期基类，但**互不依赖对方**——用哪个就只为哪个的形状付费。
 
-## 8. 踩坑清单（最容易踩的坑）
+## 8. 生命周期、错误与边界
 
 1. **工厂函数与类构造函数的参数顺序不一样**。`new ObservableArray(initial, runtime, options)`，但 `observableArray(initial, options, runtime)`——混用会把 `options` 传成 `runtime` 或反过来，且没有运行时报错提醒（类型层面 `IRuntime` 和 `IObservableCollectionOptions` 结构不同，通常会被 TS 拦住，但传 `undefined`/字面量时要格外小心）。
 2. **不用之后必须调用 `dispose()`**。集合创建的每个 Signal 都要显式释放，忘记 dispose 会让它们常驻在 Runtime 的依赖图和内存里。
@@ -93,6 +93,10 @@ const rows = observableArray([{ id: 'a' }]);
 4. **一个集合实例绑定一个 Runtime**，跨 Runtime 读取会直接抛错，不会静默产生错误的跨图依赖。
 5. **`ObservableArray` 是纯索引语义**，`splice`/`pop`/`replace` 会移动后续索引对应的值；需要"删除/插入不影响其余成员定位"的场景，这不是本包的设计目标。
 6. **`mutationGuard` 只在写方法里触发**，`assertMutationAllowed` 抛出的错误会原样从 `set`/`push`/`delete` 等调用里抛出，需要自行 catch 或保证调用时机合法。
+
+`dispose()` 幂等；释放后所有集合读写以 `source: '@migaia/store-indexed'`、
+`code: 'COLLECTION_DISPOSED'` 失败。越界/非法索引和跨 Runtime tracked 读取也保留其
+原生错误类型，并携带稳定错误码。
 
 ## 9. 深入参考
 

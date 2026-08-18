@@ -5,7 +5,7 @@
   "description": "Runtime-neutral lifecycle primitives: scopes, generations, quiescence tracking and dispose transactions.",
   "license": "MIT",
   "type": "module",
-  "files": ["dist", "README.md"],
+  "files": ["dist", "README.md", "USEGUIDE.md"],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -25,6 +25,9 @@
     "release:patch": "pnpm version patch --no-git-tag-version",
     "release:pack": "pnpm pack --pack-destination /tmp",
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
+  },
+  "dependencies": {
+    "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
     "typescript": "~6.0.2",

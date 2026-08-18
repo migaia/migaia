@@ -39,8 +39,8 @@ wasm.alloc_bytes(8); // 也可以直接从这个对象上调用，效果和具�
 
 ```ts
 import { readFile } from 'node:fs/promises';
-import wasmProviderUrl from '@migaia/wasm/src/wasm_provider_bg.wasm'; // 或自行拼路径
-const bytes = await readFile(new URL(wasmProviderUrl, import.meta.url));
+// 由你的构建/部署流程提供这一份 wasm 二进制；包未公开深层 asset import。
+const bytes = await readFile(new URL('./assets/wasm_provider_bg.wasm', import.meta.url));
 const { memory, alloc_bytes } = await init(bytes);
 ```
 

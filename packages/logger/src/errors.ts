@@ -1,5 +1,6 @@
 import { LoggerErrorCode, type ILoggerErrorCode } from './error-code.js';
 import { LoggerErrorText } from './error-text.js';
+import { attachErrorIdentity } from '@migaia/utils/error';
 
 export { LoggerErrorCode, type ILoggerErrorCode };
 
@@ -9,9 +10,7 @@ export const LOGGER_SOURCE = '@migaia/logger';
 /** Attaches logger metadata, or returns an attachable wrapper that keeps the original as `cause`. */
 export function tagLoggerError<E extends Error>(error: E, code: ILoggerErrorCode): E {
   try {
-    Object.defineProperty(error, 'source', { value: LOGGER_SOURCE, enumerable: true });
-    Object.defineProperty(error, 'code', { value: code, enumerable: true });
-    return error;
+    return attachErrorIdentity(error, { source: LOGGER_SOURCE, code });
   } catch {
     /** Wrapper carries logger metadata when the original Error is sealed or frozen. */
     const wrapper = new Error(LoggerErrorText.errorTaggingFailed, { cause: error });

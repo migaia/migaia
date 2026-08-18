@@ -90,15 +90,18 @@ log.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, 
 | `reasoning(config?)` | `config?: IReasoningPluginConfig` | 同步 | 流式 thinking/response 输出，适合展示 AI 生成过程 |
 | `uuid(config?)` | `config?: IUuidPluginConfig` | 同步 | 给每条 entry 附加唯一 id |
 
-## 7. 安装
+## 7. 安装与公开入口
 
 ```bash
 pnpm add @migaia/logger
 ```
 
-内置插件从子路径引入：`@migaia/logger/plugins`。
+| 入口 | 内容 |
+| --- | --- |
+| `@migaia/logger` | `Logger`、运行时 manager、状态/错误码、日志与插件类型。 |
+| `@migaia/logger/plugins` | `level`、`color`、`batch`、`http`、`process`、`reasoning`、`uuid` 及其配置类型。 |
 
-## 8. 注意事项（最容易踩的坑）
+## 8. 生命周期、错误与边界
 
 1. **构造函数只接受同步安装的插件**。`new Logger({ plugins: [...] })` 里的插件必须能同步完成安装，需要异步安装的插件用 `await log.use(plugin)`。
 2. **插件实例不能跨 logger 复用**。每次安装都应该重新调用一次插件工厂函数（`level()`、`http()` 等），不要把同一个插件实例装到多个 `Logger`，否则内部状态可能串联。

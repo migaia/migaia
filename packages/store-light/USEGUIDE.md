@@ -123,49 +123,49 @@ const store = createStore(shape, {
 Store 定义协议，扩展去实现——`store-light` 不知道 WASM、也不知道任何具体字段实现，`FieldBuilder` 只是一份约定。`@migaia/store-wasm` 的 `number()`/`string()`/`boolean()`/`array()`/`record()` 都是这份协议的具体实现。
 
 ```ts
-export type FieldContext = {
+export type IFieldContext = {
   runtime: IRuntime;
   signal: AbortSignal;          // Store dispose 时中止在途初始化
   createSource(debugName?: string): IFieldSource;
 };
 
-export type SyncFieldBuilder<F extends IDisposable> = {
+export type ISyncFieldBuilder<F extends IDisposable> = {
   readonly [FIELD_BUILDER]: true;
   readonly mode: 'sync';
-  create(context: FieldContext): F;
+  create(context: IFieldContext): F;
 };
 
-export type AsyncFieldBuilder<F extends IDisposable> = {
+export type IAsyncFieldBuilder<F extends IDisposable> = {
   readonly [FIELD_BUILDER]: true;
   readonly mode: 'async';
-  create(context: FieldContext): Promise<F>;
+  create(context: IFieldContext): Promise<F>;
 };
 ```
 
 | 名称 | 作用 |
 | --- | --- |
 | `FIELD_BUILDER` | 品牌 symbol，不导出为公共构造 API，只用于 `isFieldBuilder` 的身份判定（防止结构类似的普通对象被误判为 Builder） |
-| `isFieldBuilder(value)` | 类型守卫，判断某个值是否为 `FieldBuilder` |
+| `isFieldBuilder(value)` | 类型守卫，判断某个值是否为 `IFieldBuilder` |
 | `IFieldSource` | Runtime 为自定义存储签发的最小响应式能力：`track()`（建立依赖）、`notify()`（触发下游更新）、`commit(write)`（在发布前保留版本号，随后一次性 publish，避免"先写后通知"之间的撕裂）、`observed`（是否有人在观察） |
-| `FieldContext` | Builder 的 `create()` 唯一入参：`runtime` 用于创建普通节点；`createSource` 接入同一张依赖图；`signal` 是 Store dispose 时用来中止在途初始化的 `AbortSignal` |
+| `IFieldContext` | Builder 的 `create()` 唯一入参：`runtime` 用于创建普通节点；`createSource` 接入同一张依赖图；`signal` 是 Store dispose 时用来中止在途初始化的 `AbortSignal` |
 
-**所有权规则**：`FieldContext` 刻意不传 `scope`——所有权登记是 Store 的职责，不是 Builder 的职责。Builder 只管"造出字段"，Store 在拿到字段后统一 `claimOwnership` + `scope.own`；这样第三方 Builder 实现"创建了资源却忘了登记"时，`$dispose()` 也不会漏释放，因为登记这一步根本不由 Builder 完成。
+**所有权规则**：`IFieldContext` 刻意不传 `scope`——所有权登记是 Store 的职责，不是 Builder 的职责。Builder 只管"造出字段"，Store 在拿到字段后统一 `claimOwnership` + `scope.own`；这样第三方 Builder 实现"创建了资源却忘了登记"时，`$dispose()` 也不会漏释放，因为登记这一步根本不由 Builder 完成。
 
 **同步 vs 异步字段**：`mode: 'sync'` 的字段在 `createStore()`/`createAsyncStore()` 构造期间同步创建，构造完成即可用；`mode: 'async'`（或历史无 `mode` 字段的 `LegacyFieldBuilder`）的字段异步创建，读取会先 `assertReady()`——Store 未就绪时抛错，必须走 `createAsyncStore()` 并等待其 Promise resolve，或用 `createLegacyStore()` + `storeReady()`。
 
 一个最小的自定义同步字段实现（改编自 `@migaia/store-wasm` 的 `number()`）：
 
 ```ts
-import { FIELD_BUILDER, type FieldBuilder, type FieldContext } from '@migaia/store-light';
+import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light';
 import type { IDisposable } from '@migaia/reactive';
 
 type ICounterField = IDisposable & { value: number };
 
-function counterField(initial: number): FieldBuilder<ICounterField> {
+function counterField(initial: number): IFieldBuilder<ICounterField> {
   return {
     [FIELD_BUILDER]: true,
     mode: 'sync',
-    create({ createSource }: FieldContext): ICounterField {
+    create({ createSource }: IFieldContext): ICounterField {
       const source = createSource('CounterField');
       let value = initial;
       let disposed = false;
@@ -301,6 +301,10 @@ scope.dispose(); // 对组内每个资源调用 forceDispose()
 
 ## 9. 错误信息全表
 
+每个离开本包边界的错误都保留原生类型，并带 `source: '@migaia/store-light'` 与稳定
+`code`。例如已释放 Store 为 `STORE_DISPOSED`，未就绪异步字段为 `STORE_NOT_READY`；初始化与
+cleanup 同时失败时，主错误仍可经 `cause`/`errors` 访问。
+
 | 错误信息 | 触发条件 |
 | --- | --- |
 | `[store] store is disposed` | `$dispose()` 之后读写任意字段/调用任意 `$`-方法（`$own` 除外，它先校验其他条件） |
@@ -400,3 +404,7 @@ Computed 只有 getter、没有 setter，属性描述符层面就不可写；ESM
 
 **Q：`$plain()`/`$hydrate()` 和 `$snapshot()` 有什么区别，该用哪个？**
 `$snapshot()` 拿"当前展示状态"（含 computed/wasm 字段），要求 Store 已就绪；`$plain()`/`$hydrate()` 只处理可持久化的标量 signal 字段，且不要求 Store 已就绪——持久化/hydration 场景应该用后者，展示/调试场景用前者。
+
+## 构建、测试与排查
+
+仓库根目录：`pnpm --filter @migaia/store-light fmt` → `lint` → `typecheck` → `typecheck:test` → `test` → `build`。浏览器集成路径另跑 `typecheck:e2e` 与 `test:e2e`。

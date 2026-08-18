@@ -7,7 +7,7 @@ import {
   type ICodec,
   type IOperationContext
 } from '@migaia/storage-contract';
-import { bytesToBase64, base64ToBytes } from '../utils/base64.js';
+import { bytesToBase64, base64ToBytes } from '@migaia/utils/bytes';
 import { snapshotStorageCapabilities, type IStorageCapabilities } from '../types/capabilities.js';
 import { isUint8Array } from '../core/bytes.js';
 

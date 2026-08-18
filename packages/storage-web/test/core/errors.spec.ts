@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { invokeExtension } from '../../src/core/errors';
 import { createStorageOperationRuntime } from '../../src/core/operation-reporter.js';
 
@@ -68,5 +68,64 @@ describe('invokeExtension abort lifecycle', () => {
         createStorageOperationRuntime()
       )
     ).resolves.toBe('value');
+  });
+
+  it('将 hostile aborted getter 归一化为输入错误，且不启动扩展', async () => {
+    const cause = new Error('hostile extension aborted getter');
+    const signal = {
+      get aborted(): boolean {
+        throw cause;
+      },
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined
+    } as never;
+    const extension = async (): Promise<string> => 'must not start';
+    const call = vi.fn(extension);
+    await expect(
+      invokeExtension(
+        call,
+        'memory',
+        'entity.validate',
+        'schema',
+        signal,
+        createStorageOperationRuntime()
+      )
+    ).rejects.toThrow('[storage-contract] INVALID_ARGUMENT');
+    expect(call).not.toHaveBeenCalled();
+  });
+
+  it('将 abort 回调中的 hostile reason getter 保留为取消 cause', async () => {
+    const cause = new Error('hostile extension abort reason');
+    let aborted = false;
+    let listener: (() => void) | undefined;
+    const signal = {
+      get aborted(): boolean {
+        return aborted;
+      },
+      get reason(): never {
+        throw cause;
+      },
+      addEventListener: (_type: 'abort', callback: () => void): void => {
+        listener = callback;
+      },
+      removeEventListener: (): void => undefined
+    } as never;
+    const pending = invokeExtension(
+      () => new Promise<never>(() => undefined),
+      'memory',
+      'entity.validate',
+      'schema',
+      signal,
+      createStorageOperationRuntime()
+    );
+    const translated = pending.then(
+      () => false,
+      (error: unknown) =>
+        (error as { readonly code?: unknown }).code === 'ABORTED' &&
+        (error as Error).cause === cause
+    );
+    aborted = true;
+    listener?.();
+    await expect(translated).resolves.toBe(true);
   });
 });

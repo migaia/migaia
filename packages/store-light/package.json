@@ -28,7 +28,8 @@
   "dependencies": {
     "@migaia/event-subscriber": "workspace:^",
     "@migaia/lifecycle": "workspace:^",
-    "@migaia/reactive": "workspace:^"
+    "@migaia/reactive": "workspace:^",
+    "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

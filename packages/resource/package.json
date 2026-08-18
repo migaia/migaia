@@ -28,7 +28,8 @@
   },
   "dependencies": {
     "@migaia/lifecycle": "workspace:^",
-    "@migaia/reactive": "workspace:^"
+    "@migaia/reactive": "workspace:^",
+    "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
     "typescript": "~6.0.2",

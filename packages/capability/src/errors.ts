@@ -1,6 +1,8 @@
 /** `source` value stamped onto every error this package throws. */
 export const CAPABILITY_SOURCE = '@migaia/capability';
 
+import { attachErrorIdentity } from '@migaia/utils/error';
+
 /**
  * 全仓统一的结构契约（`docs/contracts/error-codes.md` §2）：错误以属性形式携带 `source`/`code`， 从不替换错误本身——依赖 `instanceof
  * TypeError`/`RangeError` 等类型判断的调用方不受影响。
@@ -20,9 +22,7 @@ export function createCapabilityError(
     message,
     options?.cause !== undefined ? { cause: options.cause } : undefined
   );
-  Object.defineProperty(error, 'source', { value: CAPABILITY_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
-  return error as ICapabilityError;
+  return attachErrorIdentity(error, { source: CAPABILITY_SOURCE, code }) as ICapabilityError;
 }
 
 /**
@@ -31,7 +31,5 @@ export function createCapabilityError(
  * `INVALID_HANDLE` 必须保持 `TypeError` 类型不变）。
  */
 export function tagCapabilityError<E extends Error>(error: E, code: string): E {
-  Object.defineProperty(error, 'source', { value: CAPABILITY_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
-  return error;
+  return attachErrorIdentity(error, { source: CAPABILITY_SOURCE, code });
 }

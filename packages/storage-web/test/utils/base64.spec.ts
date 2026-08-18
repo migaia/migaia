@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { base64ToBytes, bytesToBase64 } from '../../src/utils/base64';
+import { base64ToBytes, bytesToBase64 } from '@migaia/utils/bytes';
 
 describe('base64 往返', () => {
   it('空数组往返', () => {

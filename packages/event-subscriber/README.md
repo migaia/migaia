@@ -12,6 +12,16 @@ pnpm add @migaia/event-subscriber
 
 包只有 root export，零 workspace runtime dependency，并声明 `sideEffects: false`。
 
+## Public API map
+
+| 分组 | 导出 |
+| --- | --- |
+| Channel | `createEventChannel`、`subscribeOnce`、`subscribeUntil`、`subscribeSubscriber` |
+| Async publish | `publishParallel`、`publishParallelSettled`、`publishSerial`、`publishSerialSettled`、`publishTask`、`publishTaskSettled` |
+| Hub / contracts | `createEventHub`、`EventSubscriberState`、`EventSubscriberErrorCode`、`EVENT_SUBSCRIBER_SOURCE`；类型见 [USEGUIDE](./USEGUIDE.md#17-public-api-索引) |
+
+没有 subpath export；所有公开值和类型从 `@migaia/event-subscriber` 导入。
+
 ## 60 秒上手
 
 ```ts

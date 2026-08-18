@@ -39,7 +39,7 @@ pnpm add @migaia/middleware-pipeline
 
 包没有运行时依赖，产物为 ESM，目标基线为 ES2020。
 
-## 4. Sync：同步传递与短路
+## 4. 快速开始：Sync 同步传递与短路
 
 ```ts
 import { MiddlewarePipelineViolation, runSyncMiddleware } from '@migaia/middleware-pipeline';

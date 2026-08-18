@@ -1,4 +1,5 @@
 import { StoreSsrErrorCode, type IStoreSsrErrorCode } from './error-code.js';
+import { attachErrorIdentity } from '@migaia/utils/error';
 
 export { StoreSsrErrorCode, type IStoreSsrErrorCode };
 
@@ -6,11 +7,8 @@ export { StoreSsrErrorCode, type IStoreSsrErrorCode };
 export const STORE_SSR_SOURCE = '@migaia/store-ssr';
 
 /** Attaches `(source, code)` onto an existing error object without touching its type or stack. */
-function tagStoreSsrError<E extends Error>(error: E, code: IStoreSsrErrorCode): E {
-  Object.defineProperty(error, 'source', { value: STORE_SSR_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
-  return error;
-}
+const tagStoreSsrError = <E extends Error>(error: E, code: IStoreSsrErrorCode): E =>
+  attachErrorIdentity(error, { source: STORE_SSR_SOURCE, code });
 
 /** Builds a `(source, code)`-tagged `Error` without touching `stack`. */
 export function createStoreSsrError(

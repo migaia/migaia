@@ -85,7 +85,7 @@ unsubscribe();
 | `IMutationGuard` / `IMutationPolicy` 类型 | 写入守卫协议；具体实现见 `@migaia/store-middleware` |
 | `createStoreResource` / `createStoreResourceScope` | Suspense 安全的异步值容器，独立于对象 facade 使用 |
 
-## 7. 注意事项（最容易踩的坑）
+## 7. 生命周期、错误与边界
 
 1. **`createStore()` 拒绝异步字段**。定义里含 `mode !== 'sync'` 的 `FieldBuilder` 会直接抛错，必须改用 `createAsyncStore()`。
 2. **`$batch` 不是事务**。recipe 中途抛错不会回滚已经写入的字段，改名自 `$patch` 就是为了避免被误解成 Immer draft 那种"要么全成要么全不成"的语义。
@@ -94,6 +94,10 @@ unsubscribe();
 5. **`$dispose()` 之后所有字段读写统一抛 `[store] store is disposed`**，不存在"只有部分字段失效"的中间状态。
 6. **异步 action 只在首个 `await` 之前自动 batch**。续体里的写入需要调用方自己包一层 `$batch()` 才会合并通知。
 7. **`StoreResource` 的 `dispose()` 和 `forceDispose()` 不等价**：前者会等所有持有者释放后才真正清理，后者立即强制清理，不管是否还有人在用。
+
+Store 与 resource 的边界错误保留原生类型，并携带
+`source: '@migaia/store-light'` 和稳定 `code`；例如已释放 Store 是 `STORE_DISPOSED`，
+未就绪异步字段是 `STORE_NOT_READY`。`$dispose()` 返回同一清理 Promise，不能用来复活实例。
 
 ## 8. 深入参考
 

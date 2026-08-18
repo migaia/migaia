@@ -23,7 +23,8 @@
   "dependencies": {
     "@migaia/reactive": "workspace:^",
     "@migaia/store-light": "workspace:^",
-    "@migaia/wasm": "workspace:^"
+    "@migaia/wasm": "workspace:^",
+    "@migaia/utils": "workspace:^"
   },
   "devDependencies": { "typescript": "~6.0.2", "vitest": "4.1.10" }
 }
