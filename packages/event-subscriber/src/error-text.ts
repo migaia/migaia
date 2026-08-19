@@ -23,5 +23,7 @@ export const EventSubscriberErrorText = {
   /** Stable text for synchronous listener failures; used by awaited publish helpers. */
   publishFailed: 'event-subscriber publish failed',
   /** Stable text for fire-and-forget failures that reached terminal diagnostics. */
-  unhandledListenerFailure: 'event-subscriber listener failure was not handled'
+  unhandledListenerFailure: 'event-subscriber listener failure was not handled',
+  /** Stable text for extension after chain teardown; used by subscription handles. */
+  subscriptionClosed: 'event-subscriber subscription is closed'
 } as const;

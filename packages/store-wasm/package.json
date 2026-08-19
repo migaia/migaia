@@ -4,14 +4,21 @@
   "private": true,
   "description": "Optional WASM-backed fields for Store light.",
   "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "USEGUIDE.md"
+  ],
   "type": "module",
-  "files": ["dist", "README.md", "USEGUIDE.md"],
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
-  "sideEffects": false,
   "scripts": {
     "fmt": "oxfmt src test",
     "build": "tsc -p tsconfig.build.json",
@@ -23,8 +30,11 @@
   "dependencies": {
     "@migaia/reactive": "workspace:^",
     "@migaia/store-light": "workspace:^",
-    "@migaia/wasm": "workspace:^",
-    "@migaia/utils": "workspace:^"
+    "@migaia/utils": "workspace:^",
+    "@migaia/wasm": "workspace:^"
   },
-  "devDependencies": { "typescript": "~6.0.2", "vitest": "4.1.10" }
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vitest": "4.1.10"
+  }
 }

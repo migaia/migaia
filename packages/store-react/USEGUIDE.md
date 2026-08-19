@@ -119,6 +119,39 @@ type IStoreProviderConfig = {
 - **reject 会变成一个真实抛出的 `Error`**。非 `Error` 类型的 reject 原因会被包装成 `new Error(\`[store] ready barrier rejected: ${String(reason)}\`)`；`ReadyBoundary`在 render 阶段`throw` 它，只能被外层 React Error Boundary 捕获，`StoreProvider` 自己不提供错误 UI。
 - **已经 settle 的 Promise 不保证首帧同步生效**。`ITrackedReady.status()` 是同步查询，但 track 逻辑是在 Promise then 回调（微任务）里更新状态，所以哪怕传入的 Promise 已经 resolve，`ReadyBoundary` 首次渲染仍可能读到 `pending`，随后一个 effect 里同步刷新到 `ready`——多数场景感知不到，但如果你依赖"reload 后立刻同步渲染最终内容、不闪 fallback"，需要注意这个微任务延迟。
 
+### 2.4 `StoreProviderState` / `IStoreProviderState`
+
+```ts
+const StoreProviderState = { pending: 'pending', ready: 'ready', error: 'error' } as const;
+type IStoreProviderState = 'pending' | 'ready' | 'error';
+```
+
+根入口公开导出的常量对象，是 [2.3](#23-ready-屏障的精确语义) 里 `ready` 屏障三种状态的稳定取值集合。本包内部（`ReadyBoundary`）用它驱动 fallback/children/throw 三路分支；业务代码一般不需要直接使用它——除非在自己的代码里复刻类似"三态就绪追踪"的逻辑，想复用同一套状态命名。
+
+### 2.5 `assertStoreFeature(config, path, apiName?)` / `normalizeStoreConfig(config?, barrierScope?)` / `readStoreFeature(config, path)`
+
+```ts
+function readStoreFeature(
+  config: IStoreConfigValue,
+  path: 'wasm' | `experimental.${string}`
+): boolean;
+function assertStoreFeature(
+  config: IStoreConfigValue | null,
+  path: 'wasm' | `experimental.${string}`,
+  apiName?: string // 默认 'this API'，出现在错误信息里
+): void;
+function normalizeStoreConfig(
+  config?: IStoreProviderConfig,
+  barrierScope?: object // 默认 {}；用于隔离不同调用方各自的 ready-barrier 缓存
+): IStoreConfigValue;
+```
+
+这三个是 `useStoreFeature`/`useAssertStoreFeature`/`StoreProvider` 内部依赖的**非 hook 版本**，公开导出是为了让"不在组件里、但需要读取/校验同一份配置语义"的代码复用同一套逻辑（例如自定义的 SSR 请求作用域装配代码，或者非 React 的适配层）：
+
+- `readStoreFeature(config, path)`：纯查询，`path === 'wasm'` 直接读 `config.features.wasm`；`path` 形如 `` `experimental.${key}` `` 时读 `config.features.experimental[key] === true`；其他 `path` 一律返回 `false`。
+- `assertStoreFeature(config, path, apiName?)`：`config` 为 `null` 时抛 `[store] ${apiName} requires a StoreProvider (feature "path")`；`config` 非空但 `readStoreFeature` 返回 `false` 时抛 ` [store] ${apiName} requires feature "path" to be explicitly enabled on StoreProvider config`。`useAssertStoreFeature` 就是"取 `useStoreConfig()` 后调用这个函数"的薄封装。
+- `normalizeStoreConfig(config?, barrierScope?)`：`StoreProvider` 内部用来把 `IStoreProviderConfig` 归一化成 `IStoreConfigValue`（`features` 补全默认值、`ready` 屏障数组转换成惰性求值+缓存的 `ITrackedReady`）的同一段逻辑，独立导出后可以在 Provider 之外复现相同的归一化行为；`barrierScope` 决定就绪 Promise 与工厂结果缓存的隔离边界——不同调用传不同的 `barrierScope` 对象，各自独立求值，不会共享缓存。`config.ready` 里出现既不是函数也不是 thenable 的元素会抛 `[store] config.ready must be an array of Promises or zero-argument functions`。
+
 ## 3. Hook 完整参考
 
 ### 3.1 `useStore(store, selector, isEqual?)`

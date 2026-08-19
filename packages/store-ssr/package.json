@@ -4,12 +4,21 @@
   "private": true,
   "description": "Request-scoped Store SSR dehydration and hydration.",
   "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "USEGUIDE.md"
+  ],
   "type": "module",
-  "files": ["dist", "README.md", "USEGUIDE.md"],
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
-  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "fmt": "oxfmt src test",
     "build": "tsc -p tsconfig.build.json",
@@ -19,10 +28,13 @@
     "test": "vitest run test"
   },
   "dependencies": {
-    "@migaia/utils": "workspace:^",
     "@migaia/reactive": "workspace:^",
     "@migaia/resource": "workspace:^",
-    "@migaia/serialize": "workspace:^"
+    "@migaia/serialize": "workspace:^",
+    "@migaia/utils": "workspace:^"
   },
-  "devDependencies": { "typescript": "~6.0.2", "vitest": "4.1.10" }
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vitest": "4.1.10"
+  }
 }

@@ -5,7 +5,7 @@ describe('error code contract', () => {
   it('ES-T31 exposes one source and twelve unique public codes', () => {
     const codes = Object.values(EventSubscriberErrorCode);
     expect(EVENT_SUBSCRIBER_SOURCE).toBe('@migaia/event-subscriber');
-    expect(codes).toHaveLength(12);
+    expect(codes).toHaveLength(13);
     expect(new Set(codes).size).toBe(codes.length);
   });
 });

@@ -1,4 +1,5 @@
 import * as EventSubscriber from '../src/index.js';
+import { readFileSync } from 'node:fs';
 import {
   createEventChannel,
   createEventHub,
@@ -48,6 +49,19 @@ describe('public exports', () => {
       const typedHub = createEventHub<{ message: string }>();
       // @ts-expect-error key payload association must reject a number
       typedHub.publish('message', 123);
+      const finite = createEventHub<{ alpha: number; beta: string }>();
+      const finiteChain = finite.subscribe('alpha', (event) => {
+        const value: number = event.value;
+        void value;
+      });
+      finiteChain.subscribe('beta', (event) => {
+        const value: string = event.value;
+        void value;
+      });
+      // @ts-expect-error finite chain rejects a repeated key while an independent chain permits it
+      finiteChain.subscribe('alpha', () => undefined);
+      const dynamic = createEventHub<Record<string, number>>();
+      dynamic.subscribe('runtime-key', () => undefined).subscribe('runtime-key', () => undefined);
     };
     void typeNegativeCases;
   });
@@ -58,5 +72,18 @@ describe('public exports', () => {
     const stop = channel.subscribeUntil(nativeSignal, () => undefined);
     expect(nativeSignal.aborted).toBe(false);
     stop();
+  });
+
+  it('ES-T110 keeps implementation-only handle factory out of root exports', () => {
+    expect('createSubscriptionHandle' in EventSubscriber).toBe(false);
+    expect('ISubscriptionHandle' in EventSubscriber).toBe(false);
+    const sourceRoot = new URL('../src/', import.meta.url);
+    const source = ['internal/subscription.ts', 'channel.ts', 'hub.ts']
+      .map((file) => readFileSync(new URL(file, sourceRoot), 'utf8'))
+      .join('\n');
+    expect(source.match(/createRawSubscriptionOwner/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(source).not.toMatch(/hub\.subscribe\(/);
+    expect(source).not.toMatch(/\.(bind|call|apply)\(/);
+    expect(source).not.toMatch(/export\s+(?:const|function)\s+registerRaw/);
   });
 });

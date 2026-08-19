@@ -23,11 +23,6 @@
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   },
-  "dependencies": {
-    "@migaia/lifecycle": "workspace:^",
-    "@migaia/middleware-pipeline": "workspace:^",
-    "@migaia/utils": "workspace:^"
-  },
   "scripts": {
     "fmt": "oxfmt src test",
     "build": "vite build && tsc -p tsconfig.json --emitDeclarationOnly",
@@ -39,5 +34,10 @@
     "release:patch": "pnpm version patch --no-git-tag-version",
     "release:pack": "pnpm pack --pack-destination /tmp",
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
+  },
+  "dependencies": {
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/middleware-pipeline": "workspace:^",
+    "@migaia/utils": "workspace:^"
   }
 }

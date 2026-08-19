@@ -12,15 +12,15 @@
 
 ## 2. 适合什么场景
 
-| 场景 | 说明 |
-| --- | --- |
-| 主页面 ↔ iframe 通信 | 需要验证消息来源、防止同源恶意脚本伪造 |
-| 主线程 ↔ Web Worker / SharedWorker / ServiceWorker | 把耗时计算丢进 Worker，用"调用函数"的写法拿结果 |
-| 多个浏览器标签页 / 窗口互通 | 用 BroadcastChannel 做一对多广播，或做单播路由 |
-| 点对点实时通信 | 基于 WebRTC DataChannel，比如协作编辑、P2P 游戏状态同步 |
-| 大文件 / 大对象跨端传输 | 超过单次消息大小限制自动分片，接收端自动重组 |
-| 微前端子应用间通信 | 各子应用独立部署、独立运行时，仍需要互相调用能力 |
-| 需要断线容错的长连接场景 | WebTransport datagram、连接可能中断，需要超时/重试/存活探测 |
+| 场景                                               | 说明                                                        |
+| -------------------------------------------------- | ----------------------------------------------------------- |
+| 主页面 ↔ iframe 通信                               | 需要验证消息来源、防止同源恶意脚本伪造                      |
+| 主线程 ↔ Web Worker / SharedWorker / ServiceWorker | 把耗时计算丢进 Worker，用"调用函数"的写法拿结果             |
+| 多个浏览器标签页 / 窗口互通                        | 用 BroadcastChannel 做一对多广播，或做单播路由              |
+| 点对点实时通信                                     | 基于 WebRTC DataChannel，比如协作编辑、P2P 游戏状态同步     |
+| 大文件 / 大对象跨端传输                            | 超过单次消息大小限制自动分片，接收端自动重组                |
+| 微前端子应用间通信                                 | 各子应用独立部署、独立运行时，仍需要互相调用能力            |
+| 需要断线容错的长连接场景                           | WebTransport datagram、连接可能中断，需要超时/重试/存活探测 |
 
 不适合的场景：如果两端本来就在同一个 JS 线程里、能直接互相 import 调用，用这个库反而是多此一举——它解决的是"物理隔离、只能靠消息通信"这个约束下的问题。
 
@@ -35,99 +35,7 @@
 - **统一的错误处理**：所有失败都是 `WebRpcError` 的实例，带稳定的 `error.code` 字符串（不是本地化文案，不是运行时特定的错误类），可以安全地按 code 做 `switch`/分支处理。
 - **可控的生命周期**：`dispose()` 保证按预期顺序清理中间件、传输连接、进行中的请求，任何一步清理失败都会被收集而不是让后续清理步骤中断。
 
-## 4. 五分钟上手
-
-下面这个例子完全不依赖浏览器 API，用内置的内存传输（`createMemoryTransportPair`）在同一个进程里模拟两端通信，可以直接跑：
-
-```ts
-import { createEndpoint, contract, protocol, connect } from '@migaia/web-rpc';
-import { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory';
-
-// 一对互相连通的传输通道，分别给"客户端"和"服务端"用
-const [clientTransport, serverTransport] = createMemoryTransportPair();
-
-// 服务端：声明自己是谁（id），注册一个方法
-const server = await createEndpoint({
-  id: 'server',
-  transport: serverTransport,
-  middlewares: [
-    contract({ version: '1' }),
-    protocol(),
-    connect({ transport: serverTransport })
-  ]
-});
-server.provide('add', (ctx) => {
-  const { a, b } = ctx.data as { a: number; b: number };
-  return ctx.success(a + b);
-});
-
-// 客户端：同样声明身份，然后直接"调用"服务端的方法
-const client = await createEndpoint({
-  id: 'client',
-  transport: clientTransport,
-  targetIds: ['server'],
-  middlewares: [
-    contract({ version: '1' }),
-    protocol(),
-    connect({ transport: clientTransport })
-  ]
-});
-
-const result = await client.send<number>('server', 'add', { a: 1, b: 2 });
-console.log(result); // 3
-
-await client.dispose();
-await server.dispose();
-```
-
-看懂这一个例子，你就理解了这个库的核心心智模型：**每一端都是一个 `endpoint`，`endpoint` 靠 `provide()` 暴露方法、靠 `send()` 调用别人的方法，`middlewares` 决定这个 endpoint 具备哪些能力**（协议编解码、版本契约、来源验证……）。换一个真实传输（比如把 `createMemoryTransportPair()` 换成 `createWebWorkerTransport(worker)`），业务代码一行都不用改。
-
-## 5. 核心概念一览
-
-| 概念 | 是什么 | 类比 |
-| --- | --- | --- |
-| **Endpoint（端点）** | `createEndpoint()` 返回的对象，代表通信链路里的"我方" | 一个 RPC 客户端兼服务端实例 |
-| **Transport（传输）** | 只负责"发字节/对象、收字节/对象"的最底层适配器 | HTTP 里的 TCP 连接 |
-| **Middleware（中间件）** | 给 endpoint 安装某种能力（协议编解码、鉴权、分片……） | Express 的中间件链，但装的是能力而不是请求处理逻辑 |
-| **Provider（提供者）** | 通过 `provide(method, fn)` 注册的方法处理函数 | HTTP 里的路由 handler |
-| **Adapter（适配器）** | 官方提供的 `createXxxTransport()` 工厂函数，把某个具体宿主 API 包成 `Transport` | 数据库驱动之于数据库协议 |
-| **Contract（契约）** | 双方约定的协议版本号 + 每个方法的入参/出参 schema | 接口的 IDL/OpenAPI 定义 |
-| **Discovery（发现）** | 同一个 `targetId` 背后有哪些接收端存活、路由到谁 | 服务注册与发现 |
-
-## 6. 支持的传输适配器
-
-适配器不在主入口导出，按需从子路径引入（避免把用不到的浏览器 API 探测代码打进你的 bundle）：
-
-| 适配器 | 导入路径 | 适用场景 | 关键约束 |
-| --- | --- | --- | --- |
-| `createWindowMessageTransport` | `@migaia/web-rpc/adapters/window` | 主页面 ↔ iframe / 弹出窗口 | 跨源必须显式传 `targetOrigin`；无法可靠感知对方窗口被关闭，需配合超时 |
-| `createBrowserMessagePortTransport` | `@migaia/web-rpc/adapters/message-port` | 浏览器 `MessageChannel`/`MessagePort` | 默认 `owned`（框架负责关闭 port），显式传 `borrowed` 可保留控制权 |
-| `createWebWorkerTransport` | `@migaia/web-rpc/adapters/web-worker` | 主线程 ↔ dedicated Worker | `error`/`messageerror` 无消息体，统一走 `onTransportError` 让所有挂起请求立即失败 |
-| `createSharedWorkerTransport` | `@migaia/web-rpc/adapters/shared-worker` | 多标签页共享同一个 SharedWorker | 不引入 DOM/Worker 全局类型即可编译 |
-| `createServiceWorkerTransport` | `@migaia/web-rpc/adapters/service-worker` | 页面 ↔ ServiceWorker | 发送方与接收方是两个独立的宿主对象 |
-| `createBroadcastChannelTransport` | `@migaia/web-rpc/adapters/broadcast-channel` | 同源多标签页广播 | **匿名分组只是"诚实节点"路由，不是身份边界**，见下方安全提示 |
-| `createRtcDataChannelTransport` | `@migaia/web-rpc/adapters/rtc-data-channel` | WebRTC 点对点数据通道 | 要求可靠有序通道（`ordered: true`） |
-| `createWebTransportDatagramTransport` | `@migaia/web-rpc/adapters/web-transport` | HTTP/3 WebTransport datagram | 协议编解码需自行处理（datagram 无内建分帧） |
-| `createMemoryTransportPair` | `@migaia/web-rpc/adapters/memory` | 单元测试、同进程联调、不依赖任何浏览器 API | 仅供测试/开发使用，两端物理上就是同一个 JS 堆 |
-
-> 用不了官方适配器？实现 `IWebRpcTransport`（只有 `send`/`subscribe` 两个必需方法）就能接入任意自定义通道，见 [USEGUIDE.md](./USEGUIDE.md#自定义传输适配器)。
-
-## 7. 常用中间件一览
-
-| 中间件 | 作用 | 什么时候必须要 |
-| --- | --- | --- |
-| `contract()` | 声明协议版本、按方法校验入参/出参 schema | 建议总是加，否则契约不匹配时问题会在业务代码里才暴露 |
-| `protocol()` | 定义消息的编码/解码方式（默认恒等） | 需要自定义序列化格式（如 MessagePack）时配置 |
-| `connect()` | 验证对端身份、驱动服务发现 | **几乎总是需要**——没有它无法做来源校验，多接收端场景也无法路由 |
-| `authentication()` | 对每一帧做签名/验签、加解密 | 通信通道本身不可信（比如匿名 BroadcastChannel）时必须加 |
-| `chunk()` | 大消息自动分片与重组 | 消息可能超过传输通道的单条大小限制时加 |
-| `timeout()` | 统一请求超时与重试策略 | 建议总是加，否则默认行为可能是无限等待 |
-| `ping()` | 提供 `endpoint.ping(targetId, receiverId?, options?)` 存活探测 | 需要主动探测对端是否还在时加 |
-| `abort()` | 支持 `AbortSignal` 取消进行中的请求 | 需要可取消调用时加 |
-| `hooks()` | 订阅框架内部生命周期事件，用于日志/监控 | 需要可观测性时加 |
-| `uuid()` | 自定义请求/消息 ID 生成策略 | 默认策略不满足需求（如需要和其他系统的 trace id 对齐）时加 |
-
-## 8. 安装
+## 4. 安装
 
 ```bash
 pnpm add @migaia/web-rpc
@@ -135,24 +43,545 @@ pnpm add @migaia/web-rpc
 
 无运行时依赖，不依赖 Store、React、WASM，也不绑定任何具体宿主环境。
 
-## 9. 典型使用模式（更多完整示例见 USEGUIDE.md）
+## 5. 目录
 
-- **主线程调度 Worker 计算**：`createWebWorkerTransport(worker)` + `provide('compute', ...)`，把 CPU 密集任务丢给 Worker，主线程 `await endpoint.send('worker', 'compute', input)` 拿结果，写法和调本地 async 函数一样。
-- **iframe 双向鉴权通信**：`createWindowMessageTransport` + `connect({ identifier: (ctx) => allowlist.has(ctx.origin) })`，只信任白名单里的 origin。
-- **标签页广播通知**：`createBroadcastChannelTransport` + `endpoint.dispatchAll(method, data)` 单向通知所有存活标签页，不等待响应。
-- **大文件跨端传输**：`chunk({ chunkSize: 16_384, maxMessageBytes: 4 * 1024 * 1024 })`，业务代码不用关心分片逻辑，正常 `send()` 一个大 payload 即可。
+- [核心概念一览](#6-核心概念一览)
+- [`createEndpoint` 与 Endpoint 核心 API](#7-createendpoint-与-endpoint-核心-api)
+- [中间件](#8-中间件)
+- [传输适配器](#9-传输适配器)
+- [错误处理与跨端错误序列化](#10-错误处理与跨端错误序列化)
+- [高阶组合示例](#11-高阶组合示例)
+- [注意事项（最容易踩的坑）](#12-注意事项最容易踩的坑)
+- [构建门禁](#13-构建门禁)
 
-## 10. 注意事项（最容易踩的坑）
+完整签名、边界行为与错误码，见 [USEGUIDE.md](./USEGUIDE.md)。
+
+---
+
+## 6. 核心概念一览
+
+| 概念                     | 是什么                                                                          | 类比                                               |
+| ------------------------ | ------------------------------------------------------------------------------- | -------------------------------------------------- |
+| **Endpoint（端点）**     | `createEndpoint()` 返回的对象，代表通信链路里的"我方"                           | 一个 RPC 客户端兼服务端实例                        |
+| **Transport（传输）**    | 只负责"发字节/对象、收字节/对象"的最底层适配器                                  | HTTP 里的 TCP 连接                                 |
+| **Middleware（中间件）** | 给 endpoint 安装某种能力（协议编解码、鉴权、分片……）                            | Express 的中间件链，但装的是能力而不是请求处理逻辑 |
+| **Provider（提供者）**   | 通过 `provide(method, fn)` 注册的方法处理函数                                   | HTTP 里的路由 handler                              |
+| **Adapter（适配器）**    | 官方提供的 `createXxxTransport()` 工厂函数，把某个具体宿主 API 包成 `Transport` | 数据库驱动之于数据库协议                           |
+| **Contract（契约）**     | 双方约定的协议版本号 + 每个方法的入参/出参 schema                               | 接口的 IDL/OpenAPI 定义                            |
+| **Discovery（发现）**    | 同一个 `targetId` 背后有哪些接收端存活、路由到谁                                | 服务注册与发现                                     |
+
+`Transport` 的 `topology` 字段（`exclusive` / `multiplexed` / `broadcast`）决定框架如何信任这条通道，是整个安全模型里最重要的一个字段，完整语义见 [USEGUIDE §1.2](./USEGUIDE.md#12-transport传输)。
+
+---
+
+## 7. `createEndpoint` 与 Endpoint 核心 API
+
+```ts
+import { createEndpoint, contract, protocol, connect } from '@migaia/web-rpc';
+```
+
+**`createEndpoint`｜10 秒上手** —— 每一端唯一的构造入口，返回一个既能调用别人、也能被别人调用的 `endpoint`：
+
+```ts
+const endpoint = await createEndpoint({
+  id: 'server',
+  transport,
+  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]
+});
+endpoint.provide('add', (ctx) => {
+  const { a, b } = ctx.data as { a: number; b: number };
+  return ctx.success(a + b);
+});
+```
+
+全部配置项（`IWebRpcFactoryConfig`）：
+
+- `id: string`（必填）—— 本端在整个通信拓扑里的唯一标识，出现在每条消息的 `senderId` 字段（不是身份凭证）；长度受 `contract().maxIdentifierLength` 限制（默认 128，即使不装 `contract()` 也生效）
+- `middlewares: readonly IWebRpcMiddleware[]`（必填）—— 至少要包含 `connect()`，否则构造直接抛 `MIDDLEWARE_MISSING`
+- `transport?: IWebRpcTransport` —— 也可以只在 `connect({ transport })` 里提供，二选一即可
+- `targetIds?: readonly string[]` —— 已知对端 id 的预声明，非必需；自动发现模式下首次 `send`/`dispatch`/`ping` 未知 `targetId` 会懒查询
+- `provider?: Readonly<Record<string, IWebRpcProvider>>` —— 构造时批量注册的方法集合，等价于逐个调用 `provide()`
+- `replay?: { maxEntries?: number; ttlMs?: number }` —— 出站请求 id 重放保护窗口，默认容量 4096、TTL 310 秒
+- `construction?: { signal?: IWebRpcAbortSignal; timeoutMs?: number | false }` —— 构造期本身的取消/超时；取消/超时后仍会正确回滚已安装成功的中间件
+
+**`endpoint.provide(method, fn)`｜5 秒上手** —— 注册一个方法处理函数，同名重复注册抛 `PROVIDER_DUPLICATED`：
+
+```ts
+endpoint.provide('greet', (ctx) => ctx.success(`hello, ${ctx.data}`));
+```
+
+`fn` 收到的 `IWebRpcContext` 全部字段：`data: unknown`（已过 `contract()` schema 校验，如果配置了的话）、`signal: IWebRpcAbortSignal`（调用方取消时触发）、`success(data?, { transfer? })`、`failed(message, code)`、`dispatchTo({ id?, method, data })`（主动向调用方推一条单向消息）。返回 `this`，可以链式调用。
+
+**`endpoint.send<T>(targetId, method, data, options?)`｜5 秒上手** —— 发起一次双向调用并等待结果：
+
+```ts
+const sum = await endpoint.send<number>('server', 'add', { a: 1, b: 2 });
+```
+
+`options?: ISendOptions` 全部字段：`signal?: IWebRpcAbortSignal`（需要装 `abort()` 中间件）、`timeoutMs?: number | false`（覆盖 `timeout()` 中间件的默认值）、`transfer?: readonly unknown[]`（零拷贝转移列表）。
+
+**`endpoint.sendAll<T>(method, data, options?)`｜5 秒上手** —— 向当前全部已知/存活对端发起同一次调用：
+
+```ts
+const { fulfilled, rejected } = await endpoint.sendAll<number>('ping-check', undefined);
+```
+
+`options` 同 `send`。返回 `IWebRpcFanoutResult<T>`（`{ fulfilled, rejected }`，两者都是**空原型对象**，查找必须用 `Object.hasOwn()`，不能用 `in`——完整 key 编码规则见 [USEGUIDE §6](./USEGUIDE.md#6-endpoint-公开-api-参考)）。对一个已释放的 endpoint 调用 `sendAll` 会稳定失败，即使当前没有任何已知对端。
+
+**`endpoint.dispatch(targetId, method, data)` / `dispatchAll(method, data)`｜3 秒上手** —— 单向通知，不等待响应，同步返回（内部异步执行）：
+
+```ts
+endpoint.dispatch('worker', 'log', { level: 'info', message: 'started' });
+endpoint.dispatchAll('cache-invalidated', { key: 'user-profile' });
+```
+
+均无可选项（`dispatch` 需要 `targetId`，`dispatchAll` 广播给全部已知/存活对端）。
+
+**`endpoint.on(event, listener)`｜3 秒上手** —— 监听对端 `dispatch()`/`dispatchAll()` 发来的单向通知：
+
+```ts
+const off = endpoint.on('cache-invalidated', (ctx) => console.log(ctx.data));
+off(); // 取消订阅
+```
+
+`listener: IWebRpcEventListener`（`(context: IWebRpcContext) => void | Promise<void>`），无其他选项；返回取消订阅函数。
+
+**`endpoint.hooks.on(listener)`｜3 秒上手** —— 运行时动态订阅生命周期事件，等价于 `hooks()` 中间件的 `listeners` 配置项：
+
+```ts
+const off = endpoint.hooks.on((event) => console.log(event.name, event.at));
+```
+
+**`endpoint.dispose()`｜5 秒上手** —— 释放 endpoint，立即结算全部进行中的请求、清理中间件与传输：
+
+```ts
+await endpoint.dispose();
+```
+
+无参数，幂等（可安全多次调用），失败时抛 `WebRpcLifecycleError`（`cleanupErrors` 逐项列出哪个资源没清理干净），完整语义见 [USEGUIDE §9](./USEGUIDE.md#9-生命周期与资源释放)。
+
+**`endpoint.connect` / `endpoint.discovery`** —— 服务发现的读写控制，自动模式下只读（`getServerList`/`pinReceiver`/`unpinReceiver`），手动模式下额外有 `query`/`onQuery`/`register`/`unregister`/`ping`，完整参考见 [USEGUIDE §7](./USEGUIDE.md#7-服务发现自动模式与手动模式)。
+
+---
+
+## 8. 中间件
+
+```ts
+import {
+  contract,
+  protocol,
+  connect,
+  authentication,
+  chunk,
+  timeout,
+  ping,
+  abort,
+  hooks,
+  uuid
+} from '@migaia/web-rpc';
+```
+
+**`contract(config?)`｜5 秒上手** —— 声明协议版本、按方法校验入参/出参 schema：
+
+```ts
+contract({
+  version: '1',
+  schemas: { add: { params: z.object({ a: z.number(), b: z.number() }), result: z.number() } }
+});
+```
+
+全部选项：`version?: string`（本端协议版本号）、`acceptVersions?: string[]`（接受的对端版本号，默认只接受自己声明的 `version`）、`maxIdentifierLength?: number`（`id`/`targetId`/method 等标识符最大长度，**默认 128**，不装这个中间件时同样生效默认值）、`schemas?: Record<string, { params: IWebRpcSchema; result: IWebRpcSchema }>`（未覆盖的方法名不做校验，按方法名精确匹配）。建议总是加，否则契约不匹配问题会在业务代码里才暴露。
+
+**`protocol(config?)`｜3 秒上手** —— 定义消息信封的编码/解码方式：
+
+```ts
+protocol({ encode: (v) => msgpackEncode(v), decode: (v) => msgpackDecode(v) });
+```
+
+全部选项：`encode?: (value) => unknown`（默认恒等）、`decode?: (value) => unknown`（默认恒等）、`encodedType?: 'any' | 'string' | 'uint8array'`（默认 `'any'`，需要和传输层的编码要求一致，不一致在构造期直接报错）。
+
+**`connect(config)`｜10 秒上手** —— **几乎所有场景都需要**，同时负责来源校验和服务发现：
+
+```ts
+connect({
+  transport,
+  useBaseIdVerifyOnly: false,
+  identifier: (ctx) => allowlist.has(ctx.origin)
+});
+```
+
+全部选项：`transport?: IWebRpcTransport`（工厂层已提供 `transport` 时可省略）、`useBaseIdVerifyOnly?: boolean`（**默认 `true`**：只用适配器提供的 `peerId`/`origin` 做基础校验；设为 `false` 时 `identifier` 变为必需）、`identifier?: (context) => boolean | Promise<boolean>`（`useBaseIdVerifyOnly: false` 时必须提供）、`uniqueTargetId?: string | ((context) => string | Promise<string>)`（同一 `targetId` 下多接收端的路由标识，**不是凭证**）、`discoveryMode?: 'automatic' | 'manual'`（默认 `'automatic'`）、`receiverSelector?: (serverList, context) => string | undefined | Promise<string | undefined>`（自定义多接收端选路）。
+
+**`authentication(config)`｜10 秒上手** —— 对每一帧（含分片帧、ping/pong/abort 控制帧）做签名/验签、加解密：
+
+```ts
+authentication({
+  sign: (value) => hmacSign(value, key),
+  verify: (value) => hmacVerify(value, key)
+});
+```
+
+全部选项：`encrypt?`/`decrypt?`/`sign?`/`verify?: (value, context) => unknown | Promise<unknown>`（`context.direction` 为 `'outbound' | 'inbound'`；`encrypt`/`decrypt` 必须成对提供，`sign`/`verify`同理，且至少要配置一对，否则构造期抛 `INVALID_CONFIG`）、`encodedType?: 'any' | 'string' | 'uint8array'`（默认 `'any'`）。启用后 `Transfer` 零拷贝列表不再受支持。通道本身不可信（如匿名 BroadcastChannel）时必须加。
+
+**`chunk(config?)`｜10 秒上手** —— 大消息自动分片与重组：
+
+```ts
+chunk({ chunkSize: 16_384, maxMessageBytes: 50 * 1024 * 1024, assemblyTimeoutMs: 30_000 });
+```
+
+全部选项（六个容量维度即使不配置也带内置默认值，不是"不设置就不限"）：`chunkSize?: number`（单帧字节数，超过触发分片，未设不主动分片）、`maxMessageBytes?: number`（单条消息总字节数上限，未设不检查）、`maxConcurrentMessages?: number`（端点级并发重组数，默认 128）、`maxConcurrentMessagesPerPeer?: number`（单 peer 并发重组数，默认 32）、`maxBufferedBytes?: number`（重组缓冲区总字节，默认 16MiB）、`maxChunksPerMessage?: number`（单消息最大分片数，默认 4096）、`maxChunkBytes?: number`（单分片最大字节，默认 4MiB）、`assemblyTimeoutMs?: number`（重组超时，默认 30 秒）、`byteLength?: (value) => number`（自定义字节测量，默认按 UTF-8）、`split?: (value, maxBytes) => readonly string[]`（自定义切分算法）。已是 `Uint8Array` 的消息不支持自动分片。
+
+**`timeout(config?)`｜5 秒上手** —— 统一请求超时与重试策略：
+
+```ts
+timeout({ timeoutMs: 5000, retry: { maxAttempts: 3, shouldRetry: () => true } });
+```
+
+全部选项：`timeoutMs?: number | false`（默认超时，`false` 表示不限时；`send()` 的 `options.timeoutMs` 可逐次覆盖）、`retry?: { maxAttempts?: number; shouldRetry?: (context) => boolean | Promise<boolean>; delay?: (context) => number | false | null | Promise<number | false | null> }`（`context` 含 `attempt`/`error`/`targetId`/`method`/`data`）。重试回调在请求信号中止或 endpoint 释放时会被自动取消。
+
+**`ping()`｜3 秒上手** —— 安装后 endpoint 获得 `ping`/`pingAll` 方法：
+
+```ts
+ping();
+const alive = await endpoint.ping('server'); // 超时/失败统一返回 false，不抛错
+```
+
+无配置项。`ping(targetId, receiverId?, options?)` 的 `options?: { timeoutMs?: number; signal?: IWebRpcAbortSignal }`。不装这个中间件时调用 `ping` 在**编译期**就会报类型错误。
+
+**`abort()`｜3 秒上手** —— 让 `send()`/`sendAll()` 支持 `options.signal` 取消：
+
+```ts
+abort();
+const controller = new AbortController();
+endpoint.send('server', 'slow', {}, { signal: controller.signal });
+controller.abort();
+```
+
+无配置项。
+
+**`hooks(config?)`｜5 秒上手** —— 订阅框架内部生命周期事件：
+
+```ts
+hooks({ listeners: (event) => console.log(event.name), onHookError: (err) => console.error(err) });
+```
+
+全部选项：`listeners?: IWebRpcHook | readonly IWebRpcHook[]`、`onHookError?: (error, event) => void`（监听器自身抛错时的兜底，防止一个写错的日志监听器影响主流程）。完整事件表见 [USEGUIDE §10](./USEGUIDE.md#10-可观测性hooks-事件参考)。
+
+**`uuid(config?)`｜3 秒上手** —— 自定义请求/消息 id 的生成策略：
+
+```ts
+uuid({ generate: (ctx) => myTraceIdGenerator(ctx.variation) });
+```
+
+全部选项：`generate?: (context: { variation: 'task' | 'message' | 'variation'; senderId: string; targetId?: string }) => string`，默认使用内置安全随机生成器。
+
+---
+
+## 9. 传输适配器
+
+适配器不在主入口导出，按需从子路径引入（避免把用不到的浏览器 API 探测代码打进你的 bundle）。
+
+**`createMemoryTransportPair()`｜3 秒上手** —— `@migaia/web-rpc/adapters/memory`，单元测试/本地联调专用，不依赖任何浏览器 API：
+
+```ts
+import { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory';
+const [clientTransport, serverTransport] = createMemoryTransportPair();
+```
+
+无参数；返回一对互相连通的传输，通过 `queueMicrotask` 模拟真实异步时序。仅供测试/开发使用。
+
+**`createWebWorkerTransport(port, options?)`｜5 秒上手** —— `@migaia/web-rpc/adapters/web-worker`，主线程 ↔ dedicated Worker：
+
+```ts
+import { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker';
+const transport = createWebWorkerTransport(worker);
+```
+
+全部选项：`options?: { peerId?: string; origin?: string }`（静态声明已知对端身份元数据）。`error`/`messageerror` 原生事件无消息体，统一通过 `onTransportError` 让全部挂起请求立即失败。
+
+**`createWindowMessageTransport(options)`｜10 秒上手** —— `@migaia/web-rpc/adapters/window`，主页面 ↔ iframe/弹出窗口：
+
+```ts
+import { createWindowMessageTransport } from '@migaia/web-rpc/adapters/window';
+const transport = createWindowMessageTransport({
+  target: iframe.contentWindow!,
+  targetOrigin: 'https://trusted-partner.example'
+});
+```
+
+全部选项：`target: IWindowMessageTarget`（**必填**，出站投递目标，如 `iframe.contentWindow`/`window.opener`）、`receiver?: IWindowMessageReceiver`（默认当前 `window`）、`targetOrigin?: string`（默认 `window.location.origin`；跨源必须显式传）、`allowUnsafeTargetOrigin?: boolean`（显式 opt-in 通配符 `'*'` 投递，只影响出站过滤，入站 `source` 校验依然生效）。
+
+**`createBrowserMessagePortTransport(port, options?)`｜5 秒上手** —— `@migaia/web-rpc/adapters/message-port`，浏览器 `MessageChannel`/`MessagePort`：
+
+```ts
+import { createBrowserMessagePortTransport } from '@migaia/web-rpc/adapters/message-port';
+const transport = createBrowserMessagePortTransport(port, { ownership: 'borrowed' });
+```
+
+全部选项：`ownership?: 'owned' | 'borrowed'`（默认 `'owned'`——`dispose()`/`close()` 时框架会关闭传入的 `port`；`'borrowed'` 只移除框架自己的监听器）。另有 `createNodeMessagePortTransport(port)` 适配 Node `worker_threads` 的 MessagePort，无选项，用法一致。
+
+**`createSharedWorkerTransport(port)`｜3 秒上手** —— `@migaia/web-rpc/adapters/shared-worker`，多标签页共享同一个 SharedWorker：
+
+```ts
+import { createSharedWorkerTransport } from '@migaia/web-rpc/adapters/shared-worker';
+const transport = createSharedWorkerTransport(sharedWorker.port);
+```
+
+单参数，无选项。天生是 `multiplexed` 拓扑，务必配合 `connect()` 的身份校验使用。
+
+**`createServiceWorkerTransport(options)`｜5 秒上手** —— `@migaia/web-rpc/adapters/service-worker`，页面 ↔ ServiceWorker：
+
+```ts
+import { createServiceWorkerTransport } from '@migaia/web-rpc/adapters/service-worker';
+const transport = createServiceWorkerTransport({
+  target: navigator.serviceWorker.controller!,
+  receiver: navigator.serviceWorker
+});
+```
+
+全部选项：`target: IServiceWorkerMessageTarget`（必填，发送目标）、`receiver: IServiceWorkerMessageReceiver`（必填，接收来源）、`peerId?: string`（默认取 `target.id`）。发送方和接收方是两个独立的宿主对象，因此需要分别传入。
+
+**`createBroadcastChannelTransport(channel)`｜3 秒上手** —— `@migaia/web-rpc/adapters/broadcast-channel`，同源多标签页广播：
+
+```ts
+import { createBroadcastChannelTransport } from '@migaia/web-rpc/adapters/broadcast-channel';
+const transport = createBroadcastChannelTransport(new BroadcastChannel('app-sync'));
+```
+
+单参数，无选项。**这是匿名广播路由，不是身份边界**，需要防伪造/防窃听必须叠加 `authentication()`。
+
+**`createRtcDataChannelTransport(channel)`｜5 秒上手** —— `@migaia/web-rpc/adapters/rtc-data-channel`，WebRTC 点对点数据通道：
+
+```ts
+import { createRtcDataChannelTransport } from '@migaia/web-rpc/adapters/rtc-data-channel';
+const transport = createRtcDataChannelTransport(dataChannel);
+```
+
+单参数，无选项。要求 `channel.readyState` 在构造时已经是 `'open'` 或 `'closed'`（否则抛 `INVALID_CONFIG`）；要求可靠有序模式（`ordered: true`，创建时默认就是）；内部固定 `encodedType: 'string'`。
+
+**`createWebTransportDatagramTransport(datagrams)`｜5 秒上手** —— `@migaia/web-rpc/adapters/web-transport`，HTTP/3 WebTransport datagram：
+
+```ts
+import { createWebTransportDatagramTransport } from '@migaia/web-rpc/adapters/web-transport';
+const transport = createWebTransportDatagramTransport({
+  writable: session.datagrams.writable,
+  readable: session.datagrams.readable
+});
+```
+
+单参数 `{ writable: WritableStream<Uint8Array>; readable: ReadableStream<Uint8Array> }`，无其他选项。datagram 无内建分帧，`protocol()` 需自行处理帧边界；`close()` 才会真正取消内部持久 reader，取消订阅不会。
+
+> 用不了官方适配器？实现 `IWebRpcTransport`（只有 `send`/`subscribe` 两个必需方法）就能接入任意自定义通道，见 [USEGUIDE.md](./USEGUIDE.md#5-自定义传输适配器)。
+
+---
+
+## 10. 错误处理与跨端错误序列化
+
+```ts
+import {
+  isWebRpcError,
+  WebRpcErrorCode,
+  serializeError,
+  deserializeError,
+  reachError
+} from '@migaia/web-rpc';
+```
+
+**错误处理｜5 秒上手** —— 所有失败都是 `WebRpcError` 的实例，带稳定的 `code` 字符串：
+
+```ts
+try {
+  await endpoint.send('server', 'add', { a: 1, b: 2 });
+} catch (error) {
+  if (isWebRpcError(error)) {
+    switch (error.code) {
+      case WebRpcErrorCode.deadlineExceeded:
+        /* 超时 */ break;
+      default: /* 兜底 */
+    }
+  }
+}
+```
+
+请始终按 `error.code` 分支，不要依赖 `error.message` 或具体的 `error instanceof SomeSubclass`；错误码全表与每一种子类（`WebRpcRemoteError`/`WebRpcTimeoutError`/`WebRpcAbortError`/`WebRpcLifecycleError`……）的完整语义见 [USEGUIDE §8](./USEGUIDE.md#8-错误处理)。
+
+**`serializeError`｜5 秒上手** —— 把任意错误（含 `cause`/`AggregateError` 链）转成可安全 `postMessage`/`JSON.stringify` 的数据结构：
+
+```ts
+const wire = serializeError(new Error('outer', { cause: new Error('inner') }));
+```
+
+单参数 `error: unknown`，无选项；图深度上限 64、节点数上限 1024，超限抛 `WebRpcSerializationError`（`PAYLOAD_INVALID`）。
+
+**`deserializeError`｜5 秒上手** —— 逆操作，从 wire 数据重建出真正的 `Error` 实例（按 `name` 还原对应原生子类）：
+
+```ts
+const restored = deserializeError(wire);
+```
+
+单参数 `serialized: ISerializedError`，无选项。
+
+**`reachError`｜3 秒上手** —— 生成器，按遍历顺序 yield 一个错误能到达的全部节点，用于日志/脱敏：
+
+```ts
+for (const node of reachError(topLevelError)) console.error(node);
+```
+
+单参数 `error: unknown`，无选项，不会因超限抛错（截断而不是中断）。完整字段与类型定义见 [USEGUIDE §16](./USEGUIDE.md#16-跨端错误序列化)。此外主入口还整体导出 `protocol-constants` 里的全部枚举常量（`WebRpcPlatform`/`WebRpcTransportTopology`/`WebRpcMessageKind` 等），用于替代手写字符串字面量，完整清单见 [USEGUIDE §15](./USEGUIDE.md#15-协议常量与类型工具)。
+
+---
+
+## 11. 高阶组合示例
+
+### 1. 主线程调度 Web Worker
+
+```ts
+// worker.ts
+import { createEndpoint, contract, protocol, connect } from '@migaia/web-rpc';
+import { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker';
+
+const transport = createWebWorkerTransport(self as unknown as Worker);
+const endpoint = await createEndpoint({
+  id: 'worker',
+  transport,
+  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]
+});
+endpoint.provide('heavyCompute', (ctx) => ctx.success(doHeavyWork(ctx.data as number[])));
+```
+
+```ts
+// main.ts
+import { createEndpoint, contract, protocol, connect, timeout } from '@migaia/web-rpc';
+import { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker';
+
+const worker = new Worker(new URL('./worker.ts', import.meta.url));
+const transport = createWebWorkerTransport(worker);
+const endpoint = await createEndpoint({
+  id: 'main',
+  transport,
+  targetIds: ['worker'],
+  middlewares: [
+    contract({ version: '1' }),
+    protocol(),
+    connect({ transport }),
+    timeout({ timeoutMs: 30_000 })
+  ]
+});
+
+const result = await endpoint.send<number[]>('worker', 'heavyCompute', [1, 2, 3]);
+```
+
+### 2. iframe 白名单鉴权通信
+
+```ts
+import { createEndpoint, contract, protocol, connect } from '@migaia/web-rpc';
+import { createWindowMessageTransport } from '@migaia/web-rpc/adapters/window';
+
+const ALLOWED_ORIGINS = new Set(['https://trusted-partner.example']);
+const iframe = document.querySelector('iframe')!;
+const transport = createWindowMessageTransport({
+  target: iframe.contentWindow!,
+  receiver: window,
+  targetOrigin: 'https://trusted-partner.example'
+});
+
+const endpoint = await createEndpoint({
+  id: 'host',
+  transport,
+  middlewares: [
+    contract({ version: '1' }),
+    protocol(),
+    connect({
+      transport,
+      useBaseIdVerifyOnly: false,
+      identifier: (ctx) => Boolean(ctx.origin && ALLOWED_ORIGINS.has(ctx.origin))
+    })
+  ]
+});
+```
+
+### 3. 标签页广播通知（不需要响应）
+
+```ts
+import { createEndpoint, contract, protocol, connect } from '@migaia/web-rpc';
+import { createBroadcastChannelTransport } from '@migaia/web-rpc/adapters/broadcast-channel';
+
+const transport = createBroadcastChannelTransport(new BroadcastChannel('app-sync'));
+const endpoint = await createEndpoint({
+  id: `tab-${crypto.randomUUID()}`,
+  transport,
+  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]
+});
+
+endpoint.on('cache-invalidated', (ctx) => console.log('缓存失效通知：', ctx.data));
+endpoint.dispatchAll('cache-invalidated', { key: 'user-profile' }); // 其余标签页都会收到
+```
+
+### 4. 大文件跨端传输（自动分片）
+
+```ts
+import { createEndpoint, contract, protocol, connect, chunk } from '@migaia/web-rpc';
+
+const endpoint = await createEndpoint({
+  id: 'sender',
+  transport,
+  middlewares: [
+    contract({ version: '1' }),
+    protocol(),
+    connect({ transport }),
+    chunk({ chunkSize: 16_384, maxMessageBytes: 50 * 1024 * 1024, assemblyTimeoutMs: 30_000 })
+  ]
+});
+
+// 业务代码完全不用关心分片，正常发一个大 payload 即可
+await endpoint.send('receiver', 'uploadFile', { name: 'video.mp4', bytes: largeUint8Array });
+```
+
+### 5. 超时 + 重试 + 可取消调用
+
+```ts
+import { createEndpoint, contract, protocol, connect, timeout, abort } from '@migaia/web-rpc';
+
+const endpoint = await createEndpoint({
+  id: 'client',
+  transport,
+  targetIds: ['server'],
+  middlewares: [
+    contract({ version: '1' }),
+    protocol(),
+    connect({ transport }),
+    timeout({
+      timeoutMs: 5000,
+      retry: { maxAttempts: 3, shouldRetry: () => true, delay: (ctx) => ctx.attempt * 200 }
+    }),
+    abort()
+  ]
+});
+
+const controller = new AbortController();
+const resultPromise = endpoint.send('server', 'flaky', {}, { signal: controller.signal });
+// 需要时可随时 controller.abort() 主动取消
+const result = await resultPromise;
+```
+
+---
+
+## 12. 注意事项（最容易踩的坑）
 
 1. **`senderId` 是不可信字段**，任何拿到该消息的代码都能自己拼一个假的。跨源/共享传输场景必须配置 `connect()` 的 `identifier` 做真正的来源校验，不要只信任 `senderId`。
 2. **匿名 BroadcastChannel 不是身份边界**。同源的任何脚本都能观察和伪造匿名组里的帧；`uniqueTargetId` 是路由标识，**不是凭证**，需要真正的鉴权时配置 `authentication()` 中间件。
 3. **`ping()` 超时/失败一律返回 `false`**，不会抛错；不要用 try/catch 包它。
 4. **响应大小超限、连接被动断开这类"传输层失败"和"业务失败"是两种错误**，规范上区分为 `TRANSPORT`、`DEADLINE_EXCEEDED` 等 code，判断时按 `error.code` 分支，不要依赖 `error.message` 或 `error instanceof` 具体子类。
-5. **`Window.postMessage` 无法可靠探测对方窗口被关闭**——依赖 `timeoutMs`（默认有限超时）或显式的宿主生命周期信号，不要假设"没报错就代表还活着"。
+5. **`Window.postMessage` 无法可靠探测对方窗口被关闭**——依赖 `timeoutMs`（默认有限超时）或显式的宿主生命周期信号，不要假设"没报错就代表还活着"；`createWindowMessageTransport` 的 `target` 是必填字段，没有默认值。
 6. **`dispose()` 是幂等的、会等待全部清理完成才 settle**；某一步清理失败不会阻止其余步骤执行，失败信息汇总在抛出的错误的 `cleanupErrors` 里，每一项都带着资源名，方便定位是哪个中间件或传输没清理干净。
-7. **自定义传输必须准确声明 `topology`**（`exclusive` / `multiplexed` / `broadcast`）。声明为 `multiplexed` 的传输必须提供 peer/source 身份或显式校验，框架不会把它当成"只有一个发送方"的独占通道来信任。
+7. **自定义传输必须准确声明 `topology`**（`exclusive` / `multiplexed` / `broadcast`），且 `platform` 必须是内置枚举值之一（`WebRpcPlatform` 常量表列出的 7 个值）。声明为 `multiplexed` 的传输必须提供 peer/source 身份或显式校验，框架不会把它当成"只有一个发送方"的独占通道来信任。
 8. **回调函数不依赖 `this`**。中间件 `install`、`provider`、`verifier`、pipeline 回调都以裸函数形式被调用（框架内部明确不使用 `bind`/`call`/`apply`），请用箭头函数或闭包捕获状态。
+9. **`chunk()` 的容量限制不是"不设置就不限"**——六个维度里有五个（并发消息数、单 peer 消息数、分片数、分片字节、重组超时）自带内置默认值，只有 `chunkSize`/`maxMessageBytes` 才是真正的"未设不限"。
 
-## 11. 深入参考
+## 13. 构建门禁
 
-以上是能让你在 5 分钟内跑起来、并且不踩常见坑的最小知识集合。每个中间件的完整配置项、每个适配器的构造参数与平台限制、公开 API 的完整签名、全部错误码的触发场景与建议处理、发现机制（自动/手动）的完整语义、以及更多贴近真实场景的完整示例，见 **[USEGUIDE.md](./USEGUIDE.md)**。
+```bash
+pnpm --filter @migaia/web-rpc fmt && pnpm --filter @migaia/web-rpc lint && pnpm --filter @migaia/web-rpc typecheck && pnpm --filter @migaia/web-rpc typecheck:core && pnpm --filter @migaia/web-rpc typecheck:node-adapter && pnpm --filter @migaia/web-rpc typecheck:test && pnpm --filter @migaia/web-rpc test
+```
+
+以上是能让你在几分钟内跑起来、并且不踩常见坑的最小知识集合。每个中间件的完整配置项、每个适配器的构造参数与平台限制、公开 API 的完整签名、全部错误码的触发场景与建议处理、发现机制（自动/手动）的完整语义、协议常量、跨端错误序列化，以及更多贴近真实场景的完整示例，见 **[USEGUIDE.md](./USEGUIDE.md)**。

@@ -1,6 +1,6 @@
-# 使用手册
+# `@migaia/store-middleware` 使用指南
 
-本文是 `@migaia/store-middleware` 的完整参考。先看 [README.md](./README.md#5-快速开始) 的快速开始示例，跑起来之后再回来查这里的细节——README 讲"是什么、适合什么场景、怎么五分钟跑起来"，本文讲每一个 API 的精确签名、每一种边界行为，以及和 `@migaia/store-light`、`@migaia/plugin-host` 之间容易踩坑的联动关系。
+本文是 `@migaia/store-middleware` 的完整参考。先看 [README.md](./README.md#高阶组合示例) 的高阶组合示例，跑起来之后再回来查这里的细节——README 讲"是什么、适合什么场景、每个导出怎么用"，本文讲每一个 API 的精确签名、每一种边界行为，以及和 `@migaia/store-light`、`@migaia/plugin-host` 之间容易踩坑的联动关系。
 
 ## 目录
 
@@ -38,28 +38,56 @@ import { StoreMiddlewareHost } from '@migaia/store-middleware';
 
 ```ts
 type IMiddlewareActionEvent =
-  | { type: 'action'; phase: 'start'; name: string; timestamp: number; metadata?: Readonly<Record<string, unknown>> }
-  | { type: 'action'; phase: 'end'; name: string; timestamp: number; durationMs: number; metadata?: Readonly<Record<string, unknown>> }
-  | { type: 'action'; phase: 'error'; name: string; timestamp: number; durationMs: number; error: unknown; metadata?: Readonly<Record<string, unknown>> };
+  | {
+      type: 'action';
+      phase: 'start';
+      name: string;
+      timestamp: number;
+      metadata?: Readonly<Record<string, unknown>>;
+    }
+  | {
+      type: 'action';
+      phase: 'end';
+      name: string;
+      timestamp: number;
+      durationMs: number;
+      metadata?: Readonly<Record<string, unknown>>;
+    }
+  | {
+      type: 'action';
+      phase: 'error';
+      name: string;
+      timestamp: number;
+      durationMs: number;
+      error: unknown;
+      metadata?: Readonly<Record<string, unknown>>;
+    };
 
 type IMiddlewareStateEvent<S> = {
-  type: 'state'; name: string; timestamp: number; previous: S; next: S;
+  type: 'state';
+  name: string;
+  timestamp: number;
+  previous: S;
+  next: S;
   metadata?: Readonly<Record<string, unknown>>;
 };
 
 type IMiddlewareErrorEvent = {
-  type: 'error'; phase: string; timestamp: number; error: unknown;
+  type: 'error';
+  phase: string;
+  timestamp: number;
+  error: unknown;
   metadata?: Readonly<Record<string, unknown>>;
 };
 ```
 
-| 事件 | 何时产生 | 关键字段 |
-| --- | --- | --- |
-| `action` / `start` | 一个 action 开始执行 | `name` |
-| `action` / `end` | action 成功完成 | `durationMs` |
-| `action` / `error` | action 抛出异常 | `durationMs`、`error`（原始异常） |
-| `state` | 状态发生变化 | `previous`/`next`（同类型 `S` 的两个快照） |
-| `error` | 诊断层面的错误上报（不是业务 action 失败） | `phase`（自由字符串，标识来源） |
+| 事件               | 何时产生                                   | 关键字段                                   |
+| ------------------ | ------------------------------------------ | ------------------------------------------ |
+| `action` / `start` | 一个 action 开始执行                       | `name`                                     |
+| `action` / `end`   | action 成功完成                            | `durationMs`                               |
+| `action` / `error` | action 抛出异常                            | `durationMs`、`error`（原始异常）          |
+| `state`            | 状态发生变化                               | `previous`/`next`（同类型 `S` 的两个快照） |
+| `error`            | 诊断层面的错误上报（不是业务 action 失败） | `phase`（自由字符串，标识来源）            |
 
 `timestamp` 统一是 `Date.now()`；`action` 的 `durationMs` 用 `performance.now()`（不可用时退回 `Date.now()`）计算，因此在没有高精度计时器的环境下精度会退化到毫秒级 wall clock。
 
@@ -126,7 +154,12 @@ class StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddle
   constructor(options: IStoreMiddlewareHostOptions<S>);
   emit(event: IMiddlewareEvent<S>): void;
   runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;
-  recordState(name: string, previous: S, next: S, metadata?: Readonly<Record<string, unknown>>): void;
+  recordState(
+    name: string,
+    previous: S,
+    next: S,
+    metadata?: Readonly<Record<string, unknown>>
+  ): void;
   recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;
   connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'
   attachBindingDisposer(disposer: IDisposer): void;
@@ -143,14 +176,14 @@ type IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {
 
 构造函数会**强制把 pipeline 模式覆盖成 `'sync'`**——即便 `options.pipeline.mode` 传了别的值也会被覆盖。原因：Store 领域事件要求同步、可预测的处理顺序，中间件不应该让一次状态变化的观察产生跨微任务的乱序。这意味着所有中间件插件只能用 `core.usePipeline`，调用 `core.useAsyncPipeline`/`core.useGeneratorPipeline` 会触发 `@migaia/plugin-host` 的 `PIPELINE_MODE_MISMATCH` 错误。
 
-| 方法 | 参数类型 | 同步/异步 | 行为 | 抛错语义 |
-| --- | --- | --- | --- | --- |
-| `emit(event)` | `event: IMiddlewareEvent<S>` | 同步 | 同步跑一遍 pipeline；若某个 stage 忘了调用 `next()`，会以 `phase: 'trace-listener'` 上报到 `runtime.reportError()`，但 `emit()` 本身不抛错 | 不抛错，异常通过 `runtime.reportError` 上报 |
-| `runAction(name, fn, metadata?)` | `name: string`；`fn: () => T`；`metadata?: Readonly<Record<string, unknown>>` | 同步 | 派发 `action:start` → 用 `mutationPolicy.runInAction(() => runtime.batch(fn))` 执行 `fn` → 成功派发 `action:end`（带 `durationMs`），失败派发 `action:error` 后**重新抛出原始异常** | `fn` 抛出的异常会正常向调用方传播 |
-| `recordState(name, previous, next, metadata?)` | `name: string`；`previous: S`；`next: S`；`metadata?: Readonly<Record<string, unknown>>` | 同步 | 派发一个 `state` 事件 | 中间件抛错被隔离，不会传给调用方 |
-| `recordError(phase, error, metadata?)` | `phase: string`；`error: unknown`；`metadata?: Readonly<Record<string, unknown>>` | 同步 | 派发一个 `error` 事件；如果在处理上一个 `error` 事件期间**又**调用了 `recordError`（重入），直接把新错误转发给 `runtime.reportError({ phase: 'trace-listener' })`，不会再触发一轮 pipeline，避免错误处理本身死循环 | 不抛错 |
-| `connectDevTools(adapter, name?)` | `adapter: IDevToolsAdapter<S>`；`name?: string` | 异步 | 见 [§7](#7-devtools-集成) | 安装失败按 `PluginHost.use()` 的规则处理 |
-| `attachBindingDisposer(disposer)` | `disposer: IDisposer` | 同步 | 登记一个额外的清理函数，`dispose()` 时按后进先出顺序执行，先于插件卸载 | — |
+| 方法                                           | 参数类型                                                                                 | 同步/异步 | 行为                                                                                                                                                                                                               | 抛错语义                                    |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
+| `emit(event)`                                  | `event: IMiddlewareEvent<S>`                                                             | 同步      | 同步跑一遍 pipeline；若某个 stage 忘了调用 `next()`，会以 `phase: 'trace-listener'` 上报到 `runtime.reportError()`，但 `emit()` 本身不抛错                                                                         | 不抛错，异常通过 `runtime.reportError` 上报 |
+| `runAction(name, fn, metadata?)`               | `name: string`；`fn: () => T`；`metadata?: Readonly<Record<string, unknown>>`            | 同步      | 派发 `action:start` → 用 `mutationPolicy.runInAction(() => runtime.batch(fn))` 执行 `fn` → 成功派发 `action:end`（带 `durationMs`），失败派发 `action:error` 后**重新抛出原始异常**                                | `fn` 抛出的异常会正常向调用方传播           |
+| `recordState(name, previous, next, metadata?)` | `name: string`；`previous: S`；`next: S`；`metadata?: Readonly<Record<string, unknown>>` | 同步      | 派发一个 `state` 事件                                                                                                                                                                                              | 中间件抛错被隔离，不会传给调用方            |
+| `recordError(phase, error, metadata?)`         | `phase: string`；`error: unknown`；`metadata?: Readonly<Record<string, unknown>>`        | 同步      | 派发一个 `error` 事件；如果在处理上一个 `error` 事件期间**又**调用了 `recordError`（重入），直接把新错误转发给 `runtime.reportError({ phase: 'trace-listener' })`，不会再触发一轮 pipeline，避免错误处理本身死循环 | 不抛错                                      |
+| `connectDevTools(adapter, name?)`              | `adapter: IDevToolsAdapter<S>`；`name?: string`                                          | 异步      | 见 [§7](#7-devtools-集成)                                                                                                                                                                                          | 安装失败按 `PluginHost.use()` 的规则处理    |
+| `attachBindingDisposer(disposer)`              | `disposer: IDisposer`                                                                    | 同步      | 登记一个额外的清理函数，`dispose()` 时按后进先出顺序执行，先于插件卸载                                                                                                                                             | —                                           |
 
 **所有派发方法（`runAction`/`recordState`/`recordError`）对中间件本身抛出的异常都是隔离的**——一个写日志的中间件报错，不会影响业务代码继续执行；唯一的例外是 `runAction()` 包裹的**业务函数 `fn`** 抛错，这个异常按原样向外传播，因为那是业务逻辑本身的失败，不是中间件诊断层的失败。
 
@@ -176,8 +209,9 @@ type IStoreMiddlewareBindingOptions = {
   clone?: (state: Record<string, unknown>) => Record<string, unknown>; // 默认 structuredClone
 };
 
-type IStoreMiddlewareBinding<S extends Record<string, unknown>> =
-  StoreMiddlewareHost<Record<string, unknown>> & { readonly store: IReactiveStore<S> };
+type IStoreMiddlewareBinding<S extends Record<string, unknown>> = StoreMiddlewareHost<
+  Record<string, unknown>
+> & { readonly store: IReactiveStore<S> };
 
 function bindStoreMiddleware<S extends Record<string, unknown>>(
   store: IReactiveStore<S>,
@@ -257,9 +291,7 @@ function loggerMiddleware<S>(
 
 ```ts
 type IDevToolsCommand<S> =
-  | { type: 'jump'; state: S }
-  | { type: 'reset'; state: S }
-  | { type: 'commit' };
+  { type: 'jump'; state: S } | { type: 'reset'; state: S } | { type: 'commit' };
 
 type IDevToolsAdapter<S> = {
   init(state: S): void;
@@ -267,7 +299,9 @@ type IDevToolsAdapter<S> = {
   subscribe?(listener: (command: IDevToolsCommand<S>) => void): IDisposer;
 };
 
-function createReduxDevToolsAdapter<S>(connection: IReduxDevToolsConnection<S>): IDevToolsAdapter<S>;
+function createReduxDevToolsAdapter<S>(
+  connection: IReduxDevToolsConnection<S>
+): IDevToolsAdapter<S>;
 ```
 
 `createReduxDevToolsAdapter()` 把一个符合 Redux DevTools 扩展协议的 `connection`（`init`/`send`/`subscribe`）转换成本包的 `IDevToolsAdapter`：
@@ -299,8 +333,8 @@ await host.unUse('store-devtools');
 type IClonePolicyMode = 'immutable' | 'opaque' | 'diagnostic';
 
 function immutableSnapshotClone<T>(value: T): T; // 真独立深拷贝，做不到就抛错
-function opaqueReferenceClone<T>(value: T): T;   // 完全不拷贝，原样返回引用
-function diagnosticClone<T>(value: T): T;        // 尽力而为，永不抛错
+function opaqueReferenceClone<T>(value: T): T; // 完全不拷贝，原样返回引用
+function diagnosticClone<T>(value: T): T; // 尽力而为，永不抛错
 
 const ClonePolicy: {
   immutable: typeof immutableSnapshotClone;
@@ -312,11 +346,11 @@ const ClonePolicy: {
 const tolerantClone: typeof diagnosticClone;
 ```
 
-| 方法/签名 | 参数类型 | 同步/异步 | 行为 | 适合谁 |
-| --- | --- | --- | --- | --- |
-| `ClonePolicy.immutable`（`immutableSnapshotClone(value)`） | `value: T` | 同步 | 优先用 `structuredClone`；当前环境没有 `structuredClone`，或值里含有函数/DOM 句柄/类实例等不可克隆内容时，**抛错**而不是悄悄返回一份共享引用 | 需要"这一定是独立快照"这个保证的调用方——比如把 `previous` 当作历史记录长期持有，不能被后续写入污染 |
-| `ClonePolicy.opaque`（`opaqueReferenceClone(value)`） | `value: T` | 同步 | 不做任何拷贝，直接返回同一个引用 | 已经明确知道部分状态不可克隆、接受引用共享，或只是想要最低开销的"快照" |
-| `ClonePolicy.diagnostic`（`diagnosticClone(value)`） | `value: T` | 同步 | 优先 `structuredClone`；失败时退回递归拷贝：可以拷贝的部分（plain object/array）逐层深拷贝，**只有真正不可克隆的那个子树**按引用保留，不会因为树里一处不可克隆就放弃整棵树的独立性 | 中间件、DevTools 这类诊断场景——可用性优先于严格性，一个不常见的字段值不应该让整条诊断链路崩溃 |
+| 方法/签名                                                  | 参数类型   | 同步/异步 | 行为                                                                                                                                                                               | 适合谁                                                                                             |
+| ---------------------------------------------------------- | ---------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `ClonePolicy.immutable`（`immutableSnapshotClone(value)`） | `value: T` | 同步      | 优先用 `structuredClone`；当前环境没有 `structuredClone`，或值里含有函数/DOM 句柄/类实例等不可克隆内容时，**抛错**而不是悄悄返回一份共享引用                                       | 需要"这一定是独立快照"这个保证的调用方——比如把 `previous` 当作历史记录长期持有，不能被后续写入污染 |
+| `ClonePolicy.opaque`（`opaqueReferenceClone(value)`）      | `value: T` | 同步      | 不做任何拷贝，直接返回同一个引用                                                                                                                                                   | 已经明确知道部分状态不可克隆、接受引用共享，或只是想要最低开销的"快照"                             |
+| `ClonePolicy.diagnostic`（`diagnosticClone(value)`）       | `value: T` | 同步      | 优先 `structuredClone`；失败时退回递归拷贝：可以拷贝的部分（plain object/array）逐层深拷贝，**只有真正不可克隆的那个子树**按引用保留，不会因为树里一处不可克隆就放弃整棵树的独立性 | 中间件、DevTools 这类诊断场景——可用性优先于严格性，一个不常见的字段值不应该让整条诊断链路崩溃      |
 
 `bindStoreMiddleware()` 默认用的是 `state => structuredClone(state)`，语义上等同于手写了一份不带错误兜底的 `immutable`。如果 Store 状态里可能出现不可结构化克隆的值（比如存了一个类实例、`Map`、外部句柄），默认 `clone` 会直接抛错；这种情况下应该显式传 `options.clone: ClonePolicy.diagnostic`（保留诊断可用性）或 `ClonePolicy.opaque`（接受引用共享、换取零开销）。
 
@@ -353,14 +387,14 @@ const tolerantClone: typeof diagnosticClone;
 
 ## 11. 与相关包的关系
 
-| 包 | 负责什么 |
-| --- | --- |
-| `@migaia/store-light` | Store 状态、字段、快照（`$plain`）和 hydration（`$hydrate`）；`actions-only` 策略真正拦截写入的地方 |
-| `@migaia/store-middleware`（本包） | Store action/state/error 事件、写入策略实例、领域中间件插件、DevTools adapter |
-| `@migaia/plugin-host` | 通用插件生命周期、pipeline、配置和资源释放机制，本包在此之上构建 |
-| `@migaia/reactive` | Runtime——action trace 的来源（`$runtime.subscribeTrace`）、错误上报出口（`reportError`） |
-| `@migaia/store-devtools` | 依赖图、历史快照和时间旅行诊断（更完整的 DevTools 能力，本包只提供事件转发的 adapter 协议） |
-| `@migaia/store-persist` | 状态持久化和恢复 |
+| 包                                 | 负责什么                                                                                            |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `@migaia/store-light`              | Store 状态、字段、快照（`$plain`）和 hydration（`$hydrate`）；`actions-only` 策略真正拦截写入的地方 |
+| `@migaia/store-middleware`（本包） | Store action/state/error 事件、写入策略实例、领域中间件插件、DevTools adapter                       |
+| `@migaia/plugin-host`              | 通用插件生命周期、pipeline、配置和资源释放机制，本包在此之上构建                                    |
+| `@migaia/reactive`                 | Runtime——action trace 的来源（`$runtime.subscribeTrace`）、错误上报出口（`reportError`）            |
+| `@migaia/store-devtools`           | 依赖图、历史快照和时间旅行诊断（更完整的 DevTools 能力，本包只提供事件转发的 adapter 协议）         |
+| `@migaia/store-persist`            | 状态持久化和恢复                                                                                    |
 
 ---
 
@@ -384,6 +418,9 @@ const tolerantClone: typeof diagnosticClone;
 **Q：同一个 action 在中间件里被记录了两次。**
 检查是否在 `bindStoreMiddleware()` 已经转发了 Store 自身 action trace 的情况下，又手动用 `host.runAction()` 包了一遍同一个 Store 方法——两条路径都会各自派发一次 `action` 事件，见 [§5](#5-bindstoremiddleware-完整行为)。
 
-## 构建、测试与排查
+**Q：`host.dispose()` 抛了一个 `AggregateError`。**
+检查 `error.errors`——里面是绑定 disposer（状态订阅、trace 订阅）和插件卸载各自抛出的原始错误；`code` 固定是 `CLEANUP_FAILED`，见 [§10](#10-生命周期与资源释放)。
 
-仓库根目录：`pnpm --filter @migaia/store-middleware fmt` → `lint` → `typecheck` → `typecheck:test` → `test` → `build`。`cleanup` 问题检查 `AggregateError.errors`；事件重复检查是否同时使用 trace binding 与 `runAction()`。
+```bash
+pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
+```

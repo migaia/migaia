@@ -2,8 +2,13 @@
   "name": "@migaia/wasm",
   "version": "0.1.0",
   "private": true,
+  "files": [
+    "src",
+    "rust",
+    "README.md",
+    "USEGUIDE.md"
+  ],
   "type": "module",
-  "files": ["src", "rust", "README.md", "USEGUIDE.md"],
   "exports": {
     ".": {
       "types": "./src/wasm_provider.d.ts",

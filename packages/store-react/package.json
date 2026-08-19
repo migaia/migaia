@@ -4,14 +4,21 @@
   "private": true,
   "description": "React Provider and hooks for the Store runtime.",
   "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "USEGUIDE.md"
+  ],
   "type": "module",
-  "files": ["dist", "README.md", "USEGUIDE.md"],
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
-  "sideEffects": false,
   "scripts": {
     "fmt": "oxfmt src test e2e",
     "build": "tsc -p tsconfig.build.json",
@@ -22,7 +29,6 @@
     "test": "vitest run test",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts"
   },
-  "peerDependencies": { "react": ">=18", "react-dom": ">=18" },
   "dependencies": {
     "@migaia/lifecycle": "workspace:^",
     "@migaia/reactive": "workspace:^",
@@ -40,5 +46,9 @@
     "typescript": "~6.0.2",
     "vite": "8.1.1",
     "vitest": "4.1.10"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
   }
 }

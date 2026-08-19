@@ -10,14 +10,14 @@
 
 ## 2. 适合什么场景
 
-| 场景 | 说明 |
-| --- | --- |
-| 数据依赖响应式输入 | 用户详情随 `userId` Signal 变化、搜索结果随筛选条件变化——依赖变了自动重新请求，不用手写 effect 去 diff |
-| 需要 Suspense 兼容的读取方式 | `read()` 成功返回数据、pending 抛 Promise、失败抛错误，直接对接 React Suspense/Error Boundary |
-| 需要缓存过期与后台刷新 | `ttl` 控制数据新鲜时长，`staleWhileRevalidate` 让刷新时继续展示旧数据 |
-| 需要失败重试 | `retry`/`retryDelay` 支持固定次数或自定义判断/退避策略 |
-| 需要 SSR/持久化快照恢复 | `dehydrate()`/`hydrate()`/`initialSnapshot` 把成功值序列化后原样恢复，不用重新请求一次 |
-| 需要在 Worker/RPC 场景复用同一套状态机 | `@migaia/store-worker` 的 `workerComputed()` 就是在 `Resource` 上包了一层 Worker RPC 调用 |
+| 场景                                   | 说明                                                                                                   |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| 数据依赖响应式输入                     | 用户详情随 `userId` Signal 变化、搜索结果随筛选条件变化——依赖变了自动重新请求，不用手写 effect 去 diff |
+| 需要 Suspense 兼容的读取方式           | `read()` 成功返回数据、pending 抛 Promise、失败抛错误，直接对接 React Suspense/Error Boundary          |
+| 需要缓存过期与后台刷新                 | `ttl` 控制数据新鲜时长，`staleWhileRevalidate` 让刷新时继续展示旧数据                                  |
+| 需要失败重试                           | `retry`/`retryDelay` 支持固定次数或自定义判断/退避策略                                                 |
+| 需要 SSR/持久化快照恢复                | `dehydrate()`/`hydrate()`/`initialSnapshot` 把成功值序列化后原样恢复，不用重新请求一次                 |
+| 需要在 Worker/RPC 场景复用同一套状态机 | `@migaia/store-worker` 的 `workerComputed()` 就是在 `Resource` 上包了一层 Worker RPC 调用              |
 
 不适合的场景：如果异步数据完全不依赖任何响应式输入、只是一次性拉取且不需要取消/重试/缓存过期（比如页面初始化时拉一次静态配置），直接 `await` 一个 Promise 可能更简单，不需要引入状态机。
 
@@ -84,14 +84,14 @@ userId.value = 2; // fetcher 里对 userId.value 的同步读取已被登记为�
 
 ## 5. 核心概念一览
 
-| 概念 | 是什么 |
-| --- | --- |
-| **State（状态机）** | `idle` / `pending` / `success`(`data`, 可选 `refreshing`) / `error`(`error`) / `cancelled`(`error: DOMException`) 五态之一，`resource.state` 读取时会顺带触发过期检查 |
-| **Fetcher** | 构造时传入的 `({ signal }) => T \| PromiseLike<T>`；同步读取的响应式值成为依赖，`signal` 应转交给可取消的 I/O |
-| **依赖（deps）** | fetcher 在**首次 `await` 之前**同步读到的 Signal/Computed；依赖变化会合并触发一次新请求 |
-| **世代（generation）** | 每次请求的身份标记；只有当前世代的结果会写回状态，被取代的请求结果一律丢弃 |
-| **TTL / 过期** | 成功值的新鲜时长；过期后下一次读取会触发新请求（除非正在 pending） |
-| **Suspense 读取** | `read()`：成功返回值、pending 抛 Promise、失败抛错误；`peek()` 是它的非追踪版本 |
+| 概念                   | 是什么                                                                                                                                                                |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **State（状态机）**    | `idle` / `pending` / `success`(`data`, 可选 `refreshing`) / `error`(`error`) / `cancelled`(`error: DOMException`) 五态之一，`resource.state` 读取时会顺带触发过期检查 |
+| **Fetcher**            | 构造时传入的 `({ signal }) => T \| PromiseLike<T>`；同步读取的响应式值成为依赖，`signal` 应转交给可取消的 I/O                                                         |
+| **依赖（deps）**       | fetcher 在**首次 `await` 之前**同步读到的 Signal/Computed；依赖变化会合并触发一次新请求                                                                               |
+| **世代（generation）** | 每次请求的身份标记；只有当前世代的结果会写回状态，被取代的请求结果一律丢弃                                                                                            |
+| **TTL / 过期**         | 成功值的新鲜时长；过期后下一次读取会触发新请求（除非正在 pending）                                                                                                    |
+| **Suspense 读取**      | `read()`：成功返回值、pending 抛 Promise、失败抛错误；`peek()` 是它的非追踪版本                                                                                       |
 
 ## 6. 安装与公开入口
 

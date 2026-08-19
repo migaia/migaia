@@ -4,15 +4,25 @@
   "private": true,
   "description": "Worker adapters and worker-backed Resource/serialization integrations.",
   "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "USEGUIDE.md"
+  ],
   "type": "module",
-  "files": ["dist", "README.md", "USEGUIDE.md"],
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./serialize/*": { "types": "./dist/serialize/*.d.ts", "default": "./dist/serialize/*.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./serialize/*": {
+      "types": "./dist/serialize/*.d.ts",
+      "default": "./dist/serialize/*.js"
+    }
   },
-  "sideEffects": false,
   "scripts": {
     "fmt": "oxfmt src test e2e",
     "build": "tsc -p tsconfig.build.json",
@@ -27,8 +37,8 @@
     "@migaia/reactive": "workspace:^",
     "@migaia/resource": "workspace:^",
     "@migaia/serialize": "workspace:^",
-    "@migaia/web-rpc": "workspace:^",
-    "@migaia/utils": "workspace:^"
+    "@migaia/utils": "workspace:^",
+    "@migaia/web-rpc": "workspace:^"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

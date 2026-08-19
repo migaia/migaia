@@ -2,6 +2,41 @@ import { EventSubscriberState } from './state-constants.js';
 
 export type IUnsubscribe = () => void;
 
+export type IEventChannelSubscription<T, R = void> = IUnsubscribe & {
+  readonly unsubscribe: IEventChannelSubscription<T, R>;
+  readonly subscribe: (
+    listener: IEventListener<T, R>,
+    options?: { readonly taskId?: string }
+  ) => IEventChannelSubscription<T, R>;
+};
+
+export type IEventHubSubscription<C extends IEventMap, UsedKeys = never> = IUnsubscribe & {
+  readonly unsubscribe: IEventHubSubscription<C, UsedKeys>;
+  readonly subscribe: <K extends IEventHubAvailableKey<C, UsedKeys>>(
+    key: K,
+    listener: IEventListener<C[K]>
+  ) => IEventHubSubscription<C, IEventHubNextUsedKey<C, UsedKeys, K>>;
+};
+
+type IIsUnion<T, U = T> = T extends unknown ? ([U] extends [T] ? false : true) : never;
+type IEventHubNextUsedKey<C extends IEventMap, UsedKeys, K> = string extends keyof C
+  ? UsedKeys
+  : number extends keyof C
+    ? UsedKeys
+    : symbol extends keyof C
+      ? UsedKeys
+      : IIsUnion<K> extends true
+        ? UsedKeys
+        : UsedKeys | K;
+
+export type IEventHubAvailableKey<C extends IEventMap, UsedKeys> = string extends keyof C
+  ? keyof C
+  : number extends keyof C
+    ? keyof C
+    : symbol extends keyof C
+      ? keyof C
+      : Exclude<keyof C, UsedKeys & keyof C>;
+
 export type IEventSubscriberAbortType = typeof EventSubscriberState.abort;
 export type IEventSubscriberResultStatus =
   | typeof EventSubscriberState.fulfilled
@@ -61,7 +96,10 @@ export type IEventChannelLike<T, R = void> = {
 };
 
 export type IEventChannel<T, R = void> = {
-  subscribe(listener: IEventListener<T, R>, options?: { readonly taskId?: string }): IUnsubscribe;
+  subscribe(
+    listener: IEventListener<T, R>,
+    options?: { readonly taskId?: string }
+  ): IEventChannelSubscription<T, R>;
   subscribeOnce(
     listener: IEventListener<T, R>,
     options?: { readonly taskId?: string }
@@ -104,7 +142,10 @@ export type IEventHubOptions<C extends IEventMap> = {
 };
 
 export type IEventHub<C extends IEventMap> = {
-  subscribe<K extends keyof C>(key: K, listener: IEventListener<C[K]>): IUnsubscribe;
+  subscribe<K extends keyof C>(
+    key: K,
+    listener: IEventListener<C[K]>
+  ): IEventHubSubscription<C, IEventHubNextUsedKey<C, never, K>>;
   publish<K extends keyof C>(key: K, value: C[K]): void;
   clear(key?: keyof C): void;
   size(key?: keyof C): number;

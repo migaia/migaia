@@ -203,7 +203,7 @@ describe('AF-T34 rule gate: no Function.prototype call/apply/bind; Reflect.apply
     return out;
   };
 
-  it('`.call(`/`.apply(`/`.bind(` are absent; `Reflect.apply(` lives only in the two documented boundary modules', () => {
+  it('`.call(`/`.apply(`/`.bind(` are absent; `Reflect.apply(` lives only in documented receiver boundaries', () => {
     const forbidden: string[] = [];
     const reflectFiles = new Set<string>();
     for (const rel of foundationSrc) {

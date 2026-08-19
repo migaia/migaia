@@ -343,6 +343,24 @@ describe('L-T50 DisposeTransaction: signal registration and cleanup failures', (
     expect((thrown as { errors?: readonly unknown[] }).errors).toContain(removalError);
   });
 
+  it('does not append a signal cleanup error to itself when it is the only primary', async () => {
+    const cleanupError = new Error('signal cleanup failed');
+    const signal = {
+      aborted: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(() => {
+        throw cleanupError;
+      })
+    };
+    const transaction = createDisposeTransaction(
+      { kind: 'plan' },
+      { errorPolicy: 'throw', signal }
+    );
+
+    await expect(transaction.run([])).rejects.toBe(cleanupError);
+    expect((cleanupError as { errors?: readonly unknown[] }).errors).toBeUndefined();
+  });
+
   it('keeps remove failure secondary to an item primary and still reaches pending/finalize', async () => {
     const itemError = new Error('item failed');
     const removalError = new Error('remove failed');

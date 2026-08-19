@@ -4,12 +4,13 @@
   "private": true,
   "description": "Runtime-neutral lifecycle primitives: scopes, generations, quiescence tracking and dispose transactions.",
   "license": "MIT",
-  "type": "module",
   "files": [
     "dist",
     "README.md",
     "USEGUIDE.md"
   ],
+  "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -18,7 +19,6 @@
       "default": "./dist/index.js"
     }
   },
-  "sideEffects": false,
   "scripts": {
     "fmt": "oxfmt src test",
     "build": "vite build && tsc -p tsconfig.json --emitDeclarationOnly",

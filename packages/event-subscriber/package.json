@@ -4,12 +4,16 @@
   "private": true,
   "description": "Runtime-neutral transient event subscription and fan-out primitives.",
   "license": "MIT",
-  "type": "module",
   "files": [
-    "dist",
+    "dist/*.js",
+    "dist/*.js.map",
+    "dist/*.d.ts",
+    "dist/*.d.ts.map",
     "README.md",
     "USEGUIDE.md"
   ],
+  "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -18,7 +22,6 @@
       "default": "./dist/index.js"
     }
   },
-  "sideEffects": false,
   "scripts": {
     "fmt": "oxfmt src test",
     "build": "vite build && tsc -p tsconfig.json --emitDeclarationOnly",

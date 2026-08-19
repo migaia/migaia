@@ -4,12 +4,13 @@
   "private": true,
   "description": "Store-neutral reactive runtime, signals, computed values, and effects.",
   "license": "MIT",
-  "type": "module",
   "files": [
     "dist",
     "README.md",
     "USEGUIDE.md"
   ],
+  "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -50,7 +51,6 @@
       "default": "./dist/reactive/*.js"
     }
   },
-  "sideEffects": false,
   "scripts": {
     "fmt": "oxfmt src test",
     "build": "tsc -p tsconfig.build.json",
