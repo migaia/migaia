@@ -4,17 +4,33 @@
   "private": true,
   "description": "Store snapshot persistence and storage adapter protocol.",
   "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "USEGUIDE.md"
+  ],
   "type": "module",
-  "files": ["dist", "README.md", "USEGUIDE.md"],
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./light": { "types": "./dist/light-index.d.ts", "default": "./dist/light-index.js" },
-    "./indexed": { "types": "./dist/indexed-index.d.ts", "default": "./dist/indexed-index.js" },
-    "./keyed": { "types": "./dist/keyed-index.d.ts", "default": "./dist/keyed-index.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./light": {
+      "types": "./dist/light-index.d.ts",
+      "default": "./dist/light-index.js"
+    },
+    "./indexed": {
+      "types": "./dist/indexed-index.d.ts",
+      "default": "./dist/indexed-index.js"
+    },
+    "./keyed": {
+      "types": "./dist/keyed-index.d.ts",
+      "default": "./dist/keyed-index.js"
+    }
   },
-  "sideEffects": false,
   "scripts": {
     "fmt": "oxfmt src test",
     "build": "tsc -p tsconfig.build.json",
@@ -28,21 +44,27 @@
     "@migaia/storage-web": "workspace:^",
     "@migaia/utils": "workspace:^"
   },
-  "peerDependencies": {
-    "@migaia/store-light": "workspace:^",
-    "@migaia/store-keyed": "workspace:^",
-    "@migaia/store-indexed": "workspace:^"
-  },
-  "peerDependenciesMeta": {
-    "@migaia/store-light": { "optional": true },
-    "@migaia/store-keyed": { "optional": true },
-    "@migaia/store-indexed": { "optional": true }
-  },
   "devDependencies": {
-    "@migaia/store-light": "workspace:^",
-    "@migaia/store-keyed": "workspace:^",
     "@migaia/store-indexed": "workspace:^",
+    "@migaia/store-keyed": "workspace:^",
+    "@migaia/store-light": "workspace:^",
     "typescript": "~6.0.2",
     "vitest": "4.1.10"
+  },
+  "peerDependencies": {
+    "@migaia/store-indexed": "workspace:^",
+    "@migaia/store-keyed": "workspace:^",
+    "@migaia/store-light": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@migaia/store-light": {
+      "optional": true
+    },
+    "@migaia/store-keyed": {
+      "optional": true
+    },
+    "@migaia/store-indexed": {
+      "optional": true
+    }
   }
 }

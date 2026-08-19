@@ -4,15 +4,25 @@
   "private": true,
   "description": "Store mutation policy and middleware pipeline.",
   "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "USEGUIDE.md"
+  ],
   "type": "module",
-  "files": ["dist", "README.md", "USEGUIDE.md"],
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./tolerant-clone": { "types": "./dist/tolerant-clone.d.ts", "default": "./dist/tolerant-clone.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./tolerant-clone": {
+      "types": "./dist/tolerant-clone.d.ts",
+      "default": "./dist/tolerant-clone.js"
+    }
   },
-  "sideEffects": false,
   "scripts": {
     "fmt": "oxfmt src test",
     "build": "tsc -p tsconfig.build.json",
@@ -21,6 +31,14 @@
     "lint": "oxlint src test",
     "test": "vitest run test"
   },
-  "dependencies": { "@migaia/plugin-host": "workspace:^", "@migaia/reactive": "workspace:^", "@migaia/store-light": "workspace:^", "@migaia/utils": "workspace:^" },
-  "devDependencies": { "typescript": "~6.0.2", "vitest": "4.1.10" }
+  "dependencies": {
+    "@migaia/plugin-host": "workspace:^",
+    "@migaia/reactive": "workspace:^",
+    "@migaia/store-light": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vitest": "4.1.10"
+  }
 }

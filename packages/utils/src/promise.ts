@@ -710,8 +710,10 @@ export function createConcurrencyLimiter(options: {
   const signalIdle = (): void => {
     if (active !== 0) return;
     for (let index = queueHead; index < queue.length; index++) if (!queue[index].cancelled) return;
-    idleResolve?.();
+    const resolve = idleResolve;
     idleResolve = undefined;
+    idlePromise = undefined;
+    resolve?.();
   };
   const drain = (): void => {
     while (!closed && active < concurrency && queueHead < queue.length) {
@@ -819,11 +821,8 @@ export function createConcurrencyLimiter(options: {
     close,
     dispose: (reason) => {
       if (!disposePromise) {
-        disposePromise = new Promise<void>((resolve) => {
-          idleResolve = resolve;
-          close(reason);
-          if (active === 0) resolve();
-        });
+        close(reason);
+        disposePromise = limiter.whenIdle();
       }
       return disposePromise;
     }

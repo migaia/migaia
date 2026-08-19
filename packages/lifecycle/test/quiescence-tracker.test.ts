@@ -151,4 +151,21 @@ describe('seal()', () => {
     tracker.seal('never-used');
     await expect(tracker.whenZero('never-used')).resolves.toBeUndefined();
   });
+
+  it('forgets settled sealed string keys without reopening them', () => {
+    const tracker = createStringQuiescenceTracker();
+    tracker.seal('completed');
+    expect(tracker.forget('completed')).toBe(true);
+    expect(tracker.isSealed('completed')).toBe(false);
+    expect(() => tracker.retain('completed')).not.toThrow();
+  });
+
+  it('does not forget an active key', () => {
+    const tracker = createStringQuiescenceTracker();
+    const release = tracker.retain('active');
+    tracker.seal('active');
+    expect(tracker.forget('active')).toBe(false);
+    release();
+    expect(tracker.forget('active')).toBe(true);
+  });
 });

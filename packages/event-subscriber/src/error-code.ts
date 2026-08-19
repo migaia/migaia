@@ -35,7 +35,9 @@ export const EventSubscriberErrorCode = {
    * A fire-and-forget listener failure reached terminal diagnostics after report handling failed or
    * was absent.
    */
-  unhandledListenerFailure: 'UNHANDLED_LISTENER_FAILURE'
+  unhandledListenerFailure: 'UNHANDLED_LISTENER_FAILURE',
+  /** A callable subscription chain was closed; caller must retain a live handle. */
+  subscriptionClosed: 'SUBSCRIPTION_CLOSED'
 } as const;
 
 export type IEventSubscriberErrorCode =

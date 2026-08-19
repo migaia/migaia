@@ -17,6 +17,7 @@ import type {
   IFilteredEventChannel,
   IUnsubscribe
 } from './types.js';
+import { createSubscriptionHandle } from './internal/subscription.js';
 import { EventSubscriberState } from './state-constants.js';
 import {
   createSystemTerminalRuntime,
@@ -356,6 +357,38 @@ export const createCanonicalChannel = <T, R = void>(
   let first: IRegistrationOwner<T, R> | undefined;
   let last: IRegistrationOwner<T, R> | undefined;
   let count = 0;
+  const registerRaw = (
+    listener: IEventListener<T, R>,
+    taskId: string | undefined
+  ): (() => void) => {
+    let released = false;
+    const owner = {} as IRegistrationOwner<T, R>;
+    const release = (): void => {
+      if (released || !owner.active) return;
+      released = true;
+      owner.active = false;
+      if (owner.previous) owner.previous.next = owner.next;
+      else first = owner.next;
+      if (owner.next) owner.next.previous = owner.previous;
+      else last = owner.previous;
+      owner.previous = undefined;
+      owner.next = undefined;
+      count -= 1;
+    };
+    owner.listener = listener;
+    owner.active = true;
+    owner.aborted = false;
+    owner.abortReason = undefined;
+    owner.currentTaskId = taskId;
+    owner.previous = last;
+    owner.next = undefined;
+    owner.release = release;
+    if (last) last.next = owner;
+    else first = owner;
+    last = owner;
+    count += 1;
+    return release;
+  };
   const channel = {
     subscribe(listener, listenerOptions) {
       if (typeof listener !== 'function') {
@@ -365,33 +398,17 @@ export const createCanonicalChannel = <T, R = void>(
         );
       }
       const taskId = readTaskOption(listenerOptions);
-      let released = false;
-      const owner = {} as IRegistrationOwner<T, R>;
-      const release = (): void => {
-        if (released || !owner.active) return;
-        released = true;
-        owner.active = false;
-        if (owner.previous) owner.previous.next = owner.next;
-        else first = owner.next;
-        if (owner.next) owner.next.previous = owner.previous;
-        else last = owner.previous;
-        owner.previous = undefined;
-        owner.next = undefined;
-        count -= 1;
-      };
-      owner.listener = listener;
-      owner.active = true;
-      owner.aborted = false;
-      owner.abortReason = undefined;
-      owner.currentTaskId = taskId;
-      owner.previous = last;
-      owner.next = undefined;
-      owner.release = release;
-      if (last) last.next = owner;
-      else first = owner;
-      last = owner;
-      count += 1;
-      return release;
+      const release = registerRaw(listener, taskId);
+      return createSubscriptionHandle(release, (nextListener, nextOptions) => {
+        if (typeof nextListener !== 'function') {
+          throw createEventTypeError(
+            EventSubscriberErrorCode.invalidListener,
+            eventErrorText(EventSubscriberErrorCode.invalidListener)
+          );
+        }
+        const nextTaskId = readTaskOption(nextOptions);
+        return registerRaw(nextListener, nextTaskId);
+      });
     },
     subscribeOnce(listener, listenerOptions) {
       return subscribeOnce(channel, listener, listenerOptions);
@@ -428,7 +445,10 @@ export const createCanonicalChannel = <T, R = void>(
     filterTaskId(taskId) {
       const validated = validateTaskId(taskId, false) as string;
       const filtered = {} as IFilteredEventChannel<T, R>;
-      filteredCapabilities.set(filtered as object, { channel, taskId: validated });
+      filteredCapabilities.set(filtered as object, {
+        channel: channel as ICanonicalEventChannel<unknown, unknown>,
+        taskId: validated
+      });
       return filtered;
     },
     clear() {

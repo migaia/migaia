@@ -10,12 +10,12 @@
 
 ## 2. 适合什么场景
 
-| 场景 | 说明 |
-| --- | --- |
-| 自己搭建状态管理/Store 库 | 需要精确控制批处理、调度时机、依赖追踪细节，而不是套用某个框架自带的响应式实现 |
-| 同一进程需要多个互不干扰的响应式图 | 每个 `Runtime` 完全隔离：SSR 每请求一个、单测每个用例一个、多个 Worker 各一个，互不污染 |
-| 需要给响应式变化接可观测性 | `subscribeTrace` 提供只读事件流（节点创建、依赖连接、副作用执行），可以做 devtools 而不侵入核心逻辑 |
-| 需要把响应式图接到某个 UI 框架 | 三段式 `capture`/`commit` 绑定原语（见 USEGUIDE）支持并发渲染安全的适配层实现 |
+| 场景                               | 说明                                                                                                |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 自己搭建状态管理/Store 库          | 需要精确控制批处理、调度时机、依赖追踪细节，而不是套用某个框架自带的响应式实现                      |
+| 同一进程需要多个互不干扰的响应式图 | 每个 `Runtime` 完全隔离：SSR 每请求一个、单测每个用例一个、多个 Worker 各一个，互不污染             |
+| 需要给响应式变化接可观测性         | `subscribeTrace` 提供只读事件流（节点创建、依赖连接、副作用执行），可以做 devtools 而不侵入核心逻辑 |
+| 需要把响应式图接到某个 UI 框架     | 三段式 `capture`/`commit` 绑定原语（见 USEGUIDE）支持并发渲染安全的适配层实现                       |
 
 不适合的场景：只是想要组件内部的局部状态（等价于 `useState`），不需要跨组件共享的响应式图；需要开箱即用的可观察集合、异步资源状态机——这些是 monorepo 里其它包（如集合、resource 包）在本包之上构建的**上层能力**，`@migaia/reactive` 本身不提供。
 
@@ -34,12 +34,12 @@
 pnpm add @migaia/reactive
 ```
 
-| 入口 | 内容与边界 |
-| --- | --- |
-| `@migaia/reactive` | 日常 API：`Signal`、`Computed`、`Effect`、`createRuntime`、`defaultRuntime` 和公开类型/错误码。 |
-| `@migaia/reactive/runtime` | Runtime、调度和 observer binding，供框架适配层使用。 |
-| `@migaia/reactive/ownership`、`/source` | 所有权断言与受控 source，供上层基础库使用。 |
-| `@migaia/reactive/internals`、`/node-internals`、`/node-factories`、`/copy-check`、`/reactive/*` | 内核扩展面；只在实现新的 reactive 基础设施时使用，不是一般应用 API。 |
+| 入口                                                                                             | 内容与边界                                                                                      |
+| ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `@migaia/reactive`                                                                               | 日常 API：`Signal`、`Computed`、`Effect`、`createRuntime`、`defaultRuntime` 和公开类型/错误码。 |
+| `@migaia/reactive/runtime`                                                                       | Runtime、调度和 observer binding，供框架适配层使用。                                            |
+| `@migaia/reactive/ownership`、`/source`                                                          | 所有权断言与受控 source，供上层基础库使用。                                                     |
+| `@migaia/reactive/internals`、`/node-internals`、`/node-factories`、`/copy-check`、`/reactive/*` | 内核扩展面；只在实现新的 reactive 基础设施时使用，不是一般应用 API。                            |
 
 ## 5. 五分钟上手
 
@@ -68,24 +68,24 @@ count.dispose();
 
 ## 6. 核心概念速览
 
-| 概念 | 一句话 |
-| --- | --- |
-| `Runtime` | 一套独立的依赖图 + 版本时钟 + 调度器；节点必须属于同一个 `Runtime` 才能互相依赖 |
-| `Signal` | 可写的响应式原子值 |
-| `Computed` | 惰性求值、带缓存的派生值 |
-| `Effect` | 读取依赖并执行副作用；依赖变化后被调度重跑；构造时立即跑一次 |
-| `batch()` / `flush()` | 把多次写入合并成一次副作用刷新 / 手动立即触发一次冲刷 |
-| trace | 只读诊断事件流：节点创建、依赖连接/断开、副作用执行、显式 action，不影响业务状态 |
+| 概念                  | 一句话                                                                           |
+| --------------------- | -------------------------------------------------------------------------------- |
+| `Runtime`             | 一套独立的依赖图 + 版本时钟 + 调度器；节点必须属于同一个 `Runtime` 才能互相依赖  |
+| `Signal`              | 可写的响应式原子值                                                               |
+| `Computed`            | 惰性求值、带缓存的派生值                                                         |
+| `Effect`              | 读取依赖并执行副作用；依赖变化后被调度重跑；构造时立即跑一次                     |
+| `batch()` / `flush()` | 把多次写入合并成一次副作用刷新 / 手动立即触发一次冲刷                            |
+| trace                 | 只读诊断事件流：节点创建、依赖连接/断开、副作用执行、显式 action，不影响业务状态 |
 
 ## 7. 包内入口一览
 
-| 入口 | 提供什么 | 适用人群 |
-| --- | --- | --- |
-| `@migaia/reactive`（主入口） | `Signal`/`Computed`/`Effect`/`createRuntime`/`defaultRuntime` 及全部公共类型 | 日常使用，绝大多数场景只需要这一个入口 |
-| `@migaia/reactive/runtime` | `createObserverBinding` 等面向框架适配层的并发安全绑定原语 | 自己实现 React/Vue/Solid 一类响应式绑定的作者 |
-| `@migaia/reactive/ownership` | 「某节点属于哪个 `Runtime`」的登记与断言 | 在本包之上构建 Store/集合/资源类库的作者 |
-| `@migaia/reactive/internals` / `@migaia/reactive/node-internals` / `@migaia/reactive/node-factories` | 内核内部面（clock/tracker/scheduler、可变依赖边、具体节点类工厂） | 同上，仅供需要手工接入依赖图的节点实现层使用 |
-| `@migaia/reactive/source` | `createFieldSource()`——为扩展层创建一条受控 Source | 同上 |
+| 入口                                                                                                 | 提供什么                                                                     | 适用人群                                      |
+| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------- |
+| `@migaia/reactive`（主入口）                                                                         | `Signal`/`Computed`/`Effect`/`createRuntime`/`defaultRuntime` 及全部公共类型 | 日常使用，绝大多数场景只需要这一个入口        |
+| `@migaia/reactive/runtime`                                                                           | `createObserverBinding` 等面向框架适配层的并发安全绑定原语                   | 自己实现 React/Vue/Solid 一类响应式绑定的作者 |
+| `@migaia/reactive/ownership`                                                                         | 「某节点属于哪个 `Runtime`」的登记与断言                                     | 在本包之上构建 Store/集合/资源类库的作者      |
+| `@migaia/reactive/internals` / `@migaia/reactive/node-internals` / `@migaia/reactive/node-factories` | 内核内部面（clock/tracker/scheduler、可变依赖边、具体节点类工厂）            | 同上，仅供需要手工接入依赖图的节点实现层使用  |
+| `@migaia/reactive/source`                                                                            | `createFieldSource()`——为扩展层创建一条受控 Source                           | 同上                                          |
 
 > 通用的「一组资源集中释放」的所有权容器（原 `Scope`/`createScope()`）已随 `docs/lifecycle/migration.sdd.md` §4.1 整体移出本包，改用 `@migaia/lifecycle` 的 `LifecycleScope`/`SyncLifecycleScope`。
 

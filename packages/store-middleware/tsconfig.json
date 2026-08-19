@@ -3,22 +3,11 @@
   "compilerOptions": {
     "noEmit": true,
     "paths": {
-      "@migaia/plugin-host": [
-        "../plugin-host/dist/index.d.ts"
-      ],
-      "@migaia/store-light": [
-        "../store-light/dist/index.d.ts"
-      ]
+      "@migaia/plugin-host": ["../plugin-host/dist/index.d.ts"],
+      "@migaia/store-light": ["../store-light/dist/index.d.ts"]
     },
-    "types": [
-      "node"
-    ],
-    "lib": [
-      "ES2024"
-    ]
+    "types": ["node"],
+    "lib": ["ES2024"]
   },
-  "include": [
-    "src",
-    "test"
-  ]
+  "include": ["src", "test"]
 }

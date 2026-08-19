@@ -10,14 +10,14 @@
 
 ## 2. 适合什么场景
 
-| 场景 | 说明 |
-| --- | --- |
-| 需要跨运行时统一日志方案 | Node、Bun、Deno、浏览器、Worker、小程序、Electron 主/渲染进程都能跑同一套 API |
-| 需要按需组合日志能力 | 开发环境要彩色控制台，生产环境要批量 HTTP 上报，本地脚本什么插件都不装——同一个核心，不同插件组合 |
-| 需要保证进程退出前日志不丢 | `process()` 插件在收到退出信号/未捕获异常时自动 flush 并优雅退出 |
-| 需要把日志转发给多个下游 | `extends()` 把一个 logger 的输出完整转发到另一个 logger 的 pipeline/sink，环路会被拒绝 |
-| 需要流式展示 AI 生成内容 | `reasoning()` 插件提供逐 token 的 thinking/response 输出原语 |
-| 需要自己扩展日志能力 | 插件系统是公开的一等公民，不是"内部实现细节"，自定义插件和内置插件享受同等待遇 |
+| 场景                       | 说明                                                                                             |
+| -------------------------- | ------------------------------------------------------------------------------------------------ |
+| 需要跨运行时统一日志方案   | Node、Bun、Deno、浏览器、Worker、小程序、Electron 主/渲染进程都能跑同一套 API                    |
+| 需要按需组合日志能力       | 开发环境要彩色控制台，生产环境要批量 HTTP 上报，本地脚本什么插件都不装——同一个核心，不同插件组合 |
+| 需要保证进程退出前日志不丢 | `process()` 插件在收到退出信号/未捕获异常时自动 flush 并优雅退出                                 |
+| 需要把日志转发给多个下游   | `extends()` 把一个 logger 的输出完整转发到另一个 logger 的 pipeline/sink，环路会被拒绝           |
+| 需要流式展示 AI 生成内容   | `reasoning()` 插件提供逐 token 的 thinking/response 输出原语                                     |
+| 需要自己扩展日志能力       | 插件系统是公开的一等公民，不是"内部实现细节"，自定义插件和内置插件享受同等待遇                   |
 
 不适合的场景：如果你只是想要一个"能设置级别的 `console.log`"，`level()` + 原生 `console` 可能就够了，不需要理解插件系统。
 
@@ -68,27 +68,27 @@ log.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, 
 
 ## 5. 核心概念一览
 
-| 概念 | 是什么 |
-| --- | --- |
-| **Entry（日志条目）** | 一次 `log()`/`dispatchRaw()` 调用产生的结构化对象：`id`、`tag`、`time`、`message`、`args`、`meta`、`context`、`error`、`data` |
-| **Pipeline（处理管线）** | entry 在到达 sink 之前经过的一系列转换阶段，比如级别过滤就是一个 pipeline stage |
-| **Sink（输出端）** | 真正把 entry "落地"的地方——控制台、HTTP、文件等，一个 logger 可以有多个 sink |
-| **Hook（钩子）** | `before`/`after`/`before:<tag>`/`after:<tag>` 等命名事件，用于在 entry 生命周期的特定节点插入逻辑 |
-| **Flush** | 等待当前已知的全部异步输出工作完成 |
-| **Shutdown** | 跑收尾钩子 → flush → 卸载全部插件的完整关闭流程 |
-| **Extends（转发）** | 把当前 logger 接入另一个 logger 完整的 pipeline/sink，环路会被静态和运行时双重检测拒绝 |
+| 概念                     | 是什么                                                                                                                        |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Entry（日志条目）**    | 一次 `log()`/`dispatchRaw()` 调用产生的结构化对象：`id`、`tag`、`time`、`message`、`args`、`meta`、`context`、`error`、`data` |
+| **Pipeline（处理管线）** | entry 在到达 sink 之前经过的一系列转换阶段，比如级别过滤就是一个 pipeline stage                                               |
+| **Sink（输出端）**       | 真正把 entry "落地"的地方——控制台、HTTP、文件等，一个 logger 可以有多个 sink                                                  |
+| **Hook（钩子）**         | `before`/`after`/`before:<tag>`/`after:<tag>` 等命名事件，用于在 entry 生命周期的特定节点插入逻辑                             |
+| **Flush**                | 等待当前已知的全部异步输出工作完成                                                                                            |
+| **Shutdown**             | 跑收尾钩子 → flush → 卸载全部插件的完整关闭流程                                                                               |
+| **Extends（转发）**      | 把当前 logger 接入另一个 logger 完整的 pipeline/sink，环路会被静态和运行时双重检测拒绝                                        |
 
 ## 6. 内置插件一览
 
-| 插件/签名 | 参数类型 | 同步/异步 | 作用 |
-| --- | --- | --- | --- |
-| `level(config?)` | `config?: ILevelPluginConfig` | 同步 | 添加 `debug/info/warn/error/fatal` 方法与级别/过滤器控制 |
-| `color(config?)` | `config?: IColorPluginConfig` | 同步 | 控制台输出，支持 pretty/JSON 格式和 ANSI 颜色 |
-| `batch(config?)` | `config?: IBatchPluginConfig` | 同步 | 提供批处理调度能力（被 `http()` 复用，也可单独用） |
-| `http(config)` | `config: IHttpPluginConfig`（`url` 必填） | 同步 | 把 entry 批量 POST 到 HTTP endpoint，内置重试/超时/429 退避 |
-| `process(config?)` | `config?: IProcessPluginConfig` | 同步 | Node/Bun 风格的进程信号与优雅退出适配 |
-| `reasoning(config?)` | `config?: IReasoningPluginConfig` | 同步 | 流式 thinking/response 输出，适合展示 AI 生成过程 |
-| `uuid(config?)` | `config?: IUuidPluginConfig` | 同步 | 给每条 entry 附加唯一 id |
+| 插件/签名            | 参数类型                                  | 同步/异步 | 作用                                                        |
+| -------------------- | ----------------------------------------- | --------- | ----------------------------------------------------------- |
+| `level(config?)`     | `config?: ILevelPluginConfig`             | 同步      | 添加 `debug/info/warn/error/fatal` 方法与级别/过滤器控制    |
+| `color(config?)`     | `config?: IColorPluginConfig`             | 同步      | 控制台输出，支持 pretty/JSON 格式和 ANSI 颜色               |
+| `batch(config?)`     | `config?: IBatchPluginConfig`             | 同步      | 提供批处理调度能力（被 `http()` 复用，也可单独用）          |
+| `http(config)`       | `config: IHttpPluginConfig`（`url` 必填） | 同步      | 把 entry 批量 POST 到 HTTP endpoint，内置重试/超时/429 退避 |
+| `process(config?)`   | `config?: IProcessPluginConfig`           | 同步      | Node/Bun 风格的进程信号与优雅退出适配                       |
+| `reasoning(config?)` | `config?: IReasoningPluginConfig`         | 同步      | 流式 thinking/response 输出，适合展示 AI 生成过程           |
+| `uuid(config?)`      | `config?: IUuidPluginConfig`              | 同步      | 给每条 entry 附加唯一 id                                    |
 
 ## 7. 安装与公开入口
 
@@ -96,9 +96,9 @@ log.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, 
 pnpm add @migaia/logger
 ```
 
-| 入口 | 内容 |
-| --- | --- |
-| `@migaia/logger` | `Logger`、运行时 manager、状态/错误码、日志与插件类型。 |
+| 入口                     | 内容                                                                             |
+| ------------------------ | -------------------------------------------------------------------------------- |
+| `@migaia/logger`         | `Logger`、运行时 manager、状态/错误码、日志与插件类型。                          |
 | `@migaia/logger/plugins` | `level`、`color`、`batch`、`http`、`process`、`reasoning`、`uuid` 及其配置类型。 |
 
 ## 8. 生命周期、错误与边界

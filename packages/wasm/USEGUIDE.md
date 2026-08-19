@@ -19,8 +19,17 @@
 ## 1. 导入与初始化
 
 ```ts
-import init, { initSync, alloc_bytes, ptr_of, byte_len_of, dealloc_bytes,
-  json_to_msgpack, msgpack_to_json, last_error, last_len } from '@migaia/wasm';
+import init, {
+  initSync,
+  alloc_bytes,
+  ptr_of,
+  byte_len_of,
+  dealloc_bytes,
+  json_to_msgpack,
+  msgpack_to_json,
+  last_error,
+  last_len
+} from '@migaia/wasm';
 ```
 
 包的公开入口是 `src/wasm_provider.js`（类型来自同目录的 `src/wasm_provider.d.ts`），由 Rust 侧的 `wasm-pack build --target web` 编译产出，本身是标准 ES module，直接从 `@migaia/wasm` 导入即可，不需要额外的 wasm 加载插件。
@@ -31,7 +40,7 @@ import init, { initSync, alloc_bytes, ptr_of, byte_len_of, dealloc_bytes,
 
 ```ts
 const wasm = await init();
-wasm.memory;      // WebAssembly.Memory，线性内存
+wasm.memory; // WebAssembly.Memory，线性内存
 wasm.alloc_bytes(8); // 也可以直接从这个对象上调用，效果和具名导入一致
 ```
 
@@ -77,18 +86,18 @@ struct Arena {
 
 ## 3. API 完整参考
 
-| 函数 | 参数 | 返回值 | 同步/异步 | 副作用 |
-| --- | --- | --- | --- | --- |
-| `alloc_bytes(byte_len: number)` | `byte_len`：需要的最小字节数 | `number`——新分配的 id，或 `0`（id 空间耗尽） | 同步 | 在 arena 里新增一条 8 字节对齐、清零的分配 |
-| `ptr_of(id: number)` | `id`：分配 id | `number`——wasm 线性内存里的字节偏移，死 id 为 `0` | 同步 | 无（只读） |
-| `byte_len_of(id: number)` | `id`：分配 id | `number`——按 8 取整后的容量字节数，死 id 为 `0` | 同步 | 无（只读） |
-| `dealloc_bytes(id: number)` | `id`：分配 id | `boolean`——该 id 之前是否存在（真正释放了返回 `true`） | 同步 | 从 arena 移除该分配；对死 id 调用是安全的 no-op |
-| `json_to_msgpack(id: number, len: number)` | `id`：输入分配 id；`len`：要读取的字节数（≤ 该 id 的容量） | `number`——新分配的 id（转码结果），或 `0`（失败） | 同步 | 成功时新增一条分配存放输出，并更新 `last_len`/清空 `last_error`；失败时更新 `last_error`、`last_len` 归零。**不释放输入 id** |
-| `msgpack_to_json(id: number, len: number)` | 同上，方向相反 | 同上 | 同步 | 同上 |
-| `last_error()` | 无 | `string`——上一次转码失败的原因，成功后为空串 | 同步 | 无（只读快照） |
-| `last_len()` | 无 | `number`——上一次转码成功产出的精确字节数 | 同步 | 无（只读快照） |
-| `init(module_or_path?)`（默认导出） | 见[§1](#1-导入与初始化) | `Promise<InitOutput>`，含 `memory` 及全部函数 | 异步 | 首次调用时实例化 wasm 模块 |
-| `initSync(module)` | 见[§1](#1-导入与初始化) | `InitOutput` | 同步 | 同上，同步版本 |
+| 函数                                       | 参数                                                       | 返回值                                                 | 同步/异步 | 副作用                                                                                                                       |
+| ------------------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------ | --------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `alloc_bytes(byte_len: number)`            | `byte_len`：需要的最小字节数                               | `number`——新分配的 id，或 `0`（id 空间耗尽）           | 同步      | 在 arena 里新增一条 8 字节对齐、清零的分配                                                                                   |
+| `ptr_of(id: number)`                       | `id`：分配 id                                              | `number`——wasm 线性内存里的字节偏移，死 id 为 `0`      | 同步      | 无（只读）                                                                                                                   |
+| `byte_len_of(id: number)`                  | `id`：分配 id                                              | `number`——按 8 取整后的容量字节数，死 id 为 `0`        | 同步      | 无（只读）                                                                                                                   |
+| `dealloc_bytes(id: number)`                | `id`：分配 id                                              | `boolean`——该 id 之前是否存在（真正释放了返回 `true`） | 同步      | 从 arena 移除该分配；对死 id 调用是安全的 no-op                                                                              |
+| `json_to_msgpack(id: number, len: number)` | `id`：输入分配 id；`len`：要读取的字节数（≤ 该 id 的容量） | `number`——新分配的 id（转码结果），或 `0`（失败）      | 同步      | 成功时新增一条分配存放输出，并更新 `last_len`/清空 `last_error`；失败时更新 `last_error`、`last_len` 归零。**不释放输入 id** |
+| `msgpack_to_json(id: number, len: number)` | 同上，方向相反                                             | 同上                                                   | 同步      | 同上                                                                                                                         |
+| `last_error()`                             | 无                                                         | `string`——上一次转码失败的原因，成功后为空串           | 同步      | 无（只读快照）                                                                                                               |
+| `last_len()`                               | 无                                                         | `number`——上一次转码成功产出的精确字节数               | 同步      | 无（只读快照）                                                                                                               |
+| `init(module_or_path?)`（默认导出）        | 见[§1](#1-导入与初始化)                                    | `Promise<InitOutput>`，含 `memory` 及全部函数          | 异步      | 首次调用时实例化 wasm 模块                                                                                                   |
+| `initSync(module)`                         | 见[§1](#1-导入与初始化)                                    | `InitOutput`                                           | 同步      | 同上，同步版本                                                                                                               |
 
 `InitOutput` 除了 `memory: WebAssembly.Memory` 和上述业务函数外，还带有 `__wbindgen_externrefs`、`__wbindgen_free`、`__wbindgen_start` 等 wasm-bindgen 内部胶水导出——这些不是本包的公开契约，不应在业务代码里直接调用。
 
@@ -117,8 +126,12 @@ struct Arena {
 
 ```ts
 import init, {
-  alloc_bytes, ptr_of, dealloc_bytes,
-  json_to_msgpack, last_error, last_len
+  alloc_bytes,
+  ptr_of,
+  dealloc_bytes,
+  json_to_msgpack,
+  last_error,
+  last_len
 } from '@migaia/wasm';
 
 const { memory } = await init();
@@ -159,13 +172,13 @@ console.log('packed bytes:', packed.length, '< json bytes:', json.length);
 
 转码函数从不抛异常，失败一律返回 `0`，具体原因通过 `last_error()` 取。以下是源码里全部会产生的错误路径：
 
-| 触发条件 | `last_error()` 内容 | 返回值 |
-| --- | --- | --- |
-| `id` 未知或已释放，或 `len` 超过该 id 实际容量 | `"unknown allocation id or length past capacity"` | `0` |
-| 输出分配时 arena 已耗尽（`alloc_bytes` 内部再次返回 `0`） | `"arena exhausted"` | `0` |
-| 输入不是合法 JSON，`json_to_msgpack` 转码失败 | `"json to msgpack failed: {底层 serde 错误}"` | `0` |
-| 输入不是合法 MessagePack，`msgpack_to_json` 转码失败 | `"msgpack to json failed: {底层 serde 错误}"` | `0` |
-| 转码成功 | 空字符串 `""` | 非 `0` 的新 id |
+| 触发条件                                                  | `last_error()` 内容                               | 返回值         |
+| --------------------------------------------------------- | ------------------------------------------------- | -------------- |
+| `id` 未知或已释放，或 `len` 超过该 id 实际容量            | `"unknown allocation id or length past capacity"` | `0`            |
+| 输出分配时 arena 已耗尽（`alloc_bytes` 内部再次返回 `0`） | `"arena exhausted"`                               | `0`            |
+| 输入不是合法 JSON，`json_to_msgpack` 转码失败             | `"json to msgpack failed: {底层 serde 错误}"`     | `0`            |
+| 输入不是合法 MessagePack，`msgpack_to_json` 转码失败      | `"msgpack to json failed: {底层 serde 错误}"`     | `0`            |
+| 转码成功                                                  | 空字符串 `""`                                     | 非 `0` 的新 id |
 
 **空输入被当成畸形数据，不是"空文档"**——一段长度为 0 的字节流既不是合法 JSON 也不是合法 MessagePack，会走到上面对应的转码失败分支。
 

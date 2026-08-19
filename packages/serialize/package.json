@@ -4,12 +4,13 @@
   "private": true,
   "description": "Store-neutral chunked serialization and codec registry.",
   "license": "MIT",
-  "type": "module",
   "files": [
     "dist",
     "README.md",
     "USEGUIDE.md"
   ],
+  "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -30,7 +31,6 @@
       "default": "./dist/registry.js"
     }
   },
-  "sideEffects": false,
   "scripts": {
     "fmt": "oxfmt src test",
     "build": "tsc -p tsconfig.build.json",

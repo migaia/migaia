@@ -1,7 +1,7 @@
 {
   "fixture": "dist/index.js",
   "algorithm": "minified+gzip",
-  "bytes": 3928,
+  "bytes": 4955,
   "absoluteLimitBytes": 12288,
   "regressionLimit": "max(observed * 10%, 1024 bytes)",
   "recordedAfter": "B2 initial implementation"

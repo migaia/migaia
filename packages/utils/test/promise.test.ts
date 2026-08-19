@@ -411,6 +411,44 @@ describe('promise primitives', () => {
     expect(limiter.activeCount).toBe(0);
   });
 
+  it('starts a fresh whenIdle epoch after a previous idle settlement', async () => {
+    const limiter = createConcurrencyLimiter({ concurrency: 1 });
+    let release!: () => void;
+    const first = limiter.run(() => new Promise<void>((resolve) => (release = resolve)));
+    const firstIdle = limiter.whenIdle();
+    await Promise.resolve();
+    release();
+    await first;
+    await firstIdle;
+
+    let secondRelease!: () => void;
+    const second = limiter.run(() => new Promise<void>((resolve) => (secondRelease = resolve)));
+    const secondIdle = limiter.whenIdle();
+    let settled = false;
+    void secondIdle.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    secondRelease();
+    await second;
+    await secondIdle;
+    await limiter.dispose();
+  });
+
+  it('does not replace a pending whenIdle waiter when dispose is called', async () => {
+    const limiter = createConcurrencyLimiter({ concurrency: 1 });
+    let release!: () => void;
+    const running = limiter.run(() => new Promise<void>((resolve) => (release = resolve)));
+    const idle = limiter.whenIdle();
+    const disposed = limiter.dispose();
+    await Promise.resolve();
+    release();
+    await running;
+    await expect(idle).resolves.toBeUndefined();
+    await expect(disposed).resolves.toBeUndefined();
+  });
+
   it('snapshots limiter option getters exactly once at construction', async () => {
     let concurrencyReads = 0;
     let reportReads = 0;

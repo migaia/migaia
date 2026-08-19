@@ -10,12 +10,13 @@
 4. [`ManagedRpcHandler` 生命周期细节](#4-managedrpchandler-生命周期细节)
 5. [`workerComputed` 完整参考](#5-workercomputed-完整参考)
 6. [序列化 Worker 集成完整参考](#6-序列化-worker-集成完整参考)
-7. [字节转移语义（`IByteOwnership`）](#7-字节转移语义ibyteownership)
-8. [错误处理](#8-错误处理)
-9. [性能特征](#9-性能特征)
-10. [完整场景示例](#10-完整场景示例)
-11. [常见问题排查](#11-常见问题排查)
-12. [构建、格式化与测试](#12-构建格式化与测试)
+7. [常量与错误码完整参考](#7-常量与错误码完整参考)
+8. [字节转移语义（`IByteOwnership`）](#8-字节转移语义ibyteownership)
+9. [错误处理](#9-错误处理)
+10. [性能特征](#10-性能特征)
+11. [完整场景示例](#11-完整场景示例)
+12. [常见问题排查](#12-常见问题排查)
+13. [构建、格式化与测试](#13-构建格式化与测试)
 
 ---
 
@@ -29,9 +30,9 @@
 
 ### 1.2 两条独立的集成路径
 
-| 路径 | 主线程侧 | Worker 侧 | 用于 |
-| --- | --- | --- | --- |
-| 通用计算卸载 | `WorkerAdapter` | `createWorkerHandler` | 任意 `Input → Output` 的一次性计算，配合 `workerComputed` 接入 `Resource` |
+| 路径             | 主线程侧                                | Worker 侧                      | 用于                                                                                              |
+| ---------------- | --------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------- |
+| 通用计算卸载     | `WorkerAdapter`                         | `createWorkerHandler`          | 任意 `Input → Output` 的一次性计算，配合 `workerComputed` 接入 `Resource`                         |
 | 序列化编解码卸载 | `workerPlugin`（内部用 `workerParser`） | `createSerializeWorkerHandler` | 把一个 `ISerializeParser` 的 `encode`/`decode` 搬进 Worker，接入 `@migaia/serialize` 的插件注册表 |
 
 两条路径共享同一个 RPC 方法名约定：`send(targetId, 'call', payload)`。这不是巧合——两条路径底层都是"主线程发一个 `call` 请求，Worker 侧的单个 `provide('call', ...)` 处理它",只是 payload 的形状不同（前者是任意 `Input`，后者是 `{ phase, chunk }`）。
@@ -59,8 +60,14 @@ export type ManagedRpcHandler = {
 ```ts
 type IWebWorkerLikePort = {
   postMessage(message: unknown, transfer?: readonly Transferable[]): void;
-  addEventListener(type: 'message' | 'error' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void;
-  removeEventListener(type: 'message' | 'error' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void;
+  addEventListener(
+    type: 'message' | 'error' | 'messageerror',
+    listener: (event: MessageEvent<unknown> | Event) => void
+  ): void;
+  removeEventListener(
+    type: 'message' | 'error' | 'messageerror',
+    listener: (event: MessageEvent<unknown> | Event) => void
+  ): void;
 };
 ```
 
@@ -72,7 +79,10 @@ type IWebWorkerLikePort = {
 
 ```ts
 class WorkerAdapter {
-  constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number });
+  constructor(
+    port: IWorkerPort,
+    options?: { readonly clientId?: string; readonly timeoutMs?: number }
+  );
   readonly disposed: boolean;
   request<Input, Output>(
     payload: Input,
@@ -120,11 +130,11 @@ function createWorkerHandler<Input, Output>(
 const handler = createWorkerHandler(compute, postMessage);
 
 handler.pendingCount; // 0 —— 当前正在处理中的消息数
-handler.disposed;     // false
+handler.disposed; // false
 
 await handler(incomingMessage); // 处理一条消息；disposed 时直接返回，静默丢弃
 
-handler.close();         // 同步标记不可用；不执行底层清理
+handler.close(); // 同步标记不可用；不执行底层清理
 await handler.dispose(); // 先 close()，再等底层端点初始化并 dispose；失败会 reject
 ```
 
@@ -169,7 +179,7 @@ new Resource<Output>(
 - **`adapter`**：一个已经构造好的 `WorkerAdapter`，`workerComputed` 不管理它的生命周期——`adapter.dispose()` 需要调用方自己在合适的时机调用（通常晚于 `Resource.dispose()`，因为 Resource 释放时可能还有一次正在飞行的请求依赖这个 adapter）。
 - **`selectInput`**：同步函数，返回值作为 RPC 的 `payload`。它在 `Resource` 的 fetcher 里被同步调用一次——函数体里读取的响应式值（signal/computed）会被 `Resource` 记为依赖，依赖变化会让 `Resource` 重新发起请求。异步读取（比如 `await` 之后再读）不会被追踪到，这是 `@migaia/resource` 的通用限制，不是 `workerComputed` 特有的。
 - **`options.runtime`**：传给 `Resource` 的响应式运行时，默认 `defaultRuntime`（来自 `@migaia/reactive`）。
-- **`options.transfer`**：给定 `input`，返回这次调用要零拷贝转移的 `Transferable[]`。只在你确认 `input` 里的数据转移后不会再被主线程使用时才该提供——转移是破坏性的，见 [§7](#7-字节转移语义ibyteownership)。
+- **`options.transfer`**：给定 `input`，返回这次调用要零拷贝转移的 `Transferable[]`。只在你确认 `input` 里的数据转移后不会再被主线程使用时才该提供——转移是破坏性的，见 [§8](#8-字节转移语义ibyteownership)。
 - **其余字段**（`ttl`、`autoStart`、`staleWhileRevalidate`、`retry`、`retryDelay`、`keepAlive`、`initialSnapshot`、`debugName`）：原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致，本文不重复展开，参见该包文档。
 
 返回的 `Resource<Output>` 是标准 `Resource` 实例——`refetch()`、`.state`、`dispose()` 等一切用法与直接 `new Resource(...)` 得到的对象没有区别，唯一的差异只是 fetcher 内部换成了 Worker 调用。
@@ -192,13 +202,13 @@ type IWorkerPluginOptions = {
 };
 ```
 
-| 字段 | 默认值 | 说明 |
-| --- | --- | --- |
-| `worker` | 必需 | 满足 `IWorkerLike`（`IWebWorkerLikePort` 加可选 `terminate()`）的对象 |
-| `type` | `'worker'` | 写进 `ISerializePlugin.type` 的注册表格式标签，需要和读取这份存档时用的标签一致 |
-| `terminateOnDispose` | `false` | `dispose()` 时是否顺带调用 `worker.terminate?.()`。外部传入的 Worker 默认被认为归调用方所有，不由这个包代管生命周期 |
-| `ownership` | `'copy'` | 字节数据过边界时是复制还是零拷贝转移，见 [§7](#7-字节转移语义ibyteownership) |
-| `clientId` | `'main'` | 本端在 web-rpc 拓扑里的 `id` |
+| 字段                 | 默认值     | 说明                                                                                                                |
+| -------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------- |
+| `worker`             | 必需       | 满足 `IWorkerLike`（`IWebWorkerLikePort` 加可选 `terminate()`）的对象                                               |
+| `type`               | `'worker'` | 写进 `ISerializePlugin.type` 的注册表格式标签，需要和读取这份存档时用的标签一致                                     |
+| `terminateOnDispose` | `false`    | `dispose()` 时是否顺带调用 `worker.terminate?.()`。外部传入的 Worker 默认被认为归调用方所有，不由这个包代管生命周期 |
+| `ownership`          | `'copy'`   | 字节数据过边界时是复制还是零拷贝转移，见 [§8](#8-字节转移语义ibyteownership)                                        |
+| `clientId`           | `'main'`   | 本端在 web-rpc 拓扑里的 `id`                                                                                        |
 
 ### 6.2 `workerParser(options): ISerializeParser`
 
@@ -208,7 +218,7 @@ type IWorkerPluginOptions = {
 - `decode(chunk, context)`：请求 Worker 解码，返回值取自结果段的负载（`result[1]`），调用方拿到的就是还原后的值本身，不是包一层的 `ISerializeChunk`。
 - `dispose()`：异步 dispose 底层端点，并在 `terminateOnDispose: true` 时继续尝试 `worker.terminate?.()`；两步都会执行。单个 cleanup 失败会被原样 reject，端点与 terminate 都失败时返回 `CLEANUP_FAILED` `AggregateError`，不会吞掉 parser/endpoint/terminate 错误。
 
-`context.signal` 会作为这次 RPC 调用的取消信号透传；调用被取消时，`request` 内部会把泛化的 `AbortError` 重新包装成 `SerializeError`（见 [§8](#8-错误处理)），带上 `type`/`phase`/`source`/`chunkIndex`/`bytesConsumed` 这些定位信息，而不是让调用方拿到一个语义模糊的通用 abort 错误。
+`context.signal` 会作为这次 RPC 调用的取消信号透传；调用被取消时，`request` 内部会把泛化的 `AbortError` 重新包装成 `SerializeError`（见 [§9](#9-错误处理)），带上 `type`/`phase`/`source`/`chunkIndex`/`bytesConsumed` 这些定位信息，而不是让调用方拿到一个语义模糊的通用 abort 错误。
 
 ### 6.3 `workerPlugin(options): ISerializePlugin`
 
@@ -232,7 +242,7 @@ function createSerializeWorkerHandler(
 
 Worker 侧的对端：把一个**普通的、跑在 Worker 里就地工作的** `ISerializeParser`（不需要知道自己在被 RPC 调用）接成 `'call'` 方法的处理器。
 
-- **`parser`**：真正做 encode/decode 的实现，比如 `@migaia/serialize` 内置的 `jsonParser()`，或者你自己写的格式插件。注意：只有 parser 本身是"字节进、字节出"时，走 Worker 才划算，见 [§9](#9-性能特征)。
+- **`parser`**：真正做 encode/decode 的实现，比如 `@migaia/serialize` 内置的 `jsonParser()`，或者你自己写的格式插件。注意：只有 parser 本身是"字节进、字节出"时，走 Worker 才划算，见 [§10](#10-性能特征)。
 - **`post`**：Worker 侧发消息回主线程的函数，通常是 `(message, transfer) => self.postMessage(message, { transfer })`。
 
 请求处理时的分段逻辑：
@@ -253,7 +263,108 @@ Worker 侧的对端：把一个**普通的、跑在 Worker 里就地工作的** 
 
 ---
 
-## 7. 字节转移语义（`IByteOwnership`）
+## 7. 常量与错误码完整参考
+
+### 7.1 `mergeWorkerChunks(chunks)`
+
+```ts
+import { mergeWorkerChunks } from '@migaia/store-worker/serialize/worker';
+
+function mergeWorkerChunks(chunks: readonly ISerializeChunk[]): ISerializeChunk;
+```
+
+独立的公开导出（子路径 `@migaia/store-worker/serialize/worker`，也可从包根 `@migaia/store-worker` 导入），把多个 `ISerializeChunk` 拼成一个。`createSerializeWorkerHandler` 内部用它拼装 `parser.encode()` 返回的多段流式输出（见 [§6.5](#65-多段结果的本地拼装)），也可以在业务代码里单独调用。
+
+单参数 `chunks: readonly ISerializeChunk[]`（必填），无选项。边界行为：
+
+- **空数组**：抛出 `SerializeCodecError`（`code: 'CHUNK_MERGE_FAILED'`，来自 `@migaia/serialize`），`type` 字段默认 `WorkerDiagnosticType.worker`，`phase` 恒为 `'encode'`。
+- **单元素数组**：直接返回该元素本身，不做任何拷贝或包装。
+- **全部是 `'text'` 段**：按顺序 `join('')` 字符串拼接，返回 `['text', 拼接结果]`。
+- **混有 `'bytes'` 段**：统一转成 `Uint8Array`（`'bytes'` 段直接用，`'text'` 段用 `TextEncoder` 编码），逐段 `set()` 进一个新分配的定长缓冲区，返回 `['bytes', 合并后的 Uint8Array]`。
+- **混入 `'value'` 段**（已物化的对象图，语义上不能与 text/bytes 字节流混拼）：同样抛出 `SerializeCodecError`（`code: 'CHUNK_MERGE_FAILED'`），不会尝试做任何隐式转换（比如 `String(value)`）。
+
+### 7.2 `WorkerOwnership` / `WorkerDiagnosticType`
+
+```ts
+import { WorkerOwnership, WorkerDiagnosticType } from '@migaia/store-worker';
+```
+
+**`WorkerOwnership`** —— 值过 Worker 边界的所有权策略标签：
+
+```ts
+const WorkerOwnership = { transfer: 'transfer', clone: 'clone' } as const;
+type IWorkerOwnership = 'transfer' | 'clone';
+```
+
+无调用参数，`as const` 常量对象。**注意**：这是一个独立命名空间，与实际配置 `workerPlugin`/`workerParser`/`workerComputed` 的字节转移策略所用的字符串字面量 `'copy' | 'transfer'`（类型别名 `IByteOwnership`，见 [§8](#8-字节转移语义ibyteownership)）不是同一套值——`WorkerOwnership.clone` 不等于配置里的 `'copy'`，两者不能互换使用，只是恰好都表达"转移 vs 复制/克隆"这个概念。
+
+**`WorkerDiagnosticType`** —— 序列化 Worker 集成的诊断来源标签：
+
+```ts
+const WorkerDiagnosticType = { worker: 'worker' } as const;
+type IWorkerDiagnosticType = 'worker';
+```
+
+无调用参数，常量对象；`WorkerDiagnosticType.worker`（即字符串 `'worker'`）是 `workerParser`/`createSerializeWorkerHandler` 产出的 `SerializeError`/`SerializeCodecError` 的 `type` 字段默认值（未显式传 `type`/`options.type` 时使用），也是 `mergeWorkerChunks` 抛错时固定使用的 `type`。
+
+### 7.3 `StoreWorkerErrorCode` 与错误工厂
+
+```ts
+import {
+  StoreWorkerErrorCode,
+  createStoreWorkerError,
+  createStoreWorkerAggregateError
+} from '@migaia/store-worker';
+```
+
+**`StoreWorkerErrorCode`** —— 本包稳定错误码表，配合 `attachErrorIdentity` 贴出来的 `error.code` 字段做 `switch`/比较：
+
+```ts
+if ((error as { code?: string }).code === StoreWorkerErrorCode.adapterDisposed) {
+  /* ... */
+}
+```
+
+全部取值：
+
+| 常量                   | 值                       | 触发场景                                                                                              |
+| ---------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `invalidOption`        | `INVALID_OPTION`         | Worker parser/adapter 的 options 在 JavaScript 边界上不是对象，或某个字段类型不对                     |
+| `adapterDisposed`      | `ADAPTER_DISPOSED`       | Worker 适配器已释放（`close()`/`dispose()` 之后）继续调用                                             |
+| `requestAborted`       | `REQUEST_ABORTED`        | Worker 侧的序列化请求被协作式取消（`AbortSignal`）；`ownership: 'transfer'` 时输入已 detach，不可重试 |
+| `invalidRequestChunk`  | `INVALID_REQUEST_CHUNK`  | 发给 Worker 的请求 chunk 形状非法（`isChunkShape` 校验未通过），协议错误                              |
+| `invalidResponseChunk` | `INVALID_RESPONSE_CHUNK` | Worker 返回的 chunk 形状非法，Worker 侧实现错误                                                       |
+| `chunkMergeFailed`     | `CHUNK_MERGE_FAILED`     | `mergeWorkerChunks` 合并失败（空列表，或把 `'value'` 段并入字节流），parser 实现错误                  |
+| `cleanupFailed`        | `CLEANUP_FAILED`         | 释放期间 endpoint 与（可选的）`worker.terminate()` 清理均失败                                         |
+
+**`createStoreWorkerError(code, message, options?)`**：
+
+```ts
+throw createStoreWorkerError(StoreWorkerErrorCode.invalidOption, '自定义消息');
+throw createStoreWorkerError(StoreWorkerErrorCode.invalidOption, '自定义消息', {
+  cause: originalError
+});
+```
+
+签名：`(code: IStoreWorkerErrorCode, message: string, options?: { readonly cause?: unknown }) => Error`。构造一个标准 `Error`，`options.cause` 提供时透传给原生 `Error` 的 `cause`；内部经 `@migaia/utils/error` 的 `attachErrorIdentity` 贴上 `source: '@migaia/store-worker'` 与传入的 `code`，不改写 `stack`。
+
+**`createStoreWorkerAggregateError(code, errors, message)`**：
+
+```ts
+throw createStoreWorkerAggregateError(
+  StoreWorkerErrorCode.cleanupFailed,
+  [endpointDisposeError, terminateError],
+  '清理失败'
+);
+```
+
+签名：`(code: IStoreWorkerErrorCode, errors: readonly unknown[], message: string) => AggregateError`。构造 `AggregateError(errors, message)`，`errors` 原样保留在结果的 `errors` 字段（顺序不变），同样贴上 `(source, code)` 身份。包内唯一的实际调用点是 `workerParser().dispose()`——endpoint 清理与 `terminateOnDispose: true` 时的 `worker.terminate()` 若同时失败，两个原始错误都会被保留在 `errors[]` 里，不会只保留其中一个。
+
+`STORE_WORKER_SOURCE`（`'@migaia/store-worker'`）是贴在每个本包错误上的固定 `source` 值，一般不需要手动引用，除非要用它去过滤/识别本包抛出的错误（例如把它和 `@migaia/web-rpc` 的 `WebRpcError`——`source: '@migaia/web-rpc'`——区分开）。
+
+---
+
+## 8. 字节转移语义（`IByteOwnership`）
 
 ```ts
 type IByteOwnership = 'copy' | 'transfer';
@@ -273,7 +384,7 @@ type IByteOwnership = 'copy' | 'transfer';
 
 ---
 
-## 8. 错误处理
+## 9. 错误处理
 
 ### 8.1 通用 RPC 错误
 
@@ -285,10 +396,10 @@ type IByteOwnership = 'copy' | 'transfer';
 
 ```ts
 class SerializeError extends Error {
-  readonly type: string;          // 插件的 type 标签
+  readonly type: string; // 插件的 type 标签
   readonly phase: 'encode' | 'decode';
-  readonly source: string;        // 出错时定位是哪个 store/key 的辅助字段
-  readonly chunkIndex: number;    // 恒为 0（这一层不涉及分片索引）
+  readonly source: string; // 出错时定位是哪个 store/key 的辅助字段
+  readonly chunkIndex: number; // 恒为 0（这一层不涉及分片索引）
   readonly bytesConsumed: number; // 输入是 bytes 段时为其字节长度，否则 0
 }
 ```
@@ -301,20 +412,20 @@ class SerializeError extends Error {
 
 ---
 
-## 9. 性能特征
+## 10. 性能特征
 
 以下数字来自包内注释记录的实测结论(测试规模:100 万条记录、71.5MB),用于判断"什么时候该用 Worker 卸载序列化"：
 
-| 方案 | 主线程阻塞时长 | 相对直接在主线程做 JSON |
-| --- | --- | --- |
-| 字节进、字节出(`Uint8Array` → `Uint8Array`,走 transfer,结果不还原成主线程对象图) | 约 1.4ms | 快约 46 倍(直接 JSON 约 65ms),墙钟总耗时基本持平 |
-| 对象图 `postMessage` 进 Worker(需要在主线程拿到还原后的对象) | 约 126ms | 比主线程直接做还慢一倍 |
+| 方案                                                                             | 主线程阻塞时长 | 相对直接在主线程做 JSON                          |
+| -------------------------------------------------------------------------------- | -------------- | ------------------------------------------------ |
+| 字节进、字节出(`Uint8Array` → `Uint8Array`,走 transfer,结果不还原成主线程对象图) | 约 1.4ms       | 快约 46 倍(直接 JSON 约 65ms),墙钟总耗时基本持平 |
+| 对象图 `postMessage` 进 Worker(需要在主线程拿到还原后的对象)                     | 约 126ms       | 比主线程直接做还慢一倍                           |
 
 结论:**只有当 Worker 的输入输出都停留在字节层面、不需要在主线程还原成对象图时**,把编解码搬进 Worker 才是净收益。结构化克隆本身是在调用方线程**同步**完成的——把对象图丢给 Worker 只是把"JSON.stringify 的开销"换成了"结构化克隆的开销",并不会因为"跑进了另一个线程"就自动变快。这也是为什么 `workerParser`/`createSerializeWorkerHandler` 的分段逻辑处处优先选择 `'bytes'` 段而不是 `'value'` 段:承接落盘/传输这类"拿到字节就结束"的活是它的目标场景,不要用它去加速 hydrate(把字节还原成对象)这一步。
 
 ---
 
-## 10. 完整场景示例
+## 11. 完整场景示例
 
 ### 10.1 大对象派生计算,带取消与 TTL 缓存
 
@@ -353,7 +464,7 @@ const adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });
 const rows = new Signal<readonly Row[]>([], defaultRuntime);
 
 const totals = workerComputed(adapter, () => rows.value, {
-  ttl: 30_000,            // 30 秒内复用结果,不重新触发 Worker 计算
+  ttl: 30_000, // 30 秒内复用结果,不重新触发 Worker 计算
   staleWhileRevalidate: true,
   debugName: 'category-totals'
 });
@@ -377,7 +488,7 @@ declare const self: DedicatedWorkerGlobalScope;
 
 // 提示:jsonParser 产出的是 'text' 段(对象图),不是本文档建议的 bytes-in/bytes-out
 // 形态——放进 Worker 主要是为了演示接线方式,是否值得为具体数据量这样做,
-// 请对照 §9 的实测数字自行判断。
+// 请对照 §10 的实测数字自行判断。
 const handler = createSerializeWorkerHandler(jsonParser(), (message, transfer) =>
   self.postMessage(message, { transfer })
 );
@@ -402,13 +513,13 @@ registry.dispose(); // 连带 dispose workerParser 的端点,并 terminate worke
 
 ---
 
-## 11. 常见问题排查
+## 12. 常见问题排查
 
 **Q:`request()`/`refetch()` 一直不 resolve 也不 reject。**
 确认 Worker 侧确实调用了 `self.onmessage = (event) => handler(event.data)`——`ManagedRpcHandler` 不会自己挂监听,忘记接线是最常见的原因。其次检查 `WorkerAdapter`/`workerParser` 的 `timeoutMs` 是否设置了合理值,默认不限时意味着 Worker 真的没有响应时会一直挂起。
 
 **Q:传了 `ownership: 'transfer'`,但性能并没有明显提升,像是走了复制。**
-检查传入的 `Uint8Array` 是不是通过 `subarray()`/切片得到的局部视图——只有恰好覆盖整个 `ArrayBuffer` 的顶层视图才会真正被 transfer,局部视图会静默回退成复制,见 [§7](#7-字节转移语义ibyteownership)。
+检查传入的 `Uint8Array` 是不是通过 `subarray()`/切片得到的局部视图——只有恰好覆盖整个 `ArrayBuffer` 的顶层视图才会真正被 transfer,局部视图会静默回退成复制,见 [§8](#8-字节转移语义ibyteownership)。
 
 **Q:取消请求后想重试,但 `SerializeError` 提示"transferred input is detached and cannot be retried"。**
 这不是可重试的错误——`ownership: 'transfer'` 场景下,一旦请求被送出、随即又被取消,原始 `ArrayBuffer` 已经在传输过程中被 detach,数据回不来了。需要重试的调用点应该改用 `ownership: 'copy'`,或者在业务层保留一份数据副本用于重试。
@@ -423,7 +534,7 @@ registry.dispose(); // 连带 dispose workerParser 的端点,并 terminate worke
 
 如果本文没有回答你的问题,`@migaia/web-rpc` 的 [USEGUIDE.md](../web-rpc/USEGUIDE.md) 覆盖了协议层(超时、取消、错误码、生命周期)的完整细节;`@migaia/resource`、`@migaia/serialize` 各自的文档覆盖 `Resource`/序列化注册表本身的行为。
 
-## 12. 构建、格式化与测试
+## 13. 构建、格式化与测试
 
 在仓库根目录运行：
 

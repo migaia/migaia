@@ -1,29 +1,185 @@
-# 使用手册
+# `@migaia/resource` 使用指南
 
-本文是 `@migaia/resource` 的完整参考手册。先看 [README.md](./README.md#4-五分钟上手) 的五分钟上手示例，跑起来之后再回来查这里的细节——README 讲"是什么、适合什么场景、5 分钟怎么跑起来"，本文讲"每一个配置项、每一个 API 的精确语义、每一种边界与异常行为"。
+本指南逐项列出 `Resource<T>` 全部公开 API 的签名、边界行为与错误码。包的定位、适用场景与五分钟上手见 [README](./README.md)。包只公开根入口 `@migaia/resource`，没有稳定深层子路径。
 
 ## 目录
 
-1. [核心概念详解](#1-核心概念详解)
-2. [构造参考](#2-构造参考)
-3. [Resource API 完整参考](#3-resource-api-完整参考)
-4. [依赖追踪与自动刷新](#4-依赖追踪与自动刷新)
-5. [取消、暂停与自动休眠](#5-取消暂停与自动休眠)
-6. [staleWhileRevalidate 与后台刷新](#6-stalewhilerevalidate-与后台刷新)
-7. [重试策略](#7-重试策略)
-8. [SSR / 持久化快照](#8-ssr-持久化快照)
-9. [错误与异常完整参考](#9-错误与异常完整参考)
-10. [生命周期与 dispose](#10-生命周期与-dispose)
-11. [完整场景示例](#11-完整场景示例)
-12. [构建、测试与常见问题排查](#12-构建测试与常见问题排查)
+- [`Resource<T>`](#resource)：构造函数、状态读取、操作方法、快照方法
+- [配置项 `IResourceOptions`](#配置项)
+- [状态类型](#状态类型)：`IResourceState`、`ResourceStatus`、`IResourceFetchStatus`
+- [`IResourceFetcher` 与依赖追踪](#fetcher-与依赖追踪)
+- [快照类型 `IResourceCacheSnapshot`](#快照类型)
+- [底层依赖：lifecycle 原语的使用方式](#底层依赖)
+- [错误码](#错误码)：`ResourceErrorCode`（8 个码）逐条语义
+- [高阶组合示例](#高阶组合示例)
+- [排查与构建门禁](#排查与构建门禁)
 
 ---
 
-## 1. 核心概念详解
+<a id="resource"></a>
 
-### 1.1 State：状态机
+## `Resource<T>`
 
-`resource.state` 返回下面五种形状之一（`IResourceState<T>`）：
+```ts
+import { Resource, type IResourceOptions } from '@migaia/resource';
+import type { IRuntime } from '@migaia/reactive';
+
+class Resource<T> implements IObserver, IDisposable {
+  constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>);
+
+  readonly runtime: IRuntime;
+  debugName?: string;
+  readonly deps: ReadonlySet<IObservable>;
+  readonly depVersions: ReadonlyMap<IObservable, number>;
+
+  readonly state: IResourceState<T>;
+  readonly promise: Promise<T>;
+  readonly disposed: boolean;
+  readonly refreshing: boolean;
+  readonly fetchStatus: IResourceFetchStatus;
+  readonly isStale: boolean;
+  readonly observed: boolean;
+
+  read(): T;
+  peek(): T;
+  refetch(): Promise<T>;
+  invalidate(): Promise<T>;
+  cancel(): void;
+  dehydrate(): IResourceCacheSnapshot<T> | undefined;
+  hydrate(snapshot: IResourceCacheSnapshot<T>): void;
+  dispose(): void;
+
+  // IObserver 接口成员：由 @migaia/reactive 的依赖图在内部调用，一般不需要手动调用
+  markDirty(): void;
+  onDependencyDisconnected(): void;
+}
+```
+
+响应式的可取消异步资源：构造时给一个 `fetcher`，它跟踪 `fetcher` 在**首次 `await` 之前**同步读取的响应式值作为依赖；依赖变化时自动发起新请求，只有最新一代请求的结果才会生效。
+
+```ts
+import { Resource } from '@migaia/resource';
+import { Signal, createRuntime } from '@migaia/reactive';
+
+const runtime = createRuntime();
+const userId = new Signal(1, runtime);
+
+const user = new Resource(
+  async ({ signal }) => {
+    const response = await fetch(`/api/users/${userId.value}`, { signal });
+    if (!response.ok) throw new Error('加载用户失败');
+    return response.json();
+  },
+  runtime,
+  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }
+);
+
+userId.value = 2; // 触发新请求
+```
+
+### 构造函数
+
+`new Resource(fetcher, runtime, options?)`：
+
+- `fetcher: IResourceFetcher<T>`（必填）—— `({ signal }) => T | PromiseLike<T>`。
+- `runtime: IRuntime`（必填）—— 来自 `@migaia/reactive` 的 `createRuntime()`/`defaultRuntime`；决定该 `Resource` 归属哪张依赖图。
+- `options?: IResourceOptions<T>`（可选，见[配置项](#配置项)）。
+- 全部选项在构造时**一次性快照并校验**（读取每个字段本身失败——hostile getter——都会被转换成贴 `INVALID_OPTION` 码的 `TypeError`，而不是让异常从任意后续调用点冒出）。
+- 若提供了 `initialSnapshot`，构造期会先 `hydrate()` 它；随后若 `autoStart`（默认 `true`）为真且（没有初始快照，或初始快照已过期），立即发起首次请求。
+
+### 状态读取（getter）
+
+- `state: IResourceState<T>` —— 响应式状态机快照（读取会建立依赖，并顺带触发 `#ensureFresh()`：过期的 `success` 值或 `idle` 状态会自动发起新请求）。已释放时抛 `RESOURCE_DISPOSED`。
+- `promise: Promise<T>` —— 当前请求或最新缓存值对应的共享 Promise；多个读取者拿到同一个 Promise，只在 `idle`/过期时才真正启动工作。没有可返回的 Promise（内部状态机异常）时抛 `NO_ACTIVE_PROMISE`。
+- `disposed: boolean` —— 是否已 `dispose()`；这是唯一在已释放后仍可安全读取、不抛错的成员。
+- `refreshing: boolean` —— 是否正在后台刷新（`staleWhileRevalidate: true` 且当前展示的仍是旧成功值时为真）；已释放时返回 `false`（不抛错）。
+- `fetchStatus: IResourceFetchStatus` —— 传输层状态，独立于可见的 data/error：`'fetching'` 或 `'idle'`。
+- `isStale: boolean` —— 当前缓存的成功值是否已超过 TTL；非 `success` 状态恒为 `false`。
+- `observed: boolean` —— 是否有响应式消费者正在观察本资源的 `state`。
+
+### `read()` / `peek()`
+
+```ts
+read(): T; // Suspense 兼容：success 返回值，pending 抛 Promise，error/cancelled 抛错误
+peek(): T; // 与 read() 形状相同，但不建立依赖边，也不触发 ensureFresh()
+```
+
+`read()` 按 React Suspense 期望的形状工作：成功返回缓存数据；`pending`/`idle` 抛出当前 `promise`；`error`/`cancelled` 抛出对应的错误对象。`peek()` 是它的非追踪版本，用于 `getSnapshot` 一类"读当前快照但不想加入别人追踪窗口"的场景，且不会顺手启动请求。
+
+### `refetch()` / `invalidate()`
+
+```ts
+refetch(): Promise<T>;    // 总是发起新请求，不复用新鲜缓存
+invalidate(): Promise<T>; // 立即使缓存过期（expiresAt = 0）并发起新请求
+```
+
+被动读取（`state`/`promise`/`read()`）只在过期或 `idle` 时才发起请求；想强制刷新必须显式调用 `refetch()` 或 `invalidate()`。
+
+### `cancel()`
+
+```ts
+cancel(): void;
+```
+
+只中止**当前活跃的一代**请求，资源本身仍可复用（下次读取/`refetch()` 会正常发起新请求）。`pending` 状态下取消会把状态落到 `cancelled`（携带 `name === 'AbortError'` 的 `DOMException`，贴 `REQUEST_CANCELLED` 码）；`staleWhileRevalidate` 后台刷新被取消时会回退展示原有的 `success` 数据（清除 `refreshing` 标记，不会遗留"正在刷新但没有实际请求"的不一致状态）。取消期间的清理（timer/listener）若失败，会以贴 `CANCELLATION_CLEANUP_FAILED` 码的错误抛出（不影响状态已经收敛这一事实）。
+
+### `dehydrate()` / `hydrate()`
+
+```ts
+dehydrate(): IResourceCacheSnapshot<T> | undefined;
+hydrate(snapshot: IResourceCacheSnapshot<T>): void;
+```
+
+`dehydrate()`：当前状态非 `success` 时返回 `undefined`；否则返回 JSON 安全的快照（`expiresAt` 为 `Infinity` 时序列化为 `null`）。
+
+`hydrate(snapshot)`：把快照原样恢复为一个 `success` 状态，不发起请求；会先作废当前活跃的请求代（`supersede()`）并清空依赖登记。快照结构非法（`version !== 1`，或 `updatedAt`/`expiresAt` 不是有限数字）抛 `INVALID_SNAPSHOT`——读取快照字段本身失败（hostile getter）时错误的 `cause` 挂原始异常。
+
+### `dispose()`
+
+```ts
+dispose(): void;
+```
+
+彻底终结资源：中止在途请求（`GenerationController.dispose()`）、清理依赖登记、释放内部状态 `Signal`。幂等——二次调用是空操作。清理过程中若某一步失败，第一个失败原样抛出，后续失败的错误挂在其 `.errors` 数组上（不会因为一步失败就跳过其余清理步骤）。释放之后调用任何其它方法（除 `disposed` 本身）一律抛 `RESOURCE_DISPOSED`。
+
+---
+
+<a id="配置项"></a>
+
+## 配置项 `IResourceOptions`
+
+```ts
+type IResourceOptions<T = unknown> = {
+  debugName?: string;
+  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）
+  autoStart?: boolean; // 默认 true
+  staleWhileRevalidate?: boolean; // 默认 false
+  retry?: IResourceRetryPolicy; // 默认 0（不重试）
+  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0
+  keepAlive?: boolean; // 默认 false
+  initialSnapshot?: IResourceCacheSnapshot<T>;
+  scheduler?: ILifecycleScheduler; // 默认 @migaia/lifecycle 的 systemScheduler
+};
+
+type IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);
+```
+
+逐项语义与校验：
+
+- `ttl?: number` —— 成功值的新鲜时长（毫秒）。`Infinity`（默认）表示永不因时间过期，只会因依赖变化/`refetch()`/`invalidate()` 而刷新。非 `Infinity` 时必须是有限非负数，否则抛贴 `INVALID_OPTION` 码的 `RangeError`；`updatedAt + ttl` 运算结果非有限（数值溢出）同样抛 `INVALID_OPTION`。
+- `autoStart?: boolean` —— 是否在构造函数内立即发起首次请求。默认 `true`。若同时提供了新鲜的 `initialSnapshot`，即使 `autoStart: true` 也不会立即再发一次请求。
+- `staleWhileRevalidate?: boolean` —— 默认 `false`。为 `true` 时，刷新期间继续展示旧的 `success` 数据（附带 `refreshing: true`），而不是回退到 `pending`。
+- `retry?: number | (failureCount, error) => boolean` —— 固定次数或自定义判断函数。数字必须是非负整数，否则抛 `INVALID_OPTION`。函数形式在每次失败后被调用一次，用第几次失败（从 1 开始）与错误对象决定是否重试；**Suspense 抛出的 thenable 值不计入失败次数**（`fetcher` 内部同步抛出一个 thenable 是被当作"需要等待后重跑"处理的，不是一次真实失败）。
+- `retryDelay?: number | (failureCount, error) => number` —— 固定延迟或按失败次数计算的函数，单位毫秒。数字必须是有限非负数；函数返回值同样必须是有限非负数，否则以贴 `INVALID_OPTION` 码的 `RangeError` reject 当次重试的 Promise。
+- `keepAlive?: boolean` —— 默认 `false`：长时间无人观察 `state` 会在下一个 idle 时机自动休眠（断开依赖登记、令缓存过期），下次被观察时重新发起请求。设为 `true` 时禁用自动休眠。
+- `initialSnapshot?: IResourceCacheSnapshot<T>` —— SSR/持久化恢复用的初始成功快照；构造期即 `hydrate()`，格式非法抛 `INVALID_SNAPSHOT`（详见[快照类型](#快照类型)）。
+- `scheduler?: ILifecycleScheduler` —— 时间域与排程来源：TTL/`updatedAt`/`expiresAt`/重试延迟全部走同一个调度器，默认 `@migaia/lifecycle` 的 `systemScheduler`。传入的值必须满足 `{ now(): number; schedule(cb, delayMs): IScheduledTask }` 契约（内部用 `snapshotScheduler` 校验），否则抛 `INVALID_OPTION`；缺宿主能力时该 scheduler 在被调用时才 fail-fast，不会静默降级成微任务。
+
+---
+
+<a id="状态类型"></a>
+
+## 状态类型
 
 ```ts
 type IResourceState<T> =
@@ -32,340 +188,165 @@ type IResourceState<T> =
   | { status: 'success'; data: T; refreshing?: boolean }
   | { status: 'error'; error: unknown }
   | { status: 'cancelled'; error: DOMException };
+
+const ResourceStatus: {
+  idle: 'idle';
+  pending: 'pending';
+  success: 'success';
+  error: 'error';
+  cancelled: 'cancelled';
+  fetching: 'fetching';
+};
+
+type IResourceFetchStatus = 'idle' | 'fetching';
 ```
 
-- `idle`：从未发起过请求（例如 `autoStart: false` 且尚未 `refetch()`）。
-- `pending`：请求进行中且当前没有可展示的旧数据。
-- `success`：`data` 是本次成功的值；`refreshing: true` 表示背后正在跑一次 `staleWhileRevalidate` 后台刷新，`data` 仍是刷新前的旧值。
-- `error`：`fetcher` 最终失败（重试预算耗尽或不重试）；`error` 是原始抛出值，不做任何包装。
-- `cancelled`：显式调用 `cancel()` 中止了一个处于 `pending` 的请求；`error` 是一个 `name: 'AbortError'` 的 `DOMException`。
+`IResourceState<T>` 是 `state`/`peek()` 底层的判别联合，五态：`idle`（尚未发起过请求）、`pending`（请求在途，无历史数据）、`success`（`data` 为最新成功值，`refreshing` 仅在 `staleWhileRevalidate` 后台刷新时为 `true`）、`error`（`error` 为最近一次失败原因）、`cancelled`（`error` 恒为 `name === 'AbortError'` 的 `DOMException`，`code === ResourceErrorCode.requestCancelled`）。`ResourceStatus` 常量还额外包含一个第六值 `fetching`，只用于 `fetchStatus`（传输层状态），不会出现在 `IResourceState.status` 里。
 
-`error`/`cancelled` 是**稳定、可检查的终态**——被动读取（`state`/`promise`/`read()`）不会自动重试它们，只有显式调用 `refetch()`/`invalidate()` 才会重新尝试，避免读取路径出现无限重试循环。
+---
 
-### 1.2 Fetcher 与依赖追踪
+<a id="fetcher-与依赖追踪"></a>
+
+## `IResourceFetcher` 与依赖追踪
 
 ```ts
-type IResourceFetcher<T> = (ctx: { signal: AbortSignal }) => T | PromiseLike<T>;
+type IResourceFetcher<T> = (ctx: { signal: IAbortSignal }) => T | PromiseLike<T>;
 ```
 
-`fetcher` 在**首次 `await` 之前同步执行的这一段代码**，其中对 Signal/Computed `.value`（或 `.read()`/追踪读取）的访问会被登记为这个 `Resource` 的依赖（`resource.deps`）。这是 JavaScript 单线程同步执行的天然边界：`await` 之后代码是在微任务里恢复执行的，此时已经脱离了框架能建立追踪的同步窗口。**`await` 之后读取的响应式值不会自动成为依赖**，如果确实需要依赖它，要么把这部分读取提到 `await` 之前存进局部变量，要么把它包进一个 `Computed` 并在 `await` 之前读一次那个 `Computed`。
+`fetcher` 在**首次 `await` 之前**同步读取的响应式值（`Signal`/`Computed`，包括异步函数在首个 `await` 之前的同步代码）会被登记为依赖，依赖变化时合并触发一次新请求（同一批变化只重新拉取一次）。`await` 之后再读响应式值**不会**被自动追踪——JavaScript 的同步依赖收集上下文在 `await` 处已经退出；需要的话应把这部分读取挪进一个 `Computed`，或在 `await` 之前先读入局部变量。
 
-`ctx.signal` 是一个 `AbortSignal`，`fetcher` **必须**把它转交给真正可取消的 I/O（`fetch(url, { signal })`、支持 `AbortSignal` 的数据库/RPC 客户端等）——`Resource` 自己的取消逻辑只决定"这次结果还算不算数"，不会替你物理中断一个没有接上 `signal` 的请求。
+`fetcher` **必须**把 `ctx.signal` 转交给真正可取消的 I/O（如 `fetch(url, { signal })`），否则 `cancel()`/依赖变化引发的取消只是让 `Resource` 忽略这次结果，底层请求仍会在后台跑完（浪费网络资源、可能产生未观察的副作用）。
 
-### 1.3 世代（generation）与竞态防护
-
-每次发起请求都会生成一个新的世代 token。依赖变化、`refetch()`、`invalidate()` 都会立即让之前的世代失效（`supersede`）；只有当前世代的结果落地时才会写回 `state`，被取代世代的结果无论成功还是失败都会被静默丢弃。这就是"旧请求晚返回也不会覆盖新状态"的实现基础，调用方不需要自己比对时间戳或序号。
-
-### 1.4 Suspense 读取：`read()` / `peek()`
-
-`read()` 是专门给 React Suspense 风格设计的读取原语：`success` 返回 `data`；`pending`/`idle` 抛出当前的 `promise`；`error`/`cancelled` 抛出 `error`。`peek()` 形状完全一致，但**不建立依赖边、也不会顺手触发 `ensureFresh()`**——用于"只想看一眼当前快照，不想加入别人的追踪窗口、也不想意外触发一次新请求"的场景（比如 `getSnapshot`、诊断代码）。日常业务读取一般用 `state`（会追踪、会在过期时自动续请求）。
+`fetcher` 同步抛出的值若探测为 thenable（Suspense 常见模式：抛出一个 Promise 让上层挂起），会被当作"等待后重跑"处理，不计入重试次数；探测其 `.then` 时若 getter 本身抛错，无法判定是否为 thenable，会以携带 `SUSPENSE_PROBE_FAILED` 码的 `AggregateError` reject（原始抛出值与 getter 异常都保留在 `.errors` 里）。
 
 ---
 
-## 2. 构造参考
+<a id="快照类型"></a>
 
-```ts
-new Resource<T>(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>)
-```
-
-`runtime` 来自 `@migaia/reactive` 的 `createRuntime()`（或复用 `defaultRuntime`）。`Resource` 实现了 `IObserver`/`IDisposable`，构造时会把自己登记到 `runtime`（`claimOwnership`），必须和它读取的 Signal/Computed 在**同一个 `runtime`** 下才能建立依赖边。
-
-`IResourceOptions<T>` 完整字段：
-
-| 选项 | 类型 | 必填性 | 默认值 | 说明 |
-| --- | --- | --- | --- | --- |
-| `debugName` | `string` | 可选 | 无 | 调试标识，会作为内部 `state` Signal 的 `debugName` 后缀（`${debugName}.state`）。 |
-| `ttl` | `number` | 可选 | `Infinity` | 成功值的新鲜时长（毫秒）。`Infinity` 表示只要没有依赖变化/显式刷新就永远新鲜；`0` 表示成功后几乎立刻视为过期，每次读取都会触发新请求。必须是非负数，否则构造时抛 `RangeError`。 |
-| `autoStart` | `boolean` | 可选 | `true` | 构造函数返回前是否立即发起第一次请求。设为 `false` 时初始状态为 `idle`（除非提供了 `initialSnapshot`），需要显式 `refetch()` 才会开始。 |
-| `staleWhileRevalidate` | `boolean` | 可选 | `false` | 刷新时是否保留旧成功值可见（`state.status` 仍为 `success`，附带 `refreshing: true`），而不是先切回 `pending`。 |
-| `retry` | `IResourceRetryPolicy` | 可选 | `0` | 失败重试次数或判断函数，见 [§7](#7-重试策略)。必须是非负整数，否则构造时抛 `RangeError`。 |
-| `retryDelay` | `number \| (failureCount, error) => number` | 可选 | `0` | 重试前的等待毫秒数或计算函数，见 [§7](#7-重试策略)。 |
-| `keepAlive` | `boolean` | 可选 | `false` | 长期无人观察时是否仍保留依赖登记和缓存新鲜度，见 [§5](#5-取消暂停与自动休眠)。 |
-| `initialSnapshot` | `IResourceCacheSnapshot<T>` | 可选 | 无 | 用 SSR/持久化的成功快照直接初始化，见 [§8](#8-ssr-持久化快照)。 |
-
-`ttl`/`retry` 的非法值会在**构造函数同步执行期间**直接抛出，不会产生一个"参数不合法但仍然半可用"的实例。
-
----
-
-## 3. Resource API 完整参考
-
-| 成员 | 类型/签名 | 同步/异步 | 说明 |
-| --- | --- | --- | --- |
-| `deps` | `ReadonlySet<IObservable>` | 同步 | 当前登记的响应式依赖集合（来自最近一次 `fetcher` 执行）。 |
-| `depVersions` | `ReadonlyMap<IObservable, number>` | 同步 | 依赖当时的版本号快照，供追踪器判断是否已过期。 |
-| `runtime` | `IRuntime` | 同步 | 构造时传入的 runtime。 |
-| `debugName` | `string \| undefined` | 同步 | 构造时传入的调试名。 |
-| `state` | `get state(): IResourceState<T>` | 同步 | 读取状态机快照；会建立依赖边并在过期/idle 时触发 `ensureFresh()`。 |
-| `promise` | `get promise(): Promise<T>` | 异步 | 当前请求或最近一次缓存值对应的共享 Promise；多个读取者拿到同一个 Promise。空闲/过期时会先触发一次新请求；`disposed` 前从未发起过任何请求会抛 `Error`。 |
-| `disposed` | `get disposed(): boolean` | 同步 | 是否已 `dispose()`。 |
-| `refreshing` | `get refreshing(): boolean` | 同步 | 是否处于 `staleWhileRevalidate` 后台刷新中（`disposed` 后恒为 `false`）。 |
-| `fetchStatus` | `get fetchStatus(): 'idle' \| 'fetching'` | 同步 | 传输层状态，独立于 `state`——`staleWhileRevalidate` 刷新时 `state.status` 仍是 `success`，但 `fetchStatus` 是 `fetching`。 |
-| `isStale` | `get isStale(): boolean` | 同步 | 当前缓存的成功值是否已越过 `ttl`。 |
-| `observed` | `get observed(): boolean` | 同步 | 是否有响应式订阅者正在观察这个 `Resource` 的状态。 |
-| `read()` | `(): T` | 同步 | Suspense 读取，见 [§1.4](#14-suspense-读取read--peek)。 |
-| `peek()` | `(): T` | 同步 | `read()` 的非追踪版本，不触发 `ensureFresh()`。 |
-| `refetch()` | `(): Promise<T>` | 异步 | 无条件发起一次新请求（即使当前值仍新鲜），返回这次请求的 Promise。 |
-| `invalidate()` | `(): Promise<T>` | 异步 | 把当前值标记为立即过期并同步发起一次新请求。 |
-| `cancel()` | `(): void` | 同步 | 只中止当前世代的请求；`Resource` 本身保持可用，之后仍可 `refetch()`/被动重新触发。 |
-| `dehydrate()` | `(): IResourceCacheSnapshot<T> \| undefined` | 同步 | 当前若是 `success` 态，导出可 JSON 序列化的快照；否则返回 `undefined`。 |
-| `hydrate(snapshot)` | `(snapshot: IResourceCacheSnapshot<T>): void` | 同步 | 用一份快照直接设置为 `success` 状态，中止任何在途请求，清空旧依赖登记；`snapshot` 形状不合法会抛 `Error`。 |
-| `markDirty()` | `(): void` | 同步 | `IObserver` 接口方法，由依赖的 Signal/Computed 在值变化时调用，业务代码通常不需要手动调用。 |
-| `onDependencyDisconnected()` | `(): void` | 同步 | `IObserver` 接口方法，依赖被 dispose 时触发，会强制下一次重新求值（即使版本号看起来没变）。 |
-| `dispose()` | `(): void` | 同步 | 终结资源：中止在途请求、清理依赖登记与订阅、释放内部 Signal。幂等，重复调用是 no-op。 |
-
-`state`/`promise`/`read()`/`peek()`/`refetch()`/`invalidate()`/`cancel()`/`dehydrate()`/`hydrate()` 在 `dispose()` 之后调用一律抛出 `Error('cannot use a disposed resource')`，见 [§9](#9-错误与异常完整参考)。
-
----
-
-## 4. 依赖追踪与自动刷新
-
-`fetcher` 每次真正执行时都会在一个"追踪上下文"里跑（`internalsOf(runtime).tracker.runTracked`），期间同步发生的响应式读取会被记录为这次执行的依赖集合——每次请求都会重新记录一遍，不是构造时固定一次。
-
-依赖变化（`markDirty()`）不会同步立即触发新请求，而是通过 runtime 的 idle 调度通道（和 `Computed` 重算走的是同一条通道）延后合并：同一批同步变化里，哪怕多个依赖先后变脏、`markDirty()` 被调用多次，也只会产生一次实际的新请求。调度回调触发时会再检查一遍"依赖是不是真的过期了"（`hasStaleDependencies`）——如果在等待调度的这段时间里依赖恰好又变回了追踪时的版本（理论上少见），且这次不是由 `onDependencyDisconnected()` 触发的强制刷新，就会跳过这次刷新，不产生多余请求。
-
-`onDependencyDisconnected()`（某个依赖被 `dispose()` 掉）永远会强制触发一次刷新，不做"是否真的过期"的判断——依赖没了本身就是需要重新求值的信号。
-
-如果这次调度刷新在真正发起请求前抛出了同步异常（比如策略函数本身写错了），`Resource` 会把自己标记为 `error` 状态并让缓存立即过期，而不是让异常无声消失。
-
----
-
-## 5. 取消、暂停与自动休眠
-
-### 5.1 `cancel()` vs `dispose()`
-
-`cancel()` 只中止**当前世代**的请求：如果此时 `state.status === 'pending'`，会切换为 `{ status: 'cancelled', error: DOMException(name: 'AbortError') }`；`Resource` 本身依然可用，后续的被动读取或 `refetch()` 会重新发起请求。`dispose()` 是彻底终结——之后任何方法调用都会抛错，必须创建新实例才能继续使用。
-
-> **已知边界行为**：在 `staleWhileRevalidate` 的后台刷新过程中调用 `cancel()`，由于此时 `state.status` 是 `success`（附带 `refreshing: true`）而不是 `pending`，`cancel()` 不会改写 `state`——`refreshing` 会一直停留在 `true`，直到下一次请求（无论成功失败）结算才会被重置。`fetchStatus` 会正确地变回 `idle`，但 `refreshing` 和 `fetchStatus` 因此可能短暂不一致。需要精确感知"后台刷新已被取消"的场景，应该在调用 `cancel()` 后自行触发一次 `refetch()`/`invalidate()` 来重置这个标记。
-
-### 5.2 自动休眠：没人观察时会发生什么
-
-`observed`（即 `state`/`promise`/`read()` 建立的订阅数量归零）之后，`Resource` 不会立即做任何事，而是通过 idle 调度延后检查一次（避免 React 渲染过程中"临时取消订阅又立刻重新订阅"这类瞬时抖动被误判为真正的空闲）。如果延后检查时确实还是无人观察、`keepAlive` 也不是 `true`，且这个 `Resource` 当时确实有依赖（`deps.size > 0`）：
-
-- 当前是 `success` 状态：把 `ttl` 立即清零，让下一次被重新观察时视为过期，从而触发一次新请求。
-- 当前请求仍在进行中：把这次即将到来的结果标记为"结算后立即视为过期"，效果和上一条等价，只是时机延后到请求真正完成之后。
-
-**这个过程不会中止正在进行的请求**——即便这个请求是给一个即将挂起（Suspense）的渲染准备的 Promise，取消它会让还在等待这个 Promise 的调用方直接收到一个 reject，这不是预期行为。也就是说：无观察者只会让"下一次被观察"时更倾向于重新拉取，不会打断已经在跑的网络请求。
-
-`keepAlive: true` 会完全跳过上述行为——没人观察也保持依赖登记和缓存新鲜度，适合"预取后台数据，稍后某处才会读"的场景；代价是这类 `Resource` 不会自动休眠，需要调用方自己在合适时机 `dispose()`。
-
----
-
-## 6. staleWhileRevalidate 与后台刷新
-
-默认（`staleWhileRevalidate: false`）情况下，任何新请求发起时都会先把 `state` 切回 `{ status: 'pending' }`，哪怕之前有可展示的旧数据——UI 通常会因此闪一下 loading。
-
-`staleWhileRevalidate: true` 时，如果当前已经是 `success`，新请求发起时 `state` 保持 `{ status: 'success', data: 旧值, refreshing: true }`，旧数据继续可见，`refreshing` 作为额外信号驱动一个不遮挡内容的加载指示（比如顶部进度条）。刷新成功后 `data` 被替换为新值、`refreshing` 消失；刷新失败则整体切换为 `{ status: 'error' }`（**旧数据不会被保留**，失败态会覆盖掉刚才展示的旧值，如果需要"失败时继续展示旧数据"，需要在读取 `state` 的一侧自行加一层"记住最后一次成功值"的逻辑）。
-
----
-
-## 7. 重试策略
-
-```ts
-type IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);
-```
-
-- **数字形式**：表示"失败后最多重试的次数"，不含首次尝试。`retry: 2` 意味着最多总共尝试 3 次（1 次首发 + 2 次重试）。第 `n` 次失败后，`nextFailureCount = n`，`n <= retry` 才会继续重试。
-- **函数形式**：`(failureCount, error) => boolean`，`failureCount` 从 1 开始计数（第几次失败），返回 `true` 继续重试。函数内部抛出的异常会直接作为这次请求的失败原因 reject，不会被当成"不重试"处理。
-
-`retryDelay` 决定每次重试前等待多久：数字表示固定毫秒数，函数 `(failureCount, error) => number` 按失败次数/错误动态计算。等待期间如果 `signal` 被中止，等待会立即以取消错误结束，不会等到计时器结束才响应取消。计算出的延迟必须是非负有限数，否则这次请求以 `RangeError('resource retry delay must be a non-negative finite number')` 失败；Resource 不会把 retry delay 与 scheduler 当前时间相加，实际排程仍由 scheduler 负责。
-
-**Suspense 兼容读取不计入重试预算**：如果 `fetcher` 内部读取了一个自身会 `throw` 一个 Promise 的 Suspense 兼容值（例如读取另一个尚未就绪的 `Computed`/`Resource`），`Resource` 会识别出这是一个"挂起"而不是"失败"——自动 `await` 这个 Promise，然后**用同样的 `failureCount` 重新执行一次 `fetcher`**，既不计入 `retry` 次数，也不会产生 `error` 状态。这让 `fetcher` 之间可以互相组合而不用担心互相污染对方的重试预算。
-
----
-
-## 8. SSR / 持久化快照
+## 快照类型 `IResourceCacheSnapshot`
 
 ```ts
 type IResourceCacheSnapshot<T> = {
   readonly version: 1;
   readonly data: T;
   readonly updatedAt: number;
-  /** `null` 表示无限新鲜期的 JSON 安全形式 */
-  readonly expiresAt: number | null;
+  readonly expiresAt: number | null; // null 表示无限生命周期的 JSON 安全形式
 };
 ```
 
-`dehydrate()` 只在当前是 `success` 态时返回快照（其余状态返回 `undefined`），`expiresAt` 用 `null` 代表 `Infinity`（JSON 不支持 `Infinity`）。`hydrate(snapshot)` 是它的逆操作，会：
-
-1. 校验 `snapshot` 形状（`version === 1`、`updatedAt`/`expiresAt` 是有限数字或 `null`），不合法直接抛 `Error`。
-2. 中止任何在途请求（不触发 `cancelled` 状态，直接静默 supersede）。
-3. 清空旧的依赖登记。
-4. 把 `state` 设为 `{ status: 'success', data: snapshot.data }`（**不带 `refreshing` 字段**，即便原来在刷新）。
-
-构造时传入 `initialSnapshot` 等价于"构造后立即 `hydrate()`一次"，但多一层与 `autoStart` 的联动：
-
-- 快照仍新鲜（未过期）且 `autoStart`（默认 `true`）：**不会**额外发起请求，直接使用快照数据。
-- 快照已过期：即使提供了快照也会照常发起一次请求（用来验证/刷新数据）——**如果这时 `staleWhileRevalidate` 是默认的 `false`，这次自动请求会把刚刚 `hydrate` 进来的数据立刻切换成 `pending`**，SSR 首屏可能因此"先显示服务端渲染的数据、瞬间又变成 loading"。为避免这种闪烁，**过期的 `initialSnapshot` 通常应该搭配 `staleWhileRevalidate: true`**，让刷新期间继续展示 hydrate 进来的旧值。
-- `autoStart: false`：无论快照是否过期都不会自动发起请求，需要显式调用 `refetch()`/`invalidate()`。
-
-有限 `ttl` 的成功结算还要求 `updatedAt + ttl` 保持有限。若 scheduler 返回 `Number.MAX_VALUE` 等边界时间并导致加法溢出，当前请求以 `RangeError('resource ttl expiration must remain finite')`、`INVALID_OPTION` 失败，状态进入 `error`，不会发布 `success`、写入缓存或让 `dehydrate()` 产生 `expiresAt: null`。刚好仍等于最大有限数的边界加法允许通过；`hydrate()` 同样拒绝非有限数值快照。
+`dehydrate()`/`hydrate()`/`initialSnapshot` 共用的 JSON 安全快照结构。`version` 恒为 `1`（预留未来格式演进）；`expiresAt` 为 `null` 对应内部的 `Infinity`（`ttl: Infinity` 场景）。`hydrate()`/构造期 `initialSnapshot` 校验：`version !== 1`，或 `updatedAt`/非 `null` 的 `expiresAt` 不是有限数字，一律抛 `INVALID_SNAPSHOT`。
 
 ---
 
-## 9. 错误与异常完整参考
+<a id="底层依赖"></a>
 
-`Resource` **自己抛出**的每一个错误都携带 `(source, code)` 二元组：`source` 恒为 `'@migaia/resource'`，`code` 取自 `src/error-code.ts` 的 `ResourceErrorCode`（6 个码）。全仓契约见 `docs/contracts/error-codes.md`，本包码表的权威定义见 `docs/lifecycle/migration.sdd.md` §3.7.2。
+## 底层依赖：lifecycle 原语的使用方式
 
-**码是附加字段，绝不替换错误类型**——选项校验仍是 `RangeError`，中止/取消仍是 `name === 'AbortError'` 的 `DOMException`，依赖 `instanceof` 或 `error.name` 判断的调用方（包括 `store-react` 的 suspension 路径）完全不受影响。`error.message` 也一律保留 `` 前缀。
+`Resource` 内部直接组合 `@migaia/lifecycle` 与 `@migaia/reactive` 的原语，理解这层有助于诊断边界行为：
+
+- **`createGenerationController()`**（来自 `@migaia/lifecycle`）——每次 `#startRequest()` 调用 `begin()` 开一代新请求；`refetch()`/`invalidate()`/依赖变化都会使旧一代失效（`supersede()`），只有 `isCurrent(token)` 为真的那一代结果才会写回 `#stateSignal`。`dispose()` 时调用其 `dispose()` 终结控制器。
+- **`createTerminalController()`**（来自 `@migaia/lifecycle`）——驱动 `Resource` 自身的容器存活轴（`open → closing → terminal`）；`disposed` getter 直接读它的 `lifecycle === 'terminal'`。
+- **`probeThenable()` / `assimilateCapturedThen()`**（来自 `@migaia/lifecycle`）——用于安全探测 `fetcher` 同步抛出的值是否是 thenable（Suspense 抛 Promise 模式），只读一次 `.then`，避免 hostile getter 被读取两次或异常被吞掉。
+- **`systemScheduler` / `snapshotScheduler()`**（来自 `@migaia/lifecycle`）——`scheduler` 选项的默认值与校验函数；TTL 到期判定、重试延迟计时都通过它，不直接使用宿主 `setTimeout`/`Date.now`。
+- **`internalRuntimeOf()` / `internalsOf()` / `claimOwnership()` / `registerDeps()` / `registerDepVersions()`**（来自 `@migaia/reactive` 的 `/node-factories`、`/internals`、`/ownership`、`/node-internals` 子路径）——`Resource` 把自己注册为 `@migaia/reactive` 依赖图里的一个 `IObserver`（实现 `markDirty()`/`onDependencyDisconnected()`），复用其依赖追踪、所有权登记与 `deferIdle` 挂起通道，语义与 `Computed` 的自动挂起完全对称。
+
+---
+
+<a id="错误码"></a>
+
+## 错误码
 
 ```ts
-import { ResourceErrorCode } from '@migaia/resource';
-
-try {
-  resource.state;
-} catch (error) {
-  if ((error as { code?: string }).code === ResourceErrorCode.resourceDisposed) {
-    // 这个 Resource 已经终结，必须新建
-  }
-}
+import { ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource';
 ```
 
-| 触发场景 | 异常类型 | `code` | `message` / `name` |
-| --- | --- | --- | --- |
-| 构造时 `ttl` 为负数或 `NaN` | `RangeError` | `INVALID_OPTION` | `resource ttl must be non-negative` |
-| 成功结算时 `updatedAt + finite ttl` 溢出有限数范围 | `RangeError` | `INVALID_OPTION` | `resource ttl expiration must remain finite` |
-| 构造时 `retry` 为负数或非整数（数字形式） | `RangeError` | `INVALID_OPTION` | `resource retry count must be a non-negative integer` |
-| 计算出的重试延迟不是非负有限数 | `RangeError` | `INVALID_OPTION` | `resource retry delay must be a non-negative finite number` |
-| `hydrate()` 传入形状不合法的快照 | `Error` | `INVALID_SNAPSHOT` | `invalid resource cache snapshot` |
-| 已 `dispose()` 后调用任意方法 | `Error` | `RESOURCE_DISPOSED` | `cannot use a disposed resource` |
-| 读 `promise` 但从未发起过任何请求（理论边界情况） | `Error` | `NO_ACTIVE_PROMISE` | `resource has no active or cached promise` |
-| `fetcher` 的请求被依赖变化/`refetch()`/`invalidate()` 取代 | `DOMException` | `REQUEST_ABORTED` | `name: 'AbortError'`，`message: 'resource request aborted'` |
-| 显式调用 `cancel()` 中止一个 `pending` 请求 | `DOMException` | `REQUEST_CANCELLED` | `name: 'AbortError'`，`message: 'resource request cancelled'`（出现在 `state.error`，`state.status` 为 `cancelled`） |
-| `fetcher` 自身抛出的业务错误 | 原样透传 | **无**（不是本包的错误） | 不做任何包装，按引用原样出现在 `state.error` |
-| `retry`/`retryDelay` 策略函数自身抛出的异常 | 原样透传 | **无**（同上） | 直接作为这次请求的失败原因，不会被误判成"不重试" |
-| 状态结算（`then`/`catch` 回调）内部再次抛出的框架级异常（极端情况） | 通过 `runtime.reportError(error, { phase: 'async-flush' })` 上报 | — | 不会作为 `Promise` rejection 抛给调用方，需要通过 runtime 的 `onError` 观察 |
+稳定错误码表，**8 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/resource'`。
 
-> **传给 `fetcher` 的 `signal.reason`**：当一次在途请求被**新请求取代**时，底座 `@migaia/lifecycle` 的 `GenerationController` 以字符串 `'superseded by a new generation'` 作为 abort reason（迁移前是不带 reason 的默认 `AbortError`）。`Resource` 对外的 rejection 仍然被归一化成上表的 `REQUEST_ABORTED` `DOMException`，所以调用方契约不变；但如果你的 `fetcher` 直接把 `signal` 透传给 `fetch()` 并读取 `signal.reason`，看到的会是那个字符串。
+| `ResourceErrorCode` 键      | 码值                          | 触发条件                                                                                                                                        |
+| --------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `resourceDisposed`          | `RESOURCE_DISPOSED`           | 在已 `dispose()` 的 `Resource` 上调用任意读取/操作方法                                                                                          |
+| `requestAborted`            | `REQUEST_ABORTED`             | 请求被 `fetcher` 收到的 `signal` 中止、或内部转发给调用方的 `DOMException`（保持原生 `DOMException('...', 'AbortError')` 类型，码只是附加字段） |
+| `requestCancelled`          | `REQUEST_CANCELLED`           | 调用方显式 `cancel()` 导致当前 pending 请求被取消，`state` 落入 `cancelled` 所携带的 `DOMException`                                             |
+| `cancellationCleanupFailed` | `CANCELLATION_CLEANUP_FAILED` | 请求取消已完成状态收敛，但取消期间的 timer/listener cleanup 失败                                                                                |
+| `noActivePromise`           | `NO_ACTIVE_PROMISE`           | 读取 `promise`，或 `pending`/`idle` 状态下内部 `#materialize()` 时，没有一个正在进行或已缓存的 Promise 可返回                                   |
+| `invalidSnapshot`           | `INVALID_SNAPSHOT`            | `hydrate()`/`initialSnapshot` 收到的快照 `version` 不是 `1`，或 `updatedAt`/`expiresAt` 不是有限数字                                            |
+| `invalidOption`             | `INVALID_OPTION`              | 构造/调用时传入的选项（`ttl`、`retry`、`retryDelay`、`scheduler` 等）不满足取值要求                                                             |
+| `suspenseProbeFailed`       | `SUSPENSE_PROBE_FAILED`       | `fetcher` 抛出用于 Suspense 的值，但探测其 `.then` 时 getter 本身抛错，无法判定是否为 thenable                                                  |
 
-区分两类失败很重要：**业务失败**（`fetcher` reject 或抛错）落在 `state.error`，是正常的、预期内的状态；**框架自身在结算回调里意外出错**（几乎不会在正常使用下发生）才会走 `runtime.reportError`，需要在创建 `runtime` 时传入 `onError` 才能观察到。
+`requestAborted`/`requestCancelled` 抛出/落入状态的值始终是原生 `DOMException`（`name === 'AbortError'`），调用方通常按 `error.name === 'AbortError'` 判定并静默处理，而不是当作真实失败；`code` 只作为附加字段挂上，不改变类型。调用方应始终以 `error.code === ResourceErrorCode.xxx` 判别，不要硬编码码值字符串。
 
 ---
 
-## 10. 生命周期与 dispose
+<a id="高阶组合示例"></a>
 
-`dispose()` 做的事情：中止在途请求（不做任何"是否 pending"的状态改写，因为整个 `Resource` 都要终结了）、清空 `refreshScheduled`/`forceRefresh` 内部标记、清理响应式依赖登记、`dispose()` 内部的 `state` Signal、最终把生命周期标记为终态。之后任何方法调用（包括 `state`/`peek()` 这类只读访问）都会抛 `cannot use a disposed resource`。
+## 高阶组合示例
 
-`dispose()` 是幂等的——已经处于终态时再次调用直接返回，不会重复执行清理或抛错。
-
-`Resource` 没有自带的"父子级联 dispose"机制；如果一个模块内创建了多个 `Resource`，需要调用方自己在合适的生命周期节点（组件卸载、请求结束、模块热更新前）逐个 `dispose()`。
-
----
-
-## 11. 完整场景示例
-
-### 11.1 React Suspense（配合 `@migaia/store-react`）
-
-```ts
-// 定义资源
-import { Resource } from '@migaia/resource';
-import { defaultRuntime } from '@migaia/reactive';
-
-const userResource = new Resource(
-  ({ signal }) => fetch(`/api/users/${currentUserId.value}`, { signal }).then((r) => r.json()),
-  defaultRuntime,
-  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }
-);
-```
+### 1. Suspense 兼容读取 + Error Boundary
 
 ```tsx
-// 组件内消费（useResourceValue 内部就是 resource.state 分支 + read() 抛 Promise 的组合）
-import { useResourceValue } from '@migaia/store-react';
-
-function UserCard() {
-  const user = useResourceValue(userResource); // pending 时挂起，success 直接拿到 T，error 交给 ErrorBoundary
+function UserProfile({ resource }: { resource: Resource<User> }) {
+  const user = resource.read(); // pending 抛 Promise（被 Suspense 捕获），error 抛错误（被 Error Boundary 捕获）
   return <div>{user.name}</div>;
 }
 ```
 
-### 11.2 Worker RPC 场景（`@migaia/store-worker` 的封装方式）
-
-`@migaia/store-worker` 的 `workerComputed()` 就是在 `Resource` 上包了一层"把输入通过 web-rpc 转发给 Worker 计算"：
+### 2. SSR 快照恢复，客户端不重新请求
 
 ```ts
-import { Resource } from '@migaia/resource';
+// 服务端：
+const snapshot = userResource.dehydrate(); // undefined 或 { version: 1, data, updatedAt, expiresAt }
+// 序列化 snapshot 注入 HTML
 
-function workerComputed<Input, Output>(adapter, selectInput: () => Input, options = {}) {
-  return new Resource<Output>(
-    ({ signal }) => {
-      const input = selectInput(); // 同步读取，成为依赖
-      return adapter.request<Input, Output>(input, { signal });
-    },
-    runtime,
-    options
-  );
-}
-```
-
-`selectInput()` 里对响应式输入的同步读取会被正确追踪；`signal` 被转交给 RPC adapter 用于取消进行中的 Worker 调用。
-
-### 11.3 SSR 快照恢复
-
-```ts
-import { Resource } from '@migaia/resource';
-
-// 服务端：请求完成后导出快照，随页面一起序列化下发
-const snapshot = userResource.dehydrate();
-
-// 客户端：用快照直接初始化，避免重复请求；快照可能已过期，配 staleWhileRevalidate 防止闪烁
+// 客户端：
 const userResource = new Resource(fetchUser, runtime, {
-  initialSnapshot: snapshot,
-  staleWhileRevalidate: true,
+  initialSnapshot: snapshot, // 有值且未过期时不会重新发起请求
   ttl: 30_000
 });
 ```
 
-### 11.4 手动控制 + 错误处理
+### 3. 后台刷新且展示旧数据
 
 ```ts
-const search = new Resource(
-  ({ signal }) => searchApi(query.value, { signal }),
-  runtime,
-  { autoStart: false, retry: 1, retryDelay: 300 }
-);
+const list = new Resource(fetchList, runtime, {
+  ttl: 10_000,
+  staleWhileRevalidate: true
+});
 
-async function onSubmit() {
-  try {
-    const results = await search.refetch();
-    renderResults(results);
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') return; // 被新搜索取代，忽略
-    renderError(error);
-  }
-}
+// list.state.status === 'success' 时，即使正在后台刷新，
+// list.state.data 仍是旧数据，list.refreshing === true 可用来展示"刷新中"角标
+```
 
-// 页面卸载
-search.dispose();
+### 4. 自定义重试退避
+
+```ts
+const resource = new Resource(fetchWithFlakyBackend, runtime, {
+  retry: (failureCount, error) => failureCount < 5 && !(error instanceof TypeError),
+  retryDelay: (failureCount) => Math.min(1000 * 2 ** failureCount, 30_000) // 指数退避，封顶 30s
+});
+```
+
+### 5. 手动失效 + 取消
+
+```ts
+await resource.invalidate(); // 立即视为过期并重新请求
+resource.cancel(); // 只中止当前请求，资源仍可复用；下次读取会重新发起
 ```
 
 ---
 
-## 12. 构建、测试与常见问题排查
+<a id="排查与构建门禁"></a>
 
-在仓库根目录运行以下包级门禁。`resource` 的 `test` 脚本直接运行 Vitest；构建需单独运行。
+## 排查与构建门禁
+
+- **依赖变了但没有自动重新请求**：检查响应式读取是否发生在 `fetcher` 的**首次 `await` 之前**；`await` 之后的读取不会被追踪，应挪进 `Computed` 或提前读入局部变量。
+- **`cancel()`/依赖变化后底层请求似乎仍在跑**：`fetcher` 没有把 `ctx.signal` 转交给真正可取消的 I/O；`cancel()` 只是让 `Resource` 忽略这次结果，不会代为中止未接收 `signal` 的请求。
+- **重复读 `state`/`promise` 却拿不到最新数据**：被动读取只在过期或 `idle` 时才发起请求，重复读不会强制刷新；需要强制刷新用 `refetch()` 或 `invalidate()`。
+- **读取抛 `RESOURCE_DISPOSED`**：`Resource` 已被 `dispose()`；停止持有该引用，创建新的 `Resource` 实例。
+- **读取抛 `NO_ACTIVE_PROMISE`**：状态机进入了不一致的中间态，通常意味着绕过了 `refetch()`/`invalidate()`/正常构造流程直接摆弄内部状态；检查调用路径。
+- **`hydrate()`/`initialSnapshot` 抛 `INVALID_SNAPSHOT`**：快照通常来自 SSR 序列化或持久化存储，格式漂移应在装载时就失败；检查快照的产出/序列化路径，确认 `version === 1` 且 `updatedAt`/`expiresAt` 是有限数字。
+- **长时间不用后再次读取，依赖似乎"断了"重新算了一遍**：`keepAlive` 默认 `false`，无人观察时会自动休眠（清依赖、令缓存过期）；需要"没人看也保持热数据"时显式传 `keepAlive: true`。
+- **`fetcher` 里的 Suspense 抛出没有被正确识别**：若抛出值的 `.then` getter 本身抛错，会得到 `SUSPENSE_PROBE_FAILED` 而不是被当作普通 fetch 失败静默重试；检查该值为什么带有会抛错的 hostile getter。
 
 ```bash
-pnpm --filter @migaia/resource fmt
-pnpm --filter @migaia/resource lint
-pnpm --filter @migaia/resource typecheck
-pnpm --filter @migaia/resource typecheck:test
-pnpm --filter @migaia/resource build
-pnpm --filter @migaia/resource test
+pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
-
-**Q：依赖变了，但 Resource 没有自动重新请求。**
-检查这次响应式读取是不是发生在 `fetcher` 的第一个 `await` **之后**——那部分读取不会被追踪。把它挪到 `await` 之前，或者包进一个 `Computed` 并在 `await` 之前读一次。
-
-**Q：`staleWhileRevalidate` 开着，但 `cancel()` 之后 `refreshing` 一直是 `true`。**
-这是已知的边界行为，见 [§5.1](#51-cancel-vs-dispose)——`cancel()` 只在 `state.status === 'pending'` 时改写状态，后台刷新的 `success.refreshing` 不会被它重置。调用 `cancel()` 后如果需要精确重置，再调用一次 `refetch()`/`invalidate()`。
-
-**Q：SSR 下发的数据一显示就闪成 loading。**
-大概率是 `initialSnapshot` 已经过期、又没开 `staleWhileRevalidate`，见 [§8](#8-ssr-持久化快照)——构造时会自动发起一次刷新请求，默认行为会先把状态切回 `pending`。加上 `staleWhileRevalidate: true` 即可让旧值在刷新期间继续展示。
-
-**Q：`retry` 设了却感觉请求次数对不上。**
-`retry` 是重试次数、不含首次尝试，`retry: 2` 总共最多 3 次请求。同时确认 `fetcher` 内部有没有读取一个会 `throw` Promise 的 Suspense 值——这类"挂起"不计入重试预算，见 [§7](#7-重试策略)。
-
-**Q：Resource 一直没人用，但内存里好像还占着东西。**
-检查是不是设了 `keepAlive: true`——这会让 `Resource` 永远不自动休眠。默认 `false` 时，无人观察一段时间后会自动清理依赖登记并让缓存过期（但不会主动 `dispose()`，`Resource` 实例本身依然存在）；真正不再使用时仍然需要显式 `dispose()`。
-
-**Q：想在业务代码里 `catch` 到 `runtime` 报的错误。**
-只有极少数框架内部结算异常才会走 `runtime.reportError`，正常的 `fetcher` 失败都在 `state.error` 里。需要观察前者的话，在 `createRuntime({ onError })` 里传入回调。

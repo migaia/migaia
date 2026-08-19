@@ -4,6 +4,8 @@ import {
   mkdirSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
+  statSync,
   rmSync,
   symlinkSync,
   writeFileSync
@@ -27,6 +29,19 @@ function main() {
     mkdirSync(join(consumerDirectory, 'node_modules', '@migaia'), { recursive: true });
     const packedPackage = join(extractDirectory, 'package');
     execFileSync('tar', ['-xzf', pack(), '-C', extractDirectory]);
+    const packedFiles = readdirSync(join(packedPackage, 'dist'), { recursive: true });
+    if (
+      packedFiles.some((entry) => {
+        const filePath = join(packedPackage, 'dist', String(entry));
+        return (
+          existsSync(filePath) &&
+          statSync(filePath).isFile() &&
+          readFileSync(filePath, 'utf8').includes('setSubscriptionReleaseProbe')
+        );
+      })
+    ) {
+      throw new Error('packed artifact contains subscription probe instrumentation');
+    }
     symlinkSync(
       packedPackage,
       join(consumerDirectory, 'node_modules', '@migaia/event-subscriber'),
@@ -35,12 +50,12 @@ function main() {
     writeFileSync(join(consumerDirectory, 'package.json'), '{"type":"module"}\n', 'utf8');
     writeFileSync(
       join(consumerDirectory, 'runtime.mjs'),
-      "await import('@migaia/event-subscriber');\n",
+      "import { createEventChannel, createEventHub } from '@migaia/event-subscriber';\nconst channel = createEventChannel(); const legacy = channel.subscribe(() => {}); if (legacy.unsubscribe !== legacy) throw new Error('legacy self identity'); const chain = legacy.subscribe(() => {}); chain.unsubscribe(); if (channel.size !== 0) throw new Error('channel chain close'); const hub = createEventHub(); const hubHandle = hub.subscribe('ready', () => {}); if (hubHandle.unsubscribe !== hubHandle) throw new Error('hub self identity'); hubHandle.subscribe('done', () => {}); hubHandle(); if (hub.size() !== 0) throw new Error('hub chain close');\n",
       'utf8'
     );
     writeFileSync(
       join(consumerDirectory, 'types.ts'),
-      "import { createEventChannel, type IEventContext } from '@migaia/event-subscriber';\nconst channel = createEventChannel<number>();\nconst listener = (event: IEventContext<number>): void => { void event.value; };\nchannel.subscribe(listener);\n",
+      "import { createEventChannel, createEventHub, type IEventChannelSubscription, type IEventHubSubscription, type IEventContext } from '@migaia/event-subscriber';\nconst channel = createEventChannel<number>();\nconst listener = (event: IEventContext<number>): void => { void event.value; };\nconst channelHandle: IEventChannelSubscription<number> = channel.subscribe(listener);\nchannelHandle.subscribe(listener);\nconst hub = createEventHub<{ ready: number; done: string }>();\nconst hubHandle: IEventHubSubscription<{ ready: number; done: string }, 'ready'> = hub.subscribe('ready', listener);\nhubHandle.subscribe('done', (event) => { const value: string = event.value; void value; });\n// @ts-expect-error finite key cannot repeat in one chain\nhubHandle.subscribe('ready', listener);\nconst wide = createEventHub<Record<string, number>>();\nwide.subscribe('dynamic', listener).subscribe('dynamic', listener);\n",
       'utf8'
     );
     execFileSync(process.execPath, [join(consumerDirectory, 'runtime.mjs')], {

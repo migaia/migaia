@@ -12,6 +12,8 @@ export type IQuiescenceTracker<TKey> = {
   /** Blocks further `retain()` calls for `key`. Idempotent. */
   seal(key: TKey): void;
   isSealed(key: TKey): boolean;
+  /** Removes a zero-count key and returns whether a state entry was removed. */
+  forget(key: TKey): boolean;
 };
 
 type IKeyStore<TKey, TValue> = {
@@ -96,6 +98,17 @@ function createTrackerCore<TKey>(store: IKeyStore<TKey, IKeyState>): IQuiescence
     },
     isSealed(key) {
       return store.get(key)?.sealed ?? false;
+    },
+    forget(key) {
+      const state = store.get(key);
+      if (
+        !state ||
+        state.count !== 0 ||
+        state.strictWaiters.length !== 0 ||
+        state.looseWaiters.length !== 0
+      )
+        return false;
+      return store.delete(key);
     }
   };
 }

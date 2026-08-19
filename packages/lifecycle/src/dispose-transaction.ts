@@ -487,7 +487,9 @@ export function createDisposeTransaction(
       try {
         return collector.finalize(LifecycleErrorText.disposeTransactionFailed);
       } catch (error) {
-        throw appendCleanupErrors(error, errorPolicy === 'throw' ? cleanupErrors : []);
+        const additionalCleanupErrors =
+          errorPolicy === 'throw' && !cleanupErrors.includes(error) ? cleanupErrors : [];
+        throw appendCleanupErrors(error, additionalCleanupErrors);
       }
     }
   };

@@ -12,6 +12,7 @@ export {
 export { EVENT_SUBSCRIBER_SOURCE, EventSubscriberErrorCode } from './error-code.js';
 export { EventSubscriberState } from './state-constants.js';
 export type { IEventSubscriberErrorCode } from './error-code.js';
+export type { IEventChannelSubscription, IEventHubSubscription } from './types.js';
 export type {
   ICanonicalEventChannel,
   IEventAbortSignal,

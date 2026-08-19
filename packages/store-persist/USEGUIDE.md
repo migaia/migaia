@@ -13,7 +13,8 @@
 7. [与 storage-web 的 codec 集成](#7-与-storage-web-的-codec-集成)
 8. [错误参考](#8-错误参考)
 9. [生产环境完整示例](#9-生产环境完整示例)
-10. [常见问题排查](#10-常见问题排查)
+10. [底层导出：envelope 工具、状态常量与错误构造函数](#10-底层导出envelope-工具状态常量与错误构造函数)
+11. [常见问题排查](#11-常见问题排查)
 
 ---
 
@@ -21,29 +22,32 @@
 
 ```ts
 type IPersistUnit<TState> = {
-  snapshot(): TState;                          // 同步读当前可持久化状态
-  restore(state: TState): void;                // 同步写回一份状态（hydrate 用）
-  subscribe(onChange: () => void): IDisposer;   // 注册变化通知
+  snapshot(): TState; // 同步读当前可持久化状态
+  restore(state: TState): void; // 同步写回一份状态（hydrate 用）
+  subscribe(onChange: () => void): IDisposer; // 注册变化通知
 };
 
-function persistUnit<TState>(unit: IPersistUnit<TState>, options: IPersistUnitOptions<TState>): IPersistHandle;
+function persistUnit<TState>(
+  unit: IPersistUnit<TState>,
+  options: IPersistUnitOptions<TState>
+): IPersistHandle;
 ```
 
 `persist()`/`persistCollection()`/`persistKeyed()` 内部各自把自己的原生 API 适配成 `IPersistUnit<TState>`，然后统一调 `persistUnit()`——hydrate 竞态、防抖写回、dispose 清理只在这一个函数里实现一遍，三条路径不重复代码，行为也因此完全一致。一般不需要直接调用 `persistUnit()`，除非你要接入一种全新的 store 形状（第四种，本包目前没有内置适配）。
 
 `IPersistUnitOptions<TState>` 完整字段：
 
-| 选项 | 类型 | 必填性 | 默认值 | 说明 |
-| --- | --- | --- | --- | --- |
-| `key` | `string` | 必填 | 无 | 存档在 storage 里的键 |
-| `runtime` | `IRuntime` | 必填 | 无 | `status`/`error`/`hydrated` 等信号挂在哪个 Runtime 上；三条适配路径都会自动传底层 store/collection/AtomStore 自己的 runtime |
-| `storage` | `{ capabilities, get, set, remove, keys }` | 必填 | 无 | 对应 `@migaia/storage-web` 键值能力；可选 `getBytes`/`setBytes` 启用 binary codec |
-| `codec` | `ICodec` | 可选 | `defaultJsonCodec` | 见 [§7](#7-与-storage-web-的-codec-集成) |
-| `version` | `number` | 可选 | `0` | schema 版本，必须是安全非负整数 |
-| `migrate` | `(persisted: TState, fromVersion: number) => TState` | 可选 | 无 | 见 [§5](#5-存档格式与版本迁移) |
-| `partialize` | `(state: TState) => Partial<TState>` | 可选 | 恒等函数 | 写入前裁剪 |
-| `merge` | `(persisted: Partial<TState>, current: TState) => TState` | 可选 | 普通对象按启动快照做三向合并；数组/Map/Set 等非 plain shape 整体替换 | 读取后合并回内存，见下方"默认 merge 的语义" |
-| `debounceMs` | `number` | 可选 | `0`（不防抖） | 变化后延迟多久发起写入 |
+| 选项         | 类型                                                      | 必填性 | 默认值                                                               | 说明                                                                                                                        |
+| ------------ | --------------------------------------------------------- | ------ | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `key`        | `string`                                                  | 必填   | 无                                                                   | 存档在 storage 里的键                                                                                                       |
+| `runtime`    | `IRuntime`                                                | 必填   | 无                                                                   | `status`/`error`/`hydrated` 等信号挂在哪个 Runtime 上；三条适配路径都会自动传底层 store/collection/AtomStore 自己的 runtime |
+| `storage`    | `{ capabilities, get, set, remove, keys }`                | 必填   | 无                                                                   | 对应 `@migaia/storage-web` 键值能力；可选 `getBytes`/`setBytes` 启用 binary codec                                           |
+| `codec`      | `ICodec`                                                  | 可选   | `defaultJsonCodec`                                                   | 见 [§7](#7-与-storage-web-的-codec-集成)                                                                                    |
+| `version`    | `number`                                                  | 可选   | `0`                                                                  | schema 版本，必须是安全非负整数                                                                                             |
+| `migrate`    | `(persisted: TState, fromVersion: number) => TState`      | 可选   | 无                                                                   | 见 [§5](#5-存档格式与版本迁移)                                                                                              |
+| `partialize` | `(state: TState) => Partial<TState>`                      | 可选   | 恒等函数                                                             | 写入前裁剪                                                                                                                  |
+| `merge`      | `(persisted: Partial<TState>, current: TState) => TState` | 可选   | 普通对象按启动快照做三向合并；数组/Map/Set 等非 plain shape 整体替换 | 读取后合并回内存，见下方"默认 merge 的语义"                                                                                 |
+| `debounceMs` | `number`                                                  | 可选   | `0`（不防抖）                                                        | 变化后延迟多久发起写入                                                                                                      |
 
 ### 默认 `merge` 的语义（容易踩的坑）
 
@@ -65,7 +69,10 @@ type IPersistableStore = {
   readonly $runtime: IRuntime;
   $plain(): Record<string, unknown>;
   $subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean }): IDisposer;
-  $hydrate(partial: Record<string, unknown>, options?: { unknown?: 'ignore' | 'report' | 'strict'; onUnknown?: (key: string) => void }): void;
+  $hydrate(
+    partial: Record<string, unknown>,
+    options?: { unknown?: 'ignore' | 'report' | 'strict'; onUnknown?: (key: string) => void }
+  ): void;
 };
 
 type IPersistOptions = {
@@ -81,11 +88,11 @@ type IPersistOptions = {
 
 `IPersistableStore` 是结构类型，不 import `@migaia/store-light` 的具体类型——`createStore()` 的返回值天然满足这个接口，传进来不需要任何改动。适配表：
 
-| `IPersistUnit` 成员 | 对应 store-light API |
-| --- | --- |
-| `snapshot()` | `store.$plain()`（只含 signal 支撑的标量字段，排除 computed/wasm/方法） |
-| `restore(state)` | `store.$hydrate(state)`（宽松写回，未知字段跳过） |
-| `subscribe(fn)` | `store.$subscribe(fn, { fireImmediately: false })` |
+| `IPersistUnit` 成员 | 对应 store-light API                                                    |
+| ------------------- | ----------------------------------------------------------------------- |
+| `snapshot()`        | `store.$plain()`（只含 signal 支撑的标量字段，排除 computed/wasm/方法） |
+| `restore(state)`    | `store.$hydrate(state)`（宽松写回，未知字段跳过）                       |
+| `subscribe(fn)`     | `store.$subscribe(fn, { fireImmediately: false })`                      |
 
 ```ts
 import { createStore } from '@migaia/store-light';
@@ -106,7 +113,10 @@ const handle = persist(store, {
 ## 3. `persistCollection()` 完整参考（store-indexed）
 
 ```ts
-function persistCollection<TState>(collection: IPersistableCollection<TState>, options: IPersistCollectionOptions<TState>): IPersistHandle;
+function persistCollection<TState>(
+  collection: IPersistableCollection<TState>,
+  options: IPersistCollectionOptions<TState>
+): IPersistHandle;
 
 type IPersistableCollection<TState> = {
   readonly runtime: IRuntime;
@@ -153,7 +163,12 @@ cart.set('sku-123', 2); // 防抖写回（默认 debounceMs: 0，下一次写队
 ## 4. `persistKeyed()` + `clearFamily()` 完整参考（store-keyed）
 
 ```ts
-function persistKeyed<T>(atomStore: IAtomStore, def: IWritableAtomDefinition<T>, id: string, options: IPersistKeyedOptions<T>): IPersistKeyedHandle<T>;
+function persistKeyed<T>(
+  atomStore: IAtomStore,
+  def: IWritableAtomDefinition<T>,
+  id: string,
+  options: IPersistKeyedOptions<T>
+): IPersistKeyedHandle<T>;
 function clearFamily(storage: IKeyValueStore, namespace: string): Promise<number>;
 
 type IPersistKeyedOptions<T> = {
@@ -228,19 +243,19 @@ async function logout(userId: string) {
 
 `persist()`/`persistCollection()` 返回完整的 `IPersistHandle`；`persistKeyed()` 只返回 `{ value, dispose() }`（单 key 场景不需要 `status`/`flush()` 这么重的门面）。
 
-| 成员 | 类型 | 同步/异步 | 说明 |
-| --- | --- | --- | --- |
-| `status` | `IComputedValue<'loading' \| 'ready' \| 'error' \| 'disposed'>` | — | 整体状态机 |
-| `error` | `IComputedValue<unknown>` | — | hydration/write 任一失败时的错误；两者都失败返回 `AggregateError` |
-| `hydrated` | `IComputedValue<boolean>` | — | 等价于 `hydrationStatus.value === 'success'` |
-| `hydrationStatus` / `hydrationError` | `IReadonlyPersistValue<...>` | — | 首次读取的结果，只变化一次 |
-| `writeStatus` / `writeError` | `IReadonlyPersistValue<...>` | — | 最近一次写操作的结果，会反复变化 |
-| `ready` | `Promise<void>` | 异步 | hydrate 成功 resolve，失败 reject |
-| `settled` | `Promise<void>` | 异步 | 不管成功失败都 resolve |
-| `flush()` | `() => Promise<void>` | 异步 | 立即写并等待完成；这次写入失败会 reject 给调用方 |
-| `clear()` | `() => Promise<void>` | 异步 | 删除存档，不重置内存状态 |
-| `disposed` | `boolean` | 同步 | 是否已 `dispose()` |
-| `dispose()` | `() => void` | 同步 | 退订、清防抖 timer、abort 在途 I/O |
+| 成员                                 | 类型                                                            | 同步/异步 | 说明                                                              |
+| ------------------------------------ | --------------------------------------------------------------- | --------- | ----------------------------------------------------------------- |
+| `status`                             | `IComputedValue<'loading' \| 'ready' \| 'error' \| 'disposed'>` | —         | 整体状态机                                                        |
+| `error`                              | `IComputedValue<unknown>`                                       | —         | hydration/write 任一失败时的错误；两者都失败返回 `AggregateError` |
+| `hydrated`                           | `IComputedValue<boolean>`                                       | —         | 等价于 `hydrationStatus.value === 'success'`                      |
+| `hydrationStatus` / `hydrationError` | `IReadonlyPersistValue<...>`                                    | —         | 首次读取的结果，只变化一次                                        |
+| `writeStatus` / `writeError`         | `IReadonlyPersistValue<...>`                                    | —         | 最近一次写操作的结果，会反复变化                                  |
+| `ready`                              | `Promise<void>`                                                 | 异步      | hydrate 成功 resolve，失败 reject                                 |
+| `settled`                            | `Promise<void>`                                                 | 异步      | 不管成功失败都 resolve                                            |
+| `flush()`                            | `() => Promise<void>`                                           | 异步      | 立即写并等待完成；这次写入失败会 reject 给调用方                  |
+| `clear()`                            | `() => Promise<void>`                                           | 异步      | 删除存档，不重置内存状态                                          |
+| `disposed`                           | `boolean`                                                       | 同步      | 是否已 `dispose()`                                                |
+| `dispose()`                          | `() => void`                                                    | 同步      | 退订、清防抖 timer、abort 在途 I/O                                |
 
 `dispose()` 之后再调用 `flush()`/`clear()` 会立即 reject，错误是 `name === 'AbortError'` 的 `Error`。
 
@@ -282,16 +297,16 @@ const handle = persistCollection(bigDataset, {
 `ABORTED_BY_DISPOSE`；后者保留原生 `AbortError`。hydrate/write 同时失败时，`AggregateError.errors`
 保留两个原因。
 
-| 触发条件 | 错误类型 | 说明 |
-| --- | --- | --- |
-| `version` 不是安全非负整数 | `TypeError` | 构造时同步抛出 |
-| 存档不是合法信封（不是对象/缺 `version`/缺 `state`） | `PersistEnvelopeError`（继承 `TypeError`） | hydrate 阶段，反映在 `hydrationError`/`ready` reject |
-| `version` 与存档不一致且未提供 `migrate` | `Error` | 消息含 `provide migrate()` |
-| codec 编码失败（比如值包含循环引用） | 取决于 codec 实现 | `defaultJsonCodec` 透传 `JSON.stringify` 的原生错误 |
-| `codec.output === 'structured'` 但存储不支持 | `TypeError` | 见 [§7](#7-与-storage-web-的-codec-集成) |
-| `codec.output === 'binary'` 但存储没有 `getBytes`/`setBytes` | `TypeError` | 同上 |
-| `persistKeyed()` 未传 `namespace` | TypeScript 编译期错误 | `namespace` 是必填字段，不是运行时校验 |
-| `dispose()` 后调用 `flush()`/`clear()` | `Error`（`name: 'AbortError'`） | 消息为 `[store] persist operation was aborted by dispose` |
+| 触发条件                                                     | 错误类型                                   | 说明                                                      |
+| ------------------------------------------------------------ | ------------------------------------------ | --------------------------------------------------------- |
+| `version` 不是安全非负整数                                   | `TypeError`                                | 构造时同步抛出                                            |
+| 存档不是合法信封（不是对象/缺 `version`/缺 `state`）         | `PersistEnvelopeError`（继承 `TypeError`） | hydrate 阶段，反映在 `hydrationError`/`ready` reject      |
+| `version` 与存档不一致且未提供 `migrate`                     | `Error`                                    | 消息含 `provide migrate()`                                |
+| codec 编码失败（比如值包含循环引用）                         | 取决于 codec 实现                          | `defaultJsonCodec` 透传 `JSON.stringify` 的原生错误       |
+| `codec.output === 'structured'` 但存储不支持                 | `TypeError`                                | 见 [§7](#7-与-storage-web-的-codec-集成)                  |
+| `codec.output === 'binary'` 但存储没有 `getBytes`/`setBytes` | `TypeError`                                | 同上                                                      |
+| `persistKeyed()` 未传 `namespace`                            | TypeScript 编译期错误                      | `namespace` 是必填字段，不是运行时校验                    |
+| `dispose()` 后调用 `flush()`/`clear()`                       | `Error`（`name: 'AbortError'`）            | 消息为 `[store] persist operation was aborted by dispose` |
 
 ---
 
@@ -337,7 +352,91 @@ async function logout(userId: string, activeHandle: { dispose(): void }) {
 
 ---
 
-## 10. 常见问题排查
+## 10. 底层导出：envelope 工具、状态常量与错误构造函数
+
+以下是 `persistUnit()`/`persist()`/`persistCollection()`/`persistKeyed()` 内部用来读写/编解码存档的底层函数与常量。它们都从包根（`.` 导出）导出，一般不需要在业务代码里直接调用——除非要接入一种全新的 store 形状（`persistUnit()` 之外的第四种适配），或需要绕开三个高层函数手动读写某个 key 的存档。
+
+```ts
+import {
+  assertEnvelope,
+  PersistEnvelopeError,
+  type IEnvelope,
+  defaultJsonCodec,
+  writeEnvelope,
+  readEnvelope,
+  removeEnvelope,
+  PersistState,
+  PersistCodecOutput,
+  STORE_PERSIST_SOURCE,
+  createStorePersistError,
+  createStorePersistAbortError,
+  createStorePersistTypeError,
+  createStorePersistAggregateError
+} from '@migaia/store-persist';
+```
+
+```ts
+function assertEnvelope<TState>(value: unknown, key: string): IEnvelope<TState>;
+class PersistEnvelopeError extends TypeError {}
+```
+
+`assertEnvelope(value, key)` 校验 `value` 是 `{ version: number; state: unknown }` 形状的信封：`value` 非对象/是数组、`version` 不是安全非负整数、或缺失/`null`/`undefined` 的 `state`，都会抛出 `PersistEnvelopeError`（继承 `TypeError`，携带 `code: 'ENVELOPE_INVALID'`）。校验通过时返回收窄类型后的 `{ version, state: TState }`。`key` 只用于错误消息里标注是哪个存档。
+
+```ts
+const defaultJsonCodec: ICodec; // { name: 'json', output: 'text', encode(value): Promise<string>, decode(raw): Promise<unknown> }
+```
+
+本包自带的默认 codec：结构上等价于 `@migaia/storage-web` 的 `jsonCodec`，额外原生支持 `Map`/`Set` 往返（编码成带 `__migaia_persist_map__`/`__migaia_persist_set__` 标签的普通对象，解码时还原成真正的 `Map`/`Set` 实例），避免 `JSON.stringify(new Map(...))` 静默丢空的问题。`encode` 遇到不可序列化的值（如循环引用）抛 `TypeError`（`code: 'ENCODE_FAILED'`）；`decode` 收到非字符串输入抛 `TypeError`（`code: 'ENVELOPE_INVALID'`）。
+
+```ts
+function writeEnvelope(
+  storage: IPersistStorage,
+  key: string,
+  codec: ICodec,
+  value: unknown,
+  ctx: { signal?: AbortSignal }
+): Promise<void>;
+function readEnvelope(
+  storage: IPersistStorage,
+  key: string,
+  codec: ICodec,
+  ctx: { signal?: AbortSignal }
+): Promise<unknown | undefined>;
+function removeEnvelope(
+  storage: IPersistStorage,
+  key: string,
+  ctx: { signal?: AbortSignal }
+): Promise<void>;
+```
+
+- `writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。
+- `readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。
+- `removeEnvelope`：委托 `storage.remove(key, ctx)`。
+
+```ts
+const PersistState: { idle; active; loading; writing; ready; success; error; disposed }; // 见下
+const PersistCodecOutput: { text: 'text'; structured: 'structured'; binary: 'binary' };
+```
+
+`PersistState` 是本包内部状态机全部状态取值的唯一声明处，`IPersistHandle.status`/`hydrationStatus`/`writeStatus` 的类型都是它的子集（分别是 `IPersistStatus`/`IHydrationStatus`/`IWriteStatus`，见 [§6](#6-ipersisthandle-完整-api-参考)）；诊断代码可以直接比较 `handle.status.value === PersistState.error` 而不必写字符串字面量。`PersistCodecOutput` 是 `ICodec.output` 的合法取值表，与 `@migaia/storage-web` 的编码通道一一对应。
+
+```ts
+const STORE_PERSIST_SOURCE: '@migaia/store-persist';
+function createStorePersistError(code, message, options?: { cause?: unknown }): Error;
+function createStorePersistAbortError(code, message, cause?: unknown): DOMException;
+function createStorePersistTypeError(code, message, options?: { cause?: unknown }): TypeError;
+function createStorePersistAggregateError(
+  code,
+  errors: readonly unknown[],
+  message: string
+): AggregateError;
+```
+
+本包构造全部错误时使用的同一套工厂函数，统一打上 `source: STORE_PERSIST_SOURCE` 与 `IStorePersistErrorCode` 身份（经 `@migaia/utils/error` 的 `attachErrorIdentity`）。`createStorePersistAbortError` 构造原生 `DOMException('...', 'AbortError')`，用于 `dispose()` 之后取消在途操作（保持 `name === 'AbortError'` 这一约定，见 [§8](#8-错误参考)）。日常业务代码通常不需要直接调用它们；导出给需要"以 `@migaia/store-persist` 身份抛出自定义诊断错误"的高级集成方，例如自定义 `IPersistUnit` 适配实现。
+
+---
+
+## 11. 常见问题排查
 
 **Q: hydrate 完成之后，我改的字段没有被存进去？**
 检查 `debounceMs`——如果设置了防抖，需要等待或调用 `handle.flush()`；也检查 `partialize` 是不是把这个字段裁掉了。

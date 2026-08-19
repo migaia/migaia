@@ -1,419 +1,757 @@
-# 使用手册
+# `@migaia/reactive` 使用指南
 
-本文是 `@migaia/reactive` 的完整参考手册。先看 [README.md](./README.md#5-五分钟上手) 的五分钟上手示例，跑起来之后再回来查这里的细节——README 讲"是什么、为什么用、5 分钟怎么跑起来"，本文讲"每一个 API、每一个配置项、每一种边界行为"。
+本指南逐个入口列出全部导出 API 的签名、边界行为与错误码。包的定位、适用场景与五分钟上手见 [README](./README.md)。
 
 ## 目录
 
-1. [核心模型](#1-核心模型)
-2. [Signal 完整参考](#2-signal-完整参考)
-3. [Computed 完整参考](#3-computed-完整参考)
-4. [Effect 完整参考](#4-effect-完整参考)
-5. [Runtime 完整参考](#5-runtime-完整参考)
-6. [资源的集中释放：迁到 `@migaia/lifecycle`](#6-资源的集中释放迁到-migaialifecycle)
-7. [调度、批处理与 flush 精确语义](#7-调度批处理与-flush-精确语义)
-8. [错误处理](#8-错误处理)
-9. [诊断与 trace](#9-诊断与-trace)
-10. [跨 Runtime 边界与所有权](#10-跨-runtime-边界与所有权)
-11. [扩展 API：面向 Store/框架适配层作者](#11-扩展-api面向-store框架适配层作者)
-12. [更贴近生产的完整示例](#12-更贴近生产的完整示例)
-13. [构建、测试与常见问题排查](#13-构建测试与常见问题排查)
+- [主入口 `@migaia/reactive`](#主入口)：`Signal`、`Computed`、`Effect`、`createRuntime`、`defaultRuntime`
+- [`/runtime` 入口](#runtime-入口)：`Runtime`、`createObserverBinding`（`capture`/`observe`/`commit`/`retrack`）、`VersionClock`、`DependencyTracker`、`Scheduler`
+- [`/ownership` 入口](#ownership-入口)：`claimOwnership`、`ownerOf`、`assertOwnedBy`、`assertReactiveOwnedBy`
+- [`/source` 入口](#source-入口)：`createFieldSource`
+- [`/internals` 入口](#internals-入口)：`registerInternals`、`internalsOf`、`isRuntime`
+- [`/node-factories` 入口](#node-factories-入口)：`internalRuntimeOf`、`isRuntimeTracking`、`isAnyRuntimeTracking`
+- [`/node-internals` 入口](#node-internals-入口)：`registerSubs`/`registerDeps`/`registerDepVersions`/`registerVersion` 及其可变访问器
+- [`/copy-check` 入口](#copy-check-入口)：`brandOwnedValue`、`assertNoForeignOwnershipBrand`、`noteRuntimeCopy`、`runtimeCopyCount`、`assertSingleRuntimeCopy`
+- [`/reactive/*` 入口](#reactive-通配入口)：绕过桶文件的直接类导入
+- [错误码](#错误码)：`ReactiveErrorCode`（16 个码）逐条语义
+- [诊断消息](#诊断消息)：`ReactiveErrorText`
+- [Trace 事件与常量](#trace-事件与常量)：`IRuntimeTraceEvent`、`ReactiveTraceType`、`ReactiveTracePhase`、`ReactiveErrorPhase`、`ReactiveTraceReason`
+- [高阶组合示例](#高阶组合示例)
+- [排查与构建门禁](#排查与构建门禁)
 
 ---
 
-## 1. 核心模型
+<a id="主入口"></a>
 
-README 的五分钟示例已经展示了 `Signal`/`Computed`/`Effect`/`Runtime` 怎么拼在一起跑起来，这里只讲背后的运行模型，不重复那个示例。
-
-**push + pull 两段式**是理解这个内核的关键：
-
-- **push（标脏）**：`Signal.value = x` 或上游依赖变化时，只是把下游 `Computed`/`Effect` 标记为"可能过期"（`markDirty()`），并不立即重算。
-- **pull（惰性求值）**：`Computed.value`/`peek()` 被读取时才真正判断是否需要重算（依赖版本号是否变化）；没人读取的 `Computed` 永远不会白算。
-- `Effect` 是图里**唯一真正会被调度器"跑"的对象**——`Computed` 只标脏、只在被读时重算，不会自己主动执行。
-
-**惰性求值 + 自动挂起**：一个 `Computed` 在失去最后一个订阅者后（没有 `Effect` 或其它 `Computed` 依赖它），会在下一个空闲时机（默认 `queueMicrotask`）自动挂起——断开对上游的依赖、下次被读取时重新从头计算。这意味着"临时读一下某个 Computed 但不订阅"不会造成长期持有失效的缓存。需要"即使暂时没人订阅也保持热态、不重新计算"的场景，用 `{ keepAlive: true }`。
-
----
-
-## 2. Signal 完整参考
+## 主入口 `@migaia/reactive`
 
 ```ts
-class Signal<T> {
+import {
+  Signal,
+  Computed,
+  Effect,
+  type IComputedConfig,
+  createRuntime,
+  defaultRuntime,
+  type Runtime,
+  ReactiveErrorCode,
+  type IReactiveErrorCode,
+  ReactiveErrorText,
+  type IReactiveErrorText,
+  REACTIVE_SOURCE,
+  type IReactiveError,
+  ReactiveErrorPhase,
+  ReactiveTracePhase,
+  ReactiveTraceType,
+  type IDisposable,
+  type IDisposer,
+  type IComputedValue,
+  type IObservable,
+  type IObserver,
+  type IRuntime,
+  type IRuntimeOptions,
+  type ISignal,
+  type IRuntimeTraceEvent
+} from '@migaia/reactive';
+```
+
+### `Signal<T>`
+
+```ts
+class Signal<T> implements IObservable, IDisposable {
   constructor(v: T, runtime: IRuntime, options?: { debugName?: string });
-  value: T; // get 建立依赖并追踪；set 写入并（异步地）通知下游
-  peek(): T; // 读取但不建立依赖
-  readonly version: number; // 单调递增，值真的变化时才推进
-  readonly observed: boolean; // 是否至少有一个订阅者
-  readonly disposed: boolean;
-  readonly subs: ReadonlySet<IObserver>; // 只读订阅者集合，仅供诊断/自定义扩展查看
   readonly runtime: IRuntime;
   debugName?: string;
+  readonly version: number;
+  readonly disposed: boolean;
+  readonly observed: boolean; // !disposed && 有下游订阅
+  readonly subs: ReadonlySet<IObserver>;
+  value: T; // 读建立依赖；写触发下游
+  peek(): T; // 读，不建立依赖
   dispose(): void;
-  addObservedHooks(hooks: { onObserved?(): void; onUnobserved?(): void }): () => void;
+  addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void }): () => void;
 }
 ```
 
-| 成员 | 参数类型 | 同步/异步 | 行为 |
-| --- | --- | --- | --- |
-| `new Signal(v, runtime, options?)` | `v: T`；`runtime: IRuntime`；`options?: { debugName?: string }` | 同步 | 参数顺序是**值在前、`runtime` 在后**。`options.debugName` 用于诊断事件/错误信息里标识节点。 |
-| `get value` | 无参数（读取属性） | 同步 | 在有活跃追踪帧（正处在某个 `Computed`/`Effect` 求值中）时建立依赖边；已释放时抛 `cannot use a disposed signal`。 |
-| `set value` | `value: T` | 同步 | 用 `Object.is` 做相等短路——写入相同值**不会**推进 `version`、不会通知任何订阅者。真正变化时：先领取新版本号，再写值，最后（异步地，见下）通知订阅者标脏。 |
-| `peek()` | 无参数 | 同步 | 读取当前值，**不建立依赖**——适合在 `Effect`/`Computed` 内"只读一次、不订阅"的场景。已释放同样抛错。 |
-| `dispose()` | 无参数 | 同步 | 幂等；标记 `disposed = true` 并断开全部下游订阅边。释放后的任何 `value`/`peek()` 读取都会抛错，不会返回旧值。 |
-| `addObservedHooks({ onObserved, onUnobserved })` | `hooks: { onObserved?(): void; onUnobserved?(): void }` | 同步 | 注册"第一个订阅者出现/最后一个订阅者离开"的回调，返回取消订阅函数。多个 hook 可以叠加；某个 hook 抛错不会影响其它 hook 执行，全部执行完后如果有异常会重新抛出（多个异常合并成 `AggregateError`）。 |
-
-`Signal` 没有自定义相等比较的配置项——固定用 `Object.is`。需要更复杂的相等语义（比如浅比较对象），应该在写入前自己判断要不要赋值，或者在其上包一层 `Computed`。
-
-写入的通知不是同步发生在 `set value` 内部：新版本号和新值是同步落定的，但"通知下游 `markDirty()`"这一步被包在 `runDeferred` 里——目的是让"一次写入触发的所有下游标脏"作为一个整体先完成，再决定是否需要触发调度，避免同步 scheduler 策略下标脏过程中又有新的追踪把 `subs` 集合改动导致遍历出错。对调用方来说这只是实现细节，可观察的行为仍然是：写入后，`Effect` 会在下一次冲刷（微任务，或调用了 `flush()`）时看到变化。
-
----
-
-## 3. Computed 完整参考
+可写原子——响应式图里唯一的"真值来源"：
 
 ```ts
-type IComputedOptions<T> = { equals?: (a: T, b: T) => boolean; keepAlive?: boolean; debugName?: string };
+const runtime = createRuntime();
+const count = new Signal(1, runtime);
+count.value; // 1，在 Computed/Effect 内读取会建立依赖
+count.value = 2; // Object.is 判定；写入相同值不触发任何通知，也不推进版本
+count.peek(); // 2，不建立依赖
+count.dispose();
+count.value; // 抛 NODE_DISPOSED
+```
+
+边界行为：
+
+- 构造参数顺序是"先业务参数、后 `runtime`"：`new Signal(value, runtime, options?)`。
+- `value = next`：`Object.is(next, 之前值)` 为真时短路，不推进版本、不触发下游；否则先向 `VersionClock` 领取新版本号再落值（领取失败——时钟耗尽——保持原子失败，绝不出现"值已变、版本未变"的陈旧状态）。
+- `dispose()` 幂等；释放时先标记 `disposed` 再断开全部下游订阅边（通知顺序：标记优先，确保被迫重跑的 Effect 读到明确的 `NODE_DISPOSED` 而不是重新订阅一个已释放节点）。
+- `addObservedHooks({ onObserved?, onUnobserved? })`：登记节点级生命周期钩子（多个调用方可各自登记互不覆盖），返回移除函数；多个钩子中若有失败，单个失败原样抛出，多个失败聚合为携带 `OBSERVER_FAILED` 码的 `AggregateError`。
+- 跨 `Runtime` 读取/订阅一个 `Signal` 会抛 `CROSS_RUNTIME`。
+
+### `Computed<T>`
+
+```ts
+type IComputedOptions<T> = {
+  equals?: (a: T, b: T) => boolean;
+  keepAlive?: boolean;
+  debugName?: string;
+};
 type IComputedConfig<T> = IComputedOptions<T> | ((a: T, b: T) => boolean);
 
-class Computed<T> {
+class Computed<T> implements IObservable, IObserver, IDisposable {
   constructor(fn: () => T, runtime: IRuntime, config?: IComputedConfig<T>);
-  readonly value: T; // 建立依赖 + 惰性重算
-  peek(): T; // 惰性重算，不建立依赖
-  preview(): T; // 见下方"投机求值"
+  readonly runtime: IRuntime;
+  debugName?: string;
   readonly version: number;
-  readonly observed: boolean;
   readonly disposed: boolean;
-  isStale(): boolean; // 当前是否处于"标脏待重算"状态，纯同步查询，不触发求值
+  readonly observed: boolean;
+  readonly subs: ReadonlySet<IObserver>;
+  readonly deps: ReadonlySet<IObservable>;
+  readonly depVersions: ReadonlyMap<IObservable, number>;
+  readonly value: T; // 读建立依赖 + 惰性重算
+  peek(): T; // 读、重算，但不建立依赖
+  preview(): T; // 推测性求值：不发布缓存、不建立依赖边（供 React getSnapshot 一类可能被丢弃的渲染使用）
+  pull(): void; // 若脏则重算并落定版本；所有读取路径的统一入口
+  isStale(): boolean;
   dispose(): void;
 }
 ```
 
-| 成员 | 参数类型 | 同步/异步 | 行为 |
-| --- | --- | --- | --- |
-| `new Computed(fn, runtime, config?)` | `fn: () => T`；`runtime: IRuntime`；`config?: IComputedConfig<T>` | 同步 | `config` 可以直接传一个 `(a, b) => boolean` 函数（等价于只设置 `equals`），也可以传完整的选项对象。 |
-| `config.equals` | `(a: T, b: T) => boolean`（构造参数字段，非独立可调用成员） | — | 自定义"重算结果是否算变化"的比较函数，默认 `Object.is`。结果没变则**不推进 `version`**，下游因此也不会认为它变了——即使 `fn` 本身被重新执行过。 |
-| `config.keepAlive` | `boolean`（构造参数字段，非独立可调用成员） | — | 默认 `false`。为 `true` 时，即使暂时没有任何订阅者也不会被自动挂起（依赖边持续保持），适合"每次都要花很久重算、宁可持续占用一点内存也不要频繁失效重建"的场景。 |
-| `get value` | 无参数（读取属性） | 同步 | 建立依赖边（供上层 `Computed`/`Effect` 追踪），并调用内部 `pull()` 完成惰性重算判定。 |
-| `peek()` | 无参数 | 同步 | 同样会触发惰性重算（保证读到的是最新值），但不建立依赖边。 |
-| `dispose()` | 无参数 | 同步 | 幂等；断开对全部上游的依赖 + 清空下游订阅。释放后的 `value`/`peek()`/`preview()` 一律抛 `cannot read a disposed computed`。 |
-| 循环依赖（错误行为，非独立成员） | — | — | 求值过程中又读到了自己（直接或经过其它 `Computed` 间接形成环）会抛 `circular computed dependency detected`，不会栈溢出。 |
-
-**投机求值 `preview()`**：为支持可能被丢弃的并发渲染设计。preview 使用 capture 记录依赖与版本，不建立正式订阅边；后续 `pull()` 只有在 capture 仍有效时才原子提交并复用结果，否则丢弃 capture 并重新 tracked 求值。普通业务代码通常不需要直接调用它。
-
-**自动挂起细节**：`Computed` 失去最后一个订阅者后，不是立刻挂起，而是登记一个"空闲时检查"（默认 `queueMicrotask`，可通过 `IRuntimeOptions.scheduleIdle` 配置）；如果在这之前又重新被订阅，挂起会被取消。真正挂起时会清空依赖边并标记为脏，下次读取时从头重新计算。`keepAlive: true` 完全跳过这套机制。
-
----
-
-## 4. Effect 完整参考
+惰性求值、带缓存的派生值——写只标脏（push），值只在被读时重算（pull）：
 
 ```ts
-class Effect {
-  constructor(fn: () => void | (() => void), runtime: IRuntime, options?: { debugName?: string });
+const doubled = new Computed(() => count.value * 2, runtime);
+doubled.value; // 首次读取才真正计算
+doubled.value; // 依赖未变则直接返回缓存，不重算
+
+const clamped = new Computed(() => Math.max(0, count.value), runtime, { keepAlive: true }); // 无订阅者也保持热态
+const custom = new Computed(
+  () => ({ n: count.value }),
+  runtime,
+  (a, b) => a.n === b.n
+); // 第三参数可直接传比较函数
+```
+
+边界行为：
+
+- 构造参数顺序：`new Computed(fn, runtime, config?)`；`config` 可以是 `IComputedOptions` 对象，也可以直接传一个 `equals` 比较函数。
+- `equals`：默认 `Object.is`；比较函数本身抛错会阻止 dirty 落定（下次读取仍会重算，不会陷入"陈旧但标记为干净"的状态）。
+- `keepAlive`：默认 `false`——没有订阅者时会在下一个 idle 时机自动挂起（断开全部依赖、状态回到 dirty），下次读取重新建立依赖并重算；设为 `true` 时禁用自动挂起。
+- 循环自依赖（求值过程中直接或间接又读了自己）抛 `CIRCULAR_DEPENDENCY`，不会栈溢出。
+- 已释放节点的 `value`/`peek`/`pull`/`preview` 一律抛 `NODE_DISPOSED`。
+- `preview()`：用于渲染可能被丢弃的并发场景（如 React `getSnapshot`）；返回值与已提交值满足 `equals` 时共享同一个对象身份，避免消费方看到两个"相等但不同一"的对象。真正订阅仍应走 `value`/`peek`。
+
+### `Effect`
+
+```ts
+class Effect implements IObserver, IDisposable {
+  constructor(fn: () => void | IDisposer, runtime: IRuntime, options?: { debugName?: string });
+  readonly runtime: IRuntime;
+  debugName?: string;
   readonly disposed: boolean;
   readonly deps: ReadonlySet<IObservable>;
-  run(): void; // 立即强制重跑一次（构造时已自动调用一次）
+  readonly depVersions: ReadonlyMap<IObservable, number>;
+  run(): void;
   dispose(): void;
 }
 ```
 
-| 成员 | 参数类型 | 同步/异步 | 行为 |
-| --- | --- | --- | --- |
-| `new Effect(fn, runtime, options?)` | `fn: () => void \| (() => void)`；`runtime: IRuntime`；`options?: { debugName?: string }` | 同步 | **构造时会同步执行一次 `fn`**，不是等第一次依赖变化才跑。 |
-| `fn` 的返回值（构造参数 `fn` 的返回值说明，非独立可调用成员） | — | — | 可以返回一个清理函数（`() => void`）。清理函数会在**下一次重跑之前**（先清理、再执行新的 `fn`）以及 **`dispose()` 时**被调用，且调用时处于 `untracked` 状态（不会给清理逻辑本身建立依赖）。 |
-| 重跑触发（内部调度行为，非独立可调用成员） | — | — | `fn` 内读取到的 `Signal`/`Computed` 变化后，`Effect` 被加入调度队列；下一次 `flush()`（自动或手动）时，只有在依赖**真的变了**（版本号不同）才会真正重跑，仅仅"被标脏"但值没变不会重跑。 |
-| `run()` | 无参数 | 同步 | 手动强制立即重跑（不检查是否真的有依赖变化），常用于测试或需要"现在立刻同步跑一次"的场景。 |
-| `dispose()` | 无参数 | 同步 | 幂等；断开全部依赖、执行最后一次清理回调、从调度队列移除。 |
+副作用——唯一真正"被执行"的观察者（`Computed` 只标脏不重跑，只有 `Effect` 会被调度器实际 `tick`）：
 
-**清理时序的坑**：重跑逻辑是"先摘掉旧清理回调引用，再执行清理，再跑新的 `fn`"——这个顺序是为了保证：如果新的 `fn` 抛错，不会因为清理回调引用还留着旧值，导致下次重跑/`dispose()` 时重复执行同一个清理逻辑（重复 `removeEventListener`、重复释放、引用计数变负）。
+```ts
+const seen: number[] = [];
+const effect = new Effect(() => {
+  seen.push(doubled.value);
+  return () => console.log('cleanup'); // 可选：返回值作为下次重跑/dispose 前的清理回调
+}, runtime); // 构造时立即同步跑一次
+effect.dispose(); // 释放：清理依赖边 + 跑最后一次 cleanup（untracked 执行，不建立依赖）
+```
 
-**依赖断开时的强制重跑**：如果 `Effect` 依赖的某个上游节点被 `dispose()`（不是普通的值变化，是节点本身被释放），`Effect` 会被强制标记为下次冲刷时必须重跑（`onDependencyDisconnected`），而不是走"版本号比较"的路径——因为已释放节点的版本号语义已经不再有意义。
+边界行为：
 
----
+- **构造时立即同步执行一次**，不是等到依赖变化才第一次运行。
+- `fn()` 可选返回一个清理函数（`IDisposer`），会在下次重跑前、以及 `dispose()` 时被调用（`runtime.untracked()` 包裹执行，不建立新依赖）；旧 cleanup 会先被摘掉（置空）再执行，避免新 `fn()` 抛错时下次重跑/dispose 重复执行旧 cleanup。
+- 依赖变化后不会立即重跑，而是被 `Scheduler.enqueue()` 标脏排队，由 `flush()`（自动或手动）驱动 `tick()`；`tick()` 内部会先确认依赖确实变化（`hasStaleDependencies`）才真正 `run()`。
+- 依赖节点被 `dispose()`/`disconnectObservable` 断开时，会强制下次 `tick()` 无条件重跑（不看是否真的脏）。
 
-## 5. Runtime 完整参考
+### `createRuntime` / `defaultRuntime`
 
 ```ts
 function createRuntime(options?: IRuntimeOptions): Runtime;
+const defaultRuntime: Runtime;
+```
 
+```ts
 type IRuntimeOptions = {
+  adapter?: Partial<IReactiveRuntimeAdapter>; // scheduleMicrotask/now/timestamp/reportError
   onError?: (error: unknown, context: IRuntimeErrorContext) => void;
   onTrace?: (event: IRuntimeTraceEvent) => void;
-  maxFlushPasses?: number; // 默认 100
-  scheduleIdle?: (task: () => void) => void; // 默认 queueMicrotask
+  maxFlushPasses?: number; // 默认 100，须为正整数
+  scheduleIdle?: (task: () => void) => void; // 默认走 adapter.scheduleMicrotask
 };
 ```
 
-| Runtime 方法 | 签名 | 同步/异步 | 作用 |
-| --- | --- | --- | --- |
-| `signal(value, options?)` | `<T>(value: T, options?) => Signal<T>` | 同步 | 等价于 `new Signal(value, runtime, options)`。 |
-| `computed(fn, config?)` | `<T>(fn: () => T, config?) => Computed<T>` | 同步 | 等价于 `new Computed(fn, runtime, config)`。 |
-| `effect(fn, options?)` | `(fn, options?) => IDisposer` | 同步 | 等价于 `new Effect(fn, runtime, options)`，但**只返回一个 `() => void` 的 dispose 函数**，不返回 `Effect` 实例本身——拿不到 `run()`、`deps` 等成员。需要完整实例时用 `new Effect(...)`。 |
-| `batch(fn)` | `<T>(fn: () => T) => T` | 同步 | 见 [§7](#7-调度批处理与-flush-精确语义)。 |
-| `untracked(fn)` | `<T>(fn: () => T) => T` | 同步 | 在 `fn` 执行期间关闭依赖收集——`fn` 内读取任何 `Signal`/`Computed` 都不会给当前正在求值的 `Computed`/`Effect` 建立依赖边。 |
-| `flush()` | `() => 'completed' \| 'deferred'` | 同步 | 同步冲刷当前待处理队列。在另一次 `flush()` 内部重入调用会返回 `'deferred'`（外层的 `while` 循环仍会处理新加入的项）；正常情况下排空队列后返回 `'completed'`。 |
-| `setSchedulerStrategy(strategy)` | `(flush: () => void) => void` | 同步 | 替换"什么时候真正执行冲刷"的策略。默认是 `(flush) => queueMicrotask(flush)`；可以换成 `requestAnimationFrame`、`requestIdleCallback`、优先级队列或任意自定义调度。只影响**触发时机**，不改变冲刷本身的执行逻辑。 |
-| `currentVersion()` | `() => number` | 同步 | 只读查看当前版本时钟位置，不消耗版本号。 |
-| `runTracedAction(name, fn)` | `<T>(name: string, fn: () => T) => T` | 同步 | 在有 trace 监听时，包一层 `action` 类型的 start/end/error 事件；没有监听时直接执行 `fn`，零开销。`name` 必须是非空字符串，否则抛 `TypeError`。 |
-| `reportError(error, context)` | `(error, { phase, observer?, observable? }) => void` | 同步 | 手动上报一个错误到 `onError` 通道，用途见 [§8](#8-错误处理)。 |
-| `subscribeTrace(listener)` | `(listener) => IDisposer` | 同步 | 订阅 trace 事件流，见 [§9](#9-诊断与-trace)。 |
-
-**`defaultRuntime`**：`export const defaultRuntime = createRuntime()`，模块加载时不会自动创建（它单独放在 `./runtime/default-runtime` 子模块，只有真正 `import { defaultRuntime }` 才会触发构造），但一旦被 import 就是**进程级共享单例**。适合"图省事、单进程单实例"的脚本/工具场景；SSR（每请求需要独立状态）、单元测试（互不污染）、多 Worker/多 React root 场景都应该显式调用 `createRuntime()`。
-
----
-
-## 6. 资源的集中释放：迁到 `@migaia/lifecycle`
-
-本包不再提供通用的"一组资源集中释放"容器（原 `Scope`/`createScope()`）。理由见
-`docs/tray/tray.sdd.md` §2 与 `docs/lifecycle/migration.sdd.md` §4：`reactive` 是纯内存依赖图，节点的
-"释放"本质是从图上摘边，那是图操作，不是通用资源释放；而 wasm 字段、I/O 资源这类**真正持有外部资源**
-的场景，需要的是两阶段 `close()`/`dispose()`、descriptor 化的释放策略、构造失败回滚——这些能力现在
-统一由 `@migaia/lifecycle` 的 `LifecycleScope`/`SyncLifecycleScope` 提供：
+新建一个隔离运行时：
 
 ```ts
-import { createLifecycleScope } from '@migaia/lifecycle';
-
-const scope = createLifecycleScope();
-const a = new Signal(1, runtime);
-scope.own(a, { syncSafe: true, force: () => a.dispose() });
-const b = new Computed(() => a.value * 2, runtime);
-scope.own(b, { syncSafe: true, force: () => b.dispose() });
-
-// 页面卸载 / 请求结束
-await scope.dispose(); // 按登记逆序依次执行每个 descriptor 的释放策略
-```
-
-只装纯 `Signal`/`Computed`/`Effect`（不含 wasm 字段、I/O 资源）的容器可以改用同步的
-`createSyncLifecycleScope()`，避免把释放路径变成异步——具体取舍见 `@migaia/lifecycle` 自己的
-USEGUIDE。
-
----
-
-## 7. 调度、批处理与 flush 精确语义
-
-**默认调度策略**是微任务合并：`Signal` 写入 → 下游标脏 → 如果不在批处理中，立即调用 `scheduler.requestFlush()` 申请一次 `queueMicrotask` 冲刷；同一个微任务里多次写入只会触发一次真正的冲刷。
-
-**`batch(fn)`**：把 `fn` 内的多次写入合并到一次冲刷。嵌套 `batch()` 只有最外层退出时才真正冲刷。如果 `fn` 本身抛错，`batch()` 优先抛出 `fn` 的错误；如果冲刷阶段又额外抛错，第二个错误会被挂到第一个错误的 `error.cause` 上（非 `Error` 类型的抛出值则包成 `{ cause: { action, flush } }` 的新 `Error`），保证业务错误不会被冲刷阶段的错误覆盖掉。
-
-```ts
-runtime.batch(() => {
-  a.value = 1;
-  b.value = 2; // a、b 的下游只会在这里统一冲刷一次，而不是两次
+const runtime = createRuntime({
+  maxFlushPasses: 50,
+  onError: (e, ctx) => console.error(ctx.phase, e)
 });
 ```
 
-**`flush()`**：手动立即同步冲刷当前队列，常用于测试（不想等微任务）或需要"确定副作用已经跑完"的场景。冲刷期间重入（比如某个 `Effect` 内又调用了 `runtime.flush()`）返回 `'deferred'`——外层调用仍会继续处理新加入队列的项，只是这次内层调用无法保证"返回时待办已跑完"。
+边界行为：
 
-**失控保护**：一次冲刷内部是"取出全部待处理项 → 逐个 `tick()` → 如果又有新的加入，再来一轮"的循环。超过 `maxFlushPasses`（默认 100）轮仍未收敛，判定为自触发环（典型例子：`Effect` 内同步写了它自己读取的 `Signal`），此时会清空队列、抛出错误，错误信息包含被丢弃的待办数量和（最多 8 个）它们的 `debugName`。这个上限可以通过 `createRuntime({ maxFlushPasses: n })` 调整——它是策略参数（"一次冲刷允许几轮传播"），不是物理常量；很长的派生链每轮只推进一级也会消耗轮次。
+- `maxFlushPasses` 非正整数（非安全整数或 `< 1`）抛贴 `INVALID_OPTION` 码的 `RangeError`。
+- `adapter` 的每个方法（`scheduleMicrotask`/`now`/`timestamp`/`reportError`）独立解析：未提供或显式 `undefined` 回落到默认实现（`queueMicrotask`/`performance.now()`/`Date.now()`/no-op）；提供了但不是函数抛贴 `INVALID_OPTION` 码的 `TypeError`。
+- `onError`/`onTrace`/`scheduleIdle` 若提供但不是函数，同样抛 `INVALID_OPTION`。
+- `defaultRuntime` 是进程级单例（模块加载时立即 `createRuntime()`），SSR 每请求隔离、单测互不污染、Worker 独立场景都应显式 `createRuntime()`，不要依赖它。
+- 若检测到本库存在多份运行时副本（重复安装/CDN 副本共存/微前端各自打包），构造期会通过 `reportError` 上报一条 `COPY_CONFLICT` 诊断（不阻断构造）。
 
-**`untracked(fn)`**：在 `fn` 执行期间暂停依赖收集。典型用途：`Effect` 内需要读取某个 `Signal` 但不想让它成为依赖（用 `.peek()` 更直接）、清理回调内部的读取（内核自动这么做）、诊断/trace 监听器内部的读取（同样自动处理，避免诊断代码反过来污染业务依赖图）。
-
----
-
-## 8. 错误处理
-
-`@migaia/reactive` 的每一个抛出物都携带 `(source, code)` 二元组：`source` 恒为 `'@migaia/reactive'`，`code` 取自 `src/error-code.ts` 的 `ReactiveErrorCode`（16 个码，逐条带三段式 JSDoc）。全仓契约见 `docs/contracts/error-codes.md`，本包码表的权威定义见 `docs/lifecycle/migration.sdd.md` §3.7.1。
+`Runtime` 实例上的全部方法：
 
 ```ts
-import { ReactiveErrorCode } from '@migaia/reactive';
-
-try {
-  disposedSignal.value;
-} catch (error) {
-  if ((error as { code?: string }).code === ReactiveErrorCode.nodeDisposed) {
-    // 节点已释放，换一个新实例
-  }
+class Runtime implements IRuntime {
+  signal<T>(value: T, options?: { debugName?: string }): Signal<T>;
+  computed<T>(fn: () => T, config?: IComputedConfig<T>): Computed<T>;
+  effect(fn: () => void | IDisposer, options?: { debugName?: string }): IDisposer; // 返回 dispose 函数，不是 Effect 实例
+  batch<T>(fn: () => T): T;
+  untracked<T>(fn: () => T): T;
+  flush(): 'completed' | 'deferred';
+  setSchedulerStrategy(strategy: (flush: () => void) => void): void;
+  currentVersion(): number;
+  runTracedAction<T>(name: string, fn: () => T): T;
+  reportError(
+    error: unknown,
+    context: { phase: string; observer?: object; observable?: object }
+  ): void;
+  subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer;
 }
 ```
 
-两条使用要点：
+逐个方法：
 
-- **码是附加字段，不替换错误类型。** 选项校验类错误仍然是 `RangeError`/`TypeError`，多错聚合仍然是 `AggregateError`，依赖 `instanceof` 判断的调用方不受影响。
-- **单个错误原样抛出，不被重新标记。** 例如一次冲刷里只有一个 observer 失败时，抛出的就是它自己的那个错误（不带本包的 `code`）；只有本包**自己构造**的聚合外壳才携带 `OBSERVER_FAILED`，原始错误在 `errors[]` 里按引用可达。
+- `batch(fn)`：显式合并多次写入为一次副作用刷新；进入时计深度，只有最外层退出才真正 `flush()`。若 `fn` 抛错且随后的收尾 `flush()` 也抛错，优先抛出 `fn` 的原始错误（`Error` 实例时把 flush 错误挂到其 `cause`；非 `Error` 抛出值时两者聚合为携带 `ACTION_FLUSH_FAILED` 码的 `AggregateError`）。
+- `untracked(fn)`：`fn` 执行期间关闭依赖收集，读取任何 `Signal`/`Computed` 都不会建立依赖边。
+- `flush()`：同步冲刷当前队列。**重入语义**：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内的重算轮数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。
+- `setSchedulerStrategy(strategy)`：受控地替换冲刷触发策略（默认微任务合并，可换成 `requestAnimationFrame`/`idle`/自定义）；只改变何时 `flush`，不交出 `Scheduler` 队列本身。`strategy` 必须是函数（否则抛 `INVALID_OPTION`），且调用后必须同步返回（不能返回 thenable）——策略返回 thenable 会被判定失败，自动回退到上一个安全策略并上报 `INVALID_OPTION` 诊断。
+- `currentVersion()`：只读版本观测，不交出可递增的 `VersionClock`。
+- `runTracedAction(name, fn)`：执行并追踪一段真实 action；`name` 必须是非空字符串，否则抛 `INVALID_OPTION`。未启用 trace（无监听器）时直接等价于 `fn()`，不产生额外开销。
+- `reportError(error, context)`：诊断通道；`context.observer`/`context.observable` 是原始节点对象，内部会先脱敏为 `IRuntimeNodeDescriptor` 再转发给 `onError`。
+- `subscribeTrace(listener)`：只读诊断事件流（节点创建、依赖连接/断开、副作用执行、显式 action），返回取消订阅函数。
 
-除了码之外，还有一套正交的**错误上下文分类**（`IRuntimeErrorPhase`），配合 `onError` 回调统一接收——码回答「是什么错」，phase 回答「在哪个阶段被观测到」：
+---
+
+<a id="runtime-入口"></a>
+
+## `/runtime` 入口
 
 ```ts
-const runtime = createRuntime({
-  onError: (error, context) => {
-    console.error(`[reactive] ${context.phase} 失败`, context.observer, context.observable, error);
-  }
-});
+import {
+  createObserverBinding,
+  type IObserverBinding,
+  type IObserverCommitResult,
+  type IObserverRetrackResult,
+  Runtime,
+  createRuntime,
+  VersionClock,
+  DependencyTracker,
+  Scheduler,
+  type ICapture,
+  type IRuntime,
+  type IRuntimeOptions,
+  type IReactiveNodeOptions,
+  type ISchedulerStrategy,
+  type IFlushResult
+} from '@migaia/reactive/runtime';
 ```
 
-| `phase` | 什么时候触发 |
-| --- | --- |
-| `async-flush` | 自动调度（微任务/自定义策略）触发的冲刷过程中，某个 `Effect` 抛错。**同步调用 `runtime.flush()` 或 `batch()` 触发的冲刷不会走这里**——那些错误会直接同步抛给调用方。 |
-| `dependency-disconnect` | 某个 `Observer` 的 `onDependencyDisconnected` 回调本身抛错（内核逻辑，一般用户代码不会直接触发）。 |
-| `lifecycle-hook` | `Signal.addObservedHooks` 注册的 `onObserved`/`onUnobserved` 回调抛错。 |
-| `ssr-resource` | 预留给 SSR 场景下"某个异步资源预取失败，页面仍然照常渲染，缺失部分交给客户端补拉"的报告通道（本包自身不产生此 phase 的事件，供上层包复用）。 |
-| `subscription-listener` | 面向自定义订阅/监听场景的错误上报通道（供扩展层复用）。 |
-| `trace-listener` | `subscribeTrace`/`onTrace` 注册的监听器自身抛错，或返回的 Promise reject。 |
+面向框架适配层的并发安全绑定原语。`defaultRuntime` **刻意不**从这里转发——import 这个入口不该顺手建一个 Runtime，需要它请从主入口显式取。
 
-默认 `onError`（不传时）把原始错误包进一个携带 `SCHEDULER_FAILED` 码的诊断错误再打印：`console.error('reactive ${phase} error', tagged)`，原始错误挂在 `tagged.cause` 上按引用可达。错误不会被吞掉、也不会中断 Runtime，但**只会打印，不会自动上报到你的监控系统**，生产环境建议显式传 `onError`——传了之后拿到的就是**未经包装的原始错误**加一个 `context`，这条包装只发生在默认实现里。
-
-**同步路径 vs 异步路径的关键区别**：直接调用 `runtime.flush()`、`runtime.batch(fn)` 触发的冲刷，如果其中的 `Effect` 抛错，错误会**同步向上抛给调用方**（可以用 `try/catch` 直接捕获）；而由 `Signal` 写入自动触发的微任务冲刷，错误只会通过 `onError` 回调报告，不会变成一个未处理的 Promise 拒绝或全局异常——这是两条独立的路径，写业务代码时需要清楚当前的错误是从哪条路径来的。
-
----
-
-## 9. 诊断与 trace
+### `createObserverBinding`
 
 ```ts
-const stop = runtime.subscribeTrace((event) => {
-  if (event.type === 'observer-run' && event.phase === 'error') {
-    console.error('effect 执行出错', event.observer.debugName, event.error);
-  }
-});
-// ... 之后
-stop();
+function createObserverBinding(runtime: IRuntime): IObserverBinding;
+
+type IObserverBinding = {
+  capture<R>(read: () => R): ICapture<R>;
+  observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer;
+  commit(capture: ICapture<unknown>): IObserverCommitResult;
+  retrack(): IObserverRetrackResult;
+};
+
+type IObserverCommitResult = 'committed' | 'stale' | 'no-observer';
+type IObserverRetrackResult = 'changed' | 'unchanged' | 'no-observer';
 ```
 
-`IRuntimeTraceEvent` 是判别联合类型：
+为一个订阅者建立三段式绑定：**render 期只读地捕获依赖，commit 期才把依赖装到订阅者上**，中间的渲染可能被并发渲染丢弃，捕获阶段绝不建边。绑定自持一个内部 `Effect`：适配层能完成 capture/observe/commit/retrack，却拿不到 `deps`、版本或强制调度入口：
 
-| `type` | 关键字段 | 含义 |
-| --- | --- | --- |
-| `observable-change` | `observable`、`reason: 'set' \| 'notify'` | 一个 `Signal`/自定义 Source 的值发生变化 |
-| `dependency` | `phase: 'connect' \| 'disconnect'`、`observable`、`observer`、`reason?` | 依赖边的建立/断开（`reason` 可以是 `retrack`/`invalidate`/`dispose`） |
-| `observer-run` | `phase: 'start' \| 'end' \| 'error'`、`observer`、`durationMs?`、`error?` | 一次 `Computed` 重算或 `Effect` 执行的开始/结束/出错 |
-| `action` | `phase`、`name`、`durationMs?`、`error?` | `runTracedAction(name, fn)` 包裹的一段业务动作 |
+```ts
+const binding = createObserverBinding(runtime);
+const dispose = binding.observe(() => {
+  // 真正的订阅者体；依赖变化后被正常调度重跑
+});
 
-要点：
+// 渲染期（可能被丢弃）：
+const capture = binding.capture(() => doubled.value); // 只记录读了谁、当时版本，不建边
 
-- **只要没有任何 trace 监听者（既没传 `onTrace`，也没调用 `subscribeTrace`），trace 相关的所有开销都是零**——内部用 `traceEnabled()` 短路跳过事件构造。
-- 事件里的 `observable`/`observer` 字段是**只读的 `IRuntimeNodeDescriptor`**（`{ id, kind, debugName? }`），不是节点本身——拿不到 `value`、改不了依赖图，诊断代码无法反向污染业务状态。
-- trace 监听器在 `untracked` 上下文里执行，读取任何响应式状态都不会给业务图建立依赖；监听器抛错或返回被拒绝的 Promise 会被送去 `onError`（`phase: 'trace-listener'`），不会中断当前的冲刷。
-- `createRuntime({ onTrace })` 是"订阅一个监听器"的构造期简写，效果等价于构造后立即 `subscribeTrace(onTrace)`；可以同时使用多个监听器（`onTrace` 一个 + 之后再 `subscribeTrace` 若干个）。
+// 提交期：
+const result = binding.commit(capture); // 'committed' | 'stale' | 'no-observer'
+if (result === 'stale') {
+  // 捕获后依赖已变化：调用方应重新求值，不要复用同一个 capture token
+}
+
+binding.retrack(); // 强制当前订阅者重跑一次，返回其依赖集合是否发生变化
+dispose();
+```
+
+四个成员逐一说明：
+
+- `capture<R>(read: () => R): ICapture<R>` —— 渲染期捕获：只记录本次读到了哪些依赖节点及其当时版本，**不建立依赖边**——被丢弃的渲染因此不会留下订阅残留。`ICapture<R>` 是带品牌的不透明 token，`result: R` 是 `read()` 的返回值；依赖集合存在 tracker 私有 `WeakMap` 里，拿到 token 既读不出依赖也改不了版本。
+- `observe(fn, options?): IDisposer` —— 安装绑定持有的内部 `Effect`（具体类保持私有，适配层拿不到它去改 `deps`/版本或调用 `run`/`markDirty`）。同一个 binding **重复调用**（当前订阅者仍处于已观察状态时再次调用）抛 `BINDING_DUPLICATE`。返回的 disposer 幂等。
+- `commit(capture): IObserverCommitResult` —— 提交期安装依赖，把 `capture` 装到**创建绑定时指定的那个 observer** 上。`'committed'`：依赖边已安装；`'stale'`：捕获后依赖已变化，token 已消费，必须重新捕获——调用方只应在此时作废快照并重新取值，**不应该**在 commit 阶段去 pull 脏节点（那会把用户的求值错误抛在 commit 里，绕过 Error Boundary）；`'no-observer'`：提交目标尚不存在（还未 `observe()` 或已 dispose），token 未消费，可在 observer 就绪后重试。
+- `retrack(): IObserverRetrackResult` —— 强制当前已提交的 observer 重跑一次，并报告其依赖集合是否发生变化（`'changed'`/`'unchanged'`），无 observer 时返回 `'no-observer'`。
+
+### `Runtime` / `createRuntime`
+
+与[主入口](#主入口)是同一个类/函数，此处重复导出供框架适配层直接从 `/runtime` 引用而不必经过主桶文件。
+
+### `VersionClock`
+
+```ts
+class VersionClock {
+  constructor(maxVersion?: number); // 默认 Number.MAX_SAFE_INTEGER
+  next(): number; // 领取下一个版本号
+  current(): number; // 只读查看，不消耗
+}
+```
+
+单调版本时钟。`next()` 达到 `maxVersion` 后抛 `VERSION_EXHAUSTED`（生产默认约 285 年才耗尽，耗尽后应释放整个 `Runtime` 并新建，而不是复用同一张图）；构造参数非正安全整数抛 `INVALID_OPTION`。
+
+### `DependencyTracker`
+
+```ts
+class DependencyTracker {
+  constructor(runtime: IRuntime);
+  isTracking(): boolean;
+  static isAnyTracking(): boolean;
+  track(observable: IObservable): void;
+  clearDependencies(observer: IObserver): void;
+  disconnectObservable(observable: IObservable, reason: 'invalidate' | 'dispose'): void;
+  runTracked<R>(observer: IObserver, fn: () => R): R;
+  capture<R>(fn: () => R): ICapture<R>;
+  commitCapture(observer: IObserver, capture: ICapture<unknown>): boolean;
+  untracked<R>(fn: () => R): R;
+  hasStaleDependencies(observer: IObserver): boolean;
+}
+```
+
+每个 `Runtime` 一个的依赖追踪上下文，图内核内部使用；`runTracked` 是事务化重算（成功才提交依赖差异，失败丢弃临时集合，旧图不动）；`track()` 检测到跨 `Runtime` 读取（当前活跃 tracker 不是本 tracker，但确实在追踪）会抛 `CROSS_RUNTIME`。一般应用代码不需要直接使用，仅供实现自定义节点类型/框架适配层参考。
+
+### `Scheduler`
+
+```ts
+class Scheduler {
+  constructor(
+    onAsyncError?: (error: unknown) => void,
+    maxFlushPasses?: number,
+    scheduleMicrotask?: (task: () => void) => void
+  );
+  batchDepth: number;
+  setStrategy(strategy: ISchedulerStrategy): void;
+  enqueue(item: IFlushable): void;
+  dequeue(item: IFlushable): void;
+  requestFlush(): void;
+  flush(): IFlushResult;
+  runBatched<T>(fn: () => T): T;
+  runDeferred<T>(fn: () => T): T;
+}
+```
+
+调度器：待冲刷队列、批处理深度、冲刷状态、可插拔触发策略全部收在这一个类里；`Runtime.flush()`/`batch()`/`setSchedulerStrategy()` 都是对它的委派。`maxFlushPasses` 非正整数抛 `INVALID_OPTION`；`requestFlush()` 重复调用安全（`scheduled`/`flushing` 两个标记天然去重）。一般应用代码同样不直接使用。
 
 ---
 
-## 10. 跨 Runtime 边界与所有权
+<a id="ownership-入口"></a>
 
-每个节点在构造时会登记归属于创建它的那个 `Runtime`（内部一张 `WeakMap`，不依赖字段名猜测）。三类边界会被显式检查：
+## `/ownership` 入口
 
-1. **依赖追踪跨界**：正在追踪某个 `Runtime` 的依赖时，读取了另一个 `Runtime` 的节点，抛 `cross-runtime dependency is not allowed`。
-2. **图操作跨界**：把一个节点交给不属于它的 `Runtime` 做依赖/订阅相关操作，抛 `... belongs to another Runtime` 一类错误。
-3. **同一对象被登记到两个 `Runtime`**：视为编程错误（正常使用不会触发，只有手写扩展层伪造节点时才可能撞到），抛 `this node is already owned by another Runtime`。
+```ts
+import {
+  claimOwnership,
+  ownerOf,
+  assertOwnedBy,
+  assertReactiveOwnedBy
+} from '@migaia/reactive/ownership';
+```
 
-实践含义：**不要在多个 `Runtime` 之间传递 `Signal`/`Computed`/`Effect` 实例**。需要跨边界共享状态时，应该在边界处显式做"读取一个 Runtime 的值、写入另一个 Runtime 的 Signal"这样的同步逻辑，而不是直接复用节点对象。
+「某节点属于哪个 `Runtime`」的登记与断言，供在本包之上构建 Store/集合/资源类库的作者使用。
 
-版本时钟上限是 `Number.MAX_SAFE_INTEGER`，即使每秒产生一百万次真实变更也需要约 285 年才会耗尽；真的耗尽时会 fail-stop（后续写入直接抛错），恢复方式是整体丢弃这个 `Runtime`、新建一个，而不是复位同一张图。
+- `claimOwnership(value: object, runtime: IRuntime): void` —— 登记归属；同一对象重复登记到不同 `Runtime` 抛 `OWNERSHIP_CONFLICT`。
+- `ownerOf(value: unknown): IRuntime | undefined` —— 查归属，未登记返回 `undefined`（区分"不归任何图"与"归错图"）。
+- `assertOwnedBy(value: unknown, runtime: IRuntime, what: string): void` —— 宽松断言：未登记的值一律放行（第三方可以把普通值注册进 Registry，不涉及图）；只有**登记过且归属不符**才抛 `CROSS_RUNTIME`。
+- `assertReactiveOwnedBy(value: object, runtime: IRuntime, what: string): void` —— 内核图边界使用的严格断言：未登记直接抛 `NOT_RUNTIME_OWNED`；登记了但不属于当前 `runtime` 抛 `CROSS_RUNTIME`。
+
+```ts
+const runtime = createRuntime();
+const node = {};
+claimOwnership(node, runtime);
+assertOwnedBy(node, runtime, 'my-node'); // 通过
+assertOwnedBy(node, otherRuntime, 'my-node'); // 抛 CROSS_RUNTIME
+```
 
 ---
 
-## 11. 扩展 API：面向 Store/框架适配层作者
+<a id="source-入口"></a>
 
-以下入口不从主入口 `@migaia/reactive` 导出，需要显式深度 import；它们是这个 monorepo 内 `store-*`/`resource` 等上层包用来在这套内核之上构建更高层能力的接口，日常写业务代码不需要它们。
+## `/source` 入口
 
-### `@migaia/reactive/runtime` → `createObserverBinding(runtime)`
+```ts
+import { createFieldSource } from '@migaia/reactive/source';
+```
 
-三段式绑定原语，用于实现"渲染期只读捕获依赖、提交期才真正建立订阅"的并发安全框架适配层（比如 React 的 `useSyncExternalStore` 风格集成）：
+```ts
+function createFieldSource(
+  runtime: IRuntime,
+  debugName?: string
+): {
+  track(): void;
+  notify(): void;
+  commit<T>(write: () => T): T;
+  readonly observed: boolean;
+  readonly disposed: boolean;
+  dispose(): void;
+};
+```
+
+为扩展层创建一条受控 Source（如 Wasm 字段、SharedArrayBuffer 支持的值）。调用方只拿到 `track`/`notify`/`commit`/`dispose` 四个能力，拿不到底层节点、`subs`、版本或 `Tracker`，因而不能制造单边依赖、伪造版本、通知另一张 `Runtime` 图：
+
+```ts
+const field = createFieldSource(runtime, 'wasm-counter');
+function read(): number {
+  field.track(); // 建立依赖，不返回值——真实值由外部存储持有
+  return wasmMemory.getValue();
+}
+function write(v: number): void {
+  field.commit(() => wasmMemory.setValue(v)); // 领取版本、执行写入、再发布，三步原子
+}
+field.dispose();
+```
+
+边界行为：`track()`/`notify()`/`commit()` 在 `dispose()` 之后调用抛 `NODE_DISPOSED`；`commit(write)` 先领取版本号、执行 `write()`、再发布通知（与 `Signal.value = ` 的三段式一致）。
+
+---
+
+<a id="internals-入口"></a>
+
+## `/internals` 入口
+
+```ts
+import {
+  registerInternals,
+  internalsOf,
+  isRuntime,
+  type IRuntimeInternals
+} from '@migaia/reactive/internals';
+```
+
+内核内部面（`clock`/`tracker`/`scheduler`/`notify`/`commitSource`/`deferIdle` 等），只供内核自身与被明确授权的高级入口使用（`architecture.test.ts` 约束哪些模块允许 import 它）。
+
+- `registerInternals(runtime, internals): void` —— `Runtime` 构造时自报内部面；重复登记（同一 `runtime` 对象二次调用）抛 `INTERNALS_REGISTERED`。
+- `internalsOf(runtime): IRuntimeInternals` —— 取内部面；拿不到时不是返回 `undefined` 而是抛 `NOT_RUNTIME_OWNED`（一个没登记内部面的对象冒充 `Runtime`，静默放行会在后续每一步产生难以追溯的错误）。
+- `isRuntime(candidate): candidate is IRuntime` —— 判断是否是本库创建的 `Runtime`，不泄漏内部面本身。
+
+一般应用代码不需要这个入口；实现自定义节点类型或框架适配层时才会用到。
+
+---
+
+<a id="node-factories-入口"></a>
+
+## `/node-factories` 入口
+
+```ts
+import {
+  internalRuntimeOf,
+  isRuntimeTracking,
+  isAnyRuntimeTracking,
+  type IInternalRuntime
+} from '@migaia/reactive/node-factories';
+```
+
+- `internalRuntimeOf(runtime: IRuntime): IInternalRuntime` —— 先校验是本库创建的 `Runtime`（内部调用 `internalsOf`，未登记会抛 `NOT_RUNTIME_OWNED`），再把 `signal()`/`computed()` 的返回类型从窄接口（`ISignal`/`IComputedValue`）收窄回具体类（`Signal`/`Computed`），供需要调用具体类方法（如 `dispose()`）的实现层（collections、对象门面）使用。节点仍走同一个 `Runtime` 造，仍受归属登记与通知管线约束——这里只是类型收窄，不额外授权。
+- `isRuntimeTracking(runtime: IRuntime): boolean` —— 只读查询：该 `Runtime` 当前是否正在收集依赖帧。
+- `isAnyRuntimeTracking(): boolean` —— 只读查询：进程内任意 `Runtime` 当前是否有依赖帧处于活跃状态。
+
+---
+
+<a id="node-internals-入口"></a>
+
+## `/node-internals` 入口
+
+```ts
+import {
+  registerVersion,
+  setVersion,
+  readVersion,
+  registerSubs,
+  mutableSubs,
+  registerDeps,
+  mutableDeps,
+  registerDepVersions,
+  mutableDepVersions
+} from '@migaia/reactive/node-internals';
+```
+
+可变依赖边的登记与访问，供实现新的响应式基础设施（自定义 `IObservable`/`IObserver`）时手工接入依赖图使用：
+
+- `registerVersion(node, initial): void` / `setVersion(node, value): void` / `readVersion(node, fallback): number` —— 节点版本号的登记、写入、读取（版本状态存在私有 `WeakMap`，不是节点自身字段）。
+- `registerSubs(node, subs): ReadonlySet<IObserver>` —— 登记一个内置节点的可变下游边集合，返回一份只读视图供节点对外暴露；`mutableSubs(node, fallback)` 取回可变的原始 `Set`（未登记过时回落到 `fallback`）。
+- `registerDeps`/`mutableDeps`、`registerDepVersions`/`mutableDepVersions` —— 对应上游依赖集合/依赖版本映射的登记与可变访问，语义与 `subs` 对称。
+
+一般应用代码不需要这个入口；只有需要自己实现 `IObservable`/`IObserver` 协议、并让其反向边受同一套只读视图保护的节点实现层才会用到。
+
+---
+
+<a id="copy-check-入口"></a>
+
+## `/copy-check` 入口
+
+```ts
+import {
+  brandOwnedValue,
+  assertNoForeignOwnershipBrand,
+  consumePendingCopyWarning,
+  noteRuntimeCopy,
+  runtimeCopyCount,
+  assertSingleRuntimeCopy,
+  resetRuntimeCopiesForTest
+} from '@migaia/reactive/copy-check';
+```
+
+双实例自检：本库若干模块级状态（所有权表、内部面表、同步追踪上下文）的正确性前提是"进程内只有一份模块"。重复安装、CDN 副本共存、微前端各自打包会安静地打破这个前提。
+
+- `brandOwnedValue(value: object): void` —— 为本副本创建的受管对象打上不可变品牌，供另一份模块 fail closed；对已打过本副本品牌的对象重复调用是空操作，对已打过**另一**副本品牌的对象调用抛 `COPY_CONFLICT`；品牌被篡改成非预期形状时抛 `BRAND_CORRUPTED`。
+- `assertNoForeignOwnershipBrand(value: object): void` —— 本地所有权表 miss 时识别是否是另一副本创建的受管对象，避免误判为普通值放行；命中另一副本品牌抛 `COPY_CONFLICT`，品牌被篡改抛 `BRAND_CORRUPTED`。
+- `consumePendingCopyWarning(): string | undefined` —— 取出并清空待上报的多副本诊断文案（`Runtime` 构造时消费一次）。
+- `noteRuntimeCopy(copy?: symbol): void` —— 登记本副本；`createRuntime()`、所有权/内部面边界都会调用，幂等且有本地快路径。
+- `runtimeCopyCount(): number` —— 当前进程里已进入正确性边界的副本数（纯 `import` 不计数）。
+- `assertSingleRuntimeCopy(): void` —— 要求单副本，否则抛 `COPY_CONFLICT`；供"宁可启动失败也不要静默陈旧数据"的应用主动调用，库自身从不调用它。
+- `resetRuntimeCopiesForTest(): void` —— 仅供测试：清掉模拟出来的副本登记。
+
+---
+
+<a id="reactive-通配入口"></a>
+
+## `/reactive/*` 入口
+
+```ts
+import { Signal } from '@migaia/reactive/reactive/signal.class';
+import { Computed, type IComputedConfig } from '@migaia/reactive/reactive/computed.class';
+import { Effect } from '@migaia/reactive/reactive/effect.class';
+```
+
+与主入口导出的是**同一批类**，只是绕开桶文件（`index.ts`）直接从具体文件导入，供打包分析/摇树场景使用。行为与[主入口](#主入口)描述的 `Signal`/`Computed`/`Effect` 完全一致，不重复列出签名。
+
+---
+
+<a id="错误码"></a>
+
+## 错误码
+
+```ts
+import { ReactiveErrorCode, type IReactiveErrorCode } from '@migaia/reactive';
+```
+
+稳定错误码表，**16 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）
+
+| `ReactiveErrorCode` 键 | 码值                   | 触发条件                                                                                                         |
+| ---------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `nodeDisposed`         | `NODE_DISPOSED`        | 在已 dispose 的 `Signal`/`Computed`/自定义 Source 上调用读取或写入方法                                           |
+| `circularDependency`   | `CIRCULAR_DEPENDENCY`  | 求值 `Computed` 时检测到它（直接或间接）读取了自己正在求值的结果                                                 |
+| `crossRuntime`         | `CROSS_RUNTIME`        | 一个属于某 `Runtime` 的节点在另一个 `Runtime` 的追踪/所有权边界上被读取、订阅或校验                              |
+| `notRuntimeOwned`      | `NOT_RUNTIME_OWNED`    | 传入的对象不是由 `createRuntime()` 创建、或不携带内部所有权登记                                                  |
+| `ownershipConflict`    | `OWNERSHIP_CONFLICT`   | 同一个节点对象被重复登记到不同的 `Runtime`                                                                       |
+| `copyConflict`         | `COPY_CONFLICT`        | 检测到本库存在多份运行时副本，或 `assertSingleRuntimeCopy()` 校验到副本数大于一                                  |
+| `brandCorrupted`       | `BRAND_CORRUPTED`      | 跨副本诊断品牌被发现处于非预期形状                                                                               |
+| `versionExhausted`     | `VERSION_EXHAUSTED`    | 单调版本时钟达到配置上限（默认 `Number.MAX_SAFE_INTEGER`）后再次申请新版本号                                     |
+| `flushLoop`            | `FLUSH_LOOP`           | 一次冲刷内的重算轮数超过 `maxFlushPasses`（默认 100）                                                            |
+| `observerFailed`       | `OBSERVER_FAILED`      | 一次冲刷中多个 observer 的 `tick()` 失败、或多个 observable 生命周期钩子失败，作为 `AggregateError` 外壳         |
+| `actionFlushFailed`    | `ACTION_FLUSH_FAILED`  | `runBatched()` 内业务动作与其收尾 flush 同时失败，作为聚合外壳附加在业务错误的 `cause` 上                        |
+| `schedulerFailed`      | `SCHEDULER_FAILED`     | 预留：异步调度策略回调或 `reportError()` 捕获到未处理错误的诊断通道码（默认无内置抛出/上报点）                   |
+| `captureInvalid`       | `CAPTURE_INVALID`      | `capture()` 产生的 token 在 `commitCapture()` 时已失效、已被消费、属于另一个 tracker，或对应 observer 已 dispose |
+| `bindingDuplicate`     | `BINDING_DUPLICATE`    | 同一个 `IObserverBinding` 被重复调用 `observe()`（已处于 observed 状态）                                         |
+| `internalsRegistered`  | `INTERNALS_REGISTERED` | 同一个 `Runtime` 对象被重复注册内部面（`registerInternals()`）                                                   |
+| `invalidOption`        | `INVALID_OPTION`       | 构造 `Runtime`/`Scheduler`/`VersionClock` 时传入的选项不满足取值要求                                             |
+
+调用方应始终以 `error.code === ReactiveErrorCode.xxx` 判别，不要硬编码码值字符串。逐条设计动机见源码 `src/error-code.ts` 的 JSDoc。
+
+---
+
+<a id="诊断消息"></a>
+
+## 诊断消息
+
+```ts
+import { ReactiveErrorText } from '@migaia/reactive';
+```
+
+稳定诊断消息表；部分键是接受参数的函数（用于把动态信息嵌入固定文案模板），其余为固定字符串常量。全部键：`runtimeOptionGetterFailed(option)`、`runtimeAdapterGetterFailed(method)`、`runtimeAdapterMustBeFunction(method)`、`runtimeOptionMustBeFunction(option)`、`maxFlushPassesInvalid`、`maximumReactiveVersionInvalid`、`tracedActionNameInvalid`、`disposedSignal`、`disposedFieldSource`、`disposedComputed`、`circularComputedDependency`、`ownershipConflict`、`belongsToDifferentRuntime(what)`、`notRuntimeOwned(what)`、`belongsToAnotherRuntime(what)`、`internalsAlreadyRegistered`、`runtimeNotCreatedByFactory`、`observerBindingAlreadyObserved`、`crossRuntimeDependency`、`captureDifferentRuntime`、`captureDisposedObserver`、`captureInvalid`、`copyRegistryInvalid`、`foreignCopyValue`、`foreignCopyDependency`、`ownershipBrandCorrupted`、`multipleCopiesWarning`、`expectedSingleCopy(count)`、`versionClockExhausted`、`schedulerStrategyInvalid`、`schedulerStrategyReturnedThenable`、`observersBeforeFlushLoop`、`multipleObserversFailed`、`actionCauseAndFlushFailed`、`actionAndFlushFailed`、`multipleLifecycleHooksFailed`、`flushLoopDetected(maxPasses, droppedCount, names)`。逐条文案与语义见源码 `src/error-text.ts`。
+
+---
+
+<a id="trace-事件与常量"></a>
+
+## Trace 事件与常量
+
+```ts
+import {
+  ReactiveErrorPhase,
+  ReactiveTracePhase,
+  ReactiveTraceType,
+  type IRuntimeTraceEvent
+} from '@migaia/reactive';
+```
+
+`subscribeTrace(listener)` 收到的事件是以下判别联合之一：
+
+```ts
+type IRuntimeTraceEvent =
+  | {
+      type: 'observable-change';
+      timestamp: number;
+      observable: IRuntimeNodeDescriptor;
+      reason: 'set' | 'notify';
+    }
+  | {
+      type: 'dependency';
+      timestamp: number;
+      phase: 'connect' | 'disconnect';
+      observable: IRuntimeNodeDescriptor;
+      observer: IRuntimeNodeDescriptor;
+      reason?: 'retrack' | 'invalidate' | 'dispose';
+    }
+  | {
+      type: 'observer-run';
+      timestamp: number;
+      phase: 'start' | 'end' | 'error';
+      observer: IRuntimeNodeDescriptor;
+      durationMs?: number;
+      error?: unknown;
+    }
+  | {
+      type: 'action';
+      timestamp: number;
+      phase: 'start' | 'end' | 'error';
+      name: string;
+      durationMs?: number;
+      error?: unknown;
+    };
+```
+
+节点以脱敏后的 `IRuntimeNodeDescriptor`（`{ id, kind, debugName? }`）出现，不是原始节点对象。
+
+| 常量                  | 取值                                                                                                    | 用途                                                |
+| --------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `ReactiveTraceType`   | `{ observableChange, dependency, observerRun, action }`                                                 | trace 事件的顶层判别                                |
+| `ReactiveTracePhase`  | `{ start, end, error, connect, disconnect }`                                                            | dependency/observerRun/action 事件的阶段            |
+| `ReactiveErrorPhase`  | `{ asyncFlush, dependencyDisconnect, lifecycleHook, ssrResource, subscriptionListener, traceListener }` | `reportError`/`onError` 收到的 `context.phase` 取值 |
+| `ReactiveTraceReason` | `{ set, notify, retrack, invalidate, dispose }`                                                         | observableChange/dependency 事件的原因              |
+
+---
+
+<a id="高阶组合示例"></a>
+
+## 高阶组合示例
+
+### 1. 隔离的 Runtime + 手动冲刷（SSR/单测场景）
+
+```ts
+import { Signal, Computed, Effect, createRuntime } from '@migaia/reactive';
+
+function renderOnce() {
+  const runtime = createRuntime(); // 每次请求/每个用例独立一份，互不污染
+  const count = new Signal(1, runtime);
+  const doubled = new Computed(() => count.value * 2, runtime);
+  const seen: number[] = [];
+  const dispose = runtime.effect(() => {
+    seen.push(doubled.value);
+  });
+  count.value = 5;
+  runtime.flush(); // 手动同步冲刷，SSR 场景不依赖微任务时机
+  dispose();
+  return seen; // [2, 10]
+}
+```
+
+### 2. 三段式绑定：实现一个最小的并发安全订阅适配层
 
 ```ts
 import { createObserverBinding } from '@migaia/reactive/runtime';
+import { createRuntime, Computed, Signal } from '@migaia/reactive';
 
-const binding = createObserverBinding(runtime);
-const capture = binding.capture(() => someSignal.value); // 只读，不建边
-const result = binding.commit(capture); // 'committed' | 'stale' | 'no-observer'
+const runtime = createRuntime();
+const count = new Signal(0, runtime);
+const doubled = new Computed(() => count.value * 2, runtime);
+
+function useReactiveValue<T>(read: () => T): T {
+  const binding = createObserverBinding(runtime);
+  const capture = binding.capture(read); // 渲染期：只读捕获，可能被丢弃
+  // ……渲染真正提交时：
+  const result = binding.commit(capture);
+  if (result === 'stale') {
+    // 依赖已变，重新求值（真实框架适配层这里会触发一次重渲染）
+  }
+  binding.observe(() => {
+    // 订阅变化后触发重渲染
+  });
+  return capture.result;
+}
 ```
 
-`capture()` 不修改依赖图，被丢弃的渲染因此不会留下泄漏的订阅；`commit()` 把捕获到的依赖装到内部持有的 `Effect` 上，返回三态结果——`stale` 表示提交时依赖已经变化，调用方必须重新捕获求值，而不是把陈旧结果当最新值提交。
-
-### `@migaia/reactive/source` → `createFieldSource(runtime, debugName?)`
-
-为扩展层创建一条受控的自定义响应式来源，只暴露 `track()`/`notify()`/`commit(write)`/`observed`/`disposed`/`dispose()`，拿不到节点、订阅集合或 tracker——用于给"不是 `Signal` 但需要参与依赖图"的状态（比如某个 wasm 内存字段）接入通知管线。
-
-### `@migaia/reactive/node-factories` → `internalRuntimeOf(runtime)`
-
-返回一个 `signal()`/`computed()` 返回**具体 `Signal`/`Computed` 类**（而不是公共窄接口 `ISignal`/`IComputedValue`）的 Runtime 视图，供需要调用 `.dispose()`、访问完整实例成员的上层实现使用。同模块的 `isRuntimeTracking(runtime)`/`isAnyRuntimeTracking()` 可用于判断当前是否处于依赖收集帧内。
-
-### `@migaia/reactive/ownership` → `claimOwnership(value, runtime)` / `ownerOf(value)` / `assertOwnedBy(value, runtime, what)` / `assertReactiveOwnedBy(value, runtime, what)`
-
-「某个对象属于哪个 `Runtime`」的登记表与断言。`assertReactiveOwnedBy` 是内核图边界用的严格版本——未登记的对象直接拒绝；`assertOwnedBy` 对未登记对象放行，只拒绝"登记过但归属不符"的情形，供上层 Registry 类结构做更宽松的校验。
-
-### `@migaia/reactive/internals` → `internalsOf(runtime)` / `registerInternals(runtime, internals)`
-
-内核内部面（`clock`/`tracker`/`scheduler`/`notify`/`commitSource`/`deferIdle`），能绕过所有权校验、`observed`/`unobserved` 生命周期与调度原子性——只给"自己就是图的实现者"的节点实现层用（比如需要复用同一条通知管线的 wasm 字段），不是给普通业务代码或增强层的。
-
-### `@migaia/reactive/node-internals` → `registerDeps` / `registerDepVersions` / `registerSubs` / `mutableDeps` / `mutableDepVersions` / `mutableSubs` / `setVersion`
-
-比 `internals` 更底层：直接读写节点的依赖边/订阅集合/版本号。只给需要实现自己的 `IObservable`/`IObserver` 具体类的包用（`resource`、`store-*` 的字段/集合类型）；普通消费端不应该出现在依赖树上。
-
-### `@migaia/reactive/copy-check` → `assertSingleRuntimeCopy()`
-
-检测同一进程里是否被打包进了多份 `@migaia/reactive`（常见于依赖没有正确去重、或微前端各自打包）。库内部的所有权表和依赖追踪上下文都是**模块级、每份副本各一份**——出现第二份副本时，跨副本的节点会互相认成"不是本库创建的 Runtime"，跨副本依赖读取也检测不到，会静默拿到陈旧数据。多副本共存时控制台会自动打印一次告警；需要"宁可启动失败也不要有这个风险"的应用可以显式调用 `assertSingleRuntimeCopy()`，检测到多副本时立即抛错。
-
-> 以上每个入口都是 `package.json` `exports` 里的具名子路径，不再有 `@migaia/reactive/runtime/*` 通配（`docs/lifecycle/migration.sdd.md` §4.3）——依赖追踪器、调度器具体类等纯内部实现文件不对外可达，不构成稳定契约。
-
----
-
-## 12. 更贴近生产的完整示例
+### 3. 批处理 + 错误优先级：一次动作里业务失败与收尾冲刷失败的顺序
 
 ```ts
-import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive';
-import { createSyncLifecycleScope } from '@migaia/lifecycle';
+const runtime = createRuntime();
+try {
+  runtime.batch(() => {
+    signalA.value = 1;
+    signalB.value = 2;
+    throw new Error('business failure');
+  });
+} catch (error) {
+  // error 就是 'business failure' 本身；若收尾 flush 也失败，flush 错误挂在 error.cause 上
+}
+```
 
-const runtime = createRuntime({
-  onError: (error, context) => reportToMonitoring(context.phase, error),
-  maxFlushPasses: 200 // 有意设计了很深的派生链，调大失控保护的阈值
+### 4. 自定义调度策略：切到 `requestAnimationFrame`
+
+```ts
+runtime.setSchedulerStrategy((flush) => {
+  requestAnimationFrame(() => flush());
 });
-
-// 全部是纯 reactive 节点、没有 wasm 字段/I/O 资源，可以用同步的 SyncLifecycleScope。
-const scope = createSyncLifecycleScope();
-
-const query = new Signal('', runtime, { debugName: 'search.query' });
-scope.own(query, { syncSafe: true, force: () => query.dispose() });
-
-const results = new Computed(() => (query.value.length === 0 ? [] : search(query.value)), runtime, {
-  debugName: 'search.results'
-});
-scope.own(results, { syncSafe: true, force: () => results.dispose() });
-
-const render = new Effect(
-  () => {
-    renderResults(results.value);
-    return () => clearResults(); // 下次重跑/dispose 前先清理
-  },
-  runtime,
-  { debugName: 'search.render' }
-);
-scope.own(render, { syncSafe: true, force: () => render.dispose() });
-
-query.value = 'reactive';
-runtime.batch(() => {
-  query.value = 'react';
-  query.value = 'reactive core'; // 两次写入只触发一次冲刷
-});
-
-// 页面卸载 / 请求结束
-scope.dispose(); // 按逆序释放 effect → results → query
 ```
 
 ---
 
-## 13. 构建、测试与常见问题排查
+<a id="排查与构建门禁"></a>
 
-在仓库根目录运行以下包级门禁。`reactive` 的 `test` 脚本直接运行 Vitest；构建需单独运行。
+## 排查与构建门禁
+
+- **读取节点抛 `NODE_DISPOSED`**：节点已 `dispose()`，绝不会静默返回旧值；停止持有该引用，改用重新创建的实例。
+- **抛 `CROSS_RUNTIME`/`NOT_RUNTIME_OWNED`**：跨 `Runtime` 混用了节点，或传入的对象不是由 `createRuntime()` 创建；确认节点与消费它的 `Runtime` 是同一个。
+- **`Computed` 抛 `CIRCULAR_DEPENDENCY`**：依赖图里存在自读环（`a` 直接或间接又读了 `a` 自己）；检查依赖图，拆掉循环引用。
+- **`flush()` 抛 `FLUSH_LOOP`**：依赖图里存在自触发环（典型是某个 `Effect` 的写操作又落回了它自己的依赖）；错误信息列出了被丢弃的待办 `debugName`，据此定位并拆环。
+- **`createObserverBinding().observe()` 抛 `BINDING_DUPLICATE`**：同一个 binding 在已处于 observed 状态时又被 `observe()` 了一次；再次调用前先确认当前是否已在观察中，或为新一轮渲染创建新的 binding。
+- **`commit()` 返回 `'stale'`**：这不是错误，是正常的竞态处理信号；作废当前快照，重新 `capture()`/`commit()`，不要在 commit 阶段直接 pull 脏节点。
+- **`COPY_CONFLICT`/`BRAND_CORRUPTED`**：进程内存在本库的多份模块副本；去重依赖（多数打包器问题），或在应用启动时调用 `assertSingleRuntimeCopy()` 主动 fail-fast。
+- **`VERSION_EXHAUSTED`**：单调版本时钟耗尽（生产默认约 285 年才会发生）；释放当前 `Runtime` 持有的全部节点，创建一份新的 `Runtime`，不要试图复用同一张依赖图。
+- **需要集合类型、异步资源状态机、UI 框架绑定**：`@migaia/reactive` 只提供引擎层三个节点原语和 `Runtime`，这些上层能力分别由 monorepo 里的 `store-*` 系列包、`@migaia/resource`、各框架适配层在其之上构建。
 
 ```bash
-pnpm --filter @migaia/reactive fmt
-pnpm --filter @migaia/reactive lint
-pnpm --filter @migaia/reactive typecheck
-pnpm --filter @migaia/reactive typecheck:test
-pnpm --filter @migaia/reactive build
-pnpm --filter @migaia/reactive test
+pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
-
-**Q：`Effect` 明明依赖变了，但没有重新执行。**
-检查是否忘了调用 `runtime.flush()`（如果测试环境不会自动跑微任务），或者写入的值和旧值经 `Object.is` 判断相等（`Signal.value = 相同值`不会触发通知）。
-
-**Q：`Computed` 每次读取都在重新计算，缓存好像没生效。**
-如果它当前没有任何订阅者（没有 `Effect` 或别的 `Computed` 依赖它），它会在空闲时被自动挂起、下次读取从头计算——这是设计如此。需要持续保留缓存，传 `{ keepAlive: true }`。
-
-**Q：读取一个用过的节点，抛 `cannot use a disposed signal` / `cannot read a disposed computed`。**
-节点已经被 `dispose()` 过，这是有意的 fail-fast 设计（不会返回一个"看着能用但永不更新"的陈旧值）。检查是不是持有它的 `@migaia/lifecycle` `LifecycleScope`/`SyncLifecycleScope` 提前释放了还在被引用的节点，或者对象被重复 `dispose()` 后又被继续使用。
-
-**Q：控制台报 `possible infinite effect loop`。**
-说明某个 `Effect` 的写操作最终又落回了它自己读取的依赖，形成了同一次冲刷内的自触发环。检查该 `Effect` 是否在读取某个 `Signal` 的同时又无条件写入了它（或者经过 `Computed` 间接形成环）；错误信息里列出的 `debugName` 可以帮助定位是哪些待办被丢弃。
-
-**Q：跨模块/跨包读取节点报 `cross-runtime dependency` 或 `belongs to another Runtime`。**
-两个 `Signal`/`Computed`/`Effect` 不属于同一个 `Runtime` 实例。检查是不是有代码分别调用了两次 `createRuntime()`，或者混用了 `defaultRuntime` 和某个显式创建的 `Runtime`。
-
-**Q：微任务里的 `Effect` 报错，但业务代码里 `try/catch` 不到。**
-这是设计如此——自动调度（微任务/自定义策略）触发的冲刷里的错误走 `onError` 回调，不会同步抛给业务代码。需要同步捕获，改用显式 `runtime.flush()` 或 `runtime.batch(fn)`；需要异步场景下感知错误，务必传 `createRuntime({ onError })`。

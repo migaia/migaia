@@ -4,8 +4,13 @@
   "private": true,
   "description": "Minimal object-state Store facade.",
   "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "USEGUIDE.md"
+  ],
   "type": "module",
-  "files": ["dist", "README.md", "USEGUIDE.md"],
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -14,7 +19,6 @@
       "default": "./dist/index.js"
     }
   },
-  "sideEffects": false,
   "scripts": {
     "fmt": "oxfmt src test e2e",
     "build": "tsc -p tsconfig.build.json",

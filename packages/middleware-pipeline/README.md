@@ -1,128 +1,334 @@
 # `@migaia/middleware-pipeline`
 
-运行时中立、无运行时依赖的 middleware chain 执行器。它把一个值依次交给多个 stage，并提供 sync、async、generator 三种明确且互不混用的执行模型。
+运行时中立、零运行时依赖的 middleware chain 执行器：把一个值依次交给多个 stage，提供 sync、async、generator 三种明确且互不混用的执行代数。
 
-这个包只拥有“如何执行一条 middleware 链”的算法，不拥有插件安装、stage 注册、生命周期、队列、事件广播或宿主诊断。`@migaia/plugin-host` 使用本包执行 pipeline，但插件和资源仍由 plugin-host 管理。
+**适用**：已经有一组按顺序运行的拦截器/转换器/middleware，需要明确的短路语义（而不是 `Array.reduce()`）；async stage 需要 `await next()` 在下游完成后继续执行后置逻辑（洋葱模型）；generator stage 需要通过 `yield` 与显式 sentinel 控制值的传播；只想执行一条链，不想为此引入 plugin host、event bus 或 lifecycle runtime。
 
-## 1. 什么时候使用
+**不适用**：不要把它当作一对多通知机制（用 event subscriber/event bus）；不要用它做固定的纯函数转换（直接组合函数或 `reduce()` 更简单）；它不提供排队、并发限制、drain、后台任务取消（应由 dispatcher + `@migaia/lifecycle` 管理）；它不管理插件安装、卸载、回滚与资源所有权（用 `@migaia/plugin-host`，本包只是 plugin-host 用来执行 pipeline 的算法层）。
 
-适合：
-
-- 已经有一组按顺序运行的拦截器、转换器或 middleware。
-- 需要明确的短路语义，而不是简单的 `Array.reduce()`。
-- async stage 需要 `await next()`，在下游完成后继续执行后置逻辑。
-- generator stage 需要通过 yield 和显式 sentinel 控制传播。
-- 不希望为了执行一条链引入 plugin host、event bus 或 lifecycle runtime。
-
-不适合：
-
-- 一对多通知：使用 event subscriber/event bus。
-- 固定的纯函数转换：直接组合函数或使用 `reduce()` 更简单。
-- 需要排队、并发限制、drain、取消后台任务：应由 dispatcher + lifecycle 管理。
-- 需要插件安装、卸载、回滚和资源所有权：使用 `@migaia/plugin-host`。
-
-## 2. 三种模式怎么选
-
-| 模式      | `next()` / 控制方式       | 下游何时执行                         | 适合场景                          |
-| --------- | ------------------------- | ------------------------------------ | --------------------------------- |
-| sync      | `next(value)`             | 当前 stage 返回后                    | 同步转换、校验、快速短路          |
-| async     | `await next(value)`       | 调用 `next()` 后启动，可等待完整下游 | 洋葱模型、异步拦截器、前后置逻辑  |
-| generator | `yield` + return sentinel | 当前 generator 完成后                | 多次产值、显式继续/终止/undefined |
-
-三种模式是不同代数。不要把 sync stage 当成洋葱模型：sync 的 `next()` 只提交下一阶段输入，不会在调用点同步执行下游。
-
-## 3. 安装
+## 安装
 
 ```bash
 pnpm add @migaia/middleware-pipeline
 ```
 
-包没有运行时依赖，产物为 ESM，目标基线为 ES2020。
+包没有运行时依赖，产物为 ESM，声明 `sideEffects: false`。
 
-## 4. 快速开始：Sync 同步传递与短路
+## 目录
+
+- [执行器](#执行器)：`runSyncMiddleware`、`runAsyncMiddleware`、`runGeneratorMiddleware`
+- [适配器](#适配器)：`adaptSyncStageToAsync`、`adaptSyncStageToGenerator`
+- [生成器信号](#生成器信号)：`GENERATOR_CONTINUE`、`GENERATOR_HALT`、`GENERATOR_UNDEFINED`、`MiddlewarePipelineGeneratorSignals`
+- [稳定值与错误](#稳定值与错误)：`MiddlewarePipelineMode`、`MiddlewarePipelineViolation`、`MIDDLEWARE_PIPELINE_SOURCE`、`MiddlewarePipelineErrorCode`
+- [高阶组合示例](#高阶组合示例)
+- [构建门禁](#构建门禁)
+
+完整签名、边界行为与错误码，见 [USEGUIDE.md](./USEGUIDE.md)。
+
+---
+
+<a id="执行器"></a>
+
+## 执行器
 
 ```ts
-import { MiddlewarePipelineViolation, runSyncMiddleware } from '@migaia/middleware-pipeline';
+import {
+  runSyncMiddleware,
+  runAsyncMiddleware,
+  runGeneratorMiddleware
+} from '@migaia/middleware-pipeline';
+```
 
-const stages = [
-  (value: string, next: (value: string) => void) => next(value.trim()),
-  (value: string, next: (value: string) => void) => {
-    if (value.length === 0) return; // 不调用 next：短路，不调用 done
-    next(value.toUpperCase());
-  }
-];
+**`runSyncMiddleware`｜5 秒上手** —— 同步依次传递，stage 不调用 `next()` 即短路：
 
+```ts
 runSyncMiddleware(
-  stages,
-  ' migai ',
-  (value) => console.log(value), // MIGAIA
-  (violation) => {
-    if (violation === MiddlewarePipelineViolation.duplicate) {
-      console.warn('stage called next more than once');
+  [
+    (value: string, next) => next(value.trim()),
+    (value: string, next) => {
+      if (value.length === 0) return; // 不调用 next：短路，done 不执行
+      next(value.toUpperCase());
     }
-  }
+  ],
+  ' migai ',
+  (value) => console.log(value), // 'MIGAIA'
+  (violation) => console.warn(violation) // 'late' | 'duplicate'
 );
 ```
 
-规则：
+全部参数（均为位置参数，无选项对象）：
 
-- stage 不调用 `next()`：整条链短路，`done()` 不执行。
-- stage 调用两次 `next()`：只接受第一次，并报告 `duplicate`。
-- stage 返回后再调用保存的 `next()`：忽略该调用，并报告 `late`。
-- violation 如何记录、上报或转成宿主错误，由调用方决定。
+- `stages: readonly ISyncMiddlewareStage<TValue>[]`（必填）—— 调用前做一次快照，运行中调用方再修改原数组不影响本次执行
+- `value: TValue`（必填）—— 传给第一个 stage 的初始值
+- `done: (value: TValue) => void`（必填）—— 仅当每个 stage 都调用了 `next()` 时，用最后一个 stage 提交的值调用一次
+- `onViolation: IMiddlewarePipelineViolationHandler`（必填，无默认值）—— stage 返回后才调用已保存的 `next` 触发 `'late'`；同一 stage 内调用 `next` 两次触发 `'duplicate'`；只接受第一次调用的值
 
-## 5. Async：洋葱模型与双失败
+**`runAsyncMiddleware`｜10 秒上手** —— 洋葱模型：`next()` 立即启动下游并返回其 Promise，`await next()` 之后的代码在下游完成后运行：
 
 ```ts
-import { runAsyncMiddleware } from '@migaia/middleware-pipeline';
-
-const trace: string[] = [];
-
 await runAsyncMiddleware(
   [
-    async (value, next) => {
-      trace.push(`before:${value}`);
-      await next(value + 1);
-      trace.push(`after:${value}`);
+    async (value: number, next) => {
+      await next(value + 1); // 下游先跑完，再继续本行之后的代码
     },
-    async (value, next) => {
-      trace.push(`inner:${value}`);
+    async (value: number, next) => {
       await next(value * 2);
     }
   ],
   1,
-  (value) => {
-    trace.push(`done:${value}`);
-  },
+  (value) => console.log(value), // 4
   { onViolation: () => undefined }
 );
-
-// ['before:1', 'inner:2', 'done:4', 'after:1']
 ```
 
-`runAsyncMiddleware()` 的 options：
+全部参数：
 
-| 选项                             | 必填 | 作用                                                      |
-| -------------------------------- | ---- | --------------------------------------------------------- |
-| `onViolation`                    | 是   | 接收 `late` / `duplicate`                                 |
-| `assertActive`                   | 否   | 进入 stage 及下游结束后检查宿主是否仍有效                 |
-| `combineStageAndDownstreamError` | 否   | 当前 stage 与已启动的 downstream 同时失败时，接管错误构造 |
+- `stages: readonly IAsyncMiddlewareStage<TValue>[]`（必填）—— 调用前快照
+- `value: TValue`（必填）
+- `done: (value: TValue) => void | Promise<void>`（必填）—— 可返回 `Promise`；若它 reject，该错误按"下游失败"处理（顶层直接从 `runAsyncMiddleware()` 抛出，非顶层时计入触发它的那次 `next()` 的下游失败）
+- `options: IMiddlewarePipelineOptions`（必填对象，字段见下）：
+  - `onViolation: IMiddlewarePipelineViolationHandler`（必填）—— 语义同 `runSyncMiddleware`
+  - `assertActive?: () => void`（可选）—— 在每次进入 stage 前、以及该 stage 与它已启动的下游都结算完毕后（且链尚未整体完成时）各调用一次；抛出的错误被视为"runner 控制流"，只会向上传播这一个 exact 值，不会与普通 stage/downstream 失败合并，也不会经过 `combineStageAndDownstreamError`
+  - `combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown`（可选）—— 当前 stage 与它已启动的下游**同时**以普通失败结束时，用它的返回值作为要抛出的错误；不提供时抛出 `createMiddlewarePipelineExecutionError(stage, downstream)` 产出的 `AggregateError`（见[稳定值与错误](#稳定值与错误)）
 
-如果 stage 和 downstream 同时失败：
+**`runGeneratorMiddleware`｜10 秒上手** —— generator stage 可以 `yield` 多次，用 `return` 值决定如何继续：
 
-- 提供了 `combineStageAndDownstreamError`：抛出调用方返回的领域错误。
-- 未提供：抛出原生 `AggregateError`，两个原错误保留在 `errors[]`，并附加：
-  - `source: '@migaia/middleware-pipeline'`
-  - `code: 'EXECUTION_FAILED'`
-  - `message: 'middleware stage and downstream failed'`
+```ts
+import { GENERATOR_CONTINUE, GENERATOR_HALT } from '@migaia/middleware-pipeline';
 
-判断只看两个可观察结果：当前 stage 的执行结果和已由 `next()` 启动的 pending downstream。两者都 reject 时始终按 `[stageError, downstreamError]` 传给组合器，即使两者是同一 object 或 primitive；只 reject 一个时抛出其 exact value。`next()` 返回原生 Promise，不追踪消费、Promise lineage、constructor 或 species，因此 `await`、`return`、`catch`、`finally` 和 borrowed native Promise methods 都不会改变双失败判定。组合器返回的 `undefined`/`null` 也原样抛出。
+runGeneratorMiddleware(
+  [
+    function* (value: number) {
+      yield value + 1;
+      yield value + 2;
+      return GENERATOR_CONTINUE; // 采用最后一次 yield，即 value + 2
+    },
+    function* (value: number) {
+      if (value > 10) return GENERATOR_HALT;
+      return value * 2;
+    }
+  ],
+  3,
+  (value) => console.log(value) // 10
+);
+```
 
-下游 stage 入口或成功但未调用 `next()` 后，`assertActive` 产生的 active error 属于 runner control path：`await next()` 或 `return next()` 只传播该 exact error，不把它作为第二个普通 failure slot；独立 stage failure 仍保持 exact，普通同一 identity 双失败仍组合。
+全部参数：
 
-plugin-host 会为普通 stage/downstream 双失败注入自己的组合器，因此该路径抛出 `@migaia/plugin-host + PIPELINE_FAILED`；runner-owned entry/post-stage active control 不调用该组合器，不会被包装为 `PIPELINE_FAILED`。
+- `stages: readonly IGeneratorMiddlewareStage<TValue>[]`（必填）—— 调用前快照
+- `value: TValue`（必填）
+- `done: (value: TValue) => void`（必填）—— 仅当所有 stage 都未终止链时，用最终值调用一次
+- `signals?: IGeneratorMiddlewareSignals`（可选，默认 `MiddlewarePipelineGeneratorSignals`）—— 兼容层可注入自己的 sentinel 集合；普通消费者直接使用默认值即可
 
-## 6. Generator：显式控制传播
+return 值语义：普通值 → 作为下一 stage 输入；`signals.continue` → 采用本次迭代最后一次 `yield` 的值；`signals.halt` 或隐式 `undefined`（未显式 `return`）→ 终止整条链、不调用 `done`；`signals.undefined` → 显式把 `undefined` 作为下一 stage 输入（与隐式 `undefined` 的终止行为不同）。
+
+---
+
+<a id="适配器"></a>
+
+## 适配器
+
+```ts
+import { adaptSyncStageToAsync, adaptSyncStageToGenerator } from '@migaia/middleware-pipeline';
+```
+
+**`adaptSyncStageToAsync`｜5 秒上手** —— 把同步 stage 接入 async chain：
+
+```ts
+const asyncStage = adaptSyncStageToAsync((value: string, next) => next(value.trim()));
+await runAsyncMiddleware([asyncStage], ' hi ', (v) => console.log(v), {
+  onViolation: () => undefined
+});
+```
+
+全部参数：
+
+- `stage: ISyncMiddlewareStage<TValue>`（必填）—— 内部同步执行；其 `next` 依旧是"返回前调用一次"的语义
+- `onViolation: IMiddlewarePipelineViolationHandler`（可选，默认 `() => {}`，即静默丢弃）—— 只捕获这个被适配的 stage 自身的 late/duplicate，不影响外层 async runner 的 `onViolation`
+
+行为：等待 `stage` 内部调用 `next()` 所启动的那一条下游 Promise（即 async runner 真正的 `next`）；`stage` 若未调用 `next()`，这一帧就不会调用 async runner 的 `next`，效果等同短路。
+
+**`adaptSyncStageToGenerator`｜5 秒上手** —— 把同步 `next(value)` 转成一次 `yield`：
+
+```ts
+const genStage = adaptSyncStageToGenerator(
+  (value: string, next) => next(value.trim()),
+  (violation) => console.warn(violation)
+);
+runGeneratorMiddleware([genStage], ' hi ', (v) => console.log(v));
+```
+
+全部参数：
+
+- `stage: ISyncMiddlewareStage<TValue>`（必填）
+- `onViolation: IMiddlewarePipelineViolationHandler`（必填，**无默认值**——与 `adaptSyncStageToAsync` 不同）
+
+行为：`stage` 调用 `next(value)` 后，适配器 `yield value` 一次并 `return GENERATOR_CONTINUE`；`stage` 若未调用 `next()`，直接 `return GENERATOR_HALT`（不 `yield`），等价于终止整条链。
+
+---
+
+<a id="生成器信号"></a>
+
+## 生成器信号
+
+```ts
+import {
+  GENERATOR_CONTINUE,
+  GENERATOR_HALT,
+  GENERATOR_UNDEFINED,
+  MiddlewarePipelineGeneratorSignals
+} from '@migaia/middleware-pipeline';
+```
+
+**`GENERATOR_CONTINUE` / `GENERATOR_HALT` / `GENERATOR_UNDEFINED`｜3 秒上手** —— 三个稳定 `Symbol` 常量，无配置，直接从 generator stage `return`：
+
+```ts
+function* stage(value: number) {
+  yield value;
+  return GENERATOR_CONTINUE; // 或 GENERATOR_HALT / GENERATOR_UNDEFINED
+}
+```
+
+**`MiddlewarePipelineGeneratorSignals`｜3 秒上手** —— 与上面三个常量配套的默认 sentinel 集合，是 `runGeneratorMiddleware` 的 `signals` 参数默认值，一般无需手动传递：
+
+```ts
+MiddlewarePipelineGeneratorSignals; // { undefined: GENERATOR_UNDEFINED, halt: GENERATOR_HALT, continue: GENERATOR_CONTINUE }
+```
+
+需要自定义 sentinel（例如宿主希望暴露自己的 Symbol）时，构造一个满足 `IGeneratorMiddlewareSignals` 形状的对象传给 `runGeneratorMiddleware` 的第四个参数即可。
+
+---
+
+<a id="稳定值与错误"></a>
+
+## 稳定值与错误
+
+```ts
+import {
+  MiddlewarePipelineMode,
+  MiddlewarePipelineViolation,
+  MIDDLEWARE_PIPELINE_SOURCE,
+  MiddlewarePipelineErrorCode
+} from '@migaia/middleware-pipeline';
+```
+
+**`MiddlewarePipelineMode`｜3 秒上手** —— 三种执行代数的稳定值，供调用方标注/分支用，本包内部不消费它：
+
+```ts
+MiddlewarePipelineMode; // { sync: 'sync', async: 'async', generator: 'generator' }
+```
+
+**`MiddlewarePipelineViolation`｜3 秒上手** —— `onViolation` 回调收到的稳定取值：
+
+```ts
+MiddlewarePipelineViolation; // { late: 'late', duplicate: 'duplicate' }
+```
+
+**`MIDDLEWARE_PIPELINE_SOURCE`｜3 秒上手** —— 本包错误身份用的稳定 `source` 字符串常量：
+
+```ts
+MIDDLEWARE_PIPELINE_SOURCE; // '@migaia/middleware-pipeline'
+```
+
+**`MiddlewarePipelineErrorCode`｜3 秒上手** —— 本包拥有的错误码表，目前只有一项：
+
+```ts
+MiddlewarePipelineErrorCode; // { executionFailed: 'EXECUTION_FAILED' }
+```
+
+`executionFailed`（`'EXECUTION_FAILED'`）：`runAsyncMiddleware` 里当前 stage 与它已经启动的 downstream 同时以普通失败结束、且调用方未提供 `combineStageAndDownstreamError` 时抛出的默认 `AggregateError` 所携带的 code；该错误的 `message` 固定为 `'middleware stage and downstream failed'`，`errors` 数组依次是 `[stageError, downstreamError]`。
+
+---
+
+<a id="高阶组合示例"></a>
+
+## 高阶组合示例
+
+### 1. Sync 校验链：短路 + violation 上报
+
+```ts
+import { MiddlewarePipelineViolation, runSyncMiddleware } from '@migaia/middleware-pipeline';
+
+const violations: string[] = [];
+
+runSyncMiddleware(
+  [
+    (value: string, next) => next(value.trim()),
+    (value: string, next) => {
+      if (value.length === 0) return; // 空字符串直接短路
+      next(value.toUpperCase());
+      next('ignored'); // 触发 duplicate，只有第一次生效
+    }
+  ],
+  '  hi  ',
+  (value) => console.log('done:', value), // 'done: HI'
+  (violation) => violations.push(violation) // ['duplicate']
+);
+```
+
+### 2. Async 洋葱模型：认证 + 路由，短路跳过 `/health`
+
+```ts
+import { runAsyncMiddleware, type IAsyncMiddlewareStage } from '@migaia/middleware-pipeline';
+
+type IRequest = { readonly path: string; readonly trace: readonly string[] };
+
+const stages: readonly IAsyncMiddlewareStage<IRequest>[] = [
+  async (request, next) => {
+    await next({ ...request, trace: [...request.trace, 'auth'] });
+  },
+  async (request, next) => {
+    if (request.path === '/health') return; // 短路，done 不执行
+    await next({ ...request, trace: [...request.trace, 'route'] });
+  }
+];
+
+await runAsyncMiddleware(
+  stages,
+  { path: '/users', trace: [] },
+  (request) => console.log(request.trace), // ['auth', 'route']
+  { onViolation: () => undefined }
+);
+```
+
+### 3. Async 双失败：自定义组合器接管领域错误
+
+```ts
+import { runAsyncMiddleware } from '@migaia/middleware-pipeline';
+
+class MyPipelineError extends Error {
+  constructor(
+    readonly stageError: unknown,
+    readonly downstreamError: unknown
+  ) {
+    super('pipeline stage and downstream both failed');
+  }
+}
+
+await runAsyncMiddleware(
+  [
+    async (value: number, next) => {
+      try {
+        await next(value);
+      } finally {
+        throw new Error('stage cleanup failed');
+      }
+    },
+    async () => {
+      throw new Error('downstream failed');
+    }
+  ],
+  1,
+  () => undefined,
+  {
+    onViolation: () => undefined,
+    combineStageAndDownstreamError: (stageError, downstreamError) =>
+      new MyPipelineError(stageError, downstreamError)
+  }
+).catch((error) => console.error(error instanceof MyPipelineError)); // true
+```
+
+### 4. Generator：多次 yield 采集 + 显式终止
 
 ```ts
 import {
@@ -135,11 +341,11 @@ runGeneratorMiddleware(
   [
     function* (value: number) {
       yield value + 1;
-      yield value + 2;
-      return GENERATOR_CONTINUE; // 使用最后一次 yield，即 value + 2
+      yield value + 2; // 最终采用这一次
+      return GENERATOR_CONTINUE;
     },
     function* (value: number) {
-      if (value > 10) return GENERATOR_HALT;
+      if (value > 10) return GENERATOR_HALT; // 终止整条链
       return value * 2;
     }
   ],
@@ -148,68 +354,34 @@ runGeneratorMiddleware(
 );
 ```
 
-generator 的 return 规则：
-
-| 返回值                | 行为                              |
-| --------------------- | --------------------------------- |
-| 普通值                | 作为下一 stage 输入               |
-| `GENERATOR_CONTINUE`  | 使用最后一次 yield 的值继续       |
-| `GENERATOR_HALT`      | 终止整条链，不调用 `done()`       |
-| `GENERATOR_UNDEFINED` | 显式把 `undefined` 传给下一 stage |
-| 隐式 `undefined`      | 视为终止，不调用 `done()`         |
-
-`runGeneratorMiddleware()` 还允许兼容 wrapper 注入自己的 sentinel identity。这个入口主要用于 plugin-host 之类已经公开过 Symbol 的宿主；普通消费者应直接使用本包导出的三个 sentinel。
-
-## 7. 从同步 stage 适配
-
-包提供两个适配器：
+### 5. 混用同步与异步 stage：用适配器统一到 async chain
 
 ```ts
-import { adaptSyncStageToAsync, adaptSyncStageToGenerator } from '@migaia/middleware-pipeline';
+import {
+  adaptSyncStageToAsync,
+  runAsyncMiddleware,
+  type IAsyncMiddlewareStage
+} from '@migaia/middleware-pipeline';
+
+const trimStage = adaptSyncStageToAsync((value: string, next) => next(value.trim()));
+const upperStage: IAsyncMiddlewareStage<string> = async (value, next) => {
+  await next(value.toUpperCase());
+};
+
+await runAsyncMiddleware(
+  [trimStage, upperStage],
+  '  migai  ',
+  (value) => console.log(value), // 'MIGAI'
+  { onViolation: (kind) => console.warn('violation:', kind) }
+);
 ```
 
-- `adaptSyncStageToAsync(stage, onViolation)`：把同步 stage 接入 async chain，并等待它启动的第一条 downstream Promise。
-- `adaptSyncStageToGenerator(stage, onViolation)`：把同步 `next(value)` 转成一次 yield；未调用 `next()` 时返回 `GENERATOR_HALT`。
+---
 
-适配不会把 sync stage 变成真正的 async/generator stage：原 stage 仍必须在返回前调用 `next()`，late/duplicate 仍会报告。
+<a id="构建门禁"></a>
 
-## 8. 公开 API
+## 构建门禁
 
-| API                           | 用途                                      |
-| ----------------------------- | ----------------------------------------- |
-| `runSyncMiddleware()`         | 执行同步、扁平的 middleware chain         |
-| `runAsyncMiddleware()`        | 执行支持 `await next()` 的 async chain    |
-| `runGeneratorMiddleware()`    | 执行 generator chain                      |
-| `adaptSyncStageToAsync()`     | sync stage → async stage                  |
-| `adaptSyncStageToGenerator()` | sync stage → generator stage              |
-| `MiddlewarePipelineMode`      | `sync` / `async` / `generator` 稳定值     |
-| `MiddlewarePipelineViolation` | `late` / `duplicate` 稳定值               |
-| `GENERATOR_CONTINUE`          | 采用最后一次 yield 并继续                 |
-| `GENERATOR_HALT`              | 终止整条链                                |
-| `GENERATOR_UNDEFINED`         | 显式传播 undefined                        |
-| `MiddlewarePipelineErrorCode` | 包拥有的错误码，目前为 `EXECUTION_FAILED` |
-
-完整类型包括 `ISyncMiddlewareStage`、`IAsyncMiddlewareStage`、`IGeneratorMiddlewareStage`、`IMiddlewarePipelineOptions` 和 violation/signal 类型，均从主入口导出。
-
-## 9. Tree-shaking 与运行时边界
-
-所有公开 API 由 ESM 主入口导出，包声明 `sideEffects: false`。sync-only 的构建测试会验证最终 bundle 不包含 async 双失败文本或 generator sentinel；没有使用的执行模式可以被移除。
-
-运行时代码不依赖：
-
-- Node / Bun / Deno 专属 API
-- DOM、Worker 或 UI framework
-- timer、scheduler 或全局 singleton
-- lifecycle、plugin-host 或 Store
-
-## 10. 生命周期边界
-
-本包一次调用只执行一次 chain，不保存跨调用状态，也不提供 `close()`、`dispose()`、`drain()` 或队列。
-
-stage registration 的 disposer、host closing 检查和运行深度由 plugin-host 拥有。需要长期持有 in-flight 工作、超时预算、取消或排空的系统，应使用独立 dispatcher 并依赖 `@migaia/lifecycle`，不要把这些职责塞进 runner。
-
-## 11. 深入参考
-
-- 更精确的行为说明：[USEGUIDE.md](./USEGUIDE.md)
-- 架构、迁移和验收矩阵：[middleware-pipeline.sdd.md](../../docs/middleware-pipeline/middleware-pipeline.sdd.md)
-- plugin-host 集成：[plugin-host README](../plugin-host/README.md)
+```bash
+pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
+```

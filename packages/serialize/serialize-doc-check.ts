@@ -26,7 +26,8 @@ async function readmeExample() {
     scheduler: systemScheduler
   });
   const collected = await collectStream(stream);
-  void value; void collected;
+  void value;
+  void collected;
 }
 
 async function useguideExample() {
@@ -60,7 +61,9 @@ async function useguideExample() {
     }
   } catch (error) {
     if (error instanceof SerializeCodecError) {
-      console.error(`导出在第 ${error.chunkIndex} 片失败：${error.message}`, { cause: error.cause });
+      console.error(`导出在第 ${error.chunkIndex} 片失败：${error.message}`, {
+        cause: error.cause
+      });
     }
     throw error;
   }
@@ -70,7 +73,9 @@ async function useguideExample() {
     restored.push(...(rows as unknown[]));
   }
   registry.dispose();
-  void chunkToText; void assertSerializeType;
+  void chunkToText;
+  void assertSerializeType;
 }
 
-void readmeExample; void useguideExample;
+void readmeExample;
+void useguideExample;

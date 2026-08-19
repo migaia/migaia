@@ -82,6 +82,15 @@ export const createEventTypeError = (
   return attachEventErrorCode(error, code);
 };
 
+/** Creates a coded native Error for lifecycle/state violations. */
+export const createEventError = (
+  code: IEventSubscriberErrorCode,
+  message: string
+): Error & {
+  readonly source: typeof EVENT_SUBSCRIBER_SOURCE;
+  readonly code: IEventSubscriberErrorCode;
+} => attachEventErrorCode(new Error(message), code);
+
 /**
  * Codes genuine Error values in place and wraps every other thrown value in a native TypeError.
  * Hostile proxy inspection is itself converted to a coded TypeError so no shape probe can escape
@@ -126,6 +135,7 @@ export const eventErrorText = (code: IEventSubscriberErrorCode): string => {
     [EventSubscriberErrorCode.invalidTaskId]: EventSubscriberErrorText.invalidTaskId,
     [EventSubscriberErrorCode.invalidOptions]: EventSubscriberErrorText.invalidOptions,
     [EventSubscriberErrorCode.publishFailed]: EventSubscriberErrorText.publishFailed,
+    [EventSubscriberErrorCode.subscriptionClosed]: EventSubscriberErrorText.subscriptionClosed,
     [EventSubscriberErrorCode.unhandledListenerFailure]:
       EventSubscriberErrorText.unhandledListenerFailure
   };

@@ -1,103 +1,317 @@
-# @migaia/store-indexed
+# `@migaia/store-indexed`
 
-**显式方法的细粒度响应式集合**——对象、数组、Map、Set 四种容器，每个 key/索引/成员各自独立追踪依赖，不做 Proxy 拦截。
+显式方法的细粒度响应式集合：`ObservableObject`/`ObservableArray`/`ObservableMap`/`ObservableSet` 四种容器，读写一律走命名方法（`get`/`set`/`has`/`peek`……），不用 Proxy 拦截整个对象/数组——因此可以做到"只读了哪个 key/索引，就只依赖哪个 key/索引"。每个 key/索引对应的响应式格子（cell）都是惰性创建、自动回收的。
 
-## 1. 这是什么
+## 适用与不适用场景
 
-如果把 `@migaia/reactive` 的 `Signal` 比作一个响应式的"格子"，`store-indexed` 就是把整箱格子按数字索引或对象 key 组织起来、按需现造格子的容器：`ObservableObject`（键值对）、`ObservableArray`（索引数组）、`ObservableMap`（K/V 表）、`ObservableSet`（成员集合）。它们长得像 JS 原生的 `Object`/`Array`/`Map`/`Set`，但读写一律走命名方法（`get`/`set`/`has`/`peek`……），不用 Proxy 包一层——这样才能把追踪粒度做到"只读了哪个 key，就只依赖哪个 key"：改数组第 5 项，只有读过第 5 项的 effect 会重算，其余 999 个索引的订阅者不受影响。
+**适用**：表格行、消息列表一类大规模集合，但只有少数条目被 UI 订阅；需要"改一个 key/索引，只有读过它的地方重算"的细粒度依赖；需要跟 `@migaia/store-light` 的 `IMutationGuard` 集成，把"只能在 action 内写"这类策略下沉到集合层。
 
-每个 key/索引对应的响应式"格子"（内部叫 cell）是**惰性造的**：没人读过就不存在，读过又没人订阅就在下一个微任务自动回收。这意味着一个十万条目的集合，哪怕你只追踪其中五条，也不会为剩下的十万条建立任何 Signal。
+**不适用**：只需要一个普通的响应式对象/数组、不关心细粒度依赖或容量——直接用 `@migaia/reactive` 的 `Signal<T>` 更省事；需要"按值稳定标识、删除/插入不改变其余成员定位"的实体集合——`ObservableArray` 是纯索引语义，`splice`/`pop`/`replace` 会移动后续索引对应的值，这不是本包的设计目标。
 
-## 2. 适合/不适合场景
-
-| 场景 | 适合吗 |
-| --- | --- |
-| 表格行、消息列表、大规模数组，只有少数行被 UI 订阅 | 适合——未订阅的索引不占用任何响应式资源 |
-| 需要"改一个 key/索引，只有读过它的地方重算"的细粒度依赖 | 适合，这是本包的核心卖点 |
-| 需要跟 `@migaia/store-light` 的写入策略（比如仅允许在 action 内变更）集成 | 适合，构造选项直接接受 `IMutationGuard` |
-| 只需要一个普通的响应式对象/数组，不关心细粒度依赖或容量 | 不必要——一个 `Signal<T[]>` 可能更直接 |
-| 需要按值稳定标识、删除/插入不改变其余成员定位的实体集合 | 不适合——这里数组是纯索引语义，插入/删除会移动后续索引对应的值 |
-
-## 3. 核心卖点
-
-- **细粒度依赖**：读一个 key/索引只订阅那个 key/索引本身；结构变化（增删 key、数组变长变短）和值变化分别用独立的 Signal 追踪，互不牵连。
-- **惰性 cell + 自动回收**：cell 只在被追踪读时才创建，失去全部订阅者后自动释放（外加逃生舱 `prune()` 手动批量回收）。
-- **`peek()` 不建 cell**：非追踪读走内部 Map 直接返回，遍历十万个 key 做快照不会意外创建十万个 Signal。
-- **跨 Runtime 误用会立刻报错**：一个集合的读操作发生在别的 Runtime 正在追踪的 effect 里时，直接抛错而不是静默产生跨图依赖。
-- **可选的变更守卫**：构造时传入 `IMutationGuard`（比如 `@migaia/store-middleware` 的 `MutationPolicy`），把"只能在 action 内写"这类策略下沉到集合层。
-- **显式生命周期**：`dispose()` 级联释放集合自己创建的全部 Signal；用完必须调用，否则常驻内存。
-
-## 4. 安装
+## 安装
 
 ```bash
 pnpm add @migaia/store-indexed
 ```
 
-依赖 `@migaia/reactive`（响应式运行时）与 `@migaia/store-light`（`IMutationGuard` 类型），二者通常已经在同一个 monorepo 里作为对等依赖存在。
+依赖 `@migaia/reactive`（响应式运行时，提供 `IRuntime`/`defaultRuntime`/`Signal`）与 `@migaia/store-light`（提供 `IMutationGuard` 类型），二者通常已经在同一个 monorepo 里作为对等依赖存在。
 
-## 5. 最小示例
+## 目录
+
+- [集合类型与工厂函数模块](#集合类型与工厂函数模块)
+- [操作常量模块](#操作常量模块)
+- [错误模块](#错误模块)
+- [高阶组合示例](#高阶组合示例)
+- [构建门禁](#构建门禁)
+
+完整方法签名、cell 惰性创建与回收的精确时序、错误信息全表、多 Runtime 场景，见 [USEGUIDE.md](./USEGUIDE.md)。
+
+---
+
+<a id="集合类型与工厂函数模块"></a>
+
+## 集合类型与工厂函数模块
 
 ```ts
-import { ObservableArray } from '@migaia/store-indexed';
-
-const rows = new ObservableArray([{ id: 'a' }, { id: 'b' }, { id: 'c' }]);
-
-// 只读了索引 1，只订阅索引 1
-rows.at(1);
-
-rows.set(1, { id: 'b2' }); // 触发依赖索引 1 的订阅者
-rows.push({ id: 'd' }); // 改变 length，触发依赖 length/结构 的订阅者
-
-console.log(rows.snapshot()); // 只读快照，追踪整体变化
-rows.dispose(); // 用完必须释放
+import {
+  ObservableObject,
+  ObservableArray,
+  ObservableMap,
+  ObservableSet,
+  observableObject,
+  observableArray,
+  observableMap,
+  observableSet,
+  type IObservableCollectionOptions
+} from '@migaia/store-indexed';
 ```
 
-也可以用工厂函数替代 `new`（注意参数顺序与类构造函数不同，见下方"踩坑清单"）：
+**`ObservableObject`｜10 秒上手** —— 键值对容器，`get`/`peek`/`has`/`set`/`update`/`delete`/`keys`/`snapshot`/`replace`/`prune`/`dispose`：
+
+```ts
+const user = new ObservableObject({ name: 'Ada', age: 30 });
+user.get('name'); // 追踪读：处在 effect/computed 内时只订阅 'name' 这个 cell
+user.set('age', 31); // 值变化：触发修订信号，已建 cell 的 'age' 同步更新
+user.snapshot(); // 冻结的、Object.create(null) 起始的浅拷贝快照
+user.dispose(); // 用完必须释放，级联 dispose 全部内部 Signal
+```
+
+构造函数全部参数（`new ObservableObject<T extends Record<string, unknown>>(initial, runtime?, options?)`）：
+
+- `initial: T`（必填）—— 初始键值对；类型参数 `T` 由它推导，之后 `get`/`set`/`update`/`delete`/`keys` 的 key 被约束为 `keyof T & string`
+- `runtime?: IRuntime` —— 默认 `defaultRuntime`（来自 `@migaia/reactive`）
+- `options?: IObservableCollectionOptions` —— 默认 `{}`；字段见下方"`IObservableCollectionOptions` 全部字段"
+
+**`ObservableArray`｜10 秒上手** —— 索引数组，`at`/`length`/`peek`/`snapshot`/`set`/`push`/`pop`/`splice`/`replace`/`clear`/`prune`/`dispose`：
+
+```ts
+const rows = new ObservableArray([{ id: 'a' }, { id: 'b' }, { id: 'c' }]);
+rows.at(1); // 只读了索引 1，只订阅索引 1
+rows.set(1, { id: 'b2' }); // 触发依赖索引 1 的订阅者
+rows.push({ id: 'd' }); // 改变 length，触发依赖 length/结构 的订阅者
+rows.dispose();
+```
+
+构造函数全部参数（`new ObservableArray<T>(initial?, runtime?, options?)`）：
+
+- `initial?: Iterable<T>` —— 默认 `[]`；接受任意可迭代对象（含字符串，按字符物化）
+- `runtime?: IRuntime` —— 默认 `defaultRuntime`
+- `options?: IObservableCollectionOptions` —— 默认 `{}`
+
+**`ObservableMap`｜10 秒上手** —— K/V 表，`get`/`peek`/`has`/`set`/`delete`/`clear`/`replace`/`keys`/`valuesArray`/`entries`/`snapshot`/`prune`/`dispose`：
+
+```ts
+const users = new ObservableMap<string, { name: string }>();
+users.set('u1', { name: 'Ann' }); // 键不存在，触发结构信号 + 迭代信号
+users.get('u1'); // 追踪读，惰性建 'u1' 的 cell
+users.dispose();
+```
+
+构造函数全部参数（`new ObservableMap<K, V>(initial?, runtime?, options?)`）：
+
+- `initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>` —— 默认 `[]`（空表）；字符串输入直接拒绝（只接受 `[K, V]` entry 形状）
+- `runtime?: IRuntime` —— 默认 `defaultRuntime`
+- `options?: IObservableCollectionOptions` —— 默认 `{}`
+
+**`ObservableSet`｜10 秒上手** —— 成员集合，`has`/`add`/`delete`/`clear`/`replace`/`valuesArray`/`snapshot`/`prune`/`dispose`：
+
+```ts
+const tags = new ObservableSet(['a', 'b']);
+tags.has('a'); // 追踪读，惰性建 'a' 的 membership cell
+tags.add('c'); // 触发结构信号
+tags.dispose();
+```
+
+构造函数全部参数（`new ObservableSet<T>(initial?, runtime?, options?)`）：
+
+- `initial?: Iterable<T>` —— 默认 `[]`；接受任意可迭代对象（含字符串，按字符物化）
+- `runtime?: IRuntime` —— 默认 `defaultRuntime`
+- `options?: IObservableCollectionOptions` —— 默认 `{}`
+
+`IObservableCollectionOptions` 全部字段（四个类共用）：
+
+- `mutationGuard?: IMutationGuard`（来自 `@migaia/store-light`）—— 默认无；每次写操作前调用其 `assertMutationAllowed(operation)`，不通过则抛错
+- `debugName?: string` —— 默认取类名（如 `'ObservableArray'`）；内部各 Signal 的调试名前缀
+
+**`observableObject`/`observableArray`/`observableMap`/`observableSet`｜5 秒上手** —— 类的工厂函数版本，**参数顺序与类构造函数不同**：
 
 ```ts
 import { observableArray } from '@migaia/store-indexed';
 
-const rows = observableArray([{ id: 'a' }]);
+const rows = observableArray([{ id: 'a' }], {}, myRuntime);
 ```
 
-## 6. 核心概念一览
+全部参数（注意顺序是 `(initial, options, runtime)`，类构造函数是 `(initial, runtime, options)`）：
 
-| 概念 | 是什么 |
-| --- | --- |
-| **Cell** | 某个 key/索引对应的响应式 Signal，惰性创建，无人订阅时自动回收 |
-| **结构信号（structure）** | 追踪"有哪些 key/索引存在"——增删 key、数组变长变短才会触发，改值不触发 |
-| **修订信号（revision）** | 追踪"整体是否有任意值变化"，供 `snapshot()` 一类整体读取使用 |
-| **迭代信号（iteration，仅 Map）** | 追踪"任意内容变化"（含同 key 换值），供 `valuesArray()`/`entries()`/`snapshot()` 使用；`keys()`/`size` 只依赖结构信号 |
-| **`peek()`** | 非追踪读，绕过 cell 创建，直接读内部存储 |
-| **`mutationGuard`** | 构造选项，写操作前调用其 `assertMutationAllowed(operation)`，不通过就抛错 |
-| **`prune()`** | 手动批量回收"已从集合移除、但 cell 还挂在内存里"的僵尸 cell |
-| **`debugName`** | 构造选项，作为集合内部各 Signal 的名字前缀，用于调试/诊断 |
+- `initial`（`observableObject` 必填，其余可选，默认 `[]`）—— 同对应类构造函数的 `initial`
+- `options?: IObservableCollectionOptions` —— 默认 `{}`
+- `runtime?: IRuntime` —— 默认 `defaultRuntime`
 
-## 7. 模块一览
+混用两套参数顺序会把 `options` 当成 `runtime` 传（或反过来）；`options`/`runtime` 结构不同，TypeScript 通常会在传入具体值时拦住，但都省略或用 `undefined` 传递时编译期不一定能拦住，务必按各自签名顺序传参。
 
-| 导出 | 是什么 |
-| --- | --- |
-| `ObservableObject<T>` / `observableObject(initial, options?, runtime?)` | 键值对容器，`get`/`peek`/`has`/`set`/`update`/`delete`/`keys`/`snapshot`/`replace`/`prune` |
-| `ObservableArray<T>` / `observableArray(initial?, options?, runtime?)` | 索引数组，`at`/`length`/`peek`/`snapshot`/`set`/`push`/`pop`/`splice`/`replace`/`clear`/`prune` |
-| `ObservableMap<K, V>` / `observableMap(initial?, options?, runtime?)` | K/V 表，`get`/`peek`/`has`/`set`/`delete`/`clear`/`keys`/`valuesArray`/`entries`/`snapshot`/`prune` |
-| `ObservableSet<T>` / `observableSet(initial?, options?, runtime?)` | 成员集合，`has`/`add`/`delete`/`clear`/`valuesArray`/`snapshot`/`prune` |
-| `IObservableCollectionOptions` | 构造选项类型：`{ mutationGuard?, debugName? }` |
+---
 
-四个类共享同一套生命周期基类，但**互不依赖对方**——用哪个就只为哪个的形状付费。
+<a id="操作常量模块"></a>
 
-## 8. 生命周期、错误与边界
+## 操作常量模块
 
-1. **工厂函数与类构造函数的参数顺序不一样**。`new ObservableArray(initial, runtime, options)`，但 `observableArray(initial, options, runtime)`——混用会把 `options` 传成 `runtime` 或反过来，且没有运行时报错提醒（类型层面 `IRuntime` 和 `IObservableCollectionOptions` 结构不同，通常会被 TS 拦住，但传 `undefined`/字面量时要格外小心）。
-2. **不用之后必须调用 `dispose()`**。集合创建的每个 Signal 都要显式释放，忘记 dispose 会让它们常驻在 Runtime 的依赖图和内存里。
-3. **`peek()`/`snapshot()` 语义不同**：`peek()` 是非追踪读，不建响应式依赖；`snapshot()`（或 `get`/`at`/`has` 等常规方法）是追踪读，且惰性创建 cell。批量遍历要用 `peek()`/`snapshot()`，不要在循环里对每个 key 调用会建 cell 的方法。
-4. **一个集合实例绑定一个 Runtime**，跨 Runtime 读取会直接抛错，不会静默产生错误的跨图依赖。
-5. **`ObservableArray` 是纯索引语义**，`splice`/`pop`/`replace` 会移动后续索引对应的值；需要"删除/插入不影响其余成员定位"的场景，这不是本包的设计目标。
-6. **`mutationGuard` 只在写方法里触发**，`assertMutationAllowed` 抛出的错误会原样从 `set`/`push`/`delete` 等调用里抛出，需要自行 catch 或保证调用时机合法。
+```ts
+import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed';
+```
 
-`dispose()` 幂等；释放后所有集合读写以 `source: '@migaia/store-indexed'`、
-`code: 'COLLECTION_DISPOSED'` 失败。越界/非法索引和跨 Runtime tracked 读取也保留其
-原生错误类型，并携带稳定错误码。
+**`IndexedOperation`｜3 秒上手** —— 稳定的操作名常量，供诊断/日志/中间件按操作类型分支，本包自身的方法不直接引用它（它是给消费方分类用的公共词表）：
 
-## 9. 深入参考
+```ts
+if (event.operation === IndexedOperation.write) reportMutation(event);
+```
 
-每个类的完整方法签名、参数/返回值/副作用表、cell 惰性创建与回收的精确时序、错误信息全表、`mutationGuard` 集成示例、多 Runtime 场景，见 **[USEGUIDE.md](./USEGUIDE.md)**。
+全部取值：`read`(`'read'`)、`write`(`'write'`)、`delete`(`'delete'`)。`IIndexedOperation` 是其取值的联合类型，无调用参数。
+
+---
+
+<a id="错误模块"></a>
+
+## 错误模块
+
+```ts
+import {
+  StoreIndexedErrorCode,
+  type IStoreIndexedErrorCode,
+  STORE_INDEXED_SOURCE,
+  createStoreIndexedError,
+  createStoreIndexedRangeError,
+  createStoreIndexedTypeError
+} from '@migaia/store-indexed';
+```
+
+**`StoreIndexedErrorCode`｜3 秒上手** —— 稳定错误码表，用于 `switch`/比较，调用方应按 `code` 判断语义、不依赖消息文本：
+
+```ts
+try {
+  collection.at(-1);
+} catch (error) {
+  if ((error as { code?: string }).code === StoreIndexedErrorCode.collectionDisposed) {
+    // ...
+  }
+}
+```
+
+全部取值：`invalidOption`(`INVALID_OPTION`)、`collectionDisposed`(`COLLECTION_DISPOSED`)、`indexOutOfRange`(`INDEX_OUT_OF_RANGE`)、`invalidIndex`(`INVALID_INDEX`)、`crossRuntime`(`CROSS_RUNTIME`)。`IStoreIndexedErrorCode` 是其取值的联合类型。
+
+**`STORE_INDEXED_SOURCE`｜3 秒上手** —— 本包所有边界错误的 `source` 字段固定值，无调用参数：
+
+```ts
+STORE_INDEXED_SOURCE; // '@migaia/store-indexed'
+```
+
+**`createStoreIndexedError`/`createStoreIndexedRangeError`/`createStoreIndexedTypeError`｜5 秒上手** —— 构造带 `(source, code)` 身份的 `Error`/`RangeError`/`TypeError`，供扩展本包行为（例如自定义 `mutationGuard`）时复用同一套错误身份约定：
+
+```ts
+throw createStoreIndexedTypeError(
+  StoreIndexedErrorCode.invalidOption,
+  'custom guard rejected the mutation'
+);
+```
+
+三者签名一致，全部参数：
+
+- `code: IStoreIndexedErrorCode`（必填）—— 通常取自 `StoreIndexedErrorCode`
+- `message: string`（必填）
+- `options?: { readonly cause?: unknown }` —— 可选，仅 `createStoreIndexedError`/`createStoreIndexedTypeError` 支持；提供后转发给原生 `Error`/`TypeError` 构造函数的 `{ cause }`；`createStoreIndexedRangeError` 不接受第三参数
+
+返回值分别是原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份），额外携带不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。
+
+---
+
+<a id="高阶组合示例"></a>
+
+## 高阶组合示例
+
+### 1. 表格行细粒度订阅 + 定期 `prune()`
+
+```ts
+import { ObservableArray } from '@migaia/store-indexed';
+import { Effect } from '@migaia/reactive';
+
+const rows = new ObservableArray<{ id: string; name: string }>(
+  Array.from({ length: 100_000 }, (_, i) => ({ id: String(i), name: `row-${i}` }))
+);
+
+// 只有被订阅的 5 行才会实体化 cell，其余 99995 行不占用任何 Signal
+const watched = [0, 1, 2, 3, 4].map(
+  (index) => new Effect(() => render(index, rows.at(index)), rows.runtime)
+);
+
+rows.splice(0, 1); // 索引语义整体后移一位
+rows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell
+
+for (const effect of watched) effect.dispose();
+rows.dispose();
+```
+
+### 2. `mutationGuard` 集成：仅允许在 action 内写入
+
+```ts
+import { ObservableMap } from '@migaia/store-indexed';
+import { MutationPolicy } from '@migaia/store-middleware';
+
+const guard = new MutationPolicy('actions-only');
+const users = new ObservableMap<string, { name: string }>(
+  [],
+  undefined, // 使用默认 Runtime
+  { mutationGuard: guard, debugName: 'users' }
+);
+
+try {
+  users.set('u1', { name: 'Ann' }); // 抛错：不在 action 内
+} catch {
+  guard.runInAction(() => users.set('u1', { name: 'Ann' })); // 成功
+}
+```
+
+### 3. 多 Runtime 隔离 + 跨 Runtime 保护
+
+```ts
+import { createRuntime, Effect } from '@migaia/reactive';
+import { ObservableSet, StoreIndexedErrorCode } from '@migaia/store-indexed';
+
+const runtimeA = createRuntime();
+const runtimeB = createRuntime();
+const tagsInA = new ObservableSet(['a', 'b'], runtimeA);
+
+new Effect(() => {
+  try {
+    tagsInA.has('a'); // 当前 effect 属于 runtimeB，读了 runtimeA 的集合
+  } catch (error) {
+    if ((error as { code?: string }).code === StoreIndexedErrorCode.crossRuntime) {
+      // 预期内的跨 Runtime 保护
+    }
+  }
+}, runtimeB);
+```
+
+### 4. 自定义错误保留同一套 `(source, code)` 约定
+
+```ts
+import { createStoreIndexedError, StoreIndexedErrorCode } from '@migaia/store-indexed';
+
+function assertNonEmptyName(name: string): void {
+  if (name.length === 0) {
+    throw createStoreIndexedError(
+      StoreIndexedErrorCode.invalidOption,
+      '[store] name must not be empty'
+    );
+  }
+}
+```
+
+### 5. 只读快照批量遍历，避免误建十万个 cell
+
+```ts
+import { ObservableObject } from '@migaia/store-indexed';
+
+const bigTable = new ObservableObject(
+  Object.fromEntries(Array.from({ length: 100_000 }, (_, i) => [`k${i}`, i]))
+);
+
+// peek() 不建 cell，适合一次性批量导出
+let sum = 0;
+for (const key of bigTable.keys()) sum += bigTable.peek(key);
+bigTable.dispose();
+```
+
+---
+
+<a id="构建门禁"></a>
+
+## 构建门禁
+
+```bash
+pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test && pnpm run build
+```
+
+浏览器集成路径另跑：
+
+```bash
+pnpm run typecheck:e2e && pnpm run test:e2e
+```

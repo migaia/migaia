@@ -14,9 +14,10 @@
 8. [`record(shape)`](#8-recordshape)
 9. [生命周期与释放](#9-生命周期与释放)
 10. [错误信息完整参考](#10-错误信息完整参考)
-11. [扩展：基于 arena 自定义 WASM 字段](#11-扩展基于-arena-自定义-wasm-字段)
-12. [常见问题排查](#12-常见问题排查)
-13. [构建、格式化与测试](#13-构建格式化与测试)
+11. [错误模块公开导出：`StoreWasmErrorCode`/`create*`/常量](#11-错误模块公开导出)
+12. [扩展：基于 arena 自定义 WASM 字段](#12-扩展基于-arena-自定义-wasm-字段)
+13. [常见问题排查](#13-常见问题排查)
+14. [构建、格式化与测试](#14-构建格式化与测试)
 
 ---
 
@@ -28,9 +29,9 @@ import { ensureWasm } from '@migaia/store-wasm';
 await ensureWasm(); // 之后所有字段构造器的 create() 才能同步工作
 ```
 
-| 签名 | 参数 | 返回值 | 同步/异步 | 作用 |
-| --- | --- | --- | --- | --- |
-| `ensureWasm()` | 无 | `Promise<WebAssembly.Memory>` | 异步 | 加载并实例化底层 `@migaia/wasm` 模块，返回其线性内存对象 |
+| 签名           | 参数 | 返回值                        | 同步/异步 | 作用                                                     |
+| -------------- | ---- | ----------------------------- | --------- | -------------------------------------------------------- |
+| `ensureWasm()` | 无   | `Promise<WebAssembly.Memory>` | 异步      | 加载并实例化底层 `@migaia/wasm` 模块，返回其线性内存对象 |
 
 `ensureWasm()` 在模块作用域内缓存加载结果：
 
@@ -118,12 +119,12 @@ type IWasmNumberField = {
 };
 ```
 
-| 成员 | 参数类型 | 同步/异步 | 说明 |
-| --- | --- | --- | --- |
-| `value`（读/写访问器） | 写入：`number` | 同步 | 读写单个 `number`；写入使用 `Object.is` 比较，值未变化时不触发响应式提交（不产生多余的通知） |
-| `observed`（只读） | 无 | 同步 | 当前是否有响应式订阅者在追踪这个字段 |
-| `disposed`（只读） | 无 | 同步 | 是否已释放 |
-| `dispose()` | 无 | 同步 | 释放底层分配；重复调用是 no-op |
+| 成员                   | 参数类型       | 同步/异步 | 说明                                                                                         |
+| ---------------------- | -------------- | --------- | -------------------------------------------------------------------------------------------- |
+| `value`（读/写访问器） | 写入：`number` | 同步      | 读写单个 `number`；写入使用 `Object.is` 比较，值未变化时不触发响应式提交（不产生多余的通知） |
+| `observed`（只读）     | 无             | 同步      | 当前是否有响应式订阅者在追踪这个字段                                                         |
+| `disposed`（只读）     | 无             | 同步      | 是否已释放                                                                                   |
+| `dispose()`            | 无             | 同步      | 释放底层分配；重复调用是 no-op                                                               |
 
 底层布局：一个 8 字节 `f64` 分配，用 `DataView.getFloat64`/`setFloat64`（小端）读写。构造/析构失败会正确回滚已分配的内存，不泄漏。
 
@@ -142,13 +143,13 @@ const field = boolean(); // FieldBuilder<IWasmBooleanField>
 ## 6. `string(maxBytes?)`
 
 ```ts
-const field = string();     // maxBytes 默认 256
-const field2 = string(64);  // 自定义最大字节数
+const field = string(); // maxBytes 默认 256
+const field2 = string(64); // 自定义最大字节数
 ```
 
-| 参数 | 类型 | 必填性 | 默认值 | 约束 |
-| --- | --- | --- | --- | --- |
-| `maxBytes` | `number` | 可选 | `256` | 必须是 `[0, 0xffff_ffff - 4]` 内的安全整数，否则构造时直接抛 `RangeError` |
+| 参数       | 类型     | 必填性 | 默认值 | 约束                                                                      |
+| ---------- | -------- | ------ | ------ | ------------------------------------------------------------------------- |
+| `maxBytes` | `number` | 可选   | `256`  | 必须是 `[0, 0xffff_ffff - 4]` 内的安全整数，否则构造时直接抛 `RangeError` |
 
 产出字段：`{ value: string; observed; disposed; dispose() }`，语义与 `number()`/`boolean()` 一致，区别在于容量与编码：
 
@@ -164,15 +165,15 @@ const field2 = string(64);  // 自定义最大字节数
 ## 7. `array(item, length, granularity?)`
 
 ```ts
-const field = array(number(), 1000);        // granularity 默认 64
-const field2 = array(number(), 1000, 1);     // 每个 index 独立追踪
+const field = array(number(), 1000); // granularity 默认 64
+const field2 = array(number(), 1000, 1); // 每个 index 独立追踪
 ```
 
-| 参数 | 类型 | 必填性 | 默认值 | 约束 |
-| --- | --- | --- | --- | --- |
-| `item` | `ReturnType<typeof number>` | 必填 | 无 | **目前只支持 `number()`**；参数存在是为了给数组元素类型占位，未来扩展其他元素类型的接口形状 |
-| `length` | `number` | 必填 | 无 | `[0, floor(0xffff_ffff / 8)]`（即 536,870,911）内的安全整数，否则构造时抛 `RangeError` |
-| `granularity` | `number` | 可选 | `64` | 必须是正安全整数，否则抛 `RangeError` |
+| 参数          | 类型                        | 必填性 | 默认值 | 约束                                                                                        |
+| ------------- | --------------------------- | ------ | ------ | ------------------------------------------------------------------------------------------- |
+| `item`        | `ReturnType<typeof number>` | 必填   | 无     | **目前只支持 `number()`**；参数存在是为了给数组元素类型占位，未来扩展其他元素类型的接口形状 |
+| `length`      | `number`                    | 必填   | 无     | `[0, floor(0xffff_ffff / 8)]`（即 536,870,911）内的安全整数，否则构造时抛 `RangeError`      |
+| `granularity` | `number`                    | 可选   | `64`   | 必须是正安全整数，否则抛 `RangeError`                                                       |
 
 产出字段：
 
@@ -188,12 +189,12 @@ type IWasmArrayField = {
 };
 ```
 
-| 成员 | 参数类型 | 同步/异步 | 说明 |
-| --- | --- | --- | --- |
-| `at(index)` | `index: number` | 同步 | 读取单个元素；越界抛 `RangeError`；读取会 track 该 index 所属的分桶 |
-| `setAt(index, value)` | `index: number`, `value: number` | 同步 | 写入单个元素；`Object.is` 比较无变化时跳过提交；越界抛 `RangeError` |
-| `setRange(lo, hi, values)` | `lo: number`, `hi: number`, `values: ArrayLike<number>` | 同步 | 批量写入 `[lo, hi)` 区间；`values.length` 必须等于 `hi - lo`；同一批次里落进同一个分桶的写入会合并到一次 `commit`，跨分桶的写入包在一次 `runtime.batch()` 里一起提交 |
-| `view()` | 无 | 同步 | 返回**当前内容的独立拷贝**（新分配的 `Float64Array`），不是线性内存的实时视图；直接修改这个返回值既不会触发响应式通知，也不会写回字段 |
+| 成员                       | 参数类型                                                | 同步/异步 | 说明                                                                                                                                                                 |
+| -------------------------- | ------------------------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `at(index)`                | `index: number`                                         | 同步      | 读取单个元素；越界抛 `RangeError`；读取会 track 该 index 所属的分桶                                                                                                  |
+| `setAt(index, value)`      | `index: number`, `value: number`                        | 同步      | 写入单个元素；`Object.is` 比较无变化时跳过提交；越界抛 `RangeError`                                                                                                  |
+| `setRange(lo, hi, values)` | `lo: number`, `hi: number`, `values: ArrayLike<number>` | 同步      | 批量写入 `[lo, hi)` 区间；`values.length` 必须等于 `hi - lo`；同一批次里落进同一个分桶的写入会合并到一次 `commit`，跨分桶的写入包在一次 `runtime.batch()` 里一起提交 |
+| `view()`                   | 无                                                      | 同步      | 返回**当前内容的独立拷贝**（新分配的 `Float64Array`），不是线性内存的实时视图；直接修改这个返回值既不会触发响应式通知，也不会写回字段                                |
 
 **分桶（granularity）**：数组底层是一整块连续的 `Float64Array`，但响应式追踪不是逐元素的——`granularity` 个连续 index 共享一个响应式 Source（"桶"），默认 64。粒度越粗，Source 数量越少（内存/管理开销小），但一次写入会让整个桶内所有订阅者都收到通知；`granularity: 1` 退化成逐元素独立追踪，精度最高但 Source 数量等于 `length`。分桶按需惰性创建——只有实际被 `at()`/`setAt()`/`setRange()` 触碰过的桶才会创建对应的 Source。
 
@@ -207,9 +208,9 @@ type IWasmArrayField = {
 const field = record({ x: number(), y: number(), z: number() });
 ```
 
-| 参数 | 类型 | 必填性 | 约束 |
-| --- | --- | --- | --- |
-| `shape` | `Record<string, ReturnType<typeof number>>` | 必填 | 每个 key 对应的值必须是 `number()` 返回的构造器；key 不能是 `'dispose'` 或 `'disposed'` |
+| 参数    | 类型                                        | 必填性 | 约束                                                                                    |
+| ------- | ------------------------------------------- | ------ | --------------------------------------------------------------------------------------- |
+| `shape` | `Record<string, ReturnType<typeof number>>` | 必填   | 每个 key 对应的值必须是 `number()` 返回的构造器；key 不能是 `'dispose'` 或 `'disposed'` |
 
 产出字段类型是 `shape` 的键到 `number` 的映射，外加 `IDisposable`：
 
@@ -245,46 +246,151 @@ type IWasmRecordField<Shape> = { [K in keyof Shape]: number } & {
 
 ## 10. 错误信息完整参考
 
-| 触发条件 | 错误类型 | 信息 |
-| --- | --- | --- |
-| `allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数 | `RangeError` | `wasm.allocate: byteLen must fit an unsigned 32-bit integer` |
-| 字段构造时 WASM 尚未就绪（未 `await ensureWasm()`） | `Error` | `[store] WASM is not initialized; await ensureWasm() or use StoreProvider` |
-| 字段构造时 `context.signal` 已经 aborted | `Error` | `[store] field init aborted` |
-| `number()`/`boolean()`/`string()` 字段 dispose 后读 `.value` | `Error` | `[store] cannot read a disposed wasm field` |
-| `number()`/`boolean()`/`string()` 字段 dispose 后写 `.value` | `Error` | `[store] cannot write a disposed wasm field` |
-| `array()` 字段 dispose 后调用任意方法 | `Error` | `[store] cannot use a disposed wasm field` |
-| `array()` 的 `length` 超出 `[0, floor(0xffff_ffff/8)]` | `RangeError` | `wasm.array: length exceeds the Wasm32 allocation limit` |
-| `array()` 的 `granularity` 不是正安全整数 | `RangeError` | `wasm.array: granularity must be a positive safe integer` |
-| `array()` 分配地址未按 8 字节对齐（防御性校验，正常不会触发） | `Error` | `` wasm.array: allocation not 8-byte aligned (ptr=${ptr}) `` |
-| `array().at(i)` / `setAt(i, ...)` 的 `i` 越界或非安全整数 | `RangeError` | `` wasm.array: index out of bounds (${i}) `` |
-| `array().setRange(lo, hi, ...)` 的区间不合法 | `RangeError` | `` wasm.array: invalid range [${lo}, ${hi}) `` |
-| `array().setRange()` 的 `values` 不是 array-like | `TypeError` | `wasm.array: values must be array-like` |
-| `array().setRange()` 的 `values.length !== hi - lo` | `RangeError` | `wasm.array: values length must match the target range`（由 `StoreWasmErrorText` 统一维护） |
-| `string()` 的 `maxBytes` 超出 `[0, 0xffff_ffff - 4]` | `RangeError` | `wasm.string: maxBytes exceeds the Wasm32 allocation limit` |
-| `string()` 字段写入的字符串编码后超过 `maxBytes` | `Error` | `` wasm.string: value exceeds maxBytes (${实际字节数} > ${maxBytes}) `` |
-| `string()` 字段读取到存储长度大于 `maxBytes`（数据损坏，正常不会触发） | `Error` | `wasm.string: corrupted byte length` |
-| `record()` 的 `shape` 里出现 key 为 `'dispose'` 或 `'disposed'` | `TypeError` | `` [store] wasm.record field name is reserved: ${key} `` |
+| 触发条件                                                                    | 错误类型     | 信息                                                                                        |
+| --------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------- |
+| `allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数 | `RangeError` | `wasm.allocate: byteLen must fit an unsigned 32-bit integer`                                |
+| 字段构造时 WASM 尚未就绪（未 `await ensureWasm()`）                         | `Error`      | `[store] WASM is not initialized; await ensureWasm() or use StoreProvider`                  |
+| 字段构造时 `context.signal` 已经 aborted                                    | `Error`      | `[store] field init aborted`                                                                |
+| `number()`/`boolean()`/`string()` 字段 dispose 后读 `.value`                | `Error`      | `[store] cannot read a disposed wasm field`                                                 |
+| `number()`/`boolean()`/`string()` 字段 dispose 后写 `.value`                | `Error`      | `[store] cannot write a disposed wasm field`                                                |
+| `array()` 字段 dispose 后调用任意方法                                       | `Error`      | `[store] cannot use a disposed wasm field`                                                  |
+| `array()` 的 `length` 超出 `[0, floor(0xffff_ffff/8)]`                      | `RangeError` | `wasm.array: length exceeds the Wasm32 allocation limit`                                    |
+| `array()` 的 `granularity` 不是正安全整数                                   | `RangeError` | `wasm.array: granularity must be a positive safe integer`                                   |
+| `array()` 分配地址未按 8 字节对齐（防御性校验，正常不会触发）               | `Error`      | `wasm.array: allocation not 8-byte aligned (ptr=${ptr})`                                    |
+| `array().at(i)` / `setAt(i, ...)` 的 `i` 越界或非安全整数                   | `RangeError` | `wasm.array: index out of bounds (${i})`                                                    |
+| `array().setRange(lo, hi, ...)` 的区间不合法                                | `RangeError` | `wasm.array: invalid range [${lo}, ${hi})`                                                  |
+| `array().setRange()` 的 `values` 不是 array-like                            | `TypeError`  | `wasm.array: values must be array-like`                                                     |
+| `array().setRange()` 的 `values.length !== hi - lo`                         | `RangeError` | `wasm.array: values length must match the target range`（由 `StoreWasmErrorText` 统一维护） |
+| `string()` 的 `maxBytes` 超出 `[0, 0xffff_ffff - 4]`                        | `RangeError` | `wasm.string: maxBytes exceeds the Wasm32 allocation limit`                                 |
+| `string()` 字段写入的字符串编码后超过 `maxBytes`                            | `Error`      | `wasm.string: value exceeds maxBytes (${实际字节数} > ${maxBytes})`                         |
+| `string()` 字段读取到存储长度大于 `maxBytes`（数据损坏，正常不会触发）      | `Error`      | `wasm.string: corrupted byte length`                                                        |
+| `record()` 的 `shape` 里出现 key 为 `'dispose'` 或 `'disposed'`             | `TypeError`  | `[store] wasm.record field name is reserved: ${key}`                                        |
 
 ---
 
-## 11. 扩展：基于 arena 自定义 WASM 字段
+<a id="11-错误模块公开导出"></a>
+
+## 11. 错误模块公开导出：`StoreWasmErrorCode`/`create*`/常量
+
+除字段构造器与 `ensureWasm()` 外，根入口还公开导出以下错误相关符号，供调用方识别本包抛出的错误、或在扩展自定义字段时复用同一套错误构造逻辑：
+
+```ts
+import {
+  StoreWasmErrorCode,
+  type IStoreWasmErrorCode,
+  STORE_WASM_SOURCE,
+  createStoreWasmError,
+  createStoreWasmRangeError,
+  createStoreWasmTypeError,
+  createStoreWasmAggregateError,
+  WasmFieldMode,
+  type IWasmFieldMode,
+  WasmReservedKey,
+  type IWasmReservedKey
+} from '@migaia/store-wasm';
+```
+
+```ts
+const StoreWasmErrorCode = {
+  notInitialized: 'NOT_INITIALIZED',
+  fieldDisposed: 'FIELD_DISPOSED',
+  initAborted: 'INIT_ABORTED',
+  reservedFieldName: 'RESERVED_FIELD_NAME',
+  allocationFailed: 'ALLOCATION_FAILED',
+  invalidOption: 'INVALID_OPTION',
+  cleanupFailed: 'CLEANUP_FAILED'
+} as const;
+type IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];
+```
+
+稳定错误码表，是公开 API 的一部分——改名视为破坏性变更。每条码值的触发条件：
+
+| 码值                | 触发条件                                                                           |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| `notInitialized`    | 字段在 `ensureWasm()` settle 之前同步构造/分配                                     |
+| `fieldDisposed`     | 读写/使用一个已 `dispose()` 的字段                                                 |
+| `initAborted`       | 字段初始化时 `context.signal` 已经 aborted                                         |
+| `reservedFieldName` | `record()` 的 `shape` 用了 `'dispose'`/`'disposed'` 作为 key                       |
+| `allocationFailed`  | WASM 分配失败或对齐/长度校验失败                                                   |
+| `invalidOption`     | 构造/写入参数非法（超容量、下标越界、granularity 非法等）                          |
+| `cleanupFailed`     | 字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`） |
+
+```ts
+const STORE_WASM_SOURCE: '@migaia/store-wasm';
+```
+
+本包每个抛出的错误上 `source` 字段的固定值，用于结合 `code` 做双重识别，避免和其他包同名的 `code` 混淆。
+
+```ts
+function createStoreWasmError(
+  code: IStoreWasmErrorCode,
+  message: string,
+  options?: { readonly cause?: unknown }
+): Error;
+function createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError;
+function createStoreWasmTypeError(
+  code: IStoreWasmErrorCode,
+  message: string,
+  options?: { readonly cause?: unknown }
+): TypeError;
+function createStoreWasmAggregateError(
+  code: IStoreWasmErrorCode,
+  errors: readonly unknown[],
+  message: string
+): AggregateError;
+```
+
+四个错误构造函数，均通过 `attachErrorIdentity`（`@migaia/utils/error`）把 `source: STORE_WASM_SOURCE` 与传入的 `code` 挂到对应类型的原生错误对象上，不修改 `stack`。包内部构造字段错误时统一走这四个函数；扩展自定义字段类型（见 [§12](#12-扩展基于-arena-自定义-wasm-字段)）时可以复用它们保持错误身份风格一致。`createStoreWasmError`/`createStoreWasmTypeError` 的 `options.cause` 若提供会传给底层 `Error`/`TypeError` 构造函数的 `{ cause }`。
+
+```ts
+try {
+  field.value = 123;
+} catch (error) {
+  const e = error as { source?: string; code?: string };
+  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {
+    // 字段已释放
+  }
+}
+```
+
+```ts
+const WasmFieldMode = { sync: 'sync' } as const;
+type IWasmFieldMode = 'sync';
+```
+
+字段构造器 `mode` 字段的取值集合，目前只有 `'sync'`——本包全部字段构造器都同步产出字段，`create()` 中不发起任何异步操作（异步初始化已经被 `ensureWasm()` 提前完成）。`createStore()` 依据这个字段判断某个 `FieldBuilder` 能否被同步调用。
+
+```ts
+const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const;
+type IWasmReservedKey = 'dispose' | 'disposed';
+```
+
+`record()` 的 `shape` 禁止使用的 key 集合——这两个名字被字段实例自身的 `dispose()`/`disposed` 占用。`record()` 内部在构造时用这个常量做校验（见 [§8](#8-recordshape)）。
+
+---
+
+<a id="12-扩展基于-arena-自定义-wasm-字段"></a>
+
+## 12. 扩展：基于 arena 自定义 WASM 字段
 
 `number()`/`boolean()`/`string()`/`array()`/`record()` 内部都构建在同一套底层分配原语之上，这些原语位于 `src/arena.ts`。它们是包内实现细节：当前 `package.json` 只公开根入口，消费方不能从 `@migaia/store-wasm/arena`、`@migaia/store-wasm/field` 或其他子路径导入。
 
-| 内部符号（非公开导出） | 参数类型 | 同步/异步 | 作用 |
-| --- | --- | --- | --- |
-| `allocateOwnedSync(byteLen)` | `byteLen: number` | 同步 | 同步分配一块内存并返回 `IWasmAllocation`（`memory`/`id`/`ptr`/`register`/`unregister`/`dispose`），供字段构造器在自己的 `create()` 里使用 |
-| `allocate(byteLen)` | `byteLen: number` | 异步 | 异步分配：内部先 `await ensureWasm()` 再分配，适合在 WASM 尚未就绪时也能发起分配请求的场景 |
-| `allocateSync(byteLen)` | `byteLen: number` | 同步 | 同步分配：要求 WASM 已就绪，否则抛 `[store] WASM is not initialized...` |
-| `deallocate(id)` | `id: number` | 同步 | 释放指定分配 id；对未知/已释放的 id 是 no-op，天然抗重复调用 |
-| `registry` | 不适用（非函数导出） | 不适用 | 对 `FinalizationRegistry` 的薄封装（`register`/`unregister`），运行时不支持时静默降级为 no-op |
-| `IWasmAllocation` | 不适用（类型定义） | 不适用 | 一块分配的类型：`memory`、`id`、`ptr`，以及 `register`/`unregister`/`dispose` |
+| 内部符号（非公开导出）       | 参数类型             | 同步/异步 | 作用                                                                                                                                      |
+| ---------------------------- | -------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `allocateOwnedSync(byteLen)` | `byteLen: number`    | 同步      | 同步分配一块内存并返回 `IWasmAllocation`（`memory`/`id`/`ptr`/`register`/`unregister`/`dispose`），供字段构造器在自己的 `create()` 里使用 |
+| `allocate(byteLen)`          | `byteLen: number`    | 异步      | 异步分配：内部先 `await ensureWasm()` 再分配，适合在 WASM 尚未就绪时也能发起分配请求的场景                                                |
+| `allocateSync(byteLen)`      | `byteLen: number`    | 同步      | 同步分配：要求 WASM 已就绪，否则抛 `[store] WASM is not initialized...`                                                                   |
+| `deallocate(id)`             | `id: number`         | 同步      | 释放指定分配 id；对未知/已释放的 id 是 no-op，天然抗重复调用                                                                              |
+| `registry`                   | 不适用（非函数导出） | 不适用    | 对 `FinalizationRegistry` 的薄封装（`register`/`unregister`），运行时不支持时静默降级为 no-op                                             |
+| `IWasmAllocation`            | 不适用（类型定义）   | 不适用    | 一块分配的类型：`memory`、`id`、`ptr`，以及 `register`/`unregister`/`dispose`                                                             |
 
 如果需要新的字段类型（例如另一种数值精度或编码），当前做法是向本包贡献实现并由根入口正式导出；不要依赖 `src/arena.ts`、`src/number.ts` 或 `src/string.ts` 的深层路径。它们没有版本化的外部兼容承诺。
 
 ---
 
-## 12. 常见问题排查
+<a id="13-常见问题排查"></a>
+
+## 13. 常见问题排查
 
 **Q：字段构造直接抛 `[store] WASM is not initialized; await ensureWasm() or use StoreProvider`。**
 在调用 `number()`/`array()` 等构造器之前（更准确地说，在它们被 `createStore()` 调用 `create()` 之前）没有等到 `ensureWasm()` settle。要么手动 `await ensureWasm()` 后再 `createStore()`，要么用 `StoreProvider` 的 `config.ready: [ensureWasm]` 屏障子树渲染，见 [§3](#3-与-storeprovider-集成)。
@@ -304,7 +410,9 @@ type IWasmRecordField<Shape> = { [K in keyof Shape]: number } & {
 **Q：忘记调用 `dispose()` 会不会内存泄漏？**
 如果字段是通过 `createStore()` 创建的，`store.$dispose()` 会自动帮你释放，正常使用不会泄漏。如果是绕开 Store 手写 `builder.create(context)` 又忘记 `dispose()`，`FinalizationRegistry` 兜底会在字段对象被 GC 时异步释放——但这只是兜底，时机不确定，不要依赖它作为常规释放手段。
 
-## 13. 构建、格式化与测试
+<a id="14-构建格式化与测试"></a>
+
+## 14. 构建、格式化与测试
 
 在仓库根目录运行：
 

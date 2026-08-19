@@ -7,8 +7,9 @@ import type {
   IEventHubOptions,
   IEventMap,
   IEventListener,
-  IUnsubscribe
+  IEventHubSubscription
 } from './types.js';
+import { createRawSubscriptionOwner } from './internal/subscription.js';
 
 /** Creates a lazy keyed synchronous hub with O(1) total size accounting. */
 export const createEventHub = <C extends IEventMap>(
@@ -88,62 +89,15 @@ export const createEventHub = <C extends IEventMap>(
     }
     return { channel, validated };
   };
-  return {
-    subscribe<K extends keyof C>(key: K, listener: IEventListener<C[K]>): IUnsubscribe {
-      if (typeof listener !== 'function') {
-        throw createEventTypeError(
-          EventSubscriberErrorCode.invalidListener,
-          eventErrorText(EventSubscriberErrorCode.invalidListener)
-        );
-      }
-      const { channel, validated } = getChannel(key);
-      let deactivateRegistration: (() => void) | undefined;
-      const release = channel.subscribe((event) => {
-        return listener({
-          get value() {
-            return event.value;
-          },
-          get aborted() {
-            return event.aborted;
-          },
-          get abortReason() {
-            return event.abortReason;
-          },
-          get taskId() {
-            return event.taskId;
-          },
-          abort(reason?: unknown) {
-            event.abort(reason);
-            deactivateRegistration?.();
-          },
-          setTaskId(taskId: string | undefined) {
-            event.setTaskId(taskId);
-          }
-        } as never);
-      });
-      totalSize += 1;
-      let active = true;
-      const channelRegistrations = registrations.get(channel) ?? new Set<() => void>();
-      registrations.set(channel, channelRegistrations);
-      const deactivate = (): void => {
-        if (!active) return;
-        active = false;
-        channelRegistrations.delete(deactivate);
-        totalSize -= 1;
-        if (
-          channelRegistrations.size === 0 &&
-          registrations.get(channel) === channelRegistrations
-        ) {
-          registrations.delete(channel);
-        }
-        if (channels.get(validated) === channel && channel.size === 0) channels.delete(validated);
-      };
-      deactivateRegistration = deactivate;
-      channelRegistrations.add(deactivate);
-      return () => {
-        release();
-        deactivate();
-      };
+  const hub: IEventHub<C> = {
+    subscribe<K extends keyof C>(
+      key: K,
+      listener: IEventListener<C[K]>
+    ): IEventHubSubscription<C, K> {
+      const release = registerRaw(key, listener);
+      return createRawSubscriptionOwner(release, (nextKey, nextListener) =>
+        registerRaw(nextKey, nextListener)
+      ) as IEventHubSubscription<C, K>;
     },
     publish<K extends keyof C>(key: K, value: C[K]): void {
       const channel = channels.get(validateKey(key as PropertyKey));
@@ -174,4 +128,59 @@ export const createEventHub = <C extends IEventMap>(
       return channels.get(validateKey(key as PropertyKey))?.size ?? 0;
     }
   };
+  function registerRaw<K extends keyof C>(key: K, listener: IEventListener<C[K]>): () => void {
+    if (typeof listener !== 'function') {
+      throw createEventTypeError(
+        EventSubscriberErrorCode.invalidListener,
+        eventErrorText(EventSubscriberErrorCode.invalidListener)
+      );
+    }
+    const { channel, validated } = getChannel(key);
+    let deactivateRegistration: (() => void) | undefined;
+    const channelRelease = channel.subscribe((event) => {
+      return listener({
+        get value() {
+          return event.value;
+        },
+        get aborted() {
+          return event.aborted;
+        },
+        get abortReason() {
+          return event.abortReason;
+        },
+        get taskId() {
+          return event.taskId;
+        },
+        abort(reason?: unknown) {
+          event.abort(reason);
+          deactivateRegistration?.();
+        },
+        setTaskId(taskId: string | undefined) {
+          event.setTaskId(taskId);
+        }
+      } as never);
+    });
+    totalSize += 1;
+    let active = true;
+    const channelRegistrations = registrations.get(channel) ?? new Set<() => void>();
+    registrations.set(channel, channelRegistrations);
+    const deactivate = (): void => {
+      if (!active) return;
+      active = false;
+      channelRegistrations.delete(deactivate);
+      totalSize -= 1;
+      if (channelRegistrations.size === 0 && registrations.get(channel) === channelRegistrations) {
+        registrations.delete(channel);
+      }
+      if (channels.get(validated) === channel && channel.size === 0) channels.delete(validated);
+    };
+    deactivateRegistration = deactivate;
+    channelRegistrations.add(deactivate);
+    const release = (): void => {
+      channelRelease();
+      deactivate();
+    };
+    return release;
+  }
+  return hub;
 };
