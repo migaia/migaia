@@ -8,6 +8,7 @@
 - [`/error` 模块](#error-模块)
 - [`/bytes` 模块](#bytes-模块)
 - [`/object` 模块（含对象路径）](#object-模块)
+- [`/typing` 模块](#typing-模块)
 - [`/config` 模块](#config-模块)
 - [`/function` 模块](#function-模块)
 - [组合工作流示例](#组合工作流示例)
@@ -569,6 +570,26 @@ accessor.value; // { count: 5 }
 ```
 
 对应的类型工具（用于给调用方提供编译期路径补全与值类型推断）：`IObjectPathSegment`、`IObjectPathTuple`、`IObjectPath<T>`（字符串路径，最深 8 层）、`IObjectPathTupleFor<T>`（元组路径）、`IObjectPathInput<T>`（两者联合）、`IObjectPathValue<T, P>`（路径指向的值类型）、`IObjectPathWriteValue<T, P>`（写入时接受的类型，字面量类型会被适度放宽为其基础类型，例如字面量联合放宽为 `string`/`number`/`boolean`/`bigint`）。
+
+---
+
+<a id="typing-模块"></a>
+
+## `/typing` 模块
+
+`@migaia/utils/typing` 是不引入运行时能力的精选类型出口。它重新导出 `IObjectPath*`、`IAbortSignal`、`IDeferred` 和 `IProbePropertyResult`，并新增：
+
+```ts
+type IDiscriminatedByField<F extends PropertyKey, T extends Record<F, PropertyKey>> = {
+  [K in T[F]]: Extract<T, Record<F, K>>;
+};
+
+type IDiscriminatedByPath<T, P extends IObjectPathInput<T>> = {
+  [K in Extract<IObjectPathValue<T, P>, PropertyKey>]: /* 对应的 T union 分支 */;
+};
+```
+
+路径版本直接复用 `IObjectPath`/`IObjectPathValue` 的 string、tuple、数组索引和最深 8 层语义，不维护第二套 keyPath 类型解析。
 
 ---
 

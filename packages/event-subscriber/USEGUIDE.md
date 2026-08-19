@@ -366,21 +366,21 @@ import type { IEventChannelSubscription, IEventHubSubscription } from '@migaia/e
 ```ts
 const channelHandle = channel.subscribe(onReady);
 channelHandle.subscribe(onWarning, { taskId: 'audit' });
-channelHandle.unsubscribe(); // same function identity; releases whole chain
+channelHandle.unsubscribe(); // 和 channelHandle 是同一个函数标识；释放整条链
 
 const hubHandle = hub.subscribe('ready', onReady);
-// finite literal maps reject a repeated key on this chain; a new hub.subscribe starts a new chain.
+// 有限字面量 key map 在同一条链上禁止重复 key；要用同一个 key 订阅两次，另起一个新的 hub.subscribe()
 hubHandle.subscribe('warning', onWarning);
 
 const maybeKey: keyof IEvents = getRuntimeKey();
 const dynamicHandle = hub.subscribe(maybeKey, onReady);
-dynamicHandle.subscribe(maybeKey, onReady); // widened key: runtime fan-out, no static duplicate claim
+dynamicHandle.subscribe(maybeKey, onReady); // key 类型被拓宽为运行时值：允许同 key fan-out，编译期不做重复声明检查
 
 const owned = channel.subscribe(onReady);
 try {
   owned.subscribe(getPossiblyInvalidListener());
 } catch {
-  owned.unsubscribe(); // extension is non-transactional; earlier registration remains owned
+  owned.unsubscribe(); // 链式扩展不是事务性的：扩展失败，之前已经注册成功的那一条仍然有效、仍归 owned 所有
 }
 ```
 
