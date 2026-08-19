@@ -26,6 +26,12 @@ import { CapabilityErrorText } from './error-text.js';
 import { createCapabilityError, tagCapabilityError } from './errors.js';
 import { CapabilityEnableStatus, CapabilityState } from './state-constants.js';
 export * from './state-constants.js';
+export {
+  snapshotGraphReadiness,
+  type ICapabilityReadinessSource,
+  type IGraphReadinessSnapshot,
+  type IGraphReadinessState
+} from './graph-readiness.js';
 
 // 错误码是公开 API（`docs/contracts/error-codes.md` §3.5 / migration.sdd.md §8.1）：调用方要能按
 // `(source, code)` 分支，必须从主入口拿得到常量与类型，不能被迫抄写字符串字面量。
