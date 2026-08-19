@@ -1,5 +1,7 @@
 /** Stable capability admission messages shared by option validation and snapshot failures. */
 export const CapabilityErrorText = {
+  /** Stable admission diagnostic for readiness values outside the public graph contract. */
+  invalidReadinessState: 'capability readiness state is invalid',
   /** Explains that a public host option getter failed before lifecycle state was allocated. */
   optionsSnapshotFailed: 'capability options snapshot failed',
   /** Explains that the public host options container must support property reads. */
