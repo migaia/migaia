@@ -33,6 +33,10 @@
       "types": "./dist/object.d.ts",
       "default": "./dist/object.js"
     },
+    "./typing": {
+      "types": "./dist/typing.d.ts",
+      "default": "./dist/typing.js"
+    },
     "./config": {
       "types": "./dist/config.d.ts",
       "default": "./dist/config.js"
@@ -48,6 +52,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
     "test": "pnpm run build && vitest run",
+    "test:packed": "pnpm run build && node test/packed-export-smoke.mjs",
     "build": "vite build && tsc -p tsconfig.json --emitDeclarationOnly",
     "release:pack": "pnpm pack --pack-destination /tmp",
     "release:patch": "pnpm version patch --no-git-tag-version",

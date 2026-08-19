@@ -20,6 +20,7 @@ pnpm add @migaia/utils
 - [`/error`：错误身份与因果链](#error-模块)
 - [`/bytes`：Base64 与 UTF-8](#bytes-模块)
 - [`/object`：快照与不可变对象路径](#object-模块)
+- [`/typing`：跨项目复用类型](#typing-模块)
 - [`/config`：带所有权语义的配置对象](#config-模块)
 - [`/function`：一次性调用](#function-模块)
 - [高阶组合示例](#高阶组合示例)
@@ -392,6 +393,33 @@ accessor.value; // { count: 5 }
 - `onSet?: (event) => void` —— 每次成功 `set()` 时触发，`event.replace(value)` 可改写实际写入值
 
 返回的访问器方法：`get(path)`、`set(path, value)`、`probeValue(path)`、`parsePath(path)`、只读 `value`。
+
+---
+
+<a id="typing-模块"></a>
+
+## `/typing` 模块
+
+```ts
+import type {
+  IDiscriminatedByField,
+  IDiscriminatedByPath,
+  IObjectPathInput,
+  IObjectPathValue
+} from '@migaia/utils/typing';
+```
+
+`/typing` 是精选的 type-only 子入口：复用现有 object-path 类型，同时提供按顶层字段或深层路径把 discriminated union 转为映射的工具。原 root 与 `/object` 类型出口保持兼容。
+
+```ts
+type IEvent =
+  | { meta: { type: 'created' }; payload: { id: string } }
+  | { meta: { type: 'deleted' }; payload: { reason: string } };
+
+type IEventMap = IDiscriminatedByPath<IEvent, 'meta.type'>;
+```
+
+`IDiscriminatedByField<F, T>` 只接受顶层、值为 `PropertyKey` 的 discriminator；`IDiscriminatedByPath<T, P>` 接受 typed string 或 tuple 路径。相同 discriminator 的多个 union 分支会被保留为联合类型。
 
 ---
 
