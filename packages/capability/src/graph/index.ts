@@ -8,6 +8,7 @@ import {
   type IAbortSignal,
   type IGenerationController,
   type IGenerationToken,
+  type IReleaseContext,
   type IReleaseDescriptor
 } from '@migaia/lifecycle';
 import { CapabilityGraphErrorCode, type ICapabilityGraphErrorCode } from './error-code.js';
@@ -398,7 +399,7 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
       await provisional.commitTo(root);
       root.own(result, {
         order: releaseOrder,
-        force: (releaseContext) => {
+        force: (releaseContext: IReleaseContext) => {
           let releaseResult: void | PromiseLike<void>;
           try {
             releaseResult = invokeLifecycleCallback(() =>
