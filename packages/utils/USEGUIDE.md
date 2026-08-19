@@ -495,16 +495,52 @@ function parseObjectPath(path: string | IObjectPathTuple): IObjectPathTuple;
 把字符串路径解析成规范化的 `readonly` 段元组（数字下标解析成 `number`），或校验并冻结一个已给定的元组路径。任何越界/危险段都会抛出携带 `code: 'OBJECT_PATH_INVALID'` 的 `TypeError`。
 
 ```ts
-type IPathValueProbe<T, P>   = { readonly kind: 'value'; readonly value: ... ; ... };
-type IPathMissingProbe<P>    = { readonly kind: 'missing'; readonly failedAt: number; readonly failedKey: ...; readonly parent: unknown; ... };
-type IPathBlockedProbe<P>    = { readonly kind: 'blocked'; ... }; // 路径中途遇到 null/原始值，无法继续深入
-type IPathFailedProbe<P>     = { readonly kind: 'failed'; readonly error: unknown; ... }; // 某一段的读取本身抛错（如 getter 抛错）
-type IPathProbe<T, P> = IPathValueProbe<T, P> | IPathMissingProbe<P> | IPathBlockedProbe<P> | IPathFailedProbe<P>;
+type IPathValueProbe<T, P extends IObjectPathInput<T>> = {
+  readonly kind: 'value';
+  readonly originKey: P;
+  readonly segments: IObjectPathTuple;
+  readonly value: IObjectPathValue<T, P>;
+};
+type IPathMissingProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {
+  readonly kind: 'missing';
+  readonly originKey: P;
+  readonly segments: IObjectPathTuple;
+  readonly failedAt: number;
+  readonly failedKey: IObjectPathSegment;
+  readonly resolvedPath: IObjectPathTuple;
+  readonly parent: unknown;
+};
+type IPathBlockedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {
+  readonly kind: 'blocked';
+  readonly originKey: P;
+  readonly segments: IObjectPathTuple;
+  readonly failedAt: number;
+  readonly failedKey: IObjectPathSegment;
+  readonly resolvedPath: IObjectPathTuple;
+  readonly parent: unknown;
+};
+type IPathFailedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {
+  readonly kind: 'failed';
+  readonly originKey: P;
+  readonly segments: IObjectPathTuple;
+  readonly failedAt: number;
+  readonly failedKey: IObjectPathSegment;
+  readonly resolvedPath: IObjectPathTuple;
+  readonly parent: unknown;
+  readonly error: unknown;
+};
+type IPathProbe<T, P extends IObjectPathInput<T>> =
+  | IPathValueProbe<T, P>
+  | IPathMissingProbe<P>
+  | IPathBlockedProbe<P>
+  | IPathFailedProbe<P>;
 
 function probeObjectPath<T, P extends IObjectPathInput<T>>(object: T, path: P): IPathProbe<T, P>;
 ```
 
-沿路径逐段探测，每段只读取一次。四种结果分别对应：**成功取到值**、**某一段属性不存在**（`missing`）、**某一段的父值不是对象/函数因而无法继续深入**（`blocked`，例如路径指向 `a.b.c` 但 `a.b` 是 `null` 或字符串）、**某一段读取本身抛出异常**（`failed`，例如触发了会抛错的 getter）。`missing`/`blocked`/`failed` 都携带 `failedAt`（第几段失败）、`failedKey`（失败的那一段键）与 `resolvedPath`（成功解析到的前缀路径），便于精确诊断。
+沿路径逐段探测，每段只读取一次。四种结果分别对应：**成功取到值**（`value`，携带 `value`）、**某一段属性不存在**（`missing`）、**某一段的父值不是对象/函数因而无法继续深入**（`blocked`，例如路径指向 `a.b.c` 但 `a.b` 是 `null` 或字符串）、**某一段读取本身抛出异常**（`failed`，例如触发了会抛错的 getter，携带 `error`）。
+
+四种结果共有字段 `originKey`（原始传入的 `path`，未加工）与 `segments`（`parseObjectPath` 解析后的完整段元组）；`missing`/`blocked`/`failed` 额外共有 `failedAt`（第几段失败，0-based）、`failedKey`（失败的那一段键）、`resolvedPath`（成功解析到的前缀路径，即 `segments` 中 `failedAt` 之前的部分）、`parent`（失败发生时的父级值——`missing`/`failed` 时是该属性所属的对象，`blocked` 时是那个非对象的原始值本身）。`failed` 唯一多出 `error` 字段，携带原始抛出值。
 
 ```ts
 function get<T, P extends IObjectPathInput<T>>(
@@ -541,6 +577,20 @@ before.user.name; // 'Ada'（原对象未被修改）
 ```
 
 ```ts
+type IPathGetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {
+  readonly originKey: P;
+  readonly segments: IObjectPathTuple;
+  readonly probe: IPathValueProbe<T, P>;
+  readonly value: IObjectPathValue<T, P>;
+  replace(value: IObjectPathValue<T, P>): void;
+};
+type IPathSetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {
+  readonly originKey: P;
+  readonly segments: IObjectPathTuple;
+  readonly probe: IPathValueProbe<T, P>;
+  readonly value: IObjectPathWriteValue<T, P>;
+  replace(value: IObjectPathWriteValue<T, P>): void;
+};
 type IPathAccessorOptions<T> = {
   readonly ifMissing?: (probe: IPathMissingProbe) => void;
   readonly ifBlocked?: (probe: IPathBlockedProbe) => void;
@@ -558,7 +608,9 @@ type IPathAccessor<T> = {
 function createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>;
 ```
 
-封装一个**内部持有当前根对象**的有状态访问器：每次 `set()` 成功后，`accessor.value` 自动前进到写入后的新根（后续 `get`/`set` 都基于最新根）。`ifMissing`/`ifBlocked`/`ifFailed` 在对应探测结果出现时被调用，用作集中式诊断钩子。`onGet`/`onSet` 在每次成功读/写时被调用，事件对象上的 `replace(value)` 可以就地改写本次读取/写入的实际值（例如做统一的默认值填充或写入前校验/转换）。
+封装一个**内部持有当前根对象**的有状态访问器：每次 `set()` 成功后，`accessor.value` 自动前进到写入后的新根（后续 `get`/`set` 都基于最新根）。`ifMissing`/`ifBlocked`/`ifFailed` 在对应探测结果出现时被调用，用作集中式诊断钩子。
+
+`onGet`/`onSet` 在每次成功读/写时被调用，事件对象字段：`originKey`（原始传入路径）、`segments`（解析后的段元组）、`probe`（本次读/写命中的 `IPathValueProbe`，即成功探测结果）、`value`（本次实际读到/将要写入的值）、`replace(value)`（调用后就地改写本次读取/写入的实际返回值/写入值，例如做统一的默认值填充或写入前校验/转换）。`IPathGetEvent`/`IPathSetEvent` 唯一的区别是 `value`/`replace` 的类型：读事件用 `IObjectPathValue`（读到的原值类型），写事件用 `IObjectPathWriteValue`（字面量放宽后的可写类型）。
 
 ```ts
 const accessor = createPathAccessor(
@@ -577,19 +629,82 @@ accessor.value; // { count: 5 }
 
 ## `/typing` 模块
 
-`@migaia/utils/typing` 是不引入运行时能力的精选类型出口。它重新导出 `IObjectPath*`、`IAbortSignal`、`IDeferred` 和 `IProbePropertyResult`，并新增：
+`@migaia/utils/typing`（`src/typing.ts`）是**纯 type-only** 的子入口：文件里全部是 `export type`，没有任何运行时值，构建产物 `dist/typing.js` 不含可执行代码。它**不经由根入口 `@migaia/utils` 重新导出**——只能写 `import type { ... } from '@migaia/utils/typing'`，这是刻意的：把类型出口和运行时出口分开，消费方按类型引用它时不会因为模块解析牵连进任何运行时代码。
+
+它做两件事：
+
+1. **重导出**已在别处定义的类型，给跨包类型复用一个稳定、单一的入口，避免消费方为了拿一个类型而要记住它散落在 `/object` 还是 `/promise`：
+   - 来自 `/object`（即 `object-path.ts`）：`IObjectPath`、`IObjectPathInput`、`IObjectPathSegment`、`IObjectPathTuple`、`IObjectPathTupleFor`、`IObjectPathValue`、`IObjectPathWriteValue`
+   - 来自 `/object`（即 `object.ts`）：`IProbePropertyResult`
+   - 来自 `/promise`：`IAbortSignal`、`IDeferred`
+
+   这些类型的语义、字段、约束与它们各自源模块中的定义完全一致（同一个类型的两个入口，不是两份独立定义），完整说明见 [`/object` 模块](#object-模块)与 [`/promise` 模块](#promise-模块)对应章节。
+
+2. **新增**两个 `/object` 模块本身不提供的类型工具，用于把带判别字段的联合类型（discriminated union）转成"判别值 → 对应联合分支"的映射类型：
 
 ```ts
+/** 按一个顶层、值为 PropertyKey 的判别字段对联合类型分组。 */
 type IDiscriminatedByField<F extends PropertyKey, T extends Record<F, PropertyKey>> = {
   [K in T[F]]: Extract<T, Record<F, K>>;
 };
+```
 
+- 类型参数 `F extends PropertyKey`：判别字段名（`string`/`number`/`symbol`）。
+- 类型参数 `T extends Record<F, PropertyKey>`：目标联合类型本身；约束要求 `T` 每个成员上 `F` 对应的字段值都必须是 `PropertyKey`——如果某个分支的该字段是对象等非 `PropertyKey` 类型，`T` 就不满足 `Record<F, PropertyKey>` 约束，直接编译报错（不是运行时报错，是这个类型工具压根用不起来）。
+- 结果：一个以 `T[F]` 的每个字面量值为 key、value 是 `Extract<T, Record<F, K>>`（该判别值对应的联合分支，若多个分支共享同一判别值则保留为它们的联合）的映射类型。
+
+```ts
+/** 按一个 string 或 tuple 对象路径对联合类型分组，路径解析规则与 /object 模块的 IObjectPath 完全一致。 */
 type IDiscriminatedByPath<T, P extends IObjectPathInput<T>> = {
-  [K in Extract<IObjectPathValue<T, P>, PropertyKey>]: /* 对应的 T union 分支 */;
+  [K in Extract<IObjectPathValue<T, P>, PropertyKey>]: IExtractDiscriminatedByPath<T, P, K>;
 };
 ```
 
-路径版本直接复用 `IObjectPath`/`IObjectPathValue` 的 string、tuple、数组索引和最深 8 层语义，不维护第二套 keyPath 类型解析。
+- 类型参数 `T`：目标联合类型本身。
+- 类型参数 `P extends IObjectPathInput<T>`：字符串路径（如 `'meta.category'`）或元组路径（如 `readonly ['meta', 'category']`），和 `get`/`set`（`/object` 模块）接受的路径写法完全相同。
+- 路径必须在联合的**每一个分支**上都能解析出值，且该值必须收窄到 `PropertyKey`；哪个分支上路径不存在/类型不对，该分支在实现细节上通过条件类型被排除出结果（不是抛运行时错误——这纯粹是类型层行为，错误的路径在 TypeScript 编译期就直接报错，不会产出一个"缺分支"的类型让你在运行时才发现）。
+- 结果：以路径解析出的每个字面量判别值为 key，value 是对应的联合分支（同判别值的多个分支合并为联合）。
+
+**用法示例**（摘自包自带测试 `test/typing.test.ts`，行为已用 `expectTypeOf` 验证）：
+
+```ts
+type IEvent =
+  | {
+      readonly type: 'created';
+      readonly meta: { readonly category: 'write' };
+      readonly payload: { readonly userId: string };
+    }
+  | {
+      readonly type: 'deleted';
+      readonly meta: { readonly category: 'write' };
+      readonly payload: { readonly reason: string };
+    }
+  | {
+      readonly type: 'read';
+      readonly meta: { readonly category: 'read' };
+      readonly payload: { readonly cache: boolean };
+    };
+
+type IByType = IDiscriminatedByField<'type', IEvent>;
+// { created: Extract<IEvent, { type: 'created' }>; deleted: ...; read: ... }
+
+type IByCategory = IDiscriminatedByPath<IEvent, 'meta.category'>;
+// { write: 'created' | 'deleted' 两个分支的联合; read: 'read' 分支 }
+
+type IByTupleCategory = IDiscriminatedByPath<IEvent, readonly ['meta', 'category']>;
+// 与 IByCategory 完全等价——字符串路径和元组路径是同一套解析逻辑的两种写法
+```
+
+**编译期会拒绝的用法**（同样摘自测试文件）：
+
+```ts
+// @ts-expect-error 路径在联合的某些/全部分支上不存在，判别提取前就被拒绝
+type IInvalid1 = IDiscriminatedByPath<IEvent, 'meta.unknown'>;
+
+type INotPropertyKey = { readonly discriminator: { readonly nested: true } };
+// @ts-expect-error 判别字段的值是对象，不满足 PropertyKey 约束，无法作为映射类型的 key
+type IInvalid2 = IDiscriminatedByField<'discriminator', INotPropertyKey>;
+```
 
 ---
 
@@ -710,9 +825,27 @@ type IConfigMergeStrategies = {
   readonly set: 'replace' | 'union'; // 默认 'replace'
   readonly undefined: 'ignore' | 'assign'; // 默认 'ignore'：右侧显式 undefined 不覆盖左侧
 };
+
+type IConfigPathRule = {
+  readonly prefix: readonly PropertyKey[];
+  readonly strategies: Partial<IConfigMergeStrategies>;
+};
+
+type IConfigConflictContext = {
+  readonly path: readonly PropertyKey[];
+  readonly left: unknown;
+  readonly right: unknown;
+};
+type IConfigConflictDecision =
+  | { readonly kind: 'left' }
+  | { readonly kind: 'right' }
+  | { readonly kind: 'delete' }
+  | { readonly kind: 'value'; readonly value: unknown };
 ```
 
-`strategies` 是全局默认策略；`pathRules`（`{ prefix, strategies }[]`，按 `prefix` 最长匹配优先）可以对某条子路径覆盖不同策略。当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，由它返回 `{ kind: 'left' | 'right' | 'delete' | 'value', value? }` 决定最终结果；`onConflict` 必须**同步**返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。
+`strategies` 是全局默认策略；`pathRules` 是一组 `{ prefix, strategies }`，按 `prefix`（从根开始的键路径）匹配当前正在合并的键路径，`prefix` 更长（更具体）的规则优先生效，命中的规则会与全局 `strategies` 合并（规则内声明的字段覆盖全局同名字段，规则未声明的字段沿用全局值）。
+
+当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须**同步**返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。
 
 ```ts
 const defaults = ownConfig({ retries: 1, tags: ['default'] });

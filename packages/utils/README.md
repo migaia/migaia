@@ -404,22 +404,48 @@ accessor.value; // { count: 5 }
 import type {
   IDiscriminatedByField,
   IDiscriminatedByPath,
+  IObjectPath,
   IObjectPathInput,
-  IObjectPathValue
+  IObjectPathSegment,
+  IObjectPathTuple,
+  IObjectPathTupleFor,
+  IObjectPathValue,
+  IObjectPathWriteValue,
+  IProbePropertyResult,
+  IAbortSignal,
+  IDeferred
 } from '@migaia/utils/typing';
 ```
 
-`/typing` 是精选的 type-only 子入口：复用现有 object-path 类型，同时提供按顶层字段或深层路径把 discriminated union 转为映射的工具。原 root 与 `/object` 类型出口保持兼容。
+`/typing` 是**纯 type-only** 子入口（不含任何运行时导出，`import type` 即可，打包后不会产生任何 JS 代码），且**只能通过这个子路径导入**——不经过根入口 `@migaia/utils` 重新导出。它做两件事：把散落在 `/object`（`IObjectPath`/`IObjectPathInput`/`IObjectPathSegment`/`IObjectPathTuple`/`IObjectPathTupleFor`/`IObjectPathValue`/`IObjectPathWriteValue`/`IProbePropertyResult`）与 `/promise`（`IAbortSignal`/`IDeferred`）里的类型汇总到一个跨项目复用的稳定入口；再提供两个 `/object` 里没有的全新类型工具，用来把带判别字段的联合类型（discriminated union）转成按判别值分组的映射类型。
+
+**`IDiscriminatedByField`｜5 秒上手** —— 按顶层判别字段分组：
 
 ```ts
 type IEvent =
-  | { meta: { type: 'created' }; payload: { id: string } }
-  | { meta: { type: 'deleted' }; payload: { reason: string } };
+  | { readonly type: 'created'; readonly payload: { readonly userId: string } }
+  | { readonly type: 'deleted'; readonly payload: { readonly reason: string } };
 
-type IEventMap = IDiscriminatedByPath<IEvent, 'meta.type'>;
+type IByType = IDiscriminatedByField<'type', IEvent>;
+// { created: Extract<IEvent, { type: 'created' }>; deleted: Extract<IEvent, { type: 'deleted' }> }
 ```
 
-`IDiscriminatedByField<F, T>` 只接受顶层、值为 `PropertyKey` 的 discriminator；`IDiscriminatedByPath<T, P>` 接受 typed string 或 tuple 路径。相同 discriminator 的多个 union 分支会被保留为联合类型。
+类型参数：`F extends PropertyKey`（必填，判别字段名）、`T extends Record<F, PropertyKey>`（必填，联合类型本身；`F` 对应的字段值必须是 `PropertyKey`，即 `string`/`number`/`symbol`，否则编译期报错）。
+
+**`IDiscriminatedByPath`｜5 秒上手** —— 按深层路径分组，路径写法与 `/object` 模块的对象路径完全一致（字符串路径或元组路径）：
+
+```ts
+type IEvent =
+  | { readonly meta: { readonly category: 'write' }; readonly payload: { readonly userId: string } }
+  | { readonly meta: { readonly category: 'read' }; readonly payload: { readonly cache: boolean } };
+
+type IByCategory = IDiscriminatedByPath<IEvent, 'meta.category'>;
+// 等价于 IDiscriminatedByPath<IEvent, readonly ['meta', 'category']>
+```
+
+类型参数：`T`（必填，联合类型本身）、`P extends IObjectPathInput<T>`（必填，字符串或元组路径；路径必须在联合的**每个分支**上都存在且合法，否则该分支被排除；路径值解析不出 `PropertyKey` 时整体报编译错误）。
+
+其余重导出的类型（`IObjectPath`、`IObjectPathInput`、`IObjectPathSegment`、`IObjectPathTuple`、`IObjectPathTupleFor`、`IObjectPathValue`、`IObjectPathWriteValue`、`IProbePropertyResult`、`IAbortSignal`、`IDeferred`）语义与 `/object`、`/promise` 模块中完全一致，仅为了方便跨包复用类型而在这里再导出一份，不是新的类型定义。
 
 ---
 
