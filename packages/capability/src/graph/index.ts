@@ -421,7 +421,7 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
               () => {
                 node.state = CapabilityGraphNodeState.released;
               },
-              (error) => {
+              (error: unknown) => {
                 node.error = error;
                 node.state = CapabilityGraphNodeState.failed;
                 throw error;
@@ -557,7 +557,7 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
       rejectReady(graphError);
       readinessSettled = true;
     }
-    disposePromise = root.dispose().then(
+    const currentDisposePromise = root.dispose().then(
       () => {
         graphState = CapabilityGraphState.terminal;
         if (generationError !== undefined) {
@@ -566,14 +566,15 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
           throw graphError;
         }
       },
-      (error) => {
+      (error: unknown) => {
         graphState = CapabilityGraphState.terminal;
         graphError = graphFailure(CapabilityGraphErrorCode.disposeFailed, error);
         readyReason ??= graphError;
         throw graphError;
       }
     );
-    return disposePromise;
+    disposePromise = currentDisposePromise;
+    return currentDisposePromise;
   };
 
   return {
