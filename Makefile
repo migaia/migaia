@@ -67,7 +67,7 @@ release-check: check-package
 	pnpm @$$package build
 
 utils: PACKAGE := utils
-utils: release-check
+utils: release-check auth-check patch publish
 
 utils-check: PACKAGE := utils
 utils-check: release-check
