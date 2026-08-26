@@ -77,6 +77,22 @@ setTimeout(() => resolve(42), 0);
 await promise; // 42
 ```
 
+### `toPromise`
+
+```ts
+function toPromise<T>(run: () => T): Promise<Awaited<T>>;
+```
+
+同步且恰好调用 `run` 一次，并用原生 Promise 规则同化返回值。若 `run` 同步抛出，调用点不会同步抛错，而是返回以 exact reason reject 的 Promise。它只负责同步计算到 Promise 的规范化，不创建 timer、scheduler、retry 或 cancellation 状态。
+
+```ts
+const found = await toPromise(() => cache.get('key'));
+const pending = toPromise(() => {
+  throw new Error('read failed');
+});
+await pending; // 异步观察 rejection
+```
+
 ### `sleep`
 
 ```ts
@@ -102,6 +118,40 @@ const p = sleep(1000, { signal: controller.signal as any });
 controller.abort('cancelled');
 await p; // 抛 UtilsAbortError，cause 为 'cancelled'
 ```
+
+### `createAbortTimeoutSignal`
+
+```ts
+type IAbortTimeoutSignalOptions = {
+  readonly signal?: IAbortSignal;
+  readonly timeoutMs?: number;
+  readonly scheduler?: IUtilsScheduler;
+  readonly timeoutReason?: () => unknown;
+  readonly report?: IUtilsReporter;
+};
+type IAbortTimeoutSignal = {
+  readonly signal: IAbortSignal | undefined;
+  readonly dispose: () => void;
+};
+function createAbortTimeoutSignal(options?: IAbortTimeoutSignalOptions): IAbortTimeoutSignal;
+```
+
+创建一个可交给多个底层请求共享的 operation signal，但不创建、race 或结算业务 Promise。外部 signal 先中止时保留原始 reason；deadline 先到时使用 `timeoutReason()` 的返回值。reason factory 抛出的原始错误会成为 signal reason，不会从 timer callback 逃逸。无 `timeoutMs` 时透传外部 signal identity；`dispose()` 幂等并负责取消 timer、移除 listener，cleanup 失败通过 `report` 的 `operation: 'abort-timeout-signal'` 上报。
+
+```ts
+const merged = createAbortTimeoutSignal({
+  signal: controller.signal as any,
+  timeoutMs: 500,
+  timeoutReason: () => new Error('deadline')
+});
+try {
+  await Promise.all([requestA(merged.signal), requestB(merged.signal)]);
+} finally {
+  merged.dispose();
+}
+```
+
+`withTimeout` / `raceWithAbort` 的 callback 也能把同一 cooperative signal 交给多个请求，但它们同时拥有最终 Promise 的超时/中止 reject、late rejection 与 cleanup-error 政策。若事务 commit 才是唯一结算事实，应使用本 signal-only primitive，并由适配器自己决定 Promise 何时完成。
 
 ### `withTimeout`
 
@@ -380,6 +430,15 @@ const UtilsErrorCode = {
 ## `/bytes` 模块
 
 不依赖 Node `Buffer` 或 DOM 的字节/文本编解码，纯 ECMAScript 实现。
+
+```ts
+function isUint8Array(value: unknown): value is Uint8Array;
+function isArrayBuffer(value: unknown): value is ArrayBuffer;
+```
+
+两个 guard 通过引擎的 `%TypedArray%.prototype[Symbol.toStringTag]` 与 `ArrayBuffer.prototype.byteLength` 内部槽 getter 判定真实品牌，因此能识别跨 iframe/Worker realm 的合法实例与子类，同时拒绝 `constructor.name` / 原型 / `Symbol.toStringTag` 伪造、其他 TypedArray、`DataView`、`SharedArrayBuffer` 和 Proxy。检测不读取候选值的用户属性。
+
+detached `Uint8Array` / `ArrayBuffer` 仍返回 `true`：detachment 不改变对象品牌，但会影响读取能力；需要消费字节的调用方仍须独立处理 detached 状态。
 
 ```ts
 function bytesToBase64(value: Uint8Array): string;

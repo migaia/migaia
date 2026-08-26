@@ -1,4 +1,4 @@
-import type { IReactiveRuntimeAdapter } from './types.js';
+import type { IReactiveRuntimeAdapter } from './types.js'
 
 /**
  * 默认 runtime adapter：唯一的宿主 API 边界（`docs/contracts/runtime-neutrality.sdd.md` R-9）。
@@ -8,16 +8,16 @@ import type { IReactiveRuntimeAdapter } from './types.js';
  */
 export const defaultRuntimeAdapter: IReactiveRuntimeAdapter = {
   scheduleMicrotask(task) {
-    queueMicrotask(task);
+    queueMicrotask(task)
   },
   now() {
     // ambient.d.ts 把 performance 声明为可选；默认 adapter 假设具备单调时钟宿主，缺失时 fail-fast。
-    return performance!.now();
+    return performance!.now()
   },
   timestamp() {
-    return Date.now();
+    return Date.now()
   },
   reportError() {
     // 默认 no-op：调用方不注入 onError 时不产生任何宿主副作用。
   }
-};
+}

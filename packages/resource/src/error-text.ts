@@ -35,6 +35,6 @@ export const ResourceErrorText = {
   booleanOptionInvalid: 'resource boolean option must be boolean',
   /** Explains that the debug name constructor option received a non-string value. */
   debugNameInvalid: 'resource debugName must be a string'
-} as const;
+} as const
 
-export type IResourceErrorText = (typeof ResourceErrorText)[keyof typeof ResourceErrorText];
+export type IResourceErrorText = (typeof ResourceErrorText)[keyof typeof ResourceErrorText]

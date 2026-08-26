@@ -3,15 +3,15 @@
  *
  * Core 不 import index（防循环）；registry 依赖 core + lifecycle。
  */
-export * from './core.js';
-export * from './plugins.js';
-export { chunkToBytes, chunkToText, createSerializeRegistry } from './registry.js';
+export * from './core.js'
+export * from './plugins.js'
+export { chunkToBytes, chunkToText, createSerializeRegistry } from './registry.js'
 export type {
   ISerializeCleanupError,
   ISerializeRegistryOptions,
   ISerializeScheduler,
   ISerializeTimeoutDiagnostic
-} from './registry.js';
+} from './registry.js'
 export {
   SerializeChunkKind,
   SerializeOutput,
@@ -25,4 +25,4 @@ export {
   type ISerializeCleanupPolicy,
   type ISerializeCleanupKind,
   type ISerializePluginType
-} from './format-constants.js';
+} from './format-constants.js'

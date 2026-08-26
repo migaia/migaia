@@ -1,42 +1,47 @@
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 /** Package root used as the source of the publish-boundary tarball. */
-const packageDirectory = resolve(fileURLToPath(new URL('..', import.meta.url)));
+const packageDirectory = resolve(fileURLToPath(new URL('..', import.meta.url)))
 /** Isolated consumer workspace proving the tarball instead of workspace source. */
-const smokeDirectory = mkdtempSync(join(tmpdir(), 'migaia-utils-packed-'));
+const smokeDirectory = mkdtempSync(join(tmpdir(), 'migaia-utils-packed-'))
 
 /** Packs utils, installs it by symlink in an isolated consumer, and typechecks `/typing`. */
 function main() {
   try {
-    const packDirectory = join(smokeDirectory, 'pack');
-    const extractDirectory = join(smokeDirectory, 'extract');
-    const consumerDirectory = join(smokeDirectory, 'consumer');
-    mkdirSync(packDirectory, { recursive: true });
-    mkdirSync(extractDirectory, { recursive: true });
-    mkdirSync(join(consumerDirectory, 'node_modules', '@migaia'), { recursive: true });
+    const packDirectory = join(smokeDirectory, 'pack')
+    const extractDirectory = join(smokeDirectory, 'extract')
+    const consumerDirectory = join(smokeDirectory, 'consumer')
+    mkdirSync(packDirectory, { recursive: true })
+    mkdirSync(extractDirectory, { recursive: true })
+    mkdirSync(join(consumerDirectory, 'node_modules', '@migaia'), { recursive: true })
     execFileSync('pnpm', ['pack', '--pack-destination', packDirectory], {
       cwd: packageDirectory,
       stdio: 'inherit'
-    });
-    const tarballs = readdirSync(packDirectory).filter((entry) => entry.endsWith('.tgz'));
+    })
+    const tarballs = readdirSync(packDirectory).filter((entry) => entry.endsWith('.tgz'))
     if (tarballs.length !== 1)
-      throw new Error(`Expected one utils tarball, found ${tarballs.length}`);
-    execFileSync('tar', ['-xzf', join(packDirectory, tarballs[0]), '-C', extractDirectory]);
+      throw new Error(`Expected one utils tarball, found ${tarballs.length}`)
+    execFileSync('tar', ['-xzf', join(packDirectory, tarballs[0]), '-C', extractDirectory])
     symlinkSync(
       join(extractDirectory, 'package'),
       join(consumerDirectory, 'node_modules', '@migaia/utils'),
       'dir'
-    );
-    writeFileSync(join(consumerDirectory, 'package.json'), '{"type":"module"}\n', 'utf8');
+    )
+    writeFileSync(join(consumerDirectory, 'package.json'), '{"type":"module"}\n', 'utf8')
     writeFileSync(
       join(consumerDirectory, 'types.ts'),
       "import type { IDiscriminatedByField, IDiscriminatedByPath, IObjectPathInput, IObjectPathValue } from '@migaia/utils/typing';\ntype IEvent = { type: 'created'; meta: { type: 'write' }; value: number } | { type: 'deleted'; meta: { type: 'delete' }; value: string };\ntype IByField = IDiscriminatedByField<'type', IEvent>;\ntype IByPath = IDiscriminatedByPath<IEvent, 'meta.type'>;\nconst created: IByField['created'] = { type: 'created', meta: { type: 'write' }, value: 1 };\nconst deleted: IByPath['delete'] = { type: 'deleted', meta: { type: 'delete' }, value: 'x' };\nconst path: IObjectPathInput<IEvent> = 'meta.type';\ntype IValue = IObjectPathValue<IEvent, typeof path>;\nconst value: IValue = 'write';\nvoid created; void deleted; void value;\n",
       'utf8'
-    );
+    )
+    writeFileSync(
+      join(consumerDirectory, 'bytes.mjs'),
+      "import { createAbortTimeoutSignal as rootAbortTimeoutSignal, toPromise as rootToPromise } from '@migaia/utils'\nimport { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'\nimport { createAbortTimeoutSignal, toPromise } from '@migaia/utils/promise'\nif (rootAbortTimeoutSignal !== createAbortTimeoutSignal) throw new Error('abort-timeout export identity failed')\nif (rootToPromise !== toPromise) throw new Error('toPromise export identity failed')\nif (await toPromise(() => 42) !== 42) throw new Error('toPromise packed runtime failed')\nif (!isUint8Array(new Uint8Array(1))) throw new Error('Uint8Array guard failed')\nif (!isArrayBuffer(new ArrayBuffer(1))) throw new Error('ArrayBuffer guard failed')\nconst merged = createAbortTimeoutSignal({ timeoutMs: 0, timeoutReason: () => 'packed deadline' })\nif (!merged.signal?.aborted || merged.signal.reason !== 'packed deadline') throw new Error('abort-timeout signal failed')\nmerged.dispose()\n",
+      'utf8'
+    )
     execFileSync(
       'pnpm',
       [
@@ -54,10 +59,11 @@ function main() {
         'types.ts'
       ],
       { cwd: consumerDirectory, stdio: 'inherit' }
-    );
+    )
+    execFileSync(process.execPath, ['bytes.mjs'], { cwd: consumerDirectory, stdio: 'inherit' })
   } finally {
-    rmSync(smokeDirectory, { recursive: true, force: true });
+    rmSync(smokeDirectory, { recursive: true, force: true })
   }
 }
 
-main();
+main()

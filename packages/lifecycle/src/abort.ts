@@ -11,27 +11,23 @@
  * 有意**不含** `onabort`/`dispatchEvent`/`throwIfAborted` 等 DOM 独有字段——一旦声明它们，这个 接口又会被绑回 DOM 形状，破坏中立性。
  */
 
-import { LifecycleErrorCode } from './error-code.js';
-import { LifecycleErrorText } from './error-text.js';
-import { createLifecycleFailure, tagLifecycleError } from './errors.js';
+import { LifecycleErrorCode } from './error-code.js'
+import { LifecycleErrorText } from './error-text.js'
+import { createLifecycleFailure, tagLifecycleError } from './errors.js'
 
 /** 结构化取消信号。`reason` 可选，对齐 WHATWG/Node 语义：`abort()` 不带参时为 `undefined`。 */
 export type IAbortSignal = {
-  readonly aborted: boolean;
-  readonly reason?: unknown;
-  addEventListener(
-    type: 'abort',
-    listener: () => void,
-    options?: { readonly once?: boolean }
-  ): void;
-  removeEventListener(type: 'abort', listener: () => void): void;
-};
+  readonly aborted: boolean
+  readonly reason?: unknown
+  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void
+  removeEventListener(type: 'abort', listener: () => void): void
+}
 
 /** 结构化取消源，对应 DOM/Node 的 `AbortController`。 */
 export type IAbortController = {
-  readonly signal: IAbortSignal;
-  abort(reason?: unknown): void;
-};
+  readonly signal: IAbortSignal
+  abort(reason?: unknown): void
+}
 
 /**
  * 本包内部使用的极简 `AbortController` 实现。
@@ -43,41 +39,41 @@ export type IAbortController = {
  * callback，保证重复登记与移除都遵循结构化 signal 契约。
  */
 export function createAbortController(): IAbortController {
-  let aborted = false;
-  let reason: unknown;
+  let aborted = false
+  let reason: unknown
   /** Callback-keyed listener set; one callback can produce at most one abort invocation. */
-  const listeners = new Set<() => void>();
+  const listeners = new Set<() => void>()
 
   const signal: IAbortSignal = {
     get aborted() {
-      return aborted;
+      return aborted
     },
     get reason() {
-      return reason;
+      return reason
     },
     addEventListener(_type, listener, _options) {
-      if (aborted) return;
-      listeners.add(listener);
+      if (aborted) return
+      listeners.add(listener)
     },
     removeEventListener(_type, listener) {
-      listeners.delete(listener);
+      listeners.delete(listener)
     }
-  };
+  }
 
   return {
     signal,
     abort(value) {
-      if (aborted) return;
-      aborted = true;
-      reason = value;
-      const pending = [...listeners];
-      listeners.clear();
-      const errors: unknown[] = [];
+      if (aborted) return
+      aborted = true
+      reason = value
+      const pending = [...listeners]
+      listeners.clear()
+      const errors: unknown[] = []
       for (const listener of pending) {
         try {
-          listener();
+          listener()
         } catch (error) {
-          errors.push(error);
+          errors.push(error)
         }
       }
       if (errors.length === 1) {
@@ -85,14 +81,14 @@ export function createAbortController(): IAbortController {
           LifecycleErrorCode.abortListenerFailed,
           LifecycleErrorText.abortListenerDispatchFailed,
           errors[0]
-        );
+        )
       }
       if (errors.length > 1) {
         throw tagLifecycleError(
           new AggregateError(errors, LifecycleErrorText.abortListenerDispatchFailed),
           LifecycleErrorCode.abortListenerFailed
-        );
+        )
       }
     }
-  };
+  }
 }

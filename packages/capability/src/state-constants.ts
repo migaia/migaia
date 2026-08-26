@@ -5,15 +5,15 @@ export const CapabilityState = {
   activating: 'activating',
   on: 'on',
   failed: 'failed'
-} as const;
+} as const
 
 export const CapabilityEnableStatus = {
   enabled: 'enabled',
   gated: 'gated',
   cancelled: 'cancelled',
   failed: 'failed'
-} as const;
+} as const
 
-export type ICapabilityStateValue = (typeof CapabilityState)[keyof typeof CapabilityState];
+export type ICapabilityStateValue = (typeof CapabilityState)[keyof typeof CapabilityState]
 export type ICapabilityEnableStatusValue =
-  (typeof CapabilityEnableStatus)[keyof typeof CapabilityEnableStatus];
+  (typeof CapabilityEnableStatus)[keyof typeof CapabilityEnableStatus]

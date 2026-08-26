@@ -1,9 +1,9 @@
-export type { IDimFn, IPaintFn } from './typing.js';
+export type { IDimFn, IPaintFn } from './typing.js'
 
-export { Logger } from './log.js';
-export { LoggerErrorCode, type ILoggerErrorCode } from './error-code.js';
-export { LOGGER_SOURCE } from './errors.js';
-export { LoggerStatus, type ILoggerStatus } from './state-constants.js';
+export { Logger } from './log.js'
+export { LoggerErrorCode, type ILoggerErrorCode } from './error-code.js'
+export { LOGGER_SOURCE } from './errors.js'
+export { LoggerStatus, type ILoggerStatus } from './state-constants.js'
 export {
   LoggerLevel,
   LoggerColorMode,
@@ -11,13 +11,13 @@ export {
   type ILoggerLevel,
   type ILoggerColorMode,
   type ILoggerReasoningPhase
-} from './plugin-constants.js';
+} from './plugin-constants.js'
 export {
   getLoggerRuntimeManager,
   setLoggerRuntimeManager,
   type ILoggerProcess,
   type ILoggerRuntimeManager
-} from './runtime-manager.js';
+} from './runtime-manager.js'
 export type {
   IErrorInfo,
   IFlusher,
@@ -43,4 +43,4 @@ export type {
   IShutdownReason,
   ISink,
   IStaticLoggerCtor
-} from './typing.js';
+} from './typing.js'

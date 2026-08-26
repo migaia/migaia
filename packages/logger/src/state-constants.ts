@@ -4,6 +4,6 @@ export const LoggerStatus = {
   flushing: 'flushing',
   shuttingDown: 'shutting-down',
   closed: 'closed'
-} as const;
+} as const
 
-export type ILoggerStatus = (typeof LoggerStatus)[keyof typeof LoggerStatus];
+export type ILoggerStatus = (typeof LoggerStatus)[keyof typeof LoggerStatus]

@@ -1,70 +1,70 @@
-import type { IObservable, IObserver, IRuntime } from './types.js';
-import { internalsOf } from './internals.js';
-import { assertReactiveOwnedBy } from './ownership.js';
-import { describeObservable, describeObserver, emitTraceSafely } from './diagnostics.js';
-import { createReactiveError } from '../errors.js';
-import { ReactiveErrorCode } from '../error-code.js';
-import { ReactiveErrorText } from '../error-text.js';
+import type { IObservable, IObserver, IRuntime } from './types.js'
+import { internalsOf } from './internals.js'
+import { assertReactiveOwnedBy } from './ownership.js'
+import { describeObservable, describeObserver, emitTraceSafely } from './diagnostics.js'
+import { createReactiveError } from '../errors.js'
+import { ReactiveErrorCode } from '../error-code.js'
+import { ReactiveErrorText } from '../error-text.js'
 import {
   ReactiveDependencyKind,
   ReactiveErrorPhase,
   ReactiveTracePhase,
   ReactiveTraceReason,
   ReactiveTraceType
-} from './trace-constants.js';
+} from './trace-constants.js'
 import {
   mutableSubs as mutableNodeSubs,
   mutableDeps as mutableNodeDeps,
   mutableDepVersions as mutableNodeVersions
-} from './node-internals.js';
+} from './node-internals.js'
 
 function mutableSubs(observable: IObservable): Set<IObserver> {
-  return mutableNodeSubs(observable, observable.subs);
+  return mutableNodeSubs(observable, observable.subs)
 }
 
 // 一次追踪的临时帧：fn 执行期间读到的依赖先攒在 nextDeps，不碰正式依赖边。
 type ITrackingFrame =
   | {
-      kind: typeof ReactiveDependencyKind.observer;
-      observer: IObserver;
-      nextDeps: Set<IObservable>;
+      kind: typeof ReactiveDependencyKind.observer
+      observer: IObserver
+      nextDeps: Set<IObservable>
     }
-  | { kind: typeof ReactiveDependencyKind.capture; nextDeps: Set<IObservable> };
+  | { kind: typeof ReactiveDependencyKind.capture; nextDeps: Set<IObservable> }
 
 // Capture 的依赖与 Tracker 身份只存在于私有 WeakMap；调用者只能读取结果并交回整个 token。
-declare const CAPTURE_TOKEN: unique symbol;
+declare const CAPTURE_TOKEN: unique symbol
 export type ICapture<R> = {
-  readonly result: R;
-  readonly [CAPTURE_TOKEN]: true;
-};
+  readonly result: R
+  readonly [CAPTURE_TOKEN]: true
+}
 
 type ICaptureState = {
   dependencies: Map<
     IObservable,
     {
-      readonly version: number;
-      readonly topologyToken: object | undefined;
+      readonly version: number
+      readonly topologyToken: object | undefined
     }
-  >;
-};
+  >
+}
 
 // 全局「当前正在追踪的 tracker」——单线程 JS 里同一时刻只有一个求值在进行，用它跨 tracker 检测跨 runtime 依赖。
 // track() 被派发到「被读节点所属 runtime 的 tracker」上；若那个 tracker 不是当前活跃 tracker，
 // 且当前活跃 tracker 确实在追踪（有 observer），说明是跨 runtime 读取——立即抛错，杜绝静默陈旧数据。
-let activeTracker: DependencyTracker | null = null;
+let activeTracker: DependencyTracker | null = null
 
 // 集中管理模块级同步追踪上下文，避免各方法直接写全局槽位。
 function swapActiveTracker(next: DependencyTracker): DependencyTracker | null {
-  const previous = activeTracker;
-  activeTracker = next;
-  return previous;
+  const previous = activeTracker
+  activeTracker = next
+  return previous
 }
 
 // 依赖追踪上下文（每个 Runtime 一个）：谁在被求值、依赖边的暂存/提交/断开/脏检查。
 // 事务化：runTracked 期间 track() 只暂存到 nextDeps；成功才 commit 差异，失败直接丢弃、旧图不动。
 export class DependencyTracker {
-  #stack: (ITrackingFrame | null)[] = [];
-  #captures = new WeakMap<object, ICaptureState>();
+  #stack: (ITrackingFrame | null)[] = []
+  #captures = new WeakMap<object, ICaptureState>()
   /**
    * Terminal invalidation is deliberately independent from VersionClock.
    *
@@ -72,58 +72,58 @@ export class DependencyTracker {
    * cleanup. A WeakSet also lets a render captured before disposal fail validation without
    * consuming another global version.
    */
-  #terminalObservables = new WeakSet<IObservable>();
+  #terminalObservables = new WeakSet<IObservable>()
   /**
    * Dependency-edge invalidation is topology, not value state. An opaque identity avoids consuming
    * VersionClock and has no numeric exhaustion.
    */
-  #topologyTokens = new WeakMap<IObservable, object>();
-  #runtime: IRuntime;
+  #topologyTokens = new WeakMap<IObservable, object>()
+  #runtime: IRuntime
 
   constructor(runtime: IRuntime) {
-    this.#runtime = runtime;
+    this.#runtime = runtime
   }
 
   get #top(): ITrackingFrame | null {
-    return this.#stack.length ? this.#stack[this.#stack.length - 1] : null;
+    return this.#stack.length ? this.#stack[this.#stack.length - 1] : null
   }
 
   #hasActiveObserver(): boolean {
-    return this.#top !== null;
+    return this.#top !== null
   }
 
   /** Whether this tracker is currently collecting dependencies. */
   isTracking(): boolean {
-    return activeTracker === this && this.#top !== null;
+    return activeTracker === this && this.#top !== null
   }
 
   /** Whether any Runtime is currently collecting a dependency frame. */
   static isAnyTracking(): boolean {
-    return activeTracker !== null && activeTracker.#hasActiveObserver();
+    return activeTracker !== null && activeTracker.#hasActiveObserver()
   }
 
   /** 记一条依赖——只暂存到当前帧；跨 runtime 读取立即抛错 */
   track(observable: IObservable): void {
-    this.#assertObservableOwner(observable);
+    this.#assertObservableOwner(observable)
     if (activeTracker === this) {
-      this.#top?.nextDeps.add(observable);
-      return;
+      this.#top?.nextDeps.add(observable)
+      return
     }
     // 派发到的是本 observable 所属 runtime 的 tracker；若它不是当前活跃 tracker 而别处正在追踪 → 跨 runtime
     if (activeTracker !== null && activeTracker.#hasActiveObserver()) {
       throw createReactiveError(
         ReactiveErrorCode.crossRuntime,
         ReactiveErrorText.crossRuntimeDependency
-      );
+      )
     }
     // 无人追踪（或对方处于 untracked）→ 无依赖可建，静默跳过
   }
 
   /** 断开某 observer 的全部依赖边——仅供 dispose 用 */
   clearDependencies(observer: IObserver): void {
-    for (const dep of observer.deps) this.#unsubscribe(dep, observer);
-    mutableNodeDeps(observer, observer.deps).clear();
-    mutableNodeVersions(observer, observer.depVersions).clear();
+    for (const dep of observer.deps) this.#unsubscribe(dep, observer)
+    mutableNodeDeps(observer, observer.deps).clear()
+    mutableNodeVersions(observer, observer.depVersions).clear()
   }
 
   /**
@@ -136,17 +136,17 @@ export class DependencyTracker {
     observable: IObservable,
     reason: typeof ReactiveTraceReason.invalidate | typeof ReactiveTraceReason.dispose
   ): void {
-    this.#assertObservableOwner(observable);
-    const runtime = internalsOf(this.#runtime);
-    this.#topologyTokens.set(observable, {});
+    this.#assertObservableOwner(observable)
+    const runtime = internalsOf(this.#runtime)
+    this.#topologyTokens.set(observable, {})
     if (reason === 'dispose') {
-      this.#terminalObservables.add(observable);
+      this.#terminalObservables.add(observable)
     }
-    const observers = [...observable.subs];
-    mutableSubs(observable).clear();
+    const observers = [...observable.subs]
+    mutableSubs(observable).clear()
     for (const observer of observers) {
-      mutableNodeDeps(observer, observer.deps).delete(observable);
-      mutableNodeVersions(observer, observer.depVersions).delete(observable);
+      mutableNodeDeps(observer, observer.deps).delete(observable)
+      mutableNodeVersions(observer, observer.depVersions).delete(observable)
       if (runtime.traceEnabled()) {
         emitTraceSafely(
           {
@@ -167,18 +167,18 @@ export class DependencyTracker {
             observer: describeObserver(observer),
             reason
           })
-        );
+        )
       }
     }
     for (const observer of observers) {
       try {
-        observer.onDependencyDisconnected(observable);
+        observer.onDependencyDisconnected(observable)
       } catch (error) {
         observer.runtime.reportError(error, {
           phase: ReactiveErrorPhase.dependencyDisconnect,
           observer: describeObserver(observer),
           observable: describeObservable(observable)
-        });
+        })
       }
     }
   }
@@ -189,16 +189,16 @@ export class DependencyTracker {
       kind: ReactiveDependencyKind.observer,
       observer,
       nextDeps: new Set()
-    };
-    this.#stack.push(frame);
-    const prevTracker = swapActiveTracker(this);
+    }
+    this.#stack.push(frame)
+    const prevTracker = swapActiveTracker(this)
     try {
-      const result = fn();
-      if (!observer.disposed) this.#commit(observer, frame.nextDeps);
-      return result;
+      const result = fn()
+      if (!observer.disposed) this.#commit(observer, frame.nextDeps)
+      return result
     } finally {
-      this.#stack.pop();
-      activeTracker = prevTracker;
+      this.#stack.pop()
+      activeTracker = prevTracker
     }
   }
 
@@ -207,24 +207,24 @@ export class DependencyTracker {
     const frame: ITrackingFrame = {
       kind: ReactiveDependencyKind.capture,
       nextDeps: new Set()
-    };
-    this.#stack.push(frame);
-    const prevTracker = swapActiveTracker(this);
+    }
+    this.#stack.push(frame)
+    const prevTracker = swapActiveTracker(this)
     try {
-      const result = fn();
-      const dependencies: ICaptureState['dependencies'] = new Map();
+      const result = fn()
+      const dependencies: ICaptureState['dependencies'] = new Map()
       for (const dep of frame.nextDeps) {
         dependencies.set(dep, {
           version: dep.version,
           topologyToken: this.#topologyTokens.get(dep)
-        });
+        })
       }
-      const capture = { result } as ICapture<R>;
-      this.#captures.set(capture, { dependencies });
-      return capture;
+      const capture = { result } as ICapture<R>
+      this.#captures.set(capture, { dependencies })
+      return capture
     } finally {
-      this.#stack.pop();
-      activeTracker = prevTracker;
+      this.#stack.pop()
+      activeTracker = prevTracker
     }
   }
 
@@ -234,7 +234,7 @@ export class DependencyTracker {
       throw createReactiveError(
         ReactiveErrorCode.crossRuntime,
         ReactiveErrorText.captureDifferentRuntime
-      );
+      )
     }
     // A Concurrent render may finish after its committed observer was
     // disposed. Reject before consuming the token so a replacement observer
@@ -243,13 +243,13 @@ export class DependencyTracker {
       throw createReactiveError(
         ReactiveErrorCode.captureInvalid,
         ReactiveErrorText.captureDisposedObserver
-      );
+      )
     }
-    const state = this.#captures.get(capture);
+    const state = this.#captures.get(capture)
     if (!state) {
-      throw createReactiveError(ReactiveErrorCode.captureInvalid, ReactiveErrorText.captureInvalid);
+      throw createReactiveError(ReactiveErrorCode.captureInvalid, ReactiveErrorText.captureInvalid)
     }
-    this.#captures.delete(capture);
+    this.#captures.delete(capture)
     for (const [dep, recorded] of state.dependencies) {
       if (
         this.#terminalObservables.has(dep) ||
@@ -257,49 +257,49 @@ export class DependencyTracker {
         dep.isStale?.() ||
         dep.version !== recorded.version
       ) {
-        return false;
+        return false
       }
     }
-    this.#commit(observer, new Set(state.dependencies.keys()));
-    return true;
+    this.#commit(observer, new Set(state.dependencies.keys()))
+    return true
   }
 
   #commit(observer: IObserver, nextDeps: Set<IObservable>): void {
     /** Stable pre-commit dependency snapshot; lifecycle callbacks may mutate the live view. */
-    const prevDeps = new Set(observer.deps);
+    const prevDeps = new Set(observer.deps)
     /** Reverse edges added by this commit; terminal rollback removes only these edges. */
-    const newSubscriptions: IObservable[] = [];
+    const newSubscriptions: IObservable[] = []
     for (const dep of prevDeps) {
-      if (!nextDeps.has(dep)) this.#unsubscribe(dep, observer);
+      if (!nextDeps.has(dep)) this.#unsubscribe(dep, observer)
       if (observer.disposed) {
-        this.#rollbackTerminalCommit(observer, newSubscriptions);
-        return;
+        this.#rollbackTerminalCommit(observer, newSubscriptions)
+        return
       }
     }
     for (const dep of nextDeps) {
       if (observer.disposed) {
-        this.#rollbackTerminalCommit(observer, newSubscriptions);
-        return;
+        this.#rollbackTerminalCommit(observer, newSubscriptions)
+        return
       }
-      if (!prevDeps.has(dep)) this.#subscribe(dep, observer);
-      if (!prevDeps.has(dep)) newSubscriptions.push(dep);
+      if (!prevDeps.has(dep)) this.#subscribe(dep, observer)
+      if (!prevDeps.has(dep)) newSubscriptions.push(dep)
       if (observer.disposed) {
-        this.#rollbackTerminalCommit(observer, newSubscriptions);
-        return;
+        this.#rollbackTerminalCommit(observer, newSubscriptions)
+        return
       }
     }
     if (observer.disposed) {
-      this.#rollbackTerminalCommit(observer, newSubscriptions);
-      return;
+      this.#rollbackTerminalCommit(observer, newSubscriptions)
+      return
     }
-    const mutableDeps = mutableNodeDeps(observer, observer.deps);
-    mutableDeps.clear();
-    for (const dep of nextDeps) mutableDeps.add(dep);
-    const versions = new Map<IObservable, number>();
-    for (const dep of nextDeps) versions.set(dep, dep.version);
-    const mutableVersions = mutableNodeVersions(observer, observer.depVersions);
-    mutableVersions.clear();
-    for (const [dep, version] of versions) mutableVersions.set(dep, version);
+    const mutableDeps = mutableNodeDeps(observer, observer.deps)
+    mutableDeps.clear()
+    for (const dep of nextDeps) mutableDeps.add(dep)
+    const versions = new Map<IObservable, number>()
+    for (const dep of nextDeps) versions.set(dep, dep.version)
+    const mutableVersions = mutableNodeVersions(observer, observer.depVersions)
+    mutableVersions.clear()
+    for (const [dep, version] of versions) mutableVersions.set(dep, version)
   }
 
   /**
@@ -307,26 +307,26 @@ export class DependencyTracker {
    * observer.
    */
   #rollbackTerminalCommit(observer: IObserver, newSubscriptions: readonly IObservable[]): void {
-    for (const observable of newSubscriptions) this.#unsubscribe(observable, observer);
-    mutableNodeDeps(observer, observer.deps).clear();
-    mutableNodeVersions(observer, observer.depVersions).clear();
+    for (const observable of newSubscriptions) this.#unsubscribe(observable, observer)
+    mutableNodeDeps(observer, observer.deps).clear()
+    mutableNodeVersions(observer, observer.depVersions).clear()
   }
 
   #subscribe(observable: IObservable, observer: IObserver): void {
-    this.#assertObservableOwner(observable);
-    assertReactiveOwnedBy(observer, this.#runtime, 'observer');
-    const runtime = internalsOf(this.#runtime);
-    const wasUnobserved = observable.subs.size === 0;
-    mutableSubs(observable).add(observer);
+    this.#assertObservableOwner(observable)
+    assertReactiveOwnedBy(observer, this.#runtime, 'observer')
+    const runtime = internalsOf(this.#runtime)
+    const wasUnobserved = observable.subs.size === 0
+    mutableSubs(observable).add(observer)
     if (wasUnobserved) {
       try {
-        observable.onObserved?.();
+        observable.onObserved?.()
       } catch (error) {
         observer.runtime.reportError(error, {
           phase: ReactiveErrorPhase.lifecycleHook,
           observer: describeObserver(observer),
           observable: describeObservable(observable)
-        });
+        })
       }
     }
     if (runtime.traceEnabled()) {
@@ -348,14 +348,14 @@ export class DependencyTracker {
           observable: describeObservable(observable),
           observer: describeObserver(observer)
         })
-      );
+      )
     }
   }
 
   #unsubscribe(observable: IObservable, observer: IObserver): void {
-    this.#assertObservableOwner(observable);
-    if (!mutableSubs(observable).delete(observer)) return;
-    const runtime = internalsOf(this.#runtime);
+    this.#assertObservableOwner(observable)
+    if (!mutableSubs(observable).delete(observer)) return
+    const runtime = internalsOf(this.#runtime)
     if (runtime.traceEnabled()) {
       emitTraceSafely(
         {
@@ -376,43 +376,43 @@ export class DependencyTracker {
           observer: describeObserver(observer),
           reason: ReactiveTraceReason.retrack
         })
-      );
+      )
     }
     if (observable.subs.size === 0) {
       try {
-        observable.onUnobserved?.();
+        observable.onUnobserved?.()
       } catch (error) {
         observer.runtime.reportError(error, {
           phase: ReactiveErrorPhase.lifecycleHook,
           observer: describeObserver(observer),
           observable: describeObservable(observable)
-        });
+        })
       }
     }
   }
 
   #assertObservableOwner(observable: IObservable): void {
-    assertReactiveOwnedBy(observable, this.#runtime, 'observable');
+    assertReactiveOwnedBy(observable, this.#runtime, 'observable')
   }
 
   /** 在 fn 执行期间关闭依赖收集——action 内读取、cleanup 回调等场景用 */
   untracked<R>(fn: () => R): R {
-    this.#stack.push(null);
-    const prevTracker = swapActiveTracker(this);
+    this.#stack.push(null)
+    const prevTracker = swapActiveTracker(this)
     try {
-      return fn();
+      return fn()
     } finally {
-      this.#stack.pop();
-      activeTracker = prevTracker;
+      this.#stack.pop()
+      activeTracker = prevTracker
     }
   }
 
   /** 依赖是否真的变了（先惰性 pull 使版本落定再比较） */
   hasStaleDependencies(observer: IObserver): boolean {
     for (const [dep, recordedVersion] of observer.depVersions) {
-      dep.pull?.();
-      if (dep.version !== recordedVersion) return true;
+      dep.pull?.()
+      if (dep.version !== recordedVersion) return true
     }
-    return false;
+    return false
   }
 }

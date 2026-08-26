@@ -1,10 +1,10 @@
-import type { ICapture } from './dependency-tracker.class.js';
-import { internalsOf } from './internals.js';
-import type { IDisposer, IReactiveNodeOptions, IRuntime } from './types.js';
-import { Effect } from '../reactive/effect.class.js';
-import { createReactiveError } from '../errors.js';
-import { ReactiveErrorCode } from '../error-code.js';
-import { ReactiveErrorText } from '../error-text.js';
+import type { ICapture } from './dependency-tracker.class.js'
+import { internalsOf } from './internals.js'
+import type { IDisposer, IReactiveNodeOptions, IRuntime } from './types.js'
+import { Effect } from '../reactive/effect.class.js'
+import { createReactiveError } from '../errors.js'
+import { ReactiveErrorCode } from '../error-code.js'
+import { ReactiveErrorText } from '../error-text.js'
 
 /**
  * 一次捕获提交的完整结果。
@@ -13,8 +13,8 @@ import { ReactiveErrorText } from '../error-text.js';
  * - `stale`：捕获后依赖已变化，token 已消费，必须重新捕获；
  * - `no-observer`：提交目标尚不存在，token 未消费，可在 observer 就绪后重试。
  */
-export type IObserverCommitResult = 'committed' | 'stale' | 'no-observer';
-export type IObserverRetrackResult = 'changed' | 'unchanged' | 'no-observer';
+export type IObserverCommitResult = 'committed' | 'stale' | 'no-observer'
+export type IObserverRetrackResult = 'changed' | 'unchanged' | 'no-observer'
 
 /**
  * 三段式绑定的公开接口。
@@ -38,22 +38,22 @@ export type IObserverBinding = {
    *
    * 只记录读到了哪些节点及其版本，不建立依赖边——被丢弃的渲染因此不会留下订阅。
    */
-  capture<R>(read: () => R): ICapture<R>;
+  capture<R>(read: () => R): ICapture<R>
   /**
    * Install the binding-owned observer. Keeping the concrete Effect private prevents adapters from
    * mutating deps/versions or calling run/markDirty.
    */
-  observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer;
+  observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer
   /**
    * 提交期安装依赖。
    *
    * 返回三态结果，明确区分「需要重新捕获」与「订阅者尚不存在」。调用方只应在 `stale` 时作废快照并重新取值，而**不是**在 commit 阶段去 pull 脏节点——
    * 那会把用户的求值错误抛在 commit 里，绕过 Error Boundary。
    */
-  commit(capture: ICapture<unknown>): IObserverCommitResult;
+  commit(capture: ICapture<unknown>): IObserverCommitResult
   /** Force one committed observer run and report whether its dependency set changed. */
-  retrack(): IObserverRetrackResult;
-};
+  retrack(): IObserverRetrackResult
+}
 
 /**
  * 为一个订阅者建立绑定。
@@ -62,18 +62,18 @@ export type IObserverBinding = {
  * deps、版本或强制调度入口。
  */
 export function createObserverBinding(runtime: IRuntime): IObserverBinding {
-  const tracker = internalsOf(runtime).tracker;
-  let observer: Effect | undefined;
+  const tracker = internalsOf(runtime).tracker
+  let observer: Effect | undefined
   const dependenciesChanged = (
     before: ReadonlyMap<object, number>,
     after: ReadonlyMap<object, number>
   ): boolean => {
-    if (before.size !== after.size) return true;
+    if (before.size !== after.size) return true
     for (const [dependency, version] of after) {
-      if (before.get(dependency) !== version) return true;
+      if (before.get(dependency) !== version) return true
     }
-    return false;
-  };
+    return false
+  }
   return {
     capture: (read) => tracker.capture(read),
     observe: (fn, options) => {
@@ -81,30 +81,30 @@ export function createObserverBinding(runtime: IRuntime): IObserverBinding {
         throw createReactiveError(
           ReactiveErrorCode.bindingDuplicate,
           ReactiveErrorText.observerBindingAlreadyObserved
-        );
+        )
       }
-      const current = new Effect(fn, runtime, options);
-      observer = current;
-      let active = true;
+      const current = new Effect(fn, runtime, options)
+      observer = current
+      let active = true
       return () => {
-        if (!active) return;
-        active = false;
-        current.dispose();
-        if (observer === current) observer = undefined;
-      };
+        if (!active) return
+        active = false
+        current.dispose()
+        if (observer === current) observer = undefined
+      }
     },
     commit: (capture) => {
-      const current = observer;
-      if (!current || current.disposed) return 'no-observer';
-      return tracker.commitCapture(current, capture) ? 'committed' : 'stale';
+      const current = observer
+      if (!current || current.disposed) return 'no-observer'
+      return tracker.commitCapture(current, capture) ? 'committed' : 'stale'
     },
     retrack: () => {
-      const current = observer;
-      if (!current || current.disposed) return 'no-observer';
-      const before = new Map(current.depVersions);
-      current.run();
-      if (current.disposed) return 'no-observer';
-      return dependenciesChanged(before, current.depVersions) ? 'changed' : 'unchanged';
+      const current = observer
+      if (!current || current.disposed) return 'no-observer'
+      const before = new Map(current.depVersions)
+      current.run()
+      if (current.disposed) return 'no-observer'
+      return dependenciesChanged(before, current.depVersions) ? 'changed' : 'unchanged'
     }
-  };
+  }
 }

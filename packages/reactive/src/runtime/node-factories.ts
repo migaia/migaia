@@ -1,8 +1,8 @@
-import { internalsOf } from './internals.js';
-import { DependencyTracker } from './dependency-tracker.class.js';
-import type { IReactiveNodeOptions, IRuntime } from './types.js';
-import type { Signal } from '../reactive/signal.class.js';
-import type { Computed, IComputedConfig } from '../reactive/computed.class.js';
+import { internalsOf } from './internals.js'
+import { DependencyTracker } from './dependency-tracker.class.js'
+import type { IReactiveNodeOptions, IRuntime } from './types.js'
+import type { Signal } from '../reactive/signal.class.js'
+import type { Computed, IComputedConfig } from '../reactive/computed.class.js'
 
 /**
  * 具体节点类的工厂视图。
@@ -18,22 +18,22 @@ import type { Computed, IComputedConfig } from '../reactive/computed.class.js';
  * 这里给出的东西不比公共 `IRuntime` 多——节点还是同一个 Runtime 造的，仍走归属登记与 通知管线；只是类型不再被收窄。校验照旧：不是本库造的 Runtime 直接抛。
  */
 export type IInternalRuntime = Omit<IRuntime, 'signal' | 'computed'> & {
-  signal<T>(value: T, options?: IReactiveNodeOptions): Signal<T>;
-  computed<T>(fn: () => T, config?: IComputedConfig<T>): Computed<T>;
-};
+  signal<T>(value: T, options?: IReactiveNodeOptions): Signal<T>
+  computed<T>(fn: () => T, config?: IComputedConfig<T>): Computed<T>
+}
 
 /** 先校验是本库创建的 Runtime，再把节点工厂的具体返回类型交给实现层。 */
 export function internalRuntimeOf(runtime: IRuntime): IInternalRuntime {
-  internalsOf(runtime);
-  return runtime as IInternalRuntime;
+  internalsOf(runtime)
+  return runtime as IInternalRuntime
 }
 
 /** Read-only tracking-context query for node-building implementation layers. */
 export function isRuntimeTracking(runtime: IRuntime): boolean {
-  return internalsOf(runtime).tracker.isTracking();
+  return internalsOf(runtime).tracker.isTracking()
 }
 
 /** True when a dependency frame is active in any Runtime. */
 export function isAnyRuntimeTracking(): boolean {
-  return DependencyTracker.isAnyTracking();
+  return DependencyTracker.isAnyTracking()
 }

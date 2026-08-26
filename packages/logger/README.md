@@ -107,7 +107,7 @@ pnpm add @migaia/logger
 2. **插件实例不能跨 logger 复用**。每次安装都应该重新调用一次插件工厂函数（`level()`、`http()` 等），不要把同一个插件实例装到多个 `Logger`，否则内部状态可能串联。
 3. **`shutdown()` 之后日志被静默忽略**，不会抛错也不会有任何提示——这是有意的（避免退出流程里到处加判断），需要感知的话订阅 `onFailure()` 或自行检查状态。
 4. **日志系统内部的失败不会从业务调用抛出**。`log.info()` 永远不会因为 sink 挂了而抛异常——务必用 `onFailure()` 观察，否则问题会悄悄消失。
-5. **`pipeline.mode` 构造后不可切换**，三种模式（sync/async/generator）执行顺序有本质区别，混用会立即报错，详见 USEGUIDE。
+5. **`pipeline.mode` 构造后不可切换**，四种模式（sync/async/generator/async-generator）执行顺序有本质区别，混用会立即报错，详见 USEGUIDE。
 6. **`http()` 批量发送要求插件顺序正确**：`plugins: [batch(), http(...)]`，顺序反了批处理不会生效。
 7. **`extends()` 只转发运行时输出路径**，不会把目标 logger 的 TypeScript 扩展方法合并进当前变量的类型。
 

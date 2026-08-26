@@ -38,8 +38,10 @@ export const PluginHostErrorCode = {
   /**
    * 插件 `install()` 抛错。原始安装错误**恒为 primary**（挂在 `cause` 上，按错误码契约 §3.2 保持 `===` 可达）。
    *
-   * 回滚/清理失败不改变此码——它经 `PLUGIN_INSTALL_ROLLBACK_FAILED`（诊断码）上报，永不覆盖原始构造错误（L-T39 /
-   * `docs/lifecycle/migration.sdd.md` §3.7.4 M-T44）。调用方可据此判定 Host 已回到安装前的一致状态。
+   * `detail` 保留失败插件名与按回滚顺序排列的原始 rollback identities；异步 `use()` 直接发布已完成的冻结 detail， 同步 `useSync()`
+   * 发布冻结快照并通过 `detail.completion` 提供最终冻结 detail。回滚/清理失败仍经
+   * `PLUGIN_INSTALL_ROLLBACK_FAILED`（诊断码）上报，永不覆盖原始构造错误（L-T39 / `docs/lifecycle/migration.sdd.md`
+   * §3.7.4 M-T44）。调用方应 await completion 后再做需要完整 secondary identity 的错误转换。
    */
   pluginInstallFailed: 'PLUGIN_INSTALL_FAILED',
 
@@ -100,7 +102,7 @@ export const PluginHostErrorCode = {
   lifecycleMutation: 'LIFECYCLE_MUTATION',
 
   /**
-   * 构造 Host 时传入了不在 `'sync' | 'async' | 'generator'` 内的 pipeline mode。
+   * 构造 Host 时传入了不在 `'sync' | 'async' | 'generator' | 'async-generator'` 内的 pipeline mode。
    *
    * 配置期校验，Host 不会被构造出来。
    */
@@ -189,13 +191,13 @@ export const PluginHostErrorCode = {
    * 输入后重试；这是编程错误，不是运行时状态问题。
    */
   invalidOption: 'INVALID_OPTION'
-} as const;
+} as const
 
-export type IPluginHostErrorCode = (typeof PluginHostErrorCode)[keyof typeof PluginHostErrorCode];
+export type IPluginHostErrorCode = (typeof PluginHostErrorCode)[keyof typeof PluginHostErrorCode]
 
 /**
  * `(source, code)` 二元组中 `source` 的唯一声明处（`docs/contracts/error-codes.md` §2）。
  *
  * 全仓每个离开 plugin-host 边界的错误都以此为 `source`，禁止在抛出点或 `error-text.ts` 手写该字符串字面量。
  */
-export const PLUGIN_HOST_SOURCE = '@migaia/plugin-host' as const;
+export const PLUGIN_HOST_SOURCE = '@migaia/plugin-host' as const

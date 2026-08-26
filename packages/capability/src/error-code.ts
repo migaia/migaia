@@ -82,6 +82,6 @@ export const CapabilityErrorCode = {
    * flags/definition 对象，不要对同一份 hostile 输入重试。
    */
   invalidOption: 'INVALID_OPTION'
-} as const;
+} as const
 
-export type ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode];
+export type ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode]

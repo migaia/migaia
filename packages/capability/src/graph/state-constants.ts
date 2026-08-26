@@ -6,7 +6,7 @@ export const CapabilityGraphState = {
   failed: 'failed',
   quiescing: 'quiescing',
   terminal: 'terminal'
-} as const;
+} as const
 
 /** Stable per-node states used for diagnostics after startup and disposal. */
 export const CapabilityGraphNodeState = {
@@ -17,9 +17,8 @@ export const CapabilityGraphNodeState = {
   blocked: 'blocked',
   rolledBack: 'rolled-back',
   released: 'released'
-} as const;
+} as const
 
-export type ICapabilityGraphState =
-  (typeof CapabilityGraphState)[keyof typeof CapabilityGraphState];
+export type ICapabilityGraphState = (typeof CapabilityGraphState)[keyof typeof CapabilityGraphState]
 export type ICapabilityGraphNodeState =
-  (typeof CapabilityGraphNodeState)[keyof typeof CapabilityGraphNodeState];
+  (typeof CapabilityGraphNodeState)[keyof typeof CapabilityGraphNodeState]

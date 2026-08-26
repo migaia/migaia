@@ -7,7 +7,7 @@ import {
   type ISerializeRegistry,
   type ISerializeScheduler,
   type ITextEncoder
-} from './types.js';
+} from './types.js'
 import {
   createSerializeError,
   createSerializeRangeError,
@@ -15,53 +15,53 @@ import {
   SerializeErrorCode,
   SerializeErrorText,
   SERIALIZE_SOURCE
-} from './errors.js';
-import { SerializeChunkKind, SerializePhase } from './format-constants.js';
-import { snapshotSerializeSignal } from './signal.js';
+} from './errors.js'
+import { SerializeChunkKind, SerializePhase } from './format-constants.js'
+import { snapshotSerializeSignal } from './signal.js'
 
-type ISerializeScheduledTask = { cancel(): void };
+type ISerializeScheduledTask = { cancel(): void }
 
 /** Fully admitted frame-budget options; no field reads remain when slicing begins. */
 type IFrameBudgetSnapshot = {
-  readonly targetMs: number;
-  readonly minItems: number;
-  readonly maxItems: number;
-  readonly initialItems: number;
-  readonly yieldTo?: () => Promise<void>;
-  readonly signal?: ISerializeAbortSignal;
-  readonly scheduler: ISerializeScheduler;
-};
+  readonly targetMs: number
+  readonly minItems: number
+  readonly maxItems: number
+  readonly initialItems: number
+  readonly yieldTo?: () => Promise<void>
+  readonly signal?: ISerializeAbortSignal
+  readonly scheduler: ISerializeScheduler
+}
 
 /** Fully admitted encode-stream options captured before the first slice or registry call. */
 type IEncodeStreamSnapshot = IFrameBudgetSnapshot & {
-  readonly type?: string;
-  readonly context: string;
-  readonly maxInFlight: number;
-};
+  readonly type?: string
+  readonly context: string
+  readonly maxInFlight: number
+}
 
 /** Fully admitted decode-stream options captured before the input iterator is touched. */
 type IDecodeStreamSnapshot = {
-  readonly type?: string;
-  readonly context: string;
-  readonly signal?: ISerializeAbortSignal;
-};
+  readonly type?: string
+  readonly context: string
+  readonly signal?: ISerializeAbortSignal
+}
 
 /** Invoke one captured method with its original protocol receiver. */
-type ISerializeInvokable<TResult> = (...args: never[]) => TResult;
+type ISerializeInvokable<TResult> = (...args: never[]) => TResult
 
 /** Add a secondary cleanup failure without changing the earlier primary result. */
 const attachSerializeCleanupError = (primary: unknown, cleanupError: unknown): void => {
-  if (primary === null || (typeof primary !== 'object' && typeof primary !== 'function')) return;
+  if (primary === null || (typeof primary !== 'object' && typeof primary !== 'function')) return
   try {
-    const existing = (primary as { readonly errors?: readonly unknown[] }).errors;
+    const existing = (primary as { readonly errors?: readonly unknown[] }).errors
     Object.defineProperty(primary, 'errors', {
       value: Object.freeze([...(existing ?? []), cleanupError]),
       enumerable: true
-    });
+    })
   } catch {
     // A frozen or hostile primary still wins; cleanup failure remains contained.
   }
-};
+}
 
 /** Keep an already-owned serialize INVALID_OPTION intact while wrapping a hostile failure. */
 const isSerializeInvalidOption = (error: unknown): boolean => {
@@ -70,32 +70,32 @@ const isSerializeInvalidOption = (error: unknown): boolean => {
       error instanceof Error &&
       (error as { readonly source?: unknown }).source === SERIALIZE_SOURCE &&
       (error as { readonly code?: unknown }).code === SerializeErrorCode.invalidOption
-    );
+    )
   } catch {
-    return false;
+    return false
   }
-};
+}
 
 /** Extract hostile protocol-failure text without allowing diagnostics to replace the primary. */
 const streamFailureReason = (error: unknown): string => {
   try {
     if (error instanceof Error) {
       try {
-        const message = error.message;
-        return typeof message === 'string' ? message : String(message);
+        const message = error.message
+        return typeof message === 'string' ? message : String(message)
       } catch {
-        return SerializeErrorText.reasonUnavailable;
+        return SerializeErrorText.reasonUnavailable
       }
     }
     try {
-      return String(error);
+      return String(error)
     } catch {
-      return SerializeErrorText.reasonUnavailable;
+      return SerializeErrorText.reasonUnavailable
     }
   } catch {
-    return SerializeErrorText.reasonUnavailable;
+    return SerializeErrorText.reasonUnavailable
   }
-};
+}
 
 /** Keep pre-existing serialize-owned invalid-chunk errors unchanged during stream cleanup. */
 const isSerializeInvalidChunk = (error: unknown): boolean => {
@@ -104,11 +104,11 @@ const isSerializeInvalidChunk = (error: unknown): boolean => {
       error instanceof Error &&
       (error as { readonly source?: unknown }).source === SERIALIZE_SOURCE &&
       (error as { readonly code?: unknown }).code === SerializeErrorCode.invalidChunk
-    );
+    )
   } catch {
-    return false;
+    return false
   }
-};
+}
 
 /** Wrap one encode admission failure with the slice index that owns the invocation. */
 const encodeStreamFailure = (
@@ -129,17 +129,17 @@ const encodeStreamFailure = (
       code: SerializeErrorCode.encodeFailed,
       cause: error
     }
-  );
+  )
 
 /** Convert any stream-option getter, shape, or value failure to serialize INVALID_OPTION. */
 const streamOptionFailure = (error: unknown): never => {
-  if (isSerializeInvalidOption(error)) throw error;
+  if (isSerializeInvalidOption(error)) throw error
   throw createSerializeTypeError(
     SerializeErrorCode.invalidOption,
     SerializeErrorText.operationOptionInvalid,
     { cause: error }
-  );
-};
+  )
+}
 
 /** Translate a task-release failure without replacing its native TypeError semantics. */
 const translateTaskCancelFailure = (error: unknown): unknown =>
@@ -149,35 +149,35 @@ const translateTaskCancelFailure = (error: unknown): unknown =>
         SerializeErrorCode.invalidOption,
         SerializeErrorText.schedulerTaskCancelFailed,
         { cause: error }
-      );
+      )
 
 /** Read an operation signal's current state while keeping failures at serialize's boundary. */
 const readSerializeSignalAborted = (signal: ISerializeAbortSignal): boolean => {
   try {
-    if (typeof signal.aborted !== 'boolean') throw new TypeError(SerializeErrorText.signalInvalid);
-    return signal.aborted;
+    if (typeof signal.aborted !== 'boolean') throw new TypeError(SerializeErrorText.signalInvalid)
+    return signal.aborted
   } catch (error) {
-    if (isSerializeInvalidOption(error)) throw error;
+    if (isSerializeInvalidOption(error)) throw error
     throw createSerializeTypeError(
       SerializeErrorCode.invalidOption,
       SerializeErrorText.signalAccessorFailed,
       { cause: error }
-    );
+    )
   }
-};
+}
 
 /** Read an operation abort reason only when cancellation wins the owned-yield race. */
 const readSerializeSignalReason = (signal: ISerializeAbortSignal): unknown => {
   try {
-    return signal.reason;
+    return signal.reason
   } catch (error) {
     throw createSerializeTypeError(
       SerializeErrorCode.invalidOption,
       SerializeErrorText.signalReasonReadFailed,
       { cause: error }
-    );
+    )
   }
-};
+}
 
 /**
  * Schedule one default frame yield and own its returned task until callback, cancellation, or
@@ -188,47 +188,47 @@ const scheduleOwnedYield = (
   scheduler: ISerializeScheduler,
   signal: ISerializeAbortSignal | undefined
 ): Promise<void> => {
-  let resolveYield!: () => void;
-  let rejectYield!: (error: unknown) => void;
+  let resolveYield!: () => void
+  let rejectYield!: (error: unknown) => void
   const promise = new Promise<void>((resolve, reject) => {
-    resolveYield = resolve;
-    rejectYield = reject;
-  });
+    resolveYield = resolve
+    rejectYield = reject
+  })
   /** Task returned by scheduler, retained until exactly-once cleanup. */
-  let task: ISerializeScheduledTask | undefined;
+  let task: ISerializeScheduledTask | undefined
   /** Whether scheduler callback has fired, including synchronous reentrancy. */
-  let callbackFired = false;
+  let callbackFired = false
   /** Whether schedule invocation has returned or failed. */
-  let scheduleSettled = false;
+  let scheduleSettled = false
   /** Whether a primary outcome has been recorded. */
-  let hasPrimary = false;
+  let hasPrimary = false
   /** First failure, which cleanup failures must not replace. */
-  let primaryError: unknown;
+  let primaryError: unknown
   /** Whether task cancellation has been attempted already. */
-  let cancelAttempted = false;
+  let cancelAttempted = false
   /** Whether returned promise has been settled. */
-  let settled = false;
+  let settled = false
   /** Whether abort listener registration was attempted. */
-  let listenerAttempted = false;
+  let listenerAttempted = false
   /** Whether abort listener removal was attempted. */
-  let listenerRemoved = false;
+  let listenerRemoved = false
   /** Captured signal listener methods preserve receiver and avoid repeated hostile reads. */
-  let addAbortListener: ISerializeInvokable<void> | undefined;
-  let removeAbortListener: ISerializeInvokable<void> | undefined;
-  const signalReceiver = signal as object | undefined;
+  let addAbortListener: ISerializeInvokable<void> | undefined
+  let removeAbortListener: ISerializeInvokable<void> | undefined
+  const signalReceiver = signal as object | undefined
   /** Callback removes the owned listener and cancels the owned task before final settlement. */
   const cleanup = (): void => {
     if (task !== undefined && !cancelAttempted) {
-      cancelAttempted = true;
+      cancelAttempted = true
       try {
-        task.cancel();
+        task.cancel()
       } catch (error) {
-        const cleanupError = translateTaskCancelFailure(error);
+        const cleanupError = translateTaskCancelFailure(error)
         if (!hasPrimary) {
-          primaryError = cleanupError;
-          hasPrimary = true;
+          primaryError = cleanupError
+          hasPrimary = true
         } else {
-          attachSerializeCleanupError(primaryError, cleanupError);
+          attachSerializeCleanupError(primaryError, cleanupError)
         }
       }
     }
@@ -239,9 +239,9 @@ const scheduleOwnedYield = (
       listenerAttempted &&
       !listenerRemoved
     ) {
-      listenerRemoved = true;
+      listenerRemoved = true
       try {
-        Reflect.apply(removeAbortListener, signalReceiver, ['abort', onAbort]);
+        Reflect.apply(removeAbortListener, signalReceiver, ['abort', onAbort])
       } catch (error) {
         const cleanupError = isSerializeInvalidOption(error)
           ? error
@@ -249,64 +249,64 @@ const scheduleOwnedYield = (
               SerializeErrorCode.invalidOption,
               SerializeErrorText.signalAccessorFailed,
               { cause: error }
-            );
+            )
         if (!hasPrimary) {
-          primaryError = cleanupError;
-          hasPrimary = true;
+          primaryError = cleanupError
+          hasPrimary = true
         } else {
-          attachSerializeCleanupError(primaryError, cleanupError);
+          attachSerializeCleanupError(primaryError, cleanupError)
         }
       }
     }
-  };
+  }
   /** Settle only after the scheduler return boundary exposes the task handle. */
   const finish = (): void => {
-    if (settled || !scheduleSettled || (!callbackFired && !hasPrimary)) return;
-    cleanup();
-    settled = true;
-    if (hasPrimary) rejectYield(primaryError);
-    else resolveYield();
-  };
+    if (settled || !scheduleSettled || (!callbackFired && !hasPrimary)) return
+    cleanup()
+    settled = true
+    if (hasPrimary) rejectYield(primaryError)
+    else resolveYield()
+  }
   /** Abort callback makes cancellation the primary outcome and releases any admitted task. */
   function onAbort(): void {
-    if (settled || hasPrimary) return;
+    if (settled || hasPrimary) return
     try {
       primaryError = createSerializeError(SerializeErrorCode.aborted, 'serialize aborted', {
         cause: signal === undefined ? undefined : readSerializeSignalReason(signal)
-      });
+      })
     } catch (error) {
-      primaryError = error;
+      primaryError = error
     }
-    hasPrimary = true;
-    finish();
+    hasPrimary = true
+    finish()
   }
   /**
    * Recheck structural signal state after listener admission, including hosts that do not replay
    * abort.
    */
   const recheckAbortAfterRegistration = (): void => {
-    if (signal === undefined || hasPrimary) return;
-    if (readSerializeSignalAborted(signal)) onAbort();
-  };
+    if (signal === undefined || hasPrimary) return
+    if (readSerializeSignalAborted(signal)) onAbort()
+  }
 
   try {
     if (signal !== undefined) {
       if (readSerializeSignalAborted(signal)) {
-        onAbort();
-        scheduleSettled = true;
-        finish();
-        return promise;
+        onAbort()
+        scheduleSettled = true
+        finish()
+        return promise
       }
-      const add = signal.addEventListener;
-      const remove = signal.removeEventListener;
+      const add = signal.addEventListener
+      const remove = signal.removeEventListener
       if (typeof add !== 'function' || typeof remove !== 'function') {
-        throw new TypeError(SerializeErrorText.signalInvalid);
+        throw new TypeError(SerializeErrorText.signalInvalid)
       }
-      addAbortListener = add as ISerializeInvokable<void>;
-      removeAbortListener = remove as ISerializeInvokable<void>;
-      listenerAttempted = true;
+      addAbortListener = add as ISerializeInvokable<void>
+      removeAbortListener = remove as ISerializeInvokable<void>
+      listenerAttempted = true
       try {
-        Reflect.apply(addAbortListener, signal, ['abort', onAbort, { once: true }]);
+        Reflect.apply(addAbortListener, signal, ['abort', onAbort, { once: true }])
       } catch (error) {
         const registrationError = isSerializeInvalidOption(error)
           ? error
@@ -314,34 +314,34 @@ const scheduleOwnedYield = (
               SerializeErrorCode.invalidOption,
               SerializeErrorText.signalRegistrationFailed,
               { cause: error }
-            );
-        let recheckFailed = false;
-        let recheckError: unknown;
+            )
+        let recheckFailed = false
+        let recheckError: unknown
         try {
-          recheckAbortAfterRegistration();
+          recheckAbortAfterRegistration()
         } catch (error) {
-          recheckFailed = true;
-          recheckError = error;
+          recheckFailed = true
+          recheckError = error
         }
-        primaryError = registrationError;
-        hasPrimary = true;
-        if (recheckFailed) attachSerializeCleanupError(primaryError, recheckError);
-        scheduleSettled = true;
-        finish();
-        return promise;
+        primaryError = registrationError
+        hasPrimary = true
+        if (recheckFailed) attachSerializeCleanupError(primaryError, recheckError)
+        scheduleSettled = true
+        finish()
+        return promise
       }
-      recheckAbortAfterRegistration();
+      recheckAbortAfterRegistration()
       if (hasPrimary) {
-        scheduleSettled = true;
-        finish();
-        return promise;
+        scheduleSettled = true
+        finish()
+        return promise
       }
     }
     task = scheduler.schedule(() => {
-      callbackFired = true;
-      finish();
-    }, 0);
-    scheduleSettled = true;
+      callbackFired = true
+      finish()
+    }, 0)
+    scheduleSettled = true
   } catch (error) {
     if (!hasPrimary) {
       primaryError = isSerializeInvalidOption(error)
@@ -350,16 +350,16 @@ const scheduleOwnedYield = (
             SerializeErrorCode.invalidOption,
             SerializeErrorText.schedulerInvalid,
             { cause: error }
-          );
-      hasPrimary = true;
+          )
+      hasPrimary = true
     } else {
-      attachSerializeCleanupError(primaryError, error);
+      attachSerializeCleanupError(primaryError, error)
     }
-    scheduleSettled = true;
+    scheduleSettled = true
   }
-  finish();
-  return promise;
-};
+  finish()
+  return promise
+}
 
 /** Validate a scheduler clock value at the serialize core boundary. */
 const validateSchedulerNow = (value: unknown): number => {
@@ -367,16 +367,16 @@ const validateSchedulerNow = (value: unknown): number => {
     throw createSerializeTypeError(
       SerializeErrorCode.invalidOption,
       SerializeErrorText.schedulerNowType
-    );
+    )
   }
   if (!Number.isFinite(value)) {
     throw createSerializeRangeError(
       SerializeErrorCode.invalidOption,
       SerializeErrorText.schedulerNowRange
-    );
+    )
   }
-  return value;
-};
+  return value
+}
 
 /** Capture one scheduler task and translate hostile task access into serialize ownership. */
 const snapshotScheduledTask = (value: unknown): ISerializeScheduledTask => {
@@ -384,62 +384,62 @@ const snapshotScheduledTask = (value: unknown): ISerializeScheduledTask => {
     throw createSerializeTypeError(
       SerializeErrorCode.invalidOption,
       SerializeErrorText.schedulerTaskInvalid
-    );
+    )
   }
-  let cancel: unknown;
+  let cancel: unknown
   try {
-    cancel = (value as { cancel?: unknown }).cancel;
+    cancel = (value as { cancel?: unknown }).cancel
   } catch (error) {
     throw createSerializeTypeError(
       SerializeErrorCode.invalidOption,
       SerializeErrorText.schedulerTaskCancelGetterFailed,
       { cause: error }
-    );
+    )
   }
   if (typeof cancel !== 'function') {
     throw createSerializeTypeError(
       SerializeErrorCode.invalidOption,
       SerializeErrorText.schedulerTaskInvalid
-    );
+    )
   }
-  const receiver = value;
-  return { cancel: () => Reflect.apply(cancel as () => void, receiver, []) };
-};
+  const receiver = value
+  return { cancel: () => Reflect.apply(cancel as () => void, receiver, []) }
+}
 
 /** Capture scheduler methods once and translate every scheduler failure into serialize errors. */
 const snapshotSerializeScheduler = (value: unknown): ISerializeScheduler | undefined => {
   if ((typeof value !== 'object' && typeof value !== 'function') || value === null) {
-    return undefined;
+    return undefined
   }
-  const receiver = value;
-  let now: unknown;
-  let schedule: unknown;
+  const receiver = value
+  let now: unknown
+  let schedule: unknown
   try {
-    now = (value as { now?: unknown }).now;
-    schedule = (value as { schedule?: unknown }).schedule;
+    now = (value as { now?: unknown }).now
+    schedule = (value as { schedule?: unknown }).schedule
   } catch (error) {
     throw createSerializeTypeError(
       SerializeErrorCode.invalidOption,
       SerializeErrorText.schedulerAccessorFailed,
       { cause: error }
-    );
+    )
   }
-  if (typeof now !== 'function' || typeof schedule !== 'function') return undefined;
+  if (typeof now !== 'function' || typeof schedule !== 'function') return undefined
   const isOwnedInvalidOption = (error: unknown): boolean =>
     error instanceof Error &&
     (error as { readonly source?: unknown }).source === SERIALIZE_SOURCE &&
-    (error as { readonly code?: unknown }).code === SerializeErrorCode.invalidOption;
+    (error as { readonly code?: unknown }).code === SerializeErrorCode.invalidOption
   return {
     now: () => {
       try {
-        return validateSchedulerNow(Reflect.apply(now as () => unknown, receiver, []));
+        return validateSchedulerNow(Reflect.apply(now as () => unknown, receiver, []))
       } catch (error) {
-        if (isOwnedInvalidOption(error)) throw error;
+        if (isOwnedInvalidOption(error)) throw error
         throw createSerializeTypeError(
           SerializeErrorCode.invalidOption,
           SerializeErrorText.schedulerNowType,
           { cause: error }
-        );
+        )
       }
     },
     schedule: (callback, delayMs) => {
@@ -449,18 +449,18 @@ const snapshotSerializeScheduler = (value: unknown): ISerializeScheduler | undef
             callback,
             delayMs
           ])
-        );
+        )
       } catch (error) {
-        if (isOwnedInvalidOption(error)) throw error;
+        if (isOwnedInvalidOption(error)) throw error
         throw createSerializeTypeError(
           SerializeErrorCode.invalidOption,
           SerializeErrorText.schedulerInvalid,
           { cause: error }
-        );
+        )
       }
     }
-  };
-};
+  }
+}
 
 /**
  * 帧预算切片。
@@ -473,28 +473,28 @@ const snapshotSerializeScheduler = (value: unknown): ISerializeScheduler | undef
  */
 export type IFrameBudgetOptions = {
   /** 每片目标耗时。默认 8ms：60fps 一帧 16.7ms，留一半余量给渲染与其他任务， 免得刚好卡在预算边缘时被别的工作顶出去。 */
-  readonly targetMs?: number;
+  readonly targetMs?: number
   /** 片大小下界，防止把开销摊成纯消息成本。 */
-  readonly minItems?: number;
+  readonly minItems?: number
   /** 片大小上界，防止首片就把主线程占死。 */
-  readonly maxItems?: number;
+  readonly maxItems?: number
   /** 首片大小。太大则第一片必然超预算，所以刻意保守。 */
-  readonly initialItems?: number;
+  readonly initialItems?: number
   /**
    * 让出方式。缺省用 `scheduler.schedule(resolve, 0)`；可换成 `scheduler.yield()`（更精确）或
    * requestIdleCallback（更保守）。
    */
-  readonly yieldTo?: () => Promise<void>;
-  readonly signal?: ISerializeAbortSignal;
+  readonly yieldTo?: () => Promise<void>
+  readonly signal?: ISerializeAbortSignal
   /**
    * Runtime-neutral scheduler（**必填**，R-4：core 无默认 timer、不直接使用宿主
    * `setTimeout`/`performance`/`Date.now`）。
    */
-  readonly scheduler: ISerializeScheduler;
-};
+  readonly scheduler: ISerializeScheduler
+}
 
 const clamp = (value: number, low: number, high: number): number =>
-  value < low ? low : value > high ? high : value;
+  value < low ? low : value > high ? high : value
 
 /** 有限正数；NaN 与 Infinity 都要挡住。 */
 function assertPositiveMs(value: number, name: string): void {
@@ -502,7 +502,7 @@ function assertPositiveMs(value: number, name: string): void {
     throw createSerializeRangeError(
       SerializeErrorCode.invalidOption,
       `frame budget ${name} must be a finite positive number, got ${value}`
-    );
+    )
   }
 }
 
@@ -512,7 +512,7 @@ function assertCount(value: number, name: string): void {
     throw createSerializeRangeError(
       SerializeErrorCode.invalidOption,
       `frame budget ${name} must be a positive integer, got ${value}`
-    );
+    )
   }
 }
 
@@ -520,111 +520,108 @@ function assertCount(value: number, name: string): void {
 const snapshotFrameBudgetOptions = (options: unknown): IFrameBudgetSnapshot => {
   try {
     if (options === null || typeof options !== 'object') {
-      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+      throw new TypeError(SerializeErrorText.operationOptionInvalid)
     }
-    const candidate = options as Record<string, unknown>;
-    const targetMsValue = candidate.targetMs;
-    const minItemsValue = candidate.minItems;
-    const maxItemsValue = candidate.maxItems;
-    const initialItemsValue = candidate.initialItems;
-    const yieldToValue = candidate.yieldTo;
-    const signalValue = candidate.signal;
-    const schedulerValue = candidate.scheduler;
-    const targetMs = targetMsValue === undefined ? 8 : targetMsValue;
-    const minItems = minItemsValue === undefined ? 64 : minItemsValue;
-    const maxItems = maxItemsValue === undefined ? 250_000 : maxItemsValue;
-    const initialItems = initialItemsValue === undefined ? 2_048 : initialItemsValue;
-    const yieldTo = yieldToValue === undefined ? undefined : (yieldToValue as () => Promise<void>);
-    if (typeof targetMs !== 'number')
-      throw new TypeError(SerializeErrorText.operationOptionInvalid);
-    if (typeof minItems !== 'number')
-      throw new TypeError(SerializeErrorText.operationOptionInvalid);
-    if (typeof maxItems !== 'number')
-      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+    const candidate = options as Record<string, unknown>
+    const targetMsValue = candidate.targetMs
+    const minItemsValue = candidate.minItems
+    const maxItemsValue = candidate.maxItems
+    const initialItemsValue = candidate.initialItems
+    const yieldToValue = candidate.yieldTo
+    const signalValue = candidate.signal
+    const schedulerValue = candidate.scheduler
+    const targetMs = targetMsValue === undefined ? 8 : targetMsValue
+    const minItems = minItemsValue === undefined ? 64 : minItemsValue
+    const maxItems = maxItemsValue === undefined ? 250_000 : maxItemsValue
+    const initialItems = initialItemsValue === undefined ? 2_048 : initialItemsValue
+    const yieldTo = yieldToValue === undefined ? undefined : (yieldToValue as () => Promise<void>)
+    if (typeof targetMs !== 'number') throw new TypeError(SerializeErrorText.operationOptionInvalid)
+    if (typeof minItems !== 'number') throw new TypeError(SerializeErrorText.operationOptionInvalid)
+    if (typeof maxItems !== 'number') throw new TypeError(SerializeErrorText.operationOptionInvalid)
     if (typeof initialItems !== 'number')
-      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+      throw new TypeError(SerializeErrorText.operationOptionInvalid)
     if (yieldTo !== undefined && typeof yieldTo !== 'function') {
-      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+      throw new TypeError(SerializeErrorText.operationOptionInvalid)
     }
-    const scheduler = snapshotSerializeScheduler(schedulerValue);
+    const scheduler = snapshotSerializeScheduler(schedulerValue)
     if (scheduler === undefined) {
       throw createSerializeTypeError(
         SerializeErrorCode.invalidOption,
         SerializeErrorText.schedulerInvalid
-      );
+      )
     }
-    const signal = signalValue === undefined ? undefined : snapshotSerializeSignal(signalValue);
-    assertPositiveMs(targetMs, 'targetMs');
-    assertCount(minItems, 'minItems');
-    assertCount(maxItems, 'maxItems');
-    assertCount(initialItems, 'initialItems');
+    const signal = signalValue === undefined ? undefined : snapshotSerializeSignal(signalValue)
+    assertPositiveMs(targetMs, 'targetMs')
+    assertCount(minItems, 'minItems')
+    assertCount(maxItems, 'maxItems')
+    assertCount(initialItems, 'initialItems')
     if (maxItems < minItems) {
       throw createSerializeRangeError(
         SerializeErrorCode.invalidOption,
         'frame budget maxItems must be at least minItems'
-      );
+      )
     }
-    return { targetMs, minItems, maxItems, initialItems, yieldTo, signal, scheduler };
+    return { targetMs, minItems, maxItems, initialItems, yieldTo, signal, scheduler }
   } catch (error) {
-    return streamOptionFailure(error);
+    return streamOptionFailure(error)
   }
-};
+}
 
 /** Capture encode-stream fields once, including all inherited frame-budget options. */
 const snapshotEncodeStreamOptions = (options: unknown): IEncodeStreamSnapshot => {
   try {
     if (options === null || typeof options !== 'object') {
-      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+      throw new TypeError(SerializeErrorText.operationOptionInvalid)
     }
-    const candidate = options as Record<string, unknown>;
-    const typeValue = candidate.type;
-    const contextValue = candidate.context;
-    const maxInFlightValue = candidate.maxInFlight;
-    const frame = snapshotFrameBudgetOptions(options);
-    const type = typeValue === undefined ? undefined : typeValue;
-    const context = contextValue === undefined ? 'stream' : contextValue;
-    const maxInFlight = maxInFlightValue === undefined ? 1 : maxInFlightValue;
+    const candidate = options as Record<string, unknown>
+    const typeValue = candidate.type
+    const contextValue = candidate.context
+    const maxInFlightValue = candidate.maxInFlight
+    const frame = snapshotFrameBudgetOptions(options)
+    const type = typeValue === undefined ? undefined : typeValue
+    const context = contextValue === undefined ? 'stream' : contextValue
+    const maxInFlight = maxInFlightValue === undefined ? 1 : maxInFlightValue
     if (type !== undefined && typeof type !== 'string') {
-      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+      throw new TypeError(SerializeErrorText.operationOptionInvalid)
     }
-    if (typeof context !== 'string') throw new TypeError(SerializeErrorText.operationOptionInvalid);
+    if (typeof context !== 'string') throw new TypeError(SerializeErrorText.operationOptionInvalid)
     if (typeof maxInFlight !== 'number') {
-      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+      throw new TypeError(SerializeErrorText.operationOptionInvalid)
     }
     if (!Number.isSafeInteger(maxInFlight) || maxInFlight < 1) {
       throw createSerializeRangeError(
         SerializeErrorCode.invalidOption,
         `maxInFlight must be a positive integer, got ${maxInFlight}`
-      );
+      )
     }
-    return { ...frame, type, context, maxInFlight };
+    return { ...frame, type, context, maxInFlight }
   } catch (error) {
-    return streamOptionFailure(error);
+    return streamOptionFailure(error)
   }
-};
+}
 
 /** Capture decode-stream fields once before the source iterator is requested. */
 const snapshotDecodeStreamOptions = (options: unknown): IDecodeStreamSnapshot => {
   try {
     if (options === null || typeof options !== 'object') {
-      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+      throw new TypeError(SerializeErrorText.operationOptionInvalid)
     }
-    const candidate = options as Record<string, unknown>;
-    const typeValue = candidate.type;
-    const contextValue = candidate.context;
-    const signalValue = candidate.signal;
-    const type = typeValue === undefined ? undefined : typeValue;
-    const context = contextValue === undefined ? 'stream' : contextValue;
+    const candidate = options as Record<string, unknown>
+    const typeValue = candidate.type
+    const contextValue = candidate.context
+    const signalValue = candidate.signal
+    const type = typeValue === undefined ? undefined : typeValue
+    const context = contextValue === undefined ? 'stream' : contextValue
     if (type !== undefined && typeof type !== 'string') {
-      throw new TypeError(SerializeErrorText.operationOptionInvalid);
+      throw new TypeError(SerializeErrorText.operationOptionInvalid)
     }
-    if (typeof context !== 'string') throw new TypeError(SerializeErrorText.operationOptionInvalid);
-    const signal = signalValue === undefined ? undefined : snapshotSerializeSignal(signalValue);
-    return { type, context, signal };
+    if (typeof context !== 'string') throw new TypeError(SerializeErrorText.operationOptionInvalid)
+    const signal = signalValue === undefined ? undefined : snapshotSerializeSignal(signalValue)
+    return { type, context, signal }
   } catch (error) {
-    return streamOptionFailure(error);
+    return streamOptionFailure(error)
   }
-};
+}
 
 /**
  * 按帧预算把一个大数组切成若干片，片间让出主线程。
@@ -636,40 +633,40 @@ export async function* sliceByFrameBudget<T>(
   options: IFrameBudgetOptions
 ): AsyncGenerator<readonly T[], void, undefined> {
   const { targetMs, minItems, maxItems, initialItems, yieldTo, signal, scheduler } =
-    snapshotFrameBudgetOptions(options);
-  const now = (): number => scheduler.now();
-  const resolveYield = yieldTo ?? (() => scheduleOwnedYield(scheduler, signal));
+    snapshotFrameBudgetOptions(options)
+  const now = (): number => scheduler.now()
+  const resolveYield = yieldTo ?? (() => scheduleOwnedYield(scheduler, signal))
 
-  let size = clamp(initialItems, minItems, maxItems);
-  let index = 0;
+  let size = clamp(initialItems, minItems, maxItems)
+  let index = 0
   while (index < items.length) {
     if (signal !== undefined && readSerializeSignalAborted(signal))
       throw createSerializeError(SerializeErrorCode.aborted, 'serialize aborted', {
         cause: readSerializeSignalReason(signal)
-      });
-    const slice = items.slice(index, index + size);
-    const startedAt = now();
-    yield slice;
+      })
+    const slice = items.slice(index, index + size)
+    const startedAt = now()
+    yield slice
     // 恢复点：消费者已经处理完这一片，时差即其真实耗时
-    const elapsed = now() - startedAt;
-    index += slice.length;
+    const elapsed = now() - startedAt
+    index += slice.length
 
     // 阻尼调整：直接按比例缩放会在噪声下来回振荡，取当前值与目标值的中点。
     // elapsed 极小时用下限兜底，避免除出一个荒谬的放大倍数。
-    const ratio = targetMs / Math.max(elapsed, 0.05);
-    const target = clamp(Math.round(size * ratio), minItems, maxItems);
-    size = clamp(Math.round((size + target) / 2), minItems, maxItems);
+    const ratio = targetMs / Math.max(elapsed, 0.05)
+    const target = clamp(Math.round(size * ratio), minItems, maxItems)
+    size = clamp(Math.round((size + target) / 2), minItems, maxItems)
 
-    if (index < items.length) await resolveYield();
+    if (index < items.length) await resolveYield()
   }
 }
 
 export type IEncodeStreamOptions = IFrameBudgetOptions & {
-  readonly type?: string;
-  readonly context?: string;
+  readonly type?: string
+  readonly context?: string
   /** 同时在途的请求数上限，即背压。默认 1：编好一片就等它落地再编下一片， 峰值内存只有一片。调高可以让编码与 worker 处理重叠，代价是峰值内存翻倍。 */
-  readonly maxInFlight?: number;
-};
+  readonly maxInFlight?: number
+}
 
 /**
  * 把一个大数组编码成分段流，**不做拼装**。
@@ -682,58 +679,58 @@ export async function* encodeStream<T>(
   items: readonly T[],
   options: IEncodeStreamOptions
 ): AsyncGenerator<ISerializeChunk, void, undefined> {
-  const streamOptions = snapshotEncodeStreamOptions(options);
-  const { type, context, signal, maxInFlight } = streamOptions;
-  const inFlight: Promise<ISerializeChunk>[] = [];
-  let sliceIndex = 0;
+  const streamOptions = snapshotEncodeStreamOptions(options)
+  const { type, context, signal, maxInFlight } = streamOptions
+  const inFlight: Promise<ISerializeChunk>[] = []
+  let sliceIndex = 0
 
   const drainOne = async (): Promise<ISerializeChunk> => {
-    const pending = inFlight.shift()!;
+    const pending = inFlight.shift()!
     try {
-      return await pending;
+      return await pending
     } catch (error) {
       // 刻意不透传内层 SerializeCodecError：它的 chunkIndex 说的是「本次编码的第几段」，
       // 恒为 0，会把「流里的第几片」这个真正有用的位置盖掉。原错误挂在 cause 上。
-      throw encodeStreamFailure(error, sliceIndex, type, context, registry);
+      throw encodeStreamFailure(error, sliceIndex, type, context, registry)
     }
-  };
+  }
 
   try {
     for await (const slice of sliceByFrameBudget(items, streamOptions)) {
       if (signal !== undefined && readSerializeSignalAborted(signal)) {
         throw createSerializeError(SerializeErrorCode.aborted, 'serialize aborted', {
           cause: readSerializeSignalReason(signal)
-        });
+        })
       }
-      let pending: Promise<ISerializeChunk>;
+      let pending: Promise<ISerializeChunk>
       try {
         // Promise.resolve preserves native Promise identity and assimilates thenables while the
         // catch below is installed in the same admission turn.
-        pending = Promise.resolve(registry.encode(slice, { type, signal, context }));
+        pending = Promise.resolve(registry.encode(slice, { type, signal, context }))
       } catch (error) {
         // A synchronous registry failure is still an ordered admission. Queue its rejection so
         // earlier work drains first and the same immediate observer prevents unhandled rejection.
-        pending = Promise.reject(error);
+        pending = Promise.reject(error)
       }
       // Observe every queued rejection at admission; draining later must still await the original
       // Promise so ordered output and exact error identity remain unchanged.
-      pending.catch(() => undefined);
-      inFlight.push(pending);
+      pending.catch(() => undefined)
+      inFlight.push(pending)
       // 背压：在途数达到上限就先把最早那笔排空，避免无限堆积
       while (inFlight.length >= maxInFlight) {
-        yield await drainOne();
-        sliceIndex++;
+        yield await drainOne()
+        sliceIndex++
       }
     }
     while (inFlight.length > 0) {
-      yield await drainOne();
-      sliceIndex++;
+      yield await drainOne()
+      sliceIndex++
     }
   } finally {
     // 消费者可能提前 break/throw，此时生成器会被 return()。留下的在途 Promise
     // 若无人认领就会变成 unhandled rejection，所以在这里统一接住。
-    for (const pending of inFlight) pending.catch(() => undefined);
-    inFlight.length = 0;
+    for (const pending of inFlight) pending.catch(() => undefined)
+    inFlight.length = 0
   }
 }
 
@@ -742,24 +739,24 @@ export async function* decodeStream(
   registry: ISerializeRegistry,
   chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>,
   options: {
-    readonly type?: string;
-    readonly context?: string;
-    readonly signal?: ISerializeAbortSignal;
+    readonly type?: string
+    readonly context?: string
+    readonly signal?: ISerializeAbortSignal
   } = {}
 ): AsyncGenerator<unknown, void, undefined> {
-  const { type, context, signal } = snapshotDecodeStreamOptions(options);
-  let index = 0;
-  let ownedError: unknown;
+  const { type, context, signal } = snapshotDecodeStreamOptions(options)
+  let index = 0
+  let ownedError: unknown
   try {
     for await (const chunk of chunks as AsyncIterable<ISerializeChunk>) {
       if (signal !== undefined && readSerializeSignalAborted(signal)) {
         ownedError = createSerializeError(SerializeErrorCode.aborted, 'serialize aborted', {
           cause: readSerializeSignalReason(signal)
-        });
-        throw ownedError;
+        })
+        throw ownedError
       }
       try {
-        yield await registry.decode(chunk, { type, signal, context });
+        yield await registry.decode(chunk, { type, signal, context })
       } catch (error) {
         // 同上：保留流位置，内层错误挂 cause
         ownedError = new SerializeCodecError(
@@ -773,13 +770,13 @@ export async function* decodeStream(
             code: SerializeErrorCode.decodeFailed,
             cause: error
           }
-        );
-        throw ownedError;
+        )
+        throw ownedError
       }
-      index++;
+      index++
     }
   } catch (error) {
-    if (error === ownedError) throw error;
+    if (error === ownedError) throw error
     throw new SerializeCodecError(
       `decode stream failed at chunk ${index}: ${streamFailureReason(error)}`,
       {
@@ -791,7 +788,7 @@ export async function* decodeStream(
         code: SerializeErrorCode.decodeFailed,
         cause: error
       }
-    );
+    )
   }
 }
 
@@ -800,12 +797,12 @@ export async function collectStream(
   chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>,
   encoder?: ITextEncoder
 ): Promise<ISerializeChunk> {
-  const collected: ISerializeChunk[] = [];
-  let sawBytes = false;
-  let bytesConsumed = 0;
-  let index = 0;
-  const chunkProgress: number[] = [];
-  let ownedError: unknown;
+  const collected: ISerializeChunk[] = []
+  let sawBytes = false
+  let bytesConsumed = 0
+  let index = 0
+  const chunkProgress: number[] = []
+  let ownedError: unknown
   try {
     for await (const chunk of chunks) {
       const validatedChunk = validateSerializeChunk(chunk, {
@@ -814,8 +811,8 @@ export async function collectStream(
         context: 'stream',
         chunkIndex: index,
         bytesConsumed
-      });
-      chunkProgress.push(bytesConsumed);
+      })
+      chunkProgress.push(bytesConsumed)
       if (validatedChunk[0] === SerializeChunkKind.value) {
         ownedError = new SerializeCodecError('cannot collect a value chunk into a stream', {
           type: 'stream',
@@ -824,18 +821,18 @@ export async function collectStream(
           chunkIndex: index,
           bytesConsumed,
           code: SerializeErrorCode.invalidChunk
-        });
-        throw ownedError;
+        })
+        throw ownedError
       }
       if (validatedChunk[0] === SerializeChunkKind.bytes) {
-        sawBytes = true;
-        bytesConsumed += validatedChunk[1].byteLength;
+        sawBytes = true
+        bytesConsumed += validatedChunk[1].byteLength
       }
-      collected.push(validatedChunk);
-      index++;
+      collected.push(validatedChunk)
+      index++
     }
   } catch (error) {
-    if (error === ownedError || isSerializeInvalidChunk(error)) throw error;
+    if (error === ownedError || isSerializeInvalidChunk(error)) throw error
     throw new SerializeCodecError(
       `collect stream failed at chunk ${index}: ${streamFailureReason(error)}`,
       {
@@ -847,18 +844,18 @@ export async function collectStream(
         code: SerializeErrorCode.encodeFailed,
         cause: error
       }
-    );
+    )
   }
-  if (collected.length === 0) return ['text', ''];
+  if (collected.length === 0) return ['text', '']
   if (!sawBytes) {
     // Joining once avoids repeatedly copying the accumulated string for a
     // long stream (which otherwise turns collection into quadratic work).
-    return ['text', collected.map((chunk) => chunk[1] as string).join('')];
+    return ['text', collected.map((chunk) => chunk[1] as string).join('')]
   }
   // core 无默认 Encoding adapter（R-4）：出现 bytes 需要合并时必须注入 encoder，不直接使用宿主 TextEncoder。
-  const enc = encoder;
+  const enc = encoder
   if (enc === undefined) {
-    throw createSerializeError(SerializeErrorCode.envUnsupported, 'TextEncoder is unavailable');
+    throw createSerializeError(SerializeErrorCode.envUnsupported, 'TextEncoder is unavailable')
   }
   const parts = collected.map((chunk, chunkIndex) =>
     chunk[0] === SerializeChunkKind.bytes
@@ -870,14 +867,14 @@ export async function collectStream(
           chunkIndex,
           bytesConsumed: chunkProgress[chunkIndex] ?? 0
         })
-  );
-  let total = 0;
-  for (const part of parts) total += part.byteLength;
-  const merged = new Uint8Array(total);
-  let offset = 0;
+  )
+  let total = 0
+  for (const part of parts) total += part.byteLength
+  const merged = new Uint8Array(total)
+  let offset = 0
   for (const part of parts) {
-    merged.set(part, offset);
-    offset += part.byteLength;
+    merged.set(part, offset)
+    offset += part.byteLength
   }
-  return ['bytes', merged];
+  return ['bytes', merged]
 }

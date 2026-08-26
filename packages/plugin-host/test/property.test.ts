@@ -1,39 +1,39 @@
-import fc from 'fast-check';
-import { describe, expect, it } from 'vitest';
-import { parseConfigPath, readConfigPath } from '../src/config';
+import fc from 'fast-check'
+import { describe, expect, it } from 'vitest'
+import { parseConfigPath, readConfigPath } from '../src/config'
 
 describe('PluginHost configuration properties', () => {
   it('reads arbitrary non-negative array indexes through the public path grammar', () => {
     fc.assert(
       fc.property(fc.nat({ max: 32 }), fc.string(), (index, value) => {
-        const config = { records: Array.from({ length: index + 1 }, () => ({ value })) };
-        const path = parseConfigPath(`plugin.records.[${index}].value`);
-        expect(readConfigPath(config, path)).toBe(value);
+        const config = { records: Array.from({ length: index + 1 }, () => ({ value })) }
+        const path = parseConfigPath(`plugin.records.[${index}].value`)
+        expect(readConfigPath(config, path)).toBe(value)
       })
-    );
-  });
+    )
+  })
 
   it('returns a cached readonly lazy view of the selected object', () => {
     fc.assert(
       fc.property(fc.string(), (value) => {
-        const nested = { value };
-        const config = { options: { nested } };
+        const nested = { value }
+        const config = { options: { nested } }
         const result = readConfigPath(config, parseConfigPath('plugin.options')) as {
-          nested: Readonly<typeof nested>;
-        };
-        expect(result).not.toBe(config.options);
-        expect(result.nested).not.toBe(nested);
+          nested: Readonly<typeof nested>
+        }
+        expect(result).not.toBe(config.options)
+        expect(result.nested).not.toBe(nested)
         expect(() => {
-          (result.nested as { value: string }).value = 'mutated';
-        }).toThrow(/readonly/);
+          ;(result.nested as { value: string }).value = 'mutated'
+        }).toThrow(/readonly/)
       })
-    );
-  });
+    )
+  })
 
   it('delegates the shared path grammar while preserving the plugin-host mutable array boundary', () => {
-    const segments = parseConfigPath('plugin.records.[0].value');
-    expect(segments).toEqual(['plugin', 'records', '0', 'value']);
-    expect(Object.isFrozen(segments)).toBe(false);
-    expect(() => parseConfigPath('plugin.records.[0')).toThrow(/invalid/);
-  });
-});
+    const segments = parseConfigPath('plugin.records.[0].value')
+    expect(segments).toEqual(['plugin', 'records', '0', 'value'])
+    expect(Object.isFrozen(segments)).toBe(false)
+    expect(() => parseConfigPath('plugin.records.[0')).toThrow(/invalid/)
+  })
+})

@@ -28,7 +28,7 @@ export const CapabilityGraphErrorText = {
   reentrantOperation: 'capability graph operation is reentrant',
   /** Stable option-admission message consumed by factory validation. */
   invalidOption: 'capability graph option admission failed'
-} as const;
+} as const
 
 export type ICapabilityGraphErrorText =
-  (typeof CapabilityGraphErrorText)[keyof typeof CapabilityGraphErrorText];
+  (typeof CapabilityGraphErrorText)[keyof typeof CapabilityGraphErrorText]

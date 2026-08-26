@@ -1,6 +1,6 @@
-export { subscribeOnce, subscribeSubscriber, subscribeUntil } from './channel.js';
-export { createCanonicalChannel as createEventChannel } from './channel.js';
-export { createEventHub } from './hub.js';
+export { subscribeOnce, subscribeSubscriber, subscribeUntil } from './channel.js'
+export { createCanonicalChannel as createEventChannel } from './channel.js'
+export { createEventHub } from './hub.js'
 export {
   publishParallel,
   publishParallelSettled,
@@ -8,11 +8,12 @@ export {
   publishSerialSettled,
   publishTask,
   publishTaskSettled
-} from './async.js';
-export { EVENT_SUBSCRIBER_SOURCE, EventSubscriberErrorCode } from './error-code.js';
-export { EventSubscriberState } from './state-constants.js';
-export type { IEventSubscriberErrorCode } from './error-code.js';
-export type { IEventChannelSubscription, IEventHubSubscription } from './types.js';
+} from './async.js'
+export { EVENT_SUBSCRIBER_SOURCE, EventSubscriberErrorCode } from './error-code.js'
+export { EventDispatchPolicy, EventSubscriberState } from './state-constants.js'
+export type { IEventSubscriberErrorCode } from './error-code.js'
+export type { IEventDispatchPolicy } from './state-constants.js'
+export type { IEventChannelSubscription, IEventHubSubscription } from './types.js'
 export type {
   ICanonicalEventChannel,
   IEventAbortSignal,
@@ -30,4 +31,4 @@ export type {
   IFilteredEventChannel,
   IListenerResult,
   IUnsubscribe
-} from './types.js';
+} from './types.js'

@@ -69,6 +69,6 @@ export const ResourceErrorCode = {
    * fetcher 抛出的 Suspense 值为何带 hostile getter，不要把它当成普通 fetch 失败静默重试。
    */
   suspenseProbeFailed: 'SUSPENSE_PROBE_FAILED'
-} as const;
+} as const
 
-export type IResourceErrorCode = (typeof ResourceErrorCode)[keyof typeof ResourceErrorCode];
+export type IResourceErrorCode = (typeof ResourceErrorCode)[keyof typeof ResourceErrorCode]

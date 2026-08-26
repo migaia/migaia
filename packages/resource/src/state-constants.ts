@@ -6,6 +6,6 @@ export const ResourceStatus = {
   error: 'error',
   cancelled: 'cancelled',
   fetching: 'fetching'
-} as const;
+} as const
 
-export type IResourceStatus = (typeof ResourceStatus)[keyof typeof ResourceStatus];
+export type IResourceStatus = (typeof ResourceStatus)[keyof typeof ResourceStatus]

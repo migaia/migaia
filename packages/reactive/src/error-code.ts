@@ -130,6 +130,6 @@ export const ReactiveErrorCode = {
    * 这是入口参数校验，早失败优于把非法配置带进运行时状态。调用方应修正传入的选项值。
    */
   invalidOption: 'INVALID_OPTION'
-} as const;
+} as const
 
-export type IReactiveErrorCode = (typeof ReactiveErrorCode)[keyof typeof ReactiveErrorCode];
+export type IReactiveErrorCode = (typeof ReactiveErrorCode)[keyof typeof ReactiveErrorCode]

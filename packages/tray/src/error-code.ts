@@ -10,6 +10,6 @@ export const TrayErrorCode = {
   unavailable: 'TRAY_UNAVAILABLE',
   /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */
   gateReadFailed: 'TRAY_GATE_READ_FAILED'
-} as const;
+} as const
 
-export type ITrayErrorCode = (typeof TrayErrorCode)[keyof typeof TrayErrorCode];
+export type ITrayErrorCode = (typeof TrayErrorCode)[keyof typeof TrayErrorCode]

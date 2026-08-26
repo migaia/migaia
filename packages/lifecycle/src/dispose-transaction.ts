@@ -1,9 +1,4 @@
-import type {
-  ICollectedError,
-  IErrorPolicy,
-  IReleaseContext,
-  IReleaseDescriptor
-} from './types.js';
+import type { ICollectedError, IErrorPolicy, IReleaseContext, IReleaseDescriptor } from './types.js'
 import {
   assimilateCapturedThen,
   containAsyncRejection,
@@ -11,10 +6,10 @@ import {
   createLifecycleError,
   probeThenable,
   tagLifecycleError
-} from './errors.js';
-import { LifecycleErrorCode } from './error-code.js';
-import { LifecycleErrorText } from './error-text.js';
-import { boundedWait } from './bounded-wait.js';
+} from './errors.js'
+import { LifecycleErrorCode } from './error-code.js'
+import { LifecycleErrorText } from './error-text.js'
+import { boundedWait } from './bounded-wait.js'
 import {
   resolveSchedulerOption,
   addSchedulerTime,
@@ -22,18 +17,18 @@ import {
   validateSchedulerDelay,
   validateSchedulerTime,
   type ILifecycleScheduler
-} from './scheduler.js';
-import { createAbortController, type IAbortSignal } from './abort.js';
-import { DisposeTransactionKind, ThenableProbeKind } from './state-constants.js';
+} from './scheduler.js'
+import { createAbortController, type IAbortSignal } from './abort.js'
+import { DisposeTransactionKind, ThenableProbeKind } from './state-constants.js'
 
-type ICallbackOutcome = { readonly ok: true } | { readonly ok: false; readonly error: unknown };
+type ICallbackOutcome = { readonly ok: true } | { readonly ok: false; readonly error: unknown }
 
 /** Stable non-aborting signal for transactions without an external cancellation source. */
 const inertReleaseSignal: IAbortSignal = Object.freeze({
   aborted: false,
   addEventListener: (): void => undefined,
   removeEventListener: (): void => undefined
-});
+})
 
 /**
  * 一次读取的 thenable 归化：非 thenable → `not-thenable`；getter 失败 → `failed`（原 getter 错误）；否则把捕获的 `thenFn`
@@ -45,34 +40,34 @@ const assimilateThenable = (
   | { readonly kind: typeof ThenableProbeKind.notThenable }
   | { readonly kind: typeof ThenableProbeKind.failed; readonly error: unknown }
   | { readonly kind: typeof ThenableProbeKind.promise; readonly promise: Promise<void> } => {
-  const probe = probeThenable(value);
-  if (probe.kind === ThenableProbeKind.notThenable) return { kind: ThenableProbeKind.notThenable };
+  const probe = probeThenable(value)
+  if (probe.kind === ThenableProbeKind.notThenable) return { kind: ThenableProbeKind.notThenable }
   if (probe.kind === ThenableProbeKind.failed)
-    return { kind: ThenableProbeKind.failed, error: probe.error };
+    return { kind: ThenableProbeKind.failed, error: probe.error }
   return {
     kind: ThenableProbeKind.promise,
     promise: assimilateCapturedThen<void>(probe.thenFn, value)
-  };
-};
+  }
+}
 
 async function runCallback(
   callback: (context: IReleaseContext) => void | PromiseLike<void>,
   context: IReleaseContext
 ): Promise<ICallbackOutcome> {
-  let result: void | PromiseLike<void>;
+  let result: void | PromiseLike<void>
   try {
-    result = callback(context);
+    result = callback(context)
   } catch (error) {
-    return { ok: false, error };
+    return { ok: false, error }
   }
-  const assimilated = assimilateThenable(result);
-  if (assimilated.kind === ThenableProbeKind.failed) return { ok: false, error: assimilated.error };
-  if (assimilated.kind === 'not-thenable') return { ok: true };
+  const assimilated = assimilateThenable(result)
+  if (assimilated.kind === ThenableProbeKind.failed) return { ok: false, error: assimilated.error }
+  if (assimilated.kind === 'not-thenable') return { ok: true }
   try {
-    await assimilated.promise;
-    return { ok: true };
+    await assimilated.promise
+    return { ok: true }
   } catch (error) {
-    return { ok: false, error };
+    return { ok: false, error }
   }
 }
 
@@ -86,42 +81,42 @@ function computeEffectiveDeadline(
   sharedDeadlineAt: number | undefined,
   now: number
 ): number | undefined {
-  if (gracefulTimeoutMs === undefined) return sharedDeadlineAt;
-  const ownDeadline = addSchedulerTime(now, gracefulTimeoutMs, 'graceful deadline');
-  if (sharedDeadlineAt === undefined) return ownDeadline;
-  return Math.min(ownDeadline, sharedDeadlineAt);
+  if (gracefulTimeoutMs === undefined) return sharedDeadlineAt
+  const ownDeadline = addSchedulerTime(now, gracefulTimeoutMs, 'graceful deadline')
+  if (sharedDeadlineAt === undefined) return ownDeadline
+  return Math.min(ownDeadline, sharedDeadlineAt)
 }
 
 type IGracefulOutcome =
   | { readonly ok: true }
   | { readonly ok: false; readonly error: unknown }
-  | { readonly ok: false; readonly timedOut: true };
+  | { readonly ok: false; readonly timedOut: true }
 
 async function raceGraceful(
   graceful: (context: IReleaseContext) => void | PromiseLike<void>,
   context: IReleaseContext,
   gracefulTimeoutMs: number | undefined
 ): Promise<IGracefulOutcome> {
-  let result: void | PromiseLike<void>;
+  let result: void | PromiseLike<void>
   try {
-    result = graceful(context);
+    result = graceful(context)
   } catch (error) {
-    return { ok: false, error };
+    return { ok: false, error }
   }
-  const assimilated = assimilateThenable(result);
-  if (assimilated.kind === ThenableProbeKind.failed) return { ok: false, error: assimilated.error };
-  if (assimilated.kind === 'not-thenable') return { ok: true };
-  const promise = assimilated.promise;
+  const assimilated = assimilateThenable(result)
+  if (assimilated.kind === ThenableProbeKind.failed) return { ok: false, error: assimilated.error }
+  if (assimilated.kind === 'not-thenable') return { ok: true }
+  const promise = assimilated.promise
   // Single clock sample: the scheduler that produced `context.deadlineAt` (R-9 time-domain contract).
-  const scheduler = context.scheduler ?? systemScheduler;
-  const now = scheduler.now();
-  const effectiveDeadline = computeEffectiveDeadline(gracefulTimeoutMs, context.deadlineAt, now);
+  const scheduler = context.scheduler ?? systemScheduler
+  const now = scheduler.now()
+  const effectiveDeadline = computeEffectiveDeadline(gracefulTimeoutMs, context.deadlineAt, now)
   if (effectiveDeadline === undefined) {
     try {
-      await promise;
-      return { ok: true };
+      await promise
+      return { ok: true }
     } catch (error) {
-      return { ok: false, error };
+      return { ok: false, error }
     }
   }
   if (effectiveDeadline <= now) {
@@ -134,14 +129,14 @@ async function raceGraceful(
         LifecycleErrorCode.deadlineExceeded,
         '[lifecycle] shared deadline already passed before this graceful phase could start'
       )
-    );
-    return { ok: false, timedOut: true };
+    )
+    return { ok: false, timedOut: true }
   }
   try {
-    const won = await boundedWait(promise, effectiveDeadline, { scheduler });
-    return won ? { ok: true } : { ok: false, timedOut: true };
+    const won = await boundedWait(promise, effectiveDeadline, { scheduler })
+    return won ? { ok: true } : { ok: false, timedOut: true }
   } catch (error) {
-    return { ok: false, error };
+    return { ok: false, error }
   }
 }
 
@@ -158,8 +153,8 @@ export async function executeReleaseDescriptor(
   descriptor: IReleaseDescriptor,
   context: IReleaseContext
 ): Promise<readonly unknown[]> {
-  if (context.deadlineAt !== undefined) validateSchedulerTime(context.deadlineAt, 'deadlineAt');
-  const scheduler = resolveSchedulerOption(context);
+  if (context.deadlineAt !== undefined) validateSchedulerTime(context.deadlineAt, 'deadlineAt')
+  const scheduler = resolveSchedulerOption(context)
   const normalizedContext =
     scheduler === undefined
       ? context
@@ -168,22 +163,22 @@ export async function executeReleaseDescriptor(
           deadlineAt: context.deadlineAt,
           scheduler,
           report: context.report
-        };
+        }
   if (descriptor.custom) {
-    const outcome = await runCallback(descriptor.custom, normalizedContext);
-    return outcome.ok ? [] : [outcome.error];
+    const outcome = await runCallback(descriptor.custom, normalizedContext)
+    return outcome.ok ? [] : [outcome.error]
   }
-  const errors: unknown[] = [];
+  const errors: unknown[] = []
   if (descriptor.graceful) {
     const gracefulOutcome = await raceGraceful(
       descriptor.graceful,
       normalizedContext,
       descriptor.gracefulTimeoutMs
-    );
-    if (gracefulOutcome.ok) return [];
-    if (!('timedOut' in gracefulOutcome)) errors.push(gracefulOutcome.error);
+    )
+    if (gracefulOutcome.ok) return []
+    if (!('timedOut' in gracefulOutcome)) errors.push(gracefulOutcome.error)
   }
-  const forceOutcome = await runCallback(descriptor.force, normalizedContext);
+  const forceOutcome = await runCallback(descriptor.force, normalizedContext)
   if (!forceOutcome.ok) {
     // The collector keeps the raw, caller-produced error untouched (so `throw` policy's single-error
     // case still throws it exactly as-is) — this tagged wrapper is a parallel diagnostic channel
@@ -193,30 +188,30 @@ export async function executeReleaseDescriptor(
       createLifecycleError(LifecycleErrorCode.releaseForceFailed, '[lifecycle] force() failed', {
         cause: forceOutcome.error
       })
-    );
-    errors.push(forceOutcome.error);
+    )
+    errors.push(forceOutcome.error)
   }
-  return errors;
+  return errors
 }
 
 export type IDisposeItem = {
-  readonly source: string;
-  readonly descriptor: IReleaseDescriptor;
-};
+  readonly source: string
+  readonly descriptor: IReleaseDescriptor
+}
 
 type IAdmittedDisposeItem = {
-  readonly source: string;
-  readonly descriptor: IReleaseDescriptor;
-};
+  readonly source: string
+  readonly descriptor: IReleaseDescriptor
+}
 
 type IDescriptorAdmission =
   | { readonly ok: true; readonly descriptor: IReleaseDescriptor }
-  | { readonly ok: false; readonly error: unknown };
+  | { readonly ok: false; readonly error: unknown }
 
 type IAdmissionBatch = {
-  readonly admitted: readonly IAdmittedDisposeItem[];
-  readonly rejected: readonly ICollectedError[];
-};
+  readonly admitted: readonly IAdmittedDisposeItem[]
+  readonly rejected: readonly ICollectedError[]
+}
 
 /**
  * `order` (weak): `DisposeTransaction` groups by `descriptor.order` (missing = `0`, higher values
@@ -229,40 +224,40 @@ type IAdmissionBatch = {
  */
 export type IDisposeTransactionMode =
   | { readonly kind: typeof DisposeTransactionKind.order }
-  | { readonly kind: typeof DisposeTransactionKind.plan };
+  | { readonly kind: typeof DisposeTransactionKind.plan }
 
 export type IDisposeTransactionOptions = {
-  readonly errorPolicy?: IErrorPolicy;
-  readonly report?: (error: unknown) => void;
+  readonly errorPolicy?: IErrorPolicy
+  readonly report?: (error: unknown) => void
   /** Absolute deadline shared, unchanged, across every item in this run (L-T32). */
-  readonly deadlineAt?: number;
+  readonly deadlineAt?: number
   /**
    * Scheduler whose `now()` produced `deadlineAt`（R-9 时间域契约）；缺省 `systemScheduler`。 Forwarded into
    * every item's `context.scheduler` and into the graceful-phase `boundedWait`.
    */
-  readonly scheduler?: ILifecycleScheduler;
+  readonly scheduler?: ILifecycleScheduler
   /** Forwarded into `context.signal` for every item; aborted automatically once `run()` starts. */
-  readonly signal?: IAbortSignal;
+  readonly signal?: IAbortSignal
   /** Awaited after every item settles, so in-flight work started by a release can still be drained. */
-  readonly pending?: { drain(): Promise<void> };
-};
+  readonly pending?: { drain(): Promise<void> }
+}
 
 export type IDisposeTransaction = {
-  readonly mode: IDisposeTransactionMode;
-  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>;
-};
+  readonly mode: IDisposeTransactionMode
+  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>
+}
 
 const safeReport = (report: ((error: unknown) => void) | undefined, error: unknown): void => {
-  if (!report) return;
+  if (!report) return
   try {
-    const result: unknown = report(error);
+    const result: unknown = report(error)
     containAsyncRejection(result, () => {
       // No lower layer to escalate a reporter's own async failure to.
-    });
+    })
   } catch {
     // The reporter is the last error boundary for its own synchronous failures too.
   }
-};
+}
 
 /** Creates one tagged lifecycle error for a descriptor value that violates admission shape. */
 const invalidDescriptor = (field: string): unknown =>
@@ -272,7 +267,7 @@ const invalidDescriptor = (field: string): unknown =>
     {
       detail: { field }
     }
-  );
+  )
 
 /**
  * Reads every descriptor value used by release exactly once and turns it into plain data. A getter
@@ -284,41 +279,41 @@ const admitDescriptor = (
   descriptor: IReleaseDescriptor,
   includeOrder: boolean
 ): IDescriptorAdmission => {
-  let order: unknown;
-  let custom: unknown;
-  let graceful: unknown;
-  let gracefulTimeoutMs: unknown;
-  let force: unknown;
+  let order: unknown
+  let custom: unknown
+  let graceful: unknown
+  let gracefulTimeoutMs: unknown
+  let force: unknown
   try {
-    if (includeOrder) order = descriptor.order;
-    custom = descriptor.custom;
-    graceful = descriptor.graceful;
-    gracefulTimeoutMs = descriptor.gracefulTimeoutMs;
-    force = descriptor.force;
+    if (includeOrder) order = descriptor.order
+    custom = descriptor.custom
+    graceful = descriptor.graceful
+    gracefulTimeoutMs = descriptor.gracefulTimeoutMs
+    force = descriptor.force
   } catch (error) {
-    return { ok: false, error };
+    return { ok: false, error }
   }
   if (
     includeOrder &&
     order !== undefined &&
     (typeof order !== 'number' || !Number.isFinite(order))
   ) {
-    return { ok: false, error: invalidDescriptor('order') };
+    return { ok: false, error: invalidDescriptor('order') }
   }
   if (custom !== undefined && typeof custom !== 'function') {
-    return { ok: false, error: invalidDescriptor('custom') };
+    return { ok: false, error: invalidDescriptor('custom') }
   }
   if (graceful !== undefined && typeof graceful !== 'function') {
-    return { ok: false, error: invalidDescriptor('graceful') };
+    return { ok: false, error: invalidDescriptor('graceful') }
   }
   if (gracefulTimeoutMs !== undefined) {
     try {
-      validateSchedulerDelay(gracefulTimeoutMs, 'gracefulTimeoutMs');
+      validateSchedulerDelay(gracefulTimeoutMs, 'gracefulTimeoutMs')
     } catch (error) {
-      return { ok: false, error };
+      return { ok: false, error }
     }
   }
-  if (typeof force !== 'function') return { ok: false, error: invalidDescriptor('force') };
+  if (typeof force !== 'function') return { ok: false, error: invalidDescriptor('force') }
 
   const admitted: IReleaseDescriptor = {
     ...(includeOrder ? { order: (order as number | undefined) ?? 0 } : {}),
@@ -326,9 +321,9 @@ const admitDescriptor = (
     graceful: graceful as IReleaseDescriptor['graceful'],
     gracefulTimeoutMs: gracefulTimeoutMs as IReleaseDescriptor['gracefulTimeoutMs'],
     force: force as IReleaseDescriptor['force']
-  };
-  return { ok: true, descriptor: admitted };
-};
+  }
+  return { ok: true, descriptor: admitted }
+}
 
 /**
  * Admits descriptors independently before any release callback runs. Rejected items are excluded
@@ -339,42 +334,42 @@ const admitItems = (
   items: readonly IDisposeItem[],
   mode: IDisposeTransactionMode
 ): IAdmissionBatch => {
-  const admitted: IAdmittedDisposeItem[] = [];
-  const rejected: ICollectedError[] = [];
-  const includeOrder = mode.kind === 'order';
+  const admitted: IAdmittedDisposeItem[] = []
+  const rejected: ICollectedError[] = []
+  const includeOrder = mode.kind === 'order'
   for (const item of items) {
-    let source = 'transaction';
+    let source = 'transaction'
     try {
-      source = item.source;
-      const admission = admitDescriptor(item.descriptor, includeOrder);
+      source = item.source
+      const admission = admitDescriptor(item.descriptor, includeOrder)
       if (!admission.ok) {
-        rejected.push({ source, error: admission.error });
-        continue;
+        rejected.push({ source, error: admission.error })
+        continue
       }
-      admitted.push({ source, descriptor: admission.descriptor });
+      admitted.push({ source, descriptor: admission.descriptor })
     } catch (error) {
-      rejected.push({ source, error });
+      rejected.push({ source, error })
     }
   }
-  if (mode.kind === 'plan') return { admitted, rejected };
+  if (mode.kind === 'plan') return { admitted, rejected }
   // Stable sort: ties (equal order) keep the caller-supplied relative sequence.
-  admitted.sort((a, b) => (b.descriptor.order ?? 0) - (a.descriptor.order ?? 0));
-  return { admitted, rejected };
-};
+  admitted.sort((a, b) => (b.descriptor.order ?? 0) - (a.descriptor.order ?? 0))
+  return { admitted, rejected }
+}
 
 /** Keeps transaction cleanup failures reachable without replacing an earlier primary failure. */
 const appendCleanupErrors = (primary: unknown, cleanupErrors: readonly unknown[]): unknown => {
-  if (cleanupErrors.length === 0) return primary;
+  if (cleanupErrors.length === 0) return primary
   if (primary !== null && (typeof primary === 'object' || typeof primary === 'function')) {
     try {
-      const existing = (primary as { readonly errors?: unknown }).errors;
-      const errors = Array.isArray(existing) ? [...existing, ...cleanupErrors] : [...cleanupErrors];
+      const existing = (primary as { readonly errors?: unknown }).errors
+      const errors = Array.isArray(existing) ? [...existing, ...cleanupErrors] : [...cleanupErrors]
       Object.defineProperty(primary, 'errors', {
         value: Object.freeze(errors),
         enumerable: true,
         configurable: true
-      });
-      return primary;
+      })
+      return primary
     } catch {
       // Frozen / non-extensible primary — fall through to the tagged aggregate wrapper.
     }
@@ -385,112 +380,112 @@ const appendCleanupErrors = (primary: unknown, cleanupErrors: readonly unknown[]
       primary instanceof Error ? primary.message : LifecycleErrorText.disposeTransactionFailed
     ),
     LifecycleErrorCode.scopeDisposalFailed
-  );
-};
+  )
+}
 
 export function createDisposeTransaction(
   mode: IDisposeTransactionMode,
   options: IDisposeTransactionOptions = {}
 ): IDisposeTransaction {
-  const errorPolicy = options.errorPolicy ?? 'throw';
-  const scheduler = resolveSchedulerOption(options);
+  const errorPolicy = options.errorPolicy ?? 'throw'
+  const scheduler = resolveSchedulerOption(options)
   return {
     mode,
     async run(items) {
-      const collector = createErrorCollector(errorPolicy, options.report);
-      const cleanupErrors: unknown[] = [];
-      let primaryRecorded = false;
+      const collector = createErrorCollector(errorPolicy, options.report)
+      const cleanupErrors: unknown[] = []
+      let primaryRecorded = false
       const record = (source: string, error: unknown): void => {
-        primaryRecorded = true;
-        collector.add(source, error);
-      };
+        primaryRecorded = true
+        collector.add(source, error)
+      }
       // Mirrors `options.signal` into a signal every item's context can observe (L-T26). With no
       // `options.signal` given, `controller.signal` simply never aborts — a scope that wants items
       // to see "we're closing" passes its own close()-tied signal in.
-      const controller = options.signal === undefined ? undefined : createAbortController();
-      const forwardAbort = (): void => controller?.abort(options.signal?.reason);
-      let registrationAttempted = false;
-      let registrationReturned = false;
-      let removalAttempted = false;
+      const controller = options.signal === undefined ? undefined : createAbortController()
+      const forwardAbort = (): void => controller?.abort(options.signal?.reason)
+      let registrationAttempted = false
+      let registrationReturned = false
+      let removalAttempted = false
       const removeSignalListener = (force = false): void => {
-        if (!options.signal || removalAttempted) return;
-        if (!force && (!registrationAttempted || !registrationReturned)) return;
-        removalAttempted = true;
-        options.signal.removeEventListener('abort', forwardAbort);
-      };
+        if (!options.signal || removalAttempted) return
+        if (!force && (!registrationAttempted || !registrationReturned)) return
+        removalAttempted = true
+        options.signal.removeEventListener('abort', forwardAbort)
+      }
       try {
         if (options.signal?.aborted) {
-          controller?.abort(options.signal.reason);
+          controller?.abort(options.signal.reason)
         } else if (options.signal) {
           // Mark before calling: a hostile signal may store the listener and then throw.
-          registrationAttempted = true;
-          options.signal.addEventListener('abort', forwardAbort, { once: true });
-          registrationReturned = true;
+          registrationAttempted = true
+          options.signal.addEventListener('abort', forwardAbort, { once: true })
+          registrationReturned = true
           // Observe an abort that happened during registration and remove any residual listener.
           if (options.signal.aborted) {
-            controller?.abort(options.signal.reason);
+            controller?.abort(options.signal.reason)
             try {
-              removeSignalListener(true);
+              removeSignalListener(true)
             } catch (error) {
-              cleanupErrors.push(error);
+              cleanupErrors.push(error)
             }
           }
         }
       } catch (error) {
-        record('transaction-signal', error);
+        record('transaction-signal', error)
         try {
-          removeSignalListener(true);
+          removeSignalListener(true)
         } catch (cleanupError) {
-          cleanupErrors.push(cleanupError);
+          cleanupErrors.push(cleanupError)
         }
       }
       try {
-        const admission = admitItems(items, mode);
-        for (const item of admission.rejected) record(item.source, item.error);
+        const admission = admitItems(items, mode)
+        for (const item of admission.rejected) record(item.source, item.error)
         for (const item of admission.admitted) {
           const context: IReleaseContext = {
             signal: controller?.signal ?? inertReleaseSignal,
             deadlineAt: options.deadlineAt,
             scheduler,
             report: (error) => safeReport(options.report, error)
-          };
+          }
           try {
-            const errors = await executeReleaseDescriptor(item.descriptor, context);
-            for (const error of errors) record(item.source, error);
+            const errors = await executeReleaseDescriptor(item.descriptor, context)
+            for (const error of errors) record(item.source, error)
           } catch (error) {
             // Keep one unexpected item failure from preventing later admitted resources from release.
-            record(item.source, error);
+            record(item.source, error)
           }
         }
       } catch (error) {
         // Input iteration failures must not bypass pending drain or collector finalization.
-        record('transaction', error);
+        record('transaction', error)
       } finally {
         try {
-          removeSignalListener();
+          removeSignalListener()
         } catch (error) {
-          cleanupErrors.push(error);
+          cleanupErrors.push(error)
         }
       }
       if (options.pending) {
         try {
-          await options.pending.drain();
+          await options.pending.drain()
         } catch (error) {
-          record('transaction-pending', error);
+          record('transaction-pending', error)
         }
       }
       // Under `throw`, attach cleanup failures to an existing primary instead of turning them into
       // a second primary. Other policies receive cleanup failures through their normal collector.
       if (errorPolicy !== 'throw' || !primaryRecorded) {
-        for (const error of cleanupErrors) record('transaction-signal-cleanup', error);
+        for (const error of cleanupErrors) record('transaction-signal-cleanup', error)
       }
       try {
-        return collector.finalize(LifecycleErrorText.disposeTransactionFailed);
+        return collector.finalize(LifecycleErrorText.disposeTransactionFailed)
       } catch (error) {
         const additionalCleanupErrors =
-          errorPolicy === 'throw' && !cleanupErrors.includes(error) ? cleanupErrors : [];
-        throw appendCleanupErrors(error, additionalCleanupErrors);
+          errorPolicy === 'throw' && !cleanupErrors.includes(error) ? cleanupErrors : []
+        throw appendCleanupErrors(error, additionalCleanupErrors)
       }
     }
-  };
+  }
 }

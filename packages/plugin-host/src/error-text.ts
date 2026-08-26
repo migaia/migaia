@@ -1,24 +1,24 @@
-import type { IPluginHostErrorCode } from './typing.js';
-import { PLUGIN_HOST_SOURCE, PluginHostErrorCode } from './error-code.js';
+import type { IPluginHostErrorCode, IPluginHostErrorDetail } from './typing.js'
+import { PLUGIN_HOST_SOURCE, PluginHostErrorCode } from './error-code.js'
 
-export type ILocaleKey = 'en' | 'zh';
+export type ILocaleKey = 'en' | 'zh'
 
-export class PluginHostError extends Error {
+export class PluginHostError<TDetail = IPluginHostErrorDetail> extends Error {
   /** `(source, code)` 二元组的 source 部分，恒为 `'@migaia/plugin-host'`（`docs/contracts/error-codes.md` §2）。 */
-  readonly source: string;
-  readonly code: IPluginHostErrorCode;
+  readonly source: string
+  readonly code: IPluginHostErrorCode
   /** 结构化诊断（如 queue timeout 的 `owner`/`waitedMs`）；不与 `cause` 混用。 */
-  readonly detail?: Readonly<Record<string, unknown>>;
+  readonly detail?: TDetail
   constructor(
     code: IPluginHostErrorCode,
     message: string,
-    options?: ErrorOptions & { readonly detail?: Readonly<Record<string, unknown>> }
+    options?: ErrorOptions & { readonly detail?: TDetail }
   ) {
-    super(message, options);
-    this.name = 'PluginHostError';
-    this.source = PLUGIN_HOST_SOURCE;
-    this.code = code;
-    if (options?.detail !== undefined) this.detail = options.detail;
+    super(message, options)
+    this.name = 'PluginHostError'
+    this.source = PLUGIN_HOST_SOURCE
+    this.code = code
+    if (options?.detail !== undefined) this.detail = options.detail
   }
 }
 
@@ -31,9 +31,9 @@ export function tagPluginHostError<E extends Error>(
   error: E,
   code: IPluginHostErrorCode
 ): E & { readonly source: string; readonly code: IPluginHostErrorCode } {
-  Object.defineProperty(error, 'source', { value: PLUGIN_HOST_SOURCE, enumerable: true });
-  Object.defineProperty(error, 'code', { value: code, enumerable: true });
-  return error as E & { readonly source: string; readonly code: IPluginHostErrorCode };
+  Object.defineProperty(error, 'source', { value: PLUGIN_HOST_SOURCE, enumerable: true })
+  Object.defineProperty(error, 'code', { value: code, enumerable: true })
+  return error as E & { readonly source: string; readonly code: IPluginHostErrorCode }
 }
 
 /** 入参校验错误：原生 `TypeError` + `INVALID_OPTION`（`docs/contracts/error-codes.md` §7 裸抛扫描门禁）。 */
@@ -44,40 +44,40 @@ export function createPluginHostTypeError(
   return tagPluginHostError(
     new TypeError(message, options?.cause !== undefined ? { cause: options.cause } : undefined),
     PluginHostErrorCode.invalidOption
-  );
+  )
 }
 
-const PREFIX = '[plugin-host] ';
-let localeKey: ILocaleKey = 'zh';
+const PREFIX = '[plugin-host] '
+let localeKey: ILocaleKey = 'zh'
 
 /** 设置 PluginHost 全局错误语言。 */
 export const setErrorLocale = (nextLocale: ILocaleKey): void => {
-  localeKey = nextLocale;
-};
+  localeKey = nextLocale
+}
 
-const localize = (zh: string, en: string): string => `${PREFIX}${localeKey === 'zh' ? zh : en}`;
+const localize = (zh: string, en: string): string => `${PREFIX}${localeKey === 'zh' ? zh : en}`
 
 /** PluginHost 错误与诊断文本集中维护处，便于调用方和维护者查找。 */
 const ERROR_TEXT = {
   get HOST_DISPOSED() {
-    return localize('宿主已关闭', 'host is disposed');
+    return localize('宿主已关闭', 'host is disposed')
   },
   get HOST_DISPOSING() {
-    return localize('宿主正在关闭', 'host is disposing');
+    return localize('宿主正在关闭', 'host is disposing')
   },
   get INVALID_PIPELINE_MODE() {
-    return localize('无效的 pipeline mode', 'invalid pipeline mode');
+    return localize('无效的 pipeline mode', 'invalid pipeline mode')
   },
   /** Admission 读取 plugin/resource getter 失败时使用，原始异常挂在 cause。 */
   get INVALID_OPTION() {
-    return localize('plugin-host 选项读取失败', 'plugin-host option read failed');
+    return localize('plugin-host 选项读取失败', 'plugin-host option read failed')
   },
   /** Config callable admission rejects shapes whose function/proxy invariants cannot be preserved. */
   CONFIG_CALLABLE_UNSUPPORTED: (reason: string) =>
     localize(`config callable 不支持：${reason}`, `config callable is unsupported: ${reason}`),
   /** Public readonly facades use this stable text for every attempted object mutation. */
   get CONFIG_READONLY() {
-    return localize('config is readonly', 'config is readonly');
+    return localize('config is readonly', 'config is readonly')
   },
   PIPELINE_MODE_MISMATCH: (hostMode: string, stageMode: string) =>
     localize(
@@ -89,48 +89,48 @@ const ERROR_TEXT = {
     return localize(
       'pipeline stage 对同一次调用重复触发了 next()',
       'pipeline stage called next() more than once for the same invocation'
-    );
+    )
   },
   /** Stage 返回或调用完成后才调用 next()，该值已无法安全进入 pipeline。 */
   get PIPELINE_NEXT_CALLED_LATE() {
     return localize(
       'pipeline stage 在返回或调用完成后触发了 next()，该次调用已被忽略',
       'pipeline stage called next() after returning or completing; the call was ignored'
-    );
+    )
   },
   get PIPELINE_EXECUTING() {
     return localize(
       'pipeline 执行期间不能注册 stage',
       'pipeline stages cannot be registered during pipeline execution'
-    );
+    )
   },
   /** `pipeline.ts#registerStage` 拒绝非函数 stage 时使用，保持公开 INVALID_OPTION 文案集中可追踪。 */
   get PIPELINE_STAGE_MUST_BE_FUNCTION() {
-    return 'pipeline stage must be a function';
+    return 'pipeline stage must be a function'
   },
   /** `pipeline.ts#runAsyncPipeline` 同时观测到 stage 与 downstream 失败时使用。 */
   get PIPELINE_STAGE_AND_DOWNSTREAM_FAILED() {
-    return 'pipeline stage and downstream failed';
+    return 'pipeline stage and downstream failed'
   },
   /** 插件不存在。 */
   get PLUGIN_NOT_INSTALLED() {
-    return (name: string) => localize(`插件 "${name}" 未安装`, `plugin "${name}" is not installed`);
+    return (name: string) => localize(`插件 "${name}" 未安装`, `plugin "${name}" is not installed`)
   },
   /** 插件卸载存在清理失败。 */
   get PLUGIN_DISPOSE_FAILED() {
     return (name: string) =>
-      localize(`插件 "${name}" 卸载失败`, `plugin "${name}" failed to dispose`);
+      localize(`插件 "${name}" 卸载失败`, `plugin "${name}" failed to dispose`)
   },
   get HOST_DISPOSE_FAILED() {
-    return localize('宿主卸载失败', 'host failed to dispose');
+    return localize('宿主卸载失败', 'host failed to dispose')
   },
   get PLUGIN_INSTALL_FAILED() {
     return (name: string) =>
-      localize(`插件 "${name}" 安装失败`, `plugin "${name}" failed to install`);
+      localize(`插件 "${name}" 安装失败`, `plugin "${name}" failed to install`)
   },
   get PLUGIN_ROLLBACK_FAILED() {
     return (name: string) =>
-      localize(`插件 "${name}" 安装失败且回滚失败`, `plugin "${name}" install rollback failed`);
+      localize(`插件 "${name}" 安装失败且回滚失败`, `plugin "${name}" install rollback failed`)
   },
   /** Shared key 重复。 */
   get SHARED_DUPLICATE() {
@@ -138,14 +138,14 @@ const ERROR_TEXT = {
       localize(
         `shared key "${String(key)}" 已经注册`,
         `shared key "${String(key)}" is already registered`
-      );
+      )
   },
   /** 资源注册不在 install 生命周期内。 */
   get RESOURCE_OUTSIDE_INSTALL() {
     return localize(
       '资源只能在插件 install() 执行期间注册',
       'resources can only be registered during plugin install()'
-    );
+    )
   },
   LIFECYCLE_MUTATION: localize(
     '插件生命周期内禁止调用 Host mutation',
@@ -154,7 +154,7 @@ const ERROR_TEXT = {
   /** 插件名称重复。 */
   get PLUGIN_DUPLICATE() {
     return (name: string) =>
-      localize(`插件 "${name}" 已经安装`, `plugin "${name}" is already installed`);
+      localize(`插件 "${name}" 已经安装`, `plugin "${name}" is already installed`)
   },
   /** 插件扩展属性冲突。 */
   get EXTENSION_DUPLICATE() {
@@ -162,21 +162,21 @@ const ERROR_TEXT = {
       localize(
         `插件 "${name}" 扩展属性 "${String(key)}" 已被占用`,
         `plugin "${name}" extension "${String(key)}" is already occupied`
-      );
+      )
   },
   get EXTENSION_OBJECT_PROTOTYPE() {
     return (name: string, key: PropertyKey) =>
       localize(
         `插件 "${name}" 扩展属性 "${String(key)}" 与 Object 原型冲突`,
         `plugin "${name}" extension "${String(key)}" conflicts with the Object prototype`
-      );
+      )
   },
   get EXTENSION_RESERVED() {
     return (name: string, key: PropertyKey) =>
       localize(
         `插件 "${name}" 扩展属性 "${String(key)}" 是保留键`,
         `plugin "${name}" extension "${String(key)}" is reserved`
-      );
+      )
   },
   /** 正式 SLA：mutation 在 FIFO 队列中等待超过阈值。 */
   get MUTATION_QUEUE_TIMEOUT() {
@@ -184,7 +184,7 @@ const ERROR_TEXT = {
       localize(
         `mutation 在队列中等待超过 ${waitedMs}ms，已拒绝执行`,
         `mutation waited in the queue for more than ${waitedMs}ms and was rejected`
-      );
+      )
   },
   /** 诊断：install() 返回值上一个非枚举键被跳过挂载（不是错误，是有意的行为，但必须可观测）。 */
   get EXTENSION_NON_ENUMERABLE_IGNORED() {
@@ -195,7 +195,7 @@ const ERROR_TEXT = {
         `plugin "${name}"'s non-enumerable extension property "${String(key)}" was not mounted ` +
           `on the host — non-enumerable keys are intentionally ignored; make it enumerable to ` +
           `expose it`
-      );
+      )
   },
   /**
    * 正式 SLA：单个 disposer（pipeline disposer / 插件 dispose 钩子 / resource disposer） 等待超过阈值仍未 settle，包括该
@@ -210,8 +210,8 @@ const ERROR_TEXT = {
         `${phase} did not settle within ${waitedMs}ms and was abandoned as a failure — if that ` +
           `disposer awaits the very host.dispose() call that triggered it, this wait can never ` +
           `complete on its own`
-      );
+      )
   }
-} as const;
+} as const
 
-export default ERROR_TEXT;
+export default ERROR_TEXT

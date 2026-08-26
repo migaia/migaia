@@ -20,27 +20,27 @@ import {
   createGenerationController,
   createQuiescenceTracker,
   type IGenerationController
-} from '@migaia/lifecycle';
-import { CapabilityErrorCode } from './error-code.js';
-import { CapabilityErrorText } from './error-text.js';
-import { createCapabilityError, tagCapabilityError } from './errors.js';
-import { CapabilityEnableStatus, CapabilityState } from './state-constants.js';
-export * from './state-constants.js';
+} from '@migaia/lifecycle'
+import { CapabilityErrorCode } from './error-code.js'
+import { CapabilityErrorText } from './error-text.js'
+import { createCapabilityError, tagCapabilityError } from './errors.js'
+import { CapabilityEnableStatus, CapabilityState } from './state-constants.js'
+export * from './state-constants.js'
 export {
   snapshotGraphReadiness,
   type ICapabilityReadinessSource,
   type IGraphReadinessSnapshot,
   type IGraphReadinessState
-} from './graph-readiness.js';
+} from './graph-readiness.js'
 
 // 错误码是公开 API（`docs/contracts/error-codes.md` §3.5 / migration.sdd.md §8.1）：调用方要能按
 // `(source, code)` 分支，必须从主入口拿得到常量与类型，不能被迫抄写字符串字面量。
-export { CapabilityErrorCode, type ICapabilityErrorCode } from './error-code.js';
-export { CAPABILITY_SOURCE } from './errors.js';
+export { CapabilityErrorCode, type ICapabilityErrorCode } from './error-code.js'
+export { CAPABILITY_SOURCE } from './errors.js'
 
 export type ICapabilityHandle = {
-  dispose(): void | PromiseLike<void>;
-};
+  dispose(): void | PromiseLike<void>
+}
 
 /**
  * 能力当前生命周期。
@@ -48,23 +48,23 @@ export type ICapabilityHandle = {
  * `off` 表示闸门允许、但尚未启用；`gated` 表示被开关明确拒绝。两者分开后， 控制台与调用方不再把「从未尝试」误报成「灰度策略拦截」。名字与 tray 的 graph
  * availability `blocked` 区分开（`migration.sdd.md` §5.5）——两者是完全不同的恢复语义，不共用一个状态名。
  */
-export type ICapabilityState = (typeof CapabilityState)[keyof typeof CapabilityState];
+export type ICapabilityState = (typeof CapabilityState)[keyof typeof CapabilityState]
 
 export type ICapabilityEnableResult =
   | { readonly status: typeof CapabilityEnableStatus.enabled }
   | { readonly status: typeof CapabilityEnableStatus.gated }
   | { readonly status: typeof CapabilityEnableStatus.cancelled }
-  | { readonly status: typeof CapabilityEnableStatus.failed; readonly error: unknown };
+  | { readonly status: typeof CapabilityEnableStatus.failed; readonly error: unknown }
 
 export type ICapabilityDefinition<Context, Handle extends ICapabilityHandle = ICapabilityHandle> = {
-  readonly name: string;
+  readonly name: string
   /**
    * 启用这个能力。
    *
    * 允许异步，正是为了按需加载持久化等增强能力——关着的时候那个 chunk 不进初始包。
    */
-  activate(context: Context): Handle | Promise<Handle>;
-};
+  activate(context: Context): Handle | Promise<Handle>
+}
 
 export type ICapabilityHostOptions = {
   /**
@@ -73,67 +73,67 @@ export type ICapabilityHostOptions = {
    * Host 会复制这份初始快照；之后请调用 `setFlag()` / `setFlags()`。外部改写传入对象 不会绕过状态机。`setFlag(name, false)`
    * 本身就是原子回退：它会作废在途激活并 释放现有 handle，不需要调用方再补一次 `disable()`。
    */
-  readonly flags?: Readonly<Record<string, boolean>>;
+  readonly flags?: Readonly<Record<string, boolean>>
   /** 激活或释放失败的上报口。Reporter 自己抛错也不会破坏闸门状态机；原始错误仍可 通过 `error(name)` 查询。 */
-  readonly onError?: (name: string, error: unknown) => void;
-};
+  readonly onError?: (name: string, error: unknown) => void
+}
 
 export type ICapabilityHost<Context> = {
   /** 登记一个能力。重复登记同名视为编程错误。 */
   register<Handle extends ICapabilityHandle>(
     definition: ICapabilityDefinition<Context, Handle>
-  ): void;
-  readonly names: readonly string[];
-  state(name: string): ICapabilityState;
+  ): void
+  readonly names: readonly string[]
+  state(name: string): ICapabilityState
   /** 已启用能力的 handle；未启用返回 undefined。 */
-  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined;
+  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined
   /** 上一次激活或释放失败的原因；成功重启或重新配置会清除。 */
-  error(name: string): unknown;
+  error(name: string): unknown
   /** 更新单个灰度开关。关闭会同步作废在途激活并释放现有 handle；打开不会自动启用。 */
-  setFlag(name: string, enabled: boolean): void;
+  setFlag(name: string, enabled: boolean): void
   /** 原子替换整份开关快照。新快照未列出的能力按拒绝处理，因此远端配置删键不会让 旧的 `true` 永久残留。 */
-  setFlags(flags: Readonly<Record<string, boolean>>): void;
+  setFlags(flags: Readonly<Record<string, boolean>>): void
   /**
    * 启用。返回是否处于启用态。
    *
    * 幂等：并发调用共享同一次激活，`activate` 只跑一次。开关为 false 时直接拒绝 （返回 false），不会「偷偷打开」。
    */
-  enable(name: string): Promise<ICapabilityEnableResult>;
+  enable(name: string): Promise<ICapabilityEnableResult>
   /** Structured counterpart of enable(); false is retained for compatibility. */
-  enableResult(name: string): Promise<ICapabilityEnableResult>;
+  enableResult(name: string): Promise<ICapabilityEnableResult>
   /** 关闭并释放 handle。返回是否确实关掉了一个启用态的能力。 */
-  disable(name: string): Promise<boolean>;
+  disable(name: string): Promise<boolean>
   /**
    * 关闭全部（后进先出）并使 host 不可用。首次调用返回唯一 completion Promise；该 Promise 完成前的后续调用 fail-fast with
    * `HOST_TRANSITIONING`，完成后才恢复 canonical Promise identity。
    */
-  dispose(): Promise<void>;
+  dispose(): Promise<void>
   /** Synchronous compatibility adapter for integrations that require a boolean. */
-  enableLegacyBoolean(name: string): Promise<boolean>;
+  enableLegacyBoolean(name: string): Promise<boolean>
   /** Synchronous release adapter; prefer awaitable `disable()`. */
-  disableNow(name: string): boolean;
-  readonly disposed: boolean;
-};
+  disableNow(name: string): boolean
+  readonly disposed: boolean
+}
 
 type IEntry<Context> = {
   /** Registration-time snapshot. Caller mutation must not rewrite gate identity. */
-  readonly name: string;
-  readonly activate: (context: Context) => ICapabilityHandle | Promise<ICapabilityHandle>;
-  state: ICapabilityState;
-  handle?: ICapabilityHandle;
+  readonly name: string
+  readonly activate: (context: Context) => ICapabilityHandle | Promise<ICapabilityHandle>
+  state: ICapabilityState
+  handle?: ICapabilityHandle
   /** Disposer captured at adoption; later mutation of the public handle cannot replace ownership. */
-  disposer?: ICapabilityHandle['dispose'];
-  error?: unknown;
+  disposer?: ICapabilityHandle['dispose']
+  error?: unknown
   /** 在途激活。用于幂等：并发 enable 共享它。 */
-  pending?: Promise<boolean>;
+  pending?: Promise<boolean>
   /**
    * 激活代数，换成 `@migaia/lifecycle` 的 `GenerationController`（`migration.sdd.md` §3.2）。
    *
    * 异步激活期间可能被 `disable()` 或 `dispose()`，此时 activate 的结果**不能** 被采纳——否则关掉的能力会在几毫秒后自己回来（而调用方以为已经回退了）。
    * `adopt()` 在代数不匹配时会把刚拿到的 handle 直接释放。
    */
-  readonly generationController: IGenerationController;
-};
+  readonly generationController: IGenerationController
+}
 
 export function createCapabilityHost<Context>(
   context: Context,
@@ -143,34 +143,34 @@ export function createCapabilityHost<Context>(
     throw tagCapabilityError(
       new TypeError(CapabilityErrorText.invalidOptions),
       CapabilityErrorCode.invalidOption
-    );
+    )
   }
-  const optionsReceiver = options;
-  let onError: ICapabilityHostOptions['onError'];
-  let flags: ICapabilityHostOptions['flags'];
+  const optionsReceiver = options
+  let onError: ICapabilityHostOptions['onError']
+  let flags: ICapabilityHostOptions['flags']
   try {
-    onError = options.onError;
+    onError = options.onError
   } catch (error) {
     throw createCapabilityError(
       CapabilityErrorCode.invalidOption,
       CapabilityErrorText.optionsSnapshotFailed,
       { cause: error }
-    );
+    )
   }
   if (onError !== undefined && typeof onError !== 'function') {
     throw tagCapabilityError(
       new TypeError(CapabilityErrorText.invalidOnError),
       CapabilityErrorCode.invalidOption
-    );
+    )
   }
   try {
-    flags = options.flags;
+    flags = options.flags
   } catch (error) {
     throw createCapabilityError(
       CapabilityErrorCode.invalidOption,
       CapabilityErrorText.optionsSnapshotFailed,
       { cause: error }
-    );
+    )
   }
 
   /**
@@ -182,11 +182,11 @@ export function createCapabilityHost<Context>(
   const copyFlags = (
     source: Readonly<Record<string, boolean>> | undefined
   ): Map<string, boolean> => {
-    const copied = new Map<string, boolean>();
-    if (!source) return copied;
-    let descriptors: PropertyDescriptorMap;
+    const copied = new Map<string, boolean>()
+    if (!source) return copied
+    let descriptors: PropertyDescriptorMap
     try {
-      descriptors = Object.getOwnPropertyDescriptors(source);
+      descriptors = Object.getOwnPropertyDescriptors(source)
     } catch (error) {
       // hostile Proxy ownKeys/getOwnPropertyDescriptor trap — surface with (source, code), cause
       // keeps the original Proxy exception === reachable (AF-09).
@@ -194,41 +194,41 @@ export function createCapabilityHost<Context>(
         CapabilityErrorCode.invalidOption,
         CapabilityErrorText.flagsSnapshotFailed,
         { cause: error }
-      );
+      )
     }
     for (const [name, descriptor] of Object.entries(descriptors)) {
       if (descriptor.enumerable && 'value' in descriptor && descriptor.value === true) {
-        copied.set(name, true);
+        copied.set(name, true)
       }
     }
-    return copied;
-  };
+    return copied
+  }
 
-  let flagValues = copyFlags(flags);
-  const entries = new Map<string, IEntry<Context>>();
+  let flagValues = copyFlags(flags)
+  const entries = new Map<string, IEntry<Context>>()
   /**
    * 排空的双视图（`migration.sdd.md` §3.3）：`ALL_KEY` 给 `dispose()` 的全局排空， `entry` 对象自身给 `disable()`
    * 的逐单元排空——同一个 `QuiescenceTracker` 承担两种 key，靠它自带的 `retain()`/`whenZeroOnce()`
    * 保证「排空过程中冒出的新待排空项不会被提前放行」，不用自己再手写 Set 快照。 激活与释放两类在途 Promise 合并计一个维度：原实现分开算但求和判零，观察语义等价。
    */
-  const pendingTracker = createQuiescenceTracker<object>();
-  const ALL_KEY = {};
+  const pendingTracker = createQuiescenceTracker<object>()
+  const ALL_KEY = {}
   const trackPending = <T>(entry: IEntry<Context>, promise: Promise<T>): void => {
-    const releaseAll = pendingTracker.retain(ALL_KEY);
-    const releaseEntry = pendingTracker.retain(entry);
+    const releaseAll = pendingTracker.retain(ALL_KEY)
+    const releaseEntry = pendingTracker.retain(entry)
     const settle = (): void => {
-      releaseAll();
-      releaseEntry();
-    };
-    void promise.then(settle, settle);
-  };
+      releaseAll()
+      releaseEntry()
+    }
+    void promise.then(settle, settle)
+  }
   const asPromiseLike = (value: unknown): Promise<void> | undefined => {
     if (value === null || (typeof value !== 'object' && typeof value !== 'function'))
-      return undefined;
-    const then = (value as { then?: unknown }).then;
-    if (typeof then !== 'function') return undefined;
-    return assimilateCapturedThen<void>(then as (resolve: unknown, reject: unknown) => void, value);
-  };
+      return undefined
+    const then = (value as { then?: unknown }).then
+    if (typeof then !== 'function') return undefined
+    return assimilateCapturedThen<void>(then as (resolve: unknown, reject: unknown) => void, value)
+  }
   /**
    * 记录真正进入 on 的顺序，回退按这个顺序 LIFO。
    *
@@ -240,76 +240,76 @@ export function createCapabilityHost<Context>(
    * 语义打架——一个被 setFlag(false) 废弃、永不 settle 的 activate() 会连带 卡死排在它后面的每一个 enable()。调用方若要严格顺序，必须显式
    * await，而不是指望这里替它保证。
    */
-  const activationOrder: IEntry<Context>[] = [];
-  let disposed = false;
-  let transitionDepth = 0;
+  const activationOrder: IEntry<Context>[] = []
+  let disposed = false
+  let transitionDepth = 0
   /** The one completion promise published before the first synchronous cleanup starts. */
-  let disposePromise: Promise<void> | undefined;
+  let disposePromise: Promise<void> | undefined
   /** Whether the published dispose completion promise has settled. */
-  let disposeCompleted = false;
+  let disposeCompleted = false
 
   const assertUsable = (): void => {
     if (disposed)
-      throw createCapabilityError(CapabilityErrorCode.hostDisposed, 'capability host is disposed');
-  };
+      throw createCapabilityError(CapabilityErrorCode.hostDisposed, 'capability host is disposed')
+  }
 
   const assertNotTransitioning = (): void => {
     if (transitionDepth > 0) {
       throw createCapabilityError(
         CapabilityErrorCode.hostTransitioning,
         CapabilityErrorText.hostTransitioning
-      );
+      )
     }
-  };
+  }
 
   const runTransition = <T>(operation: () => T): T => {
-    transitionDepth++;
+    transitionDepth++
     try {
-      return operation();
+      return operation()
     } finally {
-      transitionDepth--;
+      transitionDepth--
     }
-  };
+  }
 
   /**
    * Keep immediate API failures observable to awaiters without host-level unhandled rejection
    * noise.
    */
   const rejectedOperation = <T>(error: unknown): Promise<T> => {
-    const rejected = Promise.reject<T>(error);
+    const rejected = Promise.reject<T>(error)
     void rejected.catch(() => {
       // The original promise remains rejected for callers; this marks it handled
       // when a reentrant disposer necessarily cannot await it.
-    });
-    return rejected;
-  };
+    })
+    return rejected
+  }
 
   const entryOf = (name: string): IEntry<Context> => {
-    const entry = entries.get(name);
+    const entry = entries.get(name)
     if (!entry) {
       throw createCapabilityError(
         CapabilityErrorCode.notRegistered,
         `capability "${name}" is not registered`
-      );
+      )
     }
-    return entry;
-  };
+    return entry
+  }
 
-  const allowed = (name: string): boolean => flagValues.get(name) === true;
+  const allowed = (name: string): boolean => flagValues.get(name) === true
 
   /** 错误上报属于诊断路径，绝不能反向改变能力生命周期。 */
   const reportError = (name: string, error: unknown): void => {
     try {
       const result: unknown = onError
         ? Reflect.apply(onError, optionsReceiver, [name, error])
-        : undefined;
+        : undefined
       containAsyncRejection(result, () => {
         // Reporter 的异步失败没有更低一层可上报，只能在边界终止。
-      });
+      })
     } catch {
       // Reporter 已经是最后一道错误边界；这里不能再把它抛回业务 Promise。
     }
-  };
+  }
 
   /**
    * Preserve a generation-controller cleanup failure for terminal diagnostics without allowing it
@@ -317,9 +317,9 @@ export function createCapabilityHost<Context>(
    * `dispose()` resolved; it does not synthesize a second aggregate error contract here.
    */
   const recordDisposeCleanupError = (entry: IEntry<Context>, error: unknown): void => {
-    entry.error = error;
-    reportError(entry.name, error);
-  };
+    entry.error = error
+    reportError(entry.name, error)
+  }
 
   const release = (
     entry: IEntry<Context>,
@@ -331,135 +331,135 @@ export function createCapabilityHost<Context>(
       const inactiveWithoutReplacement =
         (entry.state === CapabilityState.gated || entry.state === CapabilityState.off) &&
         entry.pending === undefined &&
-        entry.handle === undefined;
+        entry.handle === undefined
       if (
         ownerGeneration === entry.generationController.generation ||
         (entry.generationController.generation === ownerGeneration + 1 &&
           inactiveWithoutReplacement)
       ) {
-        entry.error = error;
+        entry.error = error
       }
-    };
+    }
     runTransition(() => {
       try {
-        const releaseDisposer = disposer ?? handle.dispose;
-        const result: unknown = Reflect.apply(releaseDisposer, handle, []);
-        const thenable = asPromiseLike(result);
+        const releaseDisposer = disposer ?? handle.dispose
+        const result: unknown = Reflect.apply(releaseDisposer, handle, [])
+        const thenable = asPromiseLike(result)
         if (thenable) {
           const pending = thenable.then(
             () => undefined,
             (error) => {
               // A previous generation may finish cleanup after a replacement is
               // already healthy. Report it, but never poison the replacement state.
-              recordCleanupError(error);
-              reportError(entry.name, error);
+              recordCleanupError(error)
+              reportError(entry.name, error)
             }
-          );
-          trackPending(entry, pending);
+          )
+          trackPending(entry, pending)
         }
         if (!thenable)
           containAsyncRejection(result, (error) => {
-            recordCleanupError(error);
-            reportError(entry.name, error);
-          });
+            recordCleanupError(error)
+            reportError(entry.name, error)
+          })
       } catch (error) {
-        recordCleanupError(error);
-        reportError(entry.name, error);
+        recordCleanupError(error)
+        reportError(entry.name, error)
       }
-    });
-  };
+    })
+  }
 
   const releaseHandle = (entry: IEntry<Context>): void => {
-    const handle = entry.handle;
-    const disposer = entry.disposer;
-    entry.handle = undefined;
-    entry.disposer = undefined;
-    if (!handle) return;
+    const handle = entry.handle
+    const disposer = entry.disposer
+    entry.handle = undefined
+    entry.disposer = undefined
+    if (!handle) return
     // 释放失败不得阻断其余能力的关闭：回退路径必须能走完
-    release(entry, handle, entry.generationController.generation, disposer);
-  };
+    release(entry, handle, entry.generationController.generation, disposer)
+  }
 
   const forgetActivation = (entry: IEntry<Context>): void => {
-    const index = activationOrder.lastIndexOf(entry);
-    if (index >= 0) activationOrder.splice(index, 1);
-  };
+    const index = activationOrder.lastIndexOf(entry)
+    if (index >= 0) activationOrder.splice(index, 1)
+  }
 
   /** 关闭一个 entry；flag 已更新后调用，因此最终状态可准确表示 gated/off。 */
   const deactivate = (entry: IEntry<Context>): boolean => {
-    entry.generationController.supersede();
-    entry.pending = undefined;
-    const wasOn = entry.state === CapabilityState.on;
-    entry.state = allowed(entry.name) ? CapabilityState.off : CapabilityState.gated;
-    entry.error = undefined;
-    forgetActivation(entry);
-    releaseHandle(entry);
-    return wasOn;
-  };
+    entry.generationController.supersede()
+    entry.pending = undefined
+    const wasOn = entry.state === CapabilityState.on
+    entry.state = allowed(entry.name) ? CapabilityState.off : CapabilityState.gated
+    entry.error = undefined
+    forgetActivation(entry)
+    releaseHandle(entry)
+    return wasOn
+  }
 
   /** 应用新快照，并让全部已登记能力与闸门同步。 */
   const replaceFlags = (next: Map<string, boolean>): void => {
-    flagValues = next;
+    flagValues = next
     // 先按真实激活顺序 LIFO 关闭已有 handle，再处理尚在激活/失败/未启用的条目。
     for (const entry of [...activationOrder].reverse()) {
-      if (!allowed(entry.name)) deactivate(entry);
+      if (!allowed(entry.name)) deactivate(entry)
     }
     for (const entry of entries.values()) {
       if (!allowed(entry.name)) {
-        if (entry.state !== CapabilityState.gated) deactivate(entry);
+        if (entry.state !== CapabilityState.gated) deactivate(entry)
       } else if (entry.state === CapabilityState.gated) {
-        entry.state = CapabilityState.off;
-        entry.error = undefined;
+        entry.state = CapabilityState.off
+        entry.error = undefined
       }
     }
-  };
+  }
 
   // Compatibility implementations live outside the public host object so the
   // structured APIs do not depend on deprecated method names.
   const enableBoolean = (name: string): Promise<boolean> => {
-    let entry: IEntry<Context>;
+    let entry: IEntry<Context>
     try {
-      assertUsable();
-      assertNotTransitioning();
-      entry = entryOf(name);
+      assertUsable()
+      assertNotTransitioning()
+      entry = entryOf(name)
     } catch (error) {
-      return rejectedOperation(error);
+      return rejectedOperation(error)
     }
     if (!allowed(name)) {
-      entry.state = CapabilityState.gated;
-      entry.error = undefined;
-      return Promise.resolve(false);
+      entry.state = CapabilityState.gated
+      entry.error = undefined
+      return Promise.resolve(false)
     }
-    if (entry.state === CapabilityState.on) return Promise.resolve(true);
-    if (entry.pending) return entry.pending;
+    if (entry.state === CapabilityState.on) return Promise.resolve(true)
+    if (entry.pending) return entry.pending
 
-    const { generation, token } = entry.generationController.begin();
-    entry.state = CapabilityState.activating;
-    entry.error = undefined;
-    let resolvePending!: (enabled: boolean) => void;
+    const { generation, token } = entry.generationController.begin()
+    entry.state = CapabilityState.activating
+    entry.error = undefined
+    let resolvePending!: (enabled: boolean) => void
     const pending = new Promise<boolean>((resolve) => {
-      resolvePending = resolve;
-    });
+      resolvePending = resolve
+    })
     // Publish activation before invoking user code. Synchronous activate() callbacks may call
     // host.dispose(); that disposal must retain this promise until late handle cleanup finishes.
-    entry.pending = pending;
-    trackPending(entry, pending);
+    entry.pending = pending
+    trackPending(entry, pending)
     void (async () => {
       try {
-        const handle = await entry.activate(context);
-        let disposer: ICapabilityHandle['dispose'] | undefined;
+        const handle = await entry.activate(context)
+        let disposer: ICapabilityHandle['dispose'] | undefined
         try {
-          disposer = handle?.dispose;
+          disposer = handle?.dispose
         } catch (error) {
           throw tagCapabilityError(
             new TypeError(CapabilityErrorText.invalidHandle(name), { cause: error }),
             CapabilityErrorCode.invalidHandle
-          );
+          )
         }
         if (!handle || typeof disposer !== 'function') {
           throw tagCapabilityError(
             new TypeError(CapabilityErrorText.invalidHandle(name)),
             CapabilityErrorCode.invalidHandle
-          );
+          )
         }
         // `adopt()` returns false and releases `handle` itself whenever this token is no longer
         // current — covers both `disable()`/`setFlag(false)` superseding it (a new generation
@@ -467,77 +467,77 @@ export function createCapabilityHost<Context>(
         // disposed too, see `disposeSync()`).
         const adopted = entry.generationController.adopt(token, handle, (adoptedHandle) =>
           release(entry, adoptedHandle, generation, disposer)
-        );
-        if (!adopted) return false;
-        entry.handle = handle;
-        entry.disposer = disposer;
-        entry.state = CapabilityState.on;
-        activationOrder.push(entry);
-        return true;
+        )
+        if (!adopted) return false
+        entry.handle = handle
+        entry.disposer = disposer
+        entry.state = CapabilityState.on
+        activationOrder.push(entry)
+        return true
       } catch (error) {
         if (entry.generationController.isCurrent(token)) {
-          entry.state = CapabilityState.failed;
-          entry.error = error;
+          entry.state = CapabilityState.failed
+          entry.error = error
         }
-        reportError(name, error);
-        return false;
+        reportError(name, error)
+        return false
       } finally {
-        if (entry.generationController.isCurrent(token)) entry.pending = undefined;
+        if (entry.generationController.isCurrent(token)) entry.pending = undefined
       }
-    })().then(resolvePending, () => resolvePending(false));
-    return pending;
-  };
+    })().then(resolvePending, () => resolvePending(false))
+    return pending
+  }
 
   const disableSync = (name: string): boolean => {
-    assertUsable();
-    assertNotTransitioning();
-    const entry = entryOf(name);
-    return runTransition(() => deactivate(entry));
-  };
+    assertUsable()
+    assertNotTransitioning()
+    const entry = entryOf(name)
+    return runTransition(() => deactivate(entry))
+  }
 
   const disposeSync = (): void => {
-    assertNotTransitioning();
-    if (disposed) return;
+    assertNotTransitioning()
+    if (disposed) return
     // Publish the terminal host state before any controller or user disposer can run. This makes
     // synchronous observers see a disposed host even when the first cleanup reports a failure.
-    disposed = true;
+    disposed = true
     for (const entry of entries.values()) {
       runTransition(() => {
         try {
-          entry.generationController.dispose();
+          entry.generationController.dispose()
         } catch (error) {
           // One controller's cancellation cleanup must not prevent later controllers from closing.
-          recordDisposeCleanupError(entry, error);
+          recordDisposeCleanupError(entry, error)
         } finally {
-          entry.pending = undefined;
+          entry.pending = undefined
         }
-      });
+      })
     }
     for (const entry of [...activationOrder].reverse()) {
       runTransition(() => {
         try {
-          releaseHandle(entry);
+          releaseHandle(entry)
         } catch (error) {
           // `release()` contains normal disposer failures; keep this boundary defensive so a
           // future release-path change still cannot stop the remaining LIFO cleanup.
-          recordDisposeCleanupError(entry, error);
+          recordDisposeCleanupError(entry, error)
         } finally {
-          entry.state = CapabilityState.off;
+          entry.state = CapabilityState.off
         }
-      });
+      })
     }
-    activationOrder.length = 0;
-    for (const entry of entries.values()) entry.state = CapabilityState.off;
-  };
+    activationOrder.length = 0
+    for (const entry of entries.values()) entry.state = CapabilityState.off
+  }
 
   const drainPending = async (): Promise<void> => {
     // `whenZeroOnce()` loops until the count is actually zero the instant it resolves — draining a
     // still-in-flight activation can itself enqueue a new release promise under the same key, and
     // this must not resolve until that settles too (§8.2 "排空循环在冒出新待排空项时不提前返回").
     while (pendingTracker.count(ALL_KEY) > 0) {
-      await pendingTracker.whenZeroOnce(ALL_KEY);
+      await pendingTracker.whenZeroOnce(ALL_KEY)
     }
-  };
+  }
 
   /**
    * Publishes one completion Promise before synchronous cleanup starts, then drains every tracked
@@ -549,7 +549,7 @@ export function createCapabilityHost<Context>(
   const disposeAll = (): Promise<void> => {
     if (disposePromise) {
       if (transitionDepth > 0) {
-        assertNotTransitioning();
+        assertNotTransitioning()
       }
       if (!disposeCompleted) {
         return rejectedOperation<void>(
@@ -557,95 +557,95 @@ export function createCapabilityHost<Context>(
             CapabilityErrorCode.hostTransitioning,
             CapabilityErrorText.hostTransitioning
           )
-        );
+        )
       }
-      return disposePromise;
+      return disposePromise
     }
-    assertNotTransitioning();
+    assertNotTransitioning()
 
-    let resolvePromise!: () => void;
-    let rejectPromise!: (error: unknown) => void;
+    let resolvePromise!: () => void
+    let rejectPromise!: (error: unknown) => void
     disposePromise = new Promise<void>((resolve, reject) => {
-      resolvePromise = resolve;
-      rejectPromise = reject;
-    });
+      resolvePromise = resolve
+      rejectPromise = reject
+    })
     try {
-      disposeSync();
+      disposeSync()
       void drainPending().then(
         () => {
-          disposeCompleted = true;
-          resolvePromise();
+          disposeCompleted = true
+          resolvePromise()
         },
         (error) => {
-          disposeCompleted = true;
-          rejectPromise(error);
+          disposeCompleted = true
+          rejectPromise(error)
         }
-      );
+      )
     } catch (error) {
-      rejectPromise(error);
+      rejectPromise(error)
     }
-    return disposePromise;
-  };
+    return disposePromise
+  }
 
   const host: ICapabilityHost<Context> = {
     register(definition) {
-      assertUsable();
-      assertNotTransitioning();
+      assertUsable()
+      assertNotTransitioning()
       const snapshot = runTransition(() => {
-        let name: unknown;
-        let activate: unknown;
+        let name: unknown
+        let activate: unknown
         try {
-          name = definition?.name;
-          activate = definition?.activate;
+          name = definition?.name
+          activate = definition?.activate
         } catch (error) {
           // hostile Proxy getter on definition — surface with (source, code) + cause reachable (AF-09).
           throw createCapabilityError(
             CapabilityErrorCode.invalidOption,
             'capability definition snapshot failed',
             { cause: error }
-          );
+          )
         }
         if (typeof name !== 'string' || name.trim().length === 0) {
           throw tagCapabilityError(
             new TypeError('capability name must be a non-empty string'),
             CapabilityErrorCode.invalidName
-          );
+          )
         }
         if (typeof activate !== 'function') {
           throw tagCapabilityError(
             new TypeError(`capability "${name}" activate must be a function`),
             CapabilityErrorCode.invalidActivate
-          );
+          )
         }
         const activation = activate as (
           context: Context
-        ) => ICapabilityHandle | Promise<ICapabilityHandle>;
+        ) => ICapabilityHandle | Promise<ICapabilityHandle>
         // Preserve method-style `this.name` without retaining the caller's
         // mutable definition object or exposing the private entry. Invoking
         // `receiver.activate` as a method binds `this` to the frozen receiver —
         // the method-call form supplies the receiver without `call`/`apply`/`bind`.
-        const receiver = Object.freeze({ name, activate: activation });
+        const receiver = Object.freeze({ name, activate: activation })
         return {
           name,
           activate: (context: Context) => receiver.activate(context)
-        };
-      });
+        }
+      })
       if (entries.has(snapshot.name)) {
         throw createCapabilityError(
           CapabilityErrorCode.alreadyRegistered,
           `capability "${snapshot.name}" is already registered`
-        );
+        )
       }
       entries.set(snapshot.name, {
         name: snapshot.name,
         activate: snapshot.activate,
         state: allowed(snapshot.name) ? CapabilityState.off : CapabilityState.gated,
         generationController: createGenerationController()
-      });
+      })
     },
 
     get names() {
-      return [...entries.keys()];
+      return [...entries.keys()]
     },
 
     state: (name) => entryOf(name).state,
@@ -656,74 +656,74 @@ export function createCapabilityHost<Context>(
     error: (name) => entryOf(name).error,
 
     setFlag(name, enabled) {
-      assertUsable();
-      assertNotTransitioning();
+      assertUsable()
+      assertNotTransitioning()
       runTransition(() => {
-        const next = new Map(flagValues);
-        if (enabled === true) next.set(name, true);
-        else next.delete(name);
-        replaceFlags(next);
-      });
+        const next = new Map(flagValues)
+        if (enabled === true) next.set(name, true)
+        else next.delete(name)
+        replaceFlags(next)
+      })
     },
 
     setFlags(flags) {
-      assertUsable();
-      assertNotTransitioning();
+      assertUsable()
+      assertNotTransitioning()
       runTransition(() => {
         try {
-          replaceFlags(copyFlags(flags));
+          replaceFlags(copyFlags(flags))
         } catch (error) {
           // 配置快照本身不可读（如恶意 Proxy）时必须 fail closed，而不是继续沿用
           // 上一份 allowlist。先完成回退，再把配置错误交还调用方。
-          replaceFlags(new Map());
-          throw error;
+          replaceFlags(new Map())
+          throw error
         }
-      });
+      })
     },
 
     enableLegacyBoolean(name) {
-      return enableBoolean(name);
+      return enableBoolean(name)
     },
 
     enable(name) {
       return enableBoolean(name).then((enabled) => {
-        const entry = entries.get(name);
-        if (enabled) return { status: CapabilityEnableStatus.enabled };
-        if (entry?.state === CapabilityState.gated) return { status: CapabilityEnableStatus.gated };
+        const entry = entries.get(name)
+        if (enabled) return { status: CapabilityEnableStatus.enabled }
+        if (entry?.state === CapabilityState.gated) return { status: CapabilityEnableStatus.gated }
         if (entry?.state === CapabilityState.failed)
-          return { status: CapabilityEnableStatus.failed, error: entry.error };
-        return { status: CapabilityEnableStatus.cancelled };
-      });
+          return { status: CapabilityEnableStatus.failed, error: entry.error }
+        return { status: CapabilityEnableStatus.cancelled }
+      })
     },
 
     enableResult(name) {
-      return this.enable(name);
+      return this.enable(name)
     },
 
     disableNow(name) {
-      return disableSync(name);
+      return disableSync(name)
     },
 
     async disable(name) {
       // disposed 优先级高于 NOT_REGISTERED（AF-20）：先断言 host 可用，再做 name lookup。
-      assertUsable();
-      const entry = entryOf(name);
-      const changed = disableSync(name);
+      assertUsable()
+      const entry = entryOf(name)
+      const changed = disableSync(name)
       // Same loop-until-stable reasoning as dispose(), scoped to this entry.
       while (pendingTracker.count(entry) > 0) {
-        await pendingTracker.whenZeroOnce(entry);
+        await pendingTracker.whenZeroOnce(entry)
       }
-      return changed;
+      return changed
     },
 
     dispose() {
-      return disposeAll();
+      return disposeAll()
     },
 
     get disposed() {
-      return disposed;
+      return disposed
     }
-  };
+  }
 
-  return host;
+  return host
 }

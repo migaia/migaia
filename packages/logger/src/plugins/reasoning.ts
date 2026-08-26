@@ -1,26 +1,26 @@
-import type { IDimFn, ILoggerPluginCore, ILoggerPlugin, IPaintFn } from '../typing.js';
-import type { IPipelineMode } from '@migaia/plugin-host';
-import type { IColorShared } from './color.js';
-import { LoggerReasoningPhase } from '../plugin-constants.js';
+import type { IDimFn, ILoggerPluginCore, ILoggerPlugin, IPaintFn } from '../typing.js'
+import type { IPipelineMode } from '@migaia/plugin-host'
+import type { IColorShared } from './color.js'
+import { LoggerReasoningPhase } from '../plugin-constants.js'
 
 export type IReasoningPluginConfig = {
-  labels?: { thinking?: string; response?: string };
+  labels?: { thinking?: string; response?: string }
   /** 是否把该插件发起的流式及完整 entry 输出异步调度；默认 false。 */
-  asyncOutput?: boolean;
-};
+  asyncOutput?: boolean
+}
 
 export type IReasoningPluginExt = {
-  startThinking(label?: string): void;
-  thinking(delta: string): void;
-  endThinking(): void;
-  startResponse(label?: string): void;
-  response(delta: string): void;
-  endResponse(): void;
-};
+  startThinking(label?: string): void
+  thinking(delta: string): void
+  endThinking(): void
+  startResponse(label?: string): void
+  response(delta: string): void
+  endResponse(): void
+}
 
-type IPhase = (typeof LoggerReasoningPhase)[keyof typeof LoggerReasoningPhase];
+type IPhase = (typeof LoggerReasoningPhase)[keyof typeof LoggerReasoningPhase]
 
-export const REASONING_PLUGIN_NAME = 'reasoning' as const;
+export const REASONING_PLUGIN_NAME = 'reasoning' as const
 
 /**
  * 设计要点： - 逐 token 的可视化输出完全走 core.raw()，不经过 pipeline/sink；是否异步 由 reasoning 插件自己的 asyncOutput 配置决定，
@@ -36,23 +36,23 @@ class ReasoningPlugin implements ILoggerPlugin<
   {},
   Partial<IColorShared>
 > {
-  readonly name = REASONING_PLUGIN_NAME;
-  readonly config: IReasoningPluginConfig;
+  readonly name = REASONING_PLUGIN_NAME
+  readonly config: IReasoningPluginConfig
 
-  #phase: IPhase = LoggerReasoningPhase.idle;
-  #buffer = '';
-  #resolvedConfig!: IReasoningPluginConfig;
+  #phase: IPhase = LoggerReasoningPhase.idle
+  #buffer = ''
+  #resolvedConfig!: IReasoningPluginConfig
 
   constructor(config: IReasoningPluginConfig) {
-    this.config = config;
+    this.config = config
   }
 
   install(core: ILoggerPluginCore<IPipelineMode, Partial<IColorShared>>): IReasoningPluginExt {
     // 不读 this.config——统一通过 core.config.get() 读取
-    this.#resolvedConfig = core.config.get<IReasoningPluginConfig>() ?? {};
+    this.#resolvedConfig = core.config.get<IReasoningPluginConfig>() ?? {}
 
-    const paint = core.getShared('paint') ?? ((_tag: string, text: string) => text);
-    const dim = core.getShared('dim') ?? ((text: string) => text);
+    const paint = core.getShared('paint') ?? ((_tag: string, text: string) => text)
+    const dim = core.getShared('dim') ?? ((text: string) => text)
 
     return {
       startThinking: (label) => this.#startThinking(core, paint, label),
@@ -61,7 +61,7 @@ class ReasoningPlugin implements ILoggerPlugin<
       startResponse: (label) => this.#startResponse(core, paint, label),
       response: (delta) => this.#appendResponse(core, delta),
       endResponse: () => this.#endResponse(core)
-    };
+    }
   }
 
   #startThinking(
@@ -70,11 +70,11 @@ class ReasoningPlugin implements ILoggerPlugin<
     label?: string
   ): void {
     if (this.#phase !== LoggerReasoningPhase.idle && this.#phase !== LoggerReasoningPhase.thinking)
-      this.#flushBuffer(core, 'response');
-    this.#phase = LoggerReasoningPhase.thinking;
-    this.#buffer = '';
-    const text = label ?? this.#resolvedConfig.labels?.thinking ?? 'Thinking...';
-    this.#raw(core, `${paint('debug', text)}\n\n`);
+      this.#flushBuffer(core, 'response')
+    this.#phase = LoggerReasoningPhase.thinking
+    this.#buffer = ''
+    const text = label ?? this.#resolvedConfig.labels?.thinking ?? 'Thinking...'
+    this.#raw(core, `${paint('debug', text)}\n\n`)
   }
 
   #appendThinking(
@@ -82,14 +82,14 @@ class ReasoningPlugin implements ILoggerPlugin<
     dim: IDimFn,
     delta: string
   ): void {
-    if (this.#phase !== LoggerReasoningPhase.thinking) this.#startThinking(core, (_t, s) => s);
-    this.#buffer += delta;
-    this.#raw(core, dim(delta));
+    if (this.#phase !== LoggerReasoningPhase.thinking) this.#startThinking(core, (_t, s) => s)
+    this.#buffer += delta
+    this.#raw(core, dim(delta))
   }
 
   #endThinking(core: ILoggerPluginCore<IPipelineMode, Partial<IColorShared>>): void {
-    if (this.#phase === LoggerReasoningPhase.thinking) this.#raw(core, '\n\n');
-    this.#flushBuffer(core, 'thinking');
+    if (this.#phase === LoggerReasoningPhase.thinking) this.#raw(core, '\n\n')
+    this.#flushBuffer(core, 'thinking')
   }
 
   #startResponse(
@@ -101,44 +101,44 @@ class ReasoningPlugin implements ILoggerPlugin<
       this.#phase !== LoggerReasoningPhase.idle &&
       this.#phase !== LoggerReasoningPhase.responding
     )
-      this.#flushBuffer(core, 'thinking');
-    this.#phase = LoggerReasoningPhase.responding;
-    this.#buffer = '';
-    const text = label ?? this.#resolvedConfig.labels?.response;
-    if (text) this.#raw(core, `${paint('info', text)}\n\n`);
+      this.#flushBuffer(core, 'thinking')
+    this.#phase = LoggerReasoningPhase.responding
+    this.#buffer = ''
+    const text = label ?? this.#resolvedConfig.labels?.response
+    if (text) this.#raw(core, `${paint('info', text)}\n\n`)
   }
 
   #appendResponse(
     core: ILoggerPluginCore<IPipelineMode, Partial<IColorShared>>,
     delta: string
   ): void {
-    if (this.#phase !== LoggerReasoningPhase.responding) this.#startResponse(core, (_t, s) => s);
-    this.#buffer += delta;
-    this.#raw(core, delta);
+    if (this.#phase !== LoggerReasoningPhase.responding) this.#startResponse(core, (_t, s) => s)
+    this.#buffer += delta
+    this.#raw(core, delta)
   }
 
   #endResponse(core: ILoggerPluginCore<IPipelineMode, Partial<IColorShared>>): void {
-    if (this.#phase === LoggerReasoningPhase.responding) this.#raw(core, '\n');
-    this.#flushBuffer(core, 'response');
+    if (this.#phase === LoggerReasoningPhase.responding) this.#raw(core, '\n')
+    this.#flushBuffer(core, 'response')
   }
 
   #flushBuffer(
     core: ILoggerPluginCore<IPipelineMode, Partial<IColorShared>>,
     tag: 'thinking' | 'response'
   ): void {
-    const text = this.#buffer;
-    this.#phase = LoggerReasoningPhase.idle;
-    this.#buffer = '';
-    if (!text) return;
+    const text = this.#buffer
+    this.#phase = LoggerReasoningPhase.idle
+    this.#buffer = ''
+    if (!text) return
     core.dispatchRaw(
       { tag, message: text, data: { silent: true } },
       { asyncOutput: this.#resolvedConfig.asyncOutput }
-    );
+    )
   }
 
   /** 对 reasoning 产生的裸输出统一应用当前插件的调度策略。 */
   #raw(core: ILoggerPluginCore<IPipelineMode, Partial<IColorShared>>, text: string): void {
-    core.raw(text, { asyncOutput: this.#resolvedConfig.asyncOutput });
+    core.raw(text, { asyncOutput: this.#resolvedConfig.asyncOutput })
   }
 }
 
@@ -150,4 +150,4 @@ export const reasoning = (
   IPipelineMode,
   {},
   Partial<IColorShared>
-> => new ReasoningPlugin(config);
+> => new ReasoningPlugin(config)

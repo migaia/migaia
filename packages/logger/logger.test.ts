@@ -1,279 +1,279 @@
-import { describe, expect, expectTypeOf, it, vi } from 'vitest';
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 
-import { Logger } from './src/log';
-import { batch, type IBatchShared } from './src/plugins/batch';
-import { color } from './src/plugins/color';
-import { level } from './src/plugins/level';
-import { reasoning } from './src/plugins/reasoning';
-import { process as processPlugin } from './src/plugins/process';
-import { http } from './src/plugins/http';
-import { uuid } from './src/plugins/uuid';
-import { setLoggerRuntimeManager } from './src/runtime-manager';
-import { LoggerErrorCode } from './src/errors';
-import type { ILogEntry, ILoggerPlugin } from './src/typing';
-import { GENERATOR_CONTINUE, type IPipelineMode } from '@migaia/plugin-host';
-import { createManualScheduler } from '@migaia/lifecycle';
+import { Logger } from './src/log'
+import { batch, type IBatchShared } from './src/plugins/batch'
+import { color } from './src/plugins/color'
+import { level } from './src/plugins/level'
+import { reasoning } from './src/plugins/reasoning'
+import { process as processPlugin } from './src/plugins/process'
+import { http } from './src/plugins/http'
+import { uuid } from './src/plugins/uuid'
+import { setLoggerRuntimeManager } from './src/runtime-manager'
+import { LoggerErrorCode } from './src/errors'
+import type { ILogEntry, ILoggerPlugin } from './src/typing'
+import { GENERATOR_CONTINUE, type IPipelineMode } from '@migaia/plugin-host'
+import { createManualScheduler } from '@migaia/lifecycle'
 
 describe('logger plugin host integration', () => {
   it('runs without process through the runtime manager', () => {
-    const writes: string[] = [];
+    const writes: string[] = []
     const restore = setLoggerRuntimeManager({
       randomUUID: () => 'browser-id',
       defer: (task) => task(),
       write: (text) => writes.push(text)
-    });
+    })
     try {
-      const logger = new Logger({ plugins: [processPlugin()] });
-      logger.raw('browser log');
-      expect(logger.ctx.id).toBe('browser-id');
-      expect(writes).toEqual(['browser log']);
+      const logger = new Logger({ plugins: [processPlugin()] })
+      logger.raw('browser log')
+      expect(logger.ctx.id).toBe('browser-id')
+      expect(writes).toEqual(['browser log'])
     } finally {
-      restore();
+      restore()
     }
-  });
+  })
 
   it('reinstalls process listeners after the final process plugin is removed', async () => {
-    const listeners = new Map<string, Set<(...args: any[]) => void>>();
+    const listeners = new Map<string, Set<(...args: any[]) => void>>()
     const runtimeProcess = {
       env: {},
       stdout: { write: () => true },
       on: (event: string, listener: (...args: any[]) => void) => {
-        let group = listeners.get(event);
+        let group = listeners.get(event)
         if (!group) {
-          group = new Set();
-          listeners.set(event, group);
+          group = new Set()
+          listeners.set(event, group)
         }
-        group.add(listener);
+        group.add(listener)
       },
       removeListener: (event: string, listener: (...args: any[]) => void) => {
-        listeners.get(event)?.delete(listener);
+        listeners.get(event)?.delete(listener)
       },
       exit: (() => undefined as never) as (code?: number) => never
-    };
+    }
     const restore = setLoggerRuntimeManager({
       process: runtimeProcess,
       randomUUID: () => 'process-id',
       defer: (task) => task(),
       write: () => undefined
-    });
+    })
     try {
-      const first = new Logger({ plugins: [processPlugin()] });
-      expect(listeners.get('SIGINT')?.size).toBe(1);
-      let flushes = 0;
+      const first = new Logger({ plugins: [processPlugin()] })
+      expect(listeners.get('SIGINT')?.size).toBe(1)
+      let flushes = 0
       first.onFlush(() => {
-        flushes += 1;
-      });
-      for (const listener of listeners.get('beforeExit') ?? []) listener();
-      for (const listener of listeners.get('beforeExit') ?? []) listener();
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(flushes).toBe(1);
-      await first.unUse('process');
-      expect(listeners.get('SIGINT')?.size).toBe(0);
-      const second = new Logger({ plugins: [processPlugin()] });
-      expect(listeners.get('SIGINT')?.size).toBe(1);
-      await second.unUse('process');
+        flushes += 1
+      })
+      for (const listener of listeners.get('beforeExit') ?? []) listener()
+      for (const listener of listeners.get('beforeExit') ?? []) listener()
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(flushes).toBe(1)
+      await first.unUse('process')
+      expect(listeners.get('SIGINT')?.size).toBe(0)
+      const second = new Logger({ plugins: [processPlugin()] })
+      expect(listeners.get('SIGINT')?.size).toBe(1)
+      await second.unUse('process')
     } finally {
-      restore();
+      restore()
     }
-  });
+  })
 
   it('intercepts exit with the captured function and receiver, then restores exact identity', async () => {
-    const exitCodes: number[] = [];
-    const exitReceivers: unknown[] = [];
+    const exitCodes: number[] = []
+    const exitReceivers: unknown[] = []
     const originalExit = function (this: unknown, code?: number): never {
-      exitCodes.push(code ?? 0);
-      exitReceivers.push(this);
-      return undefined as never;
-    };
+      exitCodes.push(code ?? 0)
+      exitReceivers.push(this)
+      return undefined as never
+    }
     const runtimeProcess = {
       env: {},
       stdout: { write: () => true },
       on: () => undefined,
       removeListener: () => undefined,
       exit: originalExit
-    };
+    }
     const restore = setLoggerRuntimeManager({
       process: runtimeProcess,
       randomUUID: () => 'intercept-id',
       defer: (task) => task(),
       write: () => undefined
-    });
+    })
     try {
       const first = new Logger({
         plugins: [processPlugin({ interceptProcessExit: true, shutdownTimeoutMs: 50 })]
-      });
-      let flushes = 0;
+      })
+      let flushes = 0
       first.onFlush(() => {
-        flushes += 1;
-      });
-      const interceptedExit = runtimeProcess.exit;
-      expect(interceptedExit).not.toBe(originalExit);
-      interceptedExit(23);
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      expect(exitCodes).toEqual([23]);
-      expect(exitReceivers).toEqual([runtimeProcess]);
-      expect(flushes).toBe(1);
+        flushes += 1
+      })
+      const interceptedExit = runtimeProcess.exit
+      expect(interceptedExit).not.toBe(originalExit)
+      interceptedExit(23)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(exitCodes).toEqual([23])
+      expect(exitReceivers).toEqual([runtimeProcess])
+      expect(flushes).toBe(1)
 
-      await first.unUse('process');
-      expect(runtimeProcess.exit).toBe(originalExit);
+      await first.unUse('process')
+      expect(runtimeProcess.exit).toBe(originalExit)
 
       const second = new Logger({
         plugins: [processPlugin({ interceptProcessExit: true, shutdownTimeoutMs: 50 })]
-      });
-      expect(runtimeProcess.exit).not.toBe(originalExit);
-      runtimeProcess.exit(24);
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      expect(exitCodes).toEqual([23, 24]);
-      expect(exitReceivers).toEqual([runtimeProcess, runtimeProcess]);
-      await second.unUse('process');
-      expect(runtimeProcess.exit).toBe(originalExit);
+      })
+      expect(runtimeProcess.exit).not.toBe(originalExit)
+      runtimeProcess.exit(24)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(exitCodes).toEqual([23, 24])
+      expect(exitReceivers).toEqual([runtimeProcess, runtimeProcess])
+      await second.unUse('process')
+      expect(runtimeProcess.exit).toBe(originalExit)
     } finally {
-      restore();
+      restore()
     }
-  });
+  })
 
   it('restores exit after a setter commits the wrapper and then throws during install rollback', async () => {
     const originalExit = function (this: unknown, _code?: number): never {
-      return undefined as never;
-    };
-    let exitValue = originalExit;
-    let throwAfterCommit = false;
+      return undefined as never
+    }
+    let exitValue = originalExit
+    let throwAfterCommit = false
     const runtimeProcess = {
       env: {},
       stdout: { write: () => true },
       on: () => undefined,
       removeListener: () => undefined,
       get exit() {
-        return exitValue;
+        return exitValue
       },
       set exit(value: typeof originalExit) {
-        exitValue = value;
-        if (throwAfterCommit) throwAfterCommit = false;
+        exitValue = value
+        if (throwAfterCommit) throwAfterCommit = false
         else if (value !== originalExit) {
-          throwAfterCommit = true;
-          throw new Error('exit-setter-after-commit');
+          throwAfterCommit = true
+          throw new Error('exit-setter-after-commit')
         }
       }
-    };
+    }
     const restore = setLoggerRuntimeManager({
       process: runtimeProcess,
       randomUUID: () => 'exit-rollback-id',
       defer: (task) => task(),
       write: () => undefined
-    });
+    })
     try {
       expect(
         () => new Logger({ plugins: [processPlugin({ interceptProcessExit: true })] })
-      ).toThrow('exit-setter-after-commit');
-      expect(runtimeProcess.exit).toBe(originalExit);
-      const reinstall = new Logger({ plugins: [processPlugin()] });
-      expect(runtimeProcess.exit).toBe(originalExit);
-      await reinstall.unUse('process');
+      ).toThrow('exit-setter-after-commit')
+      expect(runtimeProcess.exit).toBe(originalExit)
+      const reinstall = new Logger({ plugins: [processPlugin()] })
+      expect(runtimeProcess.exit).toBe(originalExit)
+      await reinstall.unUse('process')
     } finally {
-      restore();
+      restore()
     }
-  });
+  })
 
   it('joins exit restoration failure with listener rollback errors without replacing install primary', () => {
-    const originalExit = (() => undefined as never) as (code?: number) => never;
-    let exitValue = originalExit;
-    const restorationError = new Error('exit-restore-failed');
+    const originalExit = (() => undefined as never) as (code?: number) => never
+    let exitValue = originalExit
+    const restorationError = new Error('exit-restore-failed')
     const runtimeProcess = {
       env: {},
       stdout: { write: () => true },
       on: () => undefined,
       removeListener: (event: string) => {
-        if (event === 'SIGTERM') throw new Error('listener-rollback-failed');
+        if (event === 'SIGTERM') throw new Error('listener-rollback-failed')
       },
       get exit() {
-        return exitValue;
+        return exitValue
       },
       set exit(value: typeof originalExit) {
-        exitValue = value;
-        if (value === originalExit) throw restorationError;
-        throw new Error('exit-wrapper-commit-failed');
+        exitValue = value
+        if (value === originalExit) throw restorationError
+        throw new Error('exit-wrapper-commit-failed')
       }
-    };
+    }
     const restore = setLoggerRuntimeManager({
       process: runtimeProcess,
       randomUUID: () => 'exit-aggregate-id',
       defer: (task) => task(),
       write: () => undefined
-    });
+    })
     try {
-      let failure: unknown;
+      let failure: unknown
       try {
-        new Logger({ plugins: [processPlugin({ interceptProcessExit: true })] });
+        new Logger({ plugins: [processPlugin({ interceptProcessExit: true })] })
       } catch (error) {
-        failure = error;
+        failure = error
       }
-      const aggregate = (failure as Error & { cause?: unknown }).cause as AggregateError;
+      const aggregate = (failure as Error & { cause?: unknown }).cause as AggregateError
       expect(aggregate.errors).toEqual([
         expect.objectContaining({ message: 'exit-wrapper-commit-failed' }),
         restorationError,
         expect.objectContaining({ message: 'listener-rollback-failed' })
-      ]);
+      ])
     } finally {
-      restore();
+      restore()
     }
-  });
+  })
 
   it('uses the logger scheduler for HTTP timeout and retry delays', async () => {
-    const scheduler = createManualScheduler();
-    let attempts = 0;
+    const scheduler = createManualScheduler()
+    let attempts = 0
     const restore = setLoggerRuntimeManager({
       randomUUID: () => 'http-scheduler-id',
       defer: (task) => task(),
       write: () => undefined,
       fetch: async (_input, init) => {
-        attempts += 1;
-        if (attempts === 1) throw new Error('retry-me');
-        expect(init.signal?.aborted).toBe(false);
-        return { ok: true, status: 200, headers: { get: () => null } };
+        attempts += 1
+        if (attempts === 1) throw new Error('retry-me')
+        expect(init.signal?.aborted).toBe(false)
+        return { ok: true, status: 200, headers: { get: () => null } }
       }
-    });
+    })
     try {
       const logger = new Logger({
         scheduler,
         plugins: [http({ url: 'https://example.test/logs', retries: 1, requestTimeoutMs: 10 })]
-      });
-      logger.log('info', 'scheduler');
-      const flush = logger.flush();
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(attempts).toBe(1);
-      scheduler.advance(199);
-      expect(attempts).toBe(1);
-      scheduler.advance(1);
-      await flush;
-      expect(attempts).toBe(2);
-      await logger.shutdown('manual');
+      })
+      logger.log('info', 'scheduler')
+      const flush = logger.flush()
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(attempts).toBe(1)
+      scheduler.advance(199)
+      expect(attempts).toBe(1)
+      scheduler.advance(1)
+      await flush
+      expect(attempts).toBe(2)
+      await logger.shutdown('manual')
     } finally {
-      restore();
+      restore()
     }
-  });
+  })
 
   it('exits with signal code after cores dispose and preserves shutdown logs', async () => {
-    const listeners = new Map<string, (...args: any[]) => void>();
-    const exits: number[] = [];
+    const listeners = new Map<string, (...args: any[]) => void>()
+    const exits: number[] = []
     const runtimeProcess = {
       env: {},
       stdout: { write: () => true },
       on: (event: string, listener: (...args: any[]) => void) => listeners.set(event, listener),
       removeListener: () => undefined,
       exit: ((code?: number) => {
-        exits.push(code ?? 0);
-        return undefined as never;
+        exits.push(code ?? 0)
+        return undefined as never
       }) as (code?: number) => never
-    };
-    const writes: string[] = [];
+    }
+    const writes: string[] = []
     const restore = setLoggerRuntimeManager({
       process: runtimeProcess,
       randomUUID: () => 'signal-id',
       defer: (task) => task(),
       write: (text) => writes.push(text)
-    });
+    })
     try {
       const logger = new Logger({
         plugins: [
@@ -281,39 +281,39 @@ describe('logger plugin host integration', () => {
           {
             name: 'shutdown-log',
             install: (core: any) => {
-              core.onShutdown(() => core.log('info', 'shutdown started'));
-              core.useSink((entry: ILogEntry) => writes.push(entry.message));
-              return {};
+              core.onShutdown(() => core.log('info', 'shutdown started'))
+              core.useSink((entry: ILogEntry) => writes.push(entry.message))
+              return {}
             }
           }
         ] as const
-      });
-      listeners.get('SIGINT')!();
-      await logger.shutdown('signal');
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      expect(exits).toEqual([0]);
-      expect(writes).toContain('shutdown started');
+      })
+      listeners.get('SIGINT')!()
+      await logger.shutdown('signal')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(exits).toEqual([0])
+      expect(writes).toContain('shutdown started')
     } finally {
-      restore();
+      restore()
     }
-  });
+  })
 
   it('exposes isolated plugin config snapshots on the logger facade', async () => {
-    const logger = new Logger({ plugins: [level({ level: 'warn' })] });
-    expect(logger.config.get('level.level')).toBe('warn');
-    await logger.config.update('level', () => ({ level: 'error' }));
-    expect(logger.config.get('level.level')).toBe('error');
-  });
+    const logger = new Logger({ plugins: [level({ level: 'warn' })] })
+    expect(logger.config.get('level.level')).toBe('warn')
+    await logger.config.update('level', () => ({ level: 'error' }))
+    expect(logger.config.get('level.level')).toBe('error')
+  })
 
   it.each(['async', 'generator'] as const)(
     'runs logger pipeline plugins in %s mode',
     async (mode) => {
-      const seen: ILogEntry[] = [];
+      const seen: ILogEntry[] = []
       const restore = setLoggerRuntimeManager({
         randomUUID: () => 'mode-id',
         defer: (task) => task(),
         write: () => undefined
-      });
+      })
       try {
         const logger = new Logger({
           pipeline: { mode },
@@ -323,540 +323,540 @@ describe('logger plugin host integration', () => {
             {
               name: `mode-capture-${mode}`,
               install: (core: any) => {
-                core.useSink((entry: ILogEntry) => seen.push(entry));
-                return {};
+                core.useSink((entry: ILogEntry) => seen.push(entry))
+                return {}
               }
             }
           ] as const
-        });
-        logger.log('debug', 'filtered');
-        logger.log('error', 'passes');
-        await logger.flush();
+        })
+        logger.log('debug', 'filtered')
+        logger.log('error', 'passes')
+        await logger.flush()
         expect(seen.map((entry) => `${entry.tag}:${entry.message}:${entry.data.uuid}`)).toEqual([
           'error:passes:mode-id'
-        ]);
+        ])
       } finally {
-        restore();
+        restore()
       }
     }
-  );
+  )
 
   it('contains synchronous pipeline errors during default dispatch', () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const logger = new Logger({
       plugins: [
         {
           name: 'throwing-sync-stage',
           install: (core: any) => {
             core.usePipeline(() => {
-              throw new Error('sync stage failed');
-            });
-            return {};
+              throw new Error('sync stage failed')
+            })
+            return {}
           }
         }
       ]
-    });
+    })
 
-    expect(() => logger.log('info', 'message')).not.toThrow();
-    expect(error).toHaveBeenCalledWith('[logger] pipeline 阶段异常:', expect.any(Error));
-    error.mockRestore();
-  });
+    expect(() => logger.log('info', 'message')).not.toThrow()
+    expect(error).toHaveBeenCalledWith('[logger] pipeline 阶段异常:', expect.any(Error))
+    error.mockRestore()
+  })
 
   it('shares concurrent flush work and ignores entries after shutdown', async () => {
-    let release!: () => void;
-    const sent: string[] = [];
+    let release!: () => void
+    const sent: string[] = []
     const plugin: ILoggerPlugin = {
       name: 'controlled-sink',
       install: (core) => {
         core.useSink(async (entry) => {
-          await new Promise<void>((resolve) => (release = resolve));
-          sent.push(entry.message);
-        });
-        return {};
+          await new Promise<void>((resolve) => (release = resolve))
+          sent.push(entry.message)
+        })
+        return {}
       }
-    };
+    }
     const logger = new Logger({
       plugins: [plugin]
-    });
+    })
 
-    logger.log('info', 'before');
-    const first = logger.flush();
-    const second = logger.flush();
-    expect(second).toBe(first);
-    release();
-    await first;
-    await logger.shutdown('manual');
-    logger.log('info', 'after');
-    await logger.flush();
-    expect(sent).toEqual(['before']);
-  });
+    logger.log('info', 'before')
+    const first = logger.flush()
+    const second = logger.flush()
+    expect(second).toBe(first)
+    release()
+    await first
+    await logger.shutdown('manual')
+    logger.log('info', 'after')
+    await logger.flush()
+    expect(sent).toEqual(['before'])
+  })
 
   it('reports rejected sink work without rejecting business dispatch', async () => {
-    const failures: string[] = [];
-    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const failures: string[] = []
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const plugin: ILoggerPlugin = {
       name: 'failing-sink',
       install: (core) => {
-        core.onFailure((failure) => failures.push(failure.source));
-        core.useSink(() => Promise.reject(new Error('sink failed')));
-        return {};
+        core.onFailure((failure) => failures.push(failure.source))
+        core.useSink(() => Promise.reject(new Error('sink failed')))
+        return {}
       }
-    };
+    }
     const logger = new Logger({
       plugins: [plugin]
-    });
+    })
 
-    expect(() => logger.log('info', 'message')).not.toThrow();
-    await logger.flush();
-    expect(failures).toEqual(['sink']);
-    error.mockRestore();
-  });
+    expect(() => logger.log('info', 'message')).not.toThrow()
+    await logger.flush()
+    expect(failures).toEqual(['sink'])
+    error.mockRestore()
+  })
 
   it('keeps console arguments separate from explicit meta and snapshots sink containers', async () => {
-    const seen: ILogEntry[] = [];
+    const seen: ILogEntry[] = []
     const plugin: ILoggerPlugin = {
       name: 'snapshot-sink',
       install: (core) => {
         core.useSink((entry) => {
-          seen.push(entry);
-        });
-        return {};
+          seen.push(entry)
+        })
+        return {}
       }
-    };
+    }
     const logger = new Logger({
       plugins: [plugin]
-    });
-    const args: unknown[] = [{ consoleOnly: true }];
-    const data = { requestId: 'one' };
-    logger.log('info', 'console', ...args);
-    logger.dispatchRaw({ tag: 'info', message: 'structured', meta: { userId: 'u1' }, data });
-    args.push('later');
-    data.requestId = 'two';
-    await logger.flush();
+    })
+    const args: unknown[] = [{ consoleOnly: true }]
+    const data = { requestId: 'one' }
+    logger.log('info', 'console', ...args)
+    logger.dispatchRaw({ tag: 'info', message: 'structured', meta: { userId: 'u1' }, data })
+    args.push('later')
+    data.requestId = 'two'
+    await logger.flush()
 
-    expect(seen[0]?.meta).toBeUndefined();
-    expect(seen[0]?.args).toEqual([{ consoleOnly: true }]);
-    expect(seen[1]?.meta).toEqual({ userId: 'u1' });
-    expect(seen[1]?.data).toEqual({ requestId: 'one' });
-  });
+    expect(seen[0]?.meta).toBeUndefined()
+    expect(seen[0]?.args).toEqual([{ consoleOnly: true }])
+    expect(seen[1]?.meta).toEqual({ userId: 'u1' })
+    expect(seen[1]?.data).toEqual({ requestId: 'one' })
+  })
 
   it('does not retry HTTP 400 responses and reports the send failure', async () => {
-    const fetch = vi.fn(async () => ({ ok: false, status: 400, headers: { get: () => null } }));
+    const fetch = vi.fn(async () => ({ ok: false, status: 400, headers: { get: () => null } }))
     const restore = setLoggerRuntimeManager({
       randomUUID: () => 'http-id',
       defer: (task) => task(),
       write: () => undefined,
       fetch
-    });
-    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    })
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     try {
-      const failures: Array<{ source: string; error: unknown }> = [];
+      const failures: Array<{ source: string; error: unknown }> = []
       const logger = new Logger({
         plugins: [http({ url: 'https://example.test/logs', retries: 2 })]
-      });
-      logger.onFailure((failure) => failures.push(failure));
-      logger.log('info', 'message');
-      await logger.flush();
-      expect(fetch).toHaveBeenCalledOnce();
-      expect(failures).toHaveLength(1);
-      const failure = failures[0];
-      expect(failure?.source).toBe('sink');
+      })
+      logger.onFailure((failure) => failures.push(failure))
+      logger.log('info', 'message')
+      await logger.flush()
+      expect(fetch).toHaveBeenCalledOnce()
+      expect(failures).toHaveLength(1)
+      const failure = failures[0]
+      expect(failure?.source).toBe('sink')
       expect((failure?.error as { code?: string } | undefined)?.code).toBe(
         LoggerErrorCode.deliveryFailed
-      );
+      )
     } finally {
-      error.mockRestore();
-      restore();
+      error.mockRestore()
+      restore()
     }
-  });
+  })
 
   it('reports HTTP serialization failures through the failure hook', async () => {
-    const fetch = vi.fn(async () => ({ ok: true, status: 200, headers: { get: () => null } }));
+    const fetch = vi.fn(async () => ({ ok: true, status: 200, headers: { get: () => null } }))
     const restore = setLoggerRuntimeManager({
       randomUUID: () => 'http-cycle',
       defer: (task) => task(),
       write: () => undefined,
       fetch
-    });
+    })
     try {
-      const failures: string[] = [];
-      const logger = new Logger({ plugins: [http({ url: 'https://example.test/logs' })] });
-      logger.onFailure((failure) => failures.push(failure.source));
-      const cyclic: Record<string, unknown> = {};
-      cyclic.self = cyclic;
-      logger.log('info', 'cyclic', cyclic);
-      await logger.flush();
-      expect(fetch).not.toHaveBeenCalled();
-      expect(failures).toEqual(['sink']);
+      const failures: string[] = []
+      const logger = new Logger({ plugins: [http({ url: 'https://example.test/logs' })] })
+      logger.onFailure((failure) => failures.push(failure.source))
+      const cyclic: Record<string, unknown> = {}
+      cyclic.self = cyclic
+      logger.log('info', 'cyclic', cyclic)
+      await logger.flush()
+      expect(fetch).not.toHaveBeenCalled()
+      expect(failures).toEqual(['sink'])
     } finally {
-      restore();
+      restore()
     }
-  });
+  })
 
   it('flushes an unfinished reasoning phase before switching phase', async () => {
-    const entries: ILogEntry[] = [];
+    const entries: ILogEntry[] = []
     const logger = new Logger({
       plugins: [
         reasoning(),
         {
           name: 'reasoning-capture',
           install: (core: any) => {
-            core.useSink((entry: ILogEntry) => entries.push(entry));
-            return {};
+            core.useSink((entry: ILogEntry) => entries.push(entry))
+            return {}
           }
         }
       ] as const
-    });
-    logger.startThinking();
-    logger.thinking('unfinished thinking');
-    logger.response('answer');
-    await logger.flush();
-    expect(entries.map((entry) => entry.tag)).toEqual(['thinking']);
-    expect(entries[0]?.message).toBe('unfinished thinking');
-  });
+    })
+    logger.startThinking()
+    logger.thinking('unfinished thinking')
+    logger.response('answer')
+    await logger.flush()
+    expect(entries.map((entry) => entry.tag)).toEqual(['thinking'])
+    expect(entries[0]?.message).toBe('unfinished thinking')
+  })
 
   it('retries HTTP 429 and honors a zero Retry-After delay', async () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce({ ok: false, status: 429, headers: { get: () => '0' } })
-      .mockResolvedValueOnce({ ok: true, status: 200, headers: { get: () => null } });
+      .mockResolvedValueOnce({ ok: true, status: 200, headers: { get: () => null } })
     const restore = setLoggerRuntimeManager({
       randomUUID: () => 'http-429',
       defer: (task) => task(),
       write: () => undefined,
       fetch
-    });
+    })
     try {
       const logger = new Logger({
         plugins: [http({ url: 'https://example.test/logs', retries: 1 })]
-      });
-      logger.log('info', 'message');
-      await logger.flush();
-      expect(fetch).toHaveBeenCalledTimes(2);
+      })
+      logger.log('info', 'message')
+      await logger.flush()
+      expect(fetch).toHaveBeenCalledTimes(2)
     } finally {
-      restore();
+      restore()
     }
-  });
+  })
 
   it.each([
     ['HTTP 5xx', () => ({ ok: false, status: 503, headers: { get: () => null } })],
     ['network failure', () => Promise.reject(new Error('offline'))]
   ])('retries %s failures', async (_name, response) => {
-    vi.useFakeTimers();
+    vi.useFakeTimers()
     const fetch = vi
       .fn()
       .mockImplementationOnce(response)
-      .mockResolvedValueOnce({ ok: true, status: 200, headers: { get: () => null } });
+      .mockResolvedValueOnce({ ok: true, status: 200, headers: { get: () => null } })
     const restore = setLoggerRuntimeManager({
       randomUUID: () => 'http-retry',
       defer: (task) => task(),
       write: () => undefined,
       fetch
-    });
+    })
     try {
       const logger = new Logger({
         plugins: [http({ url: 'https://example.test/logs', retries: 1 })]
-      });
-      logger.log('info', 'message');
-      const flushed = logger.flush();
-      await vi.runAllTimersAsync();
-      await flushed;
-      expect(fetch).toHaveBeenCalledTimes(2);
+      })
+      logger.log('info', 'message')
+      const flushed = logger.flush()
+      await vi.runAllTimersAsync()
+      await flushed
+      expect(fetch).toHaveBeenCalledTimes(2)
     } finally {
-      restore();
-      vi.useRealTimers();
+      restore()
+      vi.useRealTimers()
     }
-  });
+  })
 
   it('aborts an in-flight HTTP request during shutdown', async () => {
-    let signal: AbortSignal | undefined;
+    let signal: AbortSignal | undefined
     const fetch = vi.fn(
       (_url: string, init: { signal?: AbortSignal }) =>
         new Promise<never>((_resolve, reject) => {
-          signal = init.signal;
-          init.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+          signal = init.signal
+          init.signal?.addEventListener('abort', () => reject(new Error('aborted')))
         })
-    );
+    )
     const restore = setLoggerRuntimeManager({
       randomUUID: () => 'http-abort',
       defer: (task) => task(),
       write: () => undefined,
       fetch
-    });
-    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    })
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     try {
-      const logger = new Logger({ plugins: [http({ url: 'https://example.test/logs' })] });
-      logger.log('info', 'message');
-      await logger.shutdown('manual');
-      expect(signal?.aborted).toBe(true);
+      const logger = new Logger({ plugins: [http({ url: 'https://example.test/logs' })] })
+      logger.log('info', 'message')
+      await logger.shutdown('manual')
+      expect(signal?.aborted).toBe(true)
     } finally {
-      error.mockRestore();
-      restore();
+      error.mockRestore()
+      restore()
     }
-  });
+  })
 
   it('drains asynchronous work forwarded through multiple extends targets', async () => {
-    let release!: () => void;
+    let release!: () => void
     const leaf = new Logger({
       plugins: [
         {
           name: 'leaf-async-sink',
           install: (core: any) => {
-            core.useSink(() => new Promise<void>((resolve) => (release = resolve)));
-            return {};
+            core.useSink(() => new Promise<void>((resolve) => (release = resolve)))
+            return {}
           }
         }
       ]
-    });
-    const middle = new Logger().extends(leaf);
-    const root = new Logger().extends(middle);
-    root.log('info', 'message');
-    const flushed = root.flush();
-    release();
-    await flushed;
-  });
+    })
+    const middle = new Logger().extends(leaf)
+    const root = new Logger().extends(middle)
+    root.log('info', 'message')
+    const flushed = root.flush()
+    release()
+    await flushed
+  })
 
   it('shares concurrent shutdown work and preserves the first reason', async () => {
-    const reasons: string[] = [];
+    const reasons: string[] = []
     const logger = new Logger({
       plugins: [
         {
           name: 'shutdown-observer',
           install: (core: any) => {
-            core.onShutdown((reason: string) => reasons.push(reason));
-            return {};
+            core.onShutdown((reason: string) => reasons.push(reason))
+            return {}
           }
         }
       ]
-    });
-    const first = logger.shutdown('signal');
-    const second = logger.shutdown('manual');
-    expect(second).toBe(first);
-    await first;
-    expect(reasons).toEqual(['signal']);
-  });
+    })
+    const first = logger.shutdown('signal')
+    const second = logger.shutdown('manual')
+    expect(second).toBe(first)
+    await first
+    expect(reasons).toEqual(['signal'])
+  })
 
   it('infers getShared keys and values from plugin shared declarations', async () => {
     const sharedPlugin = {
       name: 'typed-shared',
       shared: () => ({ answer: 42, format: (value: number) => String(value) }),
       install: () => ({})
-    };
-    const logger = new Logger({ plugins: [sharedPlugin] });
-    const dynamicLogger = await new Logger().use(sharedPlugin);
+    }
+    const logger = new Logger({ plugins: [sharedPlugin] })
+    const dynamicLogger = await new Logger().use(sharedPlugin)
 
-    expectTypeOf(logger.getShared('answer')).toEqualTypeOf<number | undefined>();
+    expectTypeOf(logger.getShared('answer')).toEqualTypeOf<number | undefined>()
     expectTypeOf(logger.getShared('format')).toEqualTypeOf<
       ((value: number) => string) | undefined
-    >();
-    expectTypeOf(dynamicLogger.getShared('answer')).toEqualTypeOf<number | undefined>();
+    >()
+    expectTypeOf(dynamicLogger.getShared('answer')).toEqualTypeOf<number | undefined>()
     // oxlint-disable-next-line no-constant-condition
     if (false) {
       // @ts-expect-error unknown shared keys are rejected
-      logger.getShared('missing');
+      logger.getShared('missing')
     }
-  });
+  })
 
   it('serializes concurrent updates', async () => {
-    const seen: number[] = [];
+    const seen: number[] = []
     const plugin: ILoggerPlugin<Record<string, never>, { value: number }> = {
       name: 'serial-update',
       install: () => ({}),
       update: async (config) => {
-        seen.push(config.value);
-        await Promise.resolve();
+        seen.push(config.value)
+        await Promise.resolve()
       }
-    };
-    const logger = new Logger({ plugins: [plugin] });
+    }
+    const logger = new Logger({ plugins: [plugin] })
 
     await Promise.all([
       logger.config.update('serial-update', () => ({ value: 1 })),
       logger.config.update('serial-update', () => ({ value: 2 })),
       logger.config.update('serial-update', () => ({ value: 3 }))
-    ]);
+    ])
 
-    expect(seen).toEqual([1, 2, 3]);
-  });
+    expect(seen).toEqual([1, 2, 3])
+  })
 
   it('allows plugin update to flush without waiting for its own lifecycle task', async () => {
-    let flushed = 0;
+    let flushed = 0
     const plugin: ILoggerPlugin<Record<string, never>, { value: number }> = {
       name: 'flush-in-update',
       install: (core) => {
         core.onFlush(() => {
-          flushed += 1;
-        });
-        return {};
+          flushed += 1
+        })
+        return {}
       },
       update: async (_config, core) => {
-        await core.flush();
+        await core.flush()
       }
-    };
-    const logger = new Logger({ plugins: [plugin] });
+    }
+    const logger = new Logger({ plugins: [plugin] })
 
-    const update = logger.config.update('flush-in-update', () => ({ value: 1 }));
+    const update = logger.config.update('flush-in-update', () => ({ value: 1 }))
     await expect(
       Promise.race([
         update,
         new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('flush waited for its own lifecycle task')), 100);
+          setTimeout(() => reject(new Error('flush waited for its own lifecycle task')), 100)
         })
       ])
-    ).resolves.toBeUndefined();
-    expect(flushed).toBe(1);
-  });
+    ).resolves.toBeUndefined()
+    expect(flushed).toBe(1)
+  })
 
   it('disposes once when unUse is concurrent', async () => {
-    let disposed = 0;
+    let disposed = 0
     const plugin: ILoggerPlugin = {
       name: 'serial-dispose',
       install: () => ({}),
       dispose: async () => {
-        disposed += 1;
-        await Promise.resolve();
+        disposed += 1
+        await Promise.resolve()
       }
-    };
-    const logger = new Logger({ plugins: [plugin] });
+    }
+    const logger = new Logger({ plugins: [plugin] })
 
-    await Promise.all([logger.unUse('serial-dispose'), logger.unUse('serial-dispose')]);
+    await Promise.all([logger.unUse('serial-dispose'), logger.unUse('serial-dispose')])
 
-    expect(disposed).toBe(1);
-    await expect(logger.unUse('serial-dispose')).resolves.toBeUndefined();
-  });
+    expect(disposed).toBe(1)
+    await expect(logger.unUse('serial-dispose')).resolves.toBeUndefined()
+  })
 
   it('starts rollback cleanup after sync install fails', async () => {
-    let disposed = 0;
+    let disposed = 0
     const plugin: ILoggerPlugin = {
       name: 'failed-install',
       install: (core) => {
         core.onDispose(() => {
-          disposed += 1;
-        });
-        throw new Error('install failed');
+          disposed += 1
+        })
+        throw new Error('install failed')
       },
       dispose: () => {
-        disposed += 1;
+        disposed += 1
       }
-    };
-    const logger = new Logger();
+    }
+    const logger = new Logger()
 
-    await expect(logger.use(plugin)).rejects.toThrow('install failed');
-    expect(disposed).toBe(1);
-  });
+    await expect(logger.use(plugin)).rejects.toThrow('install failed')
+    expect(disposed).toBe(1)
+  })
 
   it('keeps constructor hooks outside plugin scope', async () => {
-    let called = 0;
-    const logger = new Logger({ on: { before: () => void (called += 1) } });
+    let called = 0
+    const logger = new Logger({ on: { before: () => void (called += 1) } })
 
-    logger.log('info', 'message');
-    await logger.flush();
+    logger.log('info', 'message')
+    await logger.flush()
 
-    expect(called).toBe(1);
-  });
+    expect(called).toBe(1)
+  })
 
   it('throws synchronous plugin installation failures from the constructor', () => {
     const plugin: ILoggerPlugin = {
       name: 'constructor-failure',
       install: () => {
-        throw new Error('constructor install failed');
+        throw new Error('constructor install failed')
       }
-    };
+    }
 
-    expect(() => new Logger({ plugins: [plugin] })).toThrow('constructor install failed');
-  });
+    expect(() => new Logger({ plugins: [plugin] })).toThrow('constructor install failed')
+  })
 
   it('rejects async plugins in the constructor before returning a partial logger', () => {
     const plugin: ILoggerPlugin<{ ready: boolean }> = {
       name: 'constructor-async',
       install: async () => ({ ready: true })
-    };
+    }
 
     expect(() => new Logger({ plugins: [plugin] })).toThrow(
       'returned an awaitable during synchronous installation'
-    );
-  });
+    )
+  })
 
   it('colors first message content when colorMessage is head', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const logger = new Logger({
       plugins: [
         level(),
         color({ color: 'always', colorMessage: 'head', format: 'pretty', timestamp: false })
       ]
-    });
+    })
 
-    logger.warn('WARNING');
-    await logger.flush();
+    logger.warn('WARNING')
+    await logger.flush()
 
-    const output = String(warn.mock.calls[0]?.[0]);
-    expect(output).toContain('\u001b[');
-    expect(output).toContain('WARNING');
-    warn.mockRestore();
-  });
+    const output = String(warn.mock.calls[0]?.[0])
+    expect(output).toContain('\u001b[')
+    expect(output).toContain('WARNING')
+    warn.mockRestore()
+  })
 
   it.each(['none', 'head'] as const)(
     'renders all console-style arguments when colorMessage is %s',
     async (colorMessage) => {
-      const info = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const info = vi.spyOn(console, 'log').mockImplementation(() => {})
       const logger = new Logger({
         plugins: [
           level(),
           color({ color: 'always', colorMessage, format: 'pretty', timestamp: false })
         ]
-      });
+      })
 
-      logger.info('value: %s', 42, true, null);
-      await logger.flush();
+      logger.info('value: %s', 42, true, null)
+      await logger.flush()
 
-      expect(info.mock.calls[0]).toEqual([expect.stringContaining('value: %s'), 42, true, null]);
-      info.mockRestore();
+      expect(info.mock.calls[0]).toEqual([expect.stringContaining('value: %s'), 42, true, null])
+      info.mockRestore()
     }
-  );
+  )
 
   it('colors every primitive argument when colorMessage is all', async () => {
-    const info = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const info = vi.spyOn(console, 'log').mockImplementation(() => {})
     const logger = new Logger({
       plugins: [
         level(),
         color({ color: 'always', colorMessage: 'all', format: 'pretty', timestamp: false })
       ]
-    });
-    const object = { answer: 42 };
+    })
+    const object = { answer: 42 }
 
-    logger.info('values', 42, true, null, object);
-    await logger.flush();
+    logger.info('values', 42, true, null, object)
+    await logger.flush()
 
-    const output = info.mock.calls[0]!;
-    expect(String(output[0])).toContain('\u001b[');
-    expect(String(output[1])).toContain('\u001b[');
-    expect(String(output[2])).toContain('\u001b[');
-    expect(String(output[3])).toContain('\u001b[');
-    expect(output[4]).toBe(object);
-    info.mockRestore();
-  });
+    const output = info.mock.calls[0]!
+    expect(String(output[0])).toContain('\u001b[')
+    expect(String(output[1])).toContain('\u001b[')
+    expect(String(output[2])).toContain('\u001b[')
+    expect(String(output[3])).toContain('\u001b[')
+    expect(output[4]).toBe(object)
+    info.mockRestore()
+  })
 
   it('colors only the final argument when colorMessage is tail', async () => {
-    const info = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const info = vi.spyOn(console, 'log').mockImplementation(() => {})
     const logger = new Logger({
       plugins: [
         level(),
         color({ color: 'always', colorMessage: 'tail', format: 'pretty', timestamp: false })
       ]
-    });
+    })
 
-    logger.info('values', 42, 'last');
-    await logger.flush();
+    logger.info('values', 42, 'last')
+    await logger.flush()
 
-    const output = info.mock.calls[0]!;
-    expect(String(output[0])).not.toContain('\u001b[36mvalues');
-    expect(output[1]).toBe(42);
-    expect(String(output[2])).toContain('\u001b[');
-    expect(String(output[2])).toContain('last');
-    info.mockRestore();
-  });
+    const output = info.mock.calls[0]!
+    expect(String(output[0])).not.toContain('\u001b[36mvalues')
+    expect(output[1]).toBe(42)
+    expect(String(output[2])).toContain('\u001b[')
+    expect(String(output[2])).toContain('last')
+    info.mockRestore()
+  })
 
   it('colors only the first and final arguments when colorMessage is head-tail', async () => {
-    const info = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const info = vi.spyOn(console, 'log').mockImplementation(() => {})
     const logger = new Logger({
       plugins: [
         level(),
@@ -867,89 +867,89 @@ describe('logger plugin host integration', () => {
           timestamp: false
         })
       ]
-    });
+    })
 
-    logger.info('head', 'middle', 'tail');
-    await logger.flush();
+    logger.info('head', 'middle', 'tail')
+    await logger.flush()
 
-    const output = info.mock.calls[0]!;
-    expect(String(output[0])).toContain('\u001b[36mhead');
-    expect(output[1]).toBe('middle');
-    expect(String(output[2])).toContain('\u001b[');
-    expect(String(output[2])).toContain('tail');
-    info.mockRestore();
-  });
+    const output = info.mock.calls[0]!
+    expect(String(output[0])).toContain('\u001b[36mhead')
+    expect(output[1]).toBe('middle')
+    expect(String(output[2])).toContain('\u001b[')
+    expect(String(output[2])).toContain('tail')
+    info.mockRestore()
+  })
 
   it('accepts a non-string first argument like console.log', async () => {
-    const info = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const info = vi.spyOn(console, 'log').mockImplementation(() => {})
     const logger = new Logger({
       plugins: [level(), color({ color: 'never', format: 'pretty', timestamp: false })]
-    });
-    const value = { answer: 42 };
+    })
+    const value = { answer: 42 }
 
-    logger.info(value, 'tail');
-    await logger.flush();
+    logger.info(value, 'tail')
+    await logger.flush()
 
-    expect(info.mock.calls[0]).toEqual([expect.stringContaining('[INFO]'), value, 'tail']);
-    info.mockRestore();
-  });
+    expect(info.mock.calls[0]).toEqual([expect.stringContaining('[INFO]'), value, 'tail'])
+    info.mockRestore()
+  })
 
   it('outputs level logs synchronously by default', () => {
-    const info = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const info = vi.spyOn(console, 'log').mockImplementation(() => {})
     const logger = new Logger({
       plugins: [level(), color({ color: 'never', format: 'pretty', timestamp: false })]
-    });
+    })
 
-    logger.info('sync');
+    logger.info('sync')
 
-    expect(info).toHaveBeenCalledOnce();
-    info.mockRestore();
-  });
+    expect(info).toHaveBeenCalledOnce()
+    info.mockRestore()
+  })
 
   it('defers level logs only when asyncOutput is enabled', async () => {
-    const info = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const info = vi.spyOn(console, 'log').mockImplementation(() => {})
     const logger = new Logger({
       plugins: [
         level({ asyncOutput: true }),
         color({ color: 'never', format: 'pretty', timestamp: false })
       ]
-    });
+    })
 
-    logger.info('async');
-    expect(info).not.toHaveBeenCalled();
+    logger.info('async')
+    expect(info).not.toHaveBeenCalled()
 
-    await logger.flush();
-    expect(info).toHaveBeenCalledOnce();
-    info.mockRestore();
-  });
+    await logger.flush()
+    expect(info).toHaveBeenCalledOnce()
+    info.mockRestore()
+  })
 
   it('applies reasoning asyncOutput to raw and completed entry output', async () => {
-    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    const seen: string[] = [];
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    const seen: string[] = []
     const collector: ILoggerPlugin = {
       name: 'reasoning-async-collector',
       install: (core) => {
         core.useSink((entry) => {
-          seen.push(entry.message);
-        });
-        return {};
+          seen.push(entry.message)
+        })
+        return {}
       }
-    };
-    const logger = new Logger({ plugins: [reasoning({ asyncOutput: true }), collector] });
+    }
+    const logger = new Logger({ plugins: [reasoning({ asyncOutput: true }), collector] })
 
-    logger.response('answer');
-    logger.endResponse();
-    expect(write).not.toHaveBeenCalled();
-    expect(seen).toEqual([]);
+    logger.response('answer')
+    logger.endResponse()
+    expect(write).not.toHaveBeenCalled()
+    expect(seen).toEqual([])
 
-    await logger.flush();
-    expect(write).toHaveBeenCalledWith('answer');
-    expect(seen).toEqual(['answer']);
-    write.mockRestore();
-  });
+    await logger.flush()
+    expect(write).toHaveBeenCalledWith('answer')
+    expect(seen).toEqual(['answer'])
+    write.mockRestore()
+  })
 
   it('runs full batch callbacks asynchronously by default', async () => {
-    const batches: string[][] = [];
+    const batches: string[][] = []
     const consumer: ILoggerPlugin<
       Record<string, never>,
       Record<string, unknown>,
@@ -959,26 +959,26 @@ describe('logger plugin host integration', () => {
     > = {
       name: 'default-async-batch-consumer',
       install: (core) => {
-        const createBatcher = core.getShared('createBatcher')!;
+        const createBatcher = core.getShared('createBatcher')!
         const batcher = createBatcher<string>({ maxSize: 1 }, (items) => {
-          batches.push(items);
-        });
-        core.useSink((entry) => batcher.push(entry.message));
-        return {};
+          batches.push(items)
+        })
+        core.useSink((entry) => batcher.push(entry.message))
+        return {}
       }
-    };
-    const logger = new Logger({ plugins: [batch(), consumer] });
+    }
+    const logger = new Logger({ plugins: [batch(), consumer] })
 
-    logger.log('info', 'deferred-1');
-    logger.log('info', 'deferred-2');
-    expect(batches).toEqual([]);
+    logger.log('info', 'deferred-1')
+    logger.log('info', 'deferred-2')
+    expect(batches).toEqual([])
 
-    await logger.flush();
-    expect(batches).toEqual([['deferred-1'], ['deferred-2']]);
-  });
+    await logger.flush()
+    expect(batches).toEqual([['deferred-1'], ['deferred-2']])
+  })
 
   it('allows synchronous full batch callbacks explicitly', () => {
-    const batches: string[][] = [];
+    const batches: string[][] = []
     const consumer: ILoggerPlugin<
       Record<string, never>,
       Record<string, unknown>,
@@ -988,57 +988,57 @@ describe('logger plugin host integration', () => {
     > = {
       name: 'sync-batch-consumer',
       install: (core) => {
-        const createBatcher = core.getShared('createBatcher')!;
+        const createBatcher = core.getShared('createBatcher')!
         const batcher = createBatcher<string>({ maxSize: 1 }, (items) => {
-          batches.push(items);
-        });
-        core.useSink((entry) => batcher.push(entry.message));
-        return {};
+          batches.push(items)
+        })
+        core.useSink((entry) => batcher.push(entry.message))
+        return {}
       }
-    };
-    const logger = new Logger({ plugins: [batch({ asyncOutput: false }), consumer] });
+    }
+    const logger = new Logger({ plugins: [batch({ asyncOutput: false }), consumer] })
 
-    logger.log('info', 'immediate');
+    logger.log('info', 'immediate')
 
-    expect(batches).toEqual([['immediate']]);
-  });
+    expect(batches).toEqual([['immediate']])
+  })
 
   it.each(['sync', 'async', 'generator'] as const)('runs %s pipeline mode', async (mode) => {
-    const seen: string[] = [];
+    const seen: string[] = []
     const collector: ILoggerPlugin = {
       name: `collector-${mode}`,
       install: (core) => {
         if (mode === 'sync') {
-          core.usePipeline((entry, next) => next({ ...entry, message: `${entry.message}:sync` }));
+          core.usePipeline((entry, next) => next({ ...entry, message: `${entry.message}:sync` }))
         } else if (mode === 'async') {
           core.useAsyncPipeline(async (entry, next) => {
-            await next({ ...entry, message: `${entry.message}:async` });
-          });
+            await next({ ...entry, message: `${entry.message}:async` })
+          })
         } else {
           core.useGeneratorPipeline(function* (entry) {
-            yield { ...entry, message: `${entry.message}:generator` };
-            return GENERATOR_CONTINUE;
-          });
+            yield { ...entry, message: `${entry.message}:generator` }
+            return GENERATOR_CONTINUE
+          })
         }
         core.useSink((entry) => {
-          seen.push(entry.message);
-        });
-        return {};
+          seen.push(entry.message)
+        })
+        return {}
       }
-    };
+    }
     const logger = new Logger({
       pipeline: { mode },
       plugins: [collector]
-    });
+    })
 
-    logger.log('info', 'message');
-    await logger.flush();
+    logger.log('info', 'message')
+    await logger.flush()
 
-    expect(seen).toEqual([`message:${mode}`]);
-  });
+    expect(seen).toEqual([`message:${mode}`])
+  })
 
   it('uses generator return values with and without yield', async () => {
-    const seen: string[] = [];
+    const seen: string[] = []
     const generatorPlugin: ILoggerPlugin<
       Record<string, never>,
       Record<string, unknown>,
@@ -1047,49 +1047,49 @@ describe('logger plugin host integration', () => {
       name: 'generator-return',
       install(core) {
         core.useGeneratorPipeline(function* (entry) {
-          return { ...entry, message: `${entry.message}:return` };
-        });
+          return { ...entry, message: `${entry.message}:return` }
+        })
         core.useGeneratorPipeline(function* (entry) {
-          yield { ...entry, message: `${entry.message}:yield` };
-          return { ...entry, message: `${entry.message}:final` };
-        });
+          yield { ...entry, message: `${entry.message}:yield` }
+          return { ...entry, message: `${entry.message}:final` }
+        })
         core.useSink((entry) => {
-          seen.push(entry.message);
-        });
-        return {};
+          seen.push(entry.message)
+        })
+        return {}
       }
-    };
+    }
     const logger = new Logger({
       pipeline: { mode: 'generator' },
       plugins: [generatorPlugin]
-    });
+    })
 
-    logger.log('info', 'message');
-    await logger.flush();
-    expect(seen).toEqual(['message:return:final']);
-  });
+    logger.log('info', 'message')
+    await logger.flush()
+    expect(seen).toEqual(['message:return:final'])
+  })
 
   it('types pipeline methods from constructor mode', () => {
-    const asyncLogger = new Logger({ pipeline: { mode: 'async' } });
-    expect(() => asyncLogger.useAsyncPipeline(async (entry, next) => next(entry))).not.toThrow();
+    const asyncLogger = new Logger({ pipeline: { mode: 'async' } })
+    expect(() => asyncLogger.useAsyncPipeline(async (entry, next) => next(entry))).not.toThrow()
     // oxlint-disable-next-line no-constant-condition
     if (false) {
       // @ts-expect-error async mode only exposes async pipeline registration
-      asyncLogger.usePipeline((entry, next) => next(entry));
+      asyncLogger.usePipeline((entry, next) => next(entry))
     }
-    const generatorLogger = new Logger({ pipeline: { mode: 'generator' } });
+    const generatorLogger = new Logger({ pipeline: { mode: 'generator' } })
     expect(() =>
       generatorLogger.useGeneratorPipeline(function* (entry) {
-        yield entry;
-        return undefined;
+        yield entry
+        return undefined
       })
-    ).not.toThrow();
+    ).not.toThrow()
     // oxlint-disable-next-line no-constant-condition
     if (false) {
       // @ts-expect-error generator mode only exposes generator pipeline registration
-      generatorLogger.useAsyncPipeline(async (entry, next) => next(entry));
+      generatorLogger.useAsyncPipeline(async (entry, next) => next(entry))
     }
-  });
+  })
 
   it('rejects nested plugin mutation during install', async () => {
     const inner: ILoggerPlugin<
@@ -1101,7 +1101,7 @@ describe('logger plugin host integration', () => {
       name: 'nested-inner',
       shared: () => ({ innerShared: 42 }),
       install: () => ({})
-    };
+    }
     const outer: ILoggerPlugin<
       Record<string, never>,
       Record<string, unknown>,
@@ -1111,52 +1111,52 @@ describe('logger plugin host integration', () => {
       name: 'nested-outer',
       shared: () => ({ outerShared: 7 }),
       install: (core) => {
-        (core as unknown as { use(plugin: unknown): unknown }).use(inner);
-        return {};
+        ;(core as unknown as { use(plugin: unknown): unknown }).use(inner)
+        return {}
       }
-    };
+    }
 
-    const logger = new Logger();
-    await expect(logger.use(outer)).rejects.toThrow();
-  });
+    const logger = new Logger()
+    await expect(logger.use(outer)).rejects.toThrow()
+  })
 
   it('awaits async cleanup when async installation fails', async () => {
-    const events: string[] = [];
-    const logger = new Logger();
+    const events: string[] = []
+    const logger = new Logger()
     const plugin: ILoggerPlugin = {
       name: 'async-failed-install',
       install: () => {
-        throw new Error('install failed');
+        throw new Error('install failed')
       },
       dispose: async () => {
-        await Promise.resolve();
-        events.push('disposed');
+        await Promise.resolve()
+        events.push('disposed')
       }
-    };
+    }
 
-    await expect(logger.use(plugin)).rejects.toThrow('install failed');
-    expect(events).toEqual([]);
-  });
+    await expect(logger.use(plugin)).rejects.toThrow('install failed')
+    expect(events).toEqual([])
+  })
 
   it('does not silently drop entries when level() runs under generator pipeline mode', async () => {
-    const seen: string[] = [];
+    const seen: string[] = []
     const collector: ILoggerPlugin = {
       name: 'collector',
       install: (core) => {
         core.useSink((entry) => {
-          seen.push(entry.message);
-        });
-        return {};
+          seen.push(entry.message)
+        })
+        return {}
       }
-    };
+    }
     const logger = new Logger({
       pipeline: { mode: 'generator' },
       plugins: [level(), collector]
-    });
+    })
 
-    logger.info('hello world');
-    await logger.flush();
+    logger.info('hello world')
+    await logger.flush()
 
-    expect(seen).toEqual(['hello world']);
-  });
-});
+    expect(seen).toEqual(['hello world'])
+  })
+})

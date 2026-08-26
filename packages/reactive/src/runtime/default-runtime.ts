@@ -1,4 +1,4 @@
-import { createRuntime, type Runtime } from './runtime.class.js';
+import { createRuntime, type Runtime } from './runtime.class.js'
 
 /**
  * 默认共享运行时——全局 `signal()` / `createStore()` 这类不显式传 runtime 的写法 都落在它上面，保持「开箱即用」的心智；需要隔离时显式
@@ -11,4 +11,4 @@ import { createRuntime, type Runtime } from './runtime.class.js';
  * 分出来之后边界是可执行的：`architecture.test.ts` 断言内核入口的传递闭包里没有 这个模块。想要便利写法就显式 import 它（或
  * `defaultRuntime`），代价随之显式。
  */
-export const defaultRuntime: Runtime = createRuntime();
+export const defaultRuntime: Runtime = createRuntime()

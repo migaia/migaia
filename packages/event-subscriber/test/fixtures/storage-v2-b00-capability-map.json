@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 7,
+  "retiredArtifacts": [
+    {
+      "id": "cycle1-callable-fact-ledger",
+      "path": "packages/event-subscriber/test/fixtures/storage-v2-b00-fact-dispositions.json",
+      "disposition": "deleted",
+      "evidence": "packages/storage-web/test/fixtures/storage-v2-c2-observation-snapshot.jsonl"
+    }
+  ],
+  "sharedProviders": [
+    "event.channel",
+    "utils.race-with-abort",
+    "utils.with-timeout",
+    "reactive.signal",
+    "reactive.scheduler",
+    "lifecycle.generation",
+    "lifecycle.sync-scope"
+  ],
+  "capabilityFlags": {
+    "memory.secondaryIndexes": false,
+    "local-storage.secondaryIndexes": false,
+    "session-storage.secondaryIndexes": false,
+    "cookie.secondaryIndexes": false,
+    "indexed-db.secondaryIndexes": false,
+    "indexed-db.changeFeed": false,
+    "memory.changeFeed": true
+  },
+  "v1Gates": [
+    {
+      "packageName": "@migaia/storage-web",
+      "script": "test/conformance/kv.spec.ts",
+      "requires": ["event.dispatch-policy"]
+    },
+    {
+      "packageName": "@migaia/storage-web",
+      "script": "test/conformance/document.spec.ts",
+      "requires": ["event.dispatch-policy"]
+    },
+    {
+      "packageName": "@migaia/storage-web",
+      "script": "test/conformance/sync.spec.ts",
+      "requires": ["event.dispatch-policy"]
+    }
+  ],
+  "directGates": [
+    {
+      "packageName": "@migaia/store-light",
+      "script": "typecheck",
+      "kind": "package-script",
+      "requires": ["event.dispatch-policy"]
+    },
+    {
+      "packageName": "@migaia/store-light",
+      "script": "test/event-subscriber-compat.test.ts",
+      "kind": "vitest",
+      "requires": ["event.dispatch-policy"]
+    },
+    {
+      "packageName": "@migaia/web-rpc",
+      "script": "typecheck",
+      "kind": "package-script",
+      "requires": ["event.dispatch-policy"]
+    },
+    {
+      "packageName": "@migaia/web-rpc",
+      "script": "test/event-subscriber-compat.test.ts",
+      "kind": "vitest",
+      "requires": ["event.dispatch-policy"]
+    },
+    {
+      "packageName": "@migaia/storage-web",
+      "script": "typecheck",
+      "kind": "package-script",
+      "requires": ["event.dispatch-policy", "utils.abort-timeout-signal"]
+    }
+  ]
+}
