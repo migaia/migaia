@@ -2,7 +2,7 @@ SHELL := /bin/sh
 export CI := true
 
 # Topological order: every workspace dependency is published before its consumers.
-RELEASE_PACKAGES := utils lifecycle reactive middleware-pipeline event-subscriber serialize resource storage-contract plugin-host web-rpc logger storage-web
+RELEASE_PACKAGES := utils event-subscriber lifecycle reactive middleware-pipeline serialize resource storage-contract plugin-host web-rpc logger storage-web
 GITHUB_PACKAGES_REGISTRY := https://npm.pkg.github.com
 
 .PHONY: utils middleware-pipeline event-subscriber plugin-host logger web-rpc storage-web reactive resource lifecycle serialize storage-contract \
@@ -105,8 +105,19 @@ publish: check-package auth-check
 	package_json="packages/$$package/package.json"; \
 	backup=$$(mktemp); \
 	cp "$$package_json" "$$backup"; \
-	restore() { cp "$$backup" "$$package_json"; rm -f "$$backup"; }; \
-	trap restore EXIT INT TERM; \
+	restored=false; \
+	restore() { \
+		if [ "$$restored" = false ]; then \
+			cp "$$backup" "$$package_json"; \
+			rm -f "$$backup"; \
+			restored=true; \
+		fi; \
+	}; \
+	on_interrupt() { restore; exit 130; }; \
+	on_terminate() { restore; exit 143; }; \
+	trap restore EXIT; \
+	trap on_interrupt INT; \
+	trap on_terminate TERM; \
 	sed -i.bak '/^[[:space:]]*"private"[[:space:]]*:[[:space:]]*true,[[:space:]]*$$/d' "$$package_json"; \
 	rm -f "$$package_json.bak"; \
 	echo "==> publishing @migaia/$$package@$$version"; \
