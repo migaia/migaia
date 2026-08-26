@@ -1,0 +1,25 @@
+---
+export const prerender = false
+
+interface Props {
+  params: {
+    lang: string
+    slug: string
+  }
+}
+
+const { lang, slug } = Astro.params
+---
+
+<html lang={lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>migaia docs - {slug || lang}</title>
+  </head>
+  <body>
+    <h1>{slug ? slug : `Language: ${lang}`}</h1>
+    <p>✓ Dynamic route working</p>
+    <p><a href="/">← Back to home</a></p>
+  </body>
+</html>
