@@ -31,8 +31,6 @@
     "src/errors.ts",
     "src/transport.ts",
     "src/wire.ts",
-    "src/factory.ts",
-    "src/endpoint.ts",
     "src/middleware",
     "src/internal/runtime.ts",
     "src/internal/pending.ts",

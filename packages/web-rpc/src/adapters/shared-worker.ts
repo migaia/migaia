@@ -1,20 +1,28 @@
-import type { IWebRpcSendOptions, IWebRpcTransport } from '../transport.js';
-import { registerListeners, releaseListeners } from '../internal/listener-safety.js';
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js';
+import type { IWebRpcSendOptions, IWebRpcTransport } from '../transport.js'
+import {
+  createListenerFailureState,
+  drainListenerFailures,
+  observeListener,
+  registerListeners,
+  releaseListenerRegistration,
+  reportListenerFailure
+} from '../internal/listener-safety.js'
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js'
+import { WebRpcErrorCode } from '../errors.js'
 
 /** Minimal SharedWorker port surface accepted by the adapter. */
 export type ISharedWorkerPort = {
-  postMessage(message: unknown, transfer?: readonly Transferable[]): void;
-  start?(): void;
+  postMessage(message: unknown, transfer?: readonly Transferable[]): void
+  start?(): void
   addEventListener(
     type: 'message' | 'messageerror',
     listener: (event: MessageEvent<unknown> | Event) => void
-  ): void;
+  ): void
   removeEventListener(
     type: 'message' | 'messageerror',
     listener: (event: MessageEvent<unknown> | Event) => void
-  ): void;
-};
+  ): void
+}
 
 /** Wraps a SharedWorker's `port` without importing DOM or worker globals at runtime. */
 export function createSharedWorkerTransport(
@@ -22,91 +30,99 @@ export function createSharedWorkerTransport(
 ): IWebRpcTransport<unknown, Transferable> {
   const listeners = new Set<
     (message: { data: unknown; origin?: string; source?: unknown }) => void
-  >();
-  const listenerErrors = new Set<(error: unknown) => void>();
-  const transportErrors = new Set<(error: unknown) => void>();
+  >()
+  const listenerErrors = new Set<(error: unknown) => void>()
+  const transportErrors = new Set<(error: unknown) => void>()
+  const secondaryFailures = createListenerFailureState()
   const onMessage = (event: MessageEvent<unknown> | Event): void => {
-    let data: unknown;
-    let origin: string | undefined;
-    let source: unknown;
+    let data: unknown
+    let origin: string | undefined
+    let source: unknown
     try {
-      data = (event as { data?: unknown }).data;
-      const eventOrigin = (event as { origin?: unknown }).origin;
-      origin = typeof eventOrigin === 'string' ? eventOrigin : undefined;
-      source = (event as { source?: unknown }).source;
+      data = (event as { data?: unknown }).data
+      const eventOrigin = (event as { origin?: unknown }).origin
+      origin = typeof eventOrigin === 'string' ? eventOrigin : undefined
+      source = (event as { source?: unknown }).source
     } catch (error) {
-      for (const report of Array.from(transportErrors)) {
-        try {
-          report(error);
-        } catch {}
-      }
-      return;
+      reportListenerFailure(error, transportErrors, secondaryFailures)
+      return
     }
     for (const listener of Array.from(listeners)) {
-      try {
-        listener({
-          data,
-          origin: typeof origin === 'string' ? origin : undefined,
-          source
-        });
-      } catch (error) {
-        for (const report of Array.from(listenerErrors)) {
-          try {
-            report(error);
-          } catch {}
-        }
-      }
+      observeListener(
+        () =>
+          listener({
+            data,
+            origin: typeof origin === 'string' ? origin : undefined,
+            source
+          }),
+        (error) => reportListenerFailure(error, listenerErrors, secondaryFailures),
+        secondaryFailures
+      )
     }
-  };
+  }
   const onError = (): void => {
-    for (const listener of Array.from(transportErrors)) {
-      try {
-        listener(new Error('[rpc] shared worker message error'));
-      } catch {}
-    }
-  };
+    reportListenerFailure(
+      new Error('[rpc] shared worker message error'),
+      transportErrors,
+      secondaryFailures
+    )
+  }
   return {
     platform: WebRpcPlatform.worker,
     topology: 'exclusive',
     ownership: WebRpcTransportOwnership.borrowed,
     send(message, options?: IWebRpcSendOptions<Transferable>) {
-      port.postMessage(message, options?.transfer);
+      port.postMessage(message, options?.transfer)
     },
     subscribe(listener) {
       if (listeners.size === 0) {
-        registerListeners([
-          { add: () => port.start?.(), remove: () => undefined },
-          {
-            add: () => port.addEventListener('message', onMessage),
-            remove: () => port.removeEventListener('message', onMessage)
-          },
-          {
-            add: () => port.addEventListener('messageerror', onError),
-            remove: () => port.removeEventListener('messageerror', onError)
-          }
-        ]);
+        registerListeners(
+          [
+            { add: () => port.start?.(), remove: () => undefined },
+            {
+              add: () => port.addEventListener('message', onMessage),
+              remove: () => port.removeEventListener('message', onMessage)
+            },
+            {
+              add: () => port.addEventListener('messageerror', onError),
+              remove: () => port.removeEventListener('messageerror', onError)
+            }
+          ],
+          { code: WebRpcErrorCode.transport, secondaryFailures }
+        )
       }
-      listeners.add(listener);
+      listeners.add(listener)
       return () => {
-        if (!listeners.has(listener)) return;
-        if (listeners.size === 1) {
-          releaseListeners([
-            () => port.removeEventListener('message', onMessage),
-            () => port.removeEventListener('messageerror', onError)
-          ]);
-          listeners.delete(listener);
-          return;
-        }
-        listeners.delete(listener);
-      };
+        if (!listeners.has(listener)) return
+        releaseListenerRegistration(
+          listeners.size === 1
+            ? [
+                () => port.removeEventListener('message', onMessage),
+                () => port.removeEventListener('messageerror', onError)
+              ]
+            : [],
+          () => {
+            listeners.delete(listener)
+          },
+          { code: WebRpcErrorCode.transport, secondaryFailures }
+        )
+      }
     },
     onListenerError(listener) {
-      listenerErrors.add(listener);
-      return () => listenerErrors.delete(listener);
+      listenerErrors.add(listener)
+      return () => {
+        const deleted = listenerErrors.delete(listener)
+        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        return deleted
+      }
     },
     onTransportError(listener) {
-      transportErrors.add(listener);
-      return () => transportErrors.delete(listener);
+      transportErrors.add(listener)
+      return () => {
+        const deleted = transportErrors.delete(listener)
+        drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
+        return deleted
+      }
     }
-  };
+  }
 }

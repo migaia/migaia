@@ -1,20 +1,20 @@
-import { raceWithAsyncControl, waitWithSignal } from './async-control.js';
-import type { IAbortSignal } from './async-control.js';
-import { tagWebRpcError, WebRpcErrorCode } from '../errors.js';
+import { raceWithAsyncControl, waitWithSignal } from './async-control.js'
+import type { IAbortSignal } from './async-control.js'
+import { tagWebRpcError, WebRpcErrorCode } from '../errors.js'
 
 export type IRetryDecision =
   | { readonly retry: false }
-  | { readonly retry: true; readonly delayMs: number };
+  | { readonly retry: true; readonly delayMs: number }
 export type IRetryExecutorOptions<T> = {
-  readonly maxAttempts: number;
-  readonly signals: readonly IAbortSignal[];
-  readonly attempt: (attempt: number) => Promise<T>;
-  readonly decide: (error: unknown, attempt: number) => Promise<IRetryDecision>;
-  readonly createAbortError: () => Error;
-  readonly createTimeoutError: () => Error;
-  readonly remainingTimeout?: () => number | false | undefined;
-  readonly onDiagnostic?: (error: unknown) => void;
-};
+  readonly maxAttempts: number
+  readonly signals: readonly IAbortSignal[]
+  readonly attempt: (attempt: number) => Promise<T>
+  readonly decide: (error: unknown, attempt: number) => Promise<IRetryDecision>
+  readonly createAbortError: (reason?: unknown) => Error
+  readonly createTimeoutError: () => Error
+  readonly remainingTimeout?: () => number | false | undefined
+  readonly onDiagnostic?: (error: unknown) => void
+}
 
 /** Executes serial attempts with cancellable backoff and no hidden retry policy. */
 export async function executeWithRetry<T>(options: IRetryExecutorOptions<T>): Promise<T> {
@@ -22,13 +22,14 @@ export async function executeWithRetry<T>(options: IRetryExecutorOptions<T>): Pr
     throw tagWebRpcError(
       new TypeError('maxAttempts must be a positive safe integer'),
       WebRpcErrorCode.invalidConfig
-    );
+    )
   for (let attempt = 1; attempt <= options.maxAttempts; attempt += 1) {
-    if (options.signals.some((signal) => signal.aborted)) throw options.createAbortError();
+    if (options.signals.some((signal) => signal.aborted))
+      throw options.createAbortError(options.signals.find((signal) => signal.aborted)?.reason)
     try {
-      return await options.attempt(attempt);
+      return await options.attempt(attempt)
     } catch (error) {
-      if (attempt >= options.maxAttempts) throw error;
+      if (attempt >= options.maxAttempts) throw error
       const decision = await raceWithAsyncControl({
         // Keep policy execution lazy so abort/dispose wins before user code starts.
         operation: () => options.decide(error, attempt),
@@ -36,15 +37,15 @@ export async function executeWithRetry<T>(options: IRetryExecutorOptions<T>): Pr
         signals: options.signals,
         createTimeoutError: options.createTimeoutError,
         createAbortError: options.createAbortError
-      });
-      if (!decision.retry) throw error;
+      })
+      if (!decision.retry) throw error
       await waitWithSignal(
         decision.delayMs,
         options.signals,
         options.createAbortError,
         options.onDiagnostic
-      );
+      )
     }
   }
-  throw options.createAbortError();
+  throw options.createAbortError(options.signals.find((signal) => signal.aborted)?.reason)
 }

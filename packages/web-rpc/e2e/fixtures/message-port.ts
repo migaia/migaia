@@ -1,27 +1,27 @@
-import { createBrowserMessagePortTransport } from '../../src/adapters/message-port';
-import { readEndpointDebugSnapshot } from '../../src/internal/test-observer';
-import { createRpc, installErrorGuards, terminalProviders } from './rpc';
+import { createBrowserMessagePortTransport } from '../../src/adapters/message-port'
+import { readEndpointDebugSnapshot } from '../../src/internal/test-observer'
+import { createRpc, installErrorGuards, terminalProviders } from './rpc'
 
-const errors = installErrorGuards();
+const errors = installErrorGuards()
 
 globalThis.runMessagePortScenario = async () => {
-  const channel = new MessageChannel();
-  const closeCounts = [0, 0];
+  const channel = new MessageChannel()
+  const closeCounts = [0, 0]
   const wrapPort = (port: MessagePort, index: number) => ({
     postMessage: (message: unknown, transfer?: readonly Transferable[]) =>
       transfer ? port.postMessage(message, { transfer: [...transfer] }) : port.postMessage(message),
     start: () => port.start(),
     close: () => {
-      closeCounts[index] += 1;
-      port.close();
+      closeCounts[index] += 1
+      port.close()
     },
     addEventListener: (type: 'message' | 'messageerror', listener: EventListener) =>
       port.addEventListener(type, listener),
     removeEventListener: (type: 'message' | 'messageerror', listener: EventListener) =>
       port.removeEventListener(type, listener)
-  });
-  const leftTransport = createBrowserMessagePortTransport(wrapPort(channel.port1, 0));
-  const rightTransport = createBrowserMessagePortTransport(wrapPort(channel.port2, 1));
+  })
+  const leftTransport = createBrowserMessagePortTransport(wrapPort(channel.port1, 0))
+  const rightTransport = createBrowserMessagePortTransport(wrapPort(channel.port2, 1))
   const left = await createRpc(
     'left',
     ['right'],
@@ -35,7 +35,7 @@ globalThis.runMessagePortScenario = async () => {
         schema: {
           params: {
             parse: () => {
-              throw new Error('schema rejected');
+              throw new Error('schema rejected')
             }
           },
           result: { parse: (value) => value }
@@ -43,8 +43,8 @@ globalThis.runMessagePortScenario = async () => {
       }
     },
     { chunkSize: 4 }
-  );
-  let dispatchPayload = '';
+  )
+  let dispatchPayload = ''
   const right = await createRpc(
     'right',
     ['left'],
@@ -62,8 +62,8 @@ globalThis.runMessagePortScenario = async () => {
           )
         ),
       notify: (context) => {
-        dispatchPayload = String(context.data);
-        return context.success(undefined);
+        dispatchPayload = String(context.data)
+        return context.success(undefined)
       }
     },
     undefined,
@@ -71,75 +71,75 @@ globalThis.runMessagePortScenario = async () => {
     false,
     undefined,
     { chunkSize: 4 }
-  );
-  const result = await left.send('right', 'echo', { value: 42 });
-  const chunkedRequest = await left.send('right', 'echo', 'chunked-request-😀-payload');
+  )
+  const result = await left.send('right', 'echo', { value: 42 })
+  const chunkedRequest = await left.send('right', 'echo', 'chunked-request-😀-payload')
   const chunkedRemoteError = await left.send('right', 'fail', 'chunked-error-😀-payload').then(
     () => 'resolved',
     (error: { readonly code?: string }) => error.code ?? 'error'
-  );
+  )
   const chunkedTimeout = await left
     .send('right', 'hang', 'chunked-timeout-😀-payload', { timeoutMs: 40 })
     .then(
       () => 'resolved',
       (error: { readonly code?: string }) => error.code ?? 'error'
-    );
-  const chunkedAbortController = new AbortController();
+    )
+  const chunkedAbortController = new AbortController()
   const chunkedAbortPending = left.send('right', 'hang', 'chunked-abort-😀-payload', {
     timeoutMs: 1_000,
     signal: chunkedAbortController.signal
-  });
-  chunkedAbortController.abort();
+  })
+  chunkedAbortController.abort()
   const chunkedAbort = await chunkedAbortPending.then(
     () => 'resolved',
     (error: { readonly code?: string }) => error.code ?? 'error'
-  );
+  )
   const chunkedSchemaError = await left.send('right', 'schema', 'chunked-schema-😀-payload').then(
     () => 'resolved',
     (error: { readonly code?: string }) => error.code ?? 'error'
-  );
-  left.dispatch('right', 'notify', 'chunked-dispatch-😀-payload');
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  )
+  left.dispatch('right', 'notify', 'chunked-dispatch-😀-payload')
+  await new Promise((resolve) => setTimeout(resolve, 0))
   const remoteError = await left.send('right', 'fail', null).then(
     () => 'resolved',
     (error: { readonly code?: string }) => error.code ?? 'error'
-  );
+  )
   const timeout = await left.send('right', 'hang', null, { timeoutMs: 40 }).then(
     () => 'resolved',
     (error: { readonly code?: string }) => error.code ?? 'error'
-  );
-  const controller = new AbortController();
-  const abortedPending = left.send('right', 'hang', null, { signal: controller.signal });
-  controller.abort();
+  )
+  const controller = new AbortController()
+  const abortedPending = left.send('right', 'hang', null, { signal: controller.signal })
+  controller.abort()
   const aborted = await abortedPending.then(
     () => 'resolved',
     (error: { readonly code?: string }) => error.code ?? 'error'
-  );
+  )
   const schemaError = await left.send('right', 'schema', null).then(
     () => 'resolved',
     (error: { readonly code?: string }) => error.code ?? 'error'
-  );
-  const pingSuccess = await left.ping('right');
-  const pingTimeout = await left.ping('missing', undefined, { timeoutMs: 40 });
-  const pingController = new AbortController();
+  )
+  const pingSuccess = await left.ping('right')
+  const pingTimeout = await left.ping('missing', undefined, { timeoutMs: 40 })
+  const pingController = new AbortController()
   const pingAbortedPending = left.ping('right', undefined, {
     signal: pingController.signal
-  });
-  pingController.abort();
-  const pingAborted = await pingAbortedPending;
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  const providerTerminalSnapshot = readEndpointDebugSnapshot(right);
+  })
+  pingController.abort()
+  const pingAborted = await pingAbortedPending
+  await new Promise((resolve) => setTimeout(resolve, 500))
+  const providerTerminalSnapshot = readEndpointDebugSnapshot(right)
   const chunkedTransportPending = left.send('right', 'echo', 'chunked-transport-😀-payload', {
     timeoutMs: 1_000
-  });
-  await leftTransport.close?.();
+  })
+  await leftTransport.close?.()
   const transportError = await chunkedTransportPending.then(
     () => 'resolved',
     (error: { readonly code?: string }) => error.code ?? 'error'
-  );
-  const transportTerminalSnapshot = readEndpointDebugSnapshot(left);
-  await left.dispose();
-  await right.dispose();
+  )
+  const transportTerminalSnapshot = readEndpointDebugSnapshot(left)
+  await left.dispose()
+  await right.dispose()
   return {
     result,
     chunkedRequest,
@@ -164,40 +164,40 @@ globalThis.runMessagePortScenario = async () => {
       left: readEndpointDebugSnapshot(left),
       right: readEndpointDebugSnapshot(right)
     }
-  };
-};
+  }
+}
 
 globalThis.runBorrowedMessagePortScenario = async () => {
-  const channel = new MessageChannel();
-  const closeCounts = [0, 0];
+  const channel = new MessageChannel()
+  const closeCounts = [0, 0]
   const wrapPort = (port: MessagePort, index: number) => ({
     postMessage: (message: unknown, transfer?: readonly Transferable[]) =>
       transfer ? port.postMessage(message, { transfer: [...transfer] }) : port.postMessage(message),
     start: () => port.start(),
     close: () => {
-      closeCounts[index] += 1;
-      port.close();
+      closeCounts[index] += 1
+      port.close()
     },
     addEventListener: (type: 'message' | 'messageerror', listener: EventListener) =>
       port.addEventListener(type, listener),
     removeEventListener: (type: 'message' | 'messageerror', listener: EventListener) =>
       port.removeEventListener(type, listener)
-  });
+  })
   const left = await createRpc(
     'left',
     ['right'],
     createBrowserMessagePortTransport(wrapPort(channel.port1, 0), { ownership: 'borrowed' })
-  );
+  )
   const right = await createRpc(
     'right',
     ['left'],
     createBrowserMessagePortTransport(wrapPort(channel.port2, 1)),
     terminalProviders
-  );
-  const result = await left.send('right', 'echo', 'borrowed');
-  await left.dispose();
-  await right.dispose();
-  channel.port1.close();
+  )
+  const result = await left.send('right', 'echo', 'borrowed')
+  await left.dispose()
+  await right.dispose()
+  channel.port1.close()
   return {
     result,
     errors,
@@ -206,10 +206,10 @@ globalThis.runBorrowedMessagePortScenario = async () => {
       left: readEndpointDebugSnapshot(left),
       right: readEndpointDebugSnapshot(right)
     }
-  };
-};
+  }
+}
 
 declare global {
-  var runMessagePortScenario: () => Promise<unknown>;
-  var runBorrowedMessagePortScenario: () => Promise<unknown>;
+  var runMessagePortScenario: () => Promise<unknown>
+  var runBorrowedMessagePortScenario: () => Promise<unknown>
 }

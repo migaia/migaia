@@ -274,6 +274,6 @@ export const WebRpcErrorCode = {
    * 当前实现不维护 outbound ack 状态机；保留此码用于未来引入可靠 chunk 投递时使用。
    */
   chunkAckTimeout: 'CHUNK_ACK_TIMEOUT'
-} as const;
+} as const
 
-export type IWebRpcErrorCode = (typeof WebRpcErrorCode)[keyof typeof WebRpcErrorCode];
+export type IWebRpcErrorCode = (typeof WebRpcErrorCode)[keyof typeof WebRpcErrorCode]

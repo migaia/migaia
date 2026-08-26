@@ -26,11 +26,13 @@
   },
   "include": [
     "src/ambient.d.ts",
-    "src/client.ts",
-    "src/server.ts",
-    "src/protocol.ts",
+    "src/core.ts",
+    "src/endpoint-kernel.ts",
     "src/errors.ts",
+    "src/error-code.ts",
+    "src/error-text.ts",
     "src/transport.ts",
-    "src/internal/**/*.ts"
+    "src/typing.ts",
+    "src/internal/endpoint-modules.ts"
   ]
 }
