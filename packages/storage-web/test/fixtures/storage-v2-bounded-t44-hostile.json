@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "unknown-route",
+      "kind": "catalog-route",
+      "capability": "byte-brand",
+      "value": "@migaia/utils/not-exported",
+      "expectedCode": "UNKNOWN_CATALOG_ROUTE"
+    },
+    {
+      "id": "unknown-symbol",
+      "kind": "catalog-symbol",
+      "capability": "byte-brand",
+      "value": "forgedByteBrand",
+      "expectedCode": "UNKNOWN_CATALOG_SYMBOL"
+    },
+    {
+      "id": "false-consumer",
+      "kind": "catalog-consumer",
+      "capability": "event-fanout",
+      "value": "@migaia/lifecycle",
+      "expectedCode": "CAPABILITY_CONSUMER_MISMATCH"
+    },
+    {
+      "id": "unused-non-capability-symbol",
+      "kind": "catalog-non-capability-symbol",
+      "path": "@migaia/utils/bytes",
+      "value": "encodeUtf8",
+      "expectedCode": "NON_CAPABILITY_EDGE_MISMATCH"
+    },
+    {
+      "id": "missing-manifest-dependency",
+      "kind": "remove-dependency",
+      "package": "@migaia/lifecycle",
+      "value": "@migaia/utils",
+      "expectedCode": "MISSING_MANIFEST_DEPENDENCY"
+    },
+    {
+      "id": "side-effect-import-dependency",
+      "kind": "append-module-source",
+      "package": "@migaia/storage-web",
+      "path": "src/sol-side-effect-import-probe.ts",
+      "value": "import '@migaia/logger'\n",
+      "expectedCode": "MISSING_MANIFEST_DEPENDENCY"
+    },
+    {
+      "id": "dynamic-import-unknown-route",
+      "kind": "append-module-source",
+      "package": "@migaia/storage-web",
+      "path": "src/sol-dynamic-import-probe.ts",
+      "value": "void import('@migaia/utils/not-exported')\n",
+      "expectedCode": "UNKNOWN_WORKSPACE_ROUTE"
+    },
+    {
+      "id": "named-import-unknown-symbol",
+      "kind": "append-module-source",
+      "package": "@migaia/storage-web",
+      "path": "src/sol-named-import-probe.ts",
+      "value": "import { forgedByteBrand } from '@migaia/utils/bytes'\nvoid forgedByteBrand\n",
+      "expectedCode": "UNKNOWN_WORKSPACE_SYMBOL"
+    },
+    {
+      "id": "namespace-import-dependency",
+      "kind": "append-module-source",
+      "package": "@migaia/storage-web",
+      "path": "src/sol-namespace-import-probe.ts",
+      "value": "import * as logger from '@migaia/logger'\nvoid logger\n",
+      "expectedCode": "MISSING_MANIFEST_DEPENDENCY"
+    },
+    {
+      "id": "import-equals-dependency",
+      "kind": "append-module-source",
+      "package": "@migaia/storage-web",
+      "path": "src/sol-import-equals-probe.ts",
+      "value": "import logger = require('@migaia/logger')\nvoid logger\n",
+      "expectedCode": "MISSING_MANIFEST_DEPENDENCY"
+    },
+    {
+      "id": "export-all-dependency",
+      "kind": "append-module-source",
+      "package": "@migaia/storage-web",
+      "path": "src/sol-export-all-probe.ts",
+      "value": "export * from '@migaia/logger'\n",
+      "expectedCode": "MISSING_MANIFEST_DEPENDENCY"
+    },
+    {
+      "id": "namespace-reexport-dependency",
+      "kind": "append-module-source",
+      "package": "@migaia/storage-web",
+      "path": "src/sol-namespace-reexport-probe.ts",
+      "value": "export * as logger from '@migaia/logger'\n",
+      "expectedCode": "MISSING_MANIFEST_DEPENDENCY"
+    },
+    {
+      "id": "named-reexport-unknown-symbol",
+      "kind": "append-module-source",
+      "package": "@migaia/storage-web",
+      "path": "src/sol-named-reexport-probe.ts",
+      "value": "export { forgedByteBrand } from '@migaia/utils/bytes'\n",
+      "expectedCode": "UNKNOWN_WORKSPACE_SYMBOL"
+    },
+    {
+      "id": "import-type-unknown-route",
+      "kind": "append-module-source",
+      "package": "@migaia/storage-web",
+      "path": "src/sol-import-type-probe.ts",
+      "value": "export type ISolImportTypeProbe = import('@migaia/utils/not-exported').Unknown\n",
+      "expectedCode": "UNKNOWN_WORKSPACE_ROUTE"
+    },
+    {
+      "id": "red02-parallel-fanout",
+      "kind": "append-source",
+      "package": "@migaia/storage-web",
+      "path": "src/backends/memory.ts",
+      "value": "\nconst storageListeners = new Set<() => void>()\n",
+      "expectedCode": "SWV2-RED02"
+    },
+    {
+      "id": "red02-non-memory-backend",
+      "kind": "append-source",
+      "package": "@migaia/storage-web",
+      "path": "src/backends/local-storage.ts",
+      "value": "\nconst storageListeners = new Set<() => void>()\n",
+      "expectedCode": "SWV2-RED02"
+    },
+    {
+      "id": "red03-parallel-scheduler",
+      "kind": "append-source",
+      "package": "@migaia/storage-web",
+      "path": "src/reactive.ts",
+      "value": "\nclass StorageReactiveScheduler {}\n",
+      "expectedCode": "SWV2-RED03"
+    },
+    {
+      "id": "red07-parallel-timeout",
+      "kind": "append-source",
+      "package": "@migaia/storage-web",
+      "path": "src/core/operation.ts",
+      "value": "\nconst storageTimeoutController = new AbortController()\n",
+      "expectedCode": "SWV2-RED07"
+    },
+    {
+      "id": "red10-instanceof-byte-boundary",
+      "kind": "append-source",
+      "package": "@migaia/storage-contract",
+      "path": "src/bytes.ts",
+      "value": "\nconst hostileByteCheck = (value: unknown): boolean => value instanceof Uint8Array\n",
+      "expectedCode": "SWV2-RED10"
+    }
+  ]
+}

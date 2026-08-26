@@ -1,44 +1,44 @@
 /** Small keyed container shared by collection-like reactive nodes. */
 export class KeyedCellRegistry<K, C> {
-  #cells = new Map<K, C>();
+  #cells = new Map<K, C>()
 
   get(key: K): C | undefined {
-    return this.#cells.get(key);
+    return this.#cells.get(key)
   }
   set(key: K, cell: C): void {
-    this.#cells.set(key, cell);
+    this.#cells.set(key, cell)
   }
   delete(key: K): boolean {
-    return this.#cells.delete(key);
+    return this.#cells.delete(key)
   }
   has(key: K): boolean {
-    return this.#cells.has(key);
+    return this.#cells.has(key)
   }
   get size(): number {
-    return this.#cells.size;
+    return this.#cells.size
   }
   entries(): IterableIterator<[K, C]> {
-    return this.#cells.entries();
+    return this.#cells.entries()
   }
   keys(): IterableIterator<K> {
-    return this.#cells.keys();
+    return this.#cells.keys()
   }
   values(): IterableIterator<C> {
-    return this.#cells.values();
+    return this.#cells.values()
   }
   [Symbol.iterator](): IterableIterator<[K, C]> {
-    return this.#cells.entries();
+    return this.#cells.entries()
   }
   clear(): void {
-    this.#cells.clear();
+    this.#cells.clear()
   }
 }
 
 type ICellRegistry<K, C> = {
-  get(key: K): C | undefined;
-  set(key: K, cell: C): void;
-  delete(key: K): boolean;
-};
+  get(key: K): C | undefined
+  set(key: K, cell: C): void
+  delete(key: K): boolean
+}
 
 /**
  * Reclaim a speculative keyed cell after the current turn. Keeping this in one place prevents
@@ -51,6 +51,6 @@ export function scheduleLazyCellRelease<K, C>(
   release: () => boolean
 ): void {
   queueMicrotask(() => {
-    if (registry.get(key) === cell && release()) registry.delete(key);
-  });
+    if (registry.get(key) === cell && release()) registry.delete(key)
+  })
 }

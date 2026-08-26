@@ -53,7 +53,7 @@ export const StorageContractErrorCode = Object.freeze({
    * 调用方按取消处理；已进入原子提交的写按提交事实返回，不伪报回滚。
    */
   aborted: 'ABORTED'
-} as const);
+} as const)
 
 export type IStorageContractErrorCode =
-  (typeof StorageContractErrorCode)[keyof typeof StorageContractErrorCode];
+  (typeof StorageContractErrorCode)[keyof typeof StorageContractErrorCode]

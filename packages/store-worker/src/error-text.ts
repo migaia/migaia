@@ -20,4 +20,4 @@ export const StoreWorkerErrorText = {
   invalidRequestChunk: '[store] invalid serialize worker request chunk',
   emptyChunks: '[store] cannot merge an empty chunk list',
   valueChunks: '[store] cannot merge value chunks into bytes'
-} as const;
+} as const

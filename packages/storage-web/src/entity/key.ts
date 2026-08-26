@@ -1,5 +1,5 @@
-import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.js';
-import type { IKeyRange, IStorageKey } from '../types/context.js';
+import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.js'
+import type { IKeyRange, IStorageKey } from '../types/context.js'
 
 /**
  * 同一个 store 实例可能被多个 entity 共用（例如同一个 indexedDb() 连接 上挂 users 和 posts）。entity 名必须编入实际存储 key，否则不同
@@ -10,17 +10,21 @@ import type { IKeyRange, IStorageKey } from '../types/context.js';
 export const composeStructuredKey = (entityName: string, id: IStorageKey): IStorageKey => [
   entityName,
   id
-];
+]
 
 /** Reserved v2 prefix keeps repository records disjoint from raw record keys. */
-export const REPOSITORY_KEY_PREFIX = '__storage_web_entity_v2__';
+export const REPOSITORY_KEY_PREFIX = '__storage_web_entity_v2__'
+
+/** Stable metadata key shared by repository migration orchestration and the raw-record firewall. */
+export const repositoryMigrationKey = (entityName: string): string =>
+  `repository:${entityName}:migration`
 
 /** Encode repository identity as a sortable, reversible physical record key. */
 export const composeRepositoryKey = (entityName: string, id: IStorageKey): IStorageKey => [
   REPOSITORY_KEY_PREFIX,
   entityName,
   encodeFlatStorageKey(id)
-];
+]
 
 /** Decode a v2 repository key; unrelated raw record keys return undefined. */
 export const decodeRepositoryKey = (
@@ -34,30 +38,30 @@ export const decodeRepositoryKey = (
     key[1] !== entityName ||
     typeof key[2] !== 'string'
   )
-    return undefined;
-  return decodeFlatStorageKey(key[2]);
-};
+    return undefined
+  return decodeFlatStorageKey(key[2])
+}
 
 /** Build an IDB range that isolates the v2 entity prefix without claiming ID encoding is sortable. */
 export const repositoryEntityRange = (
   entityName: string
 ): {
-  readonly lower: IStorageKey;
-  readonly upper: IStorageKey;
-  readonly lowerOpen?: boolean;
-  readonly upperOpen?: boolean;
+  readonly lower: IStorageKey
+  readonly upper: IStorageKey
+  readonly lowerOpen?: boolean
+  readonly upperOpen?: boolean
 } => ({
   lower: [REPOSITORY_KEY_PREFIX, entityName, ''],
   lowerOpen: false,
   upper: [REPOSITORY_KEY_PREFIX, entityName, '\uffff'],
   upperOpen: false
-});
+})
 
 /** `String(id)` 会丢失 IStorageKey 的类型信息；可逆编码保留完整类型与嵌套结构。 */
 export const composeFlatKey = (entityName: string, id: IStorageKey): string =>
-  `${entityName}:${encodeFlatStorageKey(id)}`;
+  `${entityName}:${encodeFlatStorageKey(id)}`
 
-export const flatKeyPrefix = (entityName: string): string => `${entityName}:`;
+export const flatKeyPrefix = (entityName: string): string => `${entityName}:`
 
 /** 结构化后端的历史前缀 range 仅保留给兼容调用方；repository 对嵌套数组使用全扫描过滤。 */
 export const structuredEntityRange = (
@@ -65,7 +69,7 @@ export const structuredEntityRange = (
 ): { readonly lower: IStorageKey; readonly upper: IStorageKey } => ({
   lower: [entityName],
   upper: [entityName, []]
-});
+})
 
 /**
  * 把调用方提供的 range（作用于原始 id 空间）与 entity 前缀复合，结果恒为 `[entityName, ...]` 形状。调用方传入的 lower/upper 只会被当作 id
@@ -76,12 +80,12 @@ export const composeEntityRange = (
   entityName: string,
   range: IKeyRange | undefined
 ): {
-  readonly lower: IStorageKey;
-  readonly lowerOpen?: boolean;
-  readonly upper: IStorageKey;
-  readonly upperOpen?: boolean;
+  readonly lower: IStorageKey
+  readonly lowerOpen?: boolean
+  readonly upper: IStorageKey
+  readonly upperOpen?: boolean
 } => {
-  const fallback = structuredEntityRange(entityName);
+  const fallback = structuredEntityRange(entityName)
   return {
     lower:
       range?.lower !== undefined ? composeStructuredKey(entityName, range.lower) : fallback.lower,
@@ -89,5 +93,5 @@ export const composeEntityRange = (
     upper:
       range?.upper !== undefined ? composeStructuredKey(entityName, range.upper) : fallback.upper,
     upperOpen: range?.upper !== undefined ? range.upperOpen : false
-  };
-};
+  }
+}

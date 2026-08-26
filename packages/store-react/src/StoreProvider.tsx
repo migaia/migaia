@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { createRuntime, type IRuntime } from '@migaia/reactive';
-import { StoreRegistryContext } from './provider-context.js';
-import { createStoreRegistry, type StoreRegistry } from './provider-registry.js';
-import { createStoreReactError } from './errors.js';
-import { StoreReactErrorCode } from './error-code.js';
-import { StoreReactErrorText } from './error-text.js';
-import { StoreProviderState } from './provider-state-constants.js';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createRuntime, type IRuntime } from '@migaia/reactive'
+import { StoreRegistryContext } from './provider-context.js'
+import { createStoreRegistry, type StoreRegistry } from './provider-registry.js'
+import { createStoreReactError } from './errors.js'
+import { StoreReactErrorCode } from './error-code.js'
+import { StoreReactErrorText } from './error-text.js'
+import { StoreProviderState } from './provider-state-constants.js'
 import {
   decodeStoreExperimental,
   encodeStoreExperimental,
@@ -13,17 +13,17 @@ import {
   StoreConfigContext,
   type IStoreProviderConfig,
   type IStoreReadyBarrier
-} from './store-config.js';
+} from './store-config.js'
 
-const READY_KEYS = new WeakMap<Promise<void>, number>();
-let nextReadyKey = 1;
+const READY_KEYS = new WeakMap<Promise<void>, number>()
+let nextReadyKey = 1
 function readyKey(promise: Promise<void>): number {
-  let key = READY_KEYS.get(promise);
+  let key = READY_KEYS.get(promise)
   if (key === undefined) {
-    key = nextReadyKey++;
-    READY_KEYS.set(promise, key);
+    key = nextReadyKey++
+    READY_KEYS.set(promise, key)
   }
-  return key;
+  return key
 }
 
 /** Normalizes a ready rejection without coercing hostile reasons or replacing Error identity. */
@@ -32,21 +32,21 @@ export function normalizeStoreReadyError(reason: unknown): Error {
     ? reason
     : createStoreReactError(StoreReactErrorCode.readyRejected, StoreReactErrorText.readyRejected, {
         cause: reason
-      });
+      })
 }
 
 export type IStoreProviderProps = {
-  readonly children: ReactNode;
-  readonly registry?: StoreRegistry;
-  readonly runtime?: IRuntime;
+  readonly children: ReactNode
+  readonly registry?: StoreRegistry
+  readonly runtime?: IRuntime
   /**
    * Internal registries dispose on unmount by default. External registries remain caller-owned
    * unless this flag is explicitly true.
    */
-  readonly disposeOnUnmount?: boolean;
+  readonly disposeOnUnmount?: boolean
   /** 应用级配置：特性开关 + 就绪屏障。 省略时与历史行为一致（无屏障、features 全关）。 */
-  readonly config?: IStoreProviderConfig;
-};
+  readonly config?: IStoreProviderConfig
+}
 
 export function StoreProvider({
   children,
@@ -59,7 +59,7 @@ export function StoreProvider({
     throw createStoreReactError(
       StoreReactErrorCode.invalidConfig,
       StoreReactErrorText.ownershipMismatch
-    );
+    )
   }
 
   // ready 数组字面量每次 render 都是新引用；按元素浅比较稳住 Promise，避免 use() 反复 suspend
@@ -71,7 +71,7 @@ export function StoreProvider({
         experimental: config?.features?.experimental,
         warnAsyncActions: config?.defaults?.warnAsyncActions === true,
         fallback: config?.fallback
-      };
+      }
     } catch (error) {
       throw createStoreReactError(
         StoreReactErrorCode.invalidConfig,
@@ -79,40 +79,40 @@ export function StoreProvider({
         {
           cause: error
         }
-      );
+      )
     }
-  }, [config]);
-  const readyInput = configSnapshot.ready;
-  const barrierScope = useRef<object>(undefined);
-  if (!barrierScope.current) barrierScope.current = {};
+  }, [config])
+  const readyInput = configSnapshot.ready
+  const barrierScope = useRef<object>(undefined)
+  if (!barrierScope.current) barrierScope.current = {}
   const readyRef = useRef<{
-    value: readonly IStoreReadyBarrier[] | undefined;
-    initialized: boolean;
+    value: readonly IStoreReadyBarrier[] | undefined
+    initialized: boolean
   }>({
     value: undefined,
     initialized: false
-  });
+  })
   if (!readyRef.current.initialized) {
-    readyRef.current = { value: readyInput, initialized: true };
+    readyRef.current = { value: readyInput, initialized: true }
   } else if (!sameBarrierList(readyRef.current.value, readyInput)) {
-    const nodeProcess = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process;
+    const nodeProcess = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process
     if (nodeProcess?.env?.NODE_ENV !== 'production') {
-      console.warn(StoreReactErrorText.readyIdentity);
+      console.warn(StoreReactErrorText.readyIdentity)
     } else {
-      console.error(StoreReactErrorText.readyRetained);
+      console.error(StoreReactErrorText.readyRetained)
     }
   }
-  const stableReady = readyRef.current.value;
-  const wasmEnabled = configSnapshot.wasm;
-  const warnAsyncActions = configSnapshot.warnAsyncActions;
+  const stableReady = readyRef.current.value
+  const wasmEnabled = configSnapshot.wasm
+  const warnAsyncActions = configSnapshot.warnAsyncActions
   const experimentalKey = useMemo(
     () => encodeStoreExperimental(configSnapshot.experimental),
     [configSnapshot.experimental]
-  );
+  )
   const experimental = useMemo<Readonly<Record<string, boolean>> | undefined>(
     () => decodeStoreExperimental(experimentalKey),
     [experimentalKey]
-  );
+  )
   const normalized = useMemo(
     () =>
       normalizeStoreConfig(
@@ -127,8 +127,8 @@ export function StoreProvider({
         barrierScope.current
       ),
     [experimental, stableReady, warnAsyncActions, wasmEnabled]
-  );
-  const fallback = configSnapshot.fallback ?? null;
+  )
+  const fallback = configSnapshot.fallback ?? null
 
   const tree = registry ? (
     <RegistryBoundary registry={registry} disposeOnUnmount={disposeOnUnmount ?? false}>
@@ -142,7 +142,7 @@ export function StoreProvider({
     >
       {children}
     </OwnedRegistryBoundary>
-  );
+  )
 
   return (
     <StoreConfigContext.Provider value={normalized}>
@@ -158,7 +158,7 @@ export function StoreProvider({
         tree
       )}
     </StoreConfigContext.Provider>
-  );
+  )
 }
 
 /** 就绪屏障。Promise 身份由上层稳住；已 settle 时尽量首帧直接放行（track 状态）。 */
@@ -167,60 +167,60 @@ function ReadyBoundary({
   fallback,
   children
 }: {
-  ready: import('./store-config.js').ITrackedReady;
-  fallback: ReactNode;
-  children: ReactNode;
+  ready: import('./store-config.js').ITrackedReady
+  fallback: ReactNode
+  children: ReactNode
 }) {
-  const initial = ready.status();
-  const [status, setStatus] = useState(initial);
+  const initial = ready.status()
+  const [status, setStatus] = useState(initial)
   const [error, setError] = useState<Error | null>(() => {
-    const reason = ready.error();
-    return initial === StoreProviderState.error ? normalizeStoreReadyError(reason) : null;
-  });
+    const reason = ready.error()
+    return initial === StoreProviderState.error ? normalizeStoreReadyError(reason) : null
+  })
 
   useEffect(() => {
-    let live = true;
-    const snap = ready.status();
+    let live = true
+    const snap = ready.status()
     if (snap === StoreProviderState.ready) {
-      setStatus(StoreProviderState.ready);
-      setError(null);
-      return;
+      setStatus(StoreProviderState.ready)
+      setError(null)
+      return
     }
     if (snap === StoreProviderState.error) {
-      setStatus(StoreProviderState.error);
-      setError(normalizeStoreReadyError(ready.error()));
-      return;
+      setStatus(StoreProviderState.error)
+      setError(normalizeStoreReadyError(ready.error()))
+      return
     }
-    setStatus(StoreProviderState.pending);
-    setError(null);
+    setStatus(StoreProviderState.pending)
+    setError(null)
     ready.promise.then(
       () => {
-        if (live) setStatus(StoreProviderState.ready);
+        if (live) setStatus(StoreProviderState.ready)
       },
       (reason: unknown) => {
         if (live) {
-          setError(normalizeStoreReadyError(reason));
-          setStatus(StoreProviderState.error);
+          setError(normalizeStoreReadyError(reason))
+          setStatus(StoreProviderState.error)
         }
       }
-    );
+    )
     return () => {
-      live = false;
-    };
-  }, [ready]);
+      live = false
+    }
+  }, [ready])
 
-  if (status === StoreProviderState.error) throw error;
-  if (status === StoreProviderState.pending) return <>{fallback}</>;
-  return <>{children}</>;
+  if (status === StoreProviderState.error) throw error
+  if (status === StoreProviderState.pending) return <>{fallback}</>
+  return <>{children}</>
 }
 
 type IRegistryBoundaryProps = {
-  readonly children: ReactNode;
-  readonly registry: StoreRegistry;
-  readonly disposeOnUnmount: boolean;
-  readonly deferRelease?: boolean;
-  readonly onCommit?: () => void;
-};
+  readonly children: ReactNode
+  readonly registry: StoreRegistry
+  readonly disposeOnUnmount: boolean
+  readonly deferRelease?: boolean
+  readonly onCommit?: () => void
+}
 
 function RegistryBoundary({
   children,
@@ -230,32 +230,32 @@ function RegistryBoundary({
   onCommit
 }: IRegistryBoundaryProps) {
   useEffect(() => {
-    const release = registry.retain(disposeOnUnmount, deferRelease);
-    onCommit?.();
-    return release;
-  }, [disposeOnUnmount, deferRelease, onCommit, registry]);
-  return <StoreRegistryContext.Provider value={registry}>{children}</StoreRegistryContext.Provider>;
+    const release = registry.retain(disposeOnUnmount, deferRelease)
+    onCommit?.()
+    return release
+  }, [disposeOnUnmount, deferRelease, onCommit, registry])
+  return <StoreRegistryContext.Provider value={registry}>{children}</StoreRegistryContext.Provider>
 }
 
 type IOwnedRegistryState = {
-  readonly runtime: IRuntime | undefined;
-  readonly registry: StoreRegistry;
-};
+  readonly runtime: IRuntime | undefined
+  readonly registry: StoreRegistry
+}
 
 type IOwnedRegistryBoundaryProps = {
-  readonly children: ReactNode;
-  readonly runtime: IRuntime | undefined;
-  readonly disposeOnUnmount: boolean;
-  readonly armInitial: Promise<void> | undefined;
-};
+  readonly children: ReactNode
+  readonly runtime: IRuntime | undefined
+  readonly disposeOnUnmount: boolean
+  readonly armInitial: Promise<void> | undefined
+}
 
 function sameBarrierList(
   left: readonly IStoreReadyBarrier[] | undefined,
   right: readonly IStoreReadyBarrier[] | undefined
 ): boolean {
-  if (left === right) return true;
-  if (!left || !right || left.length !== right.length) return false;
-  return left.every((item, index) => item === right[index]);
+  if (left === right) return true
+  if (!left || !right || left.length !== right.length) return false
+  return left.every((item, index) => item === right[index])
 }
 
 function OwnedRegistryBoundary({
@@ -264,43 +264,43 @@ function OwnedRegistryBoundary({
   disposeOnUnmount,
   armInitial
 }: IOwnedRegistryBoundaryProps) {
-  const initial = useRef<IOwnedRegistryState>(undefined);
+  const initial = useRef<IOwnedRegistryState>(undefined)
   if (!initial.current) {
-    const ownedRuntime = runtime ?? createRuntime();
-    const ownedRegistry = createStoreRegistry(ownedRuntime);
-    void armInitial;
+    const ownedRuntime = runtime ?? createRuntime()
+    const ownedRegistry = createStoreRegistry(ownedRuntime)
+    void armInitial
     initial.current = {
       runtime,
       registry: ownedRegistry
-    };
+    }
   }
-  const committed = useRef<IOwnedRegistryState>(initial.current);
-  const candidate = useRef<IOwnedRegistryState>(undefined);
-  let active = committed.current;
+  const committed = useRef<IOwnedRegistryState>(initial.current)
+  const candidate = useRef<IOwnedRegistryState>(undefined)
+  let active = committed.current
   if (active.runtime !== runtime) {
     if (candidate.current?.runtime === runtime) {
-      active = candidate.current!;
+      active = candidate.current!
     } else {
-      const nextRuntime = runtime ?? createRuntime();
-      const nextRegistry = createStoreRegistry(nextRuntime);
+      const nextRuntime = runtime ?? createRuntime()
+      const nextRegistry = createStoreRegistry(nextRuntime)
       // A runtime switch can happen while the readiness barrier is still
       // pending. Keep the candidate armed by that same barrier; otherwise
       // prepareForRender() would dispose it on the next timer before the
       // ReadyBoundary has a chance to commit the subtree.
-      void armInitial;
+      void armInitial
       active = {
         runtime,
         registry: nextRegistry
-      };
-      candidate.current = active;
+      }
+      candidate.current = active
     }
   }
-  const activeRef = useRef(active);
-  activeRef.current = active;
+  const activeRef = useRef(active)
+  activeRef.current = active
   const commitActive = useCallback(() => {
-    committed.current = activeRef.current;
-    if (candidate.current === activeRef.current) candidate.current = undefined;
-  }, []);
+    committed.current = activeRef.current
+    if (candidate.current === activeRef.current) candidate.current = undefined
+  }, [])
   return (
     <RegistryBoundary
       registry={active.registry}
@@ -310,5 +310,5 @@ function OwnedRegistryBoundary({
     >
       {children}
     </RegistryBoundary>
-  );
+  )
 }

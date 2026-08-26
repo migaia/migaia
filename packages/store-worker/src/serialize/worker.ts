@@ -7,7 +7,8 @@ import {
   type ISerializeParser,
   type ISerializePhase,
   type ISerializePlugin
-} from '@migaia/serialize';
+} from '@migaia/serialize'
+import { isUint8Array } from '@migaia/utils/bytes'
 import {
   abort,
   connect,
@@ -15,35 +16,35 @@ import {
   protocol,
   timeout,
   type IWebRpcAbortSignal
-} from '@migaia/web-rpc';
-import { WebRpcPlatform } from '@migaia/web-rpc/protocol-constants';
+} from '@migaia/web-rpc'
+import { WebRpcPlatform } from '@migaia/web-rpc/protocol-constants'
 import {
   createWebWorkerTransport,
   type IWebWorkerLikePort
-} from '@migaia/web-rpc/adapters/web-worker';
-import { toManagedRpcHandler, type IManagedRpcHandler } from '../managed-rpc-handler.js';
+} from '@migaia/web-rpc/adapters/web-worker'
+import { toManagedRpcHandler, type IManagedRpcHandler } from '../managed-rpc-handler.js'
 import {
   createStoreWorkerAggregateError,
   createStoreWorkerError,
   STORE_WORKER_SOURCE,
   StoreWorkerErrorCode
-} from '../errors.js';
-import { StoreWorkerErrorText } from '../error-text.js';
+} from '../errors.js'
+import { StoreWorkerErrorText } from '../error-text.js'
 import {
   WorkerByteOwnership,
   WorkerDiagnosticType,
   WorkerRpcIdentity,
   WorkerSerializePhase,
   type IWorkerByteOwnership
-} from '../worker-constants.js';
-import { transferablesOf } from './transferables.js';
+} from '../worker-constants.js'
+import { transferablesOf } from './transferables.js'
 
 /** Worker 出事的三种途径，全都得监听，否则请求会永久悬挂。 */
-export type IWorkerFailureEvent = 'error' | 'messageerror';
+export type IWorkerFailureEvent = 'error' | 'messageerror'
 
 export type IWorkerLike = IWebWorkerLikePort & {
-  terminate?(): void;
-};
+  terminate?(): void
+}
 
 /**
  * 字节过界的所有权语义。
@@ -51,19 +52,29 @@ export type IWorkerLike = IWebWorkerLikePort & {
  * Transfer 是**破坏性**的：底层 ArrayBuffer 连同指向它的所有别名视图一起被 detach。调用方交出去之后，一旦 worker 崩溃或请求被取消，就既没有结果、
  * 也失去了输入——原地数据丢失。所以默认是 copy，转移必须显式要求。
  */
-export type IByteOwnership = IWorkerByteOwnership;
+export type IByteOwnership = IWorkerByteOwnership
+
+/** Encodes one worker input using the canonical byte brand without copying its payload. */
+export function encodeWorkerValue(value: unknown): ISerializeChunk {
+  return isUint8Array(value) ? [SerializeChunkKind.bytes, value] : [SerializeChunkKind.value, value]
+}
+
+/** Encodes one worker decode result, preserving byte payload identity for transfer handling. */
+export function decodeWorkerValue(value: unknown): ISerializeChunk {
+  return isUint8Array(value) ? [SerializeChunkKind.bytes, value] : [SerializeChunkKind.value, value]
+}
 
 export type IWorkerPluginOptions = {
-  readonly worker: IWorkerLike;
+  readonly worker: IWorkerLike
   /** 注册到 registry 的格式标签，需与 worker 侧实际使用的编码一致。 */
-  readonly type?: string;
+  readonly type?: string
   /** 卸载时是否顺带终止 worker。外部传入的 worker 默认归调用方所有。 */
-  readonly terminateOnDispose?: boolean;
+  readonly terminateOnDispose?: boolean
   /** 默认 'copy'：安全但要复制一遍。只有当调用方确认这段字节独占、且交出去之后 不再使用时，才该选 'transfer' 换取零拷贝。 */
-  readonly ownership?: IByteOwnership;
+  readonly ownership?: IByteOwnership
   /** Overrides the default client id (a fixed value rather than a factory — see `src/rpc`). */
-  readonly clientId?: string;
-};
+  readonly clientId?: string
+}
 
 /** Probes public options before property reads so revoked proxies become contract errors. */
 function assertWorkerParserOptions(options: unknown): asserts options is IWorkerPluginOptions {
@@ -71,16 +82,16 @@ function assertWorkerParserOptions(options: unknown): asserts options is IWorker
     throw createStoreWorkerError(
       StoreWorkerErrorCode.invalidOption,
       StoreWorkerErrorText.optionsObject
-    );
+    )
   }
   try {
-    Object.getOwnPropertyDescriptors(options);
+    Object.getOwnPropertyDescriptors(options)
   } catch (error) {
     throw createStoreWorkerError(
       StoreWorkerErrorCode.invalidOption,
       StoreWorkerErrorText.optionsObject,
       { cause: error }
-    );
+    )
   }
 }
 
@@ -98,65 +109,62 @@ function assertWorkerParserOptions(options: unknown): asserts options is IWorker
  * 结构化克隆是在调用方线程同步完成的，成本只是从 stringify 换成 clone。 所以：用它承接落盘/传输这类「拿到字节就结束」的活，不要用它加速 hydrate。
  */
 export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
-  assertWorkerParserOptions(options);
-  let worker: IWorkerPluginOptions['worker'];
-  let optionType: string | undefined;
-  let clientId: string | undefined;
-  let ownership: IWorkerPluginOptions['ownership'];
-  let terminateOnDispose: boolean | undefined;
+  assertWorkerParserOptions(options)
+  let worker: IWorkerPluginOptions['worker']
+  let optionType: string | undefined
+  let clientId: string | undefined
+  let ownership: IWorkerPluginOptions['ownership']
+  let terminateOnDispose: boolean | undefined
   try {
-    worker = options.worker;
-    optionType = options.type;
-    clientId = options.clientId;
-    ownership = options.ownership;
-    terminateOnDispose = options.terminateOnDispose;
+    worker = options.worker
+    optionType = options.type
+    clientId = options.clientId
+    ownership = options.ownership
+    terminateOnDispose = options.terminateOnDispose
   } catch (error) {
     throw createStoreWorkerError(
       StoreWorkerErrorCode.invalidOption,
       StoreWorkerErrorText.optionsObject,
       { cause: error }
-    );
+    )
   }
   if (optionType !== undefined && typeof optionType !== 'string') {
     throw createStoreWorkerError(
       StoreWorkerErrorCode.invalidOption,
       StoreWorkerErrorText.stringOption('type')
-    );
+    )
   }
   if (clientId !== undefined && typeof clientId !== 'string') {
     throw createStoreWorkerError(
       StoreWorkerErrorCode.invalidOption,
       StoreWorkerErrorText.stringOption('clientId')
-    );
+    )
   }
   if (worker === null || typeof worker !== 'object') {
-    throw createStoreWorkerError(StoreWorkerErrorCode.invalidOption, StoreWorkerErrorText.worker);
+    throw createStoreWorkerError(StoreWorkerErrorCode.invalidOption, StoreWorkerErrorText.worker)
   }
   if (
     ownership !== undefined &&
     ownership !== WorkerByteOwnership.copy &&
     ownership !== WorkerByteOwnership.transfer
   ) {
-    throw createStoreWorkerError(
-      StoreWorkerErrorCode.invalidOption,
-      StoreWorkerErrorText.ownership
-    );
+    throw createStoreWorkerError(StoreWorkerErrorCode.invalidOption, StoreWorkerErrorText.ownership)
   }
   if (terminateOnDispose !== undefined && typeof terminateOnDispose !== 'boolean') {
     throw createStoreWorkerError(
       StoreWorkerErrorCode.invalidOption,
       StoreWorkerErrorText.terminateOnDispose
-    );
+    )
   }
-  const resolvedOwnership = ownership ?? WorkerByteOwnership.copy;
-  const resolvedTerminateOnDispose = terminateOnDispose ?? false;
-  const transport = createWebWorkerTransport(worker, { peerId: WorkerRpcIdentity.worker });
+  const resolvedOwnership = ownership ?? WorkerByteOwnership.copy
+  const resolvedTerminateOnDispose = terminateOnDispose ?? false
+  const transport = createWebWorkerTransport(worker, { peerId: WorkerRpcIdentity.worker })
   const client = createEndpoint<typeof WorkerRpcIdentity.worker>({
     id: clientId ?? WorkerRpcIdentity.main,
     targetIds: [WorkerRpcIdentity.worker],
     transport,
     middlewares: [connect({ transport }), protocol(), abort(), timeout()]
-  });
+  })
 
   const request = async (
     phase: ISerializePhase,
@@ -164,20 +172,20 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
     context: ISerializeContext
   ): Promise<ISerializeChunk> => {
     try {
-      const endpoint = await client;
+      const endpoint = await client
       const result = await endpoint.send<ISerializeChunk>(
         WorkerRpcIdentity.worker,
         WorkerRpcIdentity.call,
         { phase, chunk },
         { signal: context.signal, transfer: transferablesOf(chunk, resolvedOwnership) }
-      );
+      )
       if (!isChunkShape(result)) {
         throw createStoreWorkerError(
           StoreWorkerErrorCode.invalidResponseChunk,
           StoreWorkerErrorText.invalidChunk
-        );
+        )
       }
-      return result;
+      return result
     } catch (error) {
       // Endpoint's abort rejection is generic; re-throw it as the
       // SerializeCodecError shape this parser's callers rely on for diagnostics
@@ -187,7 +195,7 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
         // web-rpc may synthesize its own AbortError at the transport boundary;
         // the caller's explicit reason is the authoritative original failure
         // and must remain reachable for identity/stack diagnostics.
-        const abortCause = context.signal.reason ?? error;
+        const abortCause = context.signal.reason ?? error
         throw new SerializeCodecError(
           StoreWorkerErrorText.aborted(resolvedOwnership === WorkerByteOwnership.transfer),
           {
@@ -200,27 +208,27 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
             source: STORE_WORKER_SOURCE,
             cause: abortCause
           }
-        );
+        )
       }
-      throw error;
+      throw error
     }
-  };
+  }
 
-  let disposePromise: Promise<void> | undefined;
+  let disposePromise: Promise<void> | undefined
   const disposeOnce = async (): Promise<void> => {
-    let endpointError: unknown;
+    let endpointError: unknown
     try {
-      const endpoint = await client;
-      await endpoint.dispose();
+      const endpoint = await client
+      await endpoint.dispose()
     } catch (error) {
-      endpointError = error;
+      endpointError = error
     }
-    let terminateError: unknown;
+    let terminateError: unknown
     if (resolvedTerminateOnDispose) {
       try {
-        worker.terminate?.();
+        worker.terminate?.()
       } catch (error) {
-        terminateError = error;
+        terminateError = error
       }
     }
     if (endpointError !== undefined && terminateError !== undefined) {
@@ -228,11 +236,11 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
         StoreWorkerErrorCode.cleanupFailed,
         [endpointError, terminateError],
         StoreWorkerErrorText.cleanupFailed
-      );
+      )
     }
-    if (endpointError !== undefined) throw endpointError;
-    if (terminateError !== undefined) throw terminateError;
-  };
+    if (endpointError !== undefined) throw endpointError
+    if (terminateError !== undefined) throw terminateError
+  }
 
   return {
     name: optionType ?? WorkerDiagnosticType.worker,
@@ -240,31 +248,25 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
       // 已经是字节就按 bytes 段送：只有这一种形态能进 transferList 走零拷贝。
       // 包成 value 段的话会退化成结构化克隆，把整份数据在主线程上复制一遍——
       // 实测里这正是「丢给 worker 反而更慢」的成因。
-      request(
-        WorkerSerializePhase.encode,
-        value instanceof Uint8Array
-          ? [SerializeChunkKind.bytes, value]
-          : [SerializeChunkKind.value, value],
-        context
-      ),
+      request(WorkerSerializePhase.encode, encodeWorkerValue(value), context),
     decode: async (chunk, context) => {
       // 回包可能是 value 段（对象图，结构化克隆回来）也可能是 bytes 段
       // （parser 配了 decodeTo: 'jsonBytes'，走 transfer 回来）。两种情况
       // 要的都是段里的负载本身。
-      const result = await request(WorkerSerializePhase.decode, chunk, context);
-      return result[1];
+      const result = await request(WorkerSerializePhase.decode, chunk, context)
+      return result[1]
     },
     dispose() {
-      disposePromise ??= disposeOnce();
-      return disposePromise;
+      disposePromise ??= disposeOnce()
+      return disposePromise
     }
-  };
+  }
 }
 
 export const workerPlugin = (options: IWorkerPluginOptions): ISerializePlugin => {
-  const parser = workerParser(options);
-  return { type: parser.name, parser };
-};
+  const parser = workerParser(options)
+  return { type: parser.name, parser }
+}
 
 /**
  * Worker 侧的对端。把一个普通 parser 装进 worker，按上面的报文协议应答。
@@ -286,65 +288,62 @@ export function createSerializeWorkerHandler(
     throw createStoreWorkerError(
       StoreWorkerErrorCode.invalidOption,
       StoreWorkerErrorText.handlerInvalid
-    );
+    )
   }
-  let deliver: (message: unknown) => void = () => undefined;
+  let deliver: (message: unknown) => void = () => undefined
   const transport = {
     platform: WebRpcPlatform.worker,
     peerId: 'main' as const,
     send: (message: unknown, sendOptions?: { transfer?: readonly Transferable[] }) =>
       post(message, sendOptions?.transfer),
     subscribe: (listener: (message: { data: unknown }) => void) => {
-      deliver = (message) => listener({ data: message });
+      deliver = (message) => listener({ data: message })
       return () => {
-        deliver = () => undefined;
-      };
+        deliver = () => undefined
+      }
     }
-  };
+  }
   const endpoint = createEndpoint({
     id: WorkerRpcIdentity.worker,
     transport,
     provider: {
       call: async (context) => {
-        const { phase, chunk } = context.data as { phase: ISerializePhase; chunk: ISerializeChunk };
+        const { phase, chunk } = context.data as { phase: ISerializePhase; chunk: ISerializeChunk }
         if (!isChunkShape(chunk))
           throw createStoreWorkerError(
             StoreWorkerErrorCode.invalidRequestChunk,
             StoreWorkerErrorText.invalidRequestChunk
-          );
+          )
         const serializeContext: ISerializeContext = {
           signal: context.signal,
           context: 'serialize-worker'
-        };
+        }
         if (phase === WorkerSerializePhase.encode) {
           // 无论对面用 value 段还是 bytes 段送来，要编码的都是段里的负载，
           // 不是段本身。之前把整个 bytes 段当值交给 parser，字节快路直接失效。
-          const output = await parser.encode(chunk[1], serializeContext);
+          const output = await parser.encode(chunk[1], serializeContext)
           // 单段本身也是数组，必须先消歧再决定要不要走拼装
           const result = isChunkShape(output)
             ? output
             : ((Symbol.asyncIterator in Object(output) || Symbol.iterator in Object(output)
                 ? await collectInWorker(output as Iterable<ISerializeChunk>, context.signal)
-                : await output) as ISerializeChunk);
+                : await output) as ISerializeChunk)
           return context.success(result, {
             transfer: transferablesOf(result, WorkerByteOwnership.transfer)
-          });
+          })
         }
-        const value = await parser.decode(chunk, serializeContext);
+        const value = await parser.decode(chunk, serializeContext)
         // 解出来还是字节时（parser 配了 decodeTo: 'jsonBytes'）按 bytes 段回，
         // 才能走 transfer；包成 value 段就退化成结构化克隆，把整份复制回主线程。
-        const result: ISerializeChunk =
-          value instanceof Uint8Array
-            ? [SerializeChunkKind.bytes, value]
-            : [SerializeChunkKind.value, value];
+        const result: ISerializeChunk = decodeWorkerValue(value)
         return context.success(result, {
           transfer: transferablesOf(result, WorkerByteOwnership.transfer)
-        });
+        })
       }
     },
     middlewares: [connect({ transport }), protocol(), abort(), timeout()]
-  });
-  return toManagedRpcHandler(endpoint, (message) => deliver(message));
+  })
+  return toManagedRpcHandler(endpoint, (message) => deliver(message))
 }
 
 /** Worker 侧不引 registry，就地把分段拼一次，避免把整个注册表打进 worker 包。 */
@@ -352,19 +351,19 @@ async function collectInWorker(
   output: Iterable<ISerializeChunk> | AsyncIterable<ISerializeChunk>,
   signal?: IWebRpcAbortSignal
 ): Promise<ISerializeChunk> {
-  const chunks: ISerializeChunk[] = [];
+  const chunks: ISerializeChunk[] = []
   if (Symbol.asyncIterator in Object(output)) {
     for await (const chunk of output as AsyncIterable<ISerializeChunk>) {
-      signal?.throwIfAborted?.();
-      chunks.push(chunk);
+      signal?.throwIfAborted?.()
+      chunks.push(chunk)
     }
   } else {
     for (const chunk of output as Iterable<ISerializeChunk>) {
-      signal?.throwIfAborted?.();
-      chunks.push(chunk);
+      signal?.throwIfAborted?.()
+      chunks.push(chunk)
     }
   }
-  return mergeWorkerChunks(chunks);
+  return mergeWorkerChunks(chunks)
 }
 
 /** Merges worker-produced wire chunks without coercing materialized values. */
@@ -378,15 +377,15 @@ export function mergeWorkerChunks(chunks: readonly ISerializeChunk[]): ISerializ
       bytesConsumed: 0,
       code: StoreWorkerErrorCode.chunkMergeFailed,
       source: STORE_WORKER_SOURCE
-    });
-  if (chunks.length === 1) return chunks[0]!;
+    })
+  if (chunks.length === 1) return chunks[0]!
   if (chunks.every((chunk) => chunk[0] === SerializeChunkKind.text)) {
-    return [SerializeChunkKind.text, chunks.map((chunk) => chunk[1] as string).join('')];
+    return [SerializeChunkKind.text, chunks.map((chunk) => chunk[1] as string).join('')]
   }
-  const encoder = new TextEncoder();
+  const encoder = new TextEncoder()
   const parts = chunks.map((chunk) => {
-    if (chunk[0] === SerializeChunkKind.bytes) return chunk[1];
-    if (chunk[0] === SerializeChunkKind.text) return encoder.encode(chunk[1]);
+    if (chunk[0] === SerializeChunkKind.bytes) return chunk[1]
+    if (chunk[0] === SerializeChunkKind.text) return encoder.encode(chunk[1])
     throw new SerializeCodecError(StoreWorkerErrorText.valueChunks, {
       type: WorkerDiagnosticType.worker,
       phase: WorkerSerializePhase.encode,
@@ -395,15 +394,15 @@ export function mergeWorkerChunks(chunks: readonly ISerializeChunk[]): ISerializ
       bytesConsumed: 0,
       code: StoreWorkerErrorCode.chunkMergeFailed,
       source: STORE_WORKER_SOURCE
-    });
-  });
-  let total = 0;
-  for (const part of parts) total += part.byteLength;
-  const merged = new Uint8Array(total);
-  let offset = 0;
+    })
+  })
+  let total = 0
+  for (const part of parts) total += part.byteLength
+  const merged = new Uint8Array(total)
+  let offset = 0
   for (const part of parts) {
-    merged.set(part, offset);
-    offset += part.byteLength;
+    merged.set(part, offset)
+    offset += part.byteLength
   }
-  return [SerializeChunkKind.bytes, merged];
+  return [SerializeChunkKind.bytes, merged]
 }

@@ -1,0 +1,211 @@
+{
+  "schemaVersion": 1,
+  "packages": [
+    "@migaia/capability",
+    "@migaia/event-subscriber",
+    "@migaia/lifecycle",
+    "@migaia/logger",
+    "@migaia/middleware-pipeline",
+    "@migaia/plugin-host",
+    "@migaia/reactive",
+    "@migaia/resource",
+    "@migaia/serialize",
+    "@migaia/storage-contract",
+    "@migaia/storage-web",
+    "@migaia/store-devtools",
+    "@migaia/store-indexed",
+    "@migaia/store-keyed",
+    "@migaia/store-light",
+    "@migaia/store-middleware",
+    "@migaia/store-persist",
+    "@migaia/store-react",
+    "@migaia/store-shared",
+    "@migaia/store-ssr",
+    "@migaia/store-wasm",
+    "@migaia/store-worker",
+    "@migaia/tray",
+    "@migaia/utils",
+    "@migaia/wasm",
+    "@migaia/web-rpc",
+    "migaia-website"
+  ],
+  "capabilities": [
+    {
+      "name": "event-fanout",
+      "owner": "@migaia/event-subscriber",
+      "routes": ["@migaia/event-subscriber"],
+      "symbols": ["EventDispatchPolicy", "createEventChannel"],
+      "consumers": ["@migaia/storage-web", "@migaia/store-light", "@migaia/web-rpc"]
+    },
+    {
+      "name": "abort-timeout",
+      "owner": "@migaia/utils",
+      "routes": ["@migaia/utils/promise"],
+      "symbols": [
+        "IAbortSignal",
+        "UtilsAbortError",
+        "createAbortTimeoutSignal",
+        "raceWithAbort",
+        "withTimeout"
+      ],
+      "consumers": ["@migaia/lifecycle", "@migaia/storage-web"]
+    },
+    {
+      "name": "byte-brand",
+      "owner": "@migaia/utils",
+      "routes": ["@migaia/utils/bytes"],
+      "symbols": ["isArrayBuffer", "isUint8Array"],
+      "consumers": [
+        "@migaia/serialize",
+        "@migaia/storage-contract",
+        "@migaia/storage-web",
+        "@migaia/store-persist",
+        "@migaia/store-worker",
+        "@migaia/web-rpc"
+      ]
+    },
+    {
+      "name": "generation-dispose",
+      "owner": "@migaia/lifecycle",
+      "routes": ["@migaia/lifecycle"],
+      "symbols": ["IGenerationController", "IGenerationToken", "createGenerationController"],
+      "consumers": [
+        "@migaia/capability",
+        "@migaia/resource",
+        "@migaia/store-light",
+        "@migaia/web-rpc"
+      ]
+    },
+    {
+      "name": "reactive-graph",
+      "owner": "@migaia/reactive",
+      "routes": [
+        "@migaia/reactive",
+        "@migaia/reactive/internals",
+        "@migaia/reactive/node-factories",
+        "@migaia/reactive/node-internals",
+        "@migaia/reactive/ownership",
+        "@migaia/reactive/reactive/computed.class",
+        "@migaia/reactive/reactive/signal.class",
+        "@migaia/reactive/runtime",
+        "@migaia/reactive/source"
+      ],
+      "symbols": ["*"],
+      "consumers": [
+        "@migaia/resource",
+        "@migaia/store-devtools",
+        "@migaia/store-indexed",
+        "@migaia/store-keyed",
+        "@migaia/store-light",
+        "@migaia/store-middleware",
+        "@migaia/store-persist",
+        "@migaia/store-react",
+        "@migaia/store-shared",
+        "@migaia/store-ssr",
+        "@migaia/store-wasm",
+        "@migaia/store-worker"
+      ]
+    },
+    {
+      "name": "storage-contract",
+      "owner": "@migaia/storage-contract",
+      "routes": ["@migaia/storage-contract"],
+      "symbols": ["*"],
+      "consumers": ["@migaia/storage-web"]
+    }
+  ],
+  "nonCapabilityEdges": [
+    {
+      "route": "@migaia/lifecycle",
+      "symbols": [
+        "IAbortSignal",
+        "ILeaseRegistry",
+        "ILifecycleScheduler",
+        "ILifecycleScope",
+        "ILifecycleState",
+        "IMutationQueue",
+        "IReleaseContext",
+        "IReleaseDescriptor",
+        "IScheduledTask",
+        "ISyncLifecycleScope",
+        "ITerminalController",
+        "LifecycleErrorCode",
+        "LifecycleState",
+        "ThenableProbeKind",
+        "assimilateCapturedThen",
+        "boundedWait",
+        "containAsyncRejection",
+        "createAbortController",
+        "createLifecycleScope",
+        "createMutationQueue",
+        "createObjectLeaseRegistry",
+        "createProvisionalScope",
+        "createQuiescenceTracker",
+        "createStringLeaseRegistry",
+        "createSyncLifecycleScope",
+        "createTerminalController",
+        "probeThenable",
+        "snapshotScheduler",
+        "systemScheduler"
+      ]
+    },
+    {
+      "route": "@migaia/utils/bytes",
+      "symbols": ["base64ToBytes", "bytesToBase64", "streamBase64Chunks", "utf8ByteLength"]
+    },
+    {
+      "route": "@migaia/utils/config",
+      "symbols": ["parseConfigPath"]
+    },
+    {
+      "route": "@migaia/utils/error",
+      "symbols": ["UtilsErrorCode", "UtilsTimeoutError", "attachErrorIdentity"]
+    },
+    {
+      "route": "@migaia/utils/object",
+      "symbols": ["IObjectPathInput", "IObjectPathTuple", "get", "parseObjectPath"]
+    }
+  ],
+  "targetedRules": [
+    {
+      "id": "SWV2-RED02",
+      "packages": ["@migaia/storage-web"],
+      "pathPattern": "^src/backends/(?!index\\.ts$)[^/]+\\.ts$",
+      "sourcePatterns": [
+        "storageListeners\\s*=\\s*new\\s+Set",
+        "class\\s+StorageChange(?:Queue|Dispatcher)"
+      ]
+    },
+    {
+      "id": "SWV2-RED03",
+      "packages": ["@migaia/storage-web"],
+      "pathPattern": "^src/",
+      "sourcePatterns": [
+        "class\\s+StorageReactiveScheduler",
+        "createStorageReactiveScheduler\\s*[=(]"
+      ]
+    },
+    {
+      "id": "SWV2-RED07",
+      "packages": ["@migaia/storage-web"],
+      "pathPattern": "^src/core/operation\\.ts$",
+      "sourcePatterns": [
+        "storageTimeoutController\\s*=\\s*new\\s+AbortController",
+        "storageTimeoutHandle\\s*=\\s*setTimeout"
+      ]
+    },
+    {
+      "id": "SWV2-RED10",
+      "packages": [
+        "@migaia/serialize",
+        "@migaia/storage-contract",
+        "@migaia/storage-web",
+        "@migaia/store-persist",
+        "@migaia/store-worker",
+        "@migaia/web-rpc"
+      ],
+      "pathPattern": "^src/",
+      "sourcePatterns": ["instanceof\\s+(?:Uint8Array|ArrayBuffer)\\b"]
+    }
+  ]
+}

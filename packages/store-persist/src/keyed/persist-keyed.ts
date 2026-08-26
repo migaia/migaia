@@ -1,40 +1,40 @@
-import type { IAtomStore, IWritableAtomDefinition } from '@migaia/store-keyed';
-import { persistUnit } from '../core/persist-unit.js';
-import type { ICodec } from '@migaia/storage-web';
-import type { IPersistStorage, IPersistUnit } from '../core/types.js';
-import { snapshotPersistOptions, assertPersistString } from '../core/options.js';
-import { createStorePersistTypeError } from '../errors.js';
-import { StorePersistErrorCode } from '../error-code.js';
-import { StorePersistErrorText } from '../error-text.js';
+import type { IAtomStore, IWritableAtomDefinition } from '@migaia/store-keyed'
+import { persistUnit } from '../core/persist-unit.js'
+import type { ICodec } from '@migaia/storage-web'
+import type { IPersistStorage, IPersistUnit } from '../core/types.js'
+import { snapshotPersistOptions, assertPersistString } from '../core/options.js'
+import { createStorePersistTypeError } from '../errors.js'
+import { StorePersistErrorCode } from '../error-code.js'
+import { StorePersistErrorText } from '../error-text.js'
 
 export type IPersistKeyedOptions<T> = {
   /** Storage key 前缀，格式 `${namespace}:${id}`——必填，clearFamily() 靠它过滤。 */
-  namespace: string;
-  storage: IPersistStorage;
-  codec?: ICodec;
-  version?: number;
-  debounceMs?: number;
-  partialize?: (value: T) => Partial<T>;
-  merge?: (persisted: Partial<T>, current: T) => T;
-};
+  namespace: string
+  storage: IPersistStorage
+  codec?: ICodec
+  version?: number
+  debounceMs?: number
+  partialize?: (value: T) => Partial<T>
+  merge?: (persisted: Partial<T>, current: T) => T
+}
 
 export type IPersistKeyedHandle<T> = {
-  readonly value: T;
-  dispose(): void;
-};
+  readonly value: T
+  dispose(): void
+}
 
 function storageKey(namespace: string, id: string): string {
-  return `${namespace}:${id}`;
+  return `${namespace}:${id}`
 }
 
 function toPersistUnit<T>(atomStore: IAtomStore, def: IWritableAtomDefinition<T>): IPersistUnit<T> {
   return {
     snapshot: () => atomStore.peek(def),
     restore: (state) => {
-      atomStore.set(def, state as never);
+      atomStore.set(def, state as never)
     },
     subscribe: (onChange) => atomStore.sub(def, onChange)
-  };
+  }
 }
 
 /**
@@ -48,10 +48,10 @@ export function persistKeyed<T>(
   id: string,
   options: IPersistKeyedOptions<T>
 ): IPersistKeyedHandle<T> {
-  const snapshot = snapshotPersistOptions(options);
-  assertPersistString(snapshot.namespace, 'namespace');
-  assertPersistString(id, 'id');
-  const value = atomStore.get(def);
+  const snapshot = snapshotPersistOptions(options)
+  assertPersistString(snapshot.namespace, 'namespace')
+  assertPersistString(id, 'id')
+  const value = atomStore.get(def)
   const handle = persistUnit(toPersistUnit(atomStore, def), {
     key: storageKey(snapshot.namespace, id),
     runtime: atomStore.runtime,
@@ -61,11 +61,11 @@ export function persistKeyed<T>(
     partialize: snapshot.partialize,
     merge: snapshot.merge,
     debounceMs: snapshot.debounceMs
-  });
+  })
   return {
     value,
     dispose: () => handle.dispose()
-  };
+  }
 }
 
 /**
@@ -74,7 +74,7 @@ export function persistKeyed<T>(
  * 因为存档被删掉就重新触发一次写回（下一次它们自己的 subscribe 触发时才会覆盖写回一条新记录）。
  */
 export async function clearFamily(storage: IPersistStorage, namespace: string): Promise<number> {
-  assertPersistString(namespace, 'namespace');
+  assertPersistString(namespace, 'namespace')
   try {
     if (
       storage === null ||
@@ -82,18 +82,18 @@ export async function clearFamily(storage: IPersistStorage, namespace: string): 
       typeof storage.keys !== 'function' ||
       typeof storage.remove !== 'function'
     ) {
-      throw new Error(StorePersistErrorText.storageInvalid(namespace));
+      throw new Error(StorePersistErrorText.storageInvalid(namespace))
     }
   } catch (error) {
     throw createStorePersistTypeError(
       StorePersistErrorCode.invalidOption,
       StorePersistErrorText.storageInvalid(namespace),
       { cause: error }
-    );
+    )
   }
-  const prefix = `${namespace}:`;
-  const allKeys = await storage.keys();
-  const matching = allKeys.filter((k) => k.startsWith(prefix));
-  for (const key of matching) await storage.remove(key);
-  return matching.length;
+  const prefix = `${namespace}:`
+  const allKeys = await storage.keys()
+  const matching = allKeys.filter((k) => k.startsWith(prefix))
+  for (const key of matching) await storage.remove(key)
+  return matching.length
 }

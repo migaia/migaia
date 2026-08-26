@@ -9,44 +9,44 @@
  * 分层：kernel → atom-definition（此处）→ atom-store → atom facade → React
  */
 
-import { createStoreKeyedTypeError, StoreKeyedErrorCode } from '../errors.js';
-import { probeThenable, ThenableProbeKind } from '@migaia/lifecycle';
-import { AtomKind } from './kind-constants.js';
-import { StoreKeyedErrorText } from '../error-text.js';
+import { createStoreKeyedTypeError, StoreKeyedErrorCode } from '../errors.js'
+import { probeThenable, ThenableProbeKind } from '@migaia/lifecycle'
+import { AtomKind } from './kind-constants.js'
+import { StoreKeyedErrorText } from '../error-text.js'
 
 // Symbol.for keeps definitions recognizable when two copies of the package
 // coexist in one Realm (for example an app bundle plus a worker/devtools copy).
-const DEFINITION = Symbol.for('morning-watch.store.atom-definition');
+const DEFINITION = Symbol.for('morning-watch.store.atom-definition')
 
 /** 在某个 store 内读另一个定义的当前值。 */
-export type IAtomGet = <T>(definition: IAtomDefinition<T>) => T;
+export type IAtomGet = <T>(definition: IAtomDefinition<T>) => T
 
 /** 在某个 store 内写另一个可写定义。 */
 export type IAtomSet = <T, Args extends readonly unknown[], Result>(
   definition: IWritableAtomDefinition<T, Args, Result>,
   ...args: Args
-) => Result;
+) => Result
 
-export type IAtomRead<T> = (get: IAtomGet) => T;
+export type IAtomRead<T> = (get: IAtomGet) => T
 
 export type IAtomWriter<Args extends readonly unknown[], Result> = (
   get: IAtomGet,
   set: IAtomSet,
   ...args: Args
-) => Result;
+) => Result
 
-export type IAtomUpdate<T> = T | ((previous: T) => T);
+export type IAtomUpdate<T> = T | ((previous: T) => T)
 
 type IDefinitionBase = {
-  readonly [DEFINITION]: true;
-  readonly debugLabel?: string;
-};
+  readonly [DEFINITION]: true
+  readonly debugLabel?: string
+}
 
 /** 源定义：只有初值。 */
 export type IPrimitiveDefinition<T> = IDefinitionBase & {
-  readonly kind: typeof AtomKind.primitive;
-  readonly init: T;
-};
+  readonly kind: typeof AtomKind.primitive
+  readonly init: T
+}
 
 /**
  * 每个 AtomStore 首次实例化时各自创建初值。
@@ -54,19 +54,19 @@ export type IPrimitiveDefinition<T> = IDefinitionBase & {
  * 对象、数组及其它可变容器不应作为跨 Provider/SSR scope 共享的模板引用； 独立 kind 避免把“函数值”误判成初始化函数。
  */
 export type IPrimitiveFactoryDefinition<T> = IDefinitionBase & {
-  readonly kind: typeof AtomKind.primitiveFactory;
-  readonly create: () => T;
+  readonly kind: typeof AtomKind.primitiveFactory
+  readonly create: () => T
   /** Only explicitly marked factories may execute during speculative preview. */
-  readonly previewSafe: boolean;
-};
+  readonly previewSafe: boolean
+}
 
 /** 派生定义：只有读函数。 */
 export type IDerivedDefinition<T> = IDefinitionBase & {
-  readonly kind: typeof AtomKind.derived;
-  readonly read: IAtomRead<T>;
+  readonly kind: typeof AtomKind.derived
+  readonly read: IAtomRead<T>
   /** 自定义相等比较。这里只是个参数，怎么用由 store 层决定。 */
-  readonly equals?: (a: T, b: T) => boolean;
-};
+  readonly equals?: (a: T, b: T) => boolean
+}
 
 /** 可写派生定义：读一份、写另一份。 */
 export type IWritableDerivedDefinition<
@@ -74,11 +74,11 @@ export type IWritableDerivedDefinition<
   Args extends readonly unknown[],
   Result
 > = IDefinitionBase & {
-  readonly kind: typeof AtomKind.writableDerived;
-  readonly read: IAtomRead<T>;
-  readonly write: IAtomWriter<Args, Result>;
-  readonly equals?: (a: T, b: T) => boolean;
-};
+  readonly kind: typeof AtomKind.writableDerived
+  readonly read: IAtomRead<T>
+  readonly write: IAtomWriter<Args, Result>
+  readonly equals?: (a: T, b: T) => boolean
+}
 
 /**
  * 读侧的统一形态。
@@ -87,17 +87,17 @@ export type IWritableDerivedDefinition<
  * `IWritableAtomDefinition` 重新收窄。
  */
 type IErasedWritableDerived<T> = IDefinitionBase & {
-  readonly kind: typeof AtomKind.writableDerived;
-  readonly read: IAtomRead<T>;
-  readonly write: (...args: never[]) => unknown;
-  readonly equals?: (a: T, b: T) => boolean;
-};
+  readonly kind: typeof AtomKind.writableDerived
+  readonly read: IAtomRead<T>
+  readonly write: (...args: never[]) => unknown
+  readonly equals?: (a: T, b: T) => boolean
+}
 
 export type IAtomDefinition<T> =
   | IPrimitiveDefinition<T>
   | IPrimitiveFactoryDefinition<T>
   | IDerivedDefinition<T>
-  | IErasedWritableDerived<T>;
+  | IErasedWritableDerived<T>
 
 /** 能被 set 的定义：源定义，或带 write 的派生定义。 */
 export type IWritableAtomDefinition<
@@ -107,12 +107,12 @@ export type IWritableAtomDefinition<
 > =
   | IPrimitiveDefinition<T>
   | IPrimitiveFactoryDefinition<T>
-  | IWritableDerivedDefinition<T, Args, Result>;
+  | IWritableDerivedDefinition<T, Args, Result>
 
 export const isAtomDefinition = (value: unknown): value is IAtomDefinition<unknown> =>
   typeof value === 'object' &&
   value !== null &&
-  (value as Record<PropertyKey, unknown>)[DEFINITION] === true;
+  (value as Record<PropertyKey, unknown>)[DEFINITION] === true
 
 /**
  * Rejects thenables: async initial values are not supported here, and a silently-stored unresolved
@@ -120,32 +120,32 @@ export const isAtomDefinition = (value: unknown): value is IAtomDefinition<unkno
  * error message.
  */
 export function assertNotThenable(value: unknown, context: string): void {
-  const probe = probeThenable(value);
+  const probe = probeThenable(value)
   if (probe.kind === ThenableProbeKind.failed) {
     throw createStoreKeyedTypeError(
       StoreKeyedErrorCode.invalidOption,
       StoreKeyedErrorText.thenable(context),
       { cause: probe.error }
-    );
+    )
   }
   if (probe.kind === ThenableProbeKind.thenable) {
     throw createStoreKeyedTypeError(
       StoreKeyedErrorCode.invalidOption,
       StoreKeyedErrorText.thenable(context)
-    );
+    )
   }
 }
 
 // —— 构造器：只组装描述，不碰任何运行时 ——
 
 export function atomDef<T>(init: T, debugLabel?: string): IPrimitiveDefinition<T> {
-  assertNotThenable(init, 'atomDef(init)');
+  assertNotThenable(init, 'atomDef(init)')
   return Object.freeze({
     [DEFINITION]: true as const,
     kind: AtomKind.primitive,
     init,
     debugLabel
-  });
+  })
 }
 
 export function atomDefFactory<T>(
@@ -158,7 +158,7 @@ export function atomDefFactory<T>(
     create,
     previewSafe: false,
     debugLabel
-  });
+  })
 }
 
 /**
@@ -176,7 +176,7 @@ export function previewSafeAtomDefFactory<T>(
     create,
     previewSafe: true,
     debugLabel
-  });
+  })
 }
 
 export function derivedDef<T>(
@@ -190,7 +190,7 @@ export function derivedDef<T>(
     read,
     debugLabel,
     equals
-  });
+  })
 }
 
 export function writableDef<T, Args extends readonly unknown[], Result>(
@@ -206,5 +206,5 @@ export function writableDef<T, Args extends readonly unknown[], Result>(
     write,
     debugLabel,
     equals
-  });
+  })
 }

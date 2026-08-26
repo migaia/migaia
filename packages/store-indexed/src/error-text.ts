@@ -9,4 +9,4 @@ export const StoreIndexedErrorText = {
   disposed: (name: string): string => `[store] ${name} is disposed`,
   arrayIndex: '[store] ObservableArray index out of range',
   arrayInteger: '[store] ObservableArray index must be an integer'
-} as const;
+} as const

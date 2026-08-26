@@ -3,4 +3,4 @@ export {
   clearFamily,
   type IPersistKeyedOptions,
   type IPersistKeyedHandle
-} from './keyed/persist-keyed.js';
+} from './keyed/persist-keyed.js'

@@ -1,13 +1,13 @@
-import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
-import config from '../e2e/vite.config.js';
+import { fileURLToPath } from 'node:url'
+import { describe, expect, it } from 'vitest'
+import config from '../e2e/vite.config.js'
 
 describe('store-indexed E2E config', () => {
   it('loads the owning package from current source', () => {
     /** Alias table that prevents a stale dist build from producing a false-green E2E result. */
-    const aliases = config.resolve?.alias as Record<string, string>;
+    const aliases = config.resolve?.alias as Record<string, string>
     expect(aliases['@migaia/store-indexed']).toBe(
       fileURLToPath(new URL('../src/index.ts', import.meta.url))
-    );
-  });
-});
+    )
+  })
+})

@@ -8,14 +8,14 @@ export const PersistState = {
   success: 'success',
   error: 'error',
   disposed: 'disposed'
-} as const;
+} as const
 
 /** Persistence codec representations. */
 export const PersistCodecOutput = {
   text: 'text',
   structured: 'structured',
   binary: 'binary'
-} as const;
+} as const
 
-export type IPersistState = (typeof PersistState)[keyof typeof PersistState];
-export type IPersistCodecOutput = (typeof PersistCodecOutput)[keyof typeof PersistCodecOutput];
+export type IPersistState = (typeof PersistState)[keyof typeof PersistState]
+export type IPersistCodecOutput = (typeof PersistCodecOutput)[keyof typeof PersistCodecOutput]

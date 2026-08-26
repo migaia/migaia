@@ -1,6 +1,7 @@
-export { defineEntity } from './define.js';
+export { defineEntity } from './define.js'
 export type {
   IEntityDefinition,
+  IEntityIndex,
   IEntityOptions,
   IEntityTransactionScope,
   IListOptions,
@@ -11,4 +12,4 @@ export type {
   IInvalidRecordHandler,
   IRecordComparator,
   IRepository
-} from './types.js';
+} from './types.js'

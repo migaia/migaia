@@ -1,15 +1,15 @@
-import { ReactiveErrorPhase, type IRuntime } from '@migaia/reactive';
+import { ReactiveErrorPhase, type IRuntime } from '@migaia/reactive'
 
 /** Keeps a failing diagnostic sink from escaping into the reactive commit. */
 function reportReactFailure(runtime: IRuntime, error: unknown): void {
   try {
-    runtime.reportError(error, { phase: ReactiveErrorPhase.subscriptionListener });
-    return;
+    runtime.reportError(error, { phase: ReactiveErrorPhase.subscriptionListener })
+    return
   } catch (reporterError) {
-    const host = (globalThis as { reportError?: (value: unknown) => void }).reportError;
+    const host = (globalThis as { reportError?: (value: unknown) => void }).reportError
     try {
-      if (host) host(reporterError);
-      else console.error(reporterError);
+      if (host) host(reporterError)
+      else console.error(reporterError)
     } catch {
       // Diagnostic reporting is best effort and must not escape the listener boundary.
     }
@@ -19,8 +19,8 @@ function reportReactFailure(runtime: IRuntime, error: unknown): void {
 /** Isolate React listener failures from reactive dependency commits. */
 export function notifyReact(runtime: IRuntime, onChange: () => void): void {
   try {
-    runtime.untracked(onChange);
+    runtime.untracked(onChange)
   } catch (error) {
-    reportReactFailure(runtime, error);
+    reportReactFailure(runtime, error)
   }
 }

@@ -30,4 +30,4 @@ export const StorePersistErrorText = {
   hydrationWriteFailed: '[store] persist hydration and write both failed',
   versionMismatch: (key: string, archive: number, current: number): string =>
     `[store] persist archive "${key}" is version ${archive}, but this store is version ${current}; provide migrate() to convert it`
-} as const;
+} as const

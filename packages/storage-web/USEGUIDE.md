@@ -343,7 +343,7 @@ type IIndexedDbOptions = {
 
 ### L1（字节）方法
 
-- `getBytes(key, ctx?)`：从 `bytesStoreName` 读取。IndexedDB 的 structured clone 可能把写入的 `Uint8Array` 还原为 `ArrayBuffer`（取决于实现），源码同时处理两种还原形态（`isByteView`/`isRawArrayBuffer`，用跨 realm 安全的 `ArrayBuffer.isView`/`intrinsicConstructorName` 而非 `instanceof`，因为 fake-indexeddb 与 jsdom 在测试环境下是不同 realm）。不存在返回 `null`。
+- `getBytes(key, ctx?)`：从 `bytesStoreName` 读取。IndexedDB 的 structured clone 可能把写入的 `Uint8Array` 还原为 `ArrayBuffer`（取决于实现），源码用 `@migaia/utils/bytes` 的 `isUint8Array` / `isArrayBuffer` 内部槽 guard 处理两种还原形态；它们不依赖 `instanceof` 或可伪造的 `constructor.name`，能正确覆盖 fake-indexeddb、jsdom、iframe 与 Worker 的跨 realm 值。不存在返回 `null`。
 - `setBytes(key, value, ctx?)`：`value` 必须是 `Uint8Array`（`isUint8Array`），否则抛 `INVALID_CONFIG`。写入前会 `.slice()` 出一份独立副本再走 `writeWithConflict('bytes', ...)`，避免调用方在异步边界之外继续修改同一份底层缓冲区。
 - `clearBytes(ctx?)`：清空 `bytesStoreName`。
 

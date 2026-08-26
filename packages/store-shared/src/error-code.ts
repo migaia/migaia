@@ -55,7 +55,6 @@ export const StoreSharedErrorCode = {
    * 调用方修正入参；这是永久性参数错误。
    */
   invalidOption: 'INVALID_OPTION'
-} as const;
+} as const
 
-export type IStoreSharedErrorCode =
-  (typeof StoreSharedErrorCode)[keyof typeof StoreSharedErrorCode];
+export type IStoreSharedErrorCode = (typeof StoreSharedErrorCode)[keyof typeof StoreSharedErrorCode]

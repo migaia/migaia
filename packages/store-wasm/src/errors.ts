@@ -1,14 +1,14 @@
-import { StoreWasmErrorCode, type IStoreWasmErrorCode } from './error-code.js';
-import { attachErrorIdentity } from '@migaia/utils/error';
+import { StoreWasmErrorCode, type IStoreWasmErrorCode } from './error-code.js'
+import { attachErrorIdentity } from '@migaia/utils/error'
 
-export { StoreWasmErrorCode, type IStoreWasmErrorCode };
+export { StoreWasmErrorCode, type IStoreWasmErrorCode }
 
 /** `source` value stamped onto every error this package throws. */
-export const STORE_WASM_SOURCE = '@migaia/store-wasm';
+export const STORE_WASM_SOURCE = '@migaia/store-wasm'
 
 /** Attaches `(source, code)` onto an existing error object without touching its type or stack. */
 function tagStoreWasmError<E extends Error>(error: E, code: IStoreWasmErrorCode): E {
-  return attachErrorIdentity(error, { source: STORE_WASM_SOURCE, code });
+  return attachErrorIdentity(error, { source: STORE_WASM_SOURCE, code })
 }
 
 /** Builds a `(source, code)`-tagged `Error` without touching `stack`. */
@@ -20,13 +20,13 @@ export function createStoreWasmError(
   const error = new Error(
     message,
     options?.cause !== undefined ? { cause: options.cause } : undefined
-  );
-  return tagStoreWasmError(error, code);
+  )
+  return tagStoreWasmError(error, code)
 }
 
 /** Builds a `(source, code)`-tagged `RangeError`, preserving the runtime type. */
 export function createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError {
-  return tagStoreWasmError(new RangeError(message), code);
+  return tagStoreWasmError(new RangeError(message), code)
 }
 
 /** Builds a `(source, code)`-tagged `TypeError`, preserving the runtime type. */
@@ -38,8 +38,8 @@ export function createStoreWasmTypeError(
   const error = new TypeError(
     message,
     options?.cause !== undefined ? { cause: options.cause } : undefined
-  );
-  return tagStoreWasmError(error, code);
+  )
+  return tagStoreWasmError(error, code)
 }
 
 /** Builds a tagged aggregate while preserving every original cleanup error by identity. */
@@ -48,5 +48,5 @@ export function createStoreWasmAggregateError(
   errors: readonly unknown[],
   message: string
 ): AggregateError {
-  return tagStoreWasmError(new AggregateError(errors, message), code);
+  return tagStoreWasmError(new AggregateError(errors, message), code)
 }

@@ -49,7 +49,7 @@ export const StoreMiddlewareErrorCode = {
    * inspect `errors[]` and treat the host as terminal.
    */
   cleanupFailed: 'CLEANUP_FAILED'
-} as const;
+} as const
 
 export type IStoreMiddlewareErrorCode =
-  (typeof StoreMiddlewareErrorCode)[keyof typeof StoreMiddlewareErrorCode];
+  (typeof StoreMiddlewareErrorCode)[keyof typeof StoreMiddlewareErrorCode]

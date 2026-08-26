@@ -2,25 +2,25 @@ import {
   StorageContractError,
   StorageContractErrorCode,
   isStorageContractError
-} from '@migaia/storage-contract';
-import { raceWithAbort, UtilsAbortError } from '@migaia/utils/promise';
-import { UtilsErrorCode } from '@migaia/utils/error';
+} from '@migaia/storage-contract'
+import { raceWithAbort, UtilsAbortError } from '@migaia/utils/promise'
+import { UtilsErrorCode } from '@migaia/utils/error'
 import {
   createStorageOperationRuntime,
   type IStorageOperationRuntime
-} from '../core/operation-reporter.js';
-import { StorageError, StorageErrorCode } from '../types/errors.js';
-import { assertOperationContext, throwIfAborted, type IWebAbortSignal } from '../core/operation.js';
+} from '../core/operation-reporter.js'
+import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { assertOperationContext, throwIfAborted, type IWebAbortSignal } from '../core/operation.js'
 
 export type IMigrationContext = {
-  readonly fromVersion: number;
-  readonly toVersion: number;
+  readonly fromVersion: number
+  readonly toVersion: number
   /** Optional operation signal for cooperative migration cancellation. */
-  readonly signal?: IWebAbortSignal;
-};
+  readonly signal?: IWebAbortSignal
+}
 
 /** 迁移函数一律 async，允许迁移过程中读取其他存储或发请求。 */
-export type IMigration = (previous: unknown, ctx: IMigrationContext) => Promise<unknown>;
+export type IMigration = (previous: unknown, ctx: IMigrationContext) => Promise<unknown>
 
 /**
  * 公开入口：创建新 runtime（一次 operation 一个 reporter），见 `docs/store-persist/storage-web-integration.sdd.md`
@@ -33,9 +33,9 @@ export const runMigrations = async (
   migrations: Record<number, IMigration> | undefined,
   signal?: IWebAbortSignal
 ): Promise<unknown> => {
-  const runtime = createStorageOperationRuntime();
-  return runMigrationsWithRuntime(runtime, value, fromVersion, toVersion, migrations, signal);
-};
+  const runtime = createStorageOperationRuntime()
+  return runMigrationsWithRuntime(runtime, value, fromVersion, toVersion, migrations, signal)
+}
 
 /**
  * 内部实现：接收所属 operation 的 runtime，不自行创建第二个 reporter。
@@ -51,72 +51,72 @@ export const runMigrationsWithRuntime = async (
   migrations: Record<number, IMigration> | undefined,
   signal?: IWebAbortSignal
 ): Promise<unknown> => {
-  void runtime;
+  void runtime
   if (!Number.isSafeInteger(fromVersion) || fromVersion < 0)
     throw new StorageError(StorageErrorCode.invalidConfig, {
       cause: new RangeError('migration fromVersion must be a non-negative safe integer')
-    });
+    })
   if (!Number.isSafeInteger(toVersion) || toVersion < 0)
     throw new StorageError(StorageErrorCode.invalidConfig, {
       cause: new RangeError('migration toVersion must be a non-negative safe integer')
-    });
+    })
   if (
     migrations !== undefined &&
     (typeof migrations !== 'object' || migrations === null || Array.isArray(migrations))
   )
     throw new StorageError(StorageErrorCode.invalidConfig, {
       cause: new TypeError('migrations must be an object')
-    });
-  assertOperationContext(signal === undefined ? undefined : { signal });
-  throwIfAborted(signal);
-  if (fromVersion >= toVersion) return value;
-  let current = value;
+    })
+  assertOperationContext(signal === undefined ? undefined : { signal })
+  throwIfAborted(signal)
+  if (fromVersion >= toVersion) return value
+  let current = value
   for (let version = fromVersion + 1; version <= toVersion; version += 1) {
-    let migration: IMigration | undefined;
+    let migration: IMigration | undefined
     try {
       migration =
         migrations !== undefined && Object.hasOwn(migrations, version)
           ? migrations[version]
-          : undefined;
+          : undefined
     } catch (cause) {
-      throw new StorageError(StorageErrorCode.invalidConfig, { cause });
+      throw new StorageError(StorageErrorCode.invalidConfig, { cause })
     }
-    if (migration === undefined) continue;
+    if (migration === undefined) continue
     if (typeof migration !== 'function')
       throw new StorageError(StorageErrorCode.invalidConfig, {
         cause: new TypeError(`migration ${version} must be a function`)
-      });
+      })
     try {
       const migrationContext = signal
         ? { fromVersion: version - 1, toVersion: version, signal }
-        : { fromVersion: version - 1, toVersion: version };
-      const result = Promise.resolve().then(() => migration(current, migrationContext));
+        : { fromVersion: version - 1, toVersion: version }
+      const result = Promise.resolve().then(() => migration(current, migrationContext))
       if (!signal) {
-        current = await result;
-        continue;
+        current = await result
+        continue
       }
       current = await raceWithAbort(() => result, {
         signal,
         cleanupPolicy: 'report',
         report: (cause) => runtime.reporter(cause)
-      });
+      })
     } catch (cause) {
       if (cause instanceof UtilsAbortError)
         throw new StorageContractError(StorageContractErrorCode.aborted, {
           cause: cause.cause
-        });
+        })
       if (
         cause &&
         typeof cause === 'object' &&
         'code' in cause &&
         cause.code === UtilsErrorCode.invalidArgument
       )
-        throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause });
-      if (isStorageContractError(cause)) throw cause;
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
+      if (isStorageContractError(cause)) throw cause
       if (cause instanceof StorageError && cause.code === StorageErrorCode.invalidConfig)
-        throw cause;
-      throw new StorageError(StorageErrorCode.migrationFailed, { cause });
+        throw cause
+      throw new StorageError(StorageErrorCode.migrationFailed, { cause })
     }
   }
-  return current;
-};
+  return current
+}

@@ -33,4 +33,4 @@ export const StoreSsrErrorText = {
   notSerializable: (path: string): string => `[store] ${path} is not JSON serializable`,
   cycle: (path: string): string => `[store] ${path} contains a cycle`,
   nonPlain: (path: string): string => `[store] ${path} contains a non-plain object`
-} as const;
+} as const

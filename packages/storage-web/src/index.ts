@@ -11,7 +11,7 @@ export {
   type ICookiesOptions,
   type ICookieDocument,
   type IIndexedDbOptions
-} from './backends/index.js';
+} from './backends/index.js'
 
 // 契约
 export type {
@@ -40,11 +40,12 @@ export type {
   ICookieScope,
   ISyncCapableStore,
   IWebStorageLike
-} from './types/index.js';
-export { StorageError, StorageErrorCode, asRecordStore, isRecordStore } from './types/index.js';
-export { ConflictPolicy } from './types/index.js';
-export { lengthPrefixedNamespaceCodec } from './utils/key.js';
-export type { INamespaceCodec } from './utils/key.js';
+} from './types/index.js'
+export { StorageError, StorageErrorCode, asRecordStore, isRecordStore } from './types/index.js'
+export { StorageErrorText } from './error-text.js'
+export { ConflictPolicy } from './types/index.js'
+export { lengthPrefixedNamespaceCodec } from './utils/key.js'
+export type { INamespaceCodec } from './utils/key.js'
 
 // 契约级错误家族（透传自 @migaia/storage-contract）
 export {
@@ -54,23 +55,23 @@ export {
   isStorageContractError,
   type IStorageContractErrorCode,
   type IStorageContractErrorDetails
-} from '@migaia/storage-contract';
+} from '@migaia/storage-contract'
 
 // 序列化接入层
-export { jsonCodec, structuredCodec, binaryCodec, selectCodec } from './serialize/index.js';
-export type { ICodec, ICodecOutput, ISelectedCodec } from './serialize/index.js';
+export { jsonCodec, structuredCodec, binaryCodec, selectCodec } from './serialize/index.js'
+export type { ICodec, ICodecOutput, ISelectedCodec } from './serialize/index.js'
 
 // schema 接入层
-export { passthrough, fromStandardSchema, runMigrations } from './schema/index.js';
+export { passthrough, fromStandardSchema, runMigrations } from './schema/index.js'
 export type {
   ISchemaAdapter,
   IStandardSchemaV1,
   IMigration,
   IMigrationContext
-} from './schema/index.js';
+} from './schema/index.js'
 
 // entity
-export { defineEntity } from './entity/index.js';
+export { defineEntity } from './entity/index.js'
 export type {
   IEntityDefinition,
   IEntityOptions,
@@ -83,4 +84,4 @@ export type {
   IInvalidRecordHandler,
   IRecordComparator,
   IRepository
-} from './entity/index.js';
+} from './entity/index.js'

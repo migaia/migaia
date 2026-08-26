@@ -481,6 +481,7 @@ if (isStorageContractError(error)) console.log(error.code);
 
 ```ts
 import {
+  isArrayBuffer,
   isUint8Array,
   intrinsicConstructorName,
   StorageContractConflictPolicy,
@@ -488,21 +489,22 @@ import {
 } from '@migaia/storage-contract';
 ```
 
-**`isUint8Array`｜3 秒上手** —— 跨 realm 安全的字节通道输入类型检查（不依赖 `instanceof`，可识别来自其他 iframe/Worker 的 `Uint8Array`）：
+**`isUint8Array` / `isArrayBuffer`｜3 秒上手** —— `@migaia/utils/bytes` 所有的内部槽品牌检测；本包只做函数身份不变的兼容 re-export：
 
 ```ts
 isUint8Array(new Uint8Array()); // true
+isArrayBuffer(new ArrayBuffer(1)); // true
 ```
 
 单参数 `value: unknown`（必填），无选项。
 
-**`intrinsicConstructorName`｜3 秒上手** —— 不调用用户可覆写方法地读出内建构造函数名：
+**`intrinsicConstructorName`｜3 秒上手** —— 兼容保留的尽力诊断 helper：
 
 ```ts
 intrinsicConstructorName(new Date()); // 'Date'
 ```
 
-单参数 `value: unknown`（必填），无选项。非对象/`null`/访问失败返回 `undefined`。
+单参数 `value: unknown`（必填），无选项。非对象/`null`/访问失败返回 `undefined`。它会观察可篡改的原型、`constructor` 与 `name`，不得用于安全、类型或协议判定。
 
 **`StorageContractConflictPolicy`｜3 秒上手** —— 与 `ConflictPolicy` 同值的常量对象（供不想引入 `context` 模块类型的场景使用）：
 

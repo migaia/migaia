@@ -1,11 +1,11 @@
-import { defineConfig, type PlaywrightTestConfig } from '@playwright/test';
+import { defineConfig, type PlaywrightTestConfig } from '@playwright/test'
 
 /** Chromium + WebKit 固定矩阵；PLAYWRIGHT_BROWSER 可用于本地单引擎调试。 */
 const selectedBrowser = process.env.PLAYWRIGHT_BROWSER as
   | 'chromium'
   | 'webkit'
   | 'firefox'
-  | undefined;
+  | undefined
 
 export default defineConfig({
   testDir: '.',
@@ -28,4 +28,4 @@ export default defineConfig({
     reuseExistingServer: false,
     timeout: 30_000
   }
-});
+})

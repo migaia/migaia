@@ -55,6 +55,6 @@ export const StoreWasmErrorCode = {
    * 调用方应检查 `AggregateError.errors`；所有原始清理错误均按执行顺序保留。
    */
   cleanupFailed: 'CLEANUP_FAILED'
-} as const;
+} as const
 
-export type IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];
+export type IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]

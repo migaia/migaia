@@ -4,6 +4,6 @@ export const AtomKind = {
   primitiveFactory: 'primitive-factory',
   derived: 'derived',
   writableDerived: 'writable-derived'
-} as const;
+} as const
 
-export type IAtomKind = (typeof AtomKind)[keyof typeof AtomKind];
+export type IAtomKind = (typeof AtomKind)[keyof typeof AtomKind]

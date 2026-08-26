@@ -49,7 +49,6 @@ export const StoreWorkerErrorCode = {
    * `cause`/`errors[]` and treat the parser as terminal.
    */
   cleanupFailed: 'CLEANUP_FAILED'
-} as const;
+} as const
 
-export type IStoreWorkerErrorCode =
-  (typeof StoreWorkerErrorCode)[keyof typeof StoreWorkerErrorCode];
+export type IStoreWorkerErrorCode = (typeof StoreWorkerErrorCode)[keyof typeof StoreWorkerErrorCode]

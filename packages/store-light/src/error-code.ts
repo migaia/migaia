@@ -90,6 +90,6 @@ export const StoreLightErrorCode = {
    * 调用方修正参数；具体是哪个字段/值见消息文案。
    */
   invalidOption: 'INVALID_OPTION'
-} as const;
+} as const
 
-export type IStoreLightErrorCode = (typeof StoreLightErrorCode)[keyof typeof StoreLightErrorCode];
+export type IStoreLightErrorCode = (typeof StoreLightErrorCode)[keyof typeof StoreLightErrorCode]

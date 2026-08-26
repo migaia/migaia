@@ -1,15 +1,15 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test'
 
 test('localStorage 写满真实配额时抛 QUOTA_EXCEEDED', async ({ page }) => {
-  await page.goto('/');
-  const result = await page.evaluate(() => window.runLocalStorageQuotaScenario());
-  expect(result.wroteCount).toBeGreaterThan(0);
-  expect(result.quotaErrorCode).toBe('QUOTA_EXCEEDED');
-  expect(result.optionsCode).toBe('INVALID_CONFIG');
-});
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runLocalStorageQuotaScenario())
+  expect(result.wroteCount).toBeGreaterThan(0)
+  expect(result.quotaErrorCode).toBe('QUOTA_EXCEEDED')
+  expect(result.optionsCode).toBe('INVALID_CONFIG')
+})
 
 test('真实浏览器页面中的 Storage 异常归一化并保留 cause', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/')
   await expect(page.evaluate(() => window.runStorageFailureScenario())).resolves.toEqual({
     code: 'BACKEND_UNAVAILABLE',
     hasCause: true,
@@ -33,5 +33,5 @@ test('真实浏览器页面中的 Storage 异常归一化并保留 cause', async
     incoherentClearCode: 'BACKEND_UNAVAILABLE',
     incoherentClearOperation: 'local.clearAll',
     incoherentClearPreservedValues: true
-  });
-});
+  })
+})

@@ -1,7 +1,7 @@
-import { useCallback, useSyncExternalStore } from 'react';
-import { Effect, type IDisposer, type IRuntime } from '@migaia/reactive';
-import { assertReactiveOwnedBy } from '@migaia/reactive/ownership';
-import { notifyReact } from './notify-react.js';
+import { useCallback, useSyncExternalStore } from 'react'
+import { Effect, type IDisposer, type IRuntime } from '@migaia/reactive'
+import { assertReactiveOwnedBy } from '@migaia/reactive/ownership'
+import { notifyReact } from './notify-react.js'
 
 /**
  * 稳定节点的专用订阅路径。
@@ -19,37 +19,37 @@ import { notifyReact } from './notify-react.js';
  * 刻意不照搬 jotai 绕开 useSyncExternalStore 的做法：那建立在它自己的内部约束上， 整体搬过来有很大概率把已经修过的 selector/并发窗口重新引入。
  */
 export type IStableNode<T> = {
-  readonly value: T;
-  peek(): T;
-};
+  readonly value: T
+  peek(): T
+}
 
 export function useNodeValue<T>(node: IStableNode<T>, runtime: IRuntime, enabled = true): T {
   // Fail in render, where an Error Boundary can handle it. Waiting until the
   // subscription Effect runs would surface the ownership error in commit.
-  assertReactiveOwnedBy(node, runtime, 'reactive node');
+  assertReactiveOwnedBy(node, runtime, 'reactive node')
 
   // 订阅只依赖 node 与 runtime——两者都稳定，所以这个闭包也稳定，
   // React 不会因为它变化而反复退订重订。
   const subscribe = useCallback(
     (onChange: () => void): IDisposer => {
-      if (!enabled) return () => {};
-      let first = true;
+      if (!enabled) return () => {}
+      let first = true
       const effect = new Effect(() => {
         // 读 .value 才会建立依赖边；首跑只为登记，不通知
-        void node.value;
+        void node.value
         if (first) {
-          first = false;
-          return;
+          first = false
+          return
         }
-        notifyReact(runtime, onChange);
-      }, runtime);
-      return () => effect.dispose();
+        notifyReact(runtime, onChange)
+      }, runtime)
+      return () => effect.dispose()
     },
     [node, runtime, enabled]
-  );
+  )
 
   // peek() 是非追踪读且恒为当前值：React 可以在任何时刻调用它而不影响依赖图
-  const getSnapshot = useCallback(() => node.peek(), [node]);
+  const getSnapshot = useCallback(() => node.peek(), [node])
 
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }

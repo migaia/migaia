@@ -68,6 +68,6 @@ export const StoreReactErrorCode = {
    * inspect `cause` and fix the underlying store/resource failure.
    */
   readyRejected: 'READY_REJECTED'
-} as const;
+} as const
 
-export type IStoreReactErrorCode = (typeof StoreReactErrorCode)[keyof typeof StoreReactErrorCode];
+export type IStoreReactErrorCode = (typeof StoreReactErrorCode)[keyof typeof StoreReactErrorCode]

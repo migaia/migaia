@@ -1,4 +1,4 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
   testDir: '.',
@@ -10,4 +10,4 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI
   },
   use: { baseURL: 'http://127.0.0.1:4182', browserName: 'chromium' }
-});
+})

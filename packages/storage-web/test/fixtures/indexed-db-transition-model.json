@@ -1,0 +1,225 @@
+{
+  "version": 1,
+  "states": [
+    "absent",
+    "config-changed",
+    "pending",
+    "failed",
+    "running-lease",
+    "running-no-lease",
+    "complete",
+    "stale"
+  ],
+  "operations": [
+    "ensure",
+    "acquire",
+    "renew",
+    "issue-manifest",
+    "commit-nonterminal",
+    "retry-receipt",
+    "successor-acquire",
+    "commit-final",
+    "fail",
+    "rotate",
+    "open",
+    "read",
+    "commit"
+  ],
+  "fields": [
+    "definitions",
+    "currentPointer",
+    "migrationCheckpoint",
+    "generationMetadata",
+    "readiness",
+    "leaseRevision",
+    "localObservationProof",
+    "ownerToken",
+    "heartbeatRevision",
+    "leaseDuration",
+    "manifest",
+    "retryReceipt",
+    "checkpoint",
+    "recordRevisions",
+    "epoch",
+    "terminal",
+    "successorRevision",
+    "keyClassification",
+    "sidecar",
+    "counters",
+    "scopeEpoch",
+    "suffixAbsence",
+    "primaryCause"
+  ],
+  "transitions": [
+    {
+      "id": "ensure-generation",
+      "from": ["absent", "config-changed"],
+      "operation": "ensure",
+      "to": "pending",
+      "guards": ["fingerprint-snapshotted", "current-pointer-checked"],
+      "reads": ["definitions", "currentPointer", "migrationCheckpoint"],
+      "writes": ["generationMetadata", "currentPointer", "readiness", "scopeEpoch"],
+      "invariants": ["generation-readiness"]
+    },
+    {
+      "id": "acquire-pending-or-failed",
+      "from": ["pending", "failed"],
+      "operation": "acquire",
+      "to": "running-lease",
+      "guards": ["no-valid-foreign-owner", "observation-window-complete"],
+      "reads": ["generationMetadata", "readiness", "leaseRevision", "localObservationProof"],
+      "writes": [
+        "readiness",
+        "ownerToken",
+        "heartbeatRevision",
+        "leaseDuration",
+        "manifest",
+        "retryReceipt"
+      ],
+      "invariants": ["generation-readiness", "lease-receipt-fencing"]
+    },
+    {
+      "id": "renew-current-owner",
+      "from": ["running-lease"],
+      "operation": "renew",
+      "to": "running-lease",
+      "guards": ["owner-token-exact", "generation-current"],
+      "reads": ["generationMetadata", "ownerToken", "heartbeatRevision"],
+      "writes": ["heartbeatRevision"],
+      "invariants": ["lease-receipt-fencing"]
+    },
+    {
+      "id": "issue-owner-manifest",
+      "from": ["running-lease"],
+      "operation": "issue-manifest",
+      "to": "running-lease",
+      "guards": ["owner-token-exact", "bounded-batch"],
+      "reads": ["generationMetadata", "ownerToken", "checkpoint", "recordRevisions"],
+      "writes": ["manifest"],
+      "invariants": ["bounded-backfill", "lease-receipt-fencing"]
+    },
+    {
+      "id": "commit-nonterminal-manifest",
+      "from": ["running-lease"],
+      "operation": "commit-nonterminal",
+      "to": "running-no-lease",
+      "guards": ["manifest-exact", "owner-token-exact", "record-revisions-current"],
+      "reads": [
+        "generationMetadata",
+        "ownerToken",
+        "manifest",
+        "recordRevisions",
+        "checkpoint",
+        "epoch"
+      ],
+      "writes": [
+        "sidecar",
+        "counters",
+        "checkpoint",
+        "retryReceipt",
+        "ownerToken",
+        "manifest",
+        "scopeEpoch"
+      ],
+      "invariants": [
+        "atomic-projection",
+        "generation-readiness",
+        "bounded-backfill",
+        "lease-receipt-fencing"
+      ]
+    },
+    {
+      "id": "retry-exact-receipt",
+      "from": ["running-no-lease"],
+      "operation": "retry-receipt",
+      "to": "running-no-lease",
+      "guards": ["receipt-exact", "no-successor"],
+      "reads": ["generationMetadata", "terminal", "retryReceipt", "successorRevision"],
+      "writes": [],
+      "invariants": ["generation-readiness", "lease-receipt-fencing"]
+    },
+    {
+      "id": "successor-acquire-or-takeover",
+      "from": ["pending", "failed", "running-lease", "running-no-lease"],
+      "operation": "successor-acquire",
+      "to": "running-lease",
+      "guards": ["successor-cas", "observation-window-complete"],
+      "reads": [
+        "generationMetadata",
+        "ownerToken",
+        "leaseRevision",
+        "localObservationProof",
+        "retryReceipt"
+      ],
+      "writes": [
+        "readiness",
+        "ownerToken",
+        "heartbeatRevision",
+        "leaseDuration",
+        "manifest",
+        "retryReceipt"
+      ],
+      "invariants": ["generation-readiness", "lease-receipt-fencing"]
+    },
+    {
+      "id": "commit-final-manifest",
+      "from": ["running-lease"],
+      "operation": "commit-final",
+      "to": "complete",
+      "guards": ["manifest-exact", "owner-token-exact", "suffix-absent", "migration-complete"],
+      "reads": [
+        "generationMetadata",
+        "ownerToken",
+        "manifest",
+        "recordRevisions",
+        "checkpoint",
+        "suffixAbsence",
+        "migrationCheckpoint"
+      ],
+      "writes": [
+        "sidecar",
+        "counters",
+        "checkpoint",
+        "readiness",
+        "ownerToken",
+        "manifest",
+        "retryReceipt",
+        "scopeEpoch"
+      ],
+      "invariants": [
+        "atomic-projection",
+        "generation-readiness",
+        "bounded-backfill",
+        "lease-receipt-fencing"
+      ]
+    },
+    {
+      "id": "fail-current-owner",
+      "from": ["running-lease"],
+      "operation": "fail",
+      "to": "failed",
+      "guards": ["owner-token-exact", "primary-cause-preserved"],
+      "reads": ["generationMetadata", "ownerToken", "primaryCause"],
+      "writes": ["readiness", "ownerToken", "manifest", "retryReceipt"],
+      "invariants": ["generation-readiness", "lease-receipt-fencing"]
+    },
+    {
+      "id": "raw-firewall-rotation",
+      "from": ["pending", "failed", "running-lease", "running-no-lease", "complete"],
+      "operation": "rotate",
+      "to": "pending",
+      "guards": ["public-raw-mutation", "current-generation-only"],
+      "reads": ["keyClassification", "currentPointer", "migrationCheckpoint", "epoch"],
+      "writes": [
+        "generationMetadata",
+        "currentPointer",
+        "readiness",
+        "sidecar",
+        "migrationCheckpoint",
+        "epoch",
+        "scopeEpoch"
+      ],
+      "invariants": ["atomic-projection", "generation-readiness", "raw-firewall"]
+    }
+  ]
+}

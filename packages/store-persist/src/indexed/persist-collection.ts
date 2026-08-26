@@ -1,8 +1,8 @@
-import type { IRuntime } from '@migaia/reactive';
-import { persistUnit } from '../core/persist-unit.js';
-import type { ICodec } from '@migaia/storage-web';
-import type { IPersistHandle, IPersistStorage, IPersistUnit } from '../core/types.js';
-import { snapshotPersistOptions } from '../core/options.js';
+import type { IRuntime } from '@migaia/reactive'
+import { persistUnit } from '../core/persist-unit.js'
+import type { ICodec } from '@migaia/storage-web'
+import type { IPersistHandle, IPersistStorage, IPersistUnit } from '../core/types.js'
+import { snapshotPersistOptions } from '../core/options.js'
 
 /**
  * `persistCollection()` 支持的四种 store-indexed 集合。全部都有 `snapshot()`（tracked 读， 内部读了一个结构性 Signal，包进
@@ -10,41 +10,41 @@ import { snapshotPersistOptions } from '../core/options.js';
  * 的这个方法是本轮跟这份 SDD 一起补的，之前只有 `ObservableObject`/`ObservableArray` 有）。
  */
 export type IPersistableCollection<TState> = {
-  readonly runtime: IRuntime;
-  snapshot(): TState;
-  replace(state: TState): void;
-};
+  readonly runtime: IRuntime
+  snapshot(): TState
+  replace(state: TState): void
+}
 
 export type IPersistCollectionOptions<TState> = {
-  key: string;
-  storage: IPersistStorage;
-  codec?: ICodec;
-  version?: number;
-  migrate?: (persisted: TState, fromVersion: number) => TState;
-  partialize?: (state: TState) => Partial<TState>;
-  merge?: (persisted: Partial<TState>, current: TState) => TState;
-  debounceMs?: number;
-};
+  key: string
+  storage: IPersistStorage
+  codec?: ICodec
+  version?: number
+  migrate?: (persisted: TState, fromVersion: number) => TState
+  partialize?: (state: TState) => Partial<TState>
+  merge?: (persisted: Partial<TState>, current: TState) => TState
+  debounceMs?: number
+}
 
 function toPersistUnit<TState>(collection: IPersistableCollection<TState>): IPersistUnit<TState> {
   return {
     snapshot: () => collection.snapshot(),
     restore: (state) => collection.replace(state),
     subscribe: (onChange) => {
-      let first = true;
+      let first = true
       const effect = collection.runtime.effect(() => {
         // 读一次 snapshot() 建立追踪依赖；首次运行是 Effect 构造自带的同步执行，
         // 不是真正的"变化"，必须跳过，否则 hydrate 之前就会误触发一次写回。
-        collection.snapshot();
+        collection.snapshot()
         if (first) {
-          first = false;
-          return;
+          first = false
+          return
         }
-        onChange();
-      });
-      return effect;
+        onChange()
+      })
+      return effect
     }
-  };
+  }
 }
 
 // 不用重载——四种集合各自的 snapshot()/replace() 具体类型不同，但都结构性满足
@@ -54,7 +54,7 @@ export function persistCollection<TState>(
   collection: IPersistableCollection<TState>,
   options: IPersistCollectionOptions<TState>
 ): IPersistHandle {
-  const snapshot = snapshotPersistOptions(options);
+  const snapshot = snapshotPersistOptions(options)
   return persistUnit(toPersistUnit(collection), {
     key: snapshot.key,
     runtime: collection.runtime,
@@ -65,5 +65,5 @@ export function persistCollection<TState>(
     partialize: snapshot.partialize,
     merge: snapshot.merge,
     debounceMs: snapshot.debounceMs
-  });
+  })
 }

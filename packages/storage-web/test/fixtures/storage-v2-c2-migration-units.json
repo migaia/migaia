@@ -1,0 +1,239 @@
+{
+  "schemaVersion": 1,
+  "observationSnapshot": "packages/storage-web/test/fixtures/storage-v2-c2-observation-snapshot.jsonl",
+  "formatOnlyPaths": [],
+  "postSnapshotOutOfScopeClaims": [
+    {
+      "path": "Makefile",
+      "owner": "repository-tooling",
+      "reason": "C2-R4 D18 release orchestration hardening created after the immutable C2-R1 capture; it is host/release acceptance evidence, not a B00 migration-unit semantic patch."
+    },
+    {
+      "path": "packages/storage-web/test/fixtures/storage-v2-bounded-capability-catalog.json",
+      "owner": "repository-tooling",
+      "reason": "C2-R2 bounded T44 catalog created after the immutable C2-R1 capture; it is architecture-gate evidence, not a migration-unit semantic patch."
+    },
+    {
+      "path": "packages/storage-web/test/fixtures/storage-v2-bounded-t44-hostile.json",
+      "owner": "repository-tooling",
+      "reason": "C2-R2 bounded T44 hostile fixture created after the immutable C2-R1 capture; it is architecture-gate evidence, not a migration-unit semantic patch."
+    },
+    {
+      "path": "packages/storage-web/test/fixtures/storage-v2-c2-migration-units.json",
+      "owner": "repository-tooling",
+      "reason": "C2-R3 executable migration ledger created after the immutable C2-R1 capture and sealed by the T54 source contract."
+    },
+    {
+      "path": "packages/storage-web/test/fixtures/storage-v2-c2-observation-snapshot.jsonl",
+      "owner": "repository-tooling",
+      "reason": "The immutable C2-R1 snapshot excludes its own path by capture rule and is sealed independently by the snapshot validator."
+    },
+    {
+      "path": "packages/web-rpc/src/internal/composed-disposal-observer.ts",
+      "owner": "@migaia/web-rpc",
+      "reason": "Concurrent user-owned direct-consumer work created after C2-R1; unrelated to storage-v2 C2-R3 and excluded from every migration numerator."
+    },
+    {
+      "path": "packages/web-rpc/test/packed-d95-boundary.mjs",
+      "owner": "@migaia/web-rpc",
+      "reason": "Concurrent WebRPC Cycle H D95/T222 packed source-dist-export and two-copy boundary work created after C2-R1; it is owned by the active WebRPC continuation SDD, unrelated to storage-v2 C2-R3, and excluded from every migration numerator."
+    },
+    {
+      "path": "packages/web-rpc/test/packed-provider-authority.mjs",
+      "owner": "@migaia/web-rpc",
+      "reason": "Concurrent user-owned direct-consumer test work created after C2-R1; unrelated to storage-v2 C2-R3 and excluded from every migration numerator."
+    }
+  ],
+  "migrationUnits": [
+    {
+      "id": "event-fanout",
+      "rollback": true,
+      "canonicalOwners": ["@migaia/event-subscriber"],
+      "provides": ["event.dispatch-policy"],
+      "consumers": [
+        { "id": "storage.memory.queued-feed", "requires": ["event.dispatch-policy"] },
+        { "id": "storage.indexed-db.queued-feed", "requires": ["event.dispatch-policy"] }
+      ],
+      "exports": ["@migaia/event-subscriber.EventDispatchPolicy"],
+      "dependencies": [],
+      "tests": ["SWV2-T45", "SWV2-T46", "SWV2-T53"],
+      "assets": [
+        "event.dispatch-policy-contract",
+        "event.queued-runtime",
+        "storage.queued-feed-adapters"
+      ],
+      "categories": {
+        "owner": [
+          "packages/event-subscriber/src/channel.ts",
+          "packages/event-subscriber/src/state-constants.ts",
+          "packages/event-subscriber/src/types.ts"
+        ],
+        "adapter": [
+          "packages/storage-web/src/backends/indexed-db.ts",
+          "packages/storage-web/src/backends/memory.ts"
+        ],
+        "consumer": [
+          "packages/store-light/src/store-resource.ts",
+          "packages/web-rpc/src/internal/hooks.ts"
+        ],
+        "export": ["packages/event-subscriber/src/index.ts"],
+        "manifest": ["packages/event-subscriber/package.json"],
+        "lock": ["pnpm-lock.yaml"],
+        "test": [
+          "packages/event-subscriber/test/storage-v2-b00-red.spec.ts",
+          "packages/store-light/test/storage-v2-t53-event-trace.test.ts",
+          "packages/web-rpc/test/storage-v2-t53-event-trace.test.ts"
+        ],
+        "docs": ["packages/event-subscriber/README.md"],
+        "assets": []
+      },
+      "emptyCategoryReasons": {
+        "assets": "The executable contract assets are named IDs above; no generated file belongs to this semantic patch."
+      },
+      "compatibilityEdits": [
+        {
+          "file": "packages/storage-web/src/backends/memory.ts",
+          "search": "  iteration: true,\n  maxValueBytes: undefined,",
+          "replacement": "  iteration: true,\n  secondaryIndexes: false,\n  changeFeed: false,\n  maxValueBytes: undefined,"
+        },
+        {
+          "file": "packages/storage-web/src/backends/indexed-db.ts",
+          "search": "  iteration: true,\n  maxValueBytes: undefined,",
+          "replacement": "  iteration: true,\n  secondaryIndexes: false,\n  changeFeed: false,\n  maxValueBytes: undefined,"
+        }
+      ],
+      "deletePoints": [
+        {
+          "file": "packages/storage-web/src/backends/memory.ts",
+          "absentPattern": "const storageListeners = new Set",
+          "replacement": "packages/event-subscriber/src/channel.ts"
+        }
+      ]
+    },
+    {
+      "id": "abort-timeout",
+      "rollback": true,
+      "canonicalOwners": ["@migaia/utils"],
+      "provides": ["utils.abort-timeout-signal"],
+      "consumers": [
+        { "id": "storage.operation-signal-adapter", "requires": ["utils.abort-timeout-signal"] }
+      ],
+      "exports": ["@migaia/utils.createAbortTimeoutSignal"],
+      "dependencies": [],
+      "tests": ["SWV2-T47", "SWV2-T48", "SWV2-T49"],
+      "assets": [
+        "utils.abort-timeout-signal-runtime",
+        "storage.operation-signal-adapter",
+        "utils.promise-packed-smoke"
+      ],
+      "categories": {
+        "owner": ["packages/utils/src/promise.ts"],
+        "adapter": [
+          "packages/lifecycle/src/abort.ts",
+          "packages/storage-web/src/core/operation.ts"
+        ],
+        "consumer": [],
+        "export": ["packages/utils/src/index.ts"],
+        "manifest": ["packages/utils/package.json"],
+        "lock": ["pnpm-lock.yaml"],
+        "test": [
+          "packages/storage-web/test/utils/abort.spec.ts",
+          "packages/utils/test/promise.test.ts"
+        ],
+        "docs": ["packages/utils/README.md"],
+        "assets": ["packages/utils/test/packed-export-smoke.mjs"]
+      },
+      "emptyCategoryReasons": {
+        "consumer": "The storage adapter is the only runtime consumer and is classified as adapter."
+      },
+      "deletePoints": [
+        {
+          "file": "packages/storage-web/src/core/operation.ts",
+          "absentPattern": "const storageTimeoutController = new AbortController",
+          "replacement": "packages/utils/src/promise.ts"
+        }
+      ]
+    },
+    {
+      "id": "live-ownership",
+      "rollback": true,
+      "canonicalOwners": ["@migaia/lifecycle", "@migaia/reactive"],
+      "provides": ["storage.live-ownership-blueprint"],
+      "consumers": [
+        {
+          "id": "storage.live-ownership-blueprint",
+          "requires": [
+            "event.channel",
+            "reactive.signal",
+            "reactive.scheduler",
+            "lifecycle.generation",
+            "lifecycle.sync-scope"
+          ]
+        }
+      ],
+      "exports": [],
+      "dependencies": ["@migaia/storage-web -> @migaia/lifecycle"],
+      "tests": ["SWV2-T50"],
+      "assets": [
+        "storage.lifecycle-dependency-edge",
+        "storage.live-ownership-model",
+        "storage.lifecycle-build-external"
+      ],
+      "categories": {
+        "owner": [
+          "packages/lifecycle/src/generation-controller.ts",
+          "packages/reactive/src/index.ts"
+        ],
+        "adapter": [],
+        "consumer": [],
+        "export": [],
+        "manifest": ["packages/lifecycle/package.json", "packages/reactive/package.json"],
+        "lock": ["pnpm-lock.yaml"],
+        "test": ["packages/storage-web/test/reactive-ownership-model.spec.ts"],
+        "docs": [],
+        "assets": []
+      },
+      "emptyCategoryReasons": {
+        "adapter": "This B00-A unit is an ownership blueprint; the production adapter is forbidden before B06.",
+        "consumer": "No production live-query consumer is authorized before B06.",
+        "export": "No storage-web live-query export is authorized before B06.",
+        "docs": "Public live-query documentation is deferred to the authorized B06/B07 implementation.",
+        "assets": "The ownership-model test is the only file asset and is classified as test."
+      },
+      "deletePoints": []
+    },
+    {
+      "id": "byte-brand",
+      "rollback": false,
+      "canonicalOwners": ["@migaia/utils"],
+      "provides": ["utils.byte-brand"],
+      "consumers": [],
+      "exports": ["@migaia/utils.isUint8Array", "@migaia/utils.isArrayBuffer"],
+      "dependencies": [],
+      "tests": ["SWV2-T55", "SWV2-T56", "SWV2-T57", "SWV2-T58"],
+      "assets": ["utils.byte-brand-runtime", "storage-web.byte-brand-browser"],
+      "categories": {
+        "owner": ["packages/utils/src/bytes.ts"],
+        "adapter": ["packages/storage-contract/src/bytes.ts"],
+        "consumer": [
+          "packages/storage-web/src/core/bytes.ts",
+          "packages/store-worker/e2e/worker.ts"
+        ],
+        "export": ["packages/utils/src/index.ts"],
+        "manifest": ["packages/storage-contract/package.json", "packages/utils/package.json"],
+        "lock": ["pnpm-lock.yaml"],
+        "test": ["packages/utils/test/bytes.test.ts"],
+        "docs": ["packages/utils/README.md"],
+        "assets": ["packages/storage-web/e2e/byte-brand.spec.ts"]
+      },
+      "emptyCategoryReasons": {},
+      "deletePoints": [
+        {
+          "file": "packages/storage-contract/src/bytes.ts",
+          "absentPattern": "value instanceof Uint8Array",
+          "replacement": "packages/utils/src/bytes.ts"
+        }
+      ]
+    }
+  ]
+}

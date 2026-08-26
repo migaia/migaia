@@ -27,4 +27,4 @@ export const StoreWasmErrorText = {
   /** Stable aggregate message used when more than one WASM-owned resource fails cleanup. */
   cleanupFailed: '[store] WASM cleanup failed',
   reservedField: (key: string): string => `[store] wasm.record field name is reserved: ${key}`
-} as const;
+} as const

@@ -25,4 +25,4 @@ export const StoreReactErrorText = {
   readyInvalid: '[store] config.ready must be an array of Promises or zero-argument functions',
   experimentalInvalid: '[store] config.features.experimental could not be read safely',
   configRead: '[store] StoreProvider config could not be read safely'
-} as const;
+} as const

@@ -6,24 +6,24 @@ export const StoreResourceKind = {
   failed: 'failed',
   closing: 'closing',
   disposed: 'disposed'
-} as const;
+} as const
 
 /** Visible resource data states, separate from request lifecycle. */
 export const StoreResourceDataKind = {
   empty: 'empty',
   value: 'value',
   error: 'error'
-} as const;
+} as const
 
 /** Store facade initialization states used while creating field-backed values. */
 export const StoreInitializationStatus = {
   pending: 'pending',
   ready: 'ready',
   failed: 'failed'
-} as const;
+} as const
 
-export type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];
+export type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]
 export type IStoreResourceDataKind =
-  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];
+  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]
 export type IStoreInitializationStatus =
-  (typeof StoreInitializationStatus)[keyof typeof StoreInitializationStatus];
+  (typeof StoreInitializationStatus)[keyof typeof StoreInitializationStatus]

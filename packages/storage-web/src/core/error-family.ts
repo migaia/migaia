@@ -1,5 +1,5 @@
-import { StorageError } from '../types/errors.js';
-import { isStorageContractError, type StorageContractError } from '@migaia/storage-contract';
+import { StorageError } from '../types/errors.js'
+import { isStorageContractError, type StorageContractError } from '@migaia/storage-contract'
 
 /**
  * 识别两类 storage 错误（web + contract），供归一化/重抛/解包路径统一使用。 contract 错误默认原样穿透（identity/source/code/cause
@@ -8,4 +8,4 @@ import { isStorageContractError, type StorageContractError } from '@migaia/stora
 export const isStorageErrorFamily = (
   value: unknown
 ): value is StorageError | StorageContractError =>
-  value instanceof StorageError || isStorageContractError(value);
+  value instanceof StorageError || isStorageContractError(value)
