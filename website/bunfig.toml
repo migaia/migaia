@@ -1,0 +1,5 @@
+[install]
+backend = "bun"
+
+[resolve]
+alias = { "@migaia/utils" = "../packages/utils/dist", "@migaia/lifecycle" = "../packages/lifecycle/dist", "@migaia/middleware-pipeline" = "../packages/middleware-pipeline/dist", "@migaia/plugin-host" = "../packages/plugin-host/dist", "@migaia/reactive" = "../packages/reactive/dist", "@migaia/resource" = "../packages/resource/dist", "@migaia/serialize" = "../packages/serialize/dist", "@migaia/storage-contract" = "../packages/storage-contract/dist", "@migaia/storage-web" = "../packages/storage-web/dist", "@migaia/web-rpc" = "../packages/web-rpc/dist", "@migaia/event-subscriber" = "../packages/event-subscriber/dist" }
