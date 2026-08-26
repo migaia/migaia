@@ -355,15 +355,16 @@ function isStorageContractError(value: unknown): value is StorageContractError;
 
 ```ts
 function isUint8Array(value: unknown): value is Uint8Array;
+function isArrayBuffer(value: unknown): value is ArrayBuffer;
 ```
 
-跨 realm 安全：用 `ArrayBuffer.isView(value) && intrinsicConstructorName(value) === 'Uint8Array'` 判断，而不是 `instanceof Uint8Array`，因此能正确识别来自其他 iframe/Worker realm 的 `Uint8Array` 实例。
+两个 guard 由 `@migaia/utils/bytes` 所有，本包仅做函数身份不变的兼容 re-export。实现调用 ECMAScript intrinsic 的内部槽 getter，不依赖 `instanceof`，也不信任候选值可篡改的原型、`constructor.name` 或 `Symbol.toStringTag`；合法跨 iframe/Worker realm 实例和子类会被接受，其他 TypedArray、`DataView`、`SharedArrayBuffer`、Proxy 与外形伪造对象会被拒绝。detached 对象仍保留品牌，字节可用性须由调用方另行判断。
 
 ```ts
 function intrinsicConstructorName(value: unknown): string | undefined;
 ```
 
-不调用用户可覆写方法（不触发可能被篡改的 getter/`Symbol.toStringTag`），直接读原型链上的 `constructor.name`。非对象、`null`、或读取过程抛错均返回 `undefined`。
+该 helper 只为兼容诊断保留，会观察可篡改的原型、`constructor` 与 `name`；非对象、`null`、或读取过程抛错返回 `undefined`。它不得用于安全、类型或协议判定。
 
 ```ts
 const StorageContractConflictPolicy = { conflict: 'conflict', replace: 'replace' } as const;

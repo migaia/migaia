@@ -4,8 +4,8 @@ export type {
   ISyncKeyValueStore,
   IRecordStore,
   ISyncCapableStore
-} from '@migaia/storage-contract';
-export { isKeyValueStore, asRecordStore, isRecordStore } from '@migaia/storage-contract';
+} from '@migaia/storage-contract'
+export { isKeyValueStore, asRecordStore, isRecordStore } from '@migaia/storage-contract'
 
 /**
  * 结构等价于 DOM 的 `Storage` 接口，但不引用那个全局——只在 lib 里有 "DOM" 时才存在，而本包同时面向 Worker （lib: WebWorker，无
@@ -14,10 +14,10 @@ export { isKeyValueStore, asRecordStore, isRecordStore } from '@migaia/storage-c
  * web 后端专用结构，**留在 storage-web**，不进 `@migaia/storage-contract`。
  */
 export type IWebStorageLike = {
-  readonly length: number;
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-  clear(): void;
-  key(index: number): string | null;
-};
+  readonly length: number
+  getItem(key: string): string | null
+  setItem(key: string, value: string): void
+  removeItem(key: string): void
+  clear(): void
+  key(index: number): string | null
+}

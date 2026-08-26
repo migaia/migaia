@@ -3,6 +3,6 @@ export const IndexedOperation = {
   read: 'read',
   write: 'write',
   delete: 'delete'
-} as const;
+} as const
 
-export type IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation];
+export type IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation]

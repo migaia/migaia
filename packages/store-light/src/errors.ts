@@ -1,14 +1,14 @@
-import { StoreLightErrorCode, type IStoreLightErrorCode } from './error-code.js';
-import { attachErrorIdentity } from '@migaia/utils/error';
+import { StoreLightErrorCode, type IStoreLightErrorCode } from './error-code.js'
+import { attachErrorIdentity } from '@migaia/utils/error'
 
-export { StoreLightErrorCode, type IStoreLightErrorCode };
+export { StoreLightErrorCode, type IStoreLightErrorCode }
 
 /** `source` value stamped onto every error this package throws. */
-export const STORE_LIGHT_SOURCE = '@migaia/store-light';
+export const STORE_LIGHT_SOURCE = '@migaia/store-light'
 
 /** Attaches `(source, code)` onto an existing error object without touching its type or stack. */
 function tagStoreLightError<E extends Error>(error: E, code: IStoreLightErrorCode): E {
-  return attachErrorIdentity(error, { source: STORE_LIGHT_SOURCE, code });
+  return attachErrorIdentity(error, { source: STORE_LIGHT_SOURCE, code })
 }
 
 /** Builds a `(source, code)`-tagged `Error` without touching `stack`. */
@@ -20,8 +20,8 @@ export function createStoreLightError(
   const error = new Error(
     message,
     options?.cause !== undefined ? { cause: options.cause } : undefined
-  );
-  return tagStoreLightError(error, code);
+  )
+  return tagStoreLightError(error, code)
 }
 
 /** Builds a `(source, code)`-tagged `RangeError`, preserving the runtime type. */
@@ -29,7 +29,7 @@ export function createStoreLightRangeError(
   code: IStoreLightErrorCode,
   message: string
 ): RangeError {
-  return tagStoreLightError(new RangeError(message), code);
+  return tagStoreLightError(new RangeError(message), code)
 }
 
 /** Builds a `(source, code)`-tagged `TypeError`, preserving the runtime type. */
@@ -41,7 +41,7 @@ export function createStoreLightTypeError(
   return tagStoreLightError(
     new TypeError(message, options?.cause !== undefined ? { cause: options.cause } : undefined),
     code
-  );
+  )
 }
 
 /** Builds a `(source, code)`-tagged `AggregateError`; `errors[]` stays reachable (E-T13). */
@@ -50,5 +50,5 @@ export function createStoreLightAggregateError(
   errors: unknown[],
   message: string
 ): AggregateError {
-  return tagStoreLightError(new AggregateError(errors, message), code);
+  return tagStoreLightError(new AggregateError(errors, message), code)
 }

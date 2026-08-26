@@ -1,6 +1,6 @@
-import type { IDisposable, IRuntime } from '@migaia/reactive';
-import type { IAbortSignal } from '@migaia/lifecycle';
-import { StoreFieldMode } from './field-mode-constants.js';
+import type { IDisposable, IRuntime } from '@migaia/reactive'
+import type { IAbortSignal } from '@migaia/lifecycle'
+import { StoreFieldMode } from './field-mode-constants.js'
 
 /**
  * Store 门面对外开放的扩展协议。
@@ -14,16 +14,16 @@ import { StoreFieldMode } from './field-mode-constants.js';
 // —— 字段构造协议 ——
 //
 // symbol 品牌识别而非鸭子类型：字段值本身可能是任意形状，靠结构猜会误判。
-export const FIELD_BUILDER = Symbol('store.field-builder');
+export const FIELD_BUILDER = Symbol('store.field-builder')
 
 /** Runtime 为字段签发的最小响应式能力，不暴露依赖图内部结构。 */
 export type IFieldSource = IDisposable & {
-  track(): void;
-  notify(): void;
+  track(): void
+  notify(): void
   /** Reserve the Runtime version before mutating external storage, then publish once. */
-  commit<T>(write: () => T): T;
-  readonly observed: boolean;
-};
+  commit<T>(write: () => T): T
+  readonly observed: boolean
+}
 
 /**
  * 构造上下文：runtime 供创建普通节点，createSource 供自定义存储接入同一张图， signal 让 Store dispose 时能中止在途初始化。
@@ -31,40 +31,40 @@ export type IFieldSource = IDisposable & {
  * 刻意不传 scope——所有权登记是 Store 的职责。让 Builder 自己登记的话，第三方实现 一旦「创建了资源却忘了登记」，$dispose 就漏释放，而 Store 无从察觉。
  */
 export type IFieldContext = {
-  runtime: IRuntime;
-  signal: IAbortSignal;
-  createSource(debugName?: string): IFieldSource;
-};
+  runtime: IRuntime
+  signal: IAbortSignal
+  createSource(debugName?: string): IFieldSource
+}
 
 export type ISyncFieldBuilder<F extends IDisposable> = {
-  readonly [FIELD_BUILDER]: true;
-  readonly mode: typeof StoreFieldMode.sync;
-  create(context: IFieldContext): F;
-};
+  readonly [FIELD_BUILDER]: true
+  readonly mode: typeof StoreFieldMode.sync
+  create(context: IFieldContext): F
+}
 
 export type IAsyncFieldBuilder<F extends IDisposable> = {
-  readonly [FIELD_BUILDER]: true;
-  readonly mode: typeof StoreFieldMode.async;
-  create(context: IFieldContext): Promise<F>;
-};
+  readonly [FIELD_BUILDER]: true
+  readonly mode: typeof StoreFieldMode.async
+  create(context: IFieldContext): Promise<F>
+}
 
 /** Pre-discriminant builder accepted only by legacy creation paths. */
 export type ILegacyFieldBuilder<F extends IDisposable> = {
-  readonly [FIELD_BUILDER]: true;
-  create(context: IFieldContext): Promise<F>;
-};
+  readonly [FIELD_BUILDER]: true
+  create(context: IFieldContext): Promise<F>
+}
 
 export type IFieldBuilder<F extends IDisposable> =
   | ISyncFieldBuilder<F>
   | IAsyncFieldBuilder<F>
-  | ILegacyFieldBuilder<F>;
+  | ILegacyFieldBuilder<F>
 
 export function isFieldBuilder(value: unknown): value is IFieldBuilder<IDisposable> {
   return (
     typeof value === 'object' &&
     value !== null &&
     (value as Record<PropertyKey, unknown>)[FIELD_BUILDER] === true
-  );
+  )
 }
 
 // —— 变更守卫协议 ——
@@ -72,8 +72,8 @@ export function isFieldBuilder(value: unknown): value is IFieldBuilder<IDisposab
 // Store 与 collections 只需要「能不能改」这一个问题的答案。具体策略（actions-only、
 // 严格模式等）属于中间件层，不该出现在门面的类型里。
 export type IMutationGuard = {
-  assertMutationAllowed(operation?: string): void;
-};
+  assertMutationAllowed(operation?: string): void
+}
 
 /**
  * Store 门面额外需要的一件事：把一次动作标记为「正在动作内」，好让守卫放行其中的写入。
@@ -81,8 +81,8 @@ export type IMutationGuard = {
  * 与 IMutationGuard 分开，是因为 collections 只需要问「能不能改」，不该被迫实现 动作作用域。按需要的最小面拆接口，实现方自然满足更大的那个。
  */
 export type IMutationPolicy = IMutationGuard & {
-  runInAction<T>(fn: () => T): T;
-};
+  runInAction<T>(fn: () => T): T
+}
 
 // —— 原样值标记 ——
 //
@@ -90,12 +90,12 @@ export type IMutationPolicy = IMutationGuard & {
 // 于是存不下函数状态（如 onSubmit）。raw(fn) 显式区分：
 //   method() {}        → Action（方法简写）
 //   callback: raw(fn)  → 普通函数值字段（可读可写可替换）
-const RAW = Symbol('store.raw');
+const RAW = Symbol('store.raw')
 
-export type IRaw<T> = { readonly [RAW]: true; readonly value: T };
+export type IRaw<T> = { readonly [RAW]: true; readonly value: T }
 
 export function raw<T>(value: T): IRaw<T> {
-  return { [RAW]: true, value };
+  return { [RAW]: true, value }
 }
 
 export function isRaw(value: unknown): value is IRaw<unknown> {
@@ -103,5 +103,5 @@ export function isRaw(value: unknown): value is IRaw<unknown> {
     typeof value === 'object' &&
     value !== null &&
     (value as Record<PropertyKey, unknown>)[RAW] === true
-  );
+  )
 }

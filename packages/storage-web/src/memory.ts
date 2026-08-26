@@ -5,4 +5,4 @@
  * SSR/Node/testing 等无 DOM 环境按 `@migaia/storage-web/memory` 单独引入，不把 IDB/WebStorage 的 DOM 类型泄漏进编译中立
  * fixture。
  */
-export { memoryStorage } from './backends/memory.js';
+export { memoryStorage } from './backends/memory.js'

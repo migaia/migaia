@@ -89,6 +89,6 @@ export const StoreSsrErrorCode = {
    * that resource or retry on the client.
    */
   resourceTimeout: 'RESOURCE_TIMEOUT'
-} as const;
+} as const
 
-export type IStoreSsrErrorCode = (typeof StoreSsrErrorCode)[keyof typeof StoreSsrErrorCode];
+export type IStoreSsrErrorCode = (typeof StoreSsrErrorCode)[keyof typeof StoreSsrErrorCode]

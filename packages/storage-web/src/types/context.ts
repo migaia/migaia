@@ -6,5 +6,5 @@ export type {
   IConflictPolicy,
   IStorageKey,
   IKeyRange
-} from '@migaia/storage-contract';
-export { ConflictPolicy } from '@migaia/storage-contract';
+} from '@migaia/storage-contract'
+export { ConflictPolicy } from '@migaia/storage-contract'

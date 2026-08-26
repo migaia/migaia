@@ -118,7 +118,42 @@ export const StorageErrorCode = Object.freeze({
    *
    * 调用方修正对应配置后重试；这是永久性传参/配置错误。
    */
-  invalidConfig: 'INVALID_CONFIG'
-} as const);
+  invalidConfig: 'INVALID_CONFIG',
 
-export type IStorageErrorCode = (typeof StorageErrorCode)[keyof typeof StorageErrorCode];
+  /**
+   * IndexedDB sidecar contains an index row whose authoritative record is absent. Enforces the V2
+   * orphan-reporting rule; callers should repair or rebuild the index rather than treating the
+   * skipped row as a successful query result.
+   */
+  indexOrphan: 'INDEX_ORPHAN',
+
+  /**
+   * An indexed mutation would assign one logical unique key to two authoritative records. Enforces
+   * storage-v2 SWV2-E04 inside the record/sidecar transaction; callers must choose a different
+   * indexed value or remove the competing record before retrying.
+   */
+  indexUniqueConflict: 'INDEX_UNIQUE_CONFLICT',
+
+  /**
+   * A native `iterateRecordIndex` page observed the global or scope mutation epoch change between
+   * pages. Enforces storage-v2 SWV2-E19/D26: each page validates a short readonly transaction, then
+   * closes it before yielding; callers must restart the query rather than trust a mixed snapshot.
+   */
+  indexQueryInvalidated: 'INDEX_QUERY_INVALIDATED',
+
+  /**
+   * A live-query consumer attempted to refresh after its terminal disposal. Enforces storage-v2
+   * SWV2-E12: disposal cannot revive subscriptions or owned reactive state; callers must create a
+   * new live query instead of reusing the disposed handle.
+   */
+  liveQueryDisposed: 'LIVE_QUERY_DISPOSED',
+
+  /**
+   * A backfill operation presented an expired owner, stale generation, or conflicting checkpoint.
+   * Enforces storage-v2 SWV2-E15/E18: the batch must be rejected and rolled back; callers should
+   * retry through a fresh repository operation after the current handle is reacquired.
+   */
+  indexBackfillStale: 'INDEX_BACKFILL_STALE'
+} as const)
+
+export type IStorageErrorCode = (typeof StorageErrorCode)[keyof typeof StorageErrorCode]

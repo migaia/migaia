@@ -1,17 +1,18 @@
-import { createWorkerHandler } from '@migaia/store-worker';
+import { createWorkerHandler } from '@migaia/store-worker'
+import { isArrayBuffer } from '@migaia/utils/bytes'
 
 const handler = createWorkerHandler<unknown, number>(
   async (payload) => {
     if (payload === 'hang') {
-      await new Promise<never>(() => undefined);
+      await new Promise<never>(() => undefined)
     }
-    if (payload === 'fail') throw new Error('worker-e2e-failure');
-    if (payload instanceof ArrayBuffer) return payload.byteLength;
-    return (payload as number) * 2;
+    if (payload === 'fail') throw new Error('worker-e2e-failure')
+    if (isArrayBuffer(payload)) return payload.byteLength
+    return (payload as number) * 2
   },
   (message) => self.postMessage(message)
-);
+)
 
 self.onmessage = (event) => {
-  void handler(event.data);
-};
+  void handler(event.data)
+}

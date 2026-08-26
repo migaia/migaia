@@ -9,446 +9,505 @@ import {
   selectCodec,
   jsonCodec,
   StorageError
-} from '../src/index';
-import { fromIdbRequest, idbTransactionCommit } from '../src/utils/idb-request';
-import { snapshotOperationContext, withAbort } from '../src/core/operation';
-import { createStorageOperationRuntime } from '../src/core/operation-reporter';
-import { isKeyValueStore, isRecordStore } from '../src/types/storage';
+} from '../src/index'
+import type { IRecordIndexHandle } from '@migaia/storage-contract'
+import { fromIdbRequest, idbTransactionCommit } from '../src/utils/idb-request'
+import { mergeSignals, snapshotOperationContext, withAbort } from '../src/core/operation'
+import { createStorageOperationRuntime } from '../src/core/operation-reporter'
+import { isKeyValueStore, isRecordStore } from '../src/types/storage'
+import type { IStorageKey } from '../src/types/context'
+import { asIndexedDbBackfillStore } from '../src/backends/indexed-db-backfill'
+import { composeRepositoryKey, repositoryEntityRange } from '../src/entity/key'
+import { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
+
+/** Keeps a browser-page-owned backfill lease alive while a second page exercises takeover. */
+const browserBackfillLeaseOwners = new Map<
+  string,
+  { store: { dispose(): Promise<void> }; session: { renew(): Promise<void>; release(): void } }
+>()
+const browserBackfillLeaseContenders = new Map<
+  string,
+  { store: { dispose(): Promise<void> }; handle: IRecordIndexHandle }
+>()
 
 declare global {
   interface Window {
     runLocalStorageQuotaScenario(): Promise<{
-      wroteCount: number;
-      quotaErrorCode: string | undefined;
-      optionsCode: string | undefined;
-    }>;
+      wroteCount: number
+      quotaErrorCode: string | undefined
+      optionsCode: string | undefined
+    }>
     runStorageFailureScenario(): Promise<{
-      code: string | undefined;
-      hasCause: boolean;
-      invalidStorageCode: string | undefined;
-      invalidLengthCode: string | undefined;
-      constructorOptionReads: number;
-      optionGetterCode: string | undefined;
-      storageLengthReads: number;
-      storageGetterCode: string | undefined;
-      namespaceCodecReads: number;
-      runtimeLengthReads: number;
-      codecPhysicalClear: boolean;
-      partialClearCode: string | undefined;
-      partialClearOperation: string | undefined;
-      partialClearKey: unknown;
-      snapshotClearCode: string | undefined;
-      snapshotClearOperation: string | undefined;
-      reentrantAbortCode: string | undefined;
-      reentrantAbortOperation: string | undefined;
-      reentrantAbortKeyMatchesRemaining: boolean;
-      incoherentClearCode: string | undefined;
-      incoherentClearOperation: string | undefined;
-      incoherentClearPreservedValues: boolean;
-    }>;
+      code: string | undefined
+      hasCause: boolean
+      invalidStorageCode: string | undefined
+      invalidLengthCode: string | undefined
+      constructorOptionReads: number
+      optionGetterCode: string | undefined
+      storageLengthReads: number
+      storageGetterCode: string | undefined
+      namespaceCodecReads: number
+      runtimeLengthReads: number
+      codecPhysicalClear: boolean
+      partialClearCode: string | undefined
+      partialClearOperation: string | undefined
+      partialClearKey: unknown
+      snapshotClearCode: string | undefined
+      snapshotClearOperation: string | undefined
+      reentrantAbortCode: string | undefined
+      reentrantAbortOperation: string | undefined
+      reentrantAbortKeyMatchesRemaining: boolean
+      incoherentClearCode: string | undefined
+      incoherentClearOperation: string | undefined
+      incoherentClearPreservedValues: boolean
+    }>
     runCookieSecureScenario(): Promise<{
-      insecureVisible: boolean;
-      secureVisible: boolean;
-    }>;
-    runCookieSizeLimitScenario(): Promise<{ code: string | undefined }>;
+      insecureVisible: boolean
+      secureVisible: boolean
+    }>
+    runCookieSizeLimitScenario(): Promise<{ code: string | undefined }>
     runCookieDuplicateScopeScenario(): Promise<{
-      codes: Array<string | undefined>;
-      duplicateVisible: boolean;
-    }>;
+      codes: Array<string | undefined>
+      duplicateVisible: boolean
+    }>
     runCookieScopeGuardScenario(): Promise<{
-      scopeCode: string | undefined;
-      codecCode: string | undefined;
-      documentCode: string | undefined;
-      optionsCode: string | undefined;
-      expiresCode: string | undefined;
-      maxAgeCode: string | undefined;
-      expiresReads: number;
-      snapshotValue: string | null;
-      constructorOptionReads: number;
-      scopeReads: number;
-      removeContextReads: number;
-      documentReadCode: string | undefined;
-      documentTypeDriftCode: string | undefined;
-      documentWriteCode: string | undefined;
-      partialClearCode: string | undefined;
-      partialClearOperation: string | undefined;
-      partialClearKey: unknown;
-      snapshotClearCode: string | undefined;
-      snapshotClearOperation: string | undefined;
-      reentrantAbortCode: string | undefined;
-      reentrantAbortOperation: string | undefined;
-      reentrantAbortKeyMatchesRemaining: boolean;
-      syncRemoveOverrideReads: number;
-      writeContextReads: number;
-      writeContextReturnedPromise: boolean;
-      writeContextGetterCode: string | undefined;
-      writeLifecycleMetadata: boolean;
-      removeLifecycleMetadata: boolean;
-    }>;
+      scopeCode: string | undefined
+      codecCode: string | undefined
+      documentCode: string | undefined
+      optionsCode: string | undefined
+      expiresCode: string | undefined
+      maxAgeCode: string | undefined
+      expiresReads: number
+      snapshotValue: string | null
+      constructorOptionReads: number
+      scopeReads: number
+      removeContextReads: number
+      documentReadCode: string | undefined
+      documentTypeDriftCode: string | undefined
+      documentWriteCode: string | undefined
+      partialClearCode: string | undefined
+      partialClearOperation: string | undefined
+      partialClearKey: unknown
+      snapshotClearCode: string | undefined
+      snapshotClearOperation: string | undefined
+      reentrantAbortCode: string | undefined
+      reentrantAbortOperation: string | undefined
+      reentrantAbortKeyMatchesRemaining: boolean
+      syncRemoveOverrideReads: number
+      writeContextReads: number
+      writeContextReturnedPromise: boolean
+      writeContextGetterCode: string | undefined
+      writeLifecycleMetadata: boolean
+      removeLifecycleMetadata: boolean
+    }>
     runIndexedDbBlockedScenario(): Promise<{
-      blockedErrorCode: string | undefined;
-      secondOpenSucceededAfterClose: boolean;
-      sameStoreRetrySucceeded: boolean;
-      hostileCloseRetrySucceeded: boolean;
-      transitionCloseCode: string | undefined;
-      transitionCloseRetrySucceeded: boolean;
-      schemaInspectionCodes: Array<string | undefined>;
-      schemaInspectionRecovered: boolean;
-      connectionSetterCodes: Array<string | undefined>;
-      connectionSetterRecovered: boolean;
-    }>;
-    runIndexedDbSmokeScenario(): Promise<{ ok: boolean; value: unknown; metadata: unknown }>;
-    runIndexedDbOptionsGuardScenario(): Promise<Array<string | undefined>>;
+      blockedErrorCode: string | undefined
+      secondOpenSucceededAfterClose: boolean
+      sameStoreRetrySucceeded: boolean
+      hostileCloseRetrySucceeded: boolean
+      transitionCloseCode: string | undefined
+      transitionCloseRetrySucceeded: boolean
+      schemaInspectionCodes: Array<string | undefined>
+      schemaInspectionRecovered: boolean
+      connectionSetterCodes: Array<string | undefined>
+      connectionSetterRecovered: boolean
+    }>
+    runIndexedDbSmokeScenario(): Promise<{ ok: boolean; value: unknown; metadata: unknown }>
+    runIndexedDbOptionsGuardScenario(): Promise<Array<string | undefined>>
     runIndexedDbTransactionConflictScenario(): Promise<{
-      code: string | undefined;
-      value: unknown;
-    }>;
+      code: string | undefined
+      value: unknown
+    }>
     runIndexedDbEscapedTransactionScopeScenario(): Promise<{
-      getCode: string | undefined;
-      putCode: string | undefined;
-      deleteCode: string | undefined;
-      outsideValue: unknown;
-    }>;
+      getCode: string | undefined
+      putCode: string | undefined
+      deleteCode: string | undefined
+      outsideValue: unknown
+    }>
     runIndexedDbPagedScanScenario(): Promise<{
-      count: number;
-      first: string | undefined;
-      last: string | undefined;
-      stoppedEarly: boolean;
-      listenerSetupCode: string | undefined;
-      cleanupPreserved: boolean;
-      resultGetterCode: string | undefined;
-      prematureCompletionCode: string | undefined;
-      entryFailureCodes: Array<string | undefined>;
-      requestSetterCode: string | undefined;
-    }>;
+      count: number
+      first: string | undefined
+      last: string | undefined
+      stoppedEarly: boolean
+      listenerSetupCode: string | undefined
+      cleanupPreserved: boolean
+      resultGetterCode: string | undefined
+      prematureCompletionCode: string | undefined
+      entryFailureCodes: Array<string | undefined>
+      requestSetterCode: string | undefined
+    }>
     runIndexedDbDualTransactionScenario(): Promise<{
-      committed: number;
-      conflicts: number;
-      value: unknown;
-    }>;
+      committed: number
+      conflicts: number
+      value: unknown
+    }>
     runIndexedDbLegacyRecordsMigrationScenario(): Promise<{
-      value: unknown;
-      checkpoint: unknown;
-      legacyStorePresent: boolean;
-      hostileCursorCode: string | undefined;
-      hostileOpenCode: string | undefined;
-      hostileUpgradeCode: string | undefined;
-      openSetterCodes: Array<string | undefined>;
-    }>;
-    runIndexedDbFourWayTransactionScenario(): Promise<{ committed: number; conflicts: number }>;
+      value: unknown
+      checkpoint: unknown
+      legacyStorePresent: boolean
+      hostileCursorCode: string | undefined
+      hostileOpenCode: string | undefined
+      hostileUpgradeCode: string | undefined
+      openSetterCodes: Array<string | undefined>
+    }>
+    runIndexedDbFourWayTransactionScenario(): Promise<{ committed: number; conflicts: number }>
     runIndexedDbFailureScenario(): Promise<{
-      transactionCode: string | undefined;
-      rolledBack: boolean;
-      abortCode: string | undefined;
-      abortMissing: boolean;
-      invalidCallbackCodes: Array<string | undefined>;
-      invalidScopeOptionsCode: string | undefined;
-      invalidScopeWriteMissing: boolean;
-      policyReads: number;
-    }>;
+      transactionCode: string | undefined
+      rolledBack: boolean
+      abortCode: string | undefined
+      abortMissing: boolean
+      invalidCallbackCodes: Array<string | undefined>
+      invalidScopeOptionsCode: string | undefined
+      invalidScopeWriteMissing: boolean
+      policyReads: number
+    }>
+    runIndexedDbPostCommitFailureScenario(): Promise<{
+      syncResolved: boolean
+      syncPersisted: boolean
+      syncSecondListener: boolean
+      lateResolved: boolean
+      latePersisted: boolean
+      lateSecondListener: boolean
+      reporterResolved: boolean
+      reporterPersisted: boolean
+      reporterCalls: number
+      reporterThenReads: number
+    }>
     runIndexedDbClearAbortScenario(): Promise<{
-      recordsCode: string | undefined;
-      recordsValue: unknown;
-      allCode: string | undefined;
-      allValue: unknown;
-      allRecord: unknown;
-    }>;
+      recordsCode: string | undefined
+      recordsValue: unknown
+      allCode: string | undefined
+      allValue: unknown
+      allRecord: unknown
+    }>
     runIndexedDbDeleteAbortScenario(): Promise<{
-      code: string | undefined;
-      value: unknown;
-    }>;
+      code: string | undefined
+      value: unknown
+    }>
     runIndexedDbPutAbortScenario(): Promise<{
-      code: string | undefined;
-      value: unknown;
-    }>;
+      code: string | undefined
+      value: unknown
+    }>
     runIndexedDbEntityMigrationScenario(): Promise<{
-      result: unknown;
-      value: unknown;
-      legacyValue: unknown;
-      invalidBatchCode: string | undefined;
-      invalidOptionsCodes: Array<string | undefined>;
-      invalidBatchCallbackCodes: Array<string | undefined>;
-      migrationOptionReads: number;
-    }>;
+      result: unknown
+      value: unknown
+      legacyValue: unknown
+      invalidBatchCode: string | undefined
+      invalidOptionsCodes: Array<string | undefined>
+      invalidBatchCallbackCodes: Array<string | undefined>
+      migrationOptionReads: number
+    }>
     runIndexedDbConcurrentEntityMigrationScenario(): Promise<{
-      results: Array<{ migrated: number; alreadyCurrent: number; conflicted: number }>;
-      values: unknown[];
-      legacyValues: unknown[];
-    }>;
+      results: Array<{ migrated: number; alreadyCurrent: number; conflicted: number }>
+      values: unknown[]
+      legacyValues: unknown[]
+    }>
     runIndexedDbCrossRealmKeyScenario(): Promise<{
-      dateValue: unknown;
-      bytesValue: unknown;
-      compoundValue: unknown;
-    }>;
+      dateValue: unknown
+      bytesValue: unknown
+      compoundValue: unknown
+    }>
+    runByteBrandScenario(): Promise<{
+      foreignUint8Accepted: boolean
+      foreignArrayBufferAccepted: boolean
+      subclassAccepted: boolean
+      forgedInt8Rejected: boolean
+      clampedRejected: boolean
+      dataViewRejected: boolean
+      sharedRejected: boolean
+      hostileTagRejected: boolean
+      proxyRejected: boolean
+      forgedBufferRejected: boolean
+      detachedUint8Branded: boolean
+      detachedBufferBranded: boolean
+    }>
+    runIndexedDbRawIndexFirewallScenario(): Promise<{
+      domains: Record<string, { rotated: boolean; pending: boolean; staleCode: string | undefined }>
+      rollbackPreserved: boolean
+    }>
+    runIndexedDbBackfillLeaseScenario(): Promise<{
+      initialContentionCode: string | undefined
+      forwardJumpContentionCode: string | undefined
+      backwardJumpContentionCode: string | undefined
+      takeoverSucceeded: boolean
+      staleOwnerRenewCode: string | undefined
+    }>
+    startIndexedDbBackfillLeaseOwner(dbName: string): Promise<void>
+    contendIndexedDbBackfillLease(dbName: string): Promise<string | undefined>
+    finishIndexedDbBackfillLeaseOwner(dbName: string): Promise<string | undefined>
     runOperationLifecycleScenario(): Promise<{
-      memoryTimeoutCode: string | undefined;
-      indexedTimeoutCode: string | undefined;
-      indexedDynamicSignalCode: string | undefined;
-      disposedCode: string | undefined;
-      memoryValue: unknown;
-      invalidTimeoutCode: string | undefined;
-      invalidContextCodes: Array<string | undefined>;
-      invalidSignalCode: string | undefined;
-      invalidSignalGetterCode: string | undefined;
-      hostileReasonCode: string | undefined;
-      hostileReasonHasCause: boolean;
-      listenerSetupCode: string | undefined;
-      cleanupPreservedResult: string | null;
-      extensionListenerSetupCode: string | undefined;
-      extensionCleanupPreserved: boolean;
-      migrationListenerSetupCode: string | undefined;
-      migrationCleanupPreserved: boolean;
-      signalRaceCode: string | undefined;
-      signalRaceCalls: number;
-      contextSnapshotReads: number;
-      signalSurfaceReads: number;
-      repositoryContextReads: number;
-      idbRequestRaceCode: string | undefined;
-      idbRequestContextReads: number;
-      idbRequestSetupCode: string | undefined;
-      idbRequestCleanupPreserved: boolean;
-      idbResultGetterCode: string | undefined;
-      idbErrorGetterCode: string | undefined;
-      idbRequestSetterCodes: Array<string | undefined>;
-      idbTransactionSetterCodes: Array<string | undefined>;
-      idbTransactionSetupCode: string | undefined;
-      idbTransactionSetupRolledBack: boolean;
-      idbDestructiveSetterCodes: Array<string | undefined>;
-      idbDestructiveSetterRolledBack: boolean;
-      syncOptionCodes: Array<string | undefined>;
-    }>;
+      memoryTimeoutCode: string | undefined
+      indexedTimeoutCode: string | undefined
+      indexedDynamicSignalCode: string | undefined
+      disposedCode: string | undefined
+      memoryValue: unknown
+      invalidTimeoutCode: string | undefined
+      invalidContextCodes: Array<string | undefined>
+      invalidSignalCode: string | undefined
+      invalidSignalGetterCode: string | undefined
+      hostileReasonCode: string | undefined
+      hostileReasonHasCause: boolean
+      listenerSetupCode: string | undefined
+      cleanupPreservedResult: string | null
+      extensionListenerSetupCode: string | undefined
+      extensionCleanupPreserved: boolean
+      migrationListenerSetupCode: string | undefined
+      migrationCleanupPreserved: boolean
+      signalRaceCode: string | undefined
+      signalRaceCalls: number
+      mergedSignalAbortedReads: number
+      mergedSignalReasonReads: number
+      mergedSignalRemoveCalls: number
+      mergedSignalReasonPreserved: boolean
+      contextSnapshotReads: number
+      signalSurfaceReads: number
+      repositoryContextReads: number
+      idbRequestRaceCode: string | undefined
+      idbRequestContextReads: number
+      idbRequestSetupCode: string | undefined
+      idbRequestCleanupPreserved: boolean
+      idbResultGetterCode: string | undefined
+      idbErrorGetterCode: string | undefined
+      idbRequestSetterCodes: Array<string | undefined>
+      idbTransactionSetterCodes: Array<string | undefined>
+      idbTransactionSetupCode: string | undefined
+      idbTransactionSetupRolledBack: boolean
+      idbDestructiveSetterCodes: Array<string | undefined>
+      idbDestructiveSetterRolledBack: boolean
+      syncOptionCodes: Array<string | undefined>
+    }>
     runIndexedDbExtensionFailureScenario(): Promise<{
-      code: string | undefined;
-      value: unknown;
-    }>;
+      code: string | undefined
+      value: unknown
+    }>
     runIndexedDbFutureVersionScenario(): Promise<{
-      getCode: string | undefined;
-      skippedCount: number;
-      throwCode: string | undefined;
-      invalidHandlerCode: string | undefined;
-      rawValue: unknown;
-    }>;
+      getCode: string | undefined
+      skippedCount: number
+      throwCode: string | undefined
+      invalidHandlerCode: string | undefined
+      rawValue: unknown
+    }>
     runIndexedDbHangingExtensionAbortScenario(): Promise<{
-      code: string | undefined;
-      value: unknown;
-    }>;
+      code: string | undefined
+      value: unknown
+    }>
     runIndexedDbHangingMigrationAbortScenario(): Promise<{
-      code: string | undefined;
-      rawValue: unknown;
-      receivedSignal: boolean;
-    }>;
+      code: string | undefined
+      rawValue: unknown
+      receivedSignal: boolean
+    }>
     runIndexedDbPreAbortExtensionScenario(): Promise<{
-      code: string | undefined;
-      calls: number;
-    }>;
-    runIndexedDbPreAbortMigrationScenario(): Promise<{ code: string | undefined }>;
+      code: string | undefined
+      calls: number
+    }>
+    runIndexedDbPreAbortMigrationScenario(): Promise<{ code: string | undefined }>
     runIndexedDbSchemaFailureScenario(): Promise<{
-      code: string | undefined;
-      value: unknown;
-    }>;
+      code: string | undefined
+      value: unknown
+    }>
     runEntityDefinitionGuardScenario(): Promise<{
-      codes: Array<string | undefined>;
-      storeCodes: Array<string | undefined>;
-      codecCodes: Array<string | undefined>;
-      schemaCodes: Array<string | undefined>;
-      migrationCodes: Array<string | undefined>;
-      versionCodes: Array<string | undefined>;
-      migrationVersionCodes: Array<string | undefined>;
-      prototypeMigrationCodes: Array<string | undefined>;
-      nullVersionCodes: Array<string | undefined>;
-      backendCodes: Array<string | undefined>;
-      capabilityCodes: Array<string | undefined>;
-      sparseVersionCodes: Array<string | undefined>;
-      validateOnReadCodes: Array<string | undefined>;
-      standardSchemaCodes: Array<string | undefined>;
-      standardSchemaContractReads: number;
-      standardSchemaResultReads: number;
-      migrationHelperCodes: Array<string | undefined>;
-      inheritedMigrationCalls: number;
-      migrationRaceCode: string | undefined;
-      codecSelectionCodes: Array<string | undefined>;
-      hostileStorePredicates: boolean[];
-      codecDescriptorReads: number;
-      definitionOptionReads: number;
-      definitionSchemaReads: number;
-    }>;
+      codes: Array<string | undefined>
+      storeCodes: Array<string | undefined>
+      codecCodes: Array<string | undefined>
+      schemaCodes: Array<string | undefined>
+      migrationCodes: Array<string | undefined>
+      versionCodes: Array<string | undefined>
+      migrationVersionCodes: Array<string | undefined>
+      prototypeMigrationCodes: Array<string | undefined>
+      nullVersionCodes: Array<string | undefined>
+      backendCodes: Array<string | undefined>
+      capabilityCodes: Array<string | undefined>
+      sparseVersionCodes: Array<string | undefined>
+      validateOnReadCodes: Array<string | undefined>
+      standardSchemaCodes: Array<string | undefined>
+      standardSchemaContractReads: number
+      standardSchemaResultReads: number
+      migrationHelperCodes: Array<string | undefined>
+      inheritedMigrationCalls: number
+      migrationRaceCode: string | undefined
+      codecSelectionCodes: Array<string | undefined>
+      hostileStorePredicates: boolean[]
+      codecDescriptorReads: number
+      definitionOptionReads: number
+      definitionSchemaReads: number
+    }>
     runEntityComparatorGuardScenario(): Promise<{
-      codes: Array<string | undefined>;
-      nullCode: string | undefined;
-      invalidOptionsCodes: Array<string | undefined>;
-      rangeCodes: Array<string | undefined>;
-      invalidHandlerCodes: Array<string | undefined>;
-      invalidPolicyCode: string | undefined;
-      rangeSnapshotReads: number;
-      listOptionReads: number;
-    }>;
+      codes: Array<string | undefined>
+      nullCode: string | undefined
+      invalidOptionsCodes: Array<string | undefined>
+      rangeCodes: Array<string | undefined>
+      invalidHandlerCodes: Array<string | undefined>
+      invalidPolicyCode: string | undefined
+      rangeSnapshotReads: number
+      listOptionReads: number
+    }>
     runMemoryCompositeKeyOwnershipScenario(): Promise<{
-      directStable: boolean;
-      transactionStable: boolean;
-      iterationStable: boolean;
-      rangeStable: boolean;
-    }>;
+      directStable: boolean
+      transactionStable: boolean
+      iterationStable: boolean
+      rangeStable: boolean
+    }>
     runWorkerScenario(): Promise<{
-      memory: string | null;
-      indexedDb: string | null;
-      localStorageCode: string | undefined;
-      cookiesCode: string | undefined;
-    }>;
+      memory: string | null
+      indexedDb: string | null
+      localStorageCode: string | undefined
+      cookiesCode: string | undefined
+    }>
   }
 }
 
 /** 真实浏览器下的 localStorage 配额：一直写到抛 QuotaExceededError 为止。 */
 window.runLocalStorageQuotaScenario = async () => {
-  const store = localStorage({ namespace: `quota-${Math.random().toString(36).slice(2)}` });
-  const chunk = 'x'.repeat(1024 * 64); // 64KB/条，加速填满 ~5-10MB 配额
-  let wroteCount = 0;
-  let quotaErrorCode: string | undefined;
+  const store = localStorage({ namespace: `quota-${Math.random().toString(36).slice(2)}` })
+  const chunk = 'x'.repeat(1024 * 64) // 64KB/条，加速填满 ~5-10MB 配额
+  let wroteCount = 0
+  let quotaErrorCode: string | undefined
   try {
     for (let i = 0; i < 2000; i += 1) {
-      await store.set(`k${i}`, chunk);
-      wroteCount += 1;
+      await store.set(`k${i}`, chunk)
+      wroteCount += 1
     }
   } catch (error) {
-    quotaErrorCode = (error as { code?: string }).code;
+    quotaErrorCode = (error as { code?: string }).code
   }
-  await store.clearValues();
-  let optionsCode: string | undefined;
+  await store.clearValues()
+  let optionsCode: string | undefined
   try {
-    localStorage(null as never);
+    localStorage(null as never)
   } catch (error) {
-    optionsCode = (error as { code?: string }).code;
+    optionsCode = (error as { code?: string }).code
   }
-  return { wroteCount, quotaErrorCode, optionsCode };
-};
+  return { wroteCount, quotaErrorCode, optionsCode }
+}
 
 /** 真实浏览器页面内注入异常 Storage，验证公开入口仍归一化为 StorageError。 */
 window.runStorageFailureScenario = async () => {
-  let constructorOptionReads = 0;
+  let constructorOptionReads = 0
   const getterStore = localStorage({
     get namespace() {
-      constructorOptionReads += 1;
-      return `getter-storage-${Math.random().toString(36).slice(2)}`;
+      constructorOptionReads += 1
+      return `getter-storage-${Math.random().toString(36).slice(2)}`
     },
     get namespaceCodec() {
-      constructorOptionReads += 1;
-      return undefined;
+      constructorOptionReads += 1
+      return undefined
     },
     get storage() {
-      constructorOptionReads += 1;
-      return window.localStorage;
+      constructorOptionReads += 1
+      return window.localStorage
     }
-  });
-  await getterStore.set('snapshot', 'value');
-  await getterStore.clearValues();
-  let optionGetterCode: string | undefined;
+  })
+  await getterStore.set('snapshot', 'value')
+  await getterStore.clearValues()
+  let optionGetterCode: string | undefined
   try {
     localStorage({
       get namespace(): string {
-        throw new Error('hostile browser namespace');
+        throw new Error('hostile browser namespace')
       }
-    });
+    })
   } catch (error) {
-    optionGetterCode = (error as { code?: string }).code;
+    optionGetterCode = (error as { code?: string }).code
   }
-  let storageLengthReads = 0;
+  let storageLengthReads = 0
   const lengthObservedStorage = {
     get length() {
-      storageLengthReads += 1;
-      return window.localStorage.length;
+      storageLengthReads += 1
+      return window.localStorage.length
     },
     getItem: (key: string) => window.localStorage.getItem(key),
     setItem: (key: string, value: string) => window.localStorage.setItem(key, value),
     removeItem: (key: string) => window.localStorage.removeItem(key),
     key: (index: number) => window.localStorage.key(index),
     clear: () => window.localStorage.clear()
-  };
+  }
   const lengthObservedStore = localStorage({
     namespace: `length-observed-${Math.random().toString(36).slice(2)}`,
     storage: lengthObservedStorage
-  });
-  await lengthObservedStore.dispose();
-  let storageGetterCode: string | undefined;
+  })
+  await lengthObservedStore.dispose()
+  let storageGetterCode: string | undefined
   try {
     localStorage({
       storage: Object.defineProperty(lengthObservedStorage, 'getItem', {
         configurable: true,
         get: () => {
-          throw new Error('hostile browser storage getter');
+          throw new Error('hostile browser storage getter')
         }
       })
-    });
+    })
   } catch (error) {
-    storageGetterCode = (error as { code?: string }).code;
+    storageGetterCode = (error as { code?: string }).code
   }
-  let namespaceCodecReads = 0;
+  let namespaceCodecReads = 0
   const codecStore = localStorage({
     namespace: `codec-observed-${Math.random().toString(36).slice(2)}`,
     get namespaceCodec() {
       return {
         get encode() {
-          namespaceCodecReads += 1;
-          return (namespace: string, key: string) => `${namespace}:${key}`;
+          namespaceCodecReads += 1
+          return (namespace: string, key: string) => `${namespace}:${key}`
         },
         get decode() {
-          namespaceCodecReads += 1;
+          namespaceCodecReads += 1
           return (namespace: string, physicalKey: string) =>
             physicalKey.startsWith(`${namespace}:`)
               ? physicalKey.slice(namespace.length + 1)
-              : undefined;
+              : undefined
         }
-      };
+      }
     }
-  });
-  await codecStore.set('snapshot', 'value');
-  await codecStore.clearValues();
-  let runtimeLengthReads = 0;
+  })
+  await codecStore.set('snapshot', 'value')
+  await codecStore.clearValues()
+  let runtimeLengthReads = 0
   const boundedStorage = {
     get length() {
-      runtimeLengthReads += 1;
-      if (runtimeLengthReads > 2) throw new Error('browser runtime length read repeatedly');
-      return window.localStorage.length;
+      runtimeLengthReads += 1
+      if (runtimeLengthReads > 2) throw new Error('browser runtime length read repeatedly')
+      return window.localStorage.length
     },
     getItem: (key: string) => window.localStorage.getItem(key),
     setItem: (key: string, value: string) => window.localStorage.setItem(key, value),
     removeItem: (key: string) => window.localStorage.removeItem(key),
     key: (index: number) => window.localStorage.key(index),
     clear: () => window.localStorage.clear()
-  };
+  }
   const boundedStore = localStorage({
     namespace: `bounded-iteration-${Math.random().toString(36).slice(2)}`,
     storage: boundedStorage
-  });
-  await boundedStore.set('key', 'value');
-  if (!(await boundedStore.keys()).includes('key')) throw new Error('bounded scan missed key');
-  await boundedStore.remove('key');
-  const physicalClearNamespace = `physical-clear-${Math.random().toString(36).slice(2)}`;
+  })
+  await boundedStore.set('key', 'value')
+  if (!(await boundedStore.keys()).includes('key')) throw new Error('bounded scan missed key')
+  await boundedStore.remove('key')
+  const physicalClearNamespace = `physical-clear-${Math.random().toString(36).slice(2)}`
   const physicalClearStore = localStorage({
     namespace: physicalClearNamespace,
     namespaceCodec: {
       encode: (namespace: string, key: string) => `${namespace}:wire:${key.toLowerCase()}`,
       decode: (namespace: string, physicalKey: string) => {
-        const prefix = `${namespace}:wire:`;
+        const prefix = `${namespace}:wire:`
         return physicalKey.startsWith(prefix)
           ? physicalKey.slice(prefix.length).toUpperCase()
-          : undefined;
+          : undefined
       }
     }
-  });
-  await physicalClearStore.set('mixed', 'value');
-  await physicalClearStore.clearValues();
+  })
+  await physicalClearStore.set('mixed', 'value')
+  await physicalClearStore.clearValues()
   const codecPhysicalClear =
-    window.localStorage.getItem(`${physicalClearNamespace}:wire:mixed`) === null;
-  let partialRemovals = 0;
+    window.localStorage.getItem(`${physicalClearNamespace}:wire:mixed`) === null
+  let partialRemovals = 0
   const partialStorage = {
     get length() {
-      return window.localStorage.length;
+      return window.localStorage.length
     },
     getItem: (key: string) => window.localStorage.getItem(key),
     setItem: (key: string, value: string) => window.localStorage.setItem(key, value),
     removeItem: (key: string) => {
-      partialRemovals += 1;
-      if (partialRemovals === 2) throw new Error('browser hostile second storage removal');
-      window.localStorage.removeItem(key);
+      partialRemovals += 1
+      if (partialRemovals === 2) throw new Error('browser hostile second storage removal')
+      window.localStorage.removeItem(key)
     },
     key: (index: number) =>
       Array.from({ length: window.localStorage.length }, (_, keyIndex) =>
@@ -457,33 +516,33 @@ window.runStorageFailureScenario = async () => {
         .filter((key): key is string => key !== null)
         .sort()[index] ?? null,
     clear: () => window.localStorage.clear()
-  };
+  }
   const partialClearStore = localStorage({
     namespace: `partial-clear-${Math.random().toString(36).slice(2)}`,
     storage: partialStorage
-  });
-  await partialClearStore.set('first', 'one');
-  await partialClearStore.set('second', 'two');
-  partialRemovals = 0;
-  let partialClearCode: string | undefined;
-  let partialClearOperation: string | undefined;
-  let partialClearKey: unknown;
+  })
+  await partialClearStore.set('first', 'one')
+  await partialClearStore.set('second', 'two')
+  partialRemovals = 0
+  let partialClearCode: string | undefined
+  let partialClearOperation: string | undefined
+  let partialClearKey: unknown
   try {
-    await partialClearStore.clearAll();
+    await partialClearStore.clearAll()
   } catch (error) {
-    const typed = error as { code?: string; operation?: string; key?: unknown };
-    partialClearCode = typed.code;
-    partialClearOperation = typed.operation;
-    partialClearKey = typed.key;
+    const typed = error as { code?: string; operation?: string; key?: unknown }
+    partialClearCode = typed.code
+    partialClearOperation = typed.operation
+    partialClearKey = typed.key
   }
-  let snapshotLengthReads = 0;
+  let snapshotLengthReads = 0
   const snapshotFailureStore = localStorage({
     namespace: `snapshot-failure-${Math.random().toString(36).slice(2)}`,
     storage: {
       get length(): number {
-        snapshotLengthReads += 1;
-        if (snapshotLengthReads > 1) throw new Error('browser hostile clear snapshot');
-        return window.localStorage.length;
+        snapshotLengthReads += 1
+        if (snapshotLengthReads > 1) throw new Error('browser hostile clear snapshot')
+        return window.localStorage.length
       },
       getItem: (key: string) => window.localStorage.getItem(key),
       setItem: (key: string, value: string) => window.localStorage.setItem(key, value),
@@ -491,27 +550,27 @@ window.runStorageFailureScenario = async () => {
       key: (index: number) => window.localStorage.key(index),
       clear: () => window.localStorage.clear()
     }
-  });
-  let snapshotClearCode: string | undefined;
-  let snapshotClearOperation: string | undefined;
+  })
+  let snapshotClearCode: string | undefined
+  let snapshotClearOperation: string | undefined
   try {
-    await snapshotFailureStore.clearAll();
+    await snapshotFailureStore.clearAll()
   } catch (error) {
-    const typed = error as { code?: string; operation?: string };
-    snapshotClearCode = typed.code;
-    snapshotClearOperation = typed.operation;
+    const typed = error as { code?: string; operation?: string }
+    snapshotClearCode = typed.code
+    snapshotClearOperation = typed.operation
   }
-  const reentrantController = new AbortController();
-  let reentrantArmed = false;
+  const reentrantController = new AbortController()
+  let reentrantArmed = false
   const reentrantStorage = {
     get length() {
-      return window.localStorage.length;
+      return window.localStorage.length
     },
     getItem: (key: string) => window.localStorage.getItem(key),
     setItem: (key: string, value: string) => window.localStorage.setItem(key, value),
     removeItem: (key: string) => {
-      window.localStorage.removeItem(key);
-      if (reentrantArmed) reentrantController.abort(new Error('browser reentrant clear abort'));
+      window.localStorage.removeItem(key)
+      if (reentrantArmed) reentrantController.abort(new Error('browser reentrant clear abort'))
     },
     key: (index: number) =>
       Array.from({ length: window.localStorage.length }, (_, keyIndex) =>
@@ -520,34 +579,34 @@ window.runStorageFailureScenario = async () => {
         .filter((key): key is string => key !== null)
         .sort()[index] ?? null,
     clear: () => window.localStorage.clear()
-  };
+  }
   const reentrantStore = localStorage({
     namespace: `reentrant-clear-${Math.random().toString(36).slice(2)}`,
     storage: reentrantStorage
-  });
-  await reentrantStore.set('first', 'one');
-  await reentrantStore.set('second', 'two');
-  reentrantArmed = true;
-  let reentrantAbortCode: string | undefined;
-  let reentrantAbortOperation: string | undefined;
-  let reentrantAbortKey: unknown;
+  })
+  await reentrantStore.set('first', 'one')
+  await reentrantStore.set('second', 'two')
+  reentrantArmed = true
+  let reentrantAbortCode: string | undefined
+  let reentrantAbortOperation: string | undefined
+  let reentrantAbortKey: unknown
   try {
-    await reentrantStore.clearAll({ signal: reentrantController.signal });
+    await reentrantStore.clearAll({ signal: reentrantController.signal })
   } catch (error) {
-    const typed = error as { code?: string; operation?: string; key?: unknown };
-    reentrantAbortCode = typed.code;
-    reentrantAbortOperation = typed.operation;
-    reentrantAbortKey = typed.key;
+    const typed = error as { code?: string; operation?: string; key?: unknown }
+    reentrantAbortCode = typed.code
+    reentrantAbortOperation = typed.operation
+    reentrantAbortKey = typed.key
   }
-  const reentrantRemainingKeys = await reentrantStore.keys();
+  const reentrantRemainingKeys = await reentrantStore.keys()
   const reentrantAbortKeyMatchesRemaining =
-    reentrantRemainingKeys.length === 1 && reentrantRemainingKeys[0] === reentrantAbortKey;
-  const incoherentNamespace = `incoherent-clear-${Math.random().toString(36).slice(2)}`;
+    reentrantRemainingKeys.length === 1 && reentrantRemainingKeys[0] === reentrantAbortKey
+  const incoherentNamespace = `incoherent-clear-${Math.random().toString(36).slice(2)}`
   const incoherentStore = localStorage({
     namespace: incoherentNamespace,
     storage: {
       get length() {
-        return window.localStorage.length;
+        return window.localStorage.length
       },
       getItem: (key: string) => window.localStorage.getItem(key),
       setItem: (key: string, value: string) => window.localStorage.setItem(key, value),
@@ -555,39 +614,39 @@ window.runStorageFailureScenario = async () => {
       key: () => window.localStorage.key(0),
       clear: () => window.localStorage.clear()
     }
-  });
-  await incoherentStore.set('first', 'one');
-  await incoherentStore.set('second', 'two');
-  let incoherentClearCode: string | undefined;
-  let incoherentClearOperation: string | undefined;
+  })
+  await incoherentStore.set('first', 'one')
+  await incoherentStore.set('second', 'two')
+  let incoherentClearCode: string | undefined
+  let incoherentClearOperation: string | undefined
   try {
-    await incoherentStore.clearAll();
+    await incoherentStore.clearAll()
   } catch (error) {
-    const typed = error as { code?: string; operation?: string };
-    incoherentClearCode = typed.code;
-    incoherentClearOperation = typed.operation;
+    const typed = error as { code?: string; operation?: string }
+    incoherentClearCode = typed.code
+    incoherentClearOperation = typed.operation
   }
   const incoherentClearPreservedValues =
     (await incoherentStore.get('first')) === 'one' &&
-    (await incoherentStore.get('second')) === 'two';
-  const failure = new Error('browser storage security failure');
+    (await incoherentStore.get('second')) === 'two'
+  const failure = new Error('browser storage security failure')
   const storage = {
     length: 0,
     getItem: () => {
-      throw failure;
+      throw failure
     },
     setItem: () => {},
     removeItem: () => {},
     key: () => null,
     clear: () => {}
-  };
-  let invalidStorageCode: string | undefined;
-  try {
-    localStorage({ namespace: 'invalid-storage', storage: {} as never });
-  } catch (error) {
-    invalidStorageCode = (error as { code?: string }).code;
   }
-  let invalidLengthCode: string | undefined;
+  let invalidStorageCode: string | undefined
+  try {
+    localStorage({ namespace: 'invalid-storage', storage: {} as never })
+  } catch (error) {
+    invalidStorageCode = (error as { code?: string }).code
+  }
+  let invalidLengthCode: string | undefined
   try {
     localStorage({
       namespace: 'invalid-length',
@@ -599,12 +658,12 @@ window.runStorageFailureScenario = async () => {
         key: () => null,
         clear: () => {}
       } as never
-    });
+    })
   } catch (error) {
-    invalidLengthCode = (error as { code?: string }).code;
+    invalidLengthCode = (error as { code?: string }).code
   }
   try {
-    localStorage({ namespace: `failure-${Math.random().toString(36).slice(2)}`, storage });
+    localStorage({ namespace: `failure-${Math.random().toString(36).slice(2)}`, storage })
     return {
       code: undefined,
       hasCause: false,
@@ -628,9 +687,9 @@ window.runStorageFailureScenario = async () => {
       incoherentClearCode,
       incoherentClearOperation,
       incoherentClearPreservedValues
-    };
+    }
   } catch (error) {
-    const typed = error as { code?: string; cause?: unknown };
+    const typed = error as { code?: string; cause?: unknown }
     return {
       code: typed.code,
       hasCause: typed.cause === failure,
@@ -654,59 +713,59 @@ window.runStorageFailureScenario = async () => {
       incoherentClearCode,
       incoherentClearOperation,
       incoherentClearPreservedValues
-    };
+    }
   }
-};
+}
 
 /**
  * Secure cookie 只能在 https 上下文里被写入/可见；e2e 跑在 http://127.0.0.1， 这正是"jsdom 不强制这个约束"必须用真实浏览器验证的场景（SDD
  * §12.4）。
  */
 window.runCookieSecureScenario = async () => {
-  const namespace = `secure-${Math.random().toString(36).slice(2)}`;
-  const insecureStore = cookies({ namespace });
-  await insecureStore.set('insecure-cookie', 'v1');
-  const insecureVisible = (await insecureStore.get('insecure-cookie')) === 'v1';
+  const namespace = `secure-${Math.random().toString(36).slice(2)}`
+  const insecureStore = cookies({ namespace })
+  await insecureStore.set('insecure-cookie', 'v1')
+  const insecureVisible = (await insecureStore.get('insecure-cookie')) === 'v1'
 
-  const secureStore = cookies({ namespace, scope: { path: '/', secure: true } });
-  let secureVisible = false;
+  const secureStore = cookies({ namespace, scope: { path: '/', secure: true } })
+  let secureVisible = false
   try {
-    await secureStore.set('secure-cookie', 'v2');
-    secureVisible = (await secureStore.get('secure-cookie')) === 'v2';
+    await secureStore.set('secure-cookie', 'v2')
+    secureVisible = (await secureStore.get('secure-cookie')) === 'v2'
   } catch (error) {
-    if ((error as { code?: string }).code !== 'WRITE_FAILED') throw error;
+    if ((error as { code?: string }).code !== 'WRITE_FAILED') throw error
   }
 
-  await insecureStore.clearAll();
-  await secureStore.clearAll();
-  return { insecureVisible, secureVisible };
-};
+  await insecureStore.clearAll()
+  await secureStore.clearAll()
+  return { insecureVisible, secureVisible }
+}
 
 /** 真实浏览器对单条 cookie ~4KB 的硬限制；超过后浏览器直接不写入或截断。 */
 window.runCookieSizeLimitScenario = async () => {
-  const store = cookies({ namespace: `size-${Math.random().toString(36).slice(2)}` });
+  const store = cookies({ namespace: `size-${Math.random().toString(36).slice(2)}` })
   try {
-    await store.set('big', 'x'.repeat(5000));
-    return { code: undefined };
+    await store.set('big', 'x'.repeat(5000))
+    return { code: undefined }
   } catch (error) {
-    return { code: (error as { code?: string }).code };
+    return { code: (error as { code?: string }).code }
   } finally {
-    await store.clearAll();
+    await store.clearAll()
   }
-};
+}
 
 /** Verify that two browser-native path scopes with one name are never collapsed to one value. */
 window.runCookieDuplicateScopeScenario = async () => {
-  const namespace = `duplicate-scope-${Math.random().toString(36).slice(2)}`;
-  const physicalKey = `${namespace}:key`;
-  const encodedKey = encodeURIComponent(physicalKey);
-  document.cookie = `${encodedKey}=root; path=/`;
-  document.cookie = `${encodedKey}=nested; path=/nested`;
+  const namespace = `duplicate-scope-${Math.random().toString(36).slice(2)}`
+  const physicalKey = `${namespace}:key`
+  const encodedKey = encodeURIComponent(physicalKey)
+  document.cookie = `${encodedKey}=root; path=/`
+  document.cookie = `${encodedKey}=nested; path=/nested`
   const duplicateVisible =
     document.cookie
       .split(';')
       .map((pair) => decodeURIComponent(pair.slice(0, pair.indexOf('=')).trim()))
-      .filter((name) => name === physicalKey).length === 2;
+      .filter((name) => name === physicalKey).length === 2
   const store = cookies({
     namespace,
     scope: { path: '/nested' },
@@ -717,7 +776,7 @@ window.runCookieDuplicateScopeScenario = async () => {
           ? candidate.slice(currentNamespace.length + 1)
           : undefined
     }
-  });
+  })
   const operations = [
     () => store.get('key'),
     () => store.has('key'),
@@ -726,377 +785,377 @@ window.runCookieDuplicateScopeScenario = async () => {
     () => store.clearValues(),
     () => store.clearAll(),
     () => store.set('key', 'new')
-  ];
-  const codes: Array<string | undefined> = [];
+  ]
+  const codes: Array<string | undefined> = []
   try {
     for (const operation of operations) {
       try {
-        await operation();
-        codes.push(undefined);
+        await operation()
+        codes.push(undefined)
       } catch (error) {
-        codes.push((error as { code?: string }).code);
+        codes.push((error as { code?: string }).code)
       }
     }
-    return { codes, duplicateVisible };
+    return { codes, duplicateVisible }
   } finally {
-    document.cookie = `${encodedKey}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/nested`;
-    document.cookie = `${encodedKey}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+    document.cookie = `${encodedKey}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/nested`
+    document.cookie = `${encodedKey}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
   }
-};
+}
 
 /** 真实浏览器验证 cookie scope 数组不会被当作合法 scope 配置。 */
 window.runCookieScopeGuardScenario = async () => {
-  let constructorOptionReads = 0;
-  let scopeReads = 0;
+  let constructorOptionReads = 0
+  let scopeReads = 0
   const constructorStore = cookies({
     get namespace() {
-      constructorOptionReads += 1;
-      return `constructor-${Math.random().toString(36).slice(2)}`;
+      constructorOptionReads += 1
+      return `constructor-${Math.random().toString(36).slice(2)}`
     },
     get namespaceCodec() {
-      constructorOptionReads += 1;
-      return undefined;
+      constructorOptionReads += 1
+      return undefined
     },
     get scope() {
-      constructorOptionReads += 1;
+      constructorOptionReads += 1
       return {
         get path() {
-          scopeReads += 1;
-          return '/';
+          scopeReads += 1
+          return '/'
         },
         get domain() {
-          scopeReads += 1;
-          return undefined;
+          scopeReads += 1
+          return undefined
         },
         get sameSite() {
-          scopeReads += 1;
-          return 'lax' as const;
+          scopeReads += 1
+          return 'lax' as const
         },
         get secure() {
-          scopeReads += 1;
-          return false;
+          scopeReads += 1
+          return false
         },
         get partitioned() {
-          scopeReads += 1;
-          return false;
+          scopeReads += 1
+          return false
         }
-      };
+      }
     },
     get document() {
-      constructorOptionReads += 1;
-      return document;
+      constructorOptionReads += 1
+      return document
     }
-  });
-  await constructorStore.set('snapshot', 'value');
-  let removeContextReads = 0;
-  const removeController = new AbortController();
+  })
+  await constructorStore.set('snapshot', 'value')
+  let removeContextReads = 0
+  const removeController = new AbortController()
   await constructorStore.remove('snapshot', {
     get signal() {
-      removeContextReads += 1;
-      return removeController.signal;
+      removeContextReads += 1
+      return removeController.signal
     },
     get timeoutMs() {
-      removeContextReads += 1;
-      return undefined;
+      removeContextReads += 1
+      return undefined
     }
-  });
-  let scopeCode: string | undefined;
+  })
+  let scopeCode: string | undefined
   try {
-    cookies({ namespace: `scope-${Math.random().toString(36).slice(2)}`, scope: [] as never });
+    cookies({ namespace: `scope-${Math.random().toString(36).slice(2)}`, scope: [] as never })
   } catch (error) {
-    scopeCode = (error as { code?: string }).code;
+    scopeCode = (error as { code?: string }).code
   }
-  let codecCode: string | undefined;
+  let codecCode: string | undefined
   try {
     cookies({
       namespace: `codec-${Math.random().toString(36).slice(2)}`,
       namespaceCodec: [] as never
-    });
+    })
   } catch (error) {
-    codecCode = (error as { code?: string }).code;
+    codecCode = (error as { code?: string }).code
   }
-  let documentCode: string | undefined;
+  let documentCode: string | undefined
   try {
     cookies({
       namespace: `document-${Math.random().toString(36).slice(2)}`,
       document: [] as never
-    });
+    })
   } catch (error) {
-    documentCode = (error as { code?: string }).code;
+    documentCode = (error as { code?: string }).code
   }
-  let optionsCode: string | undefined;
+  let optionsCode: string | undefined
   try {
-    cookies(null as never);
+    cookies(null as never)
   } catch (error) {
-    optionsCode = (error as { code?: string }).code;
+    optionsCode = (error as { code?: string }).code
   }
-  let expiresCode: string | undefined;
+  let expiresCode: string | undefined
   try {
     await cookies({ namespace: `expires-${Math.random().toString(36).slice(2)}` }).set(
       'key',
       'value',
       { expires: 'date' as never }
-    );
+    )
   } catch (error) {
-    expiresCode = (error as { code?: string }).code;
+    expiresCode = (error as { code?: string }).code
   }
   try {
     await cookies({ namespace: `expires-number-${Math.random().toString(36).slice(2)}` }).set(
       'key',
       'value',
       { expires: { getTime: () => Infinity } as never }
-    );
+    )
   } catch (error) {
-    if ((error as { code?: string }).code !== 'INVALID_CONFIG') throw error;
+    if ((error as { code?: string }).code !== 'INVALID_CONFIG') throw error
   }
-  let maxAgeCode: string | undefined;
+  let maxAgeCode: string | undefined
   try {
     await cookies({ namespace: `max-age-${Math.random().toString(36).slice(2)}` }).set(
       'key',
       'value',
       { maxAge: Number.MAX_SAFE_INTEGER + 1 }
-    );
+    )
   } catch (error) {
-    maxAgeCode = (error as { code?: string }).code;
+    maxAgeCode = (error as { code?: string }).code
   }
-  let expiresReads = 0;
+  let expiresReads = 0
   const snapshotStore = cookies({
     namespace: `expires-snapshot-${Math.random().toString(36).slice(2)}`
-  });
+  })
   await snapshotStore.set('key', 'value', {
     expires: {
       getTime: () => {
-        expiresReads += 1;
-        if (expiresReads > 1) throw new Error('expires read twice');
-        return Date.now() + 60_000;
+        expiresReads += 1
+        if (expiresReads > 1) throw new Error('expires read twice')
+        return Date.now() + 60_000
       }
     } as never
-  });
-  let documentReadCode: string | undefined;
-  let hostileDocumentReads = 0;
+  })
+  let documentReadCode: string | undefined
+  let hostileDocumentReads = 0
   const readFailureStore = cookies({
     namespace: 'document-read-failure',
     document: {
       get cookie() {
-        hostileDocumentReads += 1;
-        if (hostileDocumentReads > 1) throw new Error('browser cookie getter failure');
-        return '';
+        hostileDocumentReads += 1
+        if (hostileDocumentReads > 1) throw new Error('browser cookie getter failure')
+        return ''
       },
       set cookie(_value: string) {}
     }
-  });
+  })
   try {
-    await readFailureStore.get('key');
+    await readFailureStore.get('key')
   } catch (error) {
-    documentReadCode = (error as { code?: string }).code;
+    documentReadCode = (error as { code?: string }).code
   }
-  let documentTypeDriftCode: string | undefined;
-  let driftingDocumentReads = 0;
+  let documentTypeDriftCode: string | undefined
+  let driftingDocumentReads = 0
   const typeDriftStore = cookies({
     namespace: 'document-type-drift',
     document: {
       get cookie(): string {
-        driftingDocumentReads += 1;
-        return (driftingDocumentReads === 1 ? '' : 42) as never;
+        driftingDocumentReads += 1
+        return (driftingDocumentReads === 1 ? '' : 42) as never
       },
       set cookie(_value: string) {}
     }
-  });
+  })
   try {
-    await typeDriftStore.get('key');
+    await typeDriftStore.get('key')
   } catch (error) {
-    documentTypeDriftCode = (error as { code?: string }).code;
+    documentTypeDriftCode = (error as { code?: string }).code
   }
-  let documentWriteCode: string | undefined;
+  let documentWriteCode: string | undefined
   const writeFailureStore = cookies({
     namespace: 'document-write-failure',
     document: {
       get cookie() {
-        return '';
+        return ''
       },
       set cookie(_value: string) {
-        throw new Error('browser cookie setter failure');
+        throw new Error('browser cookie setter failure')
       }
     }
-  });
+  })
   try {
-    await writeFailureStore.set('key', 'value');
+    await writeFailureStore.set('key', 'value')
   } catch (error) {
-    documentWriteCode = (error as { code?: string }).code;
+    documentWriteCode = (error as { code?: string }).code
   }
-  let cookieRemovalCount = 0;
+  let cookieRemovalCount = 0
   const partialCookieDocument = {
     get cookie(): string {
-      return document.cookie;
+      return document.cookie
     },
     set cookie(value: string) {
       if (value.toLowerCase().includes('expires=thu, 01 jan 1970')) {
-        cookieRemovalCount += 1;
-        if (cookieRemovalCount === 2) throw new Error('browser hostile second cookie removal');
+        cookieRemovalCount += 1
+        if (cookieRemovalCount === 2) throw new Error('browser hostile second cookie removal')
       }
-      document.cookie = value;
+      document.cookie = value
     }
-  };
+  }
   const partialCookieStore = cookies({
     namespace: `partial-cookie-${Math.random().toString(36).slice(2)}`,
     document: partialCookieDocument
-  });
-  await partialCookieStore.set('first', 'one');
-  await partialCookieStore.set('second', 'two');
-  let partialClearCode: string | undefined;
-  let partialClearOperation: string | undefined;
-  let partialClearKey: unknown;
+  })
+  await partialCookieStore.set('first', 'one')
+  await partialCookieStore.set('second', 'two')
+  let partialClearCode: string | undefined
+  let partialClearOperation: string | undefined
+  let partialClearKey: unknown
   try {
-    await partialCookieStore.clearAll();
+    await partialCookieStore.clearAll()
   } catch (error) {
-    const typed = error as { code?: string; operation?: string; key?: unknown };
-    partialClearCode = typed.code;
-    partialClearOperation = typed.operation;
-    partialClearKey = typed.key;
+    const typed = error as { code?: string; operation?: string; key?: unknown }
+    partialClearCode = typed.code
+    partialClearOperation = typed.operation
+    partialClearKey = typed.key
   }
-  let snapshotCookieReads = 0;
+  let snapshotCookieReads = 0
   const snapshotFailureStore = cookies({
     namespace: `snapshot-cookie-${Math.random().toString(36).slice(2)}`,
     document: {
       get cookie(): string {
-        snapshotCookieReads += 1;
-        if (snapshotCookieReads > 1) throw new Error('browser hostile cookie clear snapshot');
-        return '';
+        snapshotCookieReads += 1
+        if (snapshotCookieReads > 1) throw new Error('browser hostile cookie clear snapshot')
+        return ''
       },
       set cookie(_value: string) {}
     }
-  });
-  let snapshotClearCode: string | undefined;
-  let snapshotClearOperation: string | undefined;
+  })
+  let snapshotClearCode: string | undefined
+  let snapshotClearOperation: string | undefined
   try {
-    await snapshotFailureStore.clearAll();
+    await snapshotFailureStore.clearAll()
   } catch (error) {
-    const typed = error as { code?: string; operation?: string };
-    snapshotClearCode = typed.code;
-    snapshotClearOperation = typed.operation;
+    const typed = error as { code?: string; operation?: string }
+    snapshotClearCode = typed.code
+    snapshotClearOperation = typed.operation
   }
-  const reentrantController = new AbortController();
-  let reentrantArmed = false;
+  const reentrantController = new AbortController()
+  let reentrantArmed = false
   const reentrantStore = cookies({
     namespace: `reentrant-cookie-${Math.random().toString(36).slice(2)}`,
     document: {
       get cookie(): string {
-        return document.cookie;
+        return document.cookie
       },
       set cookie(value: string) {
-        document.cookie = value;
+        document.cookie = value
         if (reentrantArmed && value.toLowerCase().includes('expires=thu, 01 jan 1970'))
-          reentrantController.abort(new Error('browser reentrant cookie abort'));
+          reentrantController.abort(new Error('browser reentrant cookie abort'))
       }
     }
-  });
-  await reentrantStore.set('first', 'one');
-  await reentrantStore.set('second', 'two');
-  reentrantArmed = true;
-  let reentrantAbortCode: string | undefined;
-  let reentrantAbortOperation: string | undefined;
-  let reentrantAbortKey: unknown;
+  })
+  await reentrantStore.set('first', 'one')
+  await reentrantStore.set('second', 'two')
+  reentrantArmed = true
+  let reentrantAbortCode: string | undefined
+  let reentrantAbortOperation: string | undefined
+  let reentrantAbortKey: unknown
   try {
-    await reentrantStore.clearAll({ signal: reentrantController.signal });
+    await reentrantStore.clearAll({ signal: reentrantController.signal })
   } catch (error) {
-    const typed = error as { code?: string; operation?: string; key?: unknown };
-    reentrantAbortCode = typed.code;
-    reentrantAbortOperation = typed.operation;
-    reentrantAbortKey = typed.key;
+    const typed = error as { code?: string; operation?: string; key?: unknown }
+    reentrantAbortCode = typed.code
+    reentrantAbortOperation = typed.operation
+    reentrantAbortKey = typed.key
   }
-  const reentrantRemainingKeys = await reentrantStore.keys();
+  const reentrantRemainingKeys = await reentrantStore.keys()
   const reentrantAbortKeyMatchesRemaining =
-    reentrantRemainingKeys.length === 1 && reentrantRemainingKeys[0] === reentrantAbortKey;
-  let syncRemoveOverrideReads = 0;
+    reentrantRemainingKeys.length === 1 && reentrantRemainingKeys[0] === reentrantAbortKey
+  let syncRemoveOverrideReads = 0
   const syncRemoveStore = cookies({
     namespace: `sync-remove-${Math.random().toString(36).slice(2)}`,
     scope: { path: '/' }
-  });
-  await syncRemoveStore.set('key', 'value');
-  (syncRemoveStore.sync!.remove as (key: string, context: unknown) => void)('key', {
+  })
+  await syncRemoveStore.set('key', 'value')
+  ;(syncRemoveStore.sync!.remove as (key: string, context: unknown) => void)('key', {
     get path(): never {
-      syncRemoveOverrideReads += 1;
-      throw new Error('browser sync remove read runtime scope');
+      syncRemoveOverrideReads += 1
+      throw new Error('browser sync remove read runtime scope')
     }
-  });
+  })
   if ((await syncRemoveStore.get('key')) !== null)
-    throw new Error('sync remove did not use fixed scope');
-  let writeContextReads = 0;
+    throw new Error('sync remove did not use fixed scope')
+  let writeContextReads = 0
   const writeContextStore = cookies({
     namespace: `write-context-${Math.random().toString(36).slice(2)}`
-  });
+  })
   await writeContextStore.set('key', 'value', {
     get signal() {
-      writeContextReads += 1;
-      return undefined;
+      writeContextReads += 1
+      return undefined
     },
     get timeoutMs() {
-      writeContextReads += 1;
-      return undefined;
+      writeContextReads += 1
+      return undefined
     },
     get expires() {
-      writeContextReads += 1;
-      return undefined;
+      writeContextReads += 1
+      return undefined
     },
     get maxAge() {
-      writeContextReads += 1;
-      return undefined;
+      writeContextReads += 1
+      return undefined
     }
-  });
-  let writeContextReturnedPromise = false;
-  let writeContextGetterCode: string | undefined;
+  })
+  let writeContextReturnedPromise = false
+  let writeContextGetterCode: string | undefined
   try {
     const operation = writeContextStore.set('hostile', 'value', {
       get expires(): never {
-        throw new Error('browser hostile expires getter');
+        throw new Error('browser hostile expires getter')
       }
-    });
-    writeContextReturnedPromise = operation instanceof Promise;
-    await operation;
+    })
+    writeContextReturnedPromise = operation instanceof Promise
+    await operation
   } catch (error) {
-    writeContextGetterCode = (error as { code?: string }).code;
+    writeContextGetterCode = (error as { code?: string }).code
   }
-  let writeLifecycleMetadata = false;
+  let writeLifecycleMetadata = false
   try {
     await writeContextStore.set('lifecycle-hostile', 'value', {
       get signal(): never {
-        throw new Error('browser hostile signal getter');
+        throw new Error('browser hostile signal getter')
       }
-    });
+    })
   } catch (error) {
     const storageError = error as {
-      code?: string;
-      backend?: string;
-      operation?: string;
-      key?: string;
-      cause?: unknown;
-    };
+      code?: string
+      backend?: string
+      operation?: string
+      key?: string
+      cause?: unknown
+    }
     writeLifecycleMetadata =
       storageError.code === 'INVALID_ARGUMENT' &&
       storageError.cause instanceof Error &&
-      storageError.cause.message === 'browser hostile signal getter';
+      storageError.cause.message === 'browser hostile signal getter'
   }
-  let removeLifecycleMetadata = false;
+  let removeLifecycleMetadata = false
   try {
     await writeContextStore.remove('remove-hostile', {
       get timeoutMs(): never {
-        throw new Error('browser hostile remove timeout getter');
+        throw new Error('browser hostile remove timeout getter')
       }
-    });
+    })
   } catch (error) {
     const storageError = error as {
-      code?: string;
-      backend?: string;
-      operation?: string;
-      key?: string;
-      cause?: unknown;
-    };
+      code?: string
+      backend?: string
+      operation?: string
+      key?: string
+      cause?: unknown
+    }
     removeLifecycleMetadata =
       storageError.code === 'INVALID_ARGUMENT' &&
       storageError.cause instanceof Error &&
-      storageError.cause.message === 'browser hostile remove timeout getter';
+      storageError.cause.message === 'browser hostile remove timeout getter'
   }
-  await writeContextStore.clearValues();
+  await writeContextStore.clearValues()
   return {
     scopeCode,
     codecCode,
@@ -1126,268 +1185,268 @@ window.runCookieScopeGuardScenario = async () => {
     writeContextGetterCode,
     writeLifecycleMetadata,
     removeLifecycleMetadata
-  };
-};
+  }
+}
 
 /**
  * Onblocked 场景：连接 A 先打开并保持存活；随后用一个只声明了 kv store 的旧版 db（version 1）状态，让 storage-web 的自动版本升级路径尝试
  * open(dbName, 2) 时被 A 阻塞。A 关闭后，被阻塞的 open 请求应该继续完成。
  */
 window.runIndexedDbBlockedScenario = async () => {
-  const dbName = `blocked-${Math.random().toString(36).slice(2)}`;
-  const factory = window.indexedDB;
+  const dbName = `blocked-${Math.random().toString(36).slice(2)}`
+  const factory = window.indexedDB
 
   // 手工创建只有 kv store 的旧版数据库（模拟旧版本 schema）。
   const legacyDb = await new Promise<IDBDatabase>((resolve, reject) => {
-    const request = factory.open(dbName, 1);
-    request.onupgradeneeded = () => request.result.createObjectStore('kv');
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+    const request = factory.open(dbName, 1)
+    request.onupgradeneeded = () => request.result.createObjectStore('kv')
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
 
-  let blockedErrorCode: string | undefined;
-  const store = indexedDb({ factory, dbName });
+  let blockedErrorCode: string | undefined
+  const store = indexedDb({ factory, dbName })
   const openAttempt = store.get('k').catch((error: { code?: string }) => {
-    blockedErrorCode = error.code;
-  });
+    blockedErrorCode = error.code
+  })
 
   // 给被阻塞的 open 一点时间真正进入 blocked 状态，再关闭旧连接放行。
-  await new Promise((resolve) => setTimeout(resolve, 200));
-  legacyDb.close();
-  await openAttempt;
+  await new Promise((resolve) => setTimeout(resolve, 200))
+  legacyDb.close()
+  await openAttempt
 
   // 旧连接关闭后，失败的 open 请求本身仍以 BACKEND_UNAVAILABLE 结束；
   // 但实现会清空 connection cache，因此同一 store 实例的后续操作可以重新 open。
-  let sameStoreRetrySucceeded = false;
+  let sameStoreRetrySucceeded = false
   try {
-    await store.set('k', 'same-store-retry');
-    sameStoreRetrySucceeded = (await store.get('k')) === 'same-store-retry';
+    await store.set('k', 'same-store-retry')
+    sameStoreRetrySucceeded = (await store.get('k')) === 'same-store-retry'
   } catch {
-    sameStoreRetrySucceeded = false;
+    sameStoreRetrySucceeded = false
   }
-  const retryStore = indexedDb({ factory, dbName });
-  await retryStore.set('k', 'v');
-  const secondOpenSucceededAfterClose = (await retryStore.get('k')) === 'v';
+  const retryStore = indexedDb({ factory, dbName })
+  await retryStore.set('k', 'v')
+  const secondOpenSucceededAfterClose = (await retryStore.get('k')) === 'v'
 
-  const hostileDbName = `${dbName}-hostile-close`;
-  const hostileStore = indexedDb({ factory, dbName: hostileDbName });
-  await hostileStore.set('before', 'value');
+  const hostileDbName = `${dbName}-hostile-close`
+  const hostileStore = indexedDb({ factory, dbName: hostileDbName })
+  await hostileStore.set('before', 'value')
   const currentDatabase = await new Promise<IDBDatabase>((resolve, reject) => {
-    const request = factory.open(hostileDbName);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-  const hostileNextVersion = currentDatabase.version + 1;
-  currentDatabase.close();
-  const originalClose = IDBDatabase.prototype.close;
-  let reportCloseAttempt!: (database: IDBDatabase) => void;
+    const request = factory.open(hostileDbName)
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+  const hostileNextVersion = currentDatabase.version + 1
+  currentDatabase.close()
+  const originalClose = IDBDatabase.prototype.close
+  let reportCloseAttempt!: (database: IDBDatabase) => void
   const closeAttempted = new Promise<IDBDatabase>((resolve) => {
-    reportCloseAttempt = resolve;
-  });
+    reportCloseAttempt = resolve
+  })
   IDBDatabase.prototype.close = function (this: IDBDatabase): void {
-    reportCloseAttempt(this);
-    throw new Error('browser hostile versionchange close');
-  };
+    reportCloseAttempt(this)
+    throw new Error('browser hostile versionchange close')
+  }
   const hostileUpgrade = new Promise<IDBDatabase>((resolve, reject) => {
-    const request = factory.open(hostileDbName, hostileNextVersion);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-  let hostileCloseRetrySucceeded = false;
+    const request = factory.open(hostileDbName, hostileNextVersion)
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+  let hostileCloseRetrySucceeded = false
   try {
-    const staleDatabase = await closeAttempted;
-    IDBDatabase.prototype.close = originalClose;
-    staleDatabase.close();
-    const upgraded = await hostileUpgrade;
-    upgraded.close();
-    await hostileStore.set('after', 'reopened');
-    hostileCloseRetrySucceeded = (await hostileStore.get('after')) === 'reopened';
+    const staleDatabase = await closeAttempted
+    IDBDatabase.prototype.close = originalClose
+    staleDatabase.close()
+    const upgraded = await hostileUpgrade
+    upgraded.close()
+    await hostileStore.set('after', 'reopened')
+    hostileCloseRetrySucceeded = (await hostileStore.get('after')) === 'reopened'
   } finally {
-    IDBDatabase.prototype.close = originalClose;
-    await hostileStore.dispose();
-    factory.deleteDatabase(hostileDbName);
+    IDBDatabase.prototype.close = originalClose
+    await hostileStore.dispose()
+    factory.deleteDatabase(hostileDbName)
   }
 
-  const transitionDbName = `${dbName}-transition-close`;
+  const transitionDbName = `${dbName}-transition-close`
   const transitionLegacy = await new Promise<IDBDatabase>((resolve, reject) => {
-    const request = factory.open(transitionDbName, 1);
-    request.onupgradeneeded = () => request.result.createObjectStore('kv');
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+    const request = factory.open(transitionDbName, 1)
+    request.onupgradeneeded = () => request.result.createObjectStore('kv')
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
   await new Promise<void>((resolve, reject) => {
-    const transaction = transitionLegacy.transaction('kv', 'readwrite');
-    transaction.objectStore('kv').put('legacy-value', 'legacy-key');
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-  });
-  transitionLegacy.close();
-  const transitionStore = indexedDb({ factory, dbName: transitionDbName });
-  let transitionCloseCode: string | undefined;
-  let transitionCloseRetrySucceeded = false;
+    const transaction = transitionLegacy.transaction('kv', 'readwrite')
+    transaction.objectStore('kv').put('legacy-value', 'legacy-key')
+    transaction.oncomplete = () => resolve()
+    transaction.onerror = () => reject(transaction.error)
+  })
+  transitionLegacy.close()
+  const transitionStore = indexedDb({ factory, dbName: transitionDbName })
+  let transitionCloseCode: string | undefined
+  let transitionCloseRetrySucceeded = false
   IDBDatabase.prototype.close = () => {
-    throw new Error('browser hostile transition close');
-  };
-  try {
-    await transitionStore.get('legacy-key');
-  } catch (error) {
-    transitionCloseCode = (error as { code?: string }).code;
-  } finally {
-    IDBDatabase.prototype.close = originalClose;
+    throw new Error('browser hostile transition close')
   }
   try {
-    transitionCloseRetrySucceeded = (await transitionStore.get('legacy-key')) === 'legacy-value';
+    await transitionStore.get('legacy-key')
+  } catch (error) {
+    transitionCloseCode = (error as { code?: string }).code
   } finally {
-    await transitionStore.dispose();
-    factory.deleteDatabase(transitionDbName);
+    IDBDatabase.prototype.close = originalClose
+  }
+  try {
+    transitionCloseRetrySucceeded = (await transitionStore.get('legacy-key')) === 'legacy-value'
+  } finally {
+    await transitionStore.dispose()
+    factory.deleteDatabase(transitionDbName)
   }
 
   /** Attack one schema getter without modifying the browser's native IndexedDB prototype. */
   const runHostileSchemaInspection = async (
     property: 'objectStoreNames' | 'version'
   ): Promise<{ code: string | undefined; recovered: boolean }> => {
-    const schemaDbName = `${dbName}-schema-${property}`;
+    const schemaDbName = `${dbName}-schema-${property}`
     const emptyDatabase = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = factory.open(schemaDbName, 1);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    emptyDatabase.close();
-    let intercepted = false;
+      const request = factory.open(schemaDbName, 1)
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    emptyDatabase.close()
+    let intercepted = false
     const hostileFactory = {
       open: (name: string, version?: number) => {
         const nativeRequest =
-          version === undefined ? factory.open(name) : factory.open(name, version);
-        if (intercepted) return nativeRequest;
-        intercepted = true;
+          version === undefined ? factory.open(name) : factory.open(name, version)
+        if (intercepted) return nativeRequest
+        intercepted = true
         return {
           get result(): IDBDatabase {
-            const database = nativeRequest.result;
+            const database = nativeRequest.result
             return new Proxy(database, {
               get: (target, key) => {
-                if (key === property) throw new Error(`browser hostile database ${property}`);
-                if (key === 'close') return () => target.close();
-                return Reflect.get(target, key, target);
+                if (key === property) throw new Error(`browser hostile database ${property}`)
+                if (key === 'close') return () => target.close()
+                return Reflect.get(target, key, target)
               }
-            });
+            })
           },
           get transaction(): IDBTransaction | null {
-            return nativeRequest.transaction;
+            return nativeRequest.transaction
           },
           get error(): DOMException | null {
-            return nativeRequest.error;
+            return nativeRequest.error
           },
           set onupgradeneeded(handler: (() => void) | null) {
-            nativeRequest.onupgradeneeded = () => handler?.();
+            nativeRequest.onupgradeneeded = () => handler?.()
           },
           set onblocked(handler: (() => void) | null) {
-            nativeRequest.onblocked = () => handler?.();
+            nativeRequest.onblocked = () => handler?.()
           },
           set onerror(handler: (() => void) | null) {
-            nativeRequest.onerror = () => handler?.();
+            nativeRequest.onerror = () => handler?.()
           },
           set onsuccess(handler: (() => void) | null) {
-            nativeRequest.onsuccess = () => handler?.();
+            nativeRequest.onsuccess = () => handler?.()
           }
-        } as unknown as IDBOpenDBRequest;
+        } as unknown as IDBOpenDBRequest
       }
-    } as unknown as IDBFactory;
-    const schemaStore = indexedDb({ factory: hostileFactory, dbName: schemaDbName });
-    let code: string | undefined;
+    } as unknown as IDBFactory
+    const schemaStore = indexedDb({ factory: hostileFactory, dbName: schemaDbName })
+    let code: string | undefined
     try {
-      await schemaStore.get('key');
+      await schemaStore.get('key')
     } catch (error) {
-      code = (error as { code?: string }).code;
+      code = (error as { code?: string }).code
     }
-    let recovered = false;
+    let recovered = false
     try {
-      await schemaStore.set('key', 'recovered');
-      recovered = (await schemaStore.get('key')) === 'recovered';
+      await schemaStore.set('key', 'recovered')
+      recovered = (await schemaStore.get('key')) === 'recovered'
     } finally {
-      await schemaStore.dispose();
-      factory.deleteDatabase(schemaDbName);
+      await schemaStore.dispose()
+      factory.deleteDatabase(schemaDbName)
     }
-    return { code, recovered };
-  };
-  const schemaObjectStores = await runHostileSchemaInspection('objectStoreNames');
-  const schemaVersion = await runHostileSchemaInspection('version');
-  const schemaInspectionCodes = [schemaObjectStores.code, schemaVersion.code];
-  const schemaInspectionRecovered = schemaObjectStores.recovered && schemaVersion.recovered;
+    return { code, recovered }
+  }
+  const schemaObjectStores = await runHostileSchemaInspection('objectStoreNames')
+  const schemaVersion = await runHostileSchemaInspection('version')
+  const schemaInspectionCodes = [schemaObjectStores.code, schemaVersion.code]
+  const schemaInspectionRecovered = schemaObjectStores.recovered && schemaVersion.recovered
 
   /** Attack connection handler installation while preserving the native database internals. */
   const runHostileConnectionSetter = async (
     property: 'onversionchange' | 'onclose'
   ): Promise<{ code: string | undefined; recovered: boolean }> => {
-    const connectionDbName = `${dbName}-connection-${property}`;
-    const seedStore = indexedDb({ factory, dbName: connectionDbName });
-    await seedStore.set('seed', 'value');
-    await seedStore.dispose();
-    let intercepted = false;
+    const connectionDbName = `${dbName}-connection-${property}`
+    const seedStore = indexedDb({ factory, dbName: connectionDbName })
+    await seedStore.set('seed', 'value')
+    await seedStore.dispose()
+    let intercepted = false
     const hostileFactory = {
       open: (name: string, version?: number) => {
         const nativeRequest =
-          version === undefined ? factory.open(name) : factory.open(name, version);
-        if (intercepted) return nativeRequest;
-        intercepted = true;
+          version === undefined ? factory.open(name) : factory.open(name, version)
+        if (intercepted) return nativeRequest
+        intercepted = true
         return {
           get result(): IDBDatabase {
-            const database = nativeRequest.result;
+            const database = nativeRequest.result
             return new Proxy(database, {
               get: (target, key) => {
-                if (key === 'close') return () => target.close();
-                return Reflect.get(target, key, target);
+                if (key === 'close') return () => target.close()
+                return Reflect.get(target, key, target)
               },
               set: (target, key, value) => {
-                if (key === property) throw new Error(`browser hostile connection ${property}`);
-                return Reflect.set(target, key, value, target);
+                if (key === property) throw new Error(`browser hostile connection ${property}`)
+                return Reflect.set(target, key, value, target)
               }
-            });
+            })
           },
           get transaction(): IDBTransaction | null {
-            return nativeRequest.transaction;
+            return nativeRequest.transaction
           },
           get error(): DOMException | null {
-            return nativeRequest.error;
+            return nativeRequest.error
           },
           set onupgradeneeded(handler: (() => void) | null) {
-            nativeRequest.onupgradeneeded = () => handler?.();
+            nativeRequest.onupgradeneeded = () => handler?.()
           },
           set onblocked(handler: (() => void) | null) {
-            nativeRequest.onblocked = () => handler?.();
+            nativeRequest.onblocked = () => handler?.()
           },
           set onerror(handler: (() => void) | null) {
-            nativeRequest.onerror = () => handler?.();
+            nativeRequest.onerror = () => handler?.()
           },
           set onsuccess(handler: (() => void) | null) {
-            nativeRequest.onsuccess = () => handler?.();
+            nativeRequest.onsuccess = () => handler?.()
           }
-        } as unknown as IDBOpenDBRequest;
+        } as unknown as IDBOpenDBRequest
       }
-    } as unknown as IDBFactory;
-    const connectionStore = indexedDb({ factory: hostileFactory, dbName: connectionDbName });
-    let code: string | undefined;
+    } as unknown as IDBFactory
+    const connectionStore = indexedDb({ factory: hostileFactory, dbName: connectionDbName })
+    let code: string | undefined
     try {
-      await connectionStore.get('seed');
+      await connectionStore.get('seed')
     } catch (error) {
-      code = (error as { code?: string }).code;
+      code = (error as { code?: string }).code
     }
-    let recovered = false;
+    let recovered = false
     try {
-      recovered = (await connectionStore.get('seed')) === 'value';
+      recovered = (await connectionStore.get('seed')) === 'value'
     } finally {
-      await connectionStore.dispose();
-      factory.deleteDatabase(connectionDbName);
+      await connectionStore.dispose()
+      factory.deleteDatabase(connectionDbName)
     }
-    return { code, recovered };
-  };
-  const versionChangeSetter = await runHostileConnectionSetter('onversionchange');
-  const closeSetter = await runHostileConnectionSetter('onclose');
-  const connectionSetterCodes = [versionChangeSetter.code, closeSetter.code];
-  const connectionSetterRecovered = versionChangeSetter.recovered && closeSetter.recovered;
+    return { code, recovered }
+  }
+  const versionChangeSetter = await runHostileConnectionSetter('onversionchange')
+  const closeSetter = await runHostileConnectionSetter('onclose')
+  const connectionSetterCodes = [versionChangeSetter.code, closeSetter.code]
+  const connectionSetterRecovered = versionChangeSetter.recovered && closeSetter.recovered
 
-  await store.dispose();
-  await retryStore.dispose();
-  factory.deleteDatabase(dbName);
+  await store.dispose()
+  await retryStore.dispose()
+  factory.deleteDatabase(dbName)
 
   return {
     blockedErrorCode,
@@ -1400,195 +1459,195 @@ window.runIndexedDbBlockedScenario = async () => {
     schemaInspectionRecovered,
     connectionSetterCodes,
     connectionSetterRecovered
-  };
-};
+  }
+}
 
 window.runIndexedDbTransactionConflictScenario = async () => {
-  const dbName = `conflict-${Math.random().toString(36).slice(2)}`;
-  const first = indexedDb({ dbName });
-  const second = indexedDb({ dbName });
-  await first.putRecord({ value: 0 }, 'revision-key');
-  let code: string | undefined;
+  const dbName = `conflict-${Math.random().toString(36).slice(2)}`
+  const first = indexedDb({ dbName })
+  const second = indexedDb({ dbName })
+  await first.putRecord({ value: 0 }, 'revision-key')
+  let code: string | undefined
   try {
     await first.transaction(async (tx) => {
-      await tx.get('revision-key');
-      await second.putRecord({ value: 2 }, 'revision-key', { conflictPolicy: 'replace' });
-      await tx.put({ value: 1 }, 'revision-key');
-    });
+      await tx.get('revision-key')
+      await second.putRecord({ value: 2 }, 'revision-key', { conflictPolicy: 'replace' })
+      await tx.put({ value: 1 }, 'revision-key')
+    })
   } catch (error) {
-    code = (error as { code?: string }).code;
+    code = (error as { code?: string }).code
   }
-  const value = await second.getRecord('revision-key');
-  await first.dispose();
-  await second.dispose();
-  return { code, value };
-};
+  const value = await second.getRecord('revision-key')
+  await first.dispose()
+  await second.dispose()
+  return { code, value }
+}
 
 /** 真实浏览器验证 transaction scope 在 callback 结束后不会静默读写。 */
 window.runIndexedDbEscapedTransactionScopeScenario = async () => {
-  const dbName = `escaped-scope-${Math.random().toString(36).slice(2)}`;
-  const store = indexedDb({ dbName });
+  const dbName = `escaped-scope-${Math.random().toString(36).slice(2)}`
+  const store = indexedDb({ dbName })
   let escaped:
     | {
-        get(key: string): Promise<unknown>;
-        put(value: unknown, key: string): Promise<unknown>;
-        delete(key: string): Promise<void>;
+        get(key: string): Promise<unknown>
+        put(value: unknown, key: string): Promise<unknown>
+        delete(key: string): Promise<void>
       }
-    | undefined;
+    | undefined
   await store.transaction(async (tx) => {
-    escaped = tx;
-    await tx.put({ inside: true }, 'inside');
-  });
+    escaped = tx
+    await tx.put({ inside: true }, 'inside')
+  })
 
   const codeOf = async (run: () => Promise<unknown>): Promise<string | undefined> => {
     try {
-      await run();
-      return undefined;
+      await run()
+      return undefined
     } catch (error) {
-      return (error as { code?: string }).code;
+      return (error as { code?: string }).code
     }
-  };
-  const getCode = await codeOf(() => escaped!.get('inside'));
-  const putCode = await codeOf(() => escaped!.put({ outside: true }, 'outside'));
-  const deleteCode = await codeOf(() => escaped!.delete('inside'));
-  const outsideValue = await store.getRecord('outside');
-  await store.dispose();
-  window.indexedDB.deleteDatabase(dbName);
-  return { getCode, putCode, deleteCode, outsideValue };
-};
+  }
+  const getCode = await codeOf(() => escaped!.get('inside'))
+  const putCode = await codeOf(() => escaped!.put({ outside: true }, 'outside'))
+  const deleteCode = await codeOf(() => escaped!.delete('inside'))
+  const outsideValue = await store.getRecord('outside')
+  await store.dispose()
+  window.indexedDB.deleteDatabase(dbName)
+  return { getCode, putCode, deleteCode, outsideValue }
+}
 
 /** 真实浏览器验证 destructive clear 在取消后不提交部分清理。 */
 window.runIndexedDbClearAbortScenario = async () => {
-  const dbName = `clear-abort-${Math.random().toString(36).slice(2)}`;
-  const store = indexedDb({ dbName });
-  await store.set('all-value', 'keep');
-  await store.putRecord({ keep: true }, 'all-record');
+  const dbName = `clear-abort-${Math.random().toString(36).slice(2)}`
+  const store = indexedDb({ dbName })
+  await store.set('all-value', 'keep')
+  await store.putRecord({ keep: true }, 'all-record')
 
-  const recordsController = new AbortController();
-  recordsController.abort('cancel records clear');
-  let recordsCode: string | undefined;
+  const recordsController = new AbortController()
+  recordsController.abort('cancel records clear')
+  let recordsCode: string | undefined
   try {
-    await store.clearRecords({ signal: recordsController.signal });
+    await store.clearRecords({ signal: recordsController.signal })
   } catch (error) {
-    recordsCode = (error as { code?: string }).code;
+    recordsCode = (error as { code?: string }).code
   }
-  const recordsValue = await store.getRecord('all-record');
+  const recordsValue = await store.getRecord('all-record')
 
-  const allController = new AbortController();
-  allController.abort('cancel all clear');
-  let allCode: string | undefined;
+  const allController = new AbortController()
+  allController.abort('cancel all clear')
+  let allCode: string | undefined
   try {
-    await store.clearAll({ signal: allController.signal });
+    await store.clearAll({ signal: allController.signal })
   } catch (error) {
-    allCode = (error as { code?: string }).code;
+    allCode = (error as { code?: string }).code
   }
-  const allValue = await store.get('all-value');
-  const allRecord = await store.getRecord('all-record');
-  await store.dispose();
-  window.indexedDB.deleteDatabase(dbName);
-  return { recordsCode, recordsValue, allCode, allValue, allRecord };
-};
+  const allValue = await store.get('all-value')
+  const allRecord = await store.getRecord('all-record')
+  await store.dispose()
+  window.indexedDB.deleteDatabase(dbName)
+  return { recordsCode, recordsValue, allCode, allValue, allRecord }
+}
 
 /** 真实浏览器验证 deleteRecord 在 revision request 期间取消不会落盘删除。 */
 window.runIndexedDbDeleteAbortScenario = async () => {
-  const dbName = `delete-abort-${Math.random().toString(36).slice(2)}`;
-  const store = indexedDb({ dbName });
-  await store.putRecord({ keep: true }, 'delete-me');
-  const controller = new AbortController();
-  const pending = store.deleteRecord('delete-me', { signal: controller.signal });
-  await Promise.resolve();
-  controller.abort('cancel delete');
-  let code: string | undefined;
+  const dbName = `delete-abort-${Math.random().toString(36).slice(2)}`
+  const store = indexedDb({ dbName })
+  await store.putRecord({ keep: true }, 'delete-me')
+  const controller = new AbortController()
+  const pending = store.deleteRecord('delete-me', { signal: controller.signal })
+  await Promise.resolve()
+  controller.abort('cancel delete')
+  let code: string | undefined
   try {
-    await pending;
+    await pending
   } catch (error) {
-    code = (error as { code?: string }).code;
+    code = (error as { code?: string }).code
   }
-  const value = await store.getRecord('delete-me');
-  await store.dispose();
-  window.indexedDB.deleteDatabase(dbName);
-  return { code, value };
-};
+  const value = await store.getRecord('delete-me')
+  await store.dispose()
+  window.indexedDB.deleteDatabase(dbName)
+  return { code, value }
+}
 
 /** 真实浏览器验证 putRecord 的 request 失败/取消不会提交部分写入。 */
 window.runIndexedDbPutAbortScenario = async () => {
-  const dbName = `put-abort-${Math.random().toString(36).slice(2)}`;
-  const store = indexedDb({ dbName });
-  await store.putRecord({ warm: true }, 'warm');
-  const controller = new AbortController();
+  const dbName = `put-abort-${Math.random().toString(36).slice(2)}`
+  const store = indexedDb({ dbName })
+  await store.putRecord({ warm: true }, 'warm')
+  const controller = new AbortController()
   const pending = store.putRecord({ keep: true }, 'put-me', {
     signal: controller.signal
-  });
-  await Promise.resolve();
-  controller.abort('cancel put');
-  let code: string | undefined;
+  })
+  await Promise.resolve()
+  controller.abort('cancel put')
+  let code: string | undefined
   try {
-    await pending;
+    await pending
   } catch (error) {
-    code = (error as { code?: string }).code;
+    code = (error as { code?: string }).code
   }
-  const value = await store.getRecord('put-me');
-  await store.dispose();
-  window.indexedDB.deleteDatabase(dbName);
-  return { code, value };
-};
+  const value = await store.getRecord('put-me')
+  await store.dispose()
+  window.indexedDB.deleteDatabase(dbName)
+  return { code, value }
+}
 
 /** 真实浏览器验证 entity migrate 的分批 transaction 与 legacy 清理语义。 */
 window.runIndexedDbEntityMigrationScenario = async () => {
-  const dbName = `entity-migrate-${Math.random().toString(36).slice(2)}`;
-  const store = indexedDb({ dbName });
+  const dbName = `entity-migrate-${Math.random().toString(36).slice(2)}`
+  const store = indexedDb({ dbName })
   const entity = defineEntity<{ id: string; displayName: string }>({
     name: 'browser-migrate',
     key: 'id',
     version: 2,
     migrations: {
       2: async (value: unknown) => {
-        const input = value as { id: string; name: string };
-        return { id: input.id, displayName: input.name };
+        const input = value as { id: string; name: string }
+        return { id: input.id, displayName: input.name }
       }
     }
-  });
-  await store.putRecord({ __v: 1, data: { id: 'a', name: 'Ada' } }, ['browser-migrate', 'a']);
-  const result = await entity.connect(store).migrate({ batchSize: 1 });
-  const value = await entity.connect(store).get('a');
-  const legacyValue = await store.getRecord(['browser-migrate', 'a']);
-  let invalidBatchCode: string | undefined;
+  })
+  await store.putRecord({ __v: 1, data: { id: 'a', name: 'Ada' } }, ['browser-migrate', 'a'])
+  const result = await entity.connect(store).migrate({ batchSize: 1 })
+  const value = await entity.connect(store).get('a')
+  const legacyValue = await store.getRecord(['browser-migrate', 'a'])
+  let invalidBatchCode: string | undefined
   try {
-    await entity.connect(store).migrate({ batchSize: null as never });
+    await entity.connect(store).migrate({ batchSize: null as never })
   } catch (error) {
-    invalidBatchCode = (error as { code?: string }).code;
+    invalidBatchCode = (error as { code?: string }).code
   }
-  const invalidOptionsCodes: Array<string | undefined> = [];
+  const invalidOptionsCodes: Array<string | undefined> = []
   for (const options of [null, [], 'options', 1]) {
     try {
-      await entity.connect(store).migrate(options as never);
+      await entity.connect(store).migrate(options as never)
     } catch (error) {
-      invalidOptionsCodes.push((error as { code?: string }).code);
+      invalidOptionsCodes.push((error as { code?: string }).code)
     }
   }
   try {
-    await entity.connect(store).migrate({ batchSize: Number.MAX_SAFE_INTEGER + 1 });
+    await entity.connect(store).migrate({ batchSize: Number.MAX_SAFE_INTEGER + 1 })
   } catch (error) {
-    invalidOptionsCodes.push((error as { code?: string }).code);
+    invalidOptionsCodes.push((error as { code?: string }).code)
   }
-  const invalidBatchCallbackCodes: Array<string | undefined> = [];
+  const invalidBatchCallbackCodes: Array<string | undefined> = []
   for (const callback of [null, undefined, {}, 'run']) {
     try {
-      await entity.connect(store).batch(callback as never);
+      await entity.connect(store).batch(callback as never)
     } catch (error) {
-      invalidBatchCallbackCodes.push((error as { code?: string }).code);
+      invalidBatchCallbackCodes.push((error as { code?: string }).code)
     }
   }
-  let migrationOptionReads = 0;
+  let migrationOptionReads = 0
   await entity.connect(store).migrate({
     get batchSize() {
-      migrationOptionReads += 1;
-      if (migrationOptionReads > 1) throw new Error('batchSize read twice');
-      return 1;
+      migrationOptionReads += 1
+      if (migrationOptionReads > 1) throw new Error('batchSize read twice')
+      return 1
     }
-  });
-  await store.dispose();
-  window.indexedDB.deleteDatabase(dbName);
+  })
+  await store.dispose()
+  window.indexedDB.deleteDatabase(dbName)
   return {
     result,
     value,
@@ -1597,23 +1656,23 @@ window.runIndexedDbEntityMigrationScenario = async () => {
     invalidOptionsCodes,
     invalidBatchCallbackCodes,
     migrationOptionReads
-  };
-};
+  }
+}
 
 /** 真实浏览器验证两个连接并发执行 entity migrate 后不会留下重复 legacy 数据。 */
 window.runIndexedDbConcurrentEntityMigrationScenario = async () => {
-  const dbName = `entity-migrate-concurrent-${Math.random().toString(36).slice(2)}`;
-  const seed = indexedDb({ dbName });
+  const dbName = `entity-migrate-concurrent-${Math.random().toString(36).slice(2)}`
+  const seed = indexedDb({ dbName })
   await seed.putRecord({ __v: 1, data: { id: 'a', name: 'Ada' } }, [
     'browser-concurrent-migrate',
     'a'
-  ]);
+  ])
   await seed.putRecord({ __v: 1, data: { id: 'b', name: 'Bob' } }, [
     'browser-concurrent-migrate',
     'b'
-  ]);
-  const first = indexedDb({ dbName });
-  const second = indexedDb({ dbName });
+  ])
+  const first = indexedDb({ dbName })
+  const second = indexedDb({ dbName })
   const createEntity = () =>
     defineEntity<{ id: string; displayName: string }>({
       name: 'browser-concurrent-migrate',
@@ -1621,255 +1680,536 @@ window.runIndexedDbConcurrentEntityMigrationScenario = async () => {
       version: 2,
       migrations: {
         2: async (value: unknown) => {
-          const input = value as { id: string; name: string };
-          return { id: input.id, displayName: input.name };
+          const input = value as { id: string; name: string }
+          return { id: input.id, displayName: input.name }
         }
       }
-    });
+    })
   const [firstResult, secondResult] = await Promise.all([
     createEntity().connect(first).migrate({ batchSize: 1 }),
     createEntity().connect(second).migrate({ batchSize: 1 })
-  ]);
+  ])
   const values = await Promise.all([
     createEntity().connect(first).get('a'),
     createEntity().connect(first).get('b')
-  ]);
+  ])
   const legacyValues = await Promise.all([
     first.getRecord(['browser-concurrent-migrate', 'a']),
     first.getRecord(['browser-concurrent-migrate', 'b'])
-  ]);
-  await seed.dispose();
-  await first.dispose();
-  await second.dispose();
-  window.indexedDB.deleteDatabase(dbName);
-  return { results: [firstResult, secondResult], values, legacyValues };
-};
+  ])
+  await seed.dispose()
+  await first.dispose()
+  await second.dispose()
+  window.indexedDB.deleteDatabase(dbName)
+  return { results: [firstResult, secondResult], values, legacyValues }
+}
 
 /** 真实浏览器验证 iframe realm 的 Date/ArrayBuffer/复合 key 可被 IndexedDB 正确编码和读取。 */
 window.runIndexedDbCrossRealmKeyScenario = async () => {
-  const frame = document.createElement('iframe');
-  document.body.appendChild(frame);
-  const frameWindow = frame.contentWindow!;
+  const frame = document.createElement('iframe')
+  document.body.appendChild(frame)
+  const frameWindow = frame.contentWindow!
   const realm = frameWindow as unknown as {
-    Date: typeof Date;
-    ArrayBuffer: typeof ArrayBuffer;
-    Uint8Array: typeof Uint8Array;
-  };
-  const dbName = `cross-realm-key-${Math.random().toString(36).slice(2)}`;
-  const store = indexedDb({ dbName });
-  const dateKey = new realm.Date('2025-01-02T03:04:05.000Z');
-  const bytesKey = new realm.ArrayBuffer(3);
-  new realm.Uint8Array(bytesKey).set([7, 8, 9]);
-  const compoundKey = [dateKey, bytesKey] as const;
-  await store.putRecord({ kind: 'date' }, dateKey);
-  await store.putRecord({ kind: 'bytes' }, bytesKey);
-  await store.putRecord({ kind: 'compound' }, compoundKey);
-  const dateValue = await store.getRecord(dateKey);
-  const bytesValue = await store.getRecord(bytesKey);
-  const compoundValue = await store.getRecord(compoundKey);
-  await store.dispose();
-  window.indexedDB.deleteDatabase(dbName);
-  frame.remove();
-  return { dateValue, bytesValue, compoundValue };
-};
+    Date: typeof Date
+    ArrayBuffer: typeof ArrayBuffer
+    Uint8Array: typeof Uint8Array
+  }
+  const dbName = `cross-realm-key-${Math.random().toString(36).slice(2)}`
+  const store = indexedDb({ dbName })
+  const dateKey = new realm.Date('2025-01-02T03:04:05.000Z')
+  const bytesKey = new realm.ArrayBuffer(3)
+  new realm.Uint8Array(bytesKey).set([7, 8, 9])
+  const compoundKey = [dateKey, bytesKey] as const
+  await store.putRecord({ kind: 'date' }, dateKey)
+  await store.putRecord({ kind: 'bytes' }, bytesKey)
+  await store.putRecord({ kind: 'compound' }, compoundKey)
+  const dateValue = await store.getRecord(dateKey)
+  const bytesValue = await store.getRecord(bytesKey)
+  const compoundValue = await store.getRecord(compoundKey)
+  await store.dispose()
+  window.indexedDB.deleteDatabase(dbName)
+  frame.remove()
+  return { dateValue, bytesValue, compoundValue }
+}
+
+/** 真实浏览器验证 byte-brand guard 的 foreign realm、伪造对象、代理和 detached 行为。 */
+window.runByteBrandScenario = async () => {
+  const frame = document.createElement('iframe')
+  document.body.appendChild(frame)
+  const frameWindow = frame.contentWindow!
+  try {
+    const realm = frameWindow as unknown as {
+      ArrayBuffer: typeof ArrayBuffer
+      Uint8Array: typeof Uint8Array
+    }
+    const foreignBytes = new realm.Uint8Array([1]) as unknown
+    const foreignBuffer = new realm.ArrayBuffer(1) as unknown
+    class ByteSubclass extends Uint8Array {}
+    const forgedInt8 = new Int8Array(1)
+    Object.setPrototypeOf(forgedInt8, { constructor: { name: 'Uint8Array' } })
+    const hostileTag = Object.create(null)
+    Object.defineProperty(hostileTag, Symbol.toStringTag, {
+      get: () => {
+        throw new Error('tag getter must not run')
+      }
+    })
+    const proxyBytes = new Proxy(new Uint8Array(1), {
+      get: () => {
+        throw new Error('proxy getter must not run')
+      }
+    })
+    const forgedBuffer = Object.create({ constructor: { name: 'ArrayBuffer' } })
+    const detachedBytes = new Uint8Array(4)
+    const detachedBuffer = new ArrayBuffer(4)
+    structuredClone(detachedBytes, { transfer: [detachedBytes.buffer] })
+    structuredClone(detachedBuffer, { transfer: [detachedBuffer] })
+    return {
+      foreignUint8Accepted: isUint8Array(foreignBytes),
+      foreignArrayBufferAccepted: isArrayBuffer(foreignBuffer),
+      subclassAccepted: isUint8Array(new ByteSubclass(1)),
+      forgedInt8Rejected: !isUint8Array(forgedInt8),
+      clampedRejected: !isUint8Array(new Uint8ClampedArray(1)),
+      dataViewRejected: !isUint8Array(new DataView(new ArrayBuffer(1))),
+      sharedRejected:
+        typeof SharedArrayBuffer === 'undefined' || !isArrayBuffer(new SharedArrayBuffer(1)),
+      hostileTagRejected: !isUint8Array(hostileTag),
+      proxyRejected: !isUint8Array(proxyBytes),
+      forgedBufferRejected: !isArrayBuffer(forgedBuffer),
+      detachedUint8Branded: isUint8Array(detachedBytes),
+      detachedBufferBranded: isArrayBuffer(detachedBuffer)
+    }
+  } finally {
+    frame.remove()
+  }
+}
+
+/** 真实浏览器验证 SWV2-D27 对每个非 canonical key 域的原子 generation rotation。 */
+window.runIndexedDbRawIndexFirewallScenario = async () => {
+  const dbName = `raw-index-firewall-${Math.random().toString(36).slice(2)}`
+  const store = indexedDb({ dbName })
+  const capability = asIndexedDbBackfillStore(store)!
+  const definitions = [{ name: 'value', unique: false, multiEntry: false, revision: 1 }] as const
+  const rawKeys: ReadonlyArray<readonly [string, IStorageKey]> = [
+    ['string', 'raw-string'],
+    ['number', 42],
+    ['date', new Date('2024-01-01T00:00:00.000Z')],
+    ['binary', new Uint8Array([1, 2, 3]).buffer],
+    ['compound', ['legacy-scope', 'legacy-id']]
+  ]
+  const domains: Record<
+    string,
+    { rotated: boolean; pending: boolean; staleCode: string | undefined }
+  > = {}
+  for (const [label, rawKey] of rawKeys) {
+    const scope = `browser-raw-${label}`
+    await store.putRecord({ value: 1 }, composeRepositoryKey(scope, 'seed'))
+    const oldHandle = await capability.ensureRecordIndexes(scope, definitions)
+    const seedSession = await capability.openBackfillSession(oldHandle, {
+      range: repositoryEntityRange(scope),
+      allowComplete: true
+    })
+    const seedBatch = await seedSession.readBatch()
+    await seedSession.commitBatch({
+      generation: oldHandle.generation,
+      ownerToken: seedSession.ownerToken,
+      checkpoint: seedBatch.checkpoint,
+      nextCheckpoint: seedBatch.candidates.at(-1)!.key,
+      endOfScan: true,
+      projections: seedBatch.candidates.map((candidate) => ({
+        key: candidate.key,
+        expectedRevision: candidate.revision,
+        outcome: 'indexed' as const,
+        projection: {
+          value: { kind: 'single' as const, key: (candidate.raw as { value: number }).value }
+        }
+      }))
+    })
+    await store.putRecord({ value: 2 }, rawKey)
+    const freshHandle = await capability.ensureRecordIndexes(scope, definitions)
+    let staleCode: string | undefined
+    try {
+      await capability.getRecordIndexReadiness(oldHandle)
+    } catch (error) {
+      staleCode = (error as { code?: string }).code
+    }
+    domains[label] = {
+      rotated: freshHandle.generation !== oldHandle.generation,
+      pending: (await capability.getRecordIndexReadiness(freshHandle)).status === 'pending',
+      staleCode
+    }
+  }
+  const rollbackScope = 'browser-raw-rollback'
+  await store.putRecord({ value: 1 }, composeRepositoryKey(rollbackScope, 'seed'))
+  const rollbackHandle = await capability.ensureRecordIndexes(rollbackScope, definitions)
+  const rollbackSession = await capability.openBackfillSession(rollbackHandle, {
+    range: repositoryEntityRange(rollbackScope),
+    allowComplete: true
+  })
+  const rollbackBatch = await rollbackSession.readBatch()
+  await rollbackSession.commitBatch({
+    generation: rollbackHandle.generation,
+    ownerToken: rollbackSession.ownerToken,
+    checkpoint: rollbackBatch.checkpoint,
+    nextCheckpoint: rollbackBatch.candidates.at(-1)!.key,
+    endOfScan: true,
+    projections: rollbackBatch.candidates.map((candidate) => ({
+      key: candidate.key,
+      expectedRevision: candidate.revision,
+      outcome: 'indexed' as const,
+      projection: {
+        value: { kind: 'single' as const, key: (candidate.raw as { value: number }).value }
+      }
+    }))
+  })
+  try {
+    await store.transaction(async (transaction) => {
+      await transaction.put({ value: 2 }, composeRepositoryKey(rollbackScope, 'uncommitted'))
+      throw new Error('browser rollback')
+    })
+  } catch {
+    // The transaction is expected to abort; the complete generation must remain queryable.
+  }
+  let rollbackPreserved = true
+  try {
+    await (store as unknown as { iterateRecordIndex: (query: unknown) => AsyncIterator<unknown> })
+      .iterateRecordIndex({ handle: rollbackHandle, index: 'value' })
+      .next()
+  } catch {
+    rollbackPreserved = false
+  }
+  await store.dispose()
+  window.indexedDB.deleteDatabase(dbName)
+  return { domains, rollbackPreserved }
+}
+
+/** 真实浏览器验证跨 connection lease 只由 monotonic heartbeat 观察窗口推进。 */
+window.runIndexedDbBackfillLeaseScenario = async () => {
+  const dbName = `backfill-lease-${Math.random().toString(36).slice(2)}`
+  const ownerStore = indexedDb({ dbName })
+  const contenderStore = indexedDb({ dbName })
+  const ownerCapability = asIndexedDbBackfillStore(ownerStore)!
+  const contenderCapability = asIndexedDbBackfillStore(contenderStore)!
+  const definitions = [{ name: 'value', unique: false, multiEntry: false, revision: 1 }] as const
+  await ownerStore.putRecord({ value: 1 }, composeRepositoryKey('lease-browser', 'id-0'))
+  const ownerHandle = await ownerCapability.ensureRecordIndexes('lease-browser', definitions)
+  const contenderHandle = await contenderCapability.ensureRecordIndexes(
+    'lease-browser',
+    definitions
+  )
+  const owner = await ownerCapability.openBackfillSession(ownerHandle, {
+    range: repositoryEntityRange('lease-browser'),
+    allowComplete: true,
+    leaseMs: 5_000
+  })
+  const readCode = async (): Promise<string | undefined> => {
+    try {
+      await contenderCapability.openBackfillSession(contenderHandle, {
+        range: repositoryEntityRange('lease-browser'),
+        allowComplete: true,
+        leaseMs: 5_000
+      })
+      return undefined
+    } catch (error) {
+      return (error as { code?: string }).code
+    }
+  }
+  const originalDateNow = Date.now
+  let initialContentionCode: string | undefined
+  let forwardJumpContentionCode: string | undefined
+  let backwardJumpContentionCode: string | undefined
+  let takeoverSucceeded = false
+  let staleOwnerRenewCode: string | undefined
+  try {
+    initialContentionCode = await readCode()
+    Date.now = () => originalDateNow() + 86_400_000
+    forwardJumpContentionCode = await readCode()
+    Date.now = () => originalDateNow() - 86_400_000
+    backwardJumpContentionCode = await readCode()
+    await new Promise((resolve) => setTimeout(resolve, 5_100))
+    const takeover = await contenderCapability.openBackfillSession(contenderHandle, {
+      range: repositoryEntityRange('lease-browser'),
+      allowComplete: true,
+      leaseMs: 5_000
+    })
+    takeoverSucceeded = true
+    try {
+      await owner.renew()
+    } catch (error) {
+      staleOwnerRenewCode = (error as { code?: string }).code
+    }
+    takeover.release()
+  } finally {
+    Date.now = originalDateNow
+    owner.release()
+    await ownerStore.dispose()
+    await contenderStore.dispose()
+    window.indexedDB.deleteDatabase(dbName)
+  }
+  return {
+    initialContentionCode,
+    forwardJumpContentionCode,
+    backwardJumpContentionCode,
+    takeoverSucceeded,
+    staleOwnerRenewCode
+  }
+}
+
+/** Start a lease in this page so another page can contend without sharing local observations. */
+window.startIndexedDbBackfillLeaseOwner = async (dbName) => {
+  const store = indexedDb({ dbName })
+  const capability = asIndexedDbBackfillStore(store)!
+  const definitions = [{ name: 'value', unique: false, multiEntry: false, revision: 1 }] as const
+  await store.putRecord({ value: 1 }, composeRepositoryKey('lease-pages', 'id-0'))
+  const handle = await capability.ensureRecordIndexes('lease-pages', definitions)
+  const session = await capability.openBackfillSession(handle, {
+    range: repositoryEntityRange('lease-pages'),
+    allowComplete: true,
+    leaseMs: 5_000
+  })
+  browserBackfillLeaseOwners.set(dbName, { store, session })
+}
+
+/** Attempt one cross-page lease acquisition; the page owns no persisted observation on restart. */
+window.contendIndexedDbBackfillLease = async (dbName) => {
+  let contender = browserBackfillLeaseContenders.get(dbName)
+  if (contender === undefined) {
+    const store = indexedDb({ dbName })
+    const capability = asIndexedDbBackfillStore(store)!
+    const definitions = [{ name: 'value', unique: false, multiEntry: false, revision: 1 }] as const
+    const handle = await capability.ensureRecordIndexes('lease-pages', definitions)
+    contender = { store, handle }
+    browserBackfillLeaseContenders.set(dbName, contender)
+  }
+  const capability = asIndexedDbBackfillStore(contender.store)!
+  try {
+    const session = await capability.openBackfillSession(contender.handle, {
+      range: repositoryEntityRange('lease-pages'),
+      allowComplete: true,
+      leaseMs: 5_000
+    })
+    session.release()
+    browserBackfillLeaseContenders.delete(dbName)
+    await contender.store.dispose()
+    return undefined
+  } catch (error) {
+    return (error as { code?: string }).code
+  }
+}
+
+/** Finish the page-owned lease fixture and report whether the original owner became stale. */
+window.finishIndexedDbBackfillLeaseOwner = async (dbName) => {
+  const owner = browserBackfillLeaseOwners.get(dbName)
+  if (owner === undefined) return undefined
+  let staleOwnerRenewCode: string | undefined
+  try {
+    await owner.session.renew()
+  } catch (error) {
+    staleOwnerRenewCode = (error as { code?: string }).code
+  }
+  owner.session.release()
+  await owner.store.dispose()
+  browserBackfillLeaseOwners.delete(dbName)
+  window.indexedDB.deleteDatabase(dbName)
+  return staleOwnerRenewCode
+}
 
 /** 真实浏览器验证 Memory 对复合 record key 的输入与输出所有权隔离。 */
 window.runMemoryCompositeKeyOwnershipScenario = async () => {
-  const store = memoryStorage<{ source: string }>();
-  const directKey: Array<string | number> = ['direct', 1];
-  const transactionKey: Array<string | number> = ['transaction', 1];
-  await store.putRecord({ source: 'direct' }, directKey);
-  directKey[1] = 9;
+  const store = memoryStorage<{ source: string }>()
+  const directKey: Array<string | number> = ['direct', 1]
+  const transactionKey: Array<string | number> = ['transaction', 1]
+  await store.putRecord({ source: 'direct' }, directKey)
+  directKey[1] = 9
   await store.transaction(async (transaction) => {
-    await transaction.put({ source: 'transaction' }, transactionKey);
-    transactionKey[1] = 9;
-  });
+    await transaction.put({ source: 'transaction' }, transactionKey)
+    transactionKey[1] = 9
+  })
 
-  const firstKeys: Array<unknown> = [];
-  for await (const [key] of store.iterateRecords()) firstKeys.push(key);
-  (firstKeys[0] as Array<unknown>)[1] = 7;
-  const secondKeys: Array<unknown> = [];
-  for await (const [key] of store.iterateRecords()) secondKeys.push(key);
+  const firstKeys: Array<unknown> = []
+  for await (const [key] of store.iterateRecords()) firstKeys.push(key)
+  ;(firstKeys[0] as Array<unknown>)[1] = 7
+  const secondKeys: Array<unknown> = []
+  for await (const [key] of store.iterateRecords()) secondKeys.push(key)
 
   const directStable =
     (await store.getRecord(['direct', 1]))?.source === 'direct' &&
-    (await store.getRecord(['direct', 9])) === undefined;
+    (await store.getRecord(['direct', 9])) === undefined
   const transactionStable =
     (await store.getRecord(['transaction', 1]))?.source === 'transaction' &&
-    (await store.getRecord(['transaction', 9])) === undefined;
+    (await store.getRecord(['transaction', 9])) === undefined
   const iterationStable =
     JSON.stringify(firstKeys) !== JSON.stringify(secondKeys) &&
     JSON.stringify(secondKeys) ===
       JSON.stringify([
         ['direct', 1],
         ['transaction', 1]
-      ]);
-  await store.dispose();
+      ])
+  await store.dispose()
 
-  const rangeStore = memoryStorage<{ value: number }>();
-  await rangeStore.putRecord({ value: 1 }, ['range', 1]);
-  await rangeStore.putRecord({ value: 2 }, ['range', 2]);
-  await rangeStore.putRecord({ value: 3 }, ['range', 3]);
-  const upper: Array<string | number> = ['range', 3];
-  const iterator = rangeStore.iterateRecords({ upper });
-  const first = await iterator.next();
-  upper[1] = 1;
-  const remaining: Array<number> = [];
-  for await (const [, value] of iterator) remaining.push(value.value);
-  const rangeStable = first.value?.[1].value === 1 && JSON.stringify(remaining) === '[2,3]';
-  await rangeStore.dispose();
-  return { directStable, transactionStable, iterationStable, rangeStable };
-};
+  const rangeStore = memoryStorage<{ value: number }>()
+  await rangeStore.putRecord({ value: 1 }, ['range', 1])
+  await rangeStore.putRecord({ value: 2 }, ['range', 2])
+  await rangeStore.putRecord({ value: 3 }, ['range', 3])
+  const upper: Array<string | number> = ['range', 3]
+  const iterator = rangeStore.iterateRecords({ upper })
+  const first = await iterator.next()
+  upper[1] = 1
+  const remaining: Array<number> = []
+  for await (const [, value] of iterator) remaining.push(value.value)
+  const rangeStable = first.value?.[1].value === 1 && JSON.stringify(remaining) === '[2,3]'
+  await rangeStore.dispose()
+  return { directStable, transactionStable, iterationStable, rangeStable }
+}
 
 /** 真实浏览器验证 timeoutMs=0 与 dispose 的统一 operation lifecycle。 */
 window.runOperationLifecycleScenario = async () => {
-  const operationRuntime = createStorageOperationRuntime();
-  const memory = (await import('../src/index')).memoryStorage();
-  let contextSnapshotReads = 0;
-  const contextController = new AbortController();
+  const operationRuntime = createStorageOperationRuntime()
+  const memory = (await import('../src/index')).memoryStorage()
+  let contextSnapshotReads = 0
+  const contextController = new AbortController()
   await memory.set('context-snapshot', 'value', {
     get signal() {
-      contextSnapshotReads += 1;
-      return contextController.signal;
+      contextSnapshotReads += 1
+      return contextController.signal
     },
     get timeoutMs() {
-      contextSnapshotReads += 1;
-      return undefined;
+      contextSnapshotReads += 1
+      return undefined
     },
     get pageSize() {
-      contextSnapshotReads += 1;
-      return 64;
+      contextSnapshotReads += 1
+      return 64
     },
     get conflictPolicy() {
-      contextSnapshotReads += 1;
-      return 'replace' as const;
+      contextSnapshotReads += 1
+      return 'replace' as const
     }
-  });
-  let repositoryContextReads = 0;
+  })
+  let repositoryContextReads = 0
   const lifecycleEntity = defineEntity<{ id: string }>({
     name: 'operation-lifecycle',
     key: 'id'
-  });
-  let signalSurfaceReads = 0;
+  })
+  let signalSurfaceReads = 0
   const stableSignal = {
     get aborted() {
-      return false;
+      return false
     },
     get addEventListener() {
-      signalSurfaceReads += 1;
-      if (signalSurfaceReads > 2) throw new Error('browser signal surface method read twice');
-      return () => {};
+      signalSurfaceReads += 1
+      if (signalSurfaceReads > 2) throw new Error('browser signal surface method read twice')
+      return () => {}
     },
     get removeEventListener() {
-      signalSurfaceReads += 1;
-      if (signalSurfaceReads > 2) throw new Error('browser signal surface method read twice');
-      return () => {};
+      signalSurfaceReads += 1
+      if (signalSurfaceReads > 2) throw new Error('browser signal surface method read twice')
+      return () => {}
     }
-  } as never;
-  const stableSnapshot = snapshotOperationContext({ signal: stableSignal });
-  await withAbort(stableSnapshot, async () => undefined);
+  } as never
+  const stableSnapshot = snapshotOperationContext({ signal: stableSignal })
+  await withAbort(stableSnapshot, async () => undefined)
   await lifecycleEntity.connect(memory).put({ id: 'snapshot' }, {
     get signal() {
-      repositoryContextReads += 1;
-      return contextController.signal;
+      repositoryContextReads += 1
+      return contextController.signal
     },
     get timeoutMs() {
-      repositoryContextReads += 1;
-      return undefined;
+      repositoryContextReads += 1
+      return undefined
     },
     get pageSize() {
-      repositoryContextReads += 1;
-      return 64;
+      repositoryContextReads += 1
+      return 64
     },
     get conflictPolicy() {
-      repositoryContextReads += 1;
-      return 'replace' as const;
+      repositoryContextReads += 1
+      return 'replace' as const
     }
-  } as never);
-  let memoryTimeoutCode: string | undefined;
+  } as never)
+  let memoryTimeoutCode: string | undefined
   try {
-    await memory.set('timeout', 'no-write', { timeoutMs: 0 });
+    await memory.set('timeout', 'no-write', { timeoutMs: 0 })
   } catch (error) {
-    memoryTimeoutCode = (error as { code?: string }).code;
+    memoryTimeoutCode = (error as { code?: string }).code
   }
-  let invalidTimeoutCode: string | undefined;
+  let invalidTimeoutCode: string | undefined
   try {
-    await memory.set('invalid-timeout', 'value', { timeoutMs: Number.MAX_SAFE_INTEGER + 1 });
+    await memory.set('invalid-timeout', 'value', { timeoutMs: Number.MAX_SAFE_INTEGER + 1 })
   } catch (error) {
-    invalidTimeoutCode = (error as { code?: string }).code;
+    invalidTimeoutCode = (error as { code?: string }).code
   }
-  const invalidContextCodes: Array<string | undefined> = [];
+  const invalidContextCodes: Array<string | undefined> = []
   for (const context of [null, [], 'context', 1]) {
     try {
-      await memory.set('invalid-context', 'value', context as never);
+      await memory.set('invalid-context', 'value', context as never)
     } catch (error) {
-      invalidContextCodes.push((error as { code?: string }).code);
+      invalidContextCodes.push((error as { code?: string }).code)
     }
   }
-  let invalidSignalCode: string | undefined;
+  let invalidSignalCode: string | undefined
   try {
-    await memory.set('invalid-signal', 'value', { signal: { aborted: false } as never });
+    await memory.set('invalid-signal', 'value', { signal: { aborted: false } as never })
   } catch (error) {
-    invalidSignalCode = (error as { code?: string }).code;
+    invalidSignalCode = (error as { code?: string }).code
   }
-  let invalidSignalGetterCode: string | undefined;
+  let invalidSignalGetterCode: string | undefined
   try {
     await memory.get('invalid-signal-getter', {
       signal: {
         get aborted(): never {
-          throw new Error('browser hostile aborted getter');
+          throw new Error('browser hostile aborted getter')
         },
         addEventListener: () => {},
         removeEventListener: () => {}
       } as never
-    });
+    })
   } catch (error) {
-    invalidSignalGetterCode = (error as { code?: string }).code;
+    invalidSignalGetterCode = (error as { code?: string }).code
   }
-  let hostileReasonCode: string | undefined;
-  let hostileReasonHasCause = false;
+  let hostileReasonCode: string | undefined
+  let hostileReasonHasCause = false
   try {
     await memory.get('hostile-reason', {
       signal: {
         aborted: true,
         get reason(): never {
-          throw new Error('browser hostile reason getter');
+          throw new Error('browser hostile reason getter')
         },
         addEventListener: () => {},
         removeEventListener: () => {}
       } as never,
       timeoutMs: 1000
-    });
+    })
   } catch (error) {
-    hostileReasonCode = (error as { code?: string }).code;
-    hostileReasonHasCause = (error as { cause?: unknown }).cause instanceof Error;
+    hostileReasonCode = (error as { code?: string }).code
+    hostileReasonHasCause = (error as { cause?: unknown }).cause instanceof Error
   }
-  let listenerSetupCode: string | undefined;
+  let listenerSetupCode: string | undefined
   try {
     await memory.get('listener-setup', {
       signal: {
         aborted: false,
         addEventListener: () => {
-          throw new Error('browser hostile listener setup');
+          throw new Error('browser hostile listener setup')
         },
         removeEventListener: () => {}
       } as never,
       timeoutMs: 1000
-    });
+    })
   } catch (error) {
-    listenerSetupCode = (error as { code?: string }).code;
+    listenerSetupCode = (error as { code?: string }).code
   }
   const cleanupPreservedResult = await memory.get('missing-cleanup', {
     signal: {
       aborted: false,
       addEventListener: () => {},
       removeEventListener: () => {
-        throw new Error('browser hostile listener cleanup');
+        throw new Error('browser hostile listener cleanup')
       }
     } as never,
     timeoutMs: 1000
-  });
-  let extensionListenerSetupCode: string | undefined;
+  })
+  let extensionListenerSetupCode: string | undefined
   try {
     await lifecycleEntity.connect(memory).put(
       { id: 'extension-listener-setup' },
@@ -1877,14 +2217,14 @@ window.runOperationLifecycleScenario = async () => {
         signal: {
           aborted: false,
           addEventListener: () => {
-            throw new Error('browser extension listener setup');
+            throw new Error('browser extension listener setup')
           },
           removeEventListener: () => {}
         } as never
       }
-    );
+    )
   } catch (error) {
-    extensionListenerSetupCode = (error as { code?: string }).code;
+    extensionListenerSetupCode = (error as { code?: string }).code
   }
   await lifecycleEntity.connect(memory).put(
     { id: 'extension-listener-cleanup' },
@@ -1893,141 +2233,173 @@ window.runOperationLifecycleScenario = async () => {
         aborted: false,
         addEventListener: () => {},
         removeEventListener: () => {
-          throw new Error('browser extension listener cleanup');
+          throw new Error('browser extension listener cleanup')
         }
       } as never
     }
-  );
+  )
   const extensionCleanupPreserved =
     (await lifecycleEntity.connect(memory).get('extension-listener-cleanup'))?.id ===
-    'extension-listener-cleanup';
-  let migrationListenerSetupCode: string | undefined;
+    'extension-listener-cleanup'
+  let migrationListenerSetupCode: string | undefined
   try {
     await runMigrations({}, 0, 1, { 1: async () => ({ migrated: true }) }, {
       aborted: false,
       addEventListener: () => {
-        throw new Error('browser migration listener setup');
+        throw new Error('browser migration listener setup')
       },
       removeEventListener: () => {}
-    } as never);
+    } as never)
   } catch (error) {
-    migrationListenerSetupCode = (error as { code?: string }).code;
+    migrationListenerSetupCode = (error as { code?: string }).code
   }
   const migrationCleanupPreserved =
     (await runMigrations({}, 0, 1, { 1: async () => ({ migrated: true }) }, {
       aborted: false,
       addEventListener: () => {},
       removeEventListener: () => {
-        throw new Error('browser migration listener cleanup');
+        throw new Error('browser migration listener cleanup')
       }
-    } as never)) !== undefined;
-  let raceAborted = false;
-  let signalRaceCalls = 0;
-  let signalRaceCode: string | undefined;
+    } as never)) !== undefined
+  let raceAborted = false
+  let signalRaceCalls = 0
+  let signalRaceCode: string | undefined
   try {
     await memory.transaction(
       async () => {
-        signalRaceCalls += 1;
+        signalRaceCalls += 1
       },
       {
         timeoutMs: 1000,
         signal: {
           get aborted() {
-            return raceAborted;
+            return raceAborted
           },
           reason: 'race abort',
           addEventListener: () => {
-            raceAborted = true;
+            raceAborted = true
           },
           removeEventListener: () => {}
         } as never
       }
-    );
+    )
   } catch (error) {
-    signalRaceCode = (error as { code?: string }).code;
+    signalRaceCode = (error as { code?: string }).code
   }
-  const syncOptionCodes: Array<string | undefined> = [];
+  let mergedSignalAborted = false
+  let mergedSignalListener: (() => void) | undefined
+  let mergedSignalAbortedReads = 0
+  let mergedSignalReasonReads = 0
+  let mergedSignalRemoveCalls = 0
+  const mergedSignalReason = new Error('browser merged signal reason')
+  const mergedSignal = mergeSignals(
+    {
+      timeoutMs: 1000,
+      signal: {
+        get aborted() {
+          mergedSignalAbortedReads += 1
+          return mergedSignalAborted
+        },
+        get reason() {
+          mergedSignalReasonReads += 1
+          return mergedSignalReason
+        },
+        addEventListener: (_type: 'abort', listener: () => void) => {
+          mergedSignalListener = listener
+        },
+        removeEventListener: () => {
+          mergedSignalRemoveCalls += 1
+        }
+      } as never
+    },
+    operationRuntime.reporter
+  )
+  mergedSignalAborted = true
+  mergedSignalListener?.()
+  const mergedSignalReasonPreserved = mergedSignal.signal?.reason === mergedSignalReason
+  mergedSignal.dispose()
+  const syncOptionCodes: Array<string | undefined> = []
   const syncStores = [
     memory,
     localStorage({ namespace: `sync-options-${Math.random().toString(36).slice(2)}` }),
     cookies({ namespace: `sync-options-${Math.random().toString(36).slice(2)}` })
-  ];
+  ]
   for (const store of syncStores)
     for (const options of [{ conflictPolicy: 'invalid' }, { timeoutMs: 1 }]) {
       try {
-        store.sync.set('sync-invalid', 'value', options as never);
+        store.sync.set('sync-invalid', 'value', options as never)
       } catch (error) {
-        syncOptionCodes.push((error as { code?: string }).code);
+        syncOptionCodes.push((error as { code?: string }).code)
       }
     }
-  const memoryValue = await memory.get('timeout');
-  const dbName = `operation-lifecycle-${Math.random().toString(36).slice(2)}`;
-  const database = indexedDb({ dbName });
-  await database.putRecord({ keep: true }, 'keep');
-  let indexedTimeoutCode: string | undefined;
+  const memoryValue = await memory.get('timeout')
+  const dbName = `operation-lifecycle-${Math.random().toString(36).slice(2)}`
+  const database = indexedDb({ dbName })
+  await database.putRecord({ keep: true }, 'keep')
+  let indexedTimeoutCode: string | undefined
   try {
-    await database.iterateRecords(undefined, { timeoutMs: 0 }).next();
+    await database.iterateRecords(undefined, { timeoutMs: 0 }).next()
   } catch (error) {
-    indexedTimeoutCode = (error as { code?: string }).code;
+    indexedTimeoutCode = (error as { code?: string }).code
   }
-  let indexedDynamicSignalCode: string | undefined;
-  let indexedSignalReads = 0;
+  let indexedDynamicSignalCode: string | undefined
+  let indexedSignalReads = 0
   try {
     await database.get('dynamic-signal', {
       signal: {
         get aborted() {
-          indexedSignalReads += 1;
-          if (indexedSignalReads > 1) throw new Error('browser dynamic aborted getter');
-          return false;
+          indexedSignalReads += 1
+          if (indexedSignalReads > 1) throw new Error('browser dynamic aborted getter')
+          return false
         },
         addEventListener: () => {},
         removeEventListener: () => {}
       } as never
-    });
+    })
   } catch (error) {
-    indexedDynamicSignalCode = (error as { code?: string }).code;
+    indexedDynamicSignalCode = (error as { code?: string }).code
   }
-  await database.dispose();
-  let disposedCode: string | undefined;
+  await database.dispose()
+  let disposedCode: string | undefined
   try {
-    await database.getRecord('keep');
+    await database.getRecord('keep')
   } catch (error) {
-    disposedCode = (error as { code?: string }).code;
+    disposedCode = (error as { code?: string }).code
   }
-  const requestDbName = `idb-request-race-${Math.random().toString(36).slice(2)}`;
+  const requestDbName = `idb-request-race-${Math.random().toString(36).slice(2)}`
   const requestDatabase = await new Promise<IDBDatabase>((resolve, reject) => {
-    const request = window.indexedDB.open(requestDbName, 1);
-    request.onupgradeneeded = () => request.result.createObjectStore('kv');
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-  let requestAborted = false;
-  let idbRequestContextReads = 0;
-  let idbRequestRaceCode: string | undefined;
+    const request = window.indexedDB.open(requestDbName, 1)
+    request.onupgradeneeded = () => request.result.createObjectStore('kv')
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+  let requestAborted = false
+  let idbRequestContextReads = 0
+  let idbRequestRaceCode: string | undefined
   try {
     await fromIdbRequest(
       requestDatabase.transaction('kv').objectStore('kv').get('missing'),
       {
         get signal() {
-          idbRequestContextReads += 1;
+          idbRequestContextReads += 1
           return {
             get aborted() {
-              return requestAborted;
+              return requestAborted
             },
             reason: 'browser request race',
             addEventListener: () => {
-              requestAborted = true;
+              requestAborted = true
             },
             removeEventListener: () => {}
-          } as never;
+          } as never
         }
       },
       operationRuntime
-    );
+    )
   } catch (error) {
-    idbRequestRaceCode = (error as { code?: string }).code;
+    idbRequestRaceCode = (error as { code?: string }).code
   }
-  let idbRequestSetupCode: string | undefined;
+  let idbRequestSetupCode: string | undefined
   try {
     await fromIdbRequest(
       requestDatabase.transaction('kv').objectStore('kv').get('missing'),
@@ -2035,15 +2407,15 @@ window.runOperationLifecycleScenario = async () => {
         signal: {
           aborted: false,
           addEventListener: () => {
-            throw new Error('browser request listener setup');
+            throw new Error('browser request listener setup')
           },
           removeEventListener: () => {}
         } as never
       },
       operationRuntime
-    );
+    )
   } catch (error) {
-    idbRequestSetupCode = (error as { code?: string }).code;
+    idbRequestSetupCode = (error as { code?: string }).code
   }
   const idbRequestCleanupPreserved =
     (await fromIdbRequest(
@@ -2053,70 +2425,70 @@ window.runOperationLifecycleScenario = async () => {
           aborted: false,
           addEventListener: () => {},
           removeEventListener: () => {
-            throw new Error('browser request listener cleanup');
+            throw new Error('browser request listener cleanup')
           }
         } as never
       },
       operationRuntime
-    )) === undefined;
-  let idbResultGetterCode: string | undefined;
+    )) === undefined
+  let idbResultGetterCode: string | undefined
   try {
     await fromIdbRequest(
       {
         get result(): never {
-          throw new Error('browser hostile request result getter');
+          throw new Error('browser hostile request result getter')
         },
         set onsuccess(handler: (() => void) | null) {
-          queueMicrotask(() => handler?.());
+          queueMicrotask(() => handler?.())
         },
         set onerror(_handler: unknown) {}
       } as unknown as IDBRequest<unknown>,
       undefined,
       operationRuntime
-    );
+    )
   } catch (error) {
-    idbResultGetterCode = (error as { code?: string }).code;
+    idbResultGetterCode = (error as { code?: string }).code
   }
-  let idbErrorGetterCode: string | undefined;
+  let idbErrorGetterCode: string | undefined
   try {
     await fromIdbRequest(
       {
         get error(): never {
-          throw new Error('browser hostile request error getter');
+          throw new Error('browser hostile request error getter')
         },
         set onsuccess(_handler: unknown) {},
         set onerror(handler: (() => void) | null) {
-          queueMicrotask(() => handler?.());
+          queueMicrotask(() => handler?.())
         }
       } as unknown as IDBRequest<unknown>,
       undefined,
       operationRuntime
-    );
+    )
   } catch (error) {
-    idbErrorGetterCode = (error as { code?: string }).code;
+    idbErrorGetterCode = (error as { code?: string }).code
   }
-  const idbRequestSetterCodes: Array<string | undefined> = [];
+  const idbRequestSetterCodes: Array<string | undefined> = []
   for (const property of ['onsuccess', 'onerror'] as const) {
     try {
       await fromIdbRequest(
         {
           set onsuccess(_handler: unknown) {
             if (property === 'onsuccess')
-              throw new Error('browser hostile request onsuccess setter');
+              throw new Error('browser hostile request onsuccess setter')
           },
           set onerror(_handler: unknown) {
-            if (property === 'onerror') throw new Error('browser hostile request onerror setter');
+            if (property === 'onerror') throw new Error('browser hostile request onerror setter')
           }
         } as unknown as IDBRequest<unknown>,
         undefined,
         operationRuntime
-      );
-      idbRequestSetterCodes.push(undefined);
+      )
+      idbRequestSetterCodes.push(undefined)
     } catch (error) {
-      idbRequestSetterCodes.push((error as { code?: string }).code);
+      idbRequestSetterCodes.push((error as { code?: string }).code)
     }
   }
-  const idbTransactionSetterCodes: Array<string | undefined> = [];
+  const idbTransactionSetterCodes: Array<string | undefined> = []
   for (const property of ['oncomplete', 'onerror', 'onabort'] as const) {
     try {
       await idbTransactionCommit(
@@ -2124,28 +2496,28 @@ window.runOperationLifecycleScenario = async () => {
           abort: () => {},
           set oncomplete(_handler: unknown) {
             if (property === 'oncomplete')
-              throw new Error('browser hostile transaction oncomplete setter');
+              throw new Error('browser hostile transaction oncomplete setter')
           },
           set onerror(_handler: unknown) {
             if (property === 'onerror')
-              throw new Error('browser hostile transaction onerror setter');
+              throw new Error('browser hostile transaction onerror setter')
           },
           set onabort(_handler: unknown) {
             if (property === 'onabort')
-              throw new Error('browser hostile transaction onabort setter');
+              throw new Error('browser hostile transaction onabort setter')
           }
         } as unknown as IDBTransaction,
         undefined,
         operationRuntime
-      );
-      idbTransactionSetterCodes.push(undefined);
+      )
+      idbTransactionSetterCodes.push(undefined)
     } catch (error) {
-      idbTransactionSetterCodes.push((error as { code?: string }).code);
+      idbTransactionSetterCodes.push((error as { code?: string }).code)
     }
   }
-  const setupTransaction = requestDatabase.transaction('kv', 'readwrite');
-  setupTransaction.objectStore('kv').put('must-rollback', 'setup-failure');
-  let idbTransactionSetupCode: string | undefined;
+  const setupTransaction = requestDatabase.transaction('kv', 'readwrite')
+  setupTransaction.objectStore('kv').put('must-rollback', 'setup-failure')
+  let idbTransactionSetupCode: string | undefined
   try {
     await idbTransactionCommit(
       setupTransaction,
@@ -2153,63 +2525,63 @@ window.runOperationLifecycleScenario = async () => {
         signal: {
           aborted: false,
           addEventListener: () => {
-            throw new Error('browser hostile transaction listener setup');
+            throw new Error('browser hostile transaction listener setup')
           },
           removeEventListener: () => {}
         } as never
       },
       operationRuntime
-    );
+    )
   } catch (error) {
-    idbTransactionSetupCode = (error as { code?: string }).code;
+    idbTransactionSetupCode = (error as { code?: string }).code
   }
   const idbTransactionSetupRolledBack =
     (await fromIdbRequest(
       requestDatabase.transaction('kv').objectStore('kv').get('setup-failure'),
       undefined,
       operationRuntime
-    )) === undefined;
-  const destructiveDbName = `idb-destructive-setter-${Math.random().toString(36).slice(2)}`;
-  const destructiveStore = indexedDb({ dbName: destructiveDbName });
-  const idbDestructiveSetterCodes: Array<string | undefined> = [];
-  let idbDestructiveSetterRolledBack = true;
+    )) === undefined
+  const destructiveDbName = `idb-destructive-setter-${Math.random().toString(36).slice(2)}`
+  const destructiveStore = indexedDb({ dbName: destructiveDbName })
+  const idbDestructiveSetterCodes: Array<string | undefined> = []
+  let idbDestructiveSetterRolledBack = true
   for (const operation of ['clearAll', 'deleteRecord', 'clearRecords'] as const) {
-    const valueKey = `keep-value-${operation}`;
-    const recordKey = `keep-record-${operation}`;
-    await destructiveStore.set(valueKey, 'value');
-    await destructiveStore.putRecord({ keep: true }, recordKey);
-    const originalGet = IDBObjectStore.prototype.get;
+    const valueKey = `keep-value-${operation}`
+    const recordKey = `keep-record-${operation}`
+    await destructiveStore.set(valueKey, 'value')
+    await destructiveStore.putRecord({ keep: true }, recordKey)
+    const originalGet = IDBObjectStore.prototype.get
     IDBObjectStore.prototype.get = (() =>
       ({
         set onsuccess(_handler: unknown) {
-          throw new Error(`browser hostile ${operation} revision handler setter`);
+          throw new Error(`browser hostile ${operation} revision handler setter`)
         },
         set onerror(_handler: unknown) {}
-      }) as unknown as IDBRequest) as typeof originalGet;
+      }) as unknown as IDBRequest) as typeof originalGet
     try {
       const pending =
         operation === 'clearAll'
           ? destructiveStore.clearAll()
           : operation === 'deleteRecord'
             ? destructiveStore.deleteRecord(recordKey)
-            : destructiveStore.clearRecords();
-      await pending;
-      idbDestructiveSetterCodes.push(undefined);
+            : destructiveStore.clearRecords()
+      await pending
+      idbDestructiveSetterCodes.push(undefined)
     } catch (error) {
-      idbDestructiveSetterCodes.push((error as { code?: string }).code);
+      idbDestructiveSetterCodes.push((error as { code?: string }).code)
     } finally {
-      IDBObjectStore.prototype.get = originalGet;
+      IDBObjectStore.prototype.get = originalGet
     }
     idbDestructiveSetterRolledBack &&=
       (await destructiveStore.get(valueKey)) === 'value' &&
-      (await destructiveStore.getRecord(recordKey)) !== undefined;
+      (await destructiveStore.getRecord(recordKey)) !== undefined
   }
-  await destructiveStore.dispose();
-  window.indexedDB.deleteDatabase(destructiveDbName);
-  requestDatabase.close();
-  window.indexedDB.deleteDatabase(requestDbName);
-  await memory.dispose();
-  window.indexedDB.deleteDatabase(dbName);
+  await destructiveStore.dispose()
+  window.indexedDB.deleteDatabase(destructiveDbName)
+  requestDatabase.close()
+  window.indexedDB.deleteDatabase(requestDbName)
+  await memory.dispose()
+  window.indexedDB.deleteDatabase(dbName)
   return {
     memoryTimeoutCode,
     indexedTimeoutCode,
@@ -2230,6 +2602,10 @@ window.runOperationLifecycleScenario = async () => {
     migrationCleanupPreserved,
     signalRaceCode,
     signalRaceCalls,
+    mergedSignalAbortedReads,
+    mergedSignalReasonReads,
+    mergedSignalRemoveCalls,
+    mergedSignalReasonPreserved,
     contextSnapshotReads,
     signalSurfaceReads,
     repositoryContextReads,
@@ -2246,13 +2622,13 @@ window.runOperationLifecycleScenario = async () => {
     idbDestructiveSetterCodes,
     idbDestructiveSetterRolledBack,
     syncOptionCodes
-  };
-};
+  }
+}
 
 /** 真实浏览器验证 entity codec 异常不会提交半条 IndexedDB record。 */
 window.runIndexedDbExtensionFailureScenario = async () => {
-  const dbName = `extension-failure-${Math.random().toString(36).slice(2)}`;
-  const store = indexedDb({ dbName });
+  const dbName = `extension-failure-${Math.random().toString(36).slice(2)}`
+  const store = indexedDb({ dbName })
   const entity = defineEntity<{ id: string; value: string }>({
     name: 'browser-extension-failure',
     key: 'id',
@@ -2260,66 +2636,66 @@ window.runIndexedDbExtensionFailureScenario = async () => {
       name: 'throwing-browser-codec',
       output: 'structured',
       encode: async () => {
-        throw new Error('codec encode failed');
+        throw new Error('codec encode failed')
       },
       decode: async (value: unknown) => value
     }
-  });
-  const repo = entity.connect(store);
-  let code: string | undefined;
+  })
+  const repo = entity.connect(store)
+  let code: string | undefined
   try {
-    await repo.put({ id: 'broken', value: 'value' });
+    await repo.put({ id: 'broken', value: 'value' })
   } catch (error) {
-    code = (error as { code?: string }).code;
+    code = (error as { code?: string }).code
   }
-  const value = await store.getRecord(['browser-extension-failure', 'broken']);
-  await store.dispose();
-  window.indexedDB.deleteDatabase(dbName);
-  return { code, value };
-};
+  const value = await store.getRecord(['browser-extension-failure', 'broken'])
+  await store.dispose()
+  window.indexedDB.deleteDatabase(dbName)
+  return { code, value }
+}
 
 /** 真实浏览器验证旧 entity 客户端不会读取或覆盖未来版本 envelope。 */
 window.runIndexedDbFutureVersionScenario = async () => {
-  const dbName = `future-version-${Math.random().toString(36).slice(2)}`;
-  const store = indexedDb({ dbName });
+  const dbName = `future-version-${Math.random().toString(36).slice(2)}`
+  const store = indexedDb({ dbName })
   await store.putRecord({ __v: 2, data: { id: 'future', name: 'New' } }, [
     'browser-future-version',
     'future'
-  ]);
+  ])
   const repo = defineEntity<{ id: string; name: string }>({
     name: 'browser-future-version',
     key: 'id',
     version: 1
-  }).connect(store);
-  let getCode: string | undefined;
+  }).connect(store)
+  let getCode: string | undefined
   try {
-    await repo.get('future');
+    await repo.get('future')
   } catch (error) {
-    getCode = (error as { code?: string }).code;
+    getCode = (error as { code?: string }).code
   }
-  const skippedCount = (await repo.list({ onInvalid: 'skip' })).length;
-  let throwCode: string | undefined;
+  const skippedCount = (await repo.list({ onInvalid: 'skip' })).length
+  let throwCode: string | undefined
   try {
-    await repo.list({ onInvalid: 'throw' });
+    await repo.list({ onInvalid: 'throw' })
   } catch (error) {
-    throwCode = (error as { code?: string }).code;
+    throwCode = (error as { code?: string }).code
   }
-  let invalidHandlerCode: string | undefined;
+  let invalidHandlerCode: string | undefined
   try {
-    await repo.list({ onInvalid: () => 'invalid' as never });
+    await repo.list({ onInvalid: () => 'invalid' as never })
   } catch (error) {
-    invalidHandlerCode = (error as { code?: string }).code;
+    invalidHandlerCode = (error as { code?: string }).code
   }
-  const rawValue = await store.getRecord(['browser-future-version', 'future']);
-  await store.dispose();
-  window.indexedDB.deleteDatabase(dbName);
-  return { getCode, skippedCount, throwCode, invalidHandlerCode, rawValue };
-};
+  const rawValue = await store.getRecord(['browser-future-version', 'future'])
+  await store.dispose()
+  window.indexedDB.deleteDatabase(dbName)
+  return { getCode, skippedCount, throwCode, invalidHandlerCode, rawValue }
+}
 
 /** 真实浏览器验证 custom codec 永不 settle 时外部 abort 仍能结束等待。 */
 window.runIndexedDbHangingExtensionAbortScenario = async () => {
-  const dbName = `hanging-extension-${Math.random().toString(36).slice(2)}`;
-  const store = indexedDb({ dbName });
+  const dbName = `hanging-extension-${Math.random().toString(36).slice(2)}`
+  const store = indexedDb({ dbName })
   const entity = defineEntity<{ id: string; name: string }>({
     name: 'browser-hanging-extension',
     key: 'id',
@@ -2329,68 +2705,68 @@ window.runIndexedDbHangingExtensionAbortScenario = async () => {
       encode: () => new Promise<unknown>(() => {}),
       decode: async (value: unknown) => value
     }
-  });
-  const controller = new AbortController();
+  })
+  const controller = new AbortController()
   const pending = entity
     .connect(store)
-    .put({ id: 'hanging', name: 'Ada' }, { signal: controller.signal });
-  await Promise.resolve();
-  controller.abort('cancel hanging codec');
-  let code: string | undefined;
+    .put({ id: 'hanging', name: 'Ada' }, { signal: controller.signal })
+  await Promise.resolve()
+  controller.abort('cancel hanging codec')
+  let code: string | undefined
   try {
-    await pending;
+    await pending
   } catch (error) {
-    code = (error as { code?: string }).code;
+    code = (error as { code?: string }).code
   }
-  const value = await store.getRecord(['browser-hanging-extension', 'hanging']);
-  await store.dispose();
-  window.indexedDB.deleteDatabase(dbName);
-  return { code, value };
-};
+  const value = await store.getRecord(['browser-hanging-extension', 'hanging'])
+  await store.dispose()
+  window.indexedDB.deleteDatabase(dbName)
+  return { code, value }
+}
 
 /** 真实浏览器验证 hanging migration 在 abort 后结束等待且不改写 legacy envelope。 */
 window.runIndexedDbHangingMigrationAbortScenario = async () => {
-  const dbName = `hanging-migration-${Math.random().toString(36).slice(2)}`;
-  const store = indexedDb({ dbName });
+  const dbName = `hanging-migration-${Math.random().toString(36).slice(2)}`
+  const store = indexedDb({ dbName })
   await store.putRecord({ __v: 1, data: { id: 'hanging', name: 'Ada' } }, [
     'browser-hanging-migration',
     'hanging'
-  ]);
+  ])
   const entity = defineEntity<{ id: string; displayName: string }>({
     name: 'browser-hanging-migration',
     key: 'id',
     version: 2,
     migrations: {
       2: async (_value: unknown, context) => {
-        receivedSignal = context.signal === controller.signal;
-        return new Promise<unknown>(() => {});
+        receivedSignal = context.signal === controller.signal
+        return new Promise<unknown>(() => {})
       }
     }
-  });
-  const controller = new AbortController();
-  let receivedSignal = false;
-  const pending = entity.connect(store).get('hanging', { signal: controller.signal });
+  })
+  const controller = new AbortController()
+  let receivedSignal = false
+  const pending = entity.connect(store).get('hanging', { signal: controller.signal })
   for (let attempt = 0; attempt < 100 && !receivedSignal; attempt += 1)
-    await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
-  if (!receivedSignal) throw new Error('migration callback did not start');
-  controller.abort('cancel hanging migration');
-  let code: string | undefined;
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 0))
+  if (!receivedSignal) throw new Error('migration callback did not start')
+  controller.abort('cancel hanging migration')
+  let code: string | undefined
   try {
-    await pending;
+    await pending
   } catch (error) {
-    code = (error as { code?: string }).code;
+    code = (error as { code?: string }).code
   }
-  const rawValue = await store.getRecord(['browser-hanging-migration', 'hanging']);
-  await store.dispose();
-  window.indexedDB.deleteDatabase(dbName);
-  return { code, rawValue, receivedSignal };
-};
+  const rawValue = await store.getRecord(['browser-hanging-migration', 'hanging'])
+  await store.dispose()
+  window.indexedDB.deleteDatabase(dbName)
+  return { code, rawValue, receivedSignal }
+}
 
 /** 真实浏览器验证 pre-abort 不会调用 custom codec。 */
 window.runIndexedDbPreAbortExtensionScenario = async () => {
-  const dbName = `pre-abort-extension-${Math.random().toString(36).slice(2)}`;
-  const store = indexedDb({ dbName });
-  let calls = 0;
+  const dbName = `pre-abort-extension-${Math.random().toString(36).slice(2)}`
+  const store = indexedDb({ dbName })
+  let calls = 0
   const entity = defineEntity<{ id: string; name: string }>({
     name: 'browser-pre-abort-extension',
     key: 'id',
@@ -2398,106 +2774,106 @@ window.runIndexedDbPreAbortExtensionScenario = async () => {
       name: 'browser-pre-abort-codec',
       output: 'structured',
       encode: async (value: unknown) => {
-        calls += 1;
-        return value;
+        calls += 1
+        return value
       },
       decode: async (value: unknown) => value
     }
-  });
-  const controller = new AbortController();
-  controller.abort('already cancelled');
-  let code: string | undefined;
+  })
+  const controller = new AbortController()
+  controller.abort('already cancelled')
+  let code: string | undefined
   try {
-    await entity.connect(store).put({ id: 'u1', name: 'Ada' }, { signal: controller.signal });
+    await entity.connect(store).put({ id: 'u1', name: 'Ada' }, { signal: controller.signal })
   } catch (error) {
-    code = (error as { code?: string }).code;
+    code = (error as { code?: string }).code
   }
-  await store.dispose();
-  window.indexedDB.deleteDatabase(dbName);
-  return { code, calls };
-};
+  await store.dispose()
+  window.indexedDB.deleteDatabase(dbName)
+  return { code, calls }
+}
 
 /** 真实浏览器验证 pre-abort migration 即使无需步骤也不会成功返回。 */
 window.runIndexedDbPreAbortMigrationScenario = async () => {
-  const dbName = `pre-abort-migration-${Math.random().toString(36).slice(2)}`;
-  const store = indexedDb({ dbName });
+  const dbName = `pre-abort-migration-${Math.random().toString(36).slice(2)}`
+  const store = indexedDb({ dbName })
   const entity = defineEntity<{ id: string; name: string }>({
     name: 'browser-pre-abort-migration',
     key: 'id',
     version: 1
-  });
-  const controller = new AbortController();
-  controller.abort('already cancelled');
-  let code: string | undefined;
+  })
+  const controller = new AbortController()
+  controller.abort('already cancelled')
+  let code: string | undefined
   try {
-    await entity.connect(store).get('missing', { signal: controller.signal });
+    await entity.connect(store).get('missing', { signal: controller.signal })
   } catch (error) {
-    code = (error as { code?: string }).code;
+    code = (error as { code?: string }).code
   }
-  await store.dispose();
-  window.indexedDB.deleteDatabase(dbName);
-  return { code };
-};
+  await store.dispose()
+  window.indexedDB.deleteDatabase(dbName)
+  return { code }
+}
 
 /** 真实浏览器验证 schema validation failure 不会留下 raw entity record。 */
 window.runIndexedDbSchemaFailureScenario = async () => {
-  const dbName = `schema-failure-${Math.random().toString(36).slice(2)}`;
-  const store = indexedDb({ dbName });
+  const dbName = `schema-failure-${Math.random().toString(36).slice(2)}`
+  const store = indexedDb({ dbName })
   const entity = defineEntity<{ id: string; name: string }>({
     name: 'browser-schema-failure',
     key: 'id',
     schema: {
       name: 'browser-schema',
       validate: async () => {
-        throw new Error('schema validation failed');
+        throw new Error('schema validation failed')
       }
     }
-  });
-  let code: string | undefined;
+  })
+  let code: string | undefined
   try {
-    await entity.connect(store).put({ id: 'invalid', name: 'Ada' });
+    await entity.connect(store).put({ id: 'invalid', name: 'Ada' })
   } catch (error) {
-    code = (error as { code?: string }).code;
+    code = (error as { code?: string }).code
   }
-  const value = await store.getRecord(['browser-schema-failure', 'invalid']);
-  await store.dispose();
-  window.indexedDB.deleteDatabase(dbName);
-  return { code, value };
-};
+  const value = await store.getRecord(['browser-schema-failure', 'invalid'])
+  await store.dispose()
+  window.indexedDB.deleteDatabase(dbName)
+  return { code, value }
+}
 
 /** 真实浏览器中用小页扫描较大结果集，验证分页不会丢项、乱序或在提前停止后继续消费。 */
 window.runIndexedDbPagedScanScenario = async () => {
-  const dbName = `paged-${Math.random().toString(36).slice(2)}`;
-  const store = indexedDb({ dbName });
+  const dbName = `paged-${Math.random().toString(36).slice(2)}`
+  const store = indexedDb({ dbName })
   for (let index = 0; index < 257; index += 1)
-    await store.putRecord({ index }, `record-${String(index).padStart(3, '0')}`);
+    await store.putRecord({ index }, `record-${String(index).padStart(3, '0')}`)
 
-  const keys: string[] = [];
+  const keys: string[] = []
   for await (const [key] of store.iterateRecords(undefined, { pageSize: 7 })) {
-    keys.push(String(key));
+    keys.push(String(key))
   }
-  let stoppedEarly = true;
-  let consumedAfterStop = 0;
+  let stoppedEarly = true
+  let consumedAfterStop = 0
   for await (const [key] of store.iterateRecords(undefined, { pageSize: 3 })) {
-    consumedAfterStop += 1;
-    if (String(key) === 'record-004') break;
+    consumedAfterStop += 1
+    if (String(key) === 'record-004') break
   }
-  stoppedEarly = consumedAfterStop === 5;
-  let listenerSetupCode: string | undefined;
+  stoppedEarly = consumedAfterStop === 5
+  let listenerSetupCode: string | undefined
   try {
     await store
       .iterateRecords(undefined, {
         signal: {
           aborted: false,
           addEventListener: () => {
-            throw new Error('browser cursor listener setup');
+            throw new Error('browser cursor listener setup')
           },
           removeEventListener: () => {}
         } as never
       })
-      .next();
+      .next()
   } catch (error) {
-    listenerSetupCode = (error as { code?: string }).code;
+    listenerSetupCode = (error as { code?: string }).code
   }
   const cleanupResult = await store
     .iterateRecords(undefined, {
@@ -2505,30 +2881,30 @@ window.runIndexedDbPagedScanScenario = async () => {
         aborted: false,
         addEventListener: () => {},
         removeEventListener: () => {
-          throw new Error('browser cursor listener cleanup');
+          throw new Error('browser cursor listener cleanup')
         }
       } as never
     })
-    .next();
-  const cleanupPreserved = cleanupResult.value !== undefined;
-  let resultGetterCode: string | undefined;
-  const originalOpenCursor = IDBObjectStore.prototype.openCursor;
+    .next()
+  const cleanupPreserved = cleanupResult.value !== undefined
+  let resultGetterCode: string | undefined
+  const originalOpenCursor = IDBObjectStore.prototype.openCursor
   IDBObjectStore.prototype.openCursor = (() =>
     ({
       get result(): never {
-        throw new Error('browser hostile cursor result getter');
+        throw new Error('browser hostile cursor result getter')
       },
       set onsuccess(handler: (() => void) | null) {
-        queueMicrotask(() => handler?.());
+        queueMicrotask(() => handler?.())
       },
       set onerror(_handler: unknown) {}
-    }) as unknown as IDBRequest) as typeof originalOpenCursor;
+    }) as unknown as IDBRequest) as typeof originalOpenCursor
   try {
-    await store.iterateRecords().next();
+    await store.iterateRecords().next()
   } catch (error) {
-    resultGetterCode = (error as { code?: string }).code;
+    resultGetterCode = (error as { code?: string }).code
   } finally {
-    IDBObjectStore.prototype.openCursor = originalOpenCursor;
+    IDBObjectStore.prototype.openCursor = originalOpenCursor
   }
   /** Exercise host failures from each cursor entry surface after request.result succeeds. */
   const readEntryFailureCode = async (
@@ -2536,67 +2912,67 @@ window.runIndexedDbPagedScanScenario = async () => {
   ): Promise<string | undefined> => {
     const cursor = {
       get key(): IDBValidKey {
-        if (attack === 'key') throw new Error('browser hostile cursor key');
-        return 'entry-key';
+        if (attack === 'key') throw new Error('browser hostile cursor key')
+        return 'entry-key'
       },
       get value(): unknown {
-        if (attack === 'value') throw new Error('browser hostile cursor value');
-        return { value: true };
+        if (attack === 'value') throw new Error('browser hostile cursor value')
+        return { value: true }
       },
       continue: () => {
-        if (attack === 'continue') throw new Error('browser hostile cursor continue');
+        if (attack === 'continue') throw new Error('browser hostile cursor continue')
       }
-    } as unknown as IDBCursorWithValue;
+    } as unknown as IDBCursorWithValue
     IDBObjectStore.prototype.openCursor = (() =>
       ({
         result: cursor,
         set onsuccess(handler: (() => void) | null) {
-          queueMicrotask(() => handler?.());
+          queueMicrotask(() => handler?.())
         },
         set onerror(_handler: unknown) {}
-      }) as unknown as IDBRequest) as typeof originalOpenCursor;
+      }) as unknown as IDBRequest) as typeof originalOpenCursor
     try {
-      await store.iterateRecords().next();
-      return undefined;
+      await store.iterateRecords().next()
+      return undefined
     } catch (error) {
-      return (error as { code?: string }).code;
+      return (error as { code?: string }).code
     } finally {
-      IDBObjectStore.prototype.openCursor = originalOpenCursor;
+      IDBObjectStore.prototype.openCursor = originalOpenCursor
     }
-  };
+  }
   /** Keeps prototype mutation attacks serialized so each owns its restoration window. */
-  const entryFailureCodes: Array<string | undefined> = [];
+  const entryFailureCodes: Array<string | undefined> = []
   for (const attack of ['key', 'value', 'continue'] as const)
-    entryFailureCodes.push(await readEntryFailureCode(attack));
-  let requestSetterCode: string | undefined;
+    entryFailureCodes.push(await readEntryFailureCode(attack))
+  let requestSetterCode: string | undefined
   IDBObjectStore.prototype.openCursor = (() =>
     ({
       set onsuccess(_handler: unknown) {
-        throw new Error('browser hostile runtime cursor onsuccess setter');
+        throw new Error('browser hostile runtime cursor onsuccess setter')
       },
       set onerror(_handler: unknown) {}
-    }) as unknown as IDBRequest) as typeof originalOpenCursor;
+    }) as unknown as IDBRequest) as typeof originalOpenCursor
   try {
-    await store.iterateRecords().next();
+    await store.iterateRecords().next()
   } catch (error) {
-    requestSetterCode = (error as { code?: string }).code;
+    requestSetterCode = (error as { code?: string }).code
   } finally {
-    IDBObjectStore.prototype.openCursor = originalOpenCursor;
+    IDBObjectStore.prototype.openCursor = originalOpenCursor
   }
-  let prematureCompletionCode: string | undefined;
+  let prematureCompletionCode: string | undefined
   IDBObjectStore.prototype.openCursor = (() =>
     ({
       set onsuccess(_handler: unknown) {},
       set onerror(_handler: unknown) {}
-    }) as unknown as IDBRequest) as typeof originalOpenCursor;
+    }) as unknown as IDBRequest) as typeof originalOpenCursor
   try {
-    await store.iterateRecords().next();
+    await store.iterateRecords().next()
   } catch (error) {
-    prematureCompletionCode = (error as { code?: string }).code;
+    prematureCompletionCode = (error as { code?: string }).code
   } finally {
-    IDBObjectStore.prototype.openCursor = originalOpenCursor;
+    IDBObjectStore.prototype.openCursor = originalOpenCursor
   }
-  await store.dispose();
+  await store.dispose()
   return {
     count: keys.length,
     first: keys[0],
@@ -2608,116 +2984,116 @@ window.runIndexedDbPagedScanScenario = async () => {
     prematureCompletionCode,
     entryFailureCodes,
     requestSetterCode
-  };
-};
+  }
+}
 
 /** 三个连接同时参与同一 revision 的竞争，验证 optimistic transaction 只允许一个提交。 */
 window.runIndexedDbDualTransactionScenario = async () => {
-  const dbName = `dual-conflict-${Math.random().toString(36).slice(2)}`;
-  const seed = indexedDb({ dbName });
-  const first = indexedDb({ dbName });
-  const second = indexedDb({ dbName });
-  await seed.putRecord({ value: 0 }, 'dual-key');
-  let releaseFirst: (() => void) | undefined;
-  let releaseSecond: (() => void) | undefined;
+  const dbName = `dual-conflict-${Math.random().toString(36).slice(2)}`
+  const seed = indexedDb({ dbName })
+  const first = indexedDb({ dbName })
+  const second = indexedDb({ dbName })
+  await seed.putRecord({ value: 0 }, 'dual-key')
+  let releaseFirst: (() => void) | undefined
+  let releaseSecond: (() => void) | undefined
   const firstPause = new Promise<void>((resolve) => {
-    releaseFirst = resolve;
-  });
+    releaseFirst = resolve
+  })
   const secondPause = new Promise<void>((resolve) => {
-    releaseSecond = resolve;
-  });
+    releaseSecond = resolve
+  })
   const run = async (store: typeof first, value: number, pause: Promise<void>) => {
     try {
       await store.transaction(async (tx) => {
-        await tx.get('dual-key');
-        await pause;
-        await tx.put({ value }, 'dual-key');
-      });
-      return 'committed' as const;
+        await tx.get('dual-key')
+        await pause
+        await tx.put({ value }, 'dual-key')
+      })
+      return 'committed' as const
     } catch (error) {
-      if ((error as { code?: string }).code !== 'TRANSACTION_CONFLICT') throw error;
-      return 'conflict' as const;
+      if ((error as { code?: string }).code !== 'TRANSACTION_CONFLICT') throw error
+      return 'conflict' as const
     }
-  };
-  const firstRun = run(first, 1, firstPause);
-  const secondRun = run(second, 2, secondPause);
-  await new Promise<void>((resolve) => queueMicrotask(() => resolve()));
-  releaseFirst!();
-  const firstResult = await firstRun;
-  releaseSecond!();
-  const secondResult = await secondRun;
-  const value = await seed.getRecord('dual-key');
-  await seed.dispose();
-  await first.dispose();
-  await second.dispose();
+  }
+  const firstRun = run(first, 1, firstPause)
+  const secondRun = run(second, 2, secondPause)
+  await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
+  releaseFirst!()
+  const firstResult = await firstRun
+  releaseSecond!()
+  const secondResult = await secondRun
+  const value = await seed.getRecord('dual-key')
+  await seed.dispose()
+  await first.dispose()
+  await second.dispose()
   return {
     committed: [firstResult, secondResult].filter((result) => result === 'committed').length,
     conflicts: [firstResult, secondResult].filter((result) => result === 'conflict').length,
     value
-  };
-};
+  }
+}
 
 window.runIndexedDbLegacyRecordsMigrationScenario = async () => {
-  const dbName = `legacy-records-${Math.random().toString(36).slice(2)}`;
+  const dbName = `legacy-records-${Math.random().toString(36).slice(2)}`
   const database = await new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(dbName, 1);
-    request.onupgradeneeded = () => request.result.createObjectStore('documents');
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+    const request = indexedDB.open(dbName, 1)
+    request.onupgradeneeded = () => request.result.createObjectStore('documents')
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
   await new Promise<void>((resolve, reject) => {
-    const transaction = database.transaction('documents', 'readwrite');
-    transaction.objectStore('documents').put({ migrated: true }, 'legacy');
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-  });
-  database.close();
-  const store = indexedDb({ dbName, cleanupLegacyRecords: true });
-  const value = await store.getRecord('legacy');
-  const checkpoint = await store.metadata!.get('migration:records-v1-to-v2');
-  await store.dispose();
+    const transaction = database.transaction('documents', 'readwrite')
+    transaction.objectStore('documents').put({ migrated: true }, 'legacy')
+    transaction.oncomplete = () => resolve()
+    transaction.onerror = () => reject(transaction.error)
+  })
+  database.close()
+  const store = indexedDb({ dbName, cleanupLegacyRecords: true })
+  const value = await store.getRecord('legacy')
+  const checkpoint = await store.metadata!.get('migration:records-v1-to-v2')
+  await store.dispose()
   const migratedDatabase = await new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(dbName);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-  const legacyStorePresent = migratedDatabase.objectStoreNames.contains('documents');
-  migratedDatabase.close();
+    const request = indexedDB.open(dbName)
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+  const legacyStorePresent = migratedDatabase.objectStoreNames.contains('documents')
+  migratedDatabase.close()
 
-  const hostileDbName = `${dbName}-hostile-cursor`;
+  const hostileDbName = `${dbName}-hostile-cursor`
   const hostileDatabase = await new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(hostileDbName, 1);
-    request.onupgradeneeded = () => request.result.createObjectStore('documents');
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+    const request = indexedDB.open(hostileDbName, 1)
+    request.onupgradeneeded = () => request.result.createObjectStore('documents')
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
   await new Promise<void>((resolve, reject) => {
-    const transaction = hostileDatabase.transaction('documents', 'readwrite');
-    transaction.objectStore('documents').put({ migrated: false }, 'hostile');
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-  });
-  hostileDatabase.close();
-  const originalOpenCursor = IDBObjectStore.prototype.openCursor;
+    const transaction = hostileDatabase.transaction('documents', 'readwrite')
+    transaction.objectStore('documents').put({ migrated: false }, 'hostile')
+    transaction.oncomplete = () => resolve()
+    transaction.onerror = () => reject(transaction.error)
+  })
+  hostileDatabase.close()
+  const originalOpenCursor = IDBObjectStore.prototype.openCursor
   IDBObjectStore.prototype.openCursor = (() =>
     ({
       get result(): never {
-        throw new Error('hostile legacy cursor result getter');
+        throw new Error('hostile legacy cursor result getter')
       },
       set onsuccess(handler: (() => void) | null) {
-        queueMicrotask(() => handler?.());
+        queueMicrotask(() => handler?.())
       },
       set onerror(_handler: unknown) {}
-    }) as unknown as IDBRequest) as typeof originalOpenCursor;
-  const hostileStore = indexedDb({ dbName: hostileDbName });
-  let hostileCursorCode: string | undefined;
+    }) as unknown as IDBRequest) as typeof originalOpenCursor
+  const hostileStore = indexedDb({ dbName: hostileDbName })
+  let hostileCursorCode: string | undefined
   try {
-    await hostileStore.getRecord('hostile');
+    await hostileStore.getRecord('hostile')
   } catch (error) {
-    hostileCursorCode = error instanceof StorageError ? error.code : undefined;
+    hostileCursorCode = error instanceof StorageError ? error.code : undefined
   } finally {
-    IDBObjectStore.prototype.openCursor = originalOpenCursor;
-    await hostileStore.dispose();
+    IDBObjectStore.prototype.openCursor = originalOpenCursor
+    await hostileStore.dispose()
   }
 
   /** Build an open request whose selected browser event exposes a throwing result getter. */
@@ -2726,39 +3102,39 @@ window.runIndexedDbLegacyRecordsMigrationScenario = async () => {
       open: () =>
         ({
           get result(): never {
-            throw new Error(`browser hostile ${event} result getter`);
+            throw new Error(`browser hostile ${event} result getter`)
           },
           get transaction(): null {
-            return null;
+            return null
           },
           set onupgradeneeded(handler: (() => void) | null) {
-            if (event === 'upgrade') queueMicrotask(() => handler?.());
+            if (event === 'upgrade') queueMicrotask(() => handler?.())
           },
           set onblocked(_handler: unknown) {},
           set onerror(_handler: unknown) {},
           set onsuccess(handler: (() => void) | null) {
-            if (event === 'success') queueMicrotask(() => handler?.());
+            if (event === 'success') queueMicrotask(() => handler?.())
           }
         }) as unknown as IDBOpenDBRequest
-    }) as unknown as IDBFactory;
+    }) as unknown as IDBFactory
   /** Run one hostile open lifecycle and return its normalized storage error code. */
   const readHostileOpenCode = async (event: 'success' | 'upgrade'): Promise<string | undefined> => {
     const hostileOpenStore = indexedDb({
       factory: createHostileFactory(event),
       dbName: `hostile-${event}`
-    });
+    })
     try {
-      await hostileOpenStore.get('key');
-      return undefined;
+      await hostileOpenStore.get('key')
+      return undefined
     } catch (error) {
-      return error instanceof StorageError ? error.code : undefined;
+      return error instanceof StorageError ? error.code : undefined
     } finally {
-      await hostileOpenStore.dispose();
+      await hostileOpenStore.dispose()
     }
-  };
-  const hostileOpenCode = await readHostileOpenCode('success');
-  const hostileUpgradeCode = await readHostileOpenCode('upgrade');
-  const openSetterCodes: Array<string | undefined> = [];
+  }
+  const hostileOpenCode = await readHostileOpenCode('success')
+  const hostileUpgradeCode = await readHostileOpenCode('upgrade')
+  const openSetterCodes: Array<string | undefined> = []
   for (const property of ['onupgradeneeded', 'onblocked', 'onsuccess', 'onerror'] as const) {
     const hostileSetterStore = indexedDb({
       factory: {
@@ -2767,28 +3143,28 @@ window.runIndexedDbLegacyRecordsMigrationScenario = async () => {
             transaction: { abort: () => {} } as IDBTransaction,
             set onupgradeneeded(_handler: unknown) {
               if (property === 'onupgradeneeded')
-                throw new Error('browser hostile open upgrade setter');
+                throw new Error('browser hostile open upgrade setter')
             },
             set onblocked(_handler: unknown) {
-              if (property === 'onblocked') throw new Error('browser hostile open blocked setter');
+              if (property === 'onblocked') throw new Error('browser hostile open blocked setter')
             },
             set onsuccess(_handler: unknown) {
-              if (property === 'onsuccess') throw new Error('browser hostile open success setter');
+              if (property === 'onsuccess') throw new Error('browser hostile open success setter')
             },
             set onerror(_handler: unknown) {
-              if (property === 'onerror') throw new Error('browser hostile open error setter');
+              if (property === 'onerror') throw new Error('browser hostile open error setter')
             }
           }) as unknown as IDBOpenDBRequest
       } as unknown as IDBFactory,
       dbName: `hostile-open-${property}`
-    });
+    })
     try {
-      await hostileSetterStore.get('key');
-      openSetterCodes.push(undefined);
+      await hostileSetterStore.get('key')
+      openSetterCodes.push(undefined)
     } catch (error) {
-      openSetterCodes.push(error instanceof StorageError ? error.code : undefined);
+      openSetterCodes.push(error instanceof StorageError ? error.code : undefined)
     } finally {
-      await hostileSetterStore.dispose();
+      await hostileSetterStore.dispose()
     }
   }
   return {
@@ -2799,96 +3175,96 @@ window.runIndexedDbLegacyRecordsMigrationScenario = async () => {
     hostileOpenCode,
     hostileUpgradeCode,
     openSetterCodes
-  };
-};
+  }
+}
 
 window.runIndexedDbFourWayTransactionScenario = async () => {
-  const dbName = `four-way-${Math.random().toString(36).slice(2)}`;
-  const seed = indexedDb({ dbName });
-  const stores = [1, 2, 3, 4].map(() => indexedDb({ dbName }));
-  await seed.putRecord({ value: 0 }, 'four-way-key');
-  const releases: Array<() => void> = [];
+  const dbName = `four-way-${Math.random().toString(36).slice(2)}`
+  const seed = indexedDb({ dbName })
+  const stores = [1, 2, 3, 4].map(() => indexedDb({ dbName }))
+  await seed.putRecord({ value: 0 }, 'four-way-key')
+  const releases: Array<() => void> = []
   const runs = stores.map((store, index) => {
     const pause = new Promise<void>((resolve) => {
-      releases[index] = resolve;
-    });
+      releases[index] = resolve
+    })
     return (async () => {
       try {
         await store.transaction(async (tx) => {
-          await tx.get('four-way-key');
-          await pause;
-          await tx.put({ value: index + 1 }, 'four-way-key');
-        });
-        return 'committed' as const;
+          await tx.get('four-way-key')
+          await pause
+          await tx.put({ value: index + 1 }, 'four-way-key')
+        })
+        return 'committed' as const
       } catch (error) {
-        if ((error as { code?: string }).code !== 'TRANSACTION_CONFLICT') throw error;
-        return 'conflict' as const;
+        if ((error as { code?: string }).code !== 'TRANSACTION_CONFLICT') throw error
+        return 'conflict' as const
       }
-    })();
-  });
-  await new Promise<void>((resolve) => queueMicrotask(() => resolve()));
-  for (const release of releases) release();
-  const results = await Promise.all(runs);
-  await seed.dispose();
-  for (const store of stores) await store.dispose();
+    })()
+  })
+  await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
+  for (const release of releases) release()
+  const results = await Promise.all(runs)
+  await seed.dispose()
+  for (const store of stores) await store.dispose()
   return {
     committed: results.filter((result) => result === 'committed').length,
     conflicts: results.filter((result) => result === 'conflict').length
-  };
-};
+  }
+}
 
 window.runIndexedDbFailureScenario = async () => {
-  const dbName = `failure-${Math.random().toString(36).slice(2)}`;
-  const store = indexedDb({ dbName });
-  let transactionCode: string | undefined;
+  const dbName = `failure-${Math.random().toString(36).slice(2)}`
+  const store = indexedDb({ dbName })
+  let transactionCode: string | undefined
   try {
     await store.transaction(async (tx) => {
-      await tx.put({ value: 'must-rollback' }, 'rollback-key');
-      throw new Error('browser callback failure');
-    });
+      await tx.put({ value: 'must-rollback' }, 'rollback-key')
+      throw new Error('browser callback failure')
+    })
   } catch (error) {
-    transactionCode = (error as { code?: string }).code;
+    transactionCode = (error as { code?: string }).code
   }
-  const rolledBack = (await store.getRecord('rollback-key')) === undefined;
-  const controller = new AbortController();
-  controller.abort('before write');
-  let abortCode: string | undefined;
+  const rolledBack = (await store.getRecord('rollback-key')) === undefined
+  const controller = new AbortController()
+  controller.abort('before write')
+  let abortCode: string | undefined
   try {
-    await store.putRecord({ value: 'must-not-write' }, 'abort-key', { signal: controller.signal });
+    await store.putRecord({ value: 'must-not-write' }, 'abort-key', { signal: controller.signal })
   } catch (error) {
-    abortCode = (error as { code?: string }).code;
+    abortCode = (error as { code?: string }).code
   }
-  const abortMissing = (await store.getRecord('abort-key')) === undefined;
-  const invalidCallbackCodes: Array<string | undefined> = [];
+  const abortMissing = (await store.getRecord('abort-key')) === undefined
+  const invalidCallbackCodes: Array<string | undefined> = []
   for (const run of [null, [], {}, 'run', 1]) {
     try {
-      await store.transaction(run as never);
+      await store.transaction(run as never)
     } catch (error) {
-      invalidCallbackCodes.push((error as { code?: string }).code);
+      invalidCallbackCodes.push((error as { code?: string }).code)
     }
   }
-  let invalidScopeOptionsCode: string | undefined;
+  let invalidScopeOptionsCode: string | undefined
   try {
     await store.transaction((tx) =>
       tx.put({ value: 'must-not-write' }, 'invalid-scope-options', {
         conflictPolicy: 'invalid'
       } as never)
-    );
+    )
   } catch (error) {
-    invalidScopeOptionsCode = (error as { code?: string }).code;
+    invalidScopeOptionsCode = (error as { code?: string }).code
   }
-  const invalidScopeWriteMissing = (await store.getRecord('invalid-scope-options')) === undefined;
-  let policyReads = 0;
+  const invalidScopeWriteMissing = (await store.getRecord('invalid-scope-options')) === undefined
+  let policyReads = 0
   await store.transaction((tx) =>
     tx.put({ value: 'snapshot' }, 'policy-snapshot', {
       get conflictPolicy() {
-        policyReads += 1;
-        if (policyReads > 1) throw new Error('policy read twice');
-        return 'replace' as const;
+        policyReads += 1
+        if (policyReads > 1) throw new Error('policy read twice')
+        return 'replace' as const
       }
     })
-  );
-  await store.dispose();
+  )
+  await store.dispose()
   return {
     transactionCode,
     rolledBack,
@@ -2898,45 +3274,141 @@ window.runIndexedDbFailureScenario = async () => {
     invalidScopeOptionsCode,
     invalidScopeWriteMissing,
     policyReads
-  };
-};
+  }
+}
+
+/** 真实浏览器验证 IndexedDB commit 后 listener/report failure 不反转 write result。 */
+window.runIndexedDbPostCommitFailureScenario = async () => {
+  const makeStore = () =>
+    indexedDb({ dbName: `post-commit-failure-${Math.random().toString(36).slice(2)}` })
+  const syncStore = makeStore()
+  const syncTrace: string[] = []
+  let syncResolved = false
+  let syncPersisted = false
+  try {
+    syncStore.subscribeChanges(() => {
+      syncTrace.push('first')
+      throw new Error('browser synchronous listener failure')
+    })
+    syncStore.subscribeChanges(() => {
+      syncTrace.push('second')
+    })
+    try {
+      await syncStore.set('sync', 'committed')
+      syncResolved = true
+    } catch {
+      syncResolved = false
+    }
+    syncPersisted = (await syncStore.get('sync')) === 'committed'
+  } finally {
+    await syncStore.dispose()
+  }
+
+  const lateStore = makeStore()
+  const lateTrace: string[] = []
+  let lateResolved = false
+  let latePersisted = false
+  try {
+    lateStore.subscribeChanges(() => Promise.reject(new Error('browser late listener failure')))
+    lateStore.subscribeChanges(() => {
+      lateTrace.push('second')
+    })
+    try {
+      await lateStore.set('late', 'committed')
+      lateResolved = true
+    } catch {
+      lateResolved = false
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    latePersisted = (await lateStore.get('late')) === 'committed'
+  } finally {
+    await lateStore.dispose()
+  }
+
+  const reporterStore = makeStore()
+  const originalConsoleError = console.error
+  let reporterCalls = 0
+  let reporterThenReads = 0
+  let reporterResolved = false
+  let reporterPersisted = false
+  const hostileReporterValue = Object.create(null)
+  const promiseResolutionProperty = ['t', 'hen'].join('')
+  Object.defineProperty(hostileReporterValue, promiseResolutionProperty, {
+    get: () => {
+      reporterThenReads += 1
+      throw new Error('browser reporter then getter failure')
+    }
+  })
+  try {
+    console.error = (() => {
+      reporterCalls += 1
+      if (reporterCalls === 1) return hostileReporterValue
+    }) as typeof console.error
+    reporterStore.subscribeChanges(() => {
+      throw new Error('browser listener failure')
+    })
+    try {
+      await reporterStore.set('reporter', 'committed')
+      reporterResolved = true
+    } catch {
+      reporterResolved = false
+    }
+    reporterPersisted = (await reporterStore.get('reporter')) === 'committed'
+  } finally {
+    console.error = originalConsoleError
+    await reporterStore.dispose()
+  }
+
+  return {
+    syncResolved,
+    syncPersisted,
+    syncSecondListener: syncTrace.includes('second'),
+    lateResolved,
+    latePersisted,
+    lateSecondListener: lateTrace.includes('second'),
+    reporterResolved,
+    reporterPersisted,
+    reporterCalls,
+    reporterThenReads
+  }
+}
 
 window.runIndexedDbSmokeScenario = async () => {
-  const store = indexedDb({ dbName: `smoke-${Math.random().toString(36).slice(2)}` });
-  await store.putRecord({ a: 1 }, 'k');
-  await store.metadata!.set('smoke', { ready: true });
-  const value = await store.getRecord('k');
-  const metadata = await store.metadata!.get('smoke');
-  await store.dispose();
-  return { ok: true, value, metadata };
-};
+  const store = indexedDb({ dbName: `smoke-${Math.random().toString(36).slice(2)}` })
+  await store.putRecord({ a: 1 }, 'k')
+  await store.metadata!.set('smoke', { ready: true })
+  const value = await store.getRecord('k')
+  const metadata = await store.metadata!.get('smoke')
+  await store.dispose()
+  return { ok: true, value, metadata }
+}
 
 /** 真实浏览器验证 IndexedDB factory options 的容器边界。 */
 window.runIndexedDbOptionsGuardScenario = async () => {
-  const codes: Array<string | undefined> = [];
+  const codes: Array<string | undefined> = []
   for (const options of [null, [], 'options', 1]) {
     try {
-      indexedDb(options as never);
+      indexedDb(options as never)
     } catch (error) {
-      codes.push((error as { code?: string }).code);
+      codes.push((error as { code?: string }).code)
     }
   }
   try {
-    indexedDb({ cleanupLegacyRecords: 'yes' as never });
+    indexedDb({ cleanupLegacyRecords: 'yes' as never })
   } catch (error) {
-    codes.push((error as { code?: string }).code);
+    codes.push((error as { code?: string }).code)
   }
   try {
     indexedDb({
       get dbName(): string {
-        throw new Error('hostile browser dbName');
+        throw new Error('hostile browser dbName')
       }
-    });
+    })
   } catch (error) {
-    codes.push((error as { code?: string }).code);
+    codes.push((error as { code?: string }).code)
   }
-  const store = indexedDb({ dbName: `invalid-string-key-${crypto.randomUUID()}` });
-  const invalidKey = 42 as unknown as string;
+  const store = indexedDb({ dbName: `invalid-string-key-${crypto.randomUUID()}` })
+  const invalidKey = 42 as unknown as string
   for (const operation of [
     () => store.get(invalidKey),
     () => store.set(invalidKey, 'value'),
@@ -2944,170 +3416,170 @@ window.runIndexedDbOptionsGuardScenario = async () => {
     () => store.metadata!.set(invalidKey, 'value')
   ]) {
     try {
-      await operation();
+      await operation()
     } catch (error) {
-      codes.push((error as { code?: string }).code);
+      codes.push((error as { code?: string }).code)
     }
   }
-  await store.dispose();
-  return codes;
-};
+  await store.dispose()
+  return codes
+}
 
 /** 真实浏览器验证 JS 边界传入非法 entity definition 时仍返回统一错误码。 */
 window.runEntityDefinitionGuardScenario = async () => {
-  let definitionOptionReads = 0;
-  let definitionSchemaReads = 0;
+  let definitionOptionReads = 0
+  let definitionSchemaReads = 0
   const getterDefinition = defineEntity<{ id: string }>({
     get name() {
-      definitionOptionReads += 1;
-      return 'browser-getter-definition';
+      definitionOptionReads += 1
+      return 'browser-getter-definition'
     },
     get key() {
-      definitionOptionReads += 1;
-      return 'id' as const;
+      definitionOptionReads += 1
+      return 'id' as const
     },
     get schema() {
-      definitionOptionReads += 1;
+      definitionOptionReads += 1
       return {
         get name() {
-          definitionSchemaReads += 1;
-          return 'browser-getter-schema';
+          definitionSchemaReads += 1
+          return 'browser-getter-schema'
         },
         get validate() {
-          definitionSchemaReads += 1;
-          return async (value: unknown) => value as { id: string };
+          definitionSchemaReads += 1
+          return async (value: unknown) => value as { id: string }
         },
         get encode() {
-          definitionSchemaReads += 1;
-          return undefined;
+          definitionSchemaReads += 1
+          return undefined
         },
         get decode() {
-          definitionSchemaReads += 1;
-          return undefined;
+          definitionSchemaReads += 1
+          return undefined
         },
         get normalize() {
-          definitionSchemaReads += 1;
-          return undefined;
+          definitionSchemaReads += 1
+          return undefined
         }
-      };
+      }
     },
     get codec() {
-      definitionOptionReads += 1;
-      return undefined;
+      definitionOptionReads += 1
+      return undefined
     },
     get version() {
-      definitionOptionReads += 1;
-      return 1;
+      definitionOptionReads += 1
+      return 1
     },
     get migrations() {
-      definitionOptionReads += 1;
-      return undefined;
+      definitionOptionReads += 1
+      return undefined
     },
     get validateOnRead() {
-      definitionOptionReads += 1;
-      return true;
+      definitionOptionReads += 1
+      return true
     },
     get onDiagnostic() {
-      definitionOptionReads += 1;
-      return undefined;
+      definitionOptionReads += 1
+      return undefined
     },
     get defaultOrderBy() {
-      definitionOptionReads += 1;
-      return undefined;
+      definitionOptionReads += 1
+      return undefined
     }
-  });
-  await getterDefinition.connect(memoryStorage()).put({ id: 'stable' });
+  })
+  await getterDefinition.connect(memoryStorage()).put({ id: 'stable' })
   const hostileStore = {
     get backend(): 'memory' {
-      throw new Error('hostile browser backend');
+      throw new Error('hostile browser backend')
     }
-  };
+  }
   const hostileStorePredicates = [
     isKeyValueStore(hostileStore),
     isRecordStore(hostileStore as never)
-  ];
-  const codes: Array<string | undefined> = [];
+  ]
+  const codes: Array<string | undefined> = []
   for (const value of [null, undefined, [], 'entity', 42, true]) {
     try {
-      defineEntity(value as never);
+      defineEntity(value as never)
     } catch (error) {
-      codes.push((error as { code?: string }).code);
+      codes.push((error as { code?: string }).code)
     }
   }
-  const entity = defineEntity<{ id: string }>({ name: 'browser-store-guard', key: 'id' });
-  const storeCodes: Array<string | undefined> = [];
+  const entity = defineEntity<{ id: string }>({ name: 'browser-store-guard', key: 'id' })
+  const storeCodes: Array<string | undefined> = []
   for (const store of [null, undefined, [], {}, { backend: 'memory' }]) {
     try {
-      entity.connect(store as never);
+      entity.connect(store as never)
     } catch (error) {
-      storeCodes.push((error as { code?: string }).code);
+      storeCodes.push((error as { code?: string }).code)
     }
   }
-  entity.connect(memoryStorage());
-  const codecCodes: Array<string | undefined> = [];
+  entity.connect(memoryStorage())
+  const codecCodes: Array<string | undefined> = []
   for (const codec of [null, [], {}, { name: 'codec' }, { name: 'codec', output: 'unknown' }]) {
     try {
-      defineEntity({ name: 'browser-codec-guard', key: 'id', codec } as never);
+      defineEntity({ name: 'browser-codec-guard', key: 'id', codec } as never)
     } catch (error) {
-      codecCodes.push((error as { code?: string }).code);
+      codecCodes.push((error as { code?: string }).code)
     }
   }
-  const schemaCodes: Array<string | undefined> = [];
+  const schemaCodes: Array<string | undefined> = []
   for (const schema of [null, [], {}, { name: 'schema' }, { name: 'schema', validate: true }]) {
     try {
-      defineEntity({ name: 'browser-schema-guard', key: 'id', schema } as never);
+      defineEntity({ name: 'browser-schema-guard', key: 'id', schema } as never)
     } catch (error) {
-      schemaCodes.push((error as { code?: string }).code);
+      schemaCodes.push((error as { code?: string }).code)
     }
   }
-  const migrationCodes: Array<string | undefined> = [];
+  const migrationCodes: Array<string | undefined> = []
   for (const migrations of [null, [], 'migrations', 42]) {
     try {
-      defineEntity({ name: 'browser-migration-guard', key: 'id', version: 1, migrations } as never);
+      defineEntity({ name: 'browser-migration-guard', key: 'id', version: 1, migrations } as never)
     } catch (error) {
-      migrationCodes.push((error as { code?: string }).code);
+      migrationCodes.push((error as { code?: string }).code)
     }
   }
-  const versionCodes: Array<string | undefined> = [];
+  const versionCodes: Array<string | undefined> = []
   try {
     defineEntity({
       name: 'browser-unsafe-version',
       key: 'id',
       version: Number.MAX_SAFE_INTEGER + 1
-    } as never);
+    } as never)
   } catch (error) {
-    versionCodes.push((error as { code?: string }).code);
+    versionCodes.push((error as { code?: string }).code)
   }
-  const migrationVersionCodes: Array<string | undefined> = [];
+  const migrationVersionCodes: Array<string | undefined> = []
   try {
     defineEntity({
       name: 'browser-unsafe-migration-version',
       key: 'id',
       version: Number.MAX_SAFE_INTEGER,
       migrations: { '9007199254740993': async (value: unknown) => value }
-    } as never);
+    } as never)
   } catch (error) {
-    migrationVersionCodes.push((error as { code?: string }).code);
+    migrationVersionCodes.push((error as { code?: string }).code)
   }
-  const prototypeMigrationCodes: Array<string | undefined> = [];
+  const prototypeMigrationCodes: Array<string | undefined> = []
   try {
-    const migrations = Object.create({ 2: async (value: unknown) => value });
+    const migrations = Object.create({ 2: async (value: unknown) => value })
     defineEntity({
       name: 'browser-prototype-migration',
       key: 'id',
       version: 2,
       migrations
-    } as never);
+    } as never)
   } catch (error) {
-    prototypeMigrationCodes.push((error as { code?: string }).code);
+    prototypeMigrationCodes.push((error as { code?: string }).code)
   }
-  const nullVersionCodes: Array<string | undefined> = [];
+  const nullVersionCodes: Array<string | undefined> = []
   try {
-    defineEntity({ name: 'browser-null-version', key: 'id', version: null } as never);
+    defineEntity({ name: 'browser-null-version', key: 'id', version: null } as never)
   } catch (error) {
-    nullVersionCodes.push((error as { code?: string }).code);
+    nullVersionCodes.push((error as { code?: string }).code)
   }
-  const backendCodes: Array<string | undefined> = [];
+  const backendCodes: Array<string | undefined> = []
   try {
     const alienStore = {
       backend: 'alien',
@@ -3120,14 +3592,14 @@ window.runEntityDefinitionGuardScenario = async () => {
       clearValues: async () => undefined,
       clearAll: async () => undefined,
       dispose: async () => undefined
-    };
+    }
     defineEntity<{ id: string }>({ name: 'browser-alien-store', key: 'id' }).connect(
       alienStore as never
-    );
+    )
   } catch (error) {
-    backendCodes.push((error as { code?: string }).code);
+    backendCodes.push((error as { code?: string }).code)
   }
-  const capabilityCodes: Array<string | undefined> = [];
+  const capabilityCodes: Array<string | undefined> = []
   for (const capabilities of [
     { syncRead: 'yes' },
     [],
@@ -3137,6 +3609,8 @@ window.runEntityDefinitionGuardScenario = async () => {
       records: false,
       transactions: false,
       iteration: false,
+      secondaryIndexes: false,
+      changeFeed: false,
       opaqueEntries: false,
       maxValueBytes: 1.5
     }
@@ -3153,109 +3627,109 @@ window.runEntityDefinitionGuardScenario = async () => {
         clearValues: async () => undefined,
         clearAll: async () => undefined,
         dispose: async () => undefined
-      };
+      }
       defineEntity<{ id: string }>({ name: 'browser-capability-guard', key: 'id' }).connect(
         malformedStore as never
-      );
+      )
     } catch (error) {
-      capabilityCodes.push((error as { code?: string }).code);
+      capabilityCodes.push((error as { code?: string }).code)
     }
   }
-  const sparseVersionCodes: Array<string | undefined> = [];
+  const sparseVersionCodes: Array<string | undefined> = []
   try {
     defineEntity({
       name: 'browser-sparse-huge-version',
       key: 'id',
       version: Number.MAX_SAFE_INTEGER,
       migrations: { 2: async (value: unknown) => value }
-    } as never);
+    } as never)
   } catch (error) {
-    sparseVersionCodes.push((error as { code?: string }).code);
+    sparseVersionCodes.push((error as { code?: string }).code)
   }
-  const validateOnReadCodes: Array<string | undefined> = [];
+  const validateOnReadCodes: Array<string | undefined> = []
   for (const validateOnRead of [null, 'yes', 1, []]) {
     try {
-      defineEntity({ name: 'browser-validate-on-read', key: 'id', validateOnRead } as never);
+      defineEntity({ name: 'browser-validate-on-read', key: 'id', validateOnRead } as never)
     } catch (error) {
-      validateOnReadCodes.push((error as { code?: string }).code);
+      validateOnReadCodes.push((error as { code?: string }).code)
     }
   }
-  const standardSchemaCodes: Array<string | undefined> = [];
+  const standardSchemaCodes: Array<string | undefined> = []
   for (const schema of [null, [], {}, { '~standard': null }, { '~standard': {} }]) {
     try {
-      fromStandardSchema(schema as never);
+      fromStandardSchema(schema as never)
     } catch (error) {
-      standardSchemaCodes.push((error as { code?: string }).code);
+      standardSchemaCodes.push((error as { code?: string }).code)
     }
   }
-  let standardSchemaContractReads = 0;
-  let standardSchemaResultReads = 0;
+  let standardSchemaContractReads = 0
+  let standardSchemaResultReads = 0
   const getterSchema = fromStandardSchema<number>({
     get '~standard'() {
-      standardSchemaContractReads += 1;
+      standardSchemaContractReads += 1
       return {
         get version() {
-          standardSchemaContractReads += 1;
-          return 1 as const;
+          standardSchemaContractReads += 1
+          return 1 as const
         },
         get vendor() {
-          standardSchemaContractReads += 1;
-          return 'browser-getter-schema';
+          standardSchemaContractReads += 1
+          return 'browser-getter-schema'
         },
         get validate() {
-          standardSchemaContractReads += 1;
+          standardSchemaContractReads += 1
           return async () => ({
             get issues() {
-              standardSchemaResultReads += 1;
-              return undefined;
+              standardSchemaResultReads += 1
+              return undefined
             },
             get value() {
-              standardSchemaResultReads += 1;
-              return 42;
+              standardSchemaResultReads += 1
+              return 42
             }
-          });
+          })
         }
-      };
+      }
     }
-  });
-  await getterSchema.validate('input');
-  const migrationHelperCodes: Array<string | undefined> = [];
+  })
+  await getterSchema.validate('input')
+  const migrationHelperCodes: Array<string | undefined> = []
   for (const [fromVersion, toVersion] of [
     [Number.NaN, 1],
     [0, Number.POSITIVE_INFINITY],
     [0, Number.MAX_SAFE_INTEGER + 1]
   ]) {
     try {
-      await runMigrations({}, fromVersion, toVersion, undefined);
+      await runMigrations({}, fromVersion, toVersion, undefined)
     } catch (error) {
-      migrationHelperCodes.push((error as { code?: string }).code);
+      migrationHelperCodes.push((error as { code?: string }).code)
     }
   }
-  let inheritedMigrationCalls = 0;
+  let inheritedMigrationCalls = 0
   const inheritedMigrations = Object.create({
     1: async () => {
-      inheritedMigrationCalls += 1;
-      return {};
+      inheritedMigrationCalls += 1
+      return {}
     }
-  });
-  await runMigrations({}, 0, 1, inheritedMigrations);
-  let raceAborted = false;
-  let migrationRaceCode: string | undefined;
+  })
+  await runMigrations({}, 0, 1, inheritedMigrations)
+  let raceAborted = false
+  let migrationRaceCode: string | undefined
   try {
     await runMigrations({}, 0, 1, { 1: async () => new Promise<unknown>(() => {}) }, {
       get aborted() {
-        return raceAborted;
+        return raceAborted
       },
       reason: 'race abort',
       addEventListener: () => {
-        raceAborted = true;
+        raceAborted = true
       },
       removeEventListener: () => {}
-    } as never);
+    } as never)
   } catch (error) {
-    migrationRaceCode = (error as { code?: string }).code;
+    migrationRaceCode = (error as { code?: string }).code
   }
-  const codecSelectionCodes: Array<string | undefined> = [];
+  const codecSelectionCodes: Array<string | undefined> = []
   for (const [codec, capabilities, diagnostic] of [
     [null, {}, undefined],
     [jsonCodec, {}, undefined],
@@ -3274,29 +3748,29 @@ window.runEntityDefinitionGuardScenario = async () => {
     ]
   ] as const) {
     try {
-      selectCodec(codec as never, capabilities as never, diagnostic as never);
+      selectCodec(codec as never, capabilities as never, diagnostic as never)
     } catch (error) {
-      codecSelectionCodes.push((error as { code?: string }).code);
+      codecSelectionCodes.push((error as { code?: string }).code)
     }
   }
-  let codecDescriptorReads = 0;
+  let codecDescriptorReads = 0
   const selectedGetterCodec = selectCodec(
     {
       get name() {
-        codecDescriptorReads += 1;
-        return 'browser-getter-codec';
+        codecDescriptorReads += 1
+        return 'browser-getter-codec'
       },
       get output() {
-        codecDescriptorReads += 1;
-        return 'text' as const;
+        codecDescriptorReads += 1
+        return 'text' as const
       },
       get encode() {
-        codecDescriptorReads += 1;
-        return async (value: unknown) => JSON.stringify(value);
+        codecDescriptorReads += 1
+        return async (value: unknown) => JSON.stringify(value)
       },
       get decode() {
-        codecDescriptorReads += 1;
-        return async (value: string) => JSON.parse(value) as unknown;
+        codecDescriptorReads += 1
+        return async (value: string) => JSON.parse(value) as unknown
       }
     },
     {
@@ -3305,11 +3779,13 @@ window.runEntityDefinitionGuardScenario = async () => {
       records: false,
       transactions: false,
       iteration: false,
+      secondaryIndexes: false,
+      changeFeed: false,
       maxValueBytes: 1024,
       opaqueEntries: false
     }
-  );
-  await selectedGetterCodec.encode({ stable: true });
+  )
+  await selectedGetterCodec.encode({ stable: true })
   return {
     codes,
     storeCodes,
@@ -3335,101 +3811,101 @@ window.runEntityDefinitionGuardScenario = async () => {
     codecDescriptorReads,
     definitionOptionReads,
     definitionSchemaReads
-  };
-};
+  }
+}
 
 /** 真实浏览器验证 orderBy comparator 的返回类型不会被 Array.sort 静默转换。 */
 window.runEntityComparatorGuardScenario = async () => {
-  const entity = defineEntity<{ id: string }>({ name: 'browser-comparator-guard', key: 'id' });
-  const repo = entity.connect(memoryStorage());
-  await repo.put({ id: 'a' });
-  await repo.put({ id: 'b' });
-  const codes: Array<string | undefined> = [];
+  const entity = defineEntity<{ id: string }>({ name: 'browser-comparator-guard', key: 'id' })
+  const repo = entity.connect(memoryStorage())
+  await repo.put({ id: 'a' })
+  await repo.put({ id: 'b' })
+  const codes: Array<string | undefined> = []
   for (const comparator of [() => 'invalid' as never, () => Number.NaN]) {
     try {
-      await repo.list({ orderBy: comparator });
+      await repo.list({ orderBy: comparator })
     } catch (error) {
-      codes.push((error as { code?: string }).code);
+      codes.push((error as { code?: string }).code)
     }
   }
-  let nullCode: string | undefined;
+  let nullCode: string | undefined
   try {
-    await repo.list({ orderBy: null as never });
+    await repo.list({ orderBy: null as never })
   } catch (error) {
-    nullCode = (error as { code?: string }).code;
+    nullCode = (error as { code?: string }).code
   }
-  const invalidOptionsCodes: Array<string | undefined> = [];
+  const invalidOptionsCodes: Array<string | undefined> = []
   for (const options of [null, [], 'options', 1]) {
     try {
-      await repo.list(options as never);
+      await repo.list(options as never)
     } catch (error) {
-      invalidOptionsCodes.push((error as { code?: string }).code);
+      invalidOptionsCodes.push((error as { code?: string }).code)
     }
   }
   try {
-    await repo.list({ limit: Number.MAX_SAFE_INTEGER + 1 });
+    await repo.list({ limit: Number.MAX_SAFE_INTEGER + 1 })
   } catch (error) {
-    invalidOptionsCodes.push((error as { code?: string }).code);
+    invalidOptionsCodes.push((error as { code?: string }).code)
   }
-  const rangeCodes: Array<string | undefined> = [];
+  const rangeCodes: Array<string | undefined> = []
   for (const range of [null, [], 'range', 1]) {
     try {
-      await repo.list({ range: range as never });
+      await repo.list({ range: range as never })
     } catch (error) {
-      rangeCodes.push((error as { code?: string }).code);
+      rangeCodes.push((error as { code?: string }).code)
     }
   }
   for (const range of [{ lowerOpen: 'yes' }, { upperOpen: 1 }]) {
     try {
-      await repo.list({ range: range as never });
+      await repo.list({ range: range as never })
     } catch (error) {
-      rangeCodes.push((error as { code?: string }).code);
+      rangeCodes.push((error as { code?: string }).code)
     }
   }
-  const invalidHandlerCodes: Array<string | undefined> = [];
+  const invalidHandlerCodes: Array<string | undefined> = []
   for (const onInvalid of [null, [], 'invalid', 1]) {
     try {
-      await repo.list({ onInvalid: onInvalid as never });
+      await repo.list({ onInvalid: onInvalid as never })
     } catch (error) {
-      invalidHandlerCodes.push((error as { code?: string }).code);
+      invalidHandlerCodes.push((error as { code?: string }).code)
     }
   }
-  let invalidPolicyCode: string | undefined;
+  let invalidPolicyCode: string | undefined
   try {
-    await memoryStorage().set('policy', 'value', { conflictPolicy: 'invalid' as never });
+    await memoryStorage().set('policy', 'value', { conflictPolicy: 'invalid' as never })
   } catch (error) {
-    invalidPolicyCode = (error as { code?: string }).code;
+    invalidPolicyCode = (error as { code?: string }).code
   }
-  let rangeSnapshotReads = 0;
+  let rangeSnapshotReads = 0
   await repo.list({
     range: {
       get lower() {
-        rangeSnapshotReads += 1;
-        if (rangeSnapshotReads > 1) throw new Error('range read twice');
-        return 'a';
+        rangeSnapshotReads += 1
+        if (rangeSnapshotReads > 1) throw new Error('range read twice')
+        return 'a'
       },
       upper: 'z'
     }
-  });
-  let listOptionReads = 0;
+  })
+  let listOptionReads = 0
   await repo.list({
     get range() {
-      listOptionReads += 1;
-      return { lower: 'a', upper: 'z' };
+      listOptionReads += 1
+      return { lower: 'a', upper: 'z' }
     },
     get limit() {
-      listOptionReads += 1;
-      return 2;
+      listOptionReads += 1
+      return 2
     },
     get orderBy() {
-      listOptionReads += 1;
-      return undefined;
+      listOptionReads += 1
+      return undefined
     },
     get onInvalid() {
-      listOptionReads += 1;
-      return 'throw' as const;
+      listOptionReads += 1
+      return 'throw' as const
     }
-  });
+  })
   return {
     codes,
     nullCode,
@@ -3439,31 +3915,31 @@ window.runEntityComparatorGuardScenario = async () => {
     invalidPolicyCode,
     rangeSnapshotReads,
     listOptionReads
-  };
-};
+  }
+}
 
 /** Run the storage capability matrix inside a real module Worker. */
 window.runWorkerScenario = (): Promise<{
-  readonly memory: string | null;
-  readonly indexedDb: string | null;
-  readonly localStorageCode: string | undefined;
-  readonly cookiesCode: string | undefined;
+  readonly memory: string | null
+  readonly indexedDb: string | null
+  readonly localStorageCode: string | undefined
+  readonly cookiesCode: string | undefined
 }> =>
   new Promise((resolve, reject) => {
-    const worker = new Worker(new URL('./worker-entry.ts', import.meta.url), { type: 'module' });
+    const worker = new Worker(new URL('./worker-entry.ts', import.meta.url), { type: 'module' })
     const timeout = window.setTimeout(() => {
-      worker.terminate();
-      reject(new Error('worker scenario timed out'));
-    }, 10_000);
+      worker.terminate()
+      reject(new Error('worker scenario timed out'))
+    }, 10_000)
     worker.onmessage = (event: MessageEvent) => {
-      window.clearTimeout(timeout);
-      worker.terminate();
-      resolve(event.data);
-    };
+      window.clearTimeout(timeout)
+      worker.terminate()
+      resolve(event.data)
+    }
     worker.onerror = (event) => {
-      window.clearTimeout(timeout);
-      worker.terminate();
-      reject(event.error ?? new Error(event.message));
-    };
-    worker.postMessage(undefined);
-  });
+      window.clearTimeout(timeout)
+      worker.terminate()
+      reject(event.error ?? new Error(event.message))
+    }
+    worker.postMessage(undefined)
+  })

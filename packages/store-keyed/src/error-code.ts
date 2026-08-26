@@ -83,6 +83,6 @@ export const StoreKeyedErrorCode = {
    * 调用方修正参数；具体是哪个参数见消息文案。
    */
   invalidOption: 'INVALID_OPTION'
-} as const;
+} as const
 
-export type IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];
+export type IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]

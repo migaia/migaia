@@ -33,4 +33,4 @@ export const StoreKeyedErrorText = {
   opticMissing: (label: string): string => `[store] ${label}`,
   thenable: (context: string): string =>
     `[store] ${context} returned a thenable — async initial values are not supported here; compose with @migaia/resource instead (e.g. \`familyDef((id) => createResource(() => fetch(id)))\`)`
-} as const;
+} as const

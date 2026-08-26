@@ -5,4 +5,4 @@ export {
   isFieldBuilder,
   type IFieldBuilder,
   type IFieldContext
-} from '@migaia/store-light';
+} from '@migaia/store-light'

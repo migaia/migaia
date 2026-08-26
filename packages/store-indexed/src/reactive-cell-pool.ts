@@ -1,5 +1,5 @@
-import type { Signal } from '@migaia/reactive/reactive/signal.class';
-import { KeyedCellRegistry, scheduleLazyCellRelease } from './keyed-cell-registry.js';
+import type { Signal } from '@migaia/reactive/reactive/signal.class'
+import { KeyedCellRegistry, scheduleLazyCellRelease } from './keyed-cell-registry.js'
 
 /**
  * Shared getOrCreate / speculative-lease / tombstone lifecycle for a keyed map of lazily
@@ -13,22 +13,22 @@ import { KeyedCellRegistry, scheduleLazyCellRelease } from './keyed-cell-registr
  * `ObservableCollectionBase#nodes`).
  */
 export class ReactiveCellPool<K, V> {
-  #cells = new KeyedCellRegistry<K, Signal<V>>();
-  readonly #own: (node: Signal<V>) => Signal<V>;
-  readonly #release: (node: Signal<unknown>) => boolean;
+  #cells = new KeyedCellRegistry<K, Signal<V>>()
+  readonly #own: (node: Signal<V>) => Signal<V>
+  readonly #release: (node: Signal<unknown>) => boolean
 
   constructor(own: (node: Signal<V>) => Signal<V>, release: (node: Signal<unknown>) => boolean) {
-    this.#own = own;
-    this.#release = release;
+    this.#own = own
+    this.#release = release
   }
 
   get(key: K): Signal<V> | undefined {
-    return this.#cells.get(key);
+    return this.#cells.get(key)
   }
 
   /** Observer count of a materialized cell; 0 for a key with no cell yet. */
   observerCount(key: K): number {
-    return this.#cells.get(key)?.subs.size ?? 0;
+    return this.#cells.get(key)?.subs.size ?? 0
   }
 
   /**
@@ -37,25 +37,25 @@ export class ReactiveCellPool<K, V> {
    * reclaimed at the end of the current microtask so a stray peek/read doesn't pin it forever.
    */
   getOrCreate(key: K, create: () => Signal<V>): Signal<V> {
-    const existing = this.#cells.get(key);
-    if (existing) return existing;
-    const cell = this.#own(create());
-    this.#cells.set(key, cell);
+    const existing = this.#cells.get(key)
+    if (existing) return existing
+    const cell = this.#own(create())
+    this.#cells.set(key, cell)
     cell.addObservedHooks({
       onUnobserved: () => {
-        this.releaseIfDormant(key, cell);
+        this.releaseIfDormant(key, cell)
       }
-    });
-    scheduleLazyCellRelease(this.#cells, key, cell, () => this.#release(cell));
-    return cell;
+    })
+    scheduleLazyCellRelease(this.#cells, key, cell, () => this.#release(cell))
+    return cell
   }
 
   /** Drop `key`'s cell now if it is exactly `cell` and has no remaining observers. */
   releaseIfDormant(key: K, cell: Signal<unknown>): boolean {
-    if (this.#cells.get(key) !== cell) return false;
-    if (!this.#release(cell)) return false;
-    this.#cells.delete(key);
-    return true;
+    if (this.#cells.get(key) !== cell) return false
+    if (!this.#release(cell)) return false
+    this.#cells.delete(key)
+    return true
   }
 
   /**
@@ -64,34 +64,34 @@ export class ReactiveCellPool<K, V> {
    * than disappearing out from under a subscriber.
    */
   tombstone(key: K): boolean {
-    const cell = this.#cells.get(key);
-    if (!cell) return false;
-    return this.releaseIfDormant(key, cell);
+    const cell = this.#cells.get(key)
+    if (!cell) return false
+    return this.releaseIfDormant(key, cell)
   }
 
   keys(): IterableIterator<K> {
-    return this.#cells.keys();
+    return this.#cells.keys()
   }
 
   entries(): IterableIterator<[K, Signal<V>]> {
-    return this.#cells.entries();
+    return this.#cells.entries()
   }
 
   [Symbol.iterator](): IterableIterator<[K, Signal<V>]> {
-    return this.#cells.entries();
+    return this.#cells.entries()
   }
 
   get size(): number {
-    return this.#cells.size;
+    return this.#cells.size
   }
 
   /** Tombstone every cell whose key `isLive` reports gone. Returns the count removed. */
   pruneStale(isLive: (key: K) => boolean): number {
-    let removed = 0;
+    let removed = 0
     for (const key of Array.from(this.#cells.keys())) {
-      if (!isLive(key) && this.tombstone(key)) removed++;
+      if (!isLive(key) && this.tombstone(key)) removed++
     }
-    return removed;
+    return removed
   }
 
   /**
@@ -101,6 +101,6 @@ export class ReactiveCellPool<K, V> {
    * from this pool or another owned node.
    */
   dispose(): void {
-    this.#cells.clear();
+    this.#cells.clear()
   }
 }

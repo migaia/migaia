@@ -1,6 +1,7 @@
 {
   "name": "@migaia/storage-web",
   "version": "0.0.3",
+  "private": true,
   "description": "Independent web storage library: localStorage, sessionStorage, cookies, IndexedDB CRUD with entity, schema and serialize extension points.",
   "repository": {
     "type": "git",
@@ -13,6 +14,7 @@
     "USEGUIDE.md"
   ],
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -21,6 +23,38 @@
     "./memory": {
       "types": "./dist/memory.d.ts",
       "default": "./dist/memory.js"
+    },
+    "./local-storage": {
+      "types": "./dist/local-storage.d.ts",
+      "default": "./dist/local-storage.js"
+    },
+    "./session-storage": {
+      "types": "./dist/session-storage.d.ts",
+      "default": "./dist/session-storage.js"
+    },
+    "./cookies": {
+      "types": "./dist/cookies.d.ts",
+      "default": "./dist/cookies.js"
+    },
+    "./indexed-db": {
+      "types": "./dist/indexed-db.d.ts",
+      "default": "./dist/indexed-db.js"
+    },
+    "./entity": {
+      "types": "./dist/entity.d.ts",
+      "default": "./dist/entity.js"
+    },
+    "./schema": {
+      "types": "./dist/schema.d.ts",
+      "default": "./dist/schema.js"
+    },
+    "./serialize": {
+      "types": "./dist/serialize.d.ts",
+      "default": "./dist/serialize.js"
+    },
+    "./reactive": {
+      "types": "./dist/reactive.d.ts",
+      "default": "./dist/reactive.js"
     }
   },
   "publishConfig": {
@@ -32,6 +66,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
     "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
+    "check:error-registry": "node test/reconcile-error-registry.mjs",
     "lint": "oxlint src test e2e",
     "test": "pnpm run build && vitest run --coverage",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",
@@ -40,6 +75,9 @@
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
   "dependencies": {
+    "@migaia/event-subscriber": "workspace:^",
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/reactive": "workspace:^",
     "@migaia/storage-contract": "workspace:^",
     "@migaia/utils": "workspace:^"
   },

@@ -1,5 +1,5 @@
-import { defineConfig } from 'vite';
-import { fileURLToPath } from 'node:url';
+import { defineConfig } from 'vite'
+import { fileURLToPath } from 'node:url'
 
 /** Produces one runtime-neutral ESM entry; declarations are emitted by TypeScript. */
 export default defineConfig({
@@ -11,6 +11,9 @@ export default defineConfig({
       formats: ['es'],
       fileName: () => 'index.js'
     },
-    sourcemap: true
+    sourcemap: true,
+    rollupOptions: {
+      external: ['@migaia/lifecycle', '@migaia/utils', '@migaia/utils/bytes']
+    }
   }
-});
+})

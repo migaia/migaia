@@ -32,7 +32,7 @@ export const StoreDevtoolsErrorCode = {
    * the session is terminal and cannot be revived.
    */
   cleanupFailed: 'CLEANUP_FAILED'
-} as const;
+} as const
 
 export type IStoreDevtoolsErrorCode =
-  (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode];
+  (typeof StoreDevtoolsErrorCode)[keyof typeof StoreDevtoolsErrorCode]

@@ -1,156 +1,224 @@
-import { describe, expect, it } from 'vitest';
-import { StoreWorkerErrorCode } from '../src/error-code.js';
-import { workerParser } from '../src/serialize/worker.js';
-import { transferablesOf } from '../src/serialize/transferables.js';
-import { WorkerByteOwnership } from '../src/worker-constants.js';
+import { describe, expect, it } from 'vitest'
+import { WEBRPC_SOURCE, WebRpcLifecycleError } from '@migaia/web-rpc'
+import { StoreWorkerErrorCode } from '../src/error-code.js'
+import { workerParser } from '../src/serialize/worker.js'
+import { transferablesOf } from '../src/serialize/transferables.js'
+import { WorkerByteOwnership } from '../src/worker-constants.js'
 
 describe('workerParser lifecycle', () => {
   it('rejects null options with a tagged configuration error', () => {
-    expect(() => workerParser(null as never)).toThrow('[store] worker options must be an object');
-  });
+    expect(() => workerParser(null as never)).toThrow('[store] worker options must be an object')
+  })
 
   it('rejects hostile option values instead of silently changing transfer/lifecycle semantics', () => {
-    const worker = {} as never;
+    const worker = {} as never
     expect(() => workerParser({ worker: null as never })).toThrow(
       '[store] worker options.worker must be an object'
-    );
+    )
     expect(() => workerParser({ worker, ownership: 'move' as never })).toThrow(
       '[store] worker options.ownership must be copy or transfer'
-    );
+    )
     expect(() => workerParser({ worker, terminateOnDispose: 'yes' as never })).toThrow(
       '[store] worker options.terminateOnDispose must be boolean'
-    );
-  });
+    )
+  })
 
   it('rejects non-string type and clientId before endpoint creation', () => {
-    const worker = {} as never;
+    const worker = {} as never
     expect(() => workerParser({ worker, type: Symbol('type') as never })).toThrow(
       expect.objectContaining({ source: '@migaia/store-worker', code: 'INVALID_OPTION' })
-    );
+    )
     expect(() => workerParser({ worker, clientId: Symbol('client') as never })).toThrow(
       expect.objectContaining({ source: '@migaia/store-worker', code: 'INVALID_OPTION' })
-    );
-  });
+    )
+  })
 
   it('does not transfer SharedArrayBuffer-backed bytes', () => {
-    const shared = new SharedArrayBuffer(4);
-    const bytes = new Uint8Array(shared);
-    expect(transferablesOf(['bytes', bytes], WorkerByteOwnership.transfer)).toEqual([]);
-  });
+    const shared = new SharedArrayBuffer(4)
+    const bytes = new Uint8Array(shared)
+    expect(transferablesOf(['bytes', bytes], WorkerByteOwnership.transfer)).toEqual([])
+  })
 
   it('shares one dispose promise and terminates an owned worker exactly once', async () => {
-    let terminateCalls = 0;
-    const listeners = new Map<string, Set<(event: MessageEvent<unknown> | Event) => void>>();
+    let terminateCalls = 0
+    const listeners = new Map<string, Set<(event: MessageEvent<unknown> | Event) => void>>()
     const worker = {
       postMessage(): void {},
       addEventListener(
         type: 'message' | 'error' | 'messageerror',
         listener: (event: MessageEvent<unknown> | Event) => void
       ): void {
-        const bucket = listeners.get(type) ?? new Set();
-        bucket.add(listener);
-        listeners.set(type, bucket);
+        const bucket = listeners.get(type) ?? new Set()
+        bucket.add(listener)
+        listeners.set(type, bucket)
       },
       removeEventListener(
         type: 'message' | 'error' | 'messageerror',
         listener: (event: MessageEvent<unknown> | Event) => void
       ): void {
-        listeners.get(type)?.delete(listener);
+        listeners.get(type)?.delete(listener)
       },
       terminate(): void {
-        terminateCalls++;
+        terminateCalls++
       }
-    };
-    const parser = workerParser({ worker, terminateOnDispose: true });
-    const dispose = parser.dispose!;
+    }
+    const parser = workerParser({ worker, terminateOnDispose: true })
+    const dispose = parser.dispose!
 
-    const first = dispose() as Promise<void>;
-    const second = dispose() as Promise<void>;
-    expect(second).toBe(first);
-    await Promise.all([first, second]);
-    await dispose();
-    expect(terminateCalls).toBe(1);
-  });
+    const first = dispose() as Promise<void>
+    const second = dispose() as Promise<void>
+    expect(second).toBe(first)
+    await Promise.all([first, second])
+    await dispose()
+    expect(terminateCalls).toBe(1)
+  })
 
-  it('collects endpoint and terminate cleanup failures under cleanupFailed', async () => {
-    const endpointCleanupError = new Error('endpoint cleanup failed');
-    const terminateError = new Error('worker terminate failed');
+  it('does not terminate a borrowed worker by default after successful disposal', async () => {
+    let terminateCalls = 0
     const worker = {
       postMessage(): void {},
       addEventListener(): void {},
-      removeEventListener(): void {
-        throw endpointCleanupError;
+      removeEventListener(): void {},
+      terminate(): void {
+        terminateCalls++
+      }
+    }
+    const parser = workerParser({ worker })
+    const dispose = parser.dispose!
+    const first = dispose() as Promise<void>
+    const second = dispose() as Promise<void>
+    expect(second).toBe(first)
+    await first
+    expect(dispose()).toBe(first)
+    expect(terminateCalls).toBe(0)
+  })
+
+  it('does not terminate a borrowed worker after endpoint-failure disposal when disabled', async () => {
+    let terminateCalls = 0
+    const endpointPrimary = new Error('borrowed endpoint disposal failed')
+    const worker = {
+      postMessage(): void {},
+      addEventListener(): void {},
+      removeEventListener(type: 'message' | 'error' | 'messageerror'): void {
+        if (type === 'message') throw endpointPrimary
       },
       terminate(): void {
-        throw terminateError;
+        terminateCalls++
       }
-    };
-    const parser = workerParser({ worker, terminateOnDispose: true });
-    const dispose = parser.dispose!;
+    }
+    const parser = workerParser({ worker, terminateOnDispose: false })
+    const dispose = parser.dispose!
+    const first = dispose() as Promise<void>
+    const second = dispose() as Promise<void>
+    expect(second).toBe(first)
+    const failure = await first.catch((error: unknown) => error)
+    expect(failure).toMatchObject({
+      name: 'WebRpcLifecycleError',
+      source: WEBRPC_SOURCE,
+      code: 'ENDPOINT_DISPOSED',
+      cause: endpointPrimary
+    })
+    expect(dispose()).toBe(first)
+    expect(terminateCalls).toBe(0)
+  })
 
-    const first = dispose() as Promise<void>;
-    const second = dispose() as Promise<void>;
-    expect(second).toBe(first);
+  it('collects endpoint and terminate cleanup failures under cleanupFailed', async () => {
+    const endpointPrimary = new Error('endpoint cleanup failed')
+    const endpointCleanupError = new WebRpcLifecycleError(
+      'Endpoint disposal completed with cleanup errors',
+      endpointPrimary,
+      [{ resource: 'transport subscription', error: endpointPrimary }]
+    )
+    const terminateError = new Error('worker terminate failed')
+    const worker = {
+      postMessage(): void {},
+      addEventListener(): void {},
+      removeEventListener(type: 'message' | 'error' | 'messageerror'): void {
+        if (type === 'message') throw endpointCleanupError
+      },
+      terminate(): void {
+        throw terminateError
+      }
+    }
+    const parser = workerParser({ worker, terminateOnDispose: true })
+    const dispose = parser.dispose!
 
-    const error = await first.catch((reason: unknown) => reason);
-    expect(error).toBeInstanceOf(AggregateError);
-    expect(error).toMatchObject({ code: StoreWorkerErrorCode.cleanupFailed });
-    const cleanupErrors = (error as AggregateError).errors;
-    expect(cleanupErrors).toHaveLength(2);
-    expect(cleanupErrors[1]).toBe(terminateError);
+    const first = dispose() as Promise<void>
+    const second = dispose() as Promise<void>
+    expect(second).toBe(first)
+
+    const error = await first.catch((reason: unknown) => reason)
+    expect(error).toBeInstanceOf(AggregateError)
+    expect(error).toMatchObject({ code: StoreWorkerErrorCode.cleanupFailed })
+    const cleanupErrors = (error as AggregateError).errors
+    expect(cleanupErrors).toHaveLength(2)
+    expect(cleanupErrors[0]).toBe(endpointCleanupError)
+    expect(cleanupErrors[0]).toMatchObject({
+      source: WEBRPC_SOURCE,
+      code: 'ENDPOINT_DISPOSED',
+      cause: endpointPrimary,
+      cleanupErrors: [{ resource: 'transport subscription', error: endpointPrimary }]
+    })
+    expect(cleanupErrors[1]).toBe(terminateError)
     expect(cleanupErrors[0]).toMatchObject({
       cleanupErrors: expect.arrayContaining([
         expect.objectContaining({ resource: 'transport subscription' })
       ])
-    });
-    expect(dispose()).toBe(first);
-  });
+    })
+    expect(dispose()).toBe(first)
+  })
 
   it('terminates an owned worker when endpoint disposal fails', async () => {
-    let terminateCalls = 0;
+    let terminateCalls = 0
+    const endpointPrimary = new Error('endpoint disposal failed')
     const worker = {
       postMessage(): void {},
       addEventListener(): void {},
-      removeEventListener(): void {
-        throw new Error('endpoint disposal failed');
+      removeEventListener(type: 'message' | 'error' | 'messageerror'): void {
+        if (type === 'message') throw endpointPrimary
       },
       terminate(): void {
-        terminateCalls++;
+        terminateCalls++
       }
-    };
-    const parser = workerParser({ worker, terminateOnDispose: true });
+    }
+    const parser = workerParser({ worker, terminateOnDispose: true })
 
-    await expect(parser.dispose?.()).rejects.toThrow(
-      'Endpoint disposal completed with cleanup errors'
-    );
-    expect(terminateCalls).toBe(1);
-  });
+    await expect(parser.dispose?.()).rejects.toMatchObject({
+      name: 'WebRpcLifecycleError',
+      source: WEBRPC_SOURCE,
+      code: 'ENDPOINT_DISPOSED',
+      message: 'Endpoint disposal completed with cleanup errors',
+      cause: endpointPrimary,
+      cleanupErrors: [{ resource: 'transport subscription', error: endpointPrimary }]
+    })
+    expect(terminateCalls).toBe(1)
+  })
 
   it('retains an AbortError cause when request cancellation crosses the parser boundary', async () => {
     const worker = {
       postMessage(): void {},
       addEventListener(): void {},
       removeEventListener(): void {}
-    };
-    const parser = workerParser({ worker });
-    const controller = new AbortController();
-    const reason = new DOMException('cancelled by test', 'AbortError');
-    controller.abort(reason);
+    }
+    const parser = workerParser({ worker })
+    const controller = new AbortController()
+    const reason = new DOMException('cancelled by test', 'AbortError')
+    controller.abort(reason)
 
     const thrown = await Promise.resolve(
       parser.encode(new Uint8Array([1]), {
         signal: controller.signal,
         context: 'worker-abort-test'
       })
-    ).catch((error: unknown) => error);
+    ).catch((error: unknown) => error)
 
     expect(thrown).toMatchObject({
       name: 'SerializeCodecError',
       source: '@migaia/store-worker',
       code: StoreWorkerErrorCode.requestAborted,
       cause: expect.objectContaining({ name: 'AbortError' })
-    });
-    expect((thrown as { cause?: unknown }).cause).toBe(reason);
-    await parser.dispose?.();
-  });
-});
+    })
+    expect((thrown as { cause?: unknown }).cause).toBe(reason)
+    await parser.dispose?.()
+  })
+})

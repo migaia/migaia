@@ -13,4 +13,4 @@ export const StoreMiddlewareErrorText = {
   logPrefix: '[store]',
   outsideAction: (operation: string): string =>
     `[store] ${operation} is not allowed outside an action`
-} as const;
+} as const

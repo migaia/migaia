@@ -2,6 +2,6 @@
 export const StoreFieldMode = {
   sync: 'sync',
   async: 'async'
-} as const;
+} as const
 
-export type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];
+export type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]

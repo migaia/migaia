@@ -6,20 +6,19 @@ export const StoreDevtoolsCommand = {
   jumpToAction: 'JUMP_TO_ACTION',
   rollback: 'ROLLBACK',
   reset: 'RESET'
-} as const;
+} as const
 
 /** Dependency graph node kinds rendered by the devtools tree helpers. */
 export const StoreDevtoolsNodeKind = {
   observable: 'observable',
   observer: 'observer'
-} as const;
+} as const
 
 /** Default labels used for anonymous reactive nodes and initial history snapshots. */
 export const StoreDevtoolsLabel = {
   anonymousReactiveNode: 'AnonymousReactiveNode',
   initial: 'initial',
   stateChange: 'state change'
-} as const;
+} as const
 
-export type IStoreDevtoolsCommand =
-  (typeof StoreDevtoolsCommand)[keyof typeof StoreDevtoolsCommand];
+export type IStoreDevtoolsCommand = (typeof StoreDevtoolsCommand)[keyof typeof StoreDevtoolsCommand]

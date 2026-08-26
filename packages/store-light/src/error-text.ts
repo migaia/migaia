@@ -26,4 +26,4 @@ export const StoreLightErrorText = {
     '[store] ResourceCaptureRegistry requires WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox',
   invalidCapture: '[store] invalid or consumed resource capture',
   resourceFactory: '[store] resource factory must be a function or an object with a load function'
-} as const;
+} as const

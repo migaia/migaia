@@ -36,7 +36,7 @@ export const StoreIndexedErrorCode = {
    * 调用方让集合与订阅它的 effect/observer 使用同一 Runtime；`peek` 不受此限制。
    */
   crossRuntime: 'CROSS_RUNTIME'
-} as const;
+} as const
 
 export type IStoreIndexedErrorCode =
-  (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode];
+  (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]

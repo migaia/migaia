@@ -22,4 +22,4 @@ export const StoreSharedErrorText = {
     `[store] shared array update at ${String(index)} kept losing the race; another writer never settled`,
   arrayDisposed: '[store] shared array is disposed',
   arrayIndex: (index: number): string => `[store] shared array index out of range: ${String(index)}`
-} as const;
+} as const

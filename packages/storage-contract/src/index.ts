@@ -6,7 +6,7 @@ export {
   isStorageContractError,
   type IStorageContractErrorCode,
   type IStorageContractErrorDetails
-} from './errors.js';
+} from './errors.js'
 
 // 公共类型
 export type {
@@ -16,24 +16,45 @@ export type {
   IConflictPolicy,
   IStorageKey,
   IKeyRange
-} from './context.js';
-export { ConflictPolicy } from './context.js';
+} from './context.js'
+export { ConflictPolicy } from './context.js'
 
-export type { IBackendKind, IStorageCapabilities } from './capabilities.js';
-export { snapshotStorageCapabilities, isStorageCapabilities } from './capabilities.js';
+export type { IBackendKind, IStorageCapabilities } from './capabilities.js'
+export { snapshotStorageCapabilities, isStorageCapabilities } from './capabilities.js'
 
-export type { ICodec, ICodecOutput } from './codec.js';
+export type { ICodec, ICodecOutput } from './codec.js'
 
 export type {
   IKeyValueStore,
   ISyncKeyValueStore,
   IRecordStore,
   ISyncCapableStore
-} from './store.js';
-export { isKeyValueStore, asRecordStore, isRecordStore } from './store.js';
+} from './store.js'
+export {
+  isKeyValueStore,
+  asRecordStore,
+  isRecordStore,
+  snapshotKeyValueStore,
+  snapshotRecordStore
+} from './store.js'
 
-export type { ITransactionScope, ITransactionWriteOptions } from './transaction.js';
-export { assertTransactionCallback, readTransactionConflictPolicy } from './transaction.js';
+export type {
+  IRecordIndexDefinition,
+  IRecordIndexHandle,
+  IRecordIndexReadiness,
+  IRecordIndexProjectionValue,
+  IRecordIndexProjection,
+  IRecordIndexQuery,
+  ISecondaryIndexTransactionScope,
+  ISecondaryIndexRecordStore
+} from './secondary-index.js'
+export { asSecondaryIndexRecordStore, isSecondaryIndexRecordStore } from './secondary-index.js'
+
+export type { IStorageChange, IChangeFeedStore } from './change-feed.js'
+export { asChangeFeedStore, isChangeFeedStore } from './change-feed.js'
+
+export type { ITransactionScope, ITransactionWriteOptions } from './transaction.js'
+export { assertTransactionCallback, readTransactionConflictPolicy } from './transaction.js'
 
 export {
   KEY_DOMAIN_LIMITS,
@@ -41,9 +62,9 @@ export {
   snapshotStorageKey,
   assertStringStorageKey,
   compareStorageKeys
-} from './key.js';
+} from './key.js'
 
-export { snapshotCodec, assertCodec } from './codec-guard.js';
+export { snapshotCodec, assertCodec } from './codec-guard.js'
 
 export {
   snapshotOperationContext,
@@ -51,10 +72,10 @@ export {
   snapshotSyncWriteOptions,
   assertSyncWriteOptions,
   type IOperationContextSnapshot
-} from './operation-context.js';
+} from './operation-context.js'
 
-export { isUint8Array, intrinsicConstructorName } from './bytes.js';
+export { isArrayBuffer, isUint8Array, intrinsicConstructorName } from './bytes.js'
 export {
   StorageContractConflictPolicy,
   type IStorageContractConflictPolicy
-} from './policy-constants.js';
+} from './policy-constants.js'

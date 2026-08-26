@@ -1,6 +1,6 @@
-import { StorePersistErrorCode } from '../error-code.js';
-import { createStorePersistTypeError } from '../errors.js';
-import { StorePersistErrorText } from '../error-text.js';
+import { StorePersistErrorCode } from '../error-code.js'
+import { createStorePersistTypeError } from '../errors.js'
+import { StorePersistErrorText } from '../error-text.js'
 
 /** Rejects JavaScript-boundary null/non-object persistence options before property access. */
 export function assertPersistOptions(options: unknown): asserts options is object {
@@ -8,34 +8,34 @@ export function assertPersistOptions(options: unknown): asserts options is objec
     throw createStorePersistTypeError(
       StorePersistErrorCode.invalidOption,
       StorePersistErrorText.optionsObject
-    );
+    )
   }
   try {
-    Object.getOwnPropertyDescriptors(options);
+    Object.getOwnPropertyDescriptors(options)
   } catch (error) {
     throw createStorePersistTypeError(
       StorePersistErrorCode.invalidOption,
       StorePersistErrorText.optionsObject,
       { cause: error }
-    );
+    )
   }
 }
 
 /** Copies persistence wrapper options once so validation and persist-unit construction share values. */
 export function snapshotPersistOptions<T extends object>(options: T): T {
-  assertPersistOptions(options);
+  assertPersistOptions(options)
   try {
-    const snapshot: Record<PropertyKey, unknown> = {};
+    const snapshot: Record<PropertyKey, unknown> = {}
     for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(options))) {
-      snapshot[key] = 'get' in descriptor ? descriptor.get?.() : descriptor.value;
+      snapshot[key] = 'get' in descriptor ? descriptor.get?.() : descriptor.value
     }
-    return snapshot as T;
+    return snapshot as T
   } catch (error) {
     throw createStorePersistTypeError(
       StorePersistErrorCode.invalidOption,
       StorePersistErrorText.optionsObject,
       { cause: error }
-    );
+    )
   }
 }
 
@@ -48,6 +48,6 @@ export function assertPersistString(value: unknown, label: string): asserts valu
     throw createStorePersistTypeError(
       StorePersistErrorCode.invalidOption,
       StorePersistErrorText.stringOption(label)
-    );
+    )
   }
 }

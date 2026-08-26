@@ -1,13 +1,13 @@
-import { StoreIndexedErrorCode, type IStoreIndexedErrorCode } from './error-code.js';
-import { attachErrorIdentity } from '@migaia/utils/error';
+import { StoreIndexedErrorCode, type IStoreIndexedErrorCode } from './error-code.js'
+import { attachErrorIdentity } from '@migaia/utils/error'
 
-export { StoreIndexedErrorCode, type IStoreIndexedErrorCode };
+export { StoreIndexedErrorCode, type IStoreIndexedErrorCode }
 
 /** `source` value stamped onto every error this package throws. */
-export const STORE_INDEXED_SOURCE = '@migaia/store-indexed';
+export const STORE_INDEXED_SOURCE = '@migaia/store-indexed'
 
 function tagStoreIndexedError<E extends Error>(error: E, code: IStoreIndexedErrorCode): E {
-  return attachErrorIdentity(error, { source: STORE_INDEXED_SOURCE, code });
+  return attachErrorIdentity(error, { source: STORE_INDEXED_SOURCE, code })
 }
 
 /** Builds a `(source, code)`-tagged `Error` without touching `stack`. */
@@ -19,8 +19,8 @@ export function createStoreIndexedError(
   const error = new Error(
     message,
     options?.cause !== undefined ? { cause: options.cause } : undefined
-  );
-  return tagStoreIndexedError(error, code);
+  )
+  return tagStoreIndexedError(error, code)
 }
 
 /** Builds a `(source, code)`-tagged `RangeError`, preserving the runtime type. */
@@ -28,7 +28,7 @@ export function createStoreIndexedRangeError(
   code: IStoreIndexedErrorCode,
   message: string
 ): RangeError {
-  return tagStoreIndexedError(new RangeError(message), code);
+  return tagStoreIndexedError(new RangeError(message), code)
 }
 
 /** Builds a `(source, code)`-tagged `TypeError`, preserving the runtime type. */
@@ -40,6 +40,6 @@ export function createStoreIndexedTypeError(
   const error = new TypeError(
     message,
     options?.cause !== undefined ? { cause: options.cause } : undefined
-  );
-  return tagStoreIndexedError(error, code);
+  )
+  return tagStoreIndexedError(error, code)
 }

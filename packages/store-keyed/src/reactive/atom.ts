@@ -1,7 +1,7 @@
-import type { IDisposable, IRuntime } from '@migaia/reactive';
-import type { IAtomDefinition } from '../atom/definition.js';
-import { createStoreKeyedError, StoreKeyedErrorCode } from '../errors.js';
-import { StoreKeyedErrorText } from '../error-text.js';
+import type { IDisposable, IRuntime } from '@migaia/reactive'
+import type { IAtomDefinition } from '../atom/definition.js'
+import { createStoreKeyedError, StoreKeyedErrorCode } from '../errors.js'
+import { StoreKeyedErrorText } from '../error-text.js'
 
 /**
  * Atom 协议：只有形状与跨 Runtime 校验，没有实现。
@@ -11,45 +11,45 @@ import { StoreKeyedErrorText } from '../error-text.js';
  */
 
 export type IReadableAtom<T> = IDisposable & {
-  readonly runtime: IRuntime;
+  readonly runtime: IRuntime
   /** Pure definition bridge used by the Provider-scoped React adapter. */
-  readonly atomDefinition?: IAtomDefinition<any>;
-  readonly value: T;
-  readonly observed: boolean;
-  read(): T;
+  readonly atomDefinition?: IAtomDefinition<any>
+  readonly value: T
+  readonly observed: boolean
+  read(): T
   /**
    * 非追踪读。
    *
    * React 适配层的 getSnapshot 可能在任意时刻被调用，包括另一个组件正在 捕获依赖的窗口内。用 `.value` 会把这次读记进别人的依赖集合，造成串边；
    * 必须有一条明确不建边的读法。
    */
-  peek(): T;
-};
+  peek(): T
+}
 
 export type IWritableAtom<T, Args extends readonly unknown[], Result> = IReadableAtom<T> & {
-  write(...args: Args): Result;
-};
+  write(...args: Args): Result
+}
 
-export type IAtomGetter = <T>(atom: IReadableAtom<T>) => T;
+export type IAtomGetter = <T>(atom: IReadableAtom<T>) => T
 
 export type IAtomSetter = <T, Args extends readonly unknown[], Result>(
   atom: IWritableAtom<T, Args, Result>,
   ...args: Args
-) => Result;
+) => Result
 
-export type IAtomRead<T> = (get: IAtomGetter) => T;
+export type IAtomRead<T> = (get: IAtomGetter) => T
 
 export type IAtomWrite<Args extends readonly unknown[], Result> = (
   get: IAtomGetter,
   set: IAtomSetter,
   ...args: Args
-) => Result;
+) => Result
 
-export type IAtomUpdate<T> = T | ((previous: T) => T);
+export type IAtomUpdate<T> = T | ((previous: T) => T)
 
 function assertSameRuntime(runtime: IRuntime, atom: IReadableAtom<unknown>): void {
   if (atom.runtime !== runtime) {
-    throw createStoreKeyedError(StoreKeyedErrorCode.crossRuntime, StoreKeyedErrorText.crossRuntime);
+    throw createStoreKeyedError(StoreKeyedErrorCode.crossRuntime, StoreKeyedErrorText.crossRuntime)
   }
 }
 
@@ -60,9 +60,9 @@ function assertSameRuntime(runtime: IRuntime, atom: IReadableAtom<unknown>): voi
  */
 export function atomGetter(runtime: IRuntime): IAtomGetter {
   return <T>(atom: IReadableAtom<T>): T => {
-    assertSameRuntime(runtime, atom);
-    return atom.value;
-  };
+    assertSameRuntime(runtime, atom)
+    return atom.value
+  }
 }
 
 export function atomSetter(runtime: IRuntime): IAtomSetter {
@@ -70,7 +70,7 @@ export function atomSetter(runtime: IRuntime): IAtomSetter {
     atom: IWritableAtom<T, Args, Result>,
     ...args: Args
   ): Result => {
-    assertSameRuntime(runtime, atom);
-    return atom.write(...args);
-  };
+    assertSameRuntime(runtime, atom)
+    return atom.write(...args)
+  }
 }

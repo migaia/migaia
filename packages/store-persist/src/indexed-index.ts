@@ -2,4 +2,4 @@ export {
   persistCollection,
   type IPersistableCollection,
   type IPersistCollectionOptions
-} from './indexed/persist-collection.js';
+} from './indexed/persist-collection.js'

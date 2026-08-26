@@ -1,27 +1,28 @@
-import type { ICodec } from '@migaia/storage-web';
-import type { IPersistStorage, IPersistByteStorage } from '../core/types.js';
-import { createStorePersistTypeError } from '../errors.js';
-import { StorePersistErrorCode } from '../error-code.js';
-import { PersistCodecOutput } from '../state-constants.js';
-import { StorePersistErrorText } from '../error-text.js';
+import type { ICodec } from '@migaia/storage-web'
+import { isUint8Array } from '@migaia/utils/bytes'
+import type { IPersistStorage, IPersistByteStorage } from '../core/types.js'
+import { createStorePersistTypeError } from '../errors.js'
+import { StorePersistErrorCode } from '../error-code.js'
+import { PersistCodecOutput } from '../state-constants.js'
+import { StorePersistErrorText } from '../error-text.js'
 
-const MAP_TAG = '__migaia_persist_map__';
-const SET_TAG = '__migaia_persist_set__';
+const MAP_TAG = '__migaia_persist_map__'
+const SET_TAG = '__migaia_persist_set__'
 
 /** Detects collections by structured-cloning into this realm; never reads a candidate constructor. */
 const intrinsicCollection = (value: unknown): Map<unknown, unknown> | Set<unknown> | undefined => {
-  if (value === null || typeof value !== 'object') return undefined;
+  if (value === null || typeof value !== 'object') return undefined
   try {
-    const clone = globalThis.structuredClone?.(value);
-    if (clone instanceof Map) return clone;
-    if (clone instanceof Set) return clone;
-    if (value instanceof Map) return value;
-    if (value instanceof Set) return value;
+    const clone = globalThis.structuredClone?.(value)
+    if (clone instanceof Map) return clone
+    if (clone instanceof Set) return clone
+    if (value instanceof Map) return value
+    if (value instanceof Set) return value
   } catch {
-    return undefined;
+    return undefined
   }
-  return undefined;
-};
+  return undefined
+}
 
 /**
  * `JSON.stringify(new Map(...))` 产出 `"{}"`——Map/Set 不是 JSON 原生可表达的形状，裸调用会
@@ -30,23 +31,23 @@ const intrinsicCollection = (value: unknown): Map<unknown, unknown> | Set<unknow
  * 必须自己认得这两种形状，用一个打了标签的普通对象过一趟，而不是要求每个使用方自己转数组。
  */
 function jsonReplacer(_key: string, value: unknown): unknown {
-  const collection = intrinsicCollection(value);
-  if (collection instanceof Map) return { [MAP_TAG]: [...collection.entries()] };
-  if (collection instanceof Set) return { [SET_TAG]: [...collection.values()] };
-  return value;
+  const collection = intrinsicCollection(value)
+  if (collection instanceof Map) return { [MAP_TAG]: [...collection.entries()] }
+  if (collection instanceof Set) return { [SET_TAG]: [...collection.values()] }
+  return value
 }
 
 function jsonReviver(_key: string, value: unknown): unknown {
   if (value !== null && typeof value === 'object') {
-    const record = value as Record<string, unknown>;
+    const record = value as Record<string, unknown>
     if (MAP_TAG in record && Array.isArray(record[MAP_TAG])) {
-      return new Map(record[MAP_TAG] as [unknown, unknown][]);
+      return new Map(record[MAP_TAG] as [unknown, unknown][])
     }
     if (SET_TAG in record && Array.isArray(record[SET_TAG])) {
-      return new Set(record[SET_TAG] as unknown[]);
+      return new Set(record[SET_TAG] as unknown[])
     }
   }
-  return value;
+  return value
 }
 
 /**
@@ -57,25 +58,25 @@ export const defaultJsonCodec: ICodec = Object.freeze({
   name: 'json',
   output: PersistCodecOutput.text,
   async encode(value: unknown): Promise<string> {
-    const encoded = JSON.stringify(value, jsonReplacer);
+    const encoded = JSON.stringify(value, jsonReplacer)
     if (encoded === undefined) {
       throw createStorePersistTypeError(
         StorePersistErrorCode.encodeFailed,
         StorePersistErrorText.jsonSerialize
-      );
+      )
     }
-    return encoded;
+    return encoded
   },
   async decode(raw: unknown): Promise<unknown> {
     if (typeof raw !== 'string') {
       throw createStorePersistTypeError(
         StorePersistErrorCode.envelopeInvalid,
         StorePersistErrorText.jsonPayload
-      );
+      )
     }
-    return JSON.parse(raw, jsonReviver);
+    return JSON.parse(raw, jsonReviver)
   }
-});
+})
 
 /**
  * 选路：codec.output 与后端 capabilities 是否匹配，决定编码后的值往 text 通道还是 bytes 通道落地。
@@ -89,7 +90,7 @@ function assertBinaryCapable(storage: IPersistStorage): asserts storage is IPers
     throw createStorePersistTypeError(
       StorePersistErrorCode.backendCapability,
       StorePersistErrorText.binaryBackend
-    );
+    )
   }
 }
 
@@ -104,27 +105,27 @@ export async function writeEnvelope(
     throw createStorePersistTypeError(
       StorePersistErrorCode.codecOutputMismatch,
       StorePersistErrorText.structuredOutput(codec.name)
-    );
+    )
   }
-  const encoded = await codec.encode(value, ctx);
+  const encoded = await codec.encode(value, ctx)
   if (codec.output === PersistCodecOutput.binary && storage.capabilities.binary) {
-    assertBinaryCapable(storage);
-    if (!(encoded instanceof Uint8Array)) {
+    assertBinaryCapable(storage)
+    if (!isUint8Array(encoded)) {
       throw createStorePersistTypeError(
         StorePersistErrorCode.codecOutputMismatch,
         StorePersistErrorText.binaryUint8(codec.name)
-      );
+      )
     }
-    await storage.setBytes(key, encoded, ctx);
-    return;
+    await storage.setBytes(key, encoded, ctx)
+    return
   }
   if (typeof encoded !== 'string') {
     throw createStorePersistTypeError(
       StorePersistErrorCode.codecOutputMismatch,
       StorePersistErrorText.stringOutput(codec.name)
-    );
+    )
   }
-  await storage.set(key, encoded, ctx);
+  await storage.set(key, encoded, ctx)
 }
 
 export async function readEnvelope(
@@ -134,20 +135,20 @@ export async function readEnvelope(
   ctx: { signal?: AbortSignal }
 ): Promise<unknown | undefined> {
   if (codec.output === PersistCodecOutput.binary && storage.capabilities.binary) {
-    assertBinaryCapable(storage);
-    const bytes = await storage.getBytes(key, ctx);
-    if (bytes === null) return undefined;
-    return codec.decode(bytes, ctx);
+    assertBinaryCapable(storage)
+    const bytes = await storage.getBytes(key, ctx)
+    if (bytes === null) return undefined
+    return codec.decode(bytes, ctx)
   }
   if (codec.output === PersistCodecOutput.binary) {
     throw createStorePersistTypeError(
       StorePersistErrorCode.codecOutputMismatch,
       StorePersistErrorText.binaryRead(codec.name)
-    );
+    )
   }
-  const text = await storage.get(key, ctx);
-  if (text === null) return undefined;
-  return codec.decode(text, ctx);
+  const text = await storage.get(key, ctx)
+  if (text === null) return undefined
+  return codec.decode(text, ctx)
 }
 
 export async function removeEnvelope(
@@ -155,5 +156,5 @@ export async function removeEnvelope(
   key: string,
   ctx: { signal?: AbortSignal }
 ): Promise<void> {
-  await storage.remove(key, ctx);
+  await storage.remove(key, ctx)
 }

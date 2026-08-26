@@ -1,6 +1,6 @@
-export { localStorage, type ILocalStorageOptions } from './local-storage.js';
-export { sessionStorage, type ISessionStorageOptions } from './session-storage.js';
-export { memoryStorage } from './memory.js';
-export { cookies, type ICookiesOptions, type ICookieDocument } from './cookie.js';
-export { indexedDb, type IIndexedDbOptions } from './indexed-db.js';
-export type { IWebStorageOptions } from './web-storage.js';
+export { localStorage, type ILocalStorageOptions } from './local-storage.js'
+export { sessionStorage, type ISessionStorageOptions } from './session-storage.js'
+export { memoryStorage } from './memory.js'
+export { cookies, type ICookiesOptions, type ICookieDocument } from './cookie.js'
+export { indexedDb, type IIndexedDbOptions } from './indexed-db.js'
+export type { IWebStorageOptions } from './web-storage.js'

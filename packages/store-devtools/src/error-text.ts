@@ -13,4 +13,4 @@ export const StoreDevtoolsErrorText = {
     `[store] DevTools ${name} maxDepth must be a non-negative safe integer`,
   optionsObject: '[store] DevTools options must be an object',
   callbackOption: (name: string): string => `[store] DevTools ${name} must be a function`
-} as const;
+} as const
