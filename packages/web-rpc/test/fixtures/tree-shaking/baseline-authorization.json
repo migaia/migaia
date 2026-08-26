@@ -1,0 +1,44 @@
+{
+  "status": "approved",
+  "requirement": "WRC-C-R25 / WRC-C-T39",
+  "reason": "Independent Sol verification approved the current WebRPC retained graph, ownership, causal attribution, provenance, and measured size drift after the error-reporting correction.",
+  "approvalRecord": {
+    "schema": "WRC-C-B11-approval-v2",
+    "authorityId": "web-rpc-release-coordinator-v1",
+    "keyId": "coordinator-ed25519-04ad8e84b3d15997",
+    "decisionId": "WRC-C-B11-decision-20260826-03",
+    "issuedAt": "2026-08-26T15:04:21.903Z",
+    "rationale": "Independent Sol verification approved the current WebRPC retained graph, ownership, causal attribution, provenance, and measured size drift after the error-reporting correction.",
+    "oldTuple": {
+      "moduleCount": 53,
+      "rawBytes": 250129,
+      "gzipBytes": 61171
+    },
+    "newTuple": {
+      "moduleCount": 66,
+      "rawBytes": 455256,
+      "gzipBytes": 107623
+    },
+    "digest": "90a3641073cf1d77459e7765751708433245f9c54faeeca8a188c7526a5555f6",
+    "signature": "arsuZ7gYwBwHH/N8Y5JTGNm/de0d3HDzHUizbuWg5JA+iNNmJeB4kGE4W9c3E1xQKxabr8UCmPIfhEOp7OS8Dg==",
+    "payload": {
+      "schema": "WRC-C-B11-approval-v2",
+      "authorityId": "web-rpc-release-coordinator-v1",
+      "keyId": "coordinator-ed25519-04ad8e84b3d15997",
+      "decisionId": "WRC-C-B11-decision-20260826-03",
+      "issuedAt": "2026-08-26T15:04:21.903Z",
+      "rationale": "Independent Sol verification approved the current WebRPC retained graph, ownership, causal attribution, provenance, and measured size drift after the error-reporting correction.",
+      "oldTuple": {
+        "moduleCount": 53,
+        "rawBytes": 250129,
+        "gzipBytes": 61171
+      },
+      "newTuple": {
+        "moduleCount": 66,
+        "rawBytes": 455256,
+        "gzipBytes": 107623
+      },
+      "digest": "90a3641073cf1d77459e7765751708433245f9c54faeeca8a188c7526a5555f6"
+    }
+  }
+}

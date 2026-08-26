@@ -1,0 +1,76 @@
+{
+  "root": {
+    "kernel": [
+      "#transport",
+      "#transportPlatform",
+      "#transportTopology",
+      "#transportOrigin",
+      "#runtime",
+      "#hooksConfig",
+      "#hooks",
+      "#unsubscribe",
+      "#unsubscribeTransportError",
+      "#unsubscribeListenerError",
+      "#disposalPromise",
+      "#disposed",
+      "#wire routing",
+      "#receive",
+      "#dispose"
+    ],
+    "outbound": [
+      "#pipeline",
+      "internal/pipeline.ts",
+      "internal/pending.ts",
+      "internal/replay.ts",
+      "send",
+      "sendVariation",
+      "allocateRpcId"
+    ],
+    "provider": [
+      "#providerExecutor",
+      "internal/provider-executor.ts",
+      "internal/provider-admission.ts",
+      "internal/request-replay-ledger.ts",
+      "provider request route",
+      "provider result route"
+    ],
+    "discovery": [
+      "#discovery",
+      "#discoveryReplay",
+      "internal/discovery-registry.ts",
+      "internal/request-replay-ledger.ts",
+      "internal/identity.ts",
+      "discovery query route",
+      "discovery maintenance timer",
+      "discovery waiter cleanup"
+    ],
+    "control": [
+      "#controlTasks",
+      "internal/control-task-registry.ts",
+      "internal/request-replay-ledger.ts",
+      "ping route",
+      "abort route"
+    ],
+    "chunk": [
+      "internal/chunk.ts",
+      "internal/operation-scope.ts",
+      "chunk assembler",
+      "chunk expiry timer",
+      "chunk acknowledgement route"
+    ],
+    "shared": [
+      "#resources",
+      "#resourceManager",
+      "internal/endpoint-resource-manager.ts",
+      "internal/resource-scope.ts",
+      "internal/peers.ts",
+      "replay owner registry",
+      "maintenance owner registry",
+      "transport subscription disposer",
+      "listener error disposer"
+    ]
+  },
+  "status": "reviewed pre-migration baseline; ownership requires B02-B06 reclassification",
+  "ownerRules": ["^#[A-Za-z0-9_]+$"],
+  "unclassified": []
+}

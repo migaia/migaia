@@ -1,28 +1,36 @@
-import { describe, expect, it } from 'vitest';
-import { WebRpcEndpoint } from '../src/endpoint';
-import { createMemoryTransportPair } from '../src/adapters/memory';
-import { readEndpointDebugSnapshot } from '../src/internal/test-observer';
+import { describe, expect, it } from 'vitest'
+import { createFullEndpoint } from '../src/full.js'
+import { createMemoryTransportPair } from '../src/adapters/memory.js'
+import { readEndpointDebugSnapshot } from '../src/internal/test-observer.js'
+import { connect } from '../src/middleware/connect.js'
+import { fullRuntimeOwnerKeys } from './fixtures/tree-shaking/runtime-owner-topology.js'
 
 describe('endpoint test-only lifecycle observer', () => {
   it('proves request and registry resources return to zero after disposal', async () => {
-    const [clientTransport, serverTransport] = createMemoryTransportPair();
-    const server = new WebRpcEndpoint('server', serverTransport, {
-      echo: (context) => context.success(context.data)
-    });
-    const client = new WebRpcEndpoint('client', clientTransport, {
-      local: (context) => context.success(context.data)
-    });
+    const [clientTransport, serverTransport] = createMemoryTransportPair()
+    const server = await createFullEndpoint({
+      id: 'server',
+      transport: serverTransport,
+      middlewares: [connect({ transport: serverTransport })],
+      provider: { echo: (context) => context.success(context.data) }
+    })
+    const client = await createFullEndpoint({
+      id: 'client',
+      transport: clientTransport,
+      middlewares: [connect({ transport: clientTransport })]
+    })
 
     expect(readEndpointDebugSnapshot(client)).toMatchObject({
       phase: 'active',
       pending: 0,
       pingPending: 0,
       activeControllers: 0,
-      chunks: 0
-    });
-    await expect(client.send('server', 'echo', 'value')).resolves.toBe('value');
-    await client.dispose();
-    await server.dispose();
+      chunks: 0,
+      owners: fullRuntimeOwnerKeys
+    })
+    await expect(client.send('server', 'echo', 'value')).resolves.toBe('value')
+    await client.dispose()
+    await server.dispose()
 
     expect(readEndpointDebugSnapshot(client)).toMatchObject({
       phase: 'disposed',
@@ -44,6 +52,6 @@ describe('endpoint test-only lifecycle observer', () => {
         inboundQueries: 0,
         inboundTimers: 0
       }
-    });
-  });
-});
+    })
+  })
+})

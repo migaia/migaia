@@ -9,30 +9,30 @@
  */
 declare global {
   interface AbortSignal {
-    readonly aborted: boolean;
+    readonly aborted: boolean
     addEventListener(
       type: 'abort',
       listener: () => void,
       options?: { readonly once?: boolean }
-    ): void;
-    removeEventListener(type: 'abort', listener: () => void): void;
+    ): void
+    removeEventListener(type: 'abort', listener: () => void): void
   }
 
   class AbortController {
-    readonly signal: AbortSignal;
-    abort(reason?: unknown): void;
+    readonly signal: AbortSignal
+    abort(reason?: unknown): void
   }
 
-  function setTimeout(callback: () => void, delayMs?: number): unknown;
-  function clearTimeout(handle: unknown): void;
+  function setTimeout(callback: () => void, delayMs?: number): unknown
+  function clearTimeout(handle: unknown): void
 
   // eslint-disable-next-line no-var
   var crypto:
     | {
-        randomUUID?: () => string;
-        getRandomValues?: (array: Uint8Array) => Uint8Array;
+        randomUUID?: () => string
+        getRandomValues?: (array: Uint8Array) => Uint8Array
       }
-    | undefined;
+    | undefined
 }
 
-export {};
+export {}

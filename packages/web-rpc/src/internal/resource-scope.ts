@@ -3,13 +3,13 @@ import {
   createSyncLifecycleScope,
   type ILifecycleScope,
   type ISyncLifecycleScope
-} from '@migaia/lifecycle';
+} from '@migaia/lifecycle'
 
-export type IResourceReleaseError = { readonly resource: string; readonly error: unknown };
-export type IResourceReleasePhase = 'critical' | 'application';
+export type IResourceReleaseError = { readonly resource: string; readonly error: unknown }
+export type IResourceReleasePhase = 'critical' | 'application'
 
 /** Higher `order` runs first (§3.1: critical transport resources release before application ones). */
-const ORDER_BY_PHASE: Record<IResourceReleasePhase, number> = { critical: 1, application: 0 };
+const ORDER_BY_PHASE: Record<IResourceReleasePhase, number> = { critical: 1, application: 0 }
 
 /**
  * Owns heterogeneous resources and releases them in reverse registration order.
@@ -25,37 +25,42 @@ const ORDER_BY_PHASE: Record<IResourceReleasePhase, number> = { critical: 1, app
  */
 export class ResourceScope {
   /** Owns synchronous release records; released first, synchronously, in LIFO order. */
-  readonly #sync: ISyncLifecycleScope = createSyncLifecycleScope({ errorPolicy: 'collect' });
+  readonly #sync: ISyncLifecycleScope = createSyncLifecycleScope({ errorPolicy: 'collect' })
   /** Owns asynchronous release records; released after the synchronous ones. */
-  readonly #async: ILifecycleScope = createLifecycleScope({ errorPolicy: 'collect' });
-  #count = 0;
-  #releasePromise: Promise<readonly IResourceReleaseError[]> | undefined;
+  readonly #async: ILifecycleScope = createLifecycleScope({ errorPolicy: 'collect' })
+  #count = 0
+  #syncCount = 0
+  #releasePromise: Promise<readonly IResourceReleaseError[]> | undefined
 
   /** Returns the number of release records retained by this scope. */
   get size(): number {
-    return this.#count;
+    return this.#count
   }
 
   /** Registers a synchronously-released resource and returns an idempotent unregister function. */
   addSync(name: string, release: () => void): () => void {
-    const token = {};
+    const token = {}
     this.#sync.own(token, {
       syncSafe: true,
       force: () => {
         try {
-          release();
+          release()
         } catch (error) {
-          throw { resource: name, error } satisfies IResourceReleaseError;
+          throw { resource: name, error } satisfies IResourceReleaseError
         }
       }
-    });
-    this.#count++;
-    let registered = true;
+    })
+    this.#count++
+    this.#syncCount++
+    let registered = true
     return () => {
-      if (!registered) return;
-      registered = false;
-      if (this.#sync.release(token)) this.#count--;
-    };
+      if (!registered) return
+      registered = false
+      if (this.#sync.release(token)) {
+        this.#count--
+        this.#syncCount--
+      }
+    }
   }
 
   /** Registers a potentially-asynchronous resource and returns an idempotent unregister function. */
@@ -64,7 +69,7 @@ export class ResourceScope {
     release: () => void | Promise<void>,
     phase: IResourceReleasePhase = 'application'
   ): () => void {
-    const token = {};
+    const token = {}
     this.#async.own(token, {
       order: ORDER_BY_PHASE[phase],
       // `LifecycleScope`'s own error collection labels failures with an internal numeric id, not
@@ -73,41 +78,50 @@ export class ResourceScope {
       // `releaseAll()` can hand back the original `{resource, error}` shape unchanged.
       force: async () => {
         try {
-          await release();
+          await release()
         } catch (error) {
-          throw { resource: name, error } satisfies IResourceReleaseError;
+          throw { resource: name, error } satisfies IResourceReleaseError
         }
       }
-    });
-    this.#count++;
-    let registered = true;
+    })
+    this.#count++
+    let registered = true
     return () => {
-      if (!registered) return;
-      registered = false;
-      if (this.#async.release(token)) this.#count--;
-    };
+      if (!registered) return
+      registered = false
+      if (this.#async.release(token)) this.#count--
+    }
+  }
+
+  /** Releases only synchronous resources so activation can detach listeners before plugin rollback. */
+  releaseSync(): readonly IResourceReleaseError[] {
+    const count = this.#syncCount
+    this.#syncCount = 0
+    this.#count -= count
+    return this.#sync.dispose().map((entry) => entry.error as IResourceReleaseError)
   }
 
   /** Releases every resource, continuing after failures and preserving order. */
   releaseAll(): Promise<readonly IResourceReleaseError[]> {
-    if (this.#releasePromise) return this.#releasePromise;
-    let resolveRelease!: (errors: readonly IResourceReleaseError[]) => void;
-    let rejectRelease!: (error: unknown) => void;
+    if (this.#releasePromise) return this.#releasePromise
+    let resolveRelease!: (errors: readonly IResourceReleaseError[]) => void
+    let rejectRelease!: (error: unknown) => void
     this.#releasePromise = new Promise((resolve, reject) => {
-      resolveRelease = resolve;
-      rejectRelease = reject;
-    });
-    (async () => {
+      resolveRelease = resolve
+      rejectRelease = reject
+    })
+    ;(async () => {
       // Synchronous resources detach in the same tick this method is called; async resources drain
       // afterwards. The endpoint constructor's failure path depends on the synchronous part having
       // already run by the time `releaseAll()` returns its promise.
-      const syncErrors = this.#sync.dispose();
-      const asyncErrors = await this.#async.dispose();
-      this.#count = 0;
-      resolveRelease(
-        [...syncErrors, ...asyncErrors].map((entry) => entry.error as IResourceReleaseError)
-      );
-    })().catch(rejectRelease);
-    return this.#releasePromise;
+      const syncErrors = this.releaseSync()
+      const asyncErrors = await this.#async.dispose()
+      this.#count = 0
+      resolveRelease([
+        ...syncErrors,
+        ...asyncErrors.map((entry) => entry.error as IResourceReleaseError)
+      ])
+    })().catch(rejectRelease)
+    return this.#releasePromise
   }
 }

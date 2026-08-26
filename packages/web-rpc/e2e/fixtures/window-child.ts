@@ -1,12 +1,12 @@
-import { createWindowMessageTransport } from '../../src/adapters/window';
-import { createRpc, echoProvider, terminalProviders } from './rpc';
+import { createWindowMessageTransport } from '../../src/adapters/window'
+import { createRpc, echoProvider, terminalProviders } from './rpc'
 
-const parentOrigin = new URL(document.referrer).origin;
+const parentOrigin = new URL(document.referrer).origin
 const transport = createWindowMessageTransport({
   target: parent,
   receiver: window,
   targetOrigin: parentOrigin
-});
+})
 const endpoint = await createRpc(
   'child',
   ['parent'],
@@ -17,8 +17,8 @@ const endpoint = await createRpc(
     fail: terminalProviders.fail,
     hang: terminalProviders.hang,
     notify: (context) => {
-      parent.postMessage({ e2e: 'dispatch-result', value: context.data }, parentOrigin);
-      return context.success(undefined);
+      parent.postMessage({ e2e: 'dispatch-result', value: context.data }, parentOrigin)
+      return context.success(undefined)
     }
   },
   undefined,
@@ -26,16 +26,16 @@ const endpoint = await createRpc(
   false,
   undefined,
   { chunkSize: 4 }
-);
+)
 
 addEventListener('message', (event) => {
   if (event.data?.e2e === 'call-parent') {
     void endpoint
       .send('parent', 'count', null)
-      .then((value) => parent.postMessage({ e2e: 'parent-result', value }, parentOrigin));
+      .then((value) => parent.postMessage({ e2e: 'parent-result', value }, parentOrigin))
   }
-});
-parent.postMessage({ e2e: 'child-ready' }, parentOrigin);
+})
+parent.postMessage({ e2e: 'child-ready' }, parentOrigin)
 
 if (new URLSearchParams(location.search).get('mode') === 'spoof') {
   parent.postMessage(
@@ -50,5 +50,5 @@ if (new URLSearchParams(location.search).get('mode') === 'spoof') {
       sentAt: Date.now()
     },
     parentOrigin
-  );
+  )
 }

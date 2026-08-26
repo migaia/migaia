@@ -1,0 +1,11 @@
+{
+  "schema": "WRC-C-B11-approval-v2",
+  "algorithm": "ed25519",
+  "authorityId": "web-rpc-release-coordinator-v1",
+  "keyId": "coordinator-ed25519-04ad8e84b3d15997",
+  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEARxFYr3MLeK11e/YCZ93gEp2nfvXNY7dKPtKqlGQ6H0E=\n-----END PUBLIC KEY-----\n",
+  "decisionId": "WRC-C-B11-decision-20260826-03",
+  "payloadDigest": "90a3641073cf1d77459e7765751708433245f9c54faeeca8a188c7526a5555f6",
+  "status": "approved",
+  "reason": "Coordinator-installed authority for the independently verified current B11f candidate."
+}

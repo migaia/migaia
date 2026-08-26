@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { assertMethod, isWebRpcEnvelope, normalizeWebRpcEnvelope } from '../src/wire';
+import { describe, expect, it } from 'vitest'
+import { assertMethod, isWebRpcEnvelope, normalizeWebRpcEnvelope } from '../src/wire'
 
 describe('wire boundary', () => {
   it('accepts only request, response, variation envelopes', () => {
@@ -14,7 +14,7 @@ describe('wire boundary', () => {
         data: null,
         sentAt: 0
       })
-    ).toBe(true);
+    ).toBe(true)
     expect(
       isWebRpcEnvelope({
         kind: 'response',
@@ -26,7 +26,7 @@ describe('wire boundary', () => {
         ok: true,
         sentAt: 0
       })
-    ).toBe(true);
+    ).toBe(true)
     expect(
       isWebRpcEnvelope({
         kind: 'variation',
@@ -36,17 +36,17 @@ describe('wire boundary', () => {
         targetId: 'b',
         sentAt: 0
       })
-    ).toBe(true);
-    expect(isWebRpcEnvelope({ kind: 'request' })).toBe(false);
-    expect(isWebRpcEnvelope({ kind: 'unknown' })).toBe(false);
-    expect(isWebRpcEnvelope(null)).toBe(false);
-  });
+    ).toBe(true)
+    expect(isWebRpcEnvelope({ kind: 'request' })).toBe(false)
+    expect(isWebRpcEnvelope({ kind: 'unknown' })).toBe(false)
+    expect(isWebRpcEnvelope(null)).toBe(false)
+  })
   it('rejects empty method names at entry', () => {
-    expect(() => assertMethod('')).toThrow('non-empty');
-    expect(assertMethod('notes.save')).toBe('notes.save');
-  });
+    expect(() => assertMethod('')).toThrow('non-empty')
+    expect(assertMethod('notes.save')).toBe('notes.save')
+  })
   it('freezes one canonical snapshot of hostile accessor fields', () => {
-    let reads = 0;
+    let reads = 0
     const input = new Proxy(
       {
         kind: 'response',
@@ -62,21 +62,21 @@ describe('wire boundary', () => {
       {
         get(target, property, receiver) {
           if (property === 'senderId') {
-            reads += 1;
-            return reads === 1 ? 'server' : 'attacker';
+            reads += 1
+            return reads === 1 ? 'server' : 'attacker'
           }
-          return Reflect.get(target, property, receiver);
+          return Reflect.get(target, property, receiver)
         }
       }
-    );
+    )
 
-    const snapshot = normalizeWebRpcEnvelope(input);
-    expect(snapshot?.senderId).toBe('server');
-    expect(snapshot).toBeDefined();
-    expect(Object.isFrozen(snapshot)).toBe(true);
-    expect(snapshot?.senderId).toBe('server');
-    expect(reads).toBe(1);
-  });
+    const snapshot = normalizeWebRpcEnvelope(input)
+    expect(snapshot?.senderId).toBe('server')
+    expect(snapshot).toBeDefined()
+    expect(Object.isFrozen(snapshot)).toBe(true)
+    expect(snapshot?.senderId).toBe('server')
+    expect(reads).toBe(1)
+  })
 
   it.each([
     {
@@ -149,25 +149,25 @@ describe('wire boundary', () => {
       receiverId: 'receiver'
     }
   ])('accepts and freezes complete $kind envelopes', (envelope) => {
-    const normalized = normalizeWebRpcEnvelope(envelope);
-    expect(normalized).toEqual(envelope);
-    expect(Object.isFrozen(normalized)).toBe(true);
-    expect(isWebRpcEnvelope(envelope)).toBe(true);
-  });
+    const normalized = normalizeWebRpcEnvelope(envelope)
+    expect(normalized).toEqual(envelope)
+    expect(Object.isFrozen(normalized)).toBe(true)
+    expect(isWebRpcEnvelope(envelope)).toBe(true)
+  })
 
   it('contains hostile kind getters in the public predicate', () => {
     const hostile = Object.defineProperty({}, 'kind', {
       get: () => {
-        throw new Error('hostile kind');
+        throw new Error('hostile kind')
       }
-    });
-    expect(isWebRpcEnvelope(hostile)).toBe(false);
-  });
+    })
+    expect(isWebRpcEnvelope(hostile)).toBe(false)
+  })
 
   it('rejects non-string and empty methods', () => {
-    expect(() => assertMethod(1 as never)).toThrow('non-empty');
-    expect(() => assertMethod('')).toThrow('non-empty');
-  });
+    expect(() => assertMethod(1 as never)).toThrow('non-empty')
+    expect(() => assertMethod('')).toThrow('non-empty')
+  })
 
   it('rejects impossible chunk indexes at the wire boundary', () => {
     expect(
@@ -180,6 +180,6 @@ describe('wire boundary', () => {
         senderId: 'a',
         targetId: 'b'
       })
-    ).toBeUndefined();
-  });
-});
+    ).toBeUndefined()
+  })
+})

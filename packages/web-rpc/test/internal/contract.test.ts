@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { WebRpcSchemaValidationError } from '../../src/errors';
-import { validateContractData } from '../../src/internal/contract';
-import type { IWebRpcContractConfig } from '../../src/typing';
+import { describe, expect, it } from 'vitest'
+import { WebRpcSchemaValidationError } from '../../src/errors'
+import { validateContractData } from '../../src/internal/contract'
+import type { IWebRpcContractConfig } from '../../src/typing'
 
 describe('contract error normalization', () => {
   it('does not let hostile issue getters replace the stable schema error', () => {
@@ -9,13 +9,13 @@ describe('contract error normalization', () => {
       {},
       {
         get() {
-          throw new Error('getter leaked');
+          throw new Error('getter leaked')
         },
         has() {
-          throw new Error('has leaked');
+          throw new Error('has leaked')
         }
       }
-    );
+    )
     expect(() =>
       validateContractData(
         {
@@ -23,7 +23,7 @@ describe('contract error normalization', () => {
             value: {
               params: {
                 parse: () => {
-                  throw hostile;
+                  throw hostile
                 }
               },
               result: { parse: () => undefined }
@@ -34,15 +34,15 @@ describe('contract error normalization', () => {
         'params',
         1
       )
-    ).toThrowError(expect.objectContaining({ code: 'SCHEMA_INVALID' }));
-  });
+    ).toThrowError(expect.objectContaining({ code: 'SCHEMA_INVALID' }))
+  })
   it('falls back when the issues collection itself is hostile', () => {
     const issues = new Proxy([], {
       get(target, property, receiver) {
-        if (property === Symbol.iterator) throw new Error('iterator leaked');
-        return Reflect.get(target, property, receiver);
+        if (property === Symbol.iterator) throw new Error('iterator leaked')
+        return Reflect.get(target, property, receiver)
       }
-    });
+    })
     expect(() =>
       validateContractData(
         {
@@ -50,7 +50,7 @@ describe('contract error normalization', () => {
             value: {
               params: {
                 parse: () => {
-                  throw { issues };
+                  throw { issues }
                 }
               },
               result: { parse: () => undefined }
@@ -61,11 +61,11 @@ describe('contract error normalization', () => {
         'params',
         1
       )
-    ).toThrowError(expect.objectContaining({ code: 'SCHEMA_INVALID' }));
-  });
+    ).toThrowError(expect.objectContaining({ code: 'SCHEMA_INVALID' }))
+  })
 
   it('ignores absent and non-parser schemas and executes valid parsers', () => {
-    expect(() => validateContractData({}, 'missing', 'params', 1)).not.toThrow();
+    expect(() => validateContractData({}, 'missing', 'params', 1)).not.toThrow()
     expect(() =>
       validateContractData(
         { schemas: { value: { params: {} } } } as unknown as IWebRpcContractConfig,
@@ -73,15 +73,15 @@ describe('contract error normalization', () => {
         'params',
         1
       )
-    ).not.toThrow();
-    let parsed: unknown;
+    ).not.toThrow()
+    let parsed: unknown
     validateContractData(
       {
         schemas: {
           value: {
             params: {
               parse: (data: unknown) => {
-                parsed = data;
+                parsed = data
               }
             },
             result: { parse: () => undefined }
@@ -91,12 +91,12 @@ describe('contract error normalization', () => {
       'value',
       'params',
       42
-    );
-    expect(parsed).toBe(42);
-  });
+    )
+    expect(parsed).toBe(42)
+  })
 
   it('snapshots normal schema issues and filters hostile path elements', () => {
-    let failure: WebRpcSchemaValidationError | undefined;
+    let failure: WebRpcSchemaValidationError | undefined
     try {
       validateContractData(
         {
@@ -109,7 +109,7 @@ describe('contract error normalization', () => {
                       { path: ['root', 1, {}, null], message: 'wrong value', code: 'custom' },
                       { path: 'not-an-array', message: 42, code: null }
                     ]
-                  };
+                  }
                 }
               },
               params: { parse: () => undefined }
@@ -119,9 +119,9 @@ describe('contract error normalization', () => {
         'value',
         'result',
         null
-      );
+      )
     } catch (error) {
-      failure = error as WebRpcSchemaValidationError;
+      failure = error as WebRpcSchemaValidationError
     }
     expect(failure?.data).toEqual({
       kind: 'schema-validation',
@@ -131,8 +131,8 @@ describe('contract error normalization', () => {
         { path: ['root', 1], message: 'wrong value', code: 'custom' },
         { path: [], message: 'Schema validation failed', code: undefined }
       ]
-    });
-  });
+    })
+  })
 
   it('uses a stable fallback for errors without issue arrays', () => {
     expect(() =>
@@ -142,7 +142,7 @@ describe('contract error normalization', () => {
             value: {
               params: {
                 parse: () => {
-                  throw new Error('bad input');
+                  throw new Error('bad input')
                 }
               },
               result: { parse: () => undefined }
@@ -157,6 +157,6 @@ describe('contract error normalization', () => {
       expect.objectContaining({
         data: expect.objectContaining({ issues: [{ path: [], message: 'bad input' }] })
       })
-    );
-  });
-});
+    )
+  })
+})
