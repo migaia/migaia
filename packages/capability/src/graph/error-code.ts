@@ -28,7 +28,7 @@ export const CapabilityGraphErrorCode = {
   reentrantOperation: 'GRAPH_REENTRANT_OPERATION',
   /** Factory options or their accessors fail admission. */
   invalidOption: 'GRAPH_INVALID_OPTION'
-} as const;
+} as const
 
 export type ICapabilityGraphErrorCode =
-  (typeof CapabilityGraphErrorCode)[keyof typeof CapabilityGraphErrorCode];
+  (typeof CapabilityGraphErrorCode)[keyof typeof CapabilityGraphErrorCode]

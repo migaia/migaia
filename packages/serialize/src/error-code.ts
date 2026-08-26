@@ -62,6 +62,6 @@ export const SerializeErrorCode = {
    * 调用方要么注入 `encoder`/`decoder`，要么在具备 Encoding API 的宿主运行；原始缺失原因在 `cause`。
    */
   envUnsupported: 'ENV_UNSUPPORTED'
-} as const;
+} as const
 
-export type ISerializeErrorCode = (typeof SerializeErrorCode)[keyof typeof SerializeErrorCode];
+export type ISerializeErrorCode = (typeof SerializeErrorCode)[keyof typeof SerializeErrorCode]

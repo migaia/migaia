@@ -100,10 +100,11 @@ import { PluginHost, type IPluginHostOptions } from '@migaia/plugin-host';
 | `host.config.get(path)`            | `path: string`——插件名，或 `插件名.键` / `插件名.[下标].键`        | `unknown \| undefined`             | 同步读取；对象/数组返回 Readonly 懒代理；未知插件或路径返回 `undefined`。见下方说明。 |
 | `host.config.update(name, recipe)` | `name: string`；`recipe(previous) => Partial<patch>`（须同步返回） | `Promise<void>`                    | Copy-on-Write 合并 patch，跑 `plugin.update(next, core)` 成功才提交。                 |
 | `host.getShared(key)`              | `key: PropertyKey`                                                 | `T \| undefined`                   | 读取已安装 provider 的 shared 值，原始引用、不做只读包装。                            |
-| `host.pipelineMode`                | 无（只读属性）                                                     | `'sync' \| 'async' \| 'generator'` | 构造时固定的 pipeline 模式。                                                          |
-| `host.usePipeline(stage)`          | `(value, next) => void`                                            | `this`                             | 按当前 mode 注册；async/generator mode 会自动适配这个 sync 签名。                     |
+| `host.pipelineMode`                | 无（只读属性）                                                     | `'sync' \| 'async' \| 'generator' \| 'async-generator'` | 构造时固定的 pipeline 模式。                                    |
+| `host.usePipeline(stage)`          | `(value, next) => void`                                            | `this`                             | 按当前 mode 注册；async/generator/async-generator mode 会自动适配这个 sync 签名。      |
 | `host.useAsyncPipeline(stage)`     | `(value, next) => void \| Promise<void>`                           | `this`                             | 仅 async mode 可用；`next()` 返回 Promise。                                           |
 | `host.useGeneratorPipeline(stage)` | `(value) => Generator<...>`                                        | `this`                             | 仅 generator mode 可用。                                                              |
+| `host.useAsyncGeneratorPipeline(stage)` | `(value) => AsyncGenerator<...>`                               | `this`                             | 仅 async-generator mode 可用。                                                        |
 | `PluginHost.setLocale(locale)`     | `locale: 'en' \| 'zh'`（静态方法）                                 | `void`                             | 切换内置错误文案语言，影响全局、全部 Host 实例。                                      |
 
 **`host.config.get(path)` 的路径语义**：`path` 可以是"插件名"本身（返回该插件整份只读配置），也可以是 `插件名.键`（可继续 `.` 或 `.[下标]` 深入嵌套）。找不到匹配的插件、或路径中途缺失，返回 `undefined`（不抛错——读取是探测性操作）；`config.update(name, ...)` 对不存在的插件则抛 `PLUGIN_NOT_INSTALLED`（写入是明确的意图表达，语义不对称）。以上两个方法都要求 Host 处于 `active` 状态，否则抛 `HOST_DISPOSING`/`HOST_DISPOSED`。
@@ -142,10 +143,11 @@ import type { IPlugin, IPluginConfig, IPluginDisposer, IPluginResource } from '@
 | `core.usePipeline(stage)`          | `(value, next) => void`                                              | `core`               | 同 Host 侧 `usePipeline`，仅 install 期间可注册。                  |
 | `core.useAsyncPipeline(stage)`     | `(value, next) => void \| Promise<void>`                             | `core`               | 仅 install 期间、且 Host mode 为 `async` 时可用。                  |
 | `core.useGeneratorPipeline(stage)` | `(value) => Generator`                                               | `core`               | 仅 install 期间、且 Host mode 为 `generator` 时可用。              |
+| `core.useAsyncGeneratorPipeline(stage)` | `(value) => AsyncGenerator`                                     | `core`               | 仅 install 期间、且 Host mode 为 `async-generator` 时可用。        |
 
-领域 core（`createPluginDomainCore()` 的返回值）不能定义与上表同名的字段（`config`/`getShared`/`onDispose`/`usePipeline`/`useAsyncPipeline`/`useGeneratorPipeline` 是保留键），且必须是普通对象、字段都是可枚举 data property，否则构造时抛 `TypeError`。
+领域 core（`createPluginDomainCore()` 的返回值）不能定义与上表同名的字段（`config`/`getShared`/`onDispose`/`usePipeline`/`useAsyncPipeline`/`useGeneratorPipeline`/`useAsyncGeneratorPipeline` 是保留键），且必须是普通对象、字段都是可枚举 data property，否则构造时抛 `TypeError`。
 
-**同步安装的插件不能注册 async disposer**：`useSync`（构造函数期）安装的插件，若声明 `async function dispose()` 或提供 `Symbol.asyncDispose`，会在 `onDispose()` 注册那一刻被同步拒绝——因为同步安装的回滚契约要求全部清理工作真正同步完成。**不要把 `use`/`unUse`/`config.update`/`dispose` 暴露给插件 core，插件生命周期钩子内也不能调用当前 Host 的这几个方法**——会同步抛 `LIFECYCLE_MUTATION`。
+`useSync`（构造函数期）安装的插件允许注册 async disposer；Host 同步撤销可见状态并发布冻结的 `PLUGIN_INSTALL_FAILED.detail` 快照，随后通过 `detail.completion` 提供包含完整 rollback identities 的冻结结果。需要完整 secondary identity 的错误转换必须 await completion。**不要把 `use`/`unUse`/`config.update`/`dispose` 暴露给插件 core，插件生命周期钩子内也不能调用当前 Host 的这几个方法**——会同步抛 `LIFECYCLE_MUTATION`。
 
 ---
 
@@ -160,15 +162,29 @@ const host = new Host({ pipeline: { mode: 'sync' } });
 host.usePipeline((value, next) => next(value.trim()));
 ```
 
+**`async-generator`｜10 秒上手**：
+
+```ts
+import { GENERATOR_CONTINUE } from '@migaia/plugin-host';
+
+const host = new Host({ pipeline: { mode: 'async-generator' } });
+host.useAsyncGeneratorPipeline(async function* (value) {
+  await Promise.resolve(); // 可以在 yield 之间做任意异步工作
+  yield value.trim(); // 中间 yield 只用于本 stage 内部观测
+  return GENERATOR_CONTINUE; // 采用最后一次 yield 的值，交给下一个 stage
+});
+```
+
 | 模式        | stage 形式                    | `next` 规则                                                                                                                                                                                                |
 | ----------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `sync`      | `(value, next) => void`       | 必须在 stage 返回前调用；延后调用被忽略并触发 `PIPELINE_NEXT_LATE` 诊断。                                                                                                                                  |
 | `async`     | `async (value, next) => void` | `await next(value)`；同一次调用重复 `next()` 抛 `PIPELINE_NEXT_DUPLICATE`。                                                                                                                                |
 | `generator` | `function* (value)`           | `return value` 继续；`return undefined` 终止；`GENERATOR_CONTINUE` 用最后一次 yield 的值；`GENERATOR_HALT` 终止整条链；`GENERATOR_UNDEFINED` 显式表达 `undefined`（仅 `TValue` 允许 `undefined` 时可用）。 |
+| `async-generator` | `async function* (value)` | terminal 语义与 `generator` 完全一致；区别是串行 `await` 耗尽每个 stage（中间 yield 不提前进入下一 stage），对应 `host.useAsyncGeneratorPipeline(stage)`。 |
 
-**sync 是扁平转换管道**：`next()` 只记录下一个值，下游 stage 在当前 stage 返回**之后**才执行。**async 是洋葱模型**：`await next(value)` 会等下游链跑完才继续，因此当前 stage 能在 `next()` 之后写"后置逻辑"。三种模式执行期间均拒绝注册新 stage（`PIPELINE_EXECUTING`），且嵌套调用用深度计数、外层未结束前依然拒绝。async pipeline 的 stage 与 downstream 同时失败会聚合成 `AggregateError`（`PIPELINE_FAILED`）。
+**sync 是扁平转换管道**：`next()` 只记录下一个值，下游 stage 在当前 stage 返回**之后**才执行。**async 是洋葱模型**：`await next(value)` 会等下游链跑完才继续，因此当前 stage 能在 `next()` 之后写"后置逻辑"。四种模式执行期间均拒绝注册新 stage（`PIPELINE_EXECUTING`），且嵌套调用用深度计数、外层未结束前依然拒绝。async pipeline 的 stage 与 downstream 同时失败会聚合成 `AggregateError`（`PIPELINE_FAILED`）——这是 async 洋葱模型特有的失败模式，async-generator 是串行 drain-then-terminal，没有等价的双失败场景。
 
-Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保护的 `runPipeline(value, done)` 触发一次遍历。
+Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保护的 `runPipeline(value, done)` 触发一次遍历。`async`/`async-generator` 两种模式下，若 host 在遍历进行到一半时被 `dispose()`，遍历会在下一个协作检查点中止并抛出 `PluginHostError('HOST_DISPOSING' | 'HOST_DISPOSED', ...)`——`async` 经 `assertActive` 回调实现，`async-generator` 经一个反映 host 状态的结构化 signal 实现（`@migaia/middleware-pipeline` 的 async-generator runner 只接受 signal，不支持回调），两者最终抛出的错误身份一致。
 
 ---
 
@@ -196,7 +212,7 @@ import {
 - **`ERROR_TEXT`**（默认导出）：本包内置的中/英双语错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。
 - **`PluginHost.setLocale(locale: ILocaleKey)`**：静态方法，`ILocaleKey = 'en' | 'zh'`，切换 `ERROR_TEXT` 与后续抛出错误的默认语言，默认 `'zh'`，全局生效（不是每个 Host 实例独立）。
 - **`PluginHostStatus`**：`{ active, closing, disposed }`——Host 的三态生命周期，`closing` 是 `dispose()` 已开始、尚未收敛的窗口。
-- **`PluginHostPipelineMode`**：`{ sync, async, generator }`——即构造选项 `pipeline.mode` 的合法取值集合，`host.pipelineMode` 返回其中之一。
+- **`PluginHostPipelineMode`**：`{ sync, async, generator, asyncGenerator: 'async-generator' }`——即构造选项 `pipeline.mode` 的合法取值集合，`host.pipelineMode` 返回其中之一。
 - **`PluginHostRegistrationLifecycle`**：`{ idle, install, dispose }`——单个插件注册记录当前所处的阶段，决定 `onDispose()`/pipeline 注册是否合法（只在 `install` 阶段允许）。一般只在自定义诊断/调试时需要引用。
 - **`PluginHostPipelineViolation`**：`{ late, duplicate }`——pipeline `next()` 违规的两种分类，供内部诊断分支使用；公开导出主要用于类型层面的穷尽性检查。
 
@@ -210,6 +226,8 @@ import {
 import {
   adaptSyncStageToAsync,
   adaptSyncStageToGenerator,
+  adaptGeneratorStageToAsyncGenerator,
+  adaptSyncStageToAsyncGenerator,
   GENERATOR_CONTINUE,
   GENERATOR_HALT,
   GENERATOR_UNDEFINED,
@@ -220,8 +238,10 @@ import {
 
 这一组导出面向**自己动手拼装 pipeline 执行、或直接对接 `@migaia/middleware-pipeline`** 的场景，日常使用 `host.use()`/`usePipeline()` 不需要它们。
 
-- **`adaptSyncStageToAsync(stage, onViolation?)`** —— 把一个 `(value, next) => void` 形状的 sync stage 包装成 async stage（`(value, next) => Promise<void> | void`），语义与 Host 内部把 `usePipeline()` 注册的 stage 适配进 async/generator mode 时完全一致。`onViolation` 默认空函数。
+- **`adaptSyncStageToAsync(stage, onViolation?)`** —— 把一个 `(value, next) => void` 形状的 sync stage 包装成 async stage（`(value, next) => Promise<void> | void`），语义与 Host 内部把 `usePipeline()` 注册的 stage 适配进 async/generator/async-generator mode 时完全一致。`onViolation` 默认空函数。
 - **`adaptSyncStageToGenerator(stage, onViolation)`** —— 同上，适配成 generator stage；`onViolation` 必填。
+- **`adaptGeneratorStageToAsyncGenerator(stage)`** —— 把一个已有的 generator stage 提升为 async-generator stage，通过 `yield*` 委托保留原 stage 的 yield、terminal sentinel 与 throw identity，不改变任何行为。
+- **`adaptSyncStageToAsyncGenerator(stage, onViolation)`** —— 组合上面两个适配器：先把 sync stage 适配成 generator stage（复用 `adaptSyncStageToGenerator` 的短路/duplicate/late 检测），再提升为 async-generator stage；`onViolation` 必填。
 - **`GENERATOR_CONTINUE`/`GENERATOR_HALT`/`GENERATOR_UNDEFINED`** —— generator pipeline 专用的哨兵值（`unique symbol`，直接从 `@migaia/middleware-pipeline` 转发，保持跨包同一身份）：generator stage 的 `return` 可以返回它们中的一个来表达"继续/终止/显式 undefined"，语义见上方 [Pipeline 处理管线](#pipeline-处理管线) 表格。
 - **`disposeKey`/`asyncDisposeKey`** —— 本包自声明的 `unique symbol`（不依赖 `ESNext.Disposable` lib），语义等价于宿主原生 `Symbol.dispose`/`Symbol.asyncDispose`。插件/资源可以用这两个 key 之一声明清理方法，运行时会把自声明 symbol 与宿主真实 symbol（若存在）都识别为等价键。
 
@@ -386,6 +406,84 @@ host.useGeneratorPipeline(function* (value) {
 host.emit({ level: 'info', message: 'ready' }); // 打印
 host.emit({ level: 'debug', message: 'noisy' }); // 被截断，不打印
 ```
+
+### 6. Async-generator：串行异步处理 + host 中途 dispose 自动止损
+
+```ts
+import { PluginHost, GENERATOR_CONTINUE } from '@migaia/plugin-host';
+
+class FetchHost extends PluginHost<{}, string> {
+  protected createPluginDomainCore() {
+    return {};
+  }
+  run(url: string): Promise<string> {
+    let result = url;
+    return Promise.resolve(
+      this.runPipeline(url, (final) => {
+        result = final;
+      })
+    ).then(() => result);
+  }
+}
+
+const host = new FetchHost({ pipeline: { mode: 'async-generator' } });
+host.useAsyncGeneratorPipeline(async function* (url) {
+  yield url; // 中间 yield 仅用于观测，不会提前进入下一 stage
+  const response = await fetch(url);
+  return await response.text();
+});
+
+const text = await host.run('https://example.com/data');
+```
+
+若 `fetch` 还没返回、`host.dispose()` 就被调用，`run()` 返回的 Promise 会在下一个协作检查点自动以 `PluginHostError('HOST_DISPOSING' | 'HOST_DISPOSED', ...)` reject——不需要手动接一根 `AbortController` 去连 host 的生命周期。
+
+### 7. Async-generator 多 stage 链式处理，复用已有的同步 generator stage
+
+```ts
+import {
+  PluginHost,
+  GENERATOR_CONTINUE,
+  adaptGeneratorStageToAsyncGenerator,
+  type IGeneratorPipelineStage
+} from '@migaia/plugin-host';
+
+// 已有的一个同步 generator stage（比如从 generator 模式的 Host 上迁移过来的）
+const trimStage: IGeneratorPipelineStage<string> = function* (value) {
+  yield value.trim();
+  return GENERATOR_CONTINUE;
+};
+
+class TextHost extends PluginHost<{}, string> {
+  protected createPluginDomainCore() {
+    return {};
+  }
+  run(value: string): Promise<string> {
+    let result = value;
+    return Promise.resolve(
+      this.runPipeline(value, (final) => {
+        result = final;
+      })
+    ).then(() => result);
+  }
+}
+
+const host = new TextHost({ pipeline: { mode: 'async-generator' } });
+
+// 不用重写：直接把同步 generator stage 提升为 async-generator stage
+host.useAsyncGeneratorPipeline(adaptGeneratorStageToAsyncGenerator(trimStage));
+
+// 第二个 stage 真正做异步工作
+host.useAsyncGeneratorPipeline(async function* (value) {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  yield value.toUpperCase();
+  return GENERATOR_CONTINUE;
+});
+
+await host.run('  migai  '); // 'MIGAI'
+```
+
+`adaptGeneratorStageToAsyncGenerator` 让"以前给 generator 模式写的 stage"原样接入 async-generator 模式，不需要重写成 `async function*`；两个 stage 都用 `GENERATOR_CONTINUE` 采用各自最后一次 `yield` 的值，链式往下传。
 
 ---
 

@@ -50,7 +50,7 @@ const log = new Logger({
 | `topic`         | `string`                           | 可选   | `''`     | `extends()` 转发时用于展示的链路节点名。                                  |
 | `options`       | `Record<string, unknown>`          | 可选   | `{}`     | 冻结后公开给插件读取的业务只读配置（通过 `ctx.options`）。                |
 | `on`            | `Record<string, ILogHookFn>`       | 可选   | `{}`     | 构造时注册 hook 的简写，等价于对每一项调用一次 `log.hook(name, fn)`。     |
-| `pipeline.mode` | `'sync' \| 'async' \| 'generator'` | 可选   | `'sync'` | 处理管线的执行模型，构造后不可更改，详见 [§4](#4-pipeline-模式与-stage)。 |
+| `pipeline.mode` | `'sync' \| 'async' \| 'generator' \| 'async-generator'` | 可选   | `'sync'` | 处理管线的执行模型，构造后不可更改，详见 [§4](#4-pipeline-模式与-stage)。 |
 | `plugins`       | `readonly ILoggerPlugin[]`         | 可选   | `[]`     | 按数组顺序同步安装的插件。                                                |
 
 同步插件在构造函数返回前就已经完成安装可用；构造期任何一个插件的 `install()` 返回 Promise/thenable 会**立即抛错**，构造函数不会返回一个"缺了几个插件"的半成品 Logger。需要异步安装的插件，在 Logger 构造完成后用 `await log.use(plugin)` 单独处理，并对失败做好错误处理。
@@ -65,7 +65,7 @@ const log = new Logger({
 | `dispatchRaw(input, options?)`                              | `input: { tag, message, args?, meta?, data?, context?, error?, time? }`；`options.asyncOutput?: boolean` | `input.tag`、`input.message` 必填；其余可选 | `void`                             | 同步      | 显式构造结构化 entry；`asyncOutput: true` 时通过 `defer()` 调度输出，但本方法调用本身同步返回。                                 |
 | `raw(text, options?)`                                       | `text: string`；`options.asyncOutput?: boolean`                                                          | `text` 必填                                 | `void`                             | 同步      | 原样写入 runtime 的 stdout/console，**不经过 pipeline 和 sink**。                                                               |
 | `ctx`                                                       | 无                                                                                                       | 只读属性                                    | `ILoggerContext`                   | 同步      | 冻结的 `id`、业务 `options`、`path`、`topic`、创建时间、环境信息。                                                              |
-| `pipelineMode`                                              | 无                                                                                                       | 只读属性                                    | `'sync' \| 'async' \| 'generator'` | 同步      | 当前 logger 固定的 pipeline 模式。                                                                                              |
+| `pipelineMode`                                              | 无                                                                                                       | 只读属性                                    | `'sync' \| 'async' \| 'generator' \| 'async-generator'` | 同步      | 当前 logger 固定的 pipeline 模式。                                                                                |
 | `flush()`                                                   | 无                                                                                                       | —                                           | `Promise<void>`                    | 异步      | drain 当前 logger、批处理与 extends 转发下游；并发调用共用同一个 Promise，见 [§7](#7-flush-与-shutdown-精确语义)。              |
 | `shutdown(reason)`                                          | `reason: 'signal' \| 'uncaughtException' \| 'unhandledRejection' \| 'manual'`                            | `reason` 必填                               | `Promise<void>`                    | 异步      | 运行 shutdown handler → flush → 卸载插件；重入调用会 alias 到同一个 in-flight promise，见 [§7](#7-flush-与-shutdown-精确语义)。 |
 | `dispose()`                                                 | 无                                                                                                       | —                                           | `Promise<void>`                    | 异步      | `shutdown('manual')` 的别名。                                                                                                   |
@@ -82,7 +82,7 @@ const log = new Logger({
 | `onFlush(fn)`                                               | `fn: () => void \| Promise<void>`                                                                        | 必填                                        | `() => void`                       | 同步      | 注册每轮 `flush()` 都会调用一次的处理函数。                                                                                     |
 | `onShutdown(fn)`                                            | `fn: (reason) => void \| Promise<void>`                                                                  | 必填                                        | `() => void`                       | 同步      | 注册 shutdown 收尾钩子。                                                                                                        |
 | `useSink(fn)`                                               | `fn: (entry) => void \| Promise<void>`                                                                   | 必填                                        | `() => void`                       | 同步      | 注册一个输出 sink。                                                                                                             |
-| `usePipeline` / `useAsyncPipeline` / `useGeneratorPipeline` | 与当前 `pipelineMode` 匹配的 stage                                                                       | 必填                                        | `this`                             | 同步      | 注册 pipeline 处理阶段，见 [§4](#4-pipeline-模式与-stage)；注册调用本身同步返回。                                               |
+| `usePipeline` / `useAsyncPipeline` / `useGeneratorPipeline` / `useAsyncGeneratorPipeline` | 与当前 `pipelineMode` 匹配的 stage                                                     | 必填                                        | `this`                             | 同步      | 注册 pipeline 处理阶段，见 [§4](#4-pipeline-模式与-stage)；注册调用本身同步返回。                                 |
 | `onDispose(resource)`                                       | disposer 函数或 disposable 对象                                                                          | 必填                                        | `void`                             | 同步      | 仅插件 `install()` 期间可调用，登记资源清理；应用代码不应直接调用。                                                             |
 | `PluginHost.setLocale(locale)`                              | 继承自 `@migaia/plugin-host`                                                                             | —                                           | —                                  | 同步      | 见 `@migaia/plugin-host` 文档。                                                                                                 |
 
@@ -94,17 +94,20 @@ const log = new Logger({
 
 `pipeline.mode` 在构造时确定，之后不能切换：
 
-| 模式        | 注册方法               | stage 要求                                            |
-| ----------- | ---------------------- | ----------------------------------------------------- |
-| `sync`      | `usePipeline`          | stage 必须同步完成，`(value, next) => void`           |
-| `async`     | `useAsyncPipeline`     | stage 可以等待异步工作，`async (value, next) => void` |
-| `generator` | `useGeneratorPipeline` | 通过生成器组合处理流程                                |
+| 模式               | 注册方法                    | stage 要求                                              |
+| ------------------ | --------------------------- | -------------------------------------------------------- |
+| `sync`             | `usePipeline`               | stage 必须同步完成，`(value, next) => void`             |
+| `async`            | `useAsyncPipeline`          | stage 可以等待异步工作，`async (value, next) => void`   |
+| `generator`        | `useGeneratorPipeline`      | 通过生成器组合处理流程                                  |
+| `async-generator`  | `useAsyncGeneratorPipeline` | terminal 语义与 `generator` 一致，串行 `await` 耗尽每个 stage（中间 yield 不提前进入下一 stage） |
 
-内置的同步插件（`level`、过滤器、`uuid` 等）会由 Logger 自动适配到当前 mode，因此不管选哪种 mode，这些插件行为一致；但**直接注册自定义 stage 时，注册方法必须和当前 mode 匹配**，不匹配会立即抛错——不存在"用错方法但静默降级"这种情况。
+`useAsyncGeneratorPipeline` 由 `PluginHost` 基类直接提供（`LoggerCore` 未对它做任何包装），能力与 `@migaia/plugin-host` 的 `host.useAsyncGeneratorPipeline` 完全一致，用法见该包文档。
 
-pipeline 执行期间禁止新增 stage，避免修改一条正在执行中的处理链。每个 stage 在一次调用里最多调用一次 `next()`：重复调用抛出 `PIPELINE_NEXT_DUPLICATE`；stage 已经返回后才延迟调用 `next()` 会产生 `PIPELINE_NEXT_LATE` diagnostic（不抛错，只上报）；完全不调用 `next()` 表示这个 stage 主动拦截了这条 entry，不会继续往下传递。三种 mode 使用完全相同的违规检测逻辑。
+内置的同步插件（`level`、过滤器、`uuid` 等）会由 Logger 自动适配到当前 mode（含 `async-generator`），因此不管选哪种 mode，这些插件行为一致；但**直接注册自定义 stage 时，注册方法必须和当前 mode 匹配**，不匹配会立即抛错——不存在"用错方法但静默降级"这种情况。`ILoggerCore<TMode>` 在 `TMode` 收窄到某个具体 mode 字面量时，会把其余三个 `useXPipeline` 方法在类型层面收窄为 `never`，因此用错方法通常在编译期就会报错，而不必等到运行时才抛 `PIPELINE_MODE_MISMATCH`。
 
-`sync` 模式是扁平转换管道：`next()` 只是记录下一个值，下游 stage 在当前 stage 返回**之后**才执行。`async` 模式是洋葱模型：`await next(value)` 会等待整条下游链跑完才继续，因此当前 stage 可以在 `next()` 之后写"后置逻辑"，并且这段逻辑能感知下游是否已经处理完毕。这个差异是切换 pipeline mode 时最容易踩的坑。
+pipeline 执行期间禁止新增 stage，避免修改一条正在执行中的处理链。每个 stage 在一次调用里最多调用一次 `next()`：重复调用抛出 `PIPELINE_NEXT_DUPLICATE`；stage 已经返回后才延迟调用 `next()` 会产生 `PIPELINE_NEXT_LATE` diagnostic（不抛错，只上报）；完全不调用 `next()` 表示这个 stage 主动拦截了这条 entry，不会继续往下传递。四种 mode 使用完全相同的违规检测逻辑。
+
+`sync` 模式是扁平转换管道：`next()` 只是记录下一个值，下游 stage 在当前 stage 返回**之后**才执行。`async` 模式是洋葱模型：`await next(value)` 会等待整条下游链跑完才继续，因此当前 stage 可以在 `next()` 之后写"后置逻辑"，并且这段逻辑能感知下游是否已经处理完毕。`async-generator` 既不是洋葱模型也不是流式管道，是"stage 顺序执行、每个 stage 各自异步跑完取一个终值"，介于 `async` 与 `generator` 之间。这个差异是切换 pipeline mode 时最容易踩的坑。
 
 ---
 

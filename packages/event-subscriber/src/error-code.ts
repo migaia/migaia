@@ -1,5 +1,5 @@
 /** Stable source attached to every event-subscriber package-boundary error. */
-export const EVENT_SUBSCRIBER_SOURCE = '@migaia/event-subscriber';
+export const EVENT_SUBSCRIBER_SOURCE = '@migaia/event-subscriber'
 
 /** The package-local error code declaration site. */
 export const EventSubscriberErrorCode = {
@@ -38,7 +38,7 @@ export const EventSubscriberErrorCode = {
   unhandledListenerFailure: 'UNHANDLED_LISTENER_FAILURE',
   /** A callable subscription chain was closed; caller must retain a live handle. */
   subscriptionClosed: 'SUBSCRIPTION_CLOSED'
-} as const;
+} as const
 
 export type IEventSubscriberErrorCode =
-  (typeof EventSubscriberErrorCode)[keyof typeof EventSubscriberErrorCode];
+  (typeof EventSubscriberErrorCode)[keyof typeof EventSubscriberErrorCode]

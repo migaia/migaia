@@ -25,11 +25,11 @@ export function assimilateThenable(
 ): Promise<unknown> {
   return new Promise<unknown>((resolve, reject) => {
     try {
-      Reflect.apply(thenFn, thenable, [resolve, reject]);
+      Reflect.apply(thenFn, thenable, [resolve, reject])
     } catch (error) {
-      reject(error);
+      reject(error)
     }
-  });
+  })
 }
 
 /**
@@ -41,7 +41,7 @@ export function createReceiverCallback<TArgs extends readonly unknown[], TResult
   fn: (...args: TArgs) => TResult,
   receiver: unknown
 ): (...args: TArgs) => TResult {
-  return (...args) => Reflect.apply(fn, receiver, args);
+  return (...args) => Reflect.apply(fn, receiver, args)
 }
 
 /**
@@ -53,5 +53,5 @@ export function forwardCollectionCallback(
   thisArg: unknown,
   args: unknown[]
 ): void {
-  Reflect.apply(callbackfn, thisArg, args);
+  Reflect.apply(callbackfn, thisArg, args)
 }

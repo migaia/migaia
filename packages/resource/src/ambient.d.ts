@@ -6,5 +6,5 @@
  * import DOM/Node。 测试 tsconfig 单独 `types:["node"]` 并排除本文件，避免与 @types/node 的 DOMException 全局重复声明。
  */
 declare class DOMException extends Error {
-  constructor(message?: string, name?: string);
+  constructor(message?: string, name?: string)
 }

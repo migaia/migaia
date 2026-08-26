@@ -47,6 +47,7 @@ function createEventChannel<T, R = void>(
 type IEventChannelOptions<T> = {
   readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>;
   readonly terminalReport?: (error: unknown) => void | PromiseLike<void>;
+  readonly dispatchPolicy?: EventDispatchPolicy;
 };
 
 type IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown };
@@ -62,6 +63,8 @@ unsubscribe();
 ```
 
 类型参数：`T`（payload 类型）、`R`（listener 结果类型，默认 `void`）。`options.report`：处理 `publish()` 之后**迟到**的 Promise/thenable rejection（同步 listener 失败不走这里，会在 `publish()` 遍历完成后聚合抛出）；`options.terminalReport`：`report` 缺失、抛错，或其返回的 thenable reject 时的兜底诊断出口；`report`/`terminalReport` 提供但不是函数抛 `INVALID_REPORTER`；`options` 本身不是普通对象（`null`/数组/非对象）抛 `INVALID_OPTIONS`。若 `report`/`terminalReport`（包括其返回的 Promise）都失败或缺失，最终会尝试 `runtime.reportError`（如全局 `reportError` 钩子）→ `console.error` → 排入下一个宏任务重新抛出，逐级降级，绝不静默吞掉。
+
+`dispatchPolicy` 默认是 `EventDispatchPolicy.recursive`，保持 canonical channel 的同步 nested publish trace。需要当前 snapshot 完成后再交付重入值的消费者必须显式传入 `EventDispatchPolicy.queued`；该 opt-in 不改变其他消费者的默认行为。
 
 `ICanonicalEventChannel<T, R>` 上的成员：
 
@@ -89,7 +92,7 @@ type IEventChannel<T, R = void> = {
 
 - `subscribe(listener, options?)` —— 登记一个 listener，返回可直接调用的[订阅句柄](#订阅句柄)（同时是 `unsubscribe` 函数、`.unsubscribe` 自身别名、可链式 `.subscribe()` 追加更多订阅）。`listener` 非函数抛 `INVALID_LISTENER`；`options.taskId` 提供但非非空字符串抛 `INVALID_TASK_ID`；`options` 本身不是普通对象抛 `INVALID_OPTIONS`。相同 listener 重复订阅会产生两份独立 registration（各自可单独退订）。
 - `subscribeOnce`/`subscribeUntil` —— 与下方 [Helper 模块](#helper-模块)的同名独立函数语义完全一致，channel 上直接暴露方便链式调用。
-- `publish(value)` —— 当前调用栈按注册顺序（快照）同步调用全部 listener，**不等待**返回的 Promise。listener **同步抛出**的错误会被收集，遍历全部目标完成后一次性以携带 `PUBLISH_FAILED` 码的 `AggregateError` 抛出；listener 返回的 thenable **迟到 reject**（即在 `publish()` 同步返回之后才拒绝）会转发给 `options.report`（见上），不计入 `publish()` 本身抛出的错误。
+- `publish(value)` —— 按注册顺序（快照）同步调用全部 listener，**不等待**返回的 Promise；默认同步重入 publish 递归交付，只有 `dispatchPolicy: EventDispatchPolicy.queued` 才会排队到当前快照完成后再交付。listener **同步抛出**的错误会被收集并以携带 `PUBLISH_FAILED` 码的 `AggregateError` 抛出；listener 返回的 thenable **迟到 reject**（即在 `publish()` 同步返回之后才拒绝）会转发给 `options.report`（见上），不计入 `publish()` 本身抛出的错误。
 - `filterTaskId(taskId)` —— 创建一个只读的 task 选择 view（`IFilteredEventChannel`），交给[异步发布](#async-模块) helper 使用；`taskId` 必须是非空字符串，否则抛 `INVALID_TASK_ID`。
 - `clear()` —— 清空全部 registration，**不**执行 listener 自身的 cleanup（listener 本身没有 dispose 概念，只是不再被调用）。
 - `size: number`（只读）—— 当前 active registration 数量。
@@ -366,7 +369,7 @@ import type { IEventChannelSubscription, IEventHubSubscription } from '@migaia/e
 ```ts
 const channelHandle = channel.subscribe(onReady);
 channelHandle.subscribe(onWarning, { taskId: 'audit' });
-channelHandle.unsubscribe(); // 和 channelHandle 是同一个函数标识；释放整条链
+ channelHandle.unsubscribe(); // same function identity; releases whole chain
 
 const hubHandle = hub.subscribe('ready', onReady);
 // 有限字面量 key map 在同一条链上禁止重复 key；要用同一个 key 订阅两次，另起一个新的 hub.subscribe()
@@ -385,6 +388,8 @@ try {
 ```
 
 `IEventChannelSubscription<T, R>`/`IEventHubSubscription<C, UsedKeys>` 是公开的 channel/hub 句柄形态。有限字面量 map 的同一 chain 会在类型层排除已用 key；`Record<string, Payload>` 等宽 key 无法静态区分运行时字符串，因此同 key 继续合法并保持 fan-out。
+
+For hub chains, finite literal maps reject a repeated key on this chain; a widened key: runtime fan-out remains valid. Chain extension is non-transactional; earlier registration stays owned by the handle if a later extension fails.
 
 行为要点：
 

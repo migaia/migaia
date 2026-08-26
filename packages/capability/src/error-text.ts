@@ -14,6 +14,6 @@ export const CapabilityErrorText = {
   hostTransitioning: 'capability host cannot mutate during a lifecycle transition',
   /** Builds stable invalid-handle text while preserving the registered capability name. */
   invalidHandle: (name: string): string => `capability "${name}" returned an invalid handle`
-} as const;
+} as const
 
-export type ICapabilityErrorText = (typeof CapabilityErrorText)[keyof typeof CapabilityErrorText];
+export type ICapabilityErrorText = (typeof CapabilityErrorText)[keyof typeof CapabilityErrorText]

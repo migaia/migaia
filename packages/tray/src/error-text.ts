@@ -5,4 +5,4 @@ export const TrayErrorText = {
   unknownEntry: 'tray entry is unknown',
   unavailable: 'tray entry is unavailable',
   gateReadFailed: 'tray readiness gate failed'
-} as const;
+} as const

@@ -1,21 +1,21 @@
-import { LoggerErrorCode, type ILoggerErrorCode } from './error-code.js';
-import { LoggerErrorText } from './error-text.js';
-import { attachErrorIdentity } from '@migaia/utils/error';
+import { LoggerErrorCode, type ILoggerErrorCode } from './error-code.js'
+import { LoggerErrorText } from './error-text.js'
+import { attachErrorIdentity } from '@migaia/utils/error'
 
-export { LoggerErrorCode, type ILoggerErrorCode };
+export { LoggerErrorCode, type ILoggerErrorCode }
 
 /** `source` value stamped onto every error this package throws. */
-export const LOGGER_SOURCE = '@migaia/logger';
+export const LOGGER_SOURCE = '@migaia/logger'
 
 /** Attaches logger metadata, or returns an attachable wrapper that keeps the original as `cause`. */
 export function tagLoggerError<E extends Error>(error: E, code: ILoggerErrorCode): E {
   try {
-    return attachErrorIdentity(error, { source: LOGGER_SOURCE, code });
+    return attachErrorIdentity(error, { source: LOGGER_SOURCE, code })
   } catch {
     /** Wrapper carries logger metadata when the original Error is sealed or frozen. */
-    const wrapper = new Error(LoggerErrorText.errorTaggingFailed, { cause: error });
+    const wrapper = new Error(LoggerErrorText.errorTaggingFailed, { cause: error })
     try {
-      Object.setPrototypeOf(wrapper, Object.getPrototypeOf(error));
+      Object.setPrototypeOf(wrapper, Object.getPrototypeOf(error))
     } catch {
       // The wrapper remains a native Error if a hostile prototype prevents preservation.
     }
@@ -25,7 +25,7 @@ export function tagLoggerError<E extends Error>(error: E, code: ILoggerErrorCode
         configurable: true,
         enumerable: false,
         writable: true
-      });
+      })
     } catch {
       // The wrapper's native name is sufficient when the original name is unreadable.
     }
@@ -36,14 +36,14 @@ export function tagLoggerError<E extends Error>(error: E, code: ILoggerErrorCode
           configurable: true,
           enumerable: false,
           writable: false
-        });
+        })
       } catch {
         // The original AggregateError and its errors remain reachable through `cause`.
       }
     }
-    Object.defineProperty(wrapper, 'source', { value: LOGGER_SOURCE, enumerable: true });
-    Object.defineProperty(wrapper, 'code', { value: code, enumerable: true });
-    return wrapper as E;
+    Object.defineProperty(wrapper, 'source', { value: LOGGER_SOURCE, enumerable: true })
+    Object.defineProperty(wrapper, 'code', { value: code, enumerable: true })
+    return wrapper as E
   }
 }
 
@@ -56,8 +56,8 @@ export function createLoggerError(
   const error = new Error(
     message,
     options?.cause !== undefined ? { cause: options.cause } : undefined
-  );
-  return tagLoggerError(error, code);
+  )
+  return tagLoggerError(error, code)
 }
 
 /**
@@ -71,10 +71,10 @@ export function ensureLoggerDeliveryError(error: unknown): Error {
     Object.getOwnPropertyDescriptor(error, 'source')?.value === LOGGER_SOURCE &&
     Object.getOwnPropertyDescriptor(error, 'code')?.value === LoggerErrorCode.deliveryFailed
   )
-    return error;
+    return error
   return createLoggerError(LoggerErrorCode.deliveryFailed, LoggerErrorText.httpTransportFailed, {
     cause: error
-  });
+  })
 }
 
 /** Builds a tagged native `TypeError` while preserving an admission failure as `cause`. */
@@ -86,8 +86,8 @@ export function createLoggerTypeError(
   const error = new TypeError(
     message,
     options?.cause !== undefined ? { cause: options.cause } : undefined
-  );
-  return tagLoggerError(error, code);
+  )
+  return tagLoggerError(error, code)
 }
 
 /** Builds a tagged AggregateError while preserving primary and rollback error identity. */
@@ -96,7 +96,7 @@ export function createLoggerAggregateError(
   message: string,
   errors: readonly unknown[]
 ): AggregateError {
-  return tagLoggerError(new AggregateError(errors, message), code);
+  return tagLoggerError(new AggregateError(errors, message), code)
 }
 
 /**
@@ -109,6 +109,6 @@ export function createLoggerCleanupError(
   message: string,
   errors: readonly unknown[]
 ): Error {
-  const cause = errors.length === 1 ? errors[0] : new AggregateError(errors, message);
-  return createLoggerError(code, message, { cause });
+  const cause = errors.length === 1 ? errors[0] : new AggregateError(errors, message)
+  return createLoggerError(code, message, { cause })
 }

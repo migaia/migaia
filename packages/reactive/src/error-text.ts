@@ -93,6 +93,6 @@ export const ReactiveErrorText = {
     ' pending item(s): ' +
     names.join(', ') +
     (droppedCount > names.length ? ', …' : '')
-} as const;
+} as const
 
-export type IReactiveErrorText = string;
+export type IReactiveErrorText = string

@@ -26,4 +26,4 @@ export const EventSubscriberErrorText = {
   unhandledListenerFailure: 'event-subscriber listener failure was not handled',
   /** Stable text for extension after chain teardown; used by subscription handles. */
   subscriptionClosed: 'event-subscriber subscription is closed'
-} as const;
+} as const

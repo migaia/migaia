@@ -4,7 +4,7 @@ export const ReactiveTraceType = {
   dependency: 'dependency',
   observerRun: 'observer-run',
   action: 'action'
-} as const;
+} as const
 
 /** Lifecycle phases used by dependency, observer, and action trace events. */
 export const ReactiveTracePhase = {
@@ -13,7 +13,7 @@ export const ReactiveTracePhase = {
   error: 'error',
   connect: 'connect',
   disconnect: 'disconnect'
-} as const;
+} as const
 
 /** Diagnostic phases used when the reactive runtime reports failures from host callbacks. */
 export const ReactiveErrorPhase = {
@@ -23,13 +23,13 @@ export const ReactiveErrorPhase = {
   ssrResource: 'ssr-resource',
   subscriptionListener: 'subscription-listener',
   traceListener: 'trace-listener'
-} as const;
+} as const
 
 /** Internal dependency-frame kinds used to distinguish committed tracking from render capture. */
 export const ReactiveDependencyKind = {
   observer: 'observer',
   capture: 'capture'
-} as const;
+} as const
 
 /** Stable reasons attached to observable and dependency trace events. */
 export const ReactiveTraceReason = {
@@ -38,11 +38,11 @@ export const ReactiveTraceReason = {
   retrack: 'retrack',
   invalidate: 'invalidate',
   dispose: 'dispose'
-} as const;
+} as const
 
-export type IReactiveTraceType = (typeof ReactiveTraceType)[keyof typeof ReactiveTraceType];
-export type IReactiveTracePhase = (typeof ReactiveTracePhase)[keyof typeof ReactiveTracePhase];
-export type IReactiveTraceReason = (typeof ReactiveTraceReason)[keyof typeof ReactiveTraceReason];
-export type IReactiveErrorPhase = (typeof ReactiveErrorPhase)[keyof typeof ReactiveErrorPhase];
+export type IReactiveTraceType = (typeof ReactiveTraceType)[keyof typeof ReactiveTraceType]
+export type IReactiveTracePhase = (typeof ReactiveTracePhase)[keyof typeof ReactiveTracePhase]
+export type IReactiveTraceReason = (typeof ReactiveTraceReason)[keyof typeof ReactiveTraceReason]
+export type IReactiveErrorPhase = (typeof ReactiveErrorPhase)[keyof typeof ReactiveErrorPhase]
 export type IReactiveDependencyKind =
-  (typeof ReactiveDependencyKind)[keyof typeof ReactiveDependencyKind];
+  (typeof ReactiveDependencyKind)[keyof typeof ReactiveDependencyKind]

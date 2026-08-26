@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "ignorePatterns": ["**/dist/**", "**/node_modules/**", "**/target/**", "**/*.map"],
-  "semi": true,
+  "semi": false,
   "trailingComma": "none",
   "singleQuote": true,
   "jsdoc": true,

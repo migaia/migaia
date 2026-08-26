@@ -2,4 +2,4 @@
 export const MiddlewarePipelineErrorText = {
   /** `runAsyncMiddleware` 无 host 组合器时用于保留既有 AggregateError message。 */
   executionFailed: 'middleware stage and downstream failed'
-} as const;
+} as const

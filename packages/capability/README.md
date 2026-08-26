@@ -6,7 +6,7 @@
 
 **适用**：某个功能需要"开关关着时代码不下载"（配合 `activate()` 内部 `await import()`）、需要启停生命周期（启用给 handle，关闭必须真释放 I/O 连接/订阅/端口等资源）、或者需要按租户/按开关表隔离哪些能力当前允许启用——比如灰度发布、按租户开关实验性面板、线上不重新部署就能回退的功能开关。
 
-**不适用**：Host 不承担依赖图编排；需要静态 required provider DAG 时使用下方的 `@migaia/capability/graph`。Graph 不提供 optional/notification、dynamic replacement 或 cross-realm adapter。Host 也**不能**让一个静态 import 进来的能力变免费——体积只有 `activate()` 内部真正用 `await import()` 时才省下来，闸门只是把这个写法变成一等公民，省体积的是打包器本身。
+**不适用**：Host 不承担依赖图编排；需要静态 required provider DAG 时使用下方的 `@migaia/capability/graph`，只需纯准入时可使用 `@migaia/capability/graph/topology`。Graph 不提供 optional/notification、dynamic replacement 或 cross-realm adapter。Host 也**不能**让一个静态 import 进来的能力变免费——体积只有 `activate()` 内部真正用 `await import()` 时才省下来，闸门只是把这个写法变成一等公民，省体积的是打包器本身。
 
 ## 安装
 
@@ -40,6 +40,8 @@ import {
 ```
 
 它只管理静态 required provider-consumer DAG：首次 `ready()` 冻结注册表，检测 unknown provider/重复 edge/cycle，按稳定拓扑顺序启动；启动失败会回滚已启动节点，`dispose()` 按逆拓扑释放。节点的 `start()` 可以通过 `context.get(provider)` 读取 direct ready provider，并用 `context.own(resource, descriptor)` 登记 auxiliary resource；primary `value + release` 只由 Graph 所有一次。
+
+无状态拓扑入口 `@migaia/capability/graph/topology` 的公开节点 `ordinal` 是一次性注册位置：对于 `nodeCount` 个节点，必须唯一且连续覆盖 `[0, nodeCount)`。不满足时通过调用方提供的 `onInvalid` 报告 `invalid-node` 或 `duplicate-ordinal`，不会静默排序或重写输入。
 
 ```ts
 const graph = createCapabilityGraph({ onError: (error) => console.error(error) });

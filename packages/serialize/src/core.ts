@@ -21,7 +21,7 @@ export {
   type ISerializeScheduler,
   type ITextDecoder,
   type ITextEncoder
-} from './types.js';
+} from './types.js'
 
 export {
   SERIALIZE_SOURCE,
@@ -35,9 +35,9 @@ export {
   createSerializeError,
   createSerializeTypeError,
   createSerializeRangeError
-} from './errors.js';
+} from './errors.js'
 
-export { base64ToBytes, bytesToBase64, streamBase64Chunks } from './base64.js';
+export { base64ToBytes, bytesToBase64, streamBase64Chunks } from './base64.js'
 
 export {
   collectStream,
@@ -46,4 +46,4 @@ export {
   sliceByFrameBudget,
   type IEncodeStreamOptions,
   type IFrameBudgetOptions
-} from './stream.js';
+} from './stream.js'

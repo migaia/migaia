@@ -1,8 +1,8 @@
-import type { IRuntime } from './types.js';
-import { assertNoForeignOwnershipBrand } from './copy-check.js';
-import { createReactiveError } from '../errors.js';
-import { ReactiveErrorCode } from '../error-code.js';
-import { ReactiveErrorText } from '../error-text.js';
+import type { IRuntime } from './types.js'
+import { assertNoForeignOwnershipBrand } from './copy-check.js'
+import { createReactiveError } from '../errors.js'
+import { ReactiveErrorCode } from '../error-code.js'
+import { ReactiveErrorText } from '../error-text.js'
 
 /**
  * 唯一所有权登记。
@@ -15,27 +15,27 @@ import { ReactiveErrorText } from '../error-text.js';
  *
  * WeakMap 仍是归属权威。跨副本品牌只在显式诊断边界登记；普通节点构造不触碰全局 Symbol 注册表，避免把部署诊断成本放进热路径。
  */
-const OWNERS = new WeakMap<object, IRuntime>();
+const OWNERS = new WeakMap<object, IRuntime>()
 
 /** 登记归属。同一个对象重复登记到不同 Runtime 视为编程错误——那意味着它同时属于 两张图，之后任何一次校验都无法给出正确答案。 */
 export function claimOwnership(value: object, runtime: IRuntime): void {
-  const existing = OWNERS.get(value);
+  const existing = OWNERS.get(value)
   if (existing && existing !== runtime) {
     throw createReactiveError(
       ReactiveErrorCode.ownershipConflict,
       ReactiveErrorText.ownershipConflict
-    );
+    )
   }
-  OWNERS.set(value, runtime);
+  OWNERS.set(value, runtime)
 }
 
 /** 查归属。未登记返回 undefined——调用方据此区分「不归任何图」与「归错图」。 */
 export function ownerOf(value: unknown): IRuntime | undefined {
-  if (typeof value !== 'object' || value === null) return undefined;
-  const owner = OWNERS.get(value);
-  if (owner) return owner;
-  if (typeof value === 'object' && value !== null) assertNoForeignOwnershipBrand(value);
-  return undefined;
+  if (typeof value !== 'object' || value === null) return undefined
+  const owner = OWNERS.get(value)
+  if (owner) return owner
+  if (typeof value === 'object' && value !== null) assertNoForeignOwnershipBrand(value)
+  return undefined
 }
 
 /**
@@ -44,12 +44,12 @@ export function ownerOf(value: unknown): IRuntime | undefined {
  * 未登记的对象一律放行：第三方可以把自己的普通值注册进 Registry，那不涉及图。 只有**登记过且归属不符**才是错误——那才是两张图被接在一起的那一刻。
  */
 export function assertOwnedBy(value: unknown, runtime: IRuntime, what: string): void {
-  const owner = ownerOf(value);
+  const owner = ownerOf(value)
   if (owner && owner !== runtime) {
     throw createReactiveError(
       ReactiveErrorCode.crossRuntime,
       ReactiveErrorText.belongsToDifferentRuntime(what)
-    );
+    )
   }
 }
 
@@ -59,17 +59,17 @@ export function assertOwnedBy(value: unknown, runtime: IRuntime, what: string): 
  * 普通 Registry 值可以没有 owner；真正进入依赖图的节点则必须由受信工厂登记。 否则第三方只要伪造一个 `runtime` 字段，就能把可变的 subs/version 接进图里。
  */
 export function assertReactiveOwnedBy(value: object, runtime: IRuntime, what: string): void {
-  const owner = OWNERS.get(value);
+  const owner = OWNERS.get(value)
   if (!owner) {
     throw createReactiveError(
       ReactiveErrorCode.notRuntimeOwned,
       ReactiveErrorText.notRuntimeOwned(what)
-    );
+    )
   }
   if (owner !== runtime) {
     throw createReactiveError(
       ReactiveErrorCode.crossRuntime,
       ReactiveErrorText.belongsToAnotherRuntime(what)
-    );
+    )
   }
 }

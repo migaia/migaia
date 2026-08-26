@@ -1,7 +1,7 @@
-export { createTray } from './tray.js';
-export { TrayErrorCode } from './error-code.js';
-export type { ITrayErrorCode } from './error-code.js';
-export { TRAY_SOURCE } from './errors.js';
+export { createTray } from './tray.js'
+export { TrayErrorCode } from './error-code.js'
+export type { ITrayErrorCode } from './error-code.js'
+export { TRAY_SOURCE } from './errors.js'
 export type {
   ITray,
   ITrayEntryContext,
@@ -10,5 +10,5 @@ export type {
   ITrayEntryKind,
   ITrayKey,
   ITrayState
-} from './contract.js';
-export type { IGraphReadinessSnapshot } from './types.js';
+} from './contract.js'
+export type { IGraphReadinessSnapshot } from './types.js'

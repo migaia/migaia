@@ -1,5 +1,5 @@
-import { defineConfig } from '@playwright/test';
-import { fileURLToPath } from 'node:url';
+import { defineConfig } from '@playwright/test'
+import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
   testDir: fileURLToPath(new URL('.', import.meta.url)),
@@ -16,4 +16,4 @@ export default defineConfig({
     reuseExistingServer: true,
     timeout: 30_000
   }
-});
+})

@@ -49,4 +49,4 @@ export const LoggerErrorText = {
   /** `extends()` would create a cycle back to the current logger. */
   extendsCycle: (id: string): string =>
     `[logger] extends() 会形成循环引用：目标 logger 已经能沿着它自己的 extends 链路 转发回当前 logger (id=${id})，已阻止这次调用`
-} as const;
+} as const

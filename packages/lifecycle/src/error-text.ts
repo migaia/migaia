@@ -31,6 +31,6 @@ export const LifecycleErrorText = {
   schedulerTimeOverflow: '[lifecycle] scheduler time arithmetic must remain finite',
   /** Explains that a generation timeout option could not be read at its admission boundary. */
   generationTimeoutAccessorFailed: '[lifecycle] generation timeout option getter failed'
-} as const;
+} as const
 
-export type ILifecycleErrorText = (typeof LifecycleErrorText)[keyof typeof LifecycleErrorText];
+export type ILifecycleErrorText = (typeof LifecycleErrorText)[keyof typeof LifecycleErrorText]

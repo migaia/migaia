@@ -1,39 +1,39 @@
-import type { IFlushable, IFlushResult, ISchedulerStrategy } from './types.js';
-import { createReactiveError, tagReactiveError } from '../errors.js';
-import { ReactiveErrorCode } from '../error-code.js';
-import { ReactiveErrorText } from '../error-text.js';
-import { defaultRuntimeAdapter } from './default-runtime-adapter.js';
-import { assimilateThenable } from './receiver.js';
-import { ReactiveErrorPhase } from './trace-constants.js';
+import type { IFlushable, IFlushResult, ISchedulerStrategy } from './types.js'
+import { createReactiveError, tagReactiveError } from '../errors.js'
+import { ReactiveErrorCode } from '../error-code.js'
+import { ReactiveErrorText } from '../error-text.js'
+import { defaultRuntimeAdapter } from './default-runtime-adapter.js'
+import { assimilateThenable } from './receiver.js'
+import { ReactiveErrorPhase } from './trace-constants.js'
 
 type IThenableInspection =
   | { readonly handler: (resolve: unknown, reject: unknown) => void }
   | { readonly error: unknown }
-  | undefined;
+  | undefined
 
 /** Reads a returned scheduler value once, preserving hostile `.then` getter failures as data. */
 function inspectThenable(value: unknown): IThenableInspection {
   if ((value === null || typeof value !== 'object') && typeof value !== 'function') {
-    return undefined;
+    return undefined
   }
   try {
-    const then = (value as { then?: unknown }).then;
+    const then = (value as { then?: unknown }).then
     return typeof then === 'function'
       ? { handler: then as (resolve: unknown, reject: unknown) => void }
-      : undefined;
+      : undefined
   } catch (error) {
-    return { error };
+    return { error }
   }
 }
 
 /** 只读 `cause`，hostile getter 抛错时按 `undefined` 处理（诊断通道不反向破坏结果）。 */
 const readCauseSafely = (error: Error): unknown => {
   try {
-    return error.cause;
+    return error.cause
   } catch {
-    return undefined;
+    return undefined
   }
-};
+}
 
 /** 用 `defineProperty` 安全附加 `cause`；失败（frozen / non-extensible）返回 false。 */
 const attachCauseSafely = (error: Error, cause: unknown): boolean => {
@@ -43,12 +43,12 @@ const attachCauseSafely = (error: Error, cause: unknown): boolean => {
       enumerable: true,
       configurable: true,
       writable: true
-    });
-    return true;
+    })
+    return true
   } catch {
-    return false;
+    return false
   }
-};
+}
 
 // 调度器：待冲刷队列、批处理深度、冲刷状态、可插拔触发策略全部收在这一个类里。
 export class Scheduler {
@@ -57,19 +57,19 @@ export class Scheduler {
    *
    * 默认 100，但**可配置**——它是「一次冲刷里允许几轮」的策略参数，不是物理常数。 写死之后，合法的深链场景（一条长派生链每轮只推进一级）与真正的环无法区分， 而调用方连调都调不了。
    */
-  #maxFlushPasses: number;
+  #maxFlushPasses: number
 
-  batchDepth = 0;
-  #flushing = false;
-  #scheduled = false;
+  batchDepth = 0
+  #flushing = false
+  #scheduled = false
   /** Monotonic identity for the currently admitted scheduling request. */
-  #scheduleGeneration = 0;
-  #queued = new Set<IFlushable>();
+  #scheduleGeneration = 0
+  #queued = new Set<IFlushable>()
   /** Strategy currently selected by the caller; it may not yet satisfy the runtime contract. */
-  #strategy: ISchedulerStrategy;
+  #strategy: ISchedulerStrategy
   /** Last strategy that returned a non-thenable, or the injected default strategy. */
-  #safeStrategy: ISchedulerStrategy;
-  #onAsyncError: (error: unknown) => void;
+  #safeStrategy: ISchedulerStrategy
+  #onAsyncError: (error: unknown) => void
 
   constructor(
     onAsyncError: (error: unknown) => void = (error) =>
@@ -81,14 +81,14 @@ export class Scheduler {
       throw tagReactiveError(
         new RangeError(ReactiveErrorText.maxFlushPassesInvalid),
         ReactiveErrorCode.invalidOption
-      );
+      )
     }
-    this.#onAsyncError = onAsyncError;
-    this.#maxFlushPasses = maxFlushPasses;
+    this.#onAsyncError = onAsyncError
+    this.#maxFlushPasses = maxFlushPasses
     // 默认冲刷走注入的微任务调度入口，不直接 queueMicrotask。
-    const defaultStrategy: ISchedulerStrategy = (flush) => scheduleMicrotask(flush);
-    this.#strategy = defaultStrategy;
-    this.#safeStrategy = defaultStrategy;
+    const defaultStrategy: ISchedulerStrategy = (flush) => scheduleMicrotask(flush)
+    this.#strategy = defaultStrategy
+    this.#safeStrategy = defaultStrategy
   }
 
   /**
@@ -100,59 +100,59 @@ export class Scheduler {
       throw tagReactiveError(
         new TypeError(ReactiveErrorText.schedulerStrategyInvalid),
         ReactiveErrorCode.invalidOption
-      );
+      )
     }
-    this.#strategy = strategy;
+    this.#strategy = strategy
   }
 
   /** 把一项加入待冲刷队列；不在批处理里就立刻申请一次冲刷 */
   enqueue(item: IFlushable): void {
-    this.#queued.add(item);
-    if (this.batchDepth === 0) this.requestFlush();
+    this.#queued.add(item)
+    if (this.batchDepth === 0) this.requestFlush()
   }
 
   /** 从队列移除（比如 effect dispose 时，避免已销毁的实例还留在队列里） */
   dequeue(item: IFlushable): void {
-    this.#queued.delete(item);
+    this.#queued.delete(item)
   }
 
   /** 申请一次冲刷——signal 写入/notifySource 也会各自调用它； 重复调用是安全的，scheduled/flushing 两个标记天然去重，不会重复触发 */
   requestFlush(): void {
-    if (this.#scheduled || this.#flushing) return;
-    this.#scheduled = true;
-    const generation = ++this.#scheduleGeneration;
-    const strategy = this.#strategy;
-    let insideStrategyCall = true;
-    let synchronousFlushError: unknown;
+    if (this.#scheduled || this.#flushing) return
+    this.#scheduled = true
+    const generation = ++this.#scheduleGeneration
+    const strategy = this.#strategy
+    let insideStrategyCall = true
+    let synchronousFlushError: unknown
     const flush = (): void => {
-      if (generation !== this.#scheduleGeneration) return;
+      if (generation !== this.#scheduleGeneration) return
       // A strategy callback is valid for one scheduling request only. Retiring its generation
       // before flushing also makes a duplicate invocation from the same strategy a no-op.
-      this.#scheduleGeneration++;
-      this.#scheduled = false;
+      this.#scheduleGeneration++
+      this.#scheduled = false
       try {
-        this.flush();
+        this.flush()
       } catch (error) {
         if (insideStrategyCall) {
-          synchronousFlushError = error;
-          throw error;
+          synchronousFlushError = error
+          throw error
         }
         try {
-          this.#onAsyncError(error);
+          this.#onAsyncError(error)
         } catch {
           // Error reporting is terminal; it must not create a second scheduler failure.
         }
       }
-    };
+    }
     try {
-      const result = (strategy as (flush: () => void) => unknown)(flush);
-      insideStrategyCall = false;
-      const inspected = inspectThenable(result);
+      const result = (strategy as (flush: () => void) => unknown)(flush)
+      insideStrategyCall = false
+      const inspected = inspectThenable(result)
       if (inspected === undefined) {
-        if (this.#strategy === strategy) this.#safeStrategy = strategy;
-        return;
+        if (this.#strategy === strategy) this.#safeStrategy = strategy
+        return
       }
-      this.#recoverFromStrategyFailure(strategy, generation);
+      this.#recoverFromStrategyFailure(strategy, generation)
       if ('error' in inspected) {
         this.#reportStrategyFailure(
           strategy,
@@ -163,10 +163,10 @@ export class Scheduler {
             }),
             ReactiveErrorCode.invalidOption
           )
-        );
-        return;
+        )
+        return
       }
-      const settled = assimilateThenable(inspected.handler, result);
+      const settled = assimilateThenable(inspected.handler, result)
       void settled.then(
         () => {
           this.#reportStrategyFailure(
@@ -176,7 +176,7 @@ export class Scheduler {
               new TypeError(ReactiveErrorText.schedulerStrategyReturnedThenable),
               ReactiveErrorCode.invalidOption
             )
-          );
+          )
         },
         (error: unknown) => {
           this.#reportStrategyFailure(
@@ -186,15 +186,15 @@ export class Scheduler {
               new TypeError(ReactiveErrorText.schedulerStrategyReturnedThenable, { cause: error }),
               ReactiveErrorCode.invalidOption
             )
-          );
+          )
         }
-      );
+      )
     } catch (error) {
-      if (synchronousFlushError === error) throw error;
-      this.#recoverFromStrategyFailure(strategy, generation);
-      throw error;
+      if (synchronousFlushError === error) throw error
+      this.#recoverFromStrategyFailure(strategy, generation)
+      throw error
     } finally {
-      insideStrategyCall = false;
+      insideStrategyCall = false
     }
   }
 
@@ -203,17 +203,17 @@ export class Scheduler {
    * boundary.
    */
   #recoverFromStrategyFailure(strategy: ISchedulerStrategy, generation: number): void {
-    if (this.#strategy === strategy) this.#strategy = this.#safeStrategy;
-    if (this.#scheduleGeneration !== generation) return;
-    this.#scheduleGeneration++;
-    this.#scheduled = false;
+    if (this.#strategy === strategy) this.#strategy = this.#safeStrategy
+    if (this.#scheduleGeneration !== generation) return
+    this.#scheduleGeneration++
+    this.#scheduled = false
   }
 
   /** Reports an invalid strategy result without disturbing a newer scheduling request. */
   #reportStrategyFailure(strategy: ISchedulerStrategy, generation: number, error: Error): void {
-    this.#recoverFromStrategyFailure(strategy, generation);
+    this.#recoverFromStrategyFailure(strategy, generation)
     try {
-      this.#onAsyncError(error);
+      this.#onAsyncError(error)
     } catch {
       // Error reporting is terminal; it must not wedge future scheduling.
     }
@@ -226,11 +226,11 @@ export class Scheduler {
    * 差异，同时不把合法的 action/devtools 重入升级成 observer 错误。
    */
   flush(): IFlushResult {
-    if (this.#flushing) return 'deferred';
-    this.#flushing = true;
+    if (this.#flushing) return 'deferred'
+    this.#flushing = true
     try {
-      let passes = 0;
-      const errors: unknown[] = [];
+      let passes = 0
+      const errors: unknown[] = []
       while (this.#queued.size) {
         if (++passes > this.#maxFlushPasses) {
           // 这不是渲染次数触发的抖动，是反应式图本身有环——effect 的写操作又落回了它自己的依赖。
@@ -239,40 +239,40 @@ export class Scheduler {
           // 队列必须清空，否则下一次冲刷会立刻再撞上同一个环、再抛一次，
           // Runtime 从此不可用。但**清掉什么必须说出来**：丢弃待办而只报
           // 「超限」，等于让调用方去猜哪些 effect 没跑。
-          const dropped = [...this.#queued];
-          this.#queued.clear();
-          const names = dropped.map((item) => item.debugName ?? '<anonymous>').slice(0, 8);
+          const dropped = [...this.#queued]
+          this.#queued.clear()
+          const names = dropped.map((item) => item.debugName ?? '<anonymous>').slice(0, 8)
           const loopError = createReactiveError(
             ReactiveErrorCode.flushLoop,
             ReactiveErrorText.flushLoopDetected(this.#maxFlushPasses, dropped.length, names)
-          );
-          if (errors.length === 0) throw loopError;
+          )
+          if (errors.length === 0) throw loopError
           throw tagReactiveError(
             new AggregateError([...errors, loopError], ReactiveErrorText.observersBeforeFlushLoop),
             ReactiveErrorCode.observerFailed
-          );
+          )
         }
-        const batch = [...this.#queued];
-        this.#queued.clear();
+        const batch = [...this.#queued]
+        this.#queued.clear()
         for (const item of batch) {
           try {
-            item.tick(); // tick 内做版本脏校验，未变则跳过
+            item.tick() // tick 内做版本脏校验，未变则跳过
           } catch (error) {
             // One bad observer must not discard unrelated work from this batch.
-            errors.push(error);
+            errors.push(error)
           }
         }
       }
-      if (errors.length === 1) throw errors[0];
+      if (errors.length === 1) throw errors[0]
       if (errors.length > 1) {
         throw tagReactiveError(
           new AggregateError(errors, ReactiveErrorText.multipleObserversFailed),
           ReactiveErrorCode.observerFailed
-        );
+        )
       }
-      return 'completed';
+      return 'completed'
     } finally {
-      this.#flushing = false;
+      this.#flushing = false
     }
   }
 
@@ -281,24 +281,24 @@ export class Scheduler {
    * 避免原始业务错误被 finally 里的 flush 错误覆盖掉。
    */
   runBatched<T>(fn: () => T): T {
-    this.batchDepth++;
-    let fnError: unknown;
-    let hasFnError = false;
-    let result: T;
+    this.batchDepth++
+    let fnError: unknown
+    let hasFnError = false
+    let result: T
     try {
-      result = fn();
+      result = fn()
     } catch (error) {
-      fnError = error;
-      hasFnError = true;
+      fnError = error
+      hasFnError = true
     }
     if (--this.batchDepth === 0 && !this.#flushing) {
       try {
-        this.flush();
+        this.flush()
       } catch (flushError) {
-        if (!hasFnError) throw flushError; // 只有 flush 出错 → 抛 flush 错误
+        if (!hasFnError) throw flushError // 只有 flush 出错 → 抛 flush 错误
         // Error 对象保持身份/类型；flush 错误挂到 cause。非 Error throw 值无法安全附加元数据。
         if (fnError instanceof Error) {
-          const previousCause = readCauseSafely(fnError);
+          const previousCause = readCauseSafely(fnError)
           const mergedCause =
             previousCause === undefined
               ? flushError
@@ -308,21 +308,21 @@ export class Scheduler {
                     ReactiveErrorText.actionCauseAndFlushFailed
                   ),
                   ReactiveErrorCode.actionFlushFailed
-                );
+                )
           // Attach, don't replace — but a frozen / non-extensible business Error cannot be safely
           // mutated. Fall through to the AggregateError wrapper so both errors stay `===` reachable.
-          if (attachCauseSafely(fnError, mergedCause)) throw fnError;
+          if (attachCauseSafely(fnError, mergedCause)) throw fnError
         }
         throw tagReactiveError(
           new AggregateError([fnError, flushError], ReactiveErrorText.actionAndFlushFailed),
           ReactiveErrorCode.actionFlushFailed
-        );
+        )
       }
     }
     // 在 observer tick 内结束的 batch 由当前最外层 flush 的 while 接管。
     // 这里不调用重入 flush；它不是一次被忽略的显式请求，而是同一调度事务的收尾。
-    if (hasFnError) throw fnError;
-    return result!;
+    if (hasFnError) throw fnError
+    return result!
   }
 
   /**
@@ -330,11 +330,11 @@ export class Scheduler {
    * this preserves the configured async/sync strategy.
    */
   runDeferred<T>(fn: () => T): T {
-    this.batchDepth++;
+    this.batchDepth++
     try {
-      return fn();
+      return fn()
     } finally {
-      if (--this.batchDepth === 0 && this.#queued.size > 0) this.requestFlush();
+      if (--this.batchDepth === 0 && this.#queued.size > 0) this.requestFlush()
     }
   }
 }

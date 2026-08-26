@@ -157,6 +157,6 @@ export const LifecycleErrorCode = {
    * 调用方应修正传入的延迟/推进量，不要重试同一份非法参数。
    */
   invalidOption: 'INVALID_OPTION'
-} as const;
+} as const
 
-export type ILifecycleErrorCode = (typeof LifecycleErrorCode)[keyof typeof LifecycleErrorCode];
+export type ILifecycleErrorCode = (typeof LifecycleErrorCode)[keyof typeof LifecycleErrorCode]

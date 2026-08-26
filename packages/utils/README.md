@@ -37,11 +37,13 @@ pnpm add @migaia/utils
 ```ts
 import {
   sleep,
+  createAbortTimeoutSignal,
   withTimeout,
   raceWithAbort,
   retry,
   createConcurrencyLimiter,
   deferred,
+  toPromise,
   createManualScheduler,
   systemScheduler,
   hostRethrowReporter
@@ -61,6 +63,23 @@ await sleep(1000, { signal: controller.signal }); // 中止时 reject UtilsAbort
 - `signals?: readonly IAbortSignal[]` —— 任意一个中止即中止
 - `scheduler?: IUtilsScheduler` —— 默认 `systemScheduler`
 - `unref?: boolean` —— 定时器不阻塞进程退出（Node）
+
+**`createAbortTimeoutSignal`｜5 秒上手** —— 只合并外部 abort 与 deadline signal，不接管任何 Promise 的结算策略：
+
+```ts
+const merged = createAbortTimeoutSignal({
+  signal: controller.signal,
+  timeoutMs: 500,
+  timeoutReason: () => new Error('deadline')
+});
+try {
+  await Promise.all([requestA(merged.signal), requestB(merged.signal)]);
+} finally {
+  merged.dispose();
+}
+```
+
+返回 `{ signal, dispose }`；`dispose()` 幂等。无 `timeoutMs` 时原样返回外部 signal，不分配 controller。它与 `withTimeout` / `raceWithAbort` 的区别是：后两者拥有最终 Promise 的超时 reject、迟到 rejection 与 cleanup-error 政策，本 API 只拥有 signal composition，适合结算事实必须由底层事务决定的适配器。
 
 **`withTimeout`｜10 秒上手** —— 给一段惰性操作套上截止时间，操作函数必须读 `signal` 才能提前退出：
 
@@ -135,6 +154,17 @@ resolve(42);
 ```
 
 无选项；返回 `{ promise, resolve, reject }`。
+
+**`toPromise`｜3 秒上手** —— 立即执行同步计算，并把返回值或同步异常统一成 Promise settlement：
+
+```ts
+const value = await toPromise(() => cache.get('key'));
+await toPromise(() => {
+  throw new Error('failed'); // 不会从 toPromise 调用点同步抛出，而是返回 rejected Promise
+});
+```
+
+`run` 同步且恰好执行一次；普通值和 thenable 交给原生 `Promise.resolve` 同化，原生 Promise 保持 identity。它不提供 timeout、retry 或 cancellation。
 
 **`createManualScheduler`｜5 秒上手** —— 单测里把时间变成确定性的：
 
@@ -247,6 +277,8 @@ throw new UtilsTimeoutError('operation', 500); // 构造参数：scope: 'operati
 
 ```ts
 import {
+  isArrayBuffer,
+  isUint8Array,
   bytesToBase64,
   base64ToBytes,
   streamBase64Chunks,
@@ -256,6 +288,17 @@ import {
   splitUtf8
 } from '@migaia/utils/bytes';
 ```
+
+**`isUint8Array` / `isArrayBuffer`｜3 秒上手** —— 基于 ECMAScript 内部槽做跨 realm 品牌检测，不信任可篡改的 `constructor.name`、原型或 `Symbol.toStringTag`：
+
+```ts
+isUint8Array(new Uint8Array()); // true
+isArrayBuffer(new ArrayBuffer(1)); // true
+isUint8Array(new Uint8ClampedArray(1)); // false
+isArrayBuffer(new SharedArrayBuffer(1)); // false
+```
+
+两者接受合法的跨 iframe/Worker 值和子类，拒绝 Proxy 与外形伪造对象。detached `Uint8Array` / `ArrayBuffer` 仍保留自身品牌；调用方必须在读取字节前另行判断可用性。
 
 **`bytesToBase64` / `base64ToBytes`｜3 秒上手**（单参数，无选项）：
 

@@ -55,12 +55,13 @@ unsubscribe();
 
 - `report?: (failure: IEventReport<T>) => void | PromiseLike<void>` —— 处理 `publish()` 之后迟到的 Promise/thenable rejection（同步 listener 失败不走这里，见下）
 - `terminalReport?: (error: unknown) => void | PromiseLike<void>` —— `report` 缺失/失败时的兜底诊断出口
+- `dispatchPolicy?: EventDispatchPolicy` —— `recursive`（默认）保持 canonical nested publish 的同步递归顺序；只有需要“当前快照全部完成后再交付重入值”的消费者才显式使用 `queued`
 
 返回的 `channel` 上的方法与字段：
 
 - `subscribe(listener, options?: { taskId?: string }): subscription` —— 返回可直接调用的 handle；handle 同时提供 `unsubscribe` 自身别名与链式 `subscribe`。解除会按逆序释放整条 chain；关闭后再扩展抛 `SUBSCRIPTION_CLOSED`。
 - `subscribeOnce` / `subscribeUntil`（见下方 Helper 模块，channel 上也直接暴露同名方法）
-- `publish(value: T): void` —— 当前调用栈按快照顺序调用全部 listener，不等待 Promise；同步失败在遍历完成后以 `PUBLISH_FAILED` 的 `AggregateError` 抛出
+- `publish(value: T): void` —— 按快照顺序同步调用全部 listener，不等待 Promise；默认同步重入 publish 递归交付，`dispatchPolicy: 'queued'` 才会排队到当前快照完成后再交付；同步失败以 `PUBLISH_FAILED` 的 `AggregateError` 抛出
 - `filterTaskId(taskId: string): IFilteredEventChannel<T, R>` —— 创建只读 task 选择 view，交给异步发布 helper
 - `clear(): void` —— 清空全部 registration，不执行 listener 自身的 cleanup
 - `size: number`（只读）—— 当前 active registration 数量

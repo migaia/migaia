@@ -4,12 +4,12 @@ import {
   type IObservable,
   type IObserver,
   type IRuntime
-} from '@migaia/reactive/runtime';
-import type { Signal } from '@migaia/reactive/reactive/signal.class';
-import { internalsOf } from '@migaia/reactive/internals';
-import { internalRuntimeOf } from '@migaia/reactive/node-factories';
-import { claimOwnership } from '@migaia/reactive/ownership';
-import { registerDeps, registerDepVersions } from '@migaia/reactive/node-internals';
+} from '@migaia/reactive/runtime'
+import type { Signal } from '@migaia/reactive/reactive/signal.class'
+import { internalsOf } from '@migaia/reactive/internals'
+import { internalRuntimeOf } from '@migaia/reactive/node-factories'
+import { claimOwnership } from '@migaia/reactive/ownership'
+import { registerDeps, registerDepVersions } from '@migaia/reactive/node-internals'
 import {
   assimilateCapturedThen,
   createGenerationController,
@@ -23,93 +23,93 @@ import {
   type IGenerationToken,
   type ILifecycleScheduler,
   type IScheduledTask
-} from '@migaia/lifecycle';
+} from '@migaia/lifecycle'
 import {
   createResourceError,
   RESOURCE_SOURCE,
   tagResourceError,
   type IResourceError
-} from './errors.js';
-import { ResourceErrorCode } from './error-code.js';
-import { ResourceErrorText } from './error-text.js';
-import { ResourceStatus } from './state-constants.js';
-export { ResourceStatus, type IResourceStatus } from './state-constants.js';
+} from './errors.js'
+import { ResourceErrorCode } from './error-code.js'
+import { ResourceErrorText } from './error-text.js'
+import { ResourceStatus } from './state-constants.js'
+export { ResourceStatus, type IResourceStatus } from './state-constants.js'
 
 export type IResourceState<T> =
   | { status: typeof ResourceStatus.idle }
   | { status: typeof ResourceStatus.pending }
   | { status: typeof ResourceStatus.success; data: T; refreshing?: boolean }
   | { status: typeof ResourceStatus.error; error: unknown }
-  | { status: typeof ResourceStatus.cancelled; error: DOMException };
+  | { status: typeof ResourceStatus.cancelled; error: DOMException }
 
-export type IResourceFetchStatus = typeof ResourceStatus.idle | typeof ResourceStatus.fetching;
+export type IResourceFetchStatus = typeof ResourceStatus.idle | typeof ResourceStatus.fetching
 
-export type IResourceFetcher<T> = (ctx: { signal: IAbortSignal }) => T | PromiseLike<T>;
+export type IResourceFetcher<T> = (ctx: { signal: IAbortSignal }) => T | PromiseLike<T>
 
 export type IResourceCacheSnapshot<T> = {
-  readonly version: 1;
-  readonly data: T;
-  readonly updatedAt: number;
+  readonly version: 1
+  readonly data: T
+  readonly updatedAt: number
   /** `null` represents an infinite lifetime in JSON-safe form. */
-  readonly expiresAt: number | null;
-};
+  readonly expiresAt: number | null
+}
 
-export type IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);
+export type IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean)
 
 type IResourceExpiry = {
-  readonly updatedAt: number;
-  readonly expiresAt: number;
-};
+  readonly updatedAt: number
+  readonly expiresAt: number
+}
 
 /** Normalized, validated constructor options retained after the single admission snapshot. */
 type IResourceOptionSnapshot<T> = {
-  readonly debugName: string | undefined;
-  readonly ttl: number;
-  readonly autoStart: boolean;
-  readonly staleWhileRevalidate: boolean;
-  readonly retry: IResourceRetryPolicy;
-  readonly retryDelay: number | ((failureCount: number, error: unknown) => number);
-  readonly keepAlive: boolean;
-  readonly initialSnapshot: IResourceCacheSnapshot<T> | undefined;
-  readonly scheduler: ILifecycleScheduler;
-};
+  readonly debugName: string | undefined
+  readonly ttl: number
+  readonly autoStart: boolean
+  readonly staleWhileRevalidate: boolean
+  readonly retry: IResourceRetryPolicy
+  readonly retryDelay: number | ((failureCount: number, error: unknown) => number)
+  readonly keepAlive: boolean
+  readonly initialSnapshot: IResourceCacheSnapshot<T> | undefined
+  readonly scheduler: ILifecycleScheduler
+}
 
 export type IResourceOptions<T = unknown> = {
-  debugName?: string;
+  debugName?: string
   /**
    * Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a
    * dependency changes or `refetch()` is called.
    */
-  ttl?: number;
+  ttl?: number
   /** Start the first request in the constructor. Defaults to true. */
-  autoStart?: boolean;
+  autoStart?: boolean
   /** Keep stale success data visible while a background refresh runs. */
-  staleWhileRevalidate?: boolean;
+  staleWhileRevalidate?: boolean
   /** Retry count or predicate. Suspense Promise throws do not count. */
-  retry?: IResourceRetryPolicy;
-  retryDelay?: number | ((failureCount: number, error: unknown) => number);
+  retry?: IResourceRetryPolicy
+  retryDelay?: number | ((failureCount: number, error: unknown) => number)
   /** Keep upstream reactive edges while no state consumer exists. */
-  keepAlive?: boolean;
+  keepAlive?: boolean
   /** SSR/persisted success cache used before optional revalidation. */
-  initialSnapshot?: IResourceCacheSnapshot<T>;
+  initialSnapshot?: IResourceCacheSnapshot<T>
   /**
    * 时间域与排程来源（`runtime-neutrality.sdd.md` R-9 / AR-02）：TTL/`updatedAt`/`expiresAt`/retry delay 全部走同一
    * scheduler，默认 lifecycle `systemScheduler`。缺宿主能力时 fail-fast，不静默降级成微任务。
    */
-  scheduler?: ILifecycleScheduler;
-};
+  scheduler?: ILifecycleScheduler
+}
 
 function abortError(): DOMException {
   return tagResourceError(
     new DOMException('resource request aborted', 'AbortError'),
     ResourceErrorCode.requestAborted
-  );
+  )
 }
 
 class ResourceCancelledError extends DOMException {
   constructor() {
-    super('resource request cancelled', 'AbortError');
-    tagResourceError(this, ResourceErrorCode.requestCancelled);
+    super('resource request cancelled', 'AbortError')
+    tagResourceError(this, ResourceErrorCode.requestCancelled)
   }
 }
 
@@ -118,21 +118,21 @@ function validateTtl(ttl: number): void {
     throw tagResourceError(
       new RangeError(ResourceErrorText.ttlInvalid),
       ResourceErrorCode.invalidOption
-    );
+    )
   }
 }
 
 /** Rejects finite TTL arithmetic that would turn a cache deadline into Infinity. */
 function calculateExpiresAt(updatedAt: number, ttl: number): number {
-  if (ttl === Infinity) return Infinity;
-  const expiresAt = updatedAt + ttl;
+  if (ttl === Infinity) return Infinity
+  const expiresAt = updatedAt + ttl
   if (!Number.isFinite(expiresAt)) {
     throw tagResourceError(
       new RangeError(ResourceErrorText.ttlExpirationOverflow),
       ResourceErrorCode.invalidOption
-    );
+    )
   }
-  return expiresAt;
+  return expiresAt
 }
 
 function validateRetry(retry: IResourceRetryPolicy): void {
@@ -140,14 +140,14 @@ function validateRetry(retry: IResourceRetryPolicy): void {
     throw tagResourceError(
       new RangeError(ResourceErrorText.retryInvalid),
       ResourceErrorCode.invalidOption
-    );
+    )
   }
 }
 
 /** Creates a native option type error while preserving a hostile getter as its cause. */
 function createResourceOptionTypeError(message: string, cause?: unknown): IResourceError {
-  const error = new TypeError(message, cause === undefined ? undefined : { cause });
-  return tagResourceError(error, ResourceErrorCode.invalidOption) as IResourceError;
+  const error = new TypeError(message, cause === undefined ? undefined : { cause })
+  return tagResourceError(error, ResourceErrorCode.invalidOption) as IResourceError
 }
 
 /** Reads one public option once and maps a hostile accessor to Resource INVALID_OPTION. */
@@ -157,33 +157,33 @@ function readResourceOption<T, K extends keyof IResourceOptions<T>>(
   message: string
 ): IResourceOptions<T>[K] {
   try {
-    return options[key];
+    return options[key]
   } catch (error) {
-    throw createResourceOptionTypeError(message, error);
+    throw createResourceOptionTypeError(message, error)
   }
 }
 
 /** Snapshots and validates one initial cache value before runtime ownership is established. */
 function snapshotInitialSnapshot<T>(value: unknown): IResourceCacheSnapshot<T> | undefined {
-  if (value === undefined) return undefined;
+  if (value === undefined) return undefined
   if (value === null || typeof value !== 'object') {
-    throw createResourceError(ResourceErrorCode.invalidSnapshot, ResourceErrorText.invalidSnapshot);
+    throw createResourceError(ResourceErrorCode.invalidSnapshot, ResourceErrorText.invalidSnapshot)
   }
-  let version: unknown;
-  let data: T;
-  let updatedAt: unknown;
-  let expiresAt: unknown;
+  let version: unknown
+  let data: T
+  let updatedAt: unknown
+  let expiresAt: unknown
   try {
-    version = (value as { version?: unknown }).version;
-    data = (value as { data: T }).data;
-    updatedAt = (value as { updatedAt?: unknown }).updatedAt;
-    expiresAt = (value as { expiresAt?: unknown }).expiresAt;
+    version = (value as { version?: unknown }).version
+    data = (value as { data: T }).data
+    updatedAt = (value as { updatedAt?: unknown }).updatedAt
+    expiresAt = (value as { expiresAt?: unknown }).expiresAt
   } catch (error) {
     throw createResourceError(
       ResourceErrorCode.invalidSnapshot,
       ResourceErrorText.invalidSnapshot,
       { cause: error }
-    );
+    )
   }
   if (
     version !== 1 ||
@@ -191,77 +191,77 @@ function snapshotInitialSnapshot<T>(value: unknown): IResourceCacheSnapshot<T> |
     !Number.isFinite(updatedAt) ||
     (expiresAt !== null && (typeof expiresAt !== 'number' || !Number.isFinite(expiresAt)))
   ) {
-    throw createResourceError(ResourceErrorCode.invalidSnapshot, ResourceErrorText.invalidSnapshot);
+    throw createResourceError(ResourceErrorCode.invalidSnapshot, ResourceErrorText.invalidSnapshot)
   }
-  return { version: 1, data, updatedAt, expiresAt };
+  return { version: 1, data, updatedAt, expiresAt }
 }
 
 /** Admits every public constructor option exactly once before Resource ownership or fetch setup. */
 function snapshotResourceOptions<T>(options: IResourceOptions<T>): IResourceOptionSnapshot<T> {
   if (options === null || (typeof options !== 'object' && typeof options !== 'function')) {
-    throw createResourceOptionTypeError(ResourceErrorText.optionsSnapshotFailed);
+    throw createResourceOptionTypeError(ResourceErrorText.optionsSnapshotFailed)
   }
   const debugName = readResourceOption(
     options,
     'debugName',
     ResourceErrorText.debugNameAccessorFailed
-  );
-  const ttl = readResourceOption(options, 'ttl', ResourceErrorText.optionsSnapshotFailed);
+  )
+  const ttl = readResourceOption(options, 'ttl', ResourceErrorText.optionsSnapshotFailed)
   const autoStart = readResourceOption(
     options,
     'autoStart',
     ResourceErrorText.autoStartAccessorFailed
-  );
+  )
   const staleWhileRevalidate = readResourceOption(
     options,
     'staleWhileRevalidate',
     ResourceErrorText.optionsSnapshotFailed
-  );
-  const retry = readResourceOption(options, 'retry', ResourceErrorText.optionsSnapshotFailed);
+  )
+  const retry = readResourceOption(options, 'retry', ResourceErrorText.optionsSnapshotFailed)
   const retryDelay = readResourceOption(
     options,
     'retryDelay',
     ResourceErrorText.optionsSnapshotFailed
-  );
+  )
   const keepAlive = readResourceOption(
     options,
     'keepAlive',
     ResourceErrorText.optionsSnapshotFailed
-  );
+  )
   const initialSnapshot = readResourceOption(
     options,
     'initialSnapshot',
     ResourceErrorText.initialSnapshotAccessorFailed
-  );
+  )
   const schedulerOption = readResourceOption(
     options,
     'scheduler',
     ResourceErrorText.optionsSnapshotFailed
-  );
+  )
 
   if (debugName !== undefined && typeof debugName !== 'string') {
-    throw createResourceOptionTypeError(ResourceErrorText.debugNameInvalid);
+    throw createResourceOptionTypeError(ResourceErrorText.debugNameInvalid)
   }
-  const admittedTtl = ttl ?? Infinity;
+  const admittedTtl = ttl ?? Infinity
   if (typeof admittedTtl !== 'number') {
-    throw createResourceOptionTypeError(ResourceErrorText.ttlInvalid);
+    throw createResourceOptionTypeError(ResourceErrorText.ttlInvalid)
   }
-  validateTtl(admittedTtl);
+  validateTtl(admittedTtl)
   if (autoStart !== undefined && typeof autoStart !== 'boolean') {
-    throw createResourceOptionTypeError(ResourceErrorText.booleanOptionInvalid);
+    throw createResourceOptionTypeError(ResourceErrorText.booleanOptionInvalid)
   }
   if (staleWhileRevalidate !== undefined && typeof staleWhileRevalidate !== 'boolean') {
-    throw createResourceOptionTypeError(ResourceErrorText.booleanOptionInvalid);
+    throw createResourceOptionTypeError(ResourceErrorText.booleanOptionInvalid)
   }
-  const admittedRetry = retry ?? 0;
+  const admittedRetry = retry ?? 0
   if (typeof admittedRetry !== 'number' && typeof admittedRetry !== 'function') {
-    throw createResourceOptionTypeError(ResourceErrorText.retryInvalid);
+    throw createResourceOptionTypeError(ResourceErrorText.retryInvalid)
   }
-  const validatedRetry = admittedRetry as IResourceRetryPolicy;
-  validateRetry(validatedRetry);
-  const admittedRetryDelay = retryDelay ?? 0;
+  const validatedRetry = admittedRetry as IResourceRetryPolicy
+  validateRetry(validatedRetry)
+  const admittedRetryDelay = retryDelay ?? 0
   if (typeof admittedRetryDelay !== 'number' && typeof admittedRetryDelay !== 'function') {
-    throw createResourceOptionTypeError(ResourceErrorText.retryDelayInvalid);
+    throw createResourceOptionTypeError(ResourceErrorText.retryDelayInvalid)
   }
   if (
     typeof admittedRetryDelay === 'number' &&
@@ -270,28 +270,28 @@ function snapshotResourceOptions<T>(options: IResourceOptions<T>): IResourceOpti
     throw tagResourceError(
       new RangeError(ResourceErrorText.retryDelayInvalid),
       ResourceErrorCode.invalidOption
-    );
+    )
   }
   if (keepAlive !== undefined && typeof keepAlive !== 'boolean') {
-    throw createResourceOptionTypeError(ResourceErrorText.booleanOptionInvalid);
+    throw createResourceOptionTypeError(ResourceErrorText.booleanOptionInvalid)
   }
   const validatedRetryDelay = admittedRetryDelay as
     | number
-    | ((failureCount: number, error: unknown) => number);
-  const admittedInitialSnapshot = snapshotInitialSnapshot<T>(initialSnapshot);
-  let admittedScheduler = systemScheduler;
+    | ((failureCount: number, error: unknown) => number)
+  const admittedInitialSnapshot = snapshotInitialSnapshot<T>(initialSnapshot)
+  let admittedScheduler = systemScheduler
   if (schedulerOption !== undefined) {
-    let schedulerSnapshot: ILifecycleScheduler | undefined;
+    let schedulerSnapshot: ILifecycleScheduler | undefined
     try {
-      schedulerSnapshot = snapshotScheduler(schedulerOption);
+      schedulerSnapshot = snapshotScheduler(schedulerOption)
     } catch (error) {
-      const cause = error instanceof Error && 'cause' in error ? error.cause : error;
-      throw createResourceOptionTypeError(ResourceErrorText.schedulerAccessorFailed, cause);
+      const cause = error instanceof Error && 'cause' in error ? error.cause : error
+      throw createResourceOptionTypeError(ResourceErrorText.schedulerAccessorFailed, cause)
     }
     if (schedulerSnapshot === undefined) {
-      throw createResourceOptionTypeError(ResourceErrorText.schedulerInvalid);
+      throw createResourceOptionTypeError(ResourceErrorText.schedulerInvalid)
     }
-    admittedScheduler = schedulerSnapshot;
+    admittedScheduler = schedulerSnapshot
   }
   return {
     debugName: debugName as string | undefined,
@@ -303,7 +303,7 @@ function snapshotResourceOptions<T>(options: IResourceOptions<T>): IResourceOpti
     keepAlive: (keepAlive ?? false) as boolean,
     initialSnapshot: admittedInitialSnapshot,
     scheduler: admittedScheduler
-  };
+  }
 }
 
 /** Wraps scheduler admission/cleanup failures without losing the original failure identity. */
@@ -312,7 +312,7 @@ function createSchedulerFailure(error: unknown): IResourceError {
     ResourceErrorCode.invalidOption,
     ResourceErrorText.schedulerTaskOperationFailed,
     { cause: error }
-  );
+  )
 }
 
 /** Identifies the Resource-owned wrapper so passive reads do not wrap one clock failure twice. */
@@ -324,7 +324,7 @@ function isSchedulerFailure(error: unknown): error is IResourceError {
     (error as { readonly code?: unknown }).code === ResourceErrorCode.invalidOption &&
     (error as { readonly message?: unknown }).message ===
       ResourceErrorText.schedulerTaskOperationFailed
-  );
+  )
 }
 
 /** Wraps abort-signal registration failures without exposing a raw host error. */
@@ -333,7 +333,7 @@ function createSignalRegistrationFailure(error: unknown): IResourceError {
     ResourceErrorCode.invalidOption,
     ResourceErrorText.signalRegistrationFailed,
     { cause: error }
-  );
+  )
 }
 
 /** Reclassifies cancellation cleanup failures without confusing them with the cancelled state. */
@@ -343,30 +343,30 @@ function createCancellationFailure(error: unknown): IResourceError {
     (typeof error === 'object' || typeof error === 'function') &&
     (error as { source?: unknown }).source === RESOURCE_SOURCE
   ) {
-    return tagResourceError(error, ResourceErrorCode.cancellationCleanupFailed) as IResourceError;
+    return tagResourceError(error, ResourceErrorCode.cancellationCleanupFailed) as IResourceError
   }
   return createResourceError(
     ResourceErrorCode.cancellationCleanupFailed,
     ResourceErrorText.cancellationCleanupFailed,
     { cause: error }
-  );
+  )
 }
 
 /** Keeps later Resource teardown failures reachable without replacing the first cleanup failure. */
 function appendDisposeCleanupErrors(primary: unknown, cleanupErrors: readonly unknown[]): unknown {
-  if (cleanupErrors.length === 0) return primary;
+  if (cleanupErrors.length === 0) return primary
   if (primary !== null && (typeof primary === 'object' || typeof primary === 'function')) {
     try {
       /** Existing aggregate members, if the primary already exposes an `errors` collection. */
-      const existing = (primary as { readonly errors?: unknown }).errors;
+      const existing = (primary as { readonly errors?: unknown }).errors
       /** Frozen identity-preserving list of cleanup failures attached to the primary. */
-      const errors = Array.isArray(existing) ? [...existing, ...cleanupErrors] : [...cleanupErrors];
+      const errors = Array.isArray(existing) ? [...existing, ...cleanupErrors] : [...cleanupErrors]
       Object.defineProperty(primary, 'errors', {
         value: Object.freeze(errors),
         enumerable: true,
         configurable: true
-      });
-      return primary;
+      })
+      return primary
     } catch {
       // Frozen/non-extensible primary: use the package's existing cleanup code as a last resort.
     }
@@ -376,13 +376,13 @@ function appendDisposeCleanupErrors(primary: unknown, cleanupErrors: readonly un
     ResourceErrorCode.cancellationCleanupFailed,
     ResourceErrorText.cancellationCleanupFailed,
     { cause: primary }
-  );
+  )
   Object.defineProperty(aggregate, 'errors', {
     value: Object.freeze([primary, ...cleanupErrors]),
     enumerable: true,
     configurable: true
-  });
-  return aggregate;
+  })
+  return aggregate
 }
 
 /**
@@ -394,80 +394,79 @@ function appendDisposeCleanupErrors(primary: unknown, cleanupErrors: readonly un
  * moved into a Computed read before awaiting.
  */
 export class Resource<T> implements IObserver, IDisposable {
-  #_deps = new Set<IObservable>();
-  #_depVersions = new Map<IObservable, number>();
-  readonly deps: ReadonlySet<IObservable>;
-  readonly depVersions: ReadonlyMap<IObservable, number>;
-  readonly runtime: IRuntime;
-  debugName?: string;
-  #stateSignal: Signal<IResourceState<T>>;
-  #fetcher: IResourceFetcher<T>;
-  #ttl: number;
-  #staleWhileRevalidate: boolean;
-  #retry: IResourceRetryPolicy;
-  #retryDelay: number | ((failureCount: number, error: unknown) => number);
-  #keepAlive: boolean;
-  #requests = createGenerationController();
-  #currentPromise: Promise<T> | undefined;
-  #expiresAt = 0;
-  #updatedAt = 0;
-  #requestPending = false;
-  #refreshScheduled = false;
-  #forceRefresh = false;
-  #suspensionGeneration = 0;
-  #paused = false;
-  #staleAfterSettlement = false;
+  #_deps = new Set<IObservable>()
+  #_depVersions = new Map<IObservable, number>()
+  readonly deps: ReadonlySet<IObservable>
+  readonly depVersions: ReadonlyMap<IObservable, number>
+  readonly runtime: IRuntime
+  debugName?: string
+  #stateSignal: Signal<IResourceState<T>>
+  #fetcher: IResourceFetcher<T>
+  #ttl: number
+  #staleWhileRevalidate: boolean
+  #retry: IResourceRetryPolicy
+  #retryDelay: number | ((failureCount: number, error: unknown) => number)
+  #keepAlive: boolean
+  #requests = createGenerationController()
+  #currentPromise: Promise<T> | undefined
+  #expiresAt = 0
+  #updatedAt = 0
+  #requestPending = false
+  #refreshScheduled = false
+  #forceRefresh = false
+  #suspensionGeneration = 0
+  #paused = false
+  #staleAfterSettlement = false
   /** Holds one validated expiry pair between request admission and success-state publication. */
-  #settlementExpiry: IResourceExpiry | undefined;
-  #terminal = createTerminalController();
-  #scheduler: ILifecycleScheduler;
+  #settlementExpiry: IResourceExpiry | undefined
+  #terminal = createTerminalController()
+  #scheduler: ILifecycleScheduler
 
   constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options: IResourceOptions<T> = {}) {
-    const admittedOptions = snapshotResourceOptions(options);
-    this.deps = registerDeps(this, this.#_deps);
-    this.depVersions = registerDepVersions(this, this.#_depVersions);
-    this.runtime = runtime;
+    const admittedOptions = snapshotResourceOptions(options)
+    this.deps = registerDeps(this, this.#_deps)
+    this.depVersions = registerDepVersions(this, this.#_depVersions)
+    this.runtime = runtime
     // 归属登记走唯一那张表，不再靠字段名让下游去猜
-    claimOwnership(this, runtime);
-    this.debugName = admittedOptions.debugName;
-    this.#fetcher = fetcher;
-    this.#ttl = admittedOptions.ttl;
-    this.#retry = admittedOptions.retry;
-    this.#retryDelay = admittedOptions.retryDelay;
-    this.#staleWhileRevalidate = admittedOptions.staleWhileRevalidate;
-    this.#keepAlive = admittedOptions.keepAlive;
-    this.#scheduler = admittedOptions.scheduler;
+    claimOwnership(this, runtime)
+    this.debugName = admittedOptions.debugName
+    this.#fetcher = fetcher
+    this.#ttl = admittedOptions.ttl
+    this.#retry = admittedOptions.retry
+    this.#retryDelay = admittedOptions.retryDelay
+    this.#staleWhileRevalidate = admittedOptions.staleWhileRevalidate
+    this.#keepAlive = admittedOptions.keepAlive
+    this.#scheduler = admittedOptions.scheduler
     this.#stateSignal = internalRuntimeOf(runtime).signal<IResourceState<T>>(
       { status: ResourceStatus.idle },
       {
         debugName: admittedOptions.debugName ? `${admittedOptions.debugName}.state` : undefined
       }
-    );
+    )
     this.#stateSignal.addObservedHooks({
       onObserved: () => {
-        this.#suspensionGeneration++;
+        this.#suspensionGeneration++
       },
       onUnobserved: () => {
         // Suspended renders have not committed a subscription yet. Aborting
         // here would reject the exact Promise React is waiting for.
-        this.#scheduleSuspension();
+        this.#scheduleSuspension()
       }
-    });
-    if (admittedOptions.initialSnapshot !== undefined)
-      this.hydrate(admittedOptions.initialSnapshot);
+    })
+    if (admittedOptions.initialSnapshot !== undefined) this.hydrate(admittedOptions.initialSnapshot)
     if (
       admittedOptions.autoStart &&
       (admittedOptions.initialSnapshot === undefined || !this.#isFresh())
     ) {
-      this.#observe(this.#startRequest());
+      this.#observe(this.#startRequest())
     }
   }
 
   /** Reactive state-machine snapshot. Expired success values revalidate. */
   get state(): IResourceState<T> {
-    this.#assertUsable();
-    this.#ensureFresh();
-    return this.#stateSignal.value;
+    this.#assertUsable()
+    this.#ensureFresh()
+    return this.#stateSignal.value
   }
 
   /**
@@ -475,50 +474,50 @@ export class Resource<T> implements IObserver, IDisposable {
    * promise; it starts work only when idle/stale.
    */
   get promise(): Promise<T> {
-    this.#assertUsable();
-    this.#ensureFresh();
+    this.#assertUsable()
+    this.#ensureFresh()
     if (!this.#currentPromise) {
       throw createResourceError(
         ResourceErrorCode.noActivePromise,
         'resource has no active or cached promise'
-      );
+      )
     }
-    return this.#currentPromise;
+    return this.#currentPromise
   }
 
   get disposed(): boolean {
-    return this.#terminal.lifecycle === LifecycleState.terminal;
+    return this.#terminal.lifecycle === LifecycleState.terminal
   }
 
   /** True while a fresh request runs without hiding an existing success value. */
   get refreshing(): boolean {
-    if (this.#terminal.lifecycle !== LifecycleState.open) return false;
-    const state = this.#stateSignal.peek();
-    return state.status === ResourceStatus.success && state.refreshing === true;
+    if (this.#terminal.lifecycle !== LifecycleState.open) return false
+    const state = this.#stateSignal.peek()
+    return state.status === ResourceStatus.success && state.refreshing === true
   }
 
   /** Transport status, separate from the visible data/error state. */
   get fetchStatus(): IResourceFetchStatus {
-    this.#assertUsable();
-    return this.#requestPending ? ResourceStatus.fetching : ResourceStatus.idle;
+    this.#assertUsable()
+    return this.#requestPending ? ResourceStatus.fetching : ResourceStatus.idle
   }
 
   /** Whether the currently cached success value has crossed its TTL. */
   get isStale(): boolean {
-    this.#assertUsable();
-    const state = this.#stateSignal.peek();
-    if (state.status !== ResourceStatus.success) return false;
+    this.#assertUsable()
+    const state = this.#stateSignal.peek()
+    if (state.status !== ResourceStatus.success) return false
     try {
-      return !this.#isFresh();
+      return !this.#isFresh()
     } catch (error) {
-      this.#recordPassiveSchedulerFailure(error);
-      return false;
+      this.#recordPassiveSchedulerFailure(error)
+      return false
     }
   }
 
   /** Whether reactive consumers currently observe this resource's state. */
   get observed(): boolean {
-    return this.#stateSignal.subs.size > 0;
+    return this.#stateSignal.subs.size > 0
   }
 
   /**
@@ -526,10 +525,10 @@ export class Resource<T> implements IObserver, IDisposable {
    * throws the fetch error after failure.
    */
   read(): T {
-    this.#assertUsable();
-    this.#ensureFresh();
-    const state = this.#stateSignal.value;
-    return this.#materialize(state);
+    this.#assertUsable()
+    this.#ensureFresh()
+    const state = this.#stateSignal.value
+    return this.#materialize(state)
   }
 
   /**
@@ -539,8 +538,8 @@ export class Resource<T> implements IObserver, IDisposable {
    * 外部诊断需要「读当前快照但不加入别人的追踪窗口」。
    */
   peek(): T {
-    this.#assertUsable();
-    return this.#materialize(this.#stateSignal.peek());
+    this.#assertUsable()
+    return this.#materialize(this.#stateSignal.peek())
   }
 
   /**
@@ -548,49 +547,49 @@ export class Resource<T> implements IObserver, IDisposable {
    * `promise`/`read()` consumers do.
    */
   refetch(): Promise<T> {
-    this.#assertUsable();
-    return this.#startRequest();
+    this.#assertUsable()
+    return this.#startRequest()
   }
 
   /** Mark cached data stale and immediately start a replacement request. */
   invalidate(): Promise<T> {
-    this.#assertUsable();
-    this.#expiresAt = 0;
-    return this.#startRequest();
+    this.#assertUsable()
+    this.#expiresAt = 0
+    return this.#startRequest()
   }
 
   /** Cancel only the active generation; the Resource remains reusable. */
   cancel(): void {
-    this.#assertUsable();
-    this.#abortActiveRequest(true);
+    this.#assertUsable()
+    this.#abortActiveRequest(true)
   }
 
   dehydrate(): IResourceCacheSnapshot<T> | undefined {
-    this.#assertUsable();
-    const state = this.#stateSignal.peek();
-    if (state.status !== ResourceStatus.success) return undefined;
+    this.#assertUsable()
+    const state = this.#stateSignal.peek()
+    if (state.status !== ResourceStatus.success) return undefined
     return {
       version: 1,
       data: state.data,
       updatedAt: this.#updatedAt,
       expiresAt: this.#expiresAt === Infinity ? null : this.#expiresAt
-    };
+    }
   }
 
   hydrate(snapshot: IResourceCacheSnapshot<T>): void {
-    this.#assertUsable();
-    let version: number;
-    let data: T;
-    let updatedAt: number;
-    let expiresAt: number | null;
+    this.#assertUsable()
+    let version: number
+    let data: T
+    let updatedAt: number
+    let expiresAt: number | null
     try {
-      ({ version, data, updatedAt, expiresAt } = snapshot);
+      ;({ version, data, updatedAt, expiresAt } = snapshot)
     } catch (error) {
       throw createResourceError(
         ResourceErrorCode.invalidSnapshot,
         ResourceErrorText.invalidSnapshot,
         { cause: error }
-      );
+      )
     }
     if (
       version !== 1 ||
@@ -600,67 +599,67 @@ export class Resource<T> implements IObserver, IDisposable {
       throw createResourceError(
         ResourceErrorCode.invalidSnapshot,
         ResourceErrorText.invalidSnapshot
-      );
+      )
     }
-    this.#requests.supersede();
-    this.#requestPending = false;
-    this.#paused = false;
-    internalsOf(this.runtime).tracker.clearDependencies(this);
-    this.#updatedAt = updatedAt;
-    this.#expiresAt = expiresAt ?? Infinity;
+    this.#requests.supersede()
+    this.#requestPending = false
+    this.#paused = false
+    internalsOf(this.runtime).tracker.clearDependencies(this)
+    this.#updatedAt = updatedAt
+    this.#expiresAt = expiresAt ?? Infinity
     this.#stateSignal.value = {
       status: ResourceStatus.success,
       data
-    };
-    this.#currentPromise = Promise.resolve(data);
+    }
+    this.#currentPromise = Promise.resolve(data)
   }
 
   /** A reactive dependency changed. Coalesce diamond/batched invalidations. */
   markDirty(): void {
-    this.#scheduleDependencyRefresh(false);
+    this.#scheduleDependencyRefresh(false)
   }
 
   /** A dependency was disposed; force re-evaluation so failure is observable. */
   onDependencyDisconnected(): void {
-    this.#scheduleDependencyRefresh(true);
+    this.#scheduleDependencyRefresh(true)
   }
 
   dispose(): void {
-    if (this.#terminal.lifecycle === LifecycleState.terminal) return;
-    this.#terminal.close();
+    if (this.#terminal.lifecycle === LifecycleState.terminal) return
+    this.#terminal.close()
 
     /** First synchronous cleanup failure; later failures attach through `errors`. */
-    let primaryCleanupError: unknown;
+    let primaryCleanupError: unknown
     /** Whether a cleanup operation has already supplied the primary failure. */
-    let hasPrimaryCleanupError = false;
+    let hasPrimaryCleanupError = false
     /** Cleanup failures after the first, retained without replacing it. */
-    const cleanupErrors: unknown[] = [];
+    const cleanupErrors: unknown[] = []
     /** Runs one teardown operation while allowing all following operations to converge. */
     const runCleanup = (cleanup: () => void): void => {
       try {
-        cleanup();
+        cleanup()
       } catch (error) {
         if (!hasPrimaryCleanupError) {
-          hasPrimaryCleanupError = true;
-          primaryCleanupError = error;
+          hasPrimaryCleanupError = true
+          primaryCleanupError = error
         } else {
-          cleanupErrors.push(error);
+          cleanupErrors.push(error)
         }
       }
-    };
+    }
 
-    runCleanup(() => this.#requests.dispose());
-    this.#refreshScheduled = false;
-    this.#forceRefresh = false;
-    this.#requestPending = false;
-    this.#staleAfterSettlement = false;
-    this.#currentPromise = undefined;
-    runCleanup(() => internalsOf(this.runtime).tracker.clearDependencies(this));
-    runCleanup(() => this.#stateSignal.dispose());
-    this.#terminal.forceTerminal();
+    runCleanup(() => this.#requests.dispose())
+    this.#refreshScheduled = false
+    this.#forceRefresh = false
+    this.#requestPending = false
+    this.#staleAfterSettlement = false
+    this.#currentPromise = undefined
+    runCleanup(() => internalsOf(this.runtime).tracker.clearDependencies(this))
+    runCleanup(() => this.#stateSignal.dispose())
+    this.#terminal.forceTerminal()
 
     if (hasPrimaryCleanupError) {
-      throw appendDisposeCleanupErrors(primaryCleanupError, cleanupErrors);
+      throw appendDisposeCleanupErrors(primaryCleanupError, cleanupErrors)
     }
   }
 
@@ -669,125 +668,125 @@ export class Resource<T> implements IObserver, IDisposable {
       throw createResourceError(
         ResourceErrorCode.resourceDisposed,
         'cannot use a disposed resource'
-      );
+      )
     }
   }
 
   #materialize(state: IResourceState<T>): T {
     switch (state.status) {
       case ResourceStatus.success:
-        return state.data;
+        return state.data
       case ResourceStatus.error:
-        throw state.error;
+        throw state.error
       case ResourceStatus.cancelled:
-        throw state.error;
+        throw state.error
       case ResourceStatus.pending:
       case ResourceStatus.idle:
         if (!this.#currentPromise) {
           throw createResourceError(
             ResourceErrorCode.noActivePromise,
             'resource has no active or cached promise'
-          );
+          )
         }
-        throw this.#currentPromise;
+        throw this.#currentPromise
     }
   }
 
   #isFresh(): boolean {
-    const state = this.#stateSignal.peek();
-    return state.status === ResourceStatus.success && this.#readSchedulerNow() < this.#expiresAt;
+    const state = this.#stateSignal.peek()
+    return state.status === ResourceStatus.success && this.#readSchedulerNow() < this.#expiresAt
   }
 
   #ensureFresh(): void {
-    if (this.#requestPending || this.#paused) return;
-    const state = this.#stateSignal.peek();
+    if (this.#requestPending || this.#paused) return
+    const state = this.#stateSignal.peek()
     // error/cancelled are stable, inspectable states. Only explicit
     // refetch()/invalidate() retries them; passive reads must not loop.
-    let fresh = true;
+    let fresh = true
     if (state.status === ResourceStatus.success) {
       try {
-        fresh = this.#isFresh();
+        fresh = this.#isFresh()
       } catch (error) {
-        this.#recordPassiveSchedulerFailure(error);
-        return;
+        this.#recordPassiveSchedulerFailure(error)
+        return
       }
     }
     if (
       state.status === ResourceStatus.idle ||
       (state.status === ResourceStatus.success && !fresh)
     ) {
-      this.#observe(this.#startRequest());
+      this.#observe(this.#startRequest())
     }
   }
 
   /** Reads the normalized scheduler clock and maps host/lifecycle failures to Resource ownership. */
   #readSchedulerNow(): number {
     try {
-      return this.#scheduler.now();
+      return this.#scheduler.now()
     } catch (error) {
-      throw createSchedulerFailure(error);
+      throw createSchedulerFailure(error)
     }
   }
 
   /** Publishes one passive clock failure without changing the prior cache metadata. */
   #recordPassiveSchedulerFailure(error: unknown): void {
     /** Stable Resource-owned failure shared by state, rejected promise, and reporter. */
-    const failure = isSchedulerFailure(error) ? error : createSchedulerFailure(error);
+    const failure = isSchedulerFailure(error) ? error : createSchedulerFailure(error)
     /** Rejected promise that preserves repeated passive `promise` reads by identity. */
-    const rejectedPromise = Promise.reject(failure);
-    this.#settlementExpiry = undefined;
-    this.#requestPending = false;
-    this.#paused = true;
-    this.#refreshScheduled = false;
-    this.#forceRefresh = false;
-    this.#staleAfterSettlement = false;
-    this.#currentPromise = rejectedPromise;
-    this.#observe(rejectedPromise);
-    this.#stateSignal.value = { status: ResourceStatus.error, error: failure };
-    this.runtime.reportError(failure, { phase: ReactiveErrorPhase.asyncFlush });
+    const rejectedPromise = Promise.reject(failure)
+    this.#settlementExpiry = undefined
+    this.#requestPending = false
+    this.#paused = true
+    this.#refreshScheduled = false
+    this.#forceRefresh = false
+    this.#staleAfterSettlement = false
+    this.#currentPromise = rejectedPromise
+    this.#observe(rejectedPromise)
+    this.#stateSignal.value = { status: ResourceStatus.error, error: failure }
+    this.runtime.reportError(failure, { phase: ReactiveErrorPhase.asyncFlush })
   }
 
   #startRequest(): Promise<T> {
-    this.#refreshScheduled = false;
-    this.#forceRefresh = false;
-    this.#paused = false;
-    const requestToken = this.#requests.begin();
-    const token = requestToken.token;
-    const signal = requestToken.signal;
-    this.#requestPending = true;
-    this.#staleAfterSettlement = false;
-    this.#settlementExpiry = undefined;
-    const current = this.#stateSignal.peek();
+    this.#refreshScheduled = false
+    this.#forceRefresh = false
+    this.#paused = false
+    const requestToken = this.#requests.begin()
+    const token = requestToken.token
+    const signal = requestToken.signal
+    this.#requestPending = true
+    this.#staleAfterSettlement = false
+    this.#settlementExpiry = undefined
+    const current = this.#stateSignal.peek()
     if (this.#staleWhileRevalidate && current.status === ResourceStatus.success) {
-      this.#stateSignal.value = { ...current, refreshing: true };
+      this.#stateSignal.value = { ...current, refreshing: true }
     } else {
-      this.#stateSignal.value = { status: ResourceStatus.pending };
+      this.#stateSignal.value = { status: ResourceStatus.pending }
     }
 
     const request = this.#withAbort(this.#executeFetcher({ signal }, 0), signal).then((data) => {
       if (this.#requests.isCurrent(token)) {
-        const updatedAt = this.#readSchedulerNow();
+        const updatedAt = this.#readSchedulerNow()
         this.#settlementExpiry = {
           updatedAt,
           expiresAt: calculateExpiresAt(updatedAt, this.#ttl)
-        };
+        }
       }
-      return data;
-    });
-    this.#currentPromise = request;
-    this.#observeSettlement(request, token);
-    return request;
+      return data
+    })
+    this.#currentPromise = request
+    this.#observeSettlement(request, token)
+    return request
   }
 
   #executeFetcher(controller: { signal: IAbortSignal }, failureCount: number): Promise<T> {
-    if (controller.signal.aborted) return Promise.reject(abortError());
-    let fetched: T | PromiseLike<T>;
+    if (controller.signal.aborted) return Promise.reject(abortError())
+    let fetched: T | PromiseLike<T>
     try {
       fetched = internalsOf(this.runtime).tracker.runTracked(this, () =>
         this.#fetcher({ signal: controller.signal })
-      );
+      )
     } catch (error) {
-      const probe = probeThenable(error);
+      const probe = probeThenable(error)
       if (probe.kind === ThenableProbeKind.failed) {
         // Getter failed while probing a Suspense throw: surface the getter error and keep the
         // original thrown value reachable — never rewrite it into a plain fetch failure (AF-08).
@@ -799,19 +798,19 @@ export class Resource<T> implements IObserver, IDisposable {
             ),
             ResourceErrorCode.suspenseProbeFailed
           )
-        );
+        )
       }
       if (probe.kind === 'not-thenable') {
-        return this.#retryFailure(error, controller, failureCount);
+        return this.#retryFailure(error, controller, failureCount)
       }
       // Captured `then` is applied exactly once — no second `.then` read via Promise.resolve.
       return assimilateCapturedThen<void>(probe.thenFn, error).then(() =>
         this.#executeFetcher(controller, failureCount)
-      );
+      )
     }
     return Promise.resolve(fetched).catch((error: unknown) =>
       this.#retryFailure(error, controller, failureCount)
-    );
+    )
   }
 
   #retryFailure(
@@ -819,26 +818,26 @@ export class Resource<T> implements IObserver, IDisposable {
     controller: { signal: IAbortSignal },
     failureCount: number
   ): Promise<T> {
-    if (controller.signal.aborted) return Promise.reject(abortError());
-    const nextFailureCount = failureCount + 1;
-    let shouldRetry: boolean;
+    if (controller.signal.aborted) return Promise.reject(abortError())
+    const nextFailureCount = failureCount + 1
+    let shouldRetry: boolean
     try {
       shouldRetry =
         typeof this.#retry === 'number'
           ? nextFailureCount <= this.#retry
-          : this.#retry(nextFailureCount, error);
+          : this.#retry(nextFailureCount, error)
     } catch (policyError) {
-      return Promise.reject(policyError);
+      return Promise.reject(policyError)
     }
-    if (!shouldRetry) return Promise.reject(error);
-    let delay: number;
+    if (!shouldRetry) return Promise.reject(error)
+    let delay: number
     try {
       delay =
         typeof this.#retryDelay === 'number'
           ? this.#retryDelay
-          : this.#retryDelay(nextFailureCount, error);
+          : this.#retryDelay(nextFailureCount, error)
     } catch (policyError) {
-      return Promise.reject(policyError);
+      return Promise.reject(policyError)
     }
     if (!Number.isFinite(delay) || delay < 0) {
       return Promise.reject(
@@ -846,159 +845,159 @@ export class Resource<T> implements IObserver, IDisposable {
           new RangeError('resource retry delay must be a non-negative finite number'),
           ResourceErrorCode.invalidOption
         )
-      );
+      )
     }
     return new Promise<void>((resolve, reject) => {
-      let timer: IScheduledTask | undefined;
-      let settled = false;
-      let aborted = false;
-      let callbackStarted = false;
-      let listenerRegistered = false;
-      let listenerRegistrationAttempted = false;
-      let listenerRegistrationReturned = false;
-      let abortDuringRegistration = false;
-      let postRegistrationCleanupAttempted = false;
+      let timer: IScheduledTask | undefined
+      let settled = false
+      let aborted = false
+      let callbackStarted = false
+      let listenerRegistered = false
+      let listenerRegistrationAttempted = false
+      let listenerRegistrationReturned = false
+      let abortDuringRegistration = false
+      let postRegistrationCleanupAttempted = false
 
       /** Reports cleanup failure without replacing the retry wait's AbortError result. */
       const reportCleanupFailure = (cleanupError: unknown): void => {
         this.runtime.reportError(createCancellationFailure(cleanupError), {
           phase: ReactiveErrorPhase.asyncFlush
-        });
-      };
+        })
+      }
 
       /** Reports scheduler admission failure using the existing scheduler diagnostic code. */
       const reportSchedulerFailure = (schedulerError: unknown): void => {
         this.runtime.reportError(createSchedulerFailure(schedulerError), {
           phase: ReactiveErrorPhase.asyncFlush
-        });
-      };
+        })
+      }
 
       /** Removes the retry abort listener, including a forced pass after hostile registration. */
       const removeAbortListener = (force = false): void => {
         if (force) {
-          if (!listenerRegistrationAttempted || postRegistrationCleanupAttempted) return;
-          postRegistrationCleanupAttempted = true;
+          if (!listenerRegistrationAttempted || postRegistrationCleanupAttempted) return
+          postRegistrationCleanupAttempted = true
         } else if (!listenerRegistered) {
-          return;
+          return
         }
-        listenerRegistered = false;
+        listenerRegistered = false
         try {
-          controller.signal.removeEventListener('abort', onAbort);
+          controller.signal.removeEventListener('abort', onAbort)
         } catch (cleanupError) {
-          reportCleanupFailure(cleanupError);
+          reportCleanupFailure(cleanupError)
         }
-      };
+      }
 
       /** Cancels a task returned after an abort/callback race and reports cancel failures. */
       const cancelTask = (task: IScheduledTask, cancellation: boolean): void => {
         try {
-          task.cancel();
+          task.cancel()
         } catch (cleanupError) {
-          if (cancellation) reportCleanupFailure(cleanupError);
-          else reportSchedulerFailure(cleanupError);
+          if (cancellation) reportCleanupFailure(cleanupError)
+          else reportSchedulerFailure(cleanupError)
         }
-      };
+      }
 
       const onAbort = (): void => {
-        if (settled) return;
-        if (!listenerRegistrationReturned) abortDuringRegistration = true;
-        aborted = true;
-        settled = true;
-        removeAbortListener();
-        let cleanupError: unknown;
-        let cleanupFailed = false;
+        if (settled) return
+        if (!listenerRegistrationReturned) abortDuringRegistration = true
+        aborted = true
+        settled = true
+        removeAbortListener()
+        let cleanupError: unknown
+        let cleanupFailed = false
         if (!callbackStarted) {
           try {
-            timer?.cancel();
+            timer?.cancel()
           } catch (error) {
-            cleanupFailed = true;
-            cleanupError = error;
+            cleanupFailed = true
+            cleanupError = error
           }
         }
-        reject(abortError());
-        if (cleanupFailed) throw cleanupError;
-      };
+        reject(abortError())
+        if (cleanupFailed) throw cleanupError
+      }
 
       const onTimer = (): void => {
-        if (settled) return;
-        callbackStarted = true;
-        removeAbortListener();
+        if (settled) return
+        callbackStarted = true
+        removeAbortListener()
         if (controller.signal.aborted) {
           try {
-            onAbort();
+            onAbort()
           } catch (cleanupError) {
-            reportCleanupFailure(cleanupError);
+            reportCleanupFailure(cleanupError)
           }
-          return;
+          return
         }
-        settled = true;
-        resolve();
-      };
+        settled = true
+        resolve()
+      }
 
       try {
         if (controller.signal.aborted) {
-          settled = true;
-          reject(abortError());
-          return;
+          settled = true
+          reject(abortError())
+          return
         }
         // Install first: schedule() may synchronously trigger the generation abort before it
         // returns its task. A listener installed afterward would miss that already-fired signal.
-        listenerRegistrationAttempted = true;
-        listenerRegistered = true;
-        controller.signal.addEventListener('abort', onAbort, { once: true });
-        listenerRegistrationReturned = true;
-        if (abortDuringRegistration) removeAbortListener(true);
+        listenerRegistrationAttempted = true
+        listenerRegistered = true
+        controller.signal.addEventListener('abort', onAbort, { once: true })
+        listenerRegistrationReturned = true
+        if (abortDuringRegistration) removeAbortListener(true)
         if (controller.signal.aborted) {
           try {
-            onAbort();
+            onAbort()
           } catch (cleanupError) {
-            reportCleanupFailure(cleanupError);
+            reportCleanupFailure(cleanupError)
           }
-          return;
+          return
         }
-        if (settled) return;
+        if (settled) return
 
-        const scheduled = this.#scheduler.schedule(onTimer, delay);
-        timer = scheduled;
+        const scheduled = this.#scheduler.schedule(onTimer, delay)
+        timer = scheduled
         if (aborted) {
           // Abort won while schedule() was still constructing the task; the task must not remain
           // armed even though the signal listener had already rejected the wait.
-          cancelTask(scheduled, true);
-          return;
+          cancelTask(scheduled, true)
+          return
         }
         if (callbackStarted) {
           // Preserve synchronous scheduler callback semantics and AF-62 task snapshot cleanup.
-          cancelTask(scheduled, false);
-          return;
+          cancelTask(scheduled, false)
+          return
         }
         if (controller.signal.aborted) {
           try {
-            onAbort();
+            onAbort()
           } catch (cleanupError) {
-            reportCleanupFailure(cleanupError);
+            reportCleanupFailure(cleanupError)
           }
-          if (aborted) cancelTask(scheduled, true);
+          if (aborted) cancelTask(scheduled, true)
         }
       } catch (error) {
         if (listenerRegistrationAttempted && !listenerRegistrationReturned) {
-          listenerRegistrationReturned = true;
-          removeAbortListener(true);
+          listenerRegistrationReturned = true
+          removeAbortListener(true)
         }
         if (settled) {
-          if (aborted) reportCleanupFailure(error);
-          else reportSchedulerFailure(error);
-          return;
+          if (aborted) reportCleanupFailure(error)
+          else reportSchedulerFailure(error)
+          return
         }
-        settled = true;
-        removeAbortListener();
-        reject(createSchedulerFailure(error));
+        settled = true
+        removeAbortListener()
+        reject(createSchedulerFailure(error))
       }
-    }).then(() => this.#executeFetcher(controller, nextFailureCount));
+    }).then(() => this.#executeFetcher(controller, nextFailureCount))
   }
 
   #withAbort(source: Promise<T>, signal: IAbortSignal): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-      let settled = false;
+      let settled = false
 
       /** Tracks listener admission and ensures one post-admission cleanup attempt. */
       const registration = {
@@ -1006,113 +1005,113 @@ export class Resource<T> implements IObserver, IDisposable {
         returned: false,
         cleanupAttempted: false,
         abortDuringRegistration: false
-      };
+      }
 
       /** Reports listener cleanup without replacing the request's primary settlement. */
       const reportCleanupFailure = (cleanupError: unknown): void => {
         try {
           this.runtime.reportError(createCancellationFailure(cleanupError), {
             phase: ReactiveErrorPhase.asyncFlush
-          });
+          })
         } catch {
           // Diagnostics are last-boundary best effort; they must not create an unhandled rejection.
         }
-      };
+      }
 
       /** Removes the listener once, including after an abort callback ran inside addEventListener. */
       const removeAbortListener = (): void => {
         if (!registration.attempted || !registration.returned || registration.cleanupAttempted) {
-          return;
+          return
         }
-        registration.cleanupAttempted = true;
+        registration.cleanupAttempted = true
         try {
-          signal.removeEventListener('abort', onAbort);
+          signal.removeEventListener('abort', onAbort)
         } catch (cleanupError) {
-          reportCleanupFailure(cleanupError);
+          reportCleanupFailure(cleanupError)
         }
-      };
+      }
 
       /** Settles cancellation and defers listener removal until hostile registration returns. */
       const onAbort = (): void => {
-        if (settled) return;
-        if (!registration.returned) registration.abortDuringRegistration = true;
-        settled = true;
-        removeAbortListener();
-        reject(abortError());
-      };
+        if (settled) return
+        if (!registration.returned) registration.abortDuringRegistration = true
+        settled = true
+        removeAbortListener()
+        reject(abortError())
+      }
 
       /** Settles source success while preserving its value and cleanup semantics. */
       const onSourceValue = (value: T): void => {
-        if (settled) return;
-        settled = true;
-        removeAbortListener();
-        resolve(value);
-      };
+        if (settled) return
+        settled = true
+        removeAbortListener()
+        resolve(value)
+      }
 
       /** Settles source failure while preserving its original rejection object. */
       const onSourceError = (error: unknown): void => {
-        if (settled) return;
-        settled = true;
-        removeAbortListener();
-        reject(error);
-      };
+        if (settled) return
+        settled = true
+        removeAbortListener()
+        reject(error)
+      }
 
       // Attach source handlers before host-controlled signal registration, preventing an add
       // failure from leaving a rejected source Promise unobserved.
-      source.then(onSourceValue, onSourceError);
+      source.then(onSourceValue, onSourceError)
 
       try {
         if (signal.aborted) {
-          settled = true;
-          reject(abortError());
-          return;
+          settled = true
+          reject(abortError())
+          return
         }
       } catch (error) {
-        settled = true;
-        reject(createSignalRegistrationFailure(error));
-        return;
+        settled = true
+        reject(createSignalRegistrationFailure(error))
+        return
       }
 
       try {
-        registration.attempted = true;
-        signal.addEventListener('abort', onAbort, { once: true });
-        registration.returned = true;
+        registration.attempted = true
+        signal.addEventListener('abort', onAbort, { once: true })
+        registration.returned = true
       } catch (error) {
         // Treat a throwing add as returned for rollback: hostile implementations may have stored
         // the listener before throwing, and must receive one removal attempt.
-        registration.returned = true;
-        removeAbortListener();
+        registration.returned = true
+        removeAbortListener()
         if (settled) {
           // An abort callback already won; preserve AbortError and expose registration failure via
           // the package diagnostic boundary instead of replacing the primary rejection.
           try {
             this.runtime.reportError(createSignalRegistrationFailure(error), {
               phase: ReactiveErrorPhase.asyncFlush
-            });
+            })
           } catch {
             // Diagnostics are last-boundary best effort; no unhandled rejection may escape.
           }
-          return;
+          return
         }
-        settled = true;
-        reject(createSignalRegistrationFailure(error));
-        return;
+        settled = true
+        reject(createSignalRegistrationFailure(error))
+        return
       }
 
-      let abortedAfterRegistration = false;
+      let abortedAfterRegistration = false
       try {
-        abortedAfterRegistration = signal.aborted;
+        abortedAfterRegistration = signal.aborted
       } catch (error) {
-        settled = true;
-        removeAbortListener();
-        reject(createSignalRegistrationFailure(error));
-        return;
+        settled = true
+        removeAbortListener()
+        reject(createSignalRegistrationFailure(error))
+        return
       }
       if (registration.abortDuringRegistration || abortedAfterRegistration) {
-        onAbort();
+        onAbort()
       }
-      if (settled) removeAbortListener();
-    });
+      if (settled) removeAbortListener()
+    })
   }
 
   #observeSettlement(request: Promise<T>, token: IGenerationToken): void {
@@ -1120,55 +1119,55 @@ export class Resource<T> implements IObserver, IDisposable {
       .then(
         (data) => {
           if (!this.#requests.isCurrent(token) || this.#terminal.lifecycle !== LifecycleState.open)
-            return;
-          const expiry = this.#settlementExpiry;
-          this.#settlementExpiry = undefined;
+            return
+          const expiry = this.#settlementExpiry
+          this.#settlementExpiry = undefined
           if (expiry === undefined) {
             throw tagResourceError(
               new RangeError(ResourceErrorText.ttlExpirationOverflow),
               ResourceErrorCode.invalidOption
-            );
+            )
           }
-          this.#updatedAt = expiry.updatedAt;
-          this.#expiresAt = expiry.expiresAt;
+          this.#updatedAt = expiry.updatedAt
+          this.#expiresAt = expiry.expiresAt
           if (this.#staleAfterSettlement) {
-            this.#expiresAt = 0;
-            this.#staleAfterSettlement = false;
+            this.#expiresAt = 0
+            this.#staleAfterSettlement = false
           }
           try {
-            this.#stateSignal.value = { status: ResourceStatus.success, data };
+            this.#stateSignal.value = { status: ResourceStatus.success, data }
           } finally {
-            this.#requestPending = false;
+            this.#requestPending = false
           }
           // autoStart 后从未被观察 → 主动休眠，防止上游边永驻
           if (this.#stateSignal.subs.size === 0) {
-            this.#scheduleSuspension();
+            this.#scheduleSuspension()
           }
         },
         (error: unknown) => {
           if (!this.#requests.isCurrent(token) || this.#terminal.lifecycle !== LifecycleState.open)
-            return;
-          this.#settlementExpiry = undefined;
-          this.#staleAfterSettlement = false;
+            return
+          this.#settlementExpiry = undefined
+          this.#staleAfterSettlement = false
           try {
-            this.#stateSignal.value = { status: ResourceStatus.error, error };
+            this.#stateSignal.value = { status: ResourceStatus.error, error }
           } finally {
-            this.#requestPending = false;
+            this.#requestPending = false
           }
           // autoStart 后从未被观察 → 主动休眠
           if (this.#stateSignal.subs.size === 0) {
-            this.#scheduleSuspension();
+            this.#scheduleSuspension()
           }
         }
       )
       .catch((error: unknown) => {
-        this.runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush });
-      });
+        this.runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })
+      })
   }
 
   /** Attach a rejection handler without replacing the public Promise. */
   #observe(request: Promise<T>): void {
-    void request.catch(() => undefined);
+    void request.catch(() => undefined)
   }
 
   /**
@@ -1176,60 +1175,60 @@ export class Resource<T> implements IObserver, IDisposable {
    * work without pausing, so a later observer can restart the derivation.
    */
   #abortActiveRequest(pause: boolean): void {
-    if (!this.#requestPending) return;
-    let cancellationError: IResourceError | undefined;
+    if (!this.#requestPending) return
+    let cancellationError: IResourceError | undefined
     try {
-      this.#requests.supersede();
+      this.#requests.supersede()
     } catch (error) {
-      cancellationError = createCancellationFailure(error);
+      cancellationError = createCancellationFailure(error)
     }
-    this.#requestPending = false;
-    this.#paused = pause;
-    const current = this.#stateSignal.peek();
+    this.#requestPending = false
+    this.#paused = pause
+    const current = this.#stateSignal.peek()
     if (current.status === ResourceStatus.pending) {
       this.#stateSignal.value = pause
         ? { status: ResourceStatus.cancelled, error: new ResourceCancelledError() }
-        : { status: ResourceStatus.idle };
-      if (cancellationError) throw cancellationError;
-      return;
+        : { status: ResourceStatus.idle }
+      if (cancellationError) throw cancellationError
+      return
     }
     // AF-07 / AL-02: an in-flight SWR refresh was superseded. Keep the stale success data visible
     // but clear `refreshing` so `fetchStatus === 'idle'` and `refreshing === false` stay consistent
     // instead of leaving a permanent `refreshing: true` with no current request.
     if (current.status === ResourceStatus.success && current.refreshing === true) {
-      this.#stateSignal.value = { status: ResourceStatus.success, data: current.data };
+      this.#stateSignal.value = { status: ResourceStatus.success, data: current.data }
     }
-    if (cancellationError) throw cancellationError;
+    if (cancellationError) throw cancellationError
   }
 
   #scheduleDependencyRefresh(force: boolean): void {
-    if (this.#terminal.lifecycle !== LifecycleState.open) return;
-    this.#forceRefresh ||= force;
-    if (this.#refreshScheduled) return;
-    this.#refreshScheduled = true;
+    if (this.#terminal.lifecycle !== LifecycleState.open) return
+    this.#forceRefresh ||= force
+    if (this.#refreshScheduled) return
+    this.#refreshScheduled = true
     // 与 Computed 挂起同一条 idle 通道：Resource 不得私自 queueMicrotask，
     // 否则 setSchedulerStrategy / scheduleIdle 对异步失效无效。
     internalsOf(this.runtime).deferIdle(() => {
-      if (!this.#refreshScheduled || this.#terminal.lifecycle !== LifecycleState.open) return;
-      this.#refreshScheduled = false;
-      const mustRefresh = this.#forceRefresh;
-      this.#forceRefresh = false;
+      if (!this.#refreshScheduled || this.#terminal.lifecycle !== LifecycleState.open) return
+      this.#refreshScheduled = false
+      const mustRefresh = this.#forceRefresh
+      this.#forceRefresh = false
       try {
         if (!mustRefresh && !internalsOf(this.runtime).tracker.hasStaleDependencies(this)) {
-          return;
+          return
         }
-        this.#observe(this.#startRequest());
+        this.#observe(this.#startRequest())
       } catch (error) {
-        this.#requestPending = false;
-        this.#expiresAt = 0;
-        this.#stateSignal.value = { status: ResourceStatus.error, error };
+        this.#requestPending = false
+        this.#expiresAt = 0
+        this.#stateSignal.value = { status: ResourceStatus.error, error }
       }
-    });
+    })
   }
 
   #scheduleSuspension(): void {
-    if (this.#keepAlive || this.#terminal.lifecycle !== LifecycleState.open) return;
-    const generation = ++this.#suspensionGeneration;
+    if (this.#keepAlive || this.#terminal.lifecycle !== LifecycleState.open) return
+    const generation = ++this.#suspensionGeneration
     internalsOf(this.runtime).deferIdle(() => {
       if (
         this.#terminal.lifecycle !== LifecycleState.open ||
@@ -1237,14 +1236,14 @@ export class Resource<T> implements IObserver, IDisposable {
         this.#stateSignal.subs.size > 0 ||
         generation !== this.#suspensionGeneration
       ) {
-        return;
+        return
       }
-      const hadDependencies = this.deps.size > 0;
-      internalsOf(this.runtime).tracker.clearDependencies(this);
+      const hadDependencies = this.deps.size > 0
+      internalsOf(this.runtime).tracker.clearDependencies(this)
       if (hadDependencies) {
-        if (this.#stateSignal.peek().status === ResourceStatus.success) this.#expiresAt = 0;
-        else if (this.#requestPending) this.#staleAfterSettlement = true;
+        if (this.#stateSignal.peek().status === ResourceStatus.success) this.#expiresAt = 0
+        else if (this.#requestPending) this.#staleAfterSettlement = true
       }
-    });
+    })
   }
 }

@@ -39,7 +39,7 @@ import {
 } from '@migaia/capability';
 ```
 
-`exports` 提供包根（`.`）与静态 Graph 子路径（`./graph`）。Host 符号从包根导入，Graph 符号从 `@migaia/capability/graph` 导入。本包复用 `@migaia/lifecycle` 的竞态/所有权原语与 `@migaia/utils/error` 的 `attachErrorIdentity`；不依赖 Store、React 或任何运行时全局对象，可在任意支持 ESM 的 JS 环境中使用。
+`exports` 提供包根（`.`）、静态 Graph 子路径（`./graph`）与无状态拓扑子路径（`./graph/topology`）。Host 符号从包根导入，Graph 符号从 `@migaia/capability/graph` 导入；只需纯 required-edge 准入时从 `@migaia/capability/graph/topology` 导入。本包复用 `@migaia/lifecycle` 的竞态/所有权原语与 `@migaia/utils/error` 的 `attachErrorIdentity`；不依赖 Store、React 或任何运行时全局对象，可在任意支持 ESM 的 JS 环境中使用。
 
 <a id="静态-capability-graph"></a>
 
@@ -70,6 +70,8 @@ type IGraphNodeDefinition<T> = {
 ```
 
 `ready()` 会先校验 unknown provider、duplicate edge、self-loop/cycle，再按注册 ordinal 做稳定拓扑启动。`context.get(provider)` 只能读取当前 node 已声明且已 ready 的 direct provider；它不创建 lease。`context.own()` 进入 node provisional scope，启动失败、abort、stale 或 dispose 时回滚。
+
+使用 `@migaia/capability/graph/topology` 时，公开节点的 `ordinal` 必须唯一并连续覆盖 `[0, nodeCount)`；拓扑构建只接受该注册域，非法或重复 ordinal 会按 `onInvalid` 的 `invalid-node` 或 `duplicate-ordinal` 语义报告。
 
 `IGraphNodeInstance` 必须提供 `{ value, release }`。Graph 只拥有一次 primary release；auxiliary release 由 lifecycle scope 管理，节点内 primary 先于 auxiliary，节点之间按逆拓扑释放。`ready()` 与 `dispose()` 在重复调用时保留 Promise identity；启动失败后 Graph 不隐式 retry，但仍可调用 `dispose()` 收尾。
 

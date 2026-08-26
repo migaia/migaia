@@ -2,11 +2,13 @@
 
 本指南逐个 API 列出完整签名、边界行为与错误码。包的定位与安装方式见 [README](./README.md)。
 
+Signal control 是最后一个可选参数（async runner 使用 `options.signal`）。它只提供 cooperative cancellation：signal-enabled 调用把同一个 frozen context 传给 stage 与 `done`；runner 不抢占当前同步调用、不竞速 pending Promise，也不伪装 hard termination。
+
 ## 目录
 
 - [执行器](#执行器)
 - [适配器](#适配器)
-- [生成器信号与类型](#生成器信号与类型)
+- [生成器信号、类型与取消协议](#生成器信号与类型)
 - [稳定值与错误](#稳定值与错误)
 - [组合工作流示例](#组合工作流示例)
 - [排查与构建门禁](#排查与构建门禁)
@@ -22,15 +24,18 @@
 ### `runSyncMiddleware`
 
 ```ts
-type ISyncMiddlewareStage<TValue> = (value: TValue, next: (value: TValue) => void) => void;
+type ISyncMiddlewareStage<TValue> = (value: TValue, next: (value: TValue) => void, context?: IMiddlewarePipelineContext) => void;
 
 function runSyncMiddleware<TValue>(
   stages: readonly ISyncMiddlewareStage<TValue>[],
   value: TValue,
-  done: (value: TValue) => void,
-  onViolation: IMiddlewarePipelineViolationHandler
+  done: (value: TValue, context?: IMiddlewarePipelineContext) => void,
+  onViolation: IMiddlewarePipelineViolationHandler,
+  control?: IMiddlewarePipelineControlOptions
 ): void;
 ```
+
+`ISyncMiddlewareStage` 末位 `context?: IMiddlewarePipelineContext`；`done` 同样接收可选 context。只有 control 显式提供 signal 时才传入 context；signal 在 stage-entry、每次 iterator transition、下一 stage 与 done admission 检查。
 
 同步、扁平地把 `value` 依次交给每个 stage。调用前会对 `stages` 做一次数组快照（`stages.slice()`），运行期间调用方再修改原数组不会影响本次已经开始的执行。
 
@@ -57,19 +62,20 @@ runSyncMiddleware(
 ```ts
 type IAsyncMiddlewareStage<TValue> = (
   value: TValue,
-  next: (value: TValue) => Promise<void>
+  next: (value: TValue) => Promise<void>, context?: IMiddlewarePipelineContext
 ) => void | Promise<void>;
 
 type IMiddlewarePipelineOptions = {
   readonly onViolation: IMiddlewarePipelineViolationHandler;
   readonly assertActive?: () => void;
   readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown;
+  readonly signal?: IMiddlewarePipelineAbortSignal;
 };
 
 function runAsyncMiddleware<TValue>(
   stages: readonly IAsyncMiddlewareStage<TValue>[],
   value: TValue,
-  done: (value: TValue) => void | Promise<void>,
+  done: (value: TValue, context?: IMiddlewarePipelineContext) => void | Promise<void>,
   options: IMiddlewarePipelineOptions
 ): Promise<void>;
 ```
@@ -117,10 +123,13 @@ await runAsyncMiddleware(
 function runGeneratorMiddleware<TValue>(
   stages: readonly IGeneratorMiddlewareStage<TValue>[],
   value: TValue,
-  done: (value: TValue) => void,
-  signals?: IGeneratorMiddlewareSignals
+  done: (value: TValue, context?: IMiddlewarePipelineContext) => void,
+  signals?: IGeneratorMiddlewareSignals,
+  control?: IMiddlewarePipelineControlOptions
 ): void;
 ```
+
+`IGeneratorMiddlewareStage<TValue>` 签名为 `(value, context?) => Generator<...>`。abort 在未 terminal iterator 上只调用一次 `return()`，继续 strict-drain cleanup yields；cleanup yield 不提交、不进入 downstream、不调用 done。abort 与 cleanup 双失败抛 `AggregateError`，`errors` 固定为 `[abortFailure, cleanupFailure]`。
 
 对每个 stage 调用 `stage(current)` 得到一个 generator 实例，然后**同步耗尽**它（反复调用 `.next()` 直到 `done: true`），期间：
 
@@ -152,6 +161,28 @@ runGeneratorMiddleware(
   (v) => console.log(v) // 10
 );
 ```
+
+### `runAsyncGeneratorMiddleware`
+
+```ts
+function runAsyncGeneratorMiddleware<TValue>(
+  stages: readonly IAsyncGeneratorMiddlewareStage<TValue>[],
+  value: TValue,
+  done: (value: TValue) => void | Promise<void>,
+  signals?: IGeneratorMiddlewareSignals,
+  control?: IMiddlewarePipelineControlOptions
+): Promise<void>;
+```
+
+`IAsyncGeneratorMiddlewareStage<TValue>` 签名为 `(value, context?) => AsyncGenerator<...>`；`done(value, context?)` 在 admission 前检查 signal，开始后不追溯回滚。Error reason 保持 exact identity；primitive/undefined reason 包装为 `ABORTED`，非法 control/signal 包装为 `TypeError` 并附 `INVALID_OPTION`。
+
+按入口 stage 快照严格串行执行。runner 对当前 stage 反复执行并 `await iterator.next()`，直到 terminal step 后才解释 return 值并进入下一 stage。多次 yield 只更新 stage-local `last`；不会产生 streaming/fan-out，也不会让后续 stage 看见尚未成功结束的中间值。
+
+terminal 语义与同步 generator 完全一致：`continue` 采用最后 yield（零 yield 时保持输入），`halt` 或无显式返回值短路，`undefined` sentinel 传播真实 `undefined`，普通 return 作为下一输入。全部 stage 成功后调用并 await `done`。
+
+stage factory throw、iterator/body reject 和 `done` reject 都以 exact value 传播，不包装为 `EXECUTION_FAILED`。本 runner 没有 `next()` 并发 channel；可通过最后一个 control 的 `signal` 协作取消，但不提供 deadline、retry 或 partial rollback；永不 settle 的非协作 stage 会令返回 Promise 永不 settle。
+
+JavaScript async generator 会对 yielded thenable 做 Promise assimilation；因此 `PromiseLike` 不能作为要求保持 identity 的不透明 payload。若业务需要传递 Promise 对象本身，应包装为 `{ value: promise }` 一类普通对象。
 
 ---
 
@@ -205,11 +236,26 @@ const genStage = adaptSyncStageToGenerator(
 );
 ```
 
+### Async Generator adapters
+
+```ts
+function adaptGeneratorStageToAsyncGenerator<TValue>(
+  stage: IGeneratorMiddlewareStage<TValue>
+): IAsyncGeneratorMiddlewareStage<TValue>;
+
+function adaptSyncStageToAsyncGenerator<TValue>(
+  stage: ISyncMiddlewareStage<TValue>,
+  onViolation: IMiddlewarePipelineViolationHandler
+): IAsyncGeneratorMiddlewareStage<TValue>;
+```
+
+前者通过 async-generator `yield*` 提升同步 generator，保留 yield、terminal signal 和 throw identity。后者复用 `adaptSyncStageToGenerator` 的短路与 duplicate/late 检测，再提升为 async generator；`onViolation` 必填且不会默认 throw。不提供 async middleware→async-generator，因为递归 `next()`、双失败 channel 和 active control 无法无损变成 stage-local yield。
+
 ---
 
 <a id="生成器信号与类型"></a>
 
-## 生成器信号与类型
+## 生成器信号、类型与取消协议
 
 ```ts
 const GENERATOR_UNDEFINED: unique symbol;
@@ -230,18 +276,37 @@ const MiddlewarePipelineGeneratorSignals: IGeneratorMiddlewareSignals;
 `MiddlewarePipelineGeneratorSignals`：与上面三个常量一一对应的默认 sentinel 集合，是 `runGeneratorMiddleware` 第四个参数 `signals` 的默认值。
 
 ```ts
-type ISyncMiddlewareStage<TValue> = (value: TValue, next: (value: TValue) => void) => void;
+type ISyncMiddlewareStage<TValue> = (
+  value: TValue,
+  next: (value: TValue) => void,
+  context?: IMiddlewarePipelineContext
+) => void;
 
 type IAsyncMiddlewareStage<TValue> = (
   value: TValue,
-  next: (value: TValue) => Promise<void>
+  next: (value: TValue) => Promise<void>,
+  context?: IMiddlewarePipelineContext
 ) => void | Promise<void>;
 
 // TValue 的类型允许 undefined 时，生成器 return 类型里额外接受 GENERATOR_UNDEFINED 作为
 // "显式传播 undefined" 的信号；TValue 不允许 undefined 时该分支类型上不存在。
 type IGeneratorMiddlewareStage<TValue> = (
-  value: TValue
+  value: TValue,
+  context?: IMiddlewarePipelineContext
 ) => Generator<
+  TValue,
+  | TValue
+  | (undefined extends TValue ? typeof GENERATOR_UNDEFINED : never)
+  | typeof GENERATOR_HALT
+  | typeof GENERATOR_CONTINUE
+  | undefined,
+  void
+>;
+
+type IAsyncGeneratorMiddlewareStage<TValue> = (
+  value: TValue,
+  context?: IMiddlewarePipelineContext
+) => AsyncGenerator<
   TValue,
   | TValue
   | (undefined extends TValue ? typeof GENERATOR_UNDEFINED : never)
@@ -252,17 +317,45 @@ type IGeneratorMiddlewareStage<TValue> = (
 >;
 ```
 
-三个 stage 函数类型分别对应 sync/async/generator 三种执行代数，均为 `@migaia/middleware-pipeline` 主入口的类型导出，无运行时值。
+四个 stage 函数类型分别对应 sync/async/generator/async-generator 四种执行代数，均为主入口类型导出。`context` 是所有四种类型共同新增的**末位可选**参数——只有调用方在对应 runner 上提供了 `signal`（`control.signal` 或 `options.signal`）时才会真的传入非 `undefined` 的值；不提供时 stage 收到的实参数量与升级前完全一致（纯加法式扩展，不破坏既有两参数写法）。
+
+```ts
+type IMiddlewarePipelineAbortSignal = {
+  readonly aborted: boolean;
+  readonly reason?: unknown;
+  addEventListener(
+    type: 'abort',
+    listener: () => void,
+    options?: { readonly once?: boolean }
+  ): void;
+  removeEventListener(type: 'abort', listener: () => void): void;
+};
+type IMiddlewarePipelineContext = { readonly signal: IMiddlewarePipelineAbortSignal };
+type IMiddlewarePipelineControlOptions = { readonly signal?: IMiddlewarePipelineAbortSignal };
+```
+
+`IMiddlewarePipelineAbortSignal` 是结构化接口，不要求真实 DOM `AbortSignal`；`addEventListener`/`removeEventListener` 目前所有 runner 都不会真正调用（runner 只在协作检查点轮询 `aborted`，不注册监听器、不用 `Promise.race` 抢占），要求这两个方法存在只是为了确保传入对象结构上真的与标准 `AbortSignal` 兼容。`IMiddlewarePipelineContext` 是 signal 启用时 stage/`done` 收到的第三个只读参数，同一次调用内所有 stage 与 `done` 共享同一个 `Object.freeze` 冻结的实例（同一个 `signal` 引用）。`IMiddlewarePipelineControlOptions` 是 `runSyncMiddleware`/`runGeneratorMiddleware`/`runAsyncGeneratorMiddleware` 末位 `control` 参数的类型；`runAsyncMiddleware` 把同名 `signal` 字段直接并入 `IMiddlewarePipelineOptions`，不单独要 `control` 参数。
 
 ```ts
 type IMiddlewarePipelineOptions = {
   readonly onViolation: IMiddlewarePipelineViolationHandler;
   readonly assertActive?: () => void;
   readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown;
+  readonly signal?: IMiddlewarePipelineAbortSignal;
 };
 ```
 
-`runAsyncMiddleware` 的选项对象类型；字段语义见[执行器 · `runAsyncMiddleware`](#执行器)。
+`runAsyncMiddleware` 的选项对象类型；字段语义见[执行器 · `runAsyncMiddleware`](#执行器)。`assertActive` 与 `signal` 是两套独立的控制流机制，可以同时提供，两者触发的错误都按"active 错误"规则处理（不与普通 stage/downstream 失败合并）。
+
+### 取消协议细节
+
+四个 runner 都在"进入某个 stage 之前"与"该 stage/迭代步骤结束之后（链未整体完成时）"检查一次 `signal.aborted`；一旦为真立即抛出中止错误、停止继续执行、不调用 `done`。几个容易被忽略的细节：
+
+- **`reason` 惰性读取且只读一次**：`signal.reason` 只在真正要抛错的那一刻才被访问，日常的 `aborted` 轮询不会碰它；一旦读取过，即便 `reason` 是一个每次返回不同值的 getter，同一次抛错过程也只使用第一次读到的值（"冻结"复用），不会因为抛错逻辑内部多处引用而重复触发 getter 的副作用。
+- **中止错误构造规则**：`signal.reason instanceof Error` 时原样抛出该 reason 本身，不包装、不附加本包的 `source`/`code`；否则包装成新 `Error`（`message: 'middleware pipeline aborted'`，`cause` 为原始 reason），并附加 `source: '@migaia/middleware-pipeline'`、`code: 'ABORTED'`。因此用 `error.code === 'ABORTED'` 判定"是否因中止而失败"并不总是可靠——如果调用方用一个 `Error` 实例作为 abort reason，这个字段就不存在。
+- **非法输入**：`control`（或 `options`）本身是 `null`、数组，或存在但不满足 `object`/`function` 形状，抛 `TypeError`（`code: 'INVALID_OPTION'`）；`signal` 字段存在但不满足 `aborted: boolean` + 两个监听方法的结构，同样抛 `INVALID_OPTION`；`control`/`signal` 字段为 `undefined`（不传）是合法的"不启用取消"写法。`control`/`options` 参数本身为 `undefined`（`runSyncMiddleware`/`runGeneratorMiddleware`/`runAsyncGeneratorMiddleware` 的 `control` 是可选参数）同样合法；但 `runAsyncMiddleware` 的 `options` 从来都是必填参数，传 `null`/`undefined` 一样抛 `INVALID_OPTION`。
+- **生成器/异步生成器专属的清理协议**：若 abort 发生在某个 stage 的 `yield` 与 `yield` 之间（generator 尚未耗尽），runner 会先调用该 iterator 的 `.return(undefined)`（异步版本 `await iterator.return(undefined)`）触发它的 `finally` 清理块，然后继续耗尽清理阶段可能产生的任何后续 `yield`（这些 `yield` 不提交、不进入下一 stage、也不会被当成新的协作检查点），最后重新抛出**原始的中止错误**。若清理过程本身也抛错，改为抛出 `AggregateError([abortFailure, cleanupFailure])`（`code: 'ABORT_CLEANUP_FAILED'`）——中止错误固定在前，清理错误固定在后。
+- **预先已中止**：调用时若 `signal.aborted` 已经是 `true`，在进入第一个 stage 之前就直接抛出中止错误，不会执行任何 stage。
 
 ---
 
@@ -271,11 +364,16 @@ type IMiddlewarePipelineOptions = {
 ## 稳定值与错误
 
 ```ts
-const MiddlewarePipelineMode = { sync: 'sync', async: 'async', generator: 'generator' } as const;
+const MiddlewarePipelineMode = {
+  sync: 'sync',
+  async: 'async',
+  generator: 'generator',
+  asyncGenerator: 'async-generator'
+} as const;
 type IMiddlewarePipelineMode = (typeof MiddlewarePipelineMode)[keyof typeof MiddlewarePipelineMode];
 ```
 
-三种执行代数的稳定字符串值，供调用方标注/分支使用；本包内部的三个 runner 函数并不消费这个值（不会根据它切换行为）。
+四种执行代数的稳定字符串值；runner 不消费该值，也不存在 runtime registry。新增成员不改变三个既有 identity，但会扩展封闭联合：外部穷尽 switch/`assertNever` 需要增加 `'async-generator'` 分支。
 
 ```ts
 const MiddlewarePipelineViolation = { late: 'late', duplicate: 'duplicate' } as const;
@@ -286,13 +384,16 @@ type IMiddlewarePipelineViolationHandler = (kind: IMiddlewarePipelineViolation) 
 
 `late`：stage 函数已经返回后，才调用了它之前保存下来的 `next` 回调。
 `duplicate`：同一 stage 在函数体内调用 `next` 超过一次；只有第一次调用的值生效。
-`IMiddlewarePipelineViolationHandler` 是所有 runner/adapter 上 `onViolation` 参数的类型；三种 runner 与两个 adapter 都用同一个签名报告。
+`IMiddlewarePipelineViolationHandler` 是 next-style runner/adapter 的报告类型；generator runner 自身没有 `next()`，sync→generator 系列 adapter 复用该签名。
 
 ```ts
 const MIDDLEWARE_PIPELINE_SOURCE: '@migaia/middleware-pipeline';
 
 const MiddlewarePipelineErrorCode = {
-  executionFailed: 'EXECUTION_FAILED'
+  executionFailed: 'EXECUTION_FAILED',
+  invalidOption: 'INVALID_OPTION',
+  aborted: 'ABORTED',
+  abortCleanupFailed: 'ABORT_CLEANUP_FAILED'
 } as const;
 type IMiddlewarePipelineErrorCode =
   (typeof MiddlewarePipelineErrorCode)[keyof typeof MiddlewarePipelineErrorCode];
@@ -300,7 +401,12 @@ type IMiddlewarePipelineErrorCode =
 
 `MIDDLEWARE_PIPELINE_SOURCE`：本包错误身份的稳定 `source` 字符串，用于 `@migaia/utils` 的 `attachErrorIdentity`/`isUtilsError` 一类工具做来源判定。
 
-`MiddlewarePipelineErrorCode.executionFailed`（`'EXECUTION_FAILED'`）：唯一取值。触发条件：`runAsyncMiddleware` 中，当前 stage 与它已经启动、被等待的 downstream **同时**以普通失败（非 `assertActive` 产生的 active 错误）结束，且调用方未提供 `options.combineStageAndDownstreamError`。
+四个错误码：
+
+- `MiddlewarePipelineErrorCode.executionFailed`（`'EXECUTION_FAILED'`）：触发条件：`runAsyncMiddleware` 中，当前 stage 与它已经启动、被等待的 downstream **同时**以普通失败（非 active 控制错误）结束，且调用方未提供 `options.combineStageAndDownstreamError`。
+- `MiddlewarePipelineErrorCode.invalidOption`（`'INVALID_OPTION'`）：`control`/`options` 本身或其 `signal` 字段结构不合法时，`TypeError` 携带的 code（详见[取消协议细节](#执行器)一节）。
+- `MiddlewarePipelineErrorCode.aborted`（`'ABORTED'`）：`signal.reason` 不是 `Error` 实例时，本包包装出的默认中止 `Error` 携带的 code；`reason` 本身就是 `Error` 时会原样抛出该 reason，不带这个 code，`instanceof`/`message` 判定比 `code` 判定更可靠。
+- `MiddlewarePipelineErrorCode.abortCleanupFailed`（`'ABORT_CLEANUP_FAILED'`）：仅 `runGeneratorMiddleware`/`runAsyncGeneratorMiddleware` 会抛——generator/async-generator stage 在 abort 触发的 `.return()` 清理阶段自身也抛错时，`AggregateError` 携带的 code，`errors` 固定为 `[abortFailure, cleanupFailure]`。
 
 ```ts
 function createMiddlewarePipelineExecutionError(
@@ -313,6 +419,8 @@ function createMiddlewarePipelineExecutionError(
 ```
 
 这是默认双失败路径内部使用的错误工厂（未从主入口导出，此处列出用于理解错误形状）：产出一个 `AggregateError([stageError, downstreamError], 'middleware stage and downstream failed')`，并通过 `@migaia/utils` 的 `attachErrorIdentity` 附加只读的 `source: '@migaia/middleware-pipeline'` 与 `code: 'EXECUTION_FAILED'`。两个原始错误始终保留在 `error.errors` 里，可据此还原具体失败原因。
+
+`invalidOption`/`aborted`/`abortCleanupFailed` 三个错误由 `src/signal-errors.ts` 中未导出的 `createMiddlewarePipelineInvalidOptionError`/`createMiddlewarePipelineAbortError`/`createMiddlewarePipelineAbortCleanupError` 三个内部工厂产出，均用同一套 `attachErrorIdentity` 附加身份，不从主入口单独导出这些工厂函数本身。
 
 ```ts
 try {
@@ -388,6 +496,10 @@ try {
 - **收到 `duplicate` 诊断**：某 stage 在一次执行中调用 `next` 超过一次；只保留一次调用，async 代码里确保只 `await`/`return` 一次 `next()`。
 - **收到 `late` 诊断**：stage 把 `next` 保存下来，在函数返回之后才调用（例如塞进定时器/事件回调）；改用宿主自己的队列/lifecycle 重新发起一次执行，而不是复用已完成的这次调用的 `next`。
 - **`runAsyncMiddleware` 抛出 `AggregateError`，`code` 是 `EXECUTION_FAILED`**：说明当前 stage 与它已启动的下游同时失败；`error.errors` 里依次是 `[stageError, downstreamError]`，需要保留领域错误类型时提供 `combineStageAndDownstreamError`。
+- **传了 `control`/`options` 却抛 `INVALID_OPTION`**：`control`/`options` 本身或其 `signal` 字段不满足结构要求——检查是否误传了 `null`（`undefined`/不传才是合法的"不启用取消"）、`signal` 是否同时具备 `aborted: boolean`、`addEventListener`、`removeEventListener`。
+- **中止后 `catch` 到的错误 `code` 不是 `ABORTED`**：这是预期行为，不是 bug——若 `signal.reason` 本身就是一个 `Error` 实例，本包会原样抛出这个 reason，不额外包装、不附加 `code`；判定"是否因中止而失败"应优先比较 `error === signal.reason` 或用 `instanceof`/自定义标记，不要只依赖 `code === 'ABORTED'`。
+- **generator/async-generator 抛 `ABORT_CLEANUP_FAILED`**：说明 stage 的 `finally` 清理块在 abort 触发的 `.return()` 期间自身也抛错了；`error.errors[0]` 是原始中止错误，`error.errors[1]` 是清理失败，按顺序检查两者。
+- **abort 后下游异步工作没有立刻停止**：符合预期——取消是协作式的，runner 只在协作检查点之间轮询，不会用 `Promise.race` 抢占已经在途的 Promise；需要真正中断某个具体的异步操作（如 `fetch`），把同一个 `signal`（`context?.signal`）显式传给该操作自己的取消入口。
 - **需要一对多广播、而不是单值依次流转**：用 `@migaia/event-subscriber`，本包只做单值链式流转。
 - **需要排队、并发限制、drain、取消后台任务、插件安装与生命周期**：这些不在本包范围内，应使用 `@migaia/lifecycle` 或 `@migaia/plugin-host`；本包每次调用只执行一次 chain，不保存跨调用状态，也不提供 `close()`/`dispose()`/`drain()`。
 

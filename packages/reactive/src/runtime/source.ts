@@ -1,18 +1,18 @@
-import { internalsOf } from './internals.js';
-import { claimOwnership } from './ownership.js';
-import type { IObservable, IObserver, IRuntime } from './types.js';
-import { createReactiveError } from '../errors.js';
-import { ReactiveErrorCode } from '../error-code.js';
-import { ReactiveErrorText } from '../error-text.js';
+import { internalsOf } from './internals.js'
+import { claimOwnership } from './ownership.js'
+import type { IObservable, IObserver, IRuntime } from './types.js'
+import { createReactiveError } from '../errors.js'
+import { ReactiveErrorCode } from '../error-code.js'
+import { ReactiveErrorText } from '../error-text.js'
 
 type IRuntimeFieldSource = {
-  track(): void;
-  notify(): void;
-  commit<T>(write: () => T): T;
-  readonly observed: boolean;
-  readonly disposed: boolean;
-  dispose(): void;
-};
+  track(): void
+  notify(): void
+  commit<T>(write: () => T): T
+  readonly observed: boolean
+  readonly disposed: boolean
+  dispose(): void
+}
 
 /**
  * 为扩展层创建一条受控 Source。
@@ -26,41 +26,41 @@ export function createFieldSource(runtime: IRuntime, debugName?: string): IRunti
     debugName,
     subs: new Set<IObserver>(),
     version: internalsOf(runtime).clock.next()
-  };
-  claimOwnership(node, runtime);
-  let disposed = false;
+  }
+  claimOwnership(node, runtime)
+  let disposed = false
 
   const assertActive = (): void => {
     if (disposed)
       throw createReactiveError(
         ReactiveErrorCode.nodeDisposed,
         ReactiveErrorText.disposedFieldSource
-      );
-  };
+      )
+  }
 
   return {
     track() {
-      assertActive();
-      internalsOf(runtime).tracker.track(node);
+      assertActive()
+      internalsOf(runtime).tracker.track(node)
     },
     notify() {
-      assertActive();
-      internalsOf(runtime).notify(node);
+      assertActive()
+      internalsOf(runtime).notify(node)
     },
     commit<T>(write: () => T): T {
-      assertActive();
-      return internalsOf(runtime).commitSource(node, write);
+      assertActive()
+      return internalsOf(runtime).commitSource(node, write)
     },
     get observed() {
-      return !disposed && node.subs.size > 0;
+      return !disposed && node.subs.size > 0
     },
     get disposed() {
-      return disposed;
+      return disposed
     },
     dispose() {
-      if (disposed) return;
-      disposed = true;
-      internalsOf(runtime).tracker.disconnectObservable(node, 'dispose');
+      if (disposed) return
+      disposed = true
+      internalsOf(runtime).tracker.disconnectObservable(node, 'dispose')
     }
-  };
+  }
 }

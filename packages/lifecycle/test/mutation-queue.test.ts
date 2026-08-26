@@ -1,566 +1,566 @@
-import { describe, expect, it, vi } from 'vitest';
-import { createMutationQueue } from '../src/mutation-queue';
-import { LifecycleErrorCode } from '../src/error-code';
-import { createManualScheduler } from '../src/scheduler';
+import { describe, expect, it, vi } from 'vitest'
+import { createMutationQueue } from '../src/mutation-queue'
+import { LifecycleErrorCode } from '../src/error-code'
+import { createManualScheduler } from '../src/scheduler'
 
 const deferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void } => {
-  let resolve!: (value: T) => void;
+  let resolve!: (value: T) => void
   const promise = new Promise<T>((res) => {
-    resolve = res;
-  });
-  return { promise, resolve };
-};
+    resolve = res
+  })
+  return { promise, resolve }
+}
 
 describe('L-T13 MutationQueue: FIFO and settle-disarms-watchdog', () => {
   it('runs tasks strictly one at a time, in submission order', async () => {
-    const queue = createMutationQueue();
-    const order: string[] = [];
-    const a = deferred<void>();
-    const b = deferred<void>();
+    const queue = createMutationQueue()
+    const order: string[] = []
+    const a = deferred<void>()
+    const b = deferred<void>()
     const p1 = queue.enqueue(async () => {
-      order.push('a-start');
-      await a.promise;
-      order.push('a-end');
-    });
+      order.push('a-start')
+      await a.promise
+      order.push('a-end')
+    })
     const p2 = queue.enqueue(async () => {
-      order.push('b-start');
-      await b.promise;
-      order.push('b-end');
-    });
-    await Promise.resolve();
-    await Promise.resolve();
+      order.push('b-start')
+      await b.promise
+      order.push('b-end')
+    })
+    await Promise.resolve()
+    await Promise.resolve()
     // b must not have started yet — a is still running.
-    expect(order).toEqual(['a-start']);
-    a.resolve();
-    await p1;
-    await Promise.resolve();
-    expect(order).toEqual(['a-start', 'a-end', 'b-start']);
-    b.resolve();
-    await p2;
-    expect(order).toEqual(['a-start', 'a-end', 'b-start', 'b-end']);
-  });
+    expect(order).toEqual(['a-start'])
+    a.resolve()
+    await p1
+    await Promise.resolve()
+    expect(order).toEqual(['a-start', 'a-end', 'b-start'])
+    b.resolve()
+    await p2
+    expect(order).toEqual(['a-start', 'a-end', 'b-start', 'b-end'])
+  })
 
   it("a task's own success/failure resolves/rejects its own promise", async () => {
-    const queue = createMutationQueue();
-    await expect(queue.enqueue(() => 42)).resolves.toBe(42);
+    const queue = createMutationQueue()
+    await expect(queue.enqueue(() => 42)).resolves.toBe(42)
     await expect(
       queue.enqueue(() => {
-        throw new Error('task failed');
+        throw new Error('task failed')
       })
-    ).rejects.toThrow('task failed');
-  });
+    ).rejects.toThrow('task failed')
+  })
 
   it('an admission watchdog is disarmed the instant its task settles — it does not fire later', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers()
     try {
-      const queue = createMutationQueue({ queueAdmissionTimeoutMs: 50 });
-      const blocking = deferred<void>();
-      const p1 = queue.enqueue(() => blocking.promise);
+      const queue = createMutationQueue({ queueAdmissionTimeoutMs: 50 })
+      const blocking = deferred<void>()
+      const p1 = queue.enqueue(() => blocking.promise)
       // Task 2 is queued behind in-flight work and gets a watchdog armed.
-      const p2 = queue.enqueue(() => 'second');
-      blocking.resolve();
-      await p1;
+      const p2 = queue.enqueue(() => 'second')
+      blocking.resolve()
+      await p1
       // Task 2 should now be running/settled well before its watchdog would fire.
-      await expect(p2).resolves.toBe('second');
+      await expect(p2).resolves.toBe('second')
       // Advancing past the original watchdog window must not produce a late rejection anywhere.
-      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(100)
     } finally {
-      vi.useRealTimers();
+      vi.useRealTimers()
     }
-  });
+  })
 
   it('a task submitted to an idle queue runs without needing to wait behind anything', async () => {
-    const queue = createMutationQueue({ queueAdmissionTimeoutMs: 1 });
+    const queue = createMutationQueue({ queueAdmissionTimeoutMs: 1 })
     // No prior work queued — this must not spuriously reject even though the timeout is 1ms.
-    await expect(queue.enqueue(() => 'immediate')).resolves.toBe('immediate');
-  });
+    await expect(queue.enqueue(() => 'immediate')).resolves.toBe('immediate')
+  })
 
   it('size reflects queued-plus-running task count', async () => {
-    const queue = createMutationQueue();
-    const blocking = deferred<void>();
-    const p1 = queue.enqueue(() => blocking.promise);
-    queue.enqueue(() => undefined);
-    expect(queue.size).toBe(2);
-    blocking.resolve();
-    await p1;
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(queue.size).toBe(0);
-  });
+    const queue = createMutationQueue()
+    const blocking = deferred<void>()
+    const p1 = queue.enqueue(() => blocking.promise)
+    queue.enqueue(() => undefined)
+    expect(queue.size).toBe(2)
+    blocking.resolve()
+    await p1
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(queue.size).toBe(0)
+  })
 
   it('this port does not claim owner-aware self-dependency detection as pre-existing plugin-host behavior — it is new (see L-T43 for its own coverage)', async () => {
-    const queue = createMutationQueue();
+    const queue = createMutationQueue()
     // Two DIFFERENT owners queued behind each other must both simply run in order — no rejection.
-    const results: string[] = [];
+    const results: string[] = []
     await queue.enqueue(
       () => {
-        results.push('a');
+        results.push('a')
       },
       { owner: 'A' }
-    );
+    )
     await queue.enqueue(
       () => {
-        results.push('b');
+        results.push('b')
       },
       { owner: 'B' }
-    );
-    expect(results).toEqual(['a', 'b']);
-  });
-});
+    )
+    expect(results).toEqual(['a', 'b'])
+  })
+})
 
 describe('L-T42 MutationQueue: watchdog unconfigured (default) only diagnoses, never rejects', () => {
   it('a task queued behind in-flight work is not rejected when queueAdmissionTimeoutMs is left unset', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers()
     try {
-      const queue = createMutationQueue(); // no queueAdmissionTimeoutMs given
-      const blocking = deferred<void>();
-      const p1 = queue.enqueue(() => blocking.promise);
-      const p2 = queue.enqueue(() => 'second');
-      await vi.advanceTimersByTimeAsync(60_000); // well past any plausible SLA
-      blocking.resolve();
-      await p1;
-      await expect(p2).resolves.toBe('second');
+      const queue = createMutationQueue() // no queueAdmissionTimeoutMs given
+      const blocking = deferred<void>()
+      const p1 = queue.enqueue(() => blocking.promise)
+      const p2 = queue.enqueue(() => 'second')
+      await vi.advanceTimersByTimeAsync(60_000) // well past any plausible SLA
+      blocking.resolve()
+      await p1
+      await expect(p2).resolves.toBe('second')
     } finally {
-      vi.useRealTimers();
+      vi.useRealTimers()
     }
-  });
+  })
 
   it('fires a diagnostic callback (if provided) without dequeuing or rejecting anything', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers()
     try {
-      const onAdmissionDiagnostic = vi.fn();
-      const queue = createMutationQueue({ admissionDiagnosticMs: 100, onAdmissionDiagnostic });
-      const blocking = deferred<void>();
-      const p1 = queue.enqueue(() => blocking.promise, { owner: 'blocker' });
-      const p2 = queue.enqueue(() => 'second', { owner: 'second' });
-      await vi.advanceTimersByTimeAsync(101);
+      const onAdmissionDiagnostic = vi.fn()
+      const queue = createMutationQueue({ admissionDiagnosticMs: 100, onAdmissionDiagnostic })
+      const blocking = deferred<void>()
+      const p1 = queue.enqueue(() => blocking.promise, { owner: 'blocker' })
+      const p2 = queue.enqueue(() => 'second', { owner: 'second' })
+      await vi.advanceTimersByTimeAsync(101)
       expect(onAdmissionDiagnostic).toHaveBeenCalledWith(
         expect.objectContaining({ owner: 'second' })
-      );
+      )
       expect(
         (onAdmissionDiagnostic.mock.calls[0]![0] as { waitedMs: number }).waitedMs
-      ).toBeGreaterThanOrEqual(100);
-      blocking.resolve();
-      await p1;
-      await expect(p2).resolves.toBe('second');
+      ).toBeGreaterThanOrEqual(100)
+      blocking.resolve()
+      await p1
+      await expect(p2).resolves.toBe('second')
     } finally {
-      vi.useRealTimers();
+      vi.useRealTimers()
     }
-  });
+  })
 
   it('never arms a diagnostic timer at all when no onAdmissionDiagnostic callback is given (nothing to fire)', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers()
     try {
-      const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
-      const queue = createMutationQueue();
-      const blocking = deferred<void>();
-      queue.enqueue(() => blocking.promise);
-      const callsBefore = setTimeoutSpy.mock.calls.length;
-      queue.enqueue(() => 'second');
+      const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout')
+      const queue = createMutationQueue()
+      const blocking = deferred<void>()
+      queue.enqueue(() => blocking.promise)
+      const callsBefore = setTimeoutSpy.mock.calls.length
+      queue.enqueue(() => 'second')
       // No new timer should have been armed for the second (queued-behind) task.
-      expect(setTimeoutSpy.mock.calls.length).toBe(callsBefore);
-      setTimeoutSpy.mockRestore();
+      expect(setTimeoutSpy.mock.calls.length).toBe(callsBefore)
+      setTimeoutSpy.mockRestore()
     } finally {
-      vi.useRealTimers();
+      vi.useRealTimers()
     }
-  });
-});
+  })
+})
 
 describe('L-T43 MutationQueue: watchdog configured, disabled, and per-call override', () => {
   it('configuring a numeric queueAdmissionTimeoutMs dequeues and rejects with QUEUE_ADMISSION_TIMEOUT once exceeded', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers()
     try {
-      const queue = createMutationQueue({ queueAdmissionTimeoutMs: 100 });
-      const blocking = deferred<void>();
-      queue.enqueue(() => blocking.promise);
-      const p2 = queue.enqueue(() => 'second', { owner: 'waiter' });
+      const queue = createMutationQueue({ queueAdmissionTimeoutMs: 100 })
+      const blocking = deferred<void>()
+      queue.enqueue(() => blocking.promise)
+      const p2 = queue.enqueue(() => 'second', { owner: 'waiter' })
       const assertion = expect(p2).rejects.toThrowError(
         expect.objectContaining({ code: LifecycleErrorCode.queueAdmissionTimeout })
-      );
-      await vi.advanceTimersByTimeAsync(101);
-      await assertion;
+      )
+      await vi.advanceTimersByTimeAsync(101)
+      await assertion
     } finally {
-      vi.useRealTimers();
+      vi.useRealTimers()
     }
-  });
+  })
 
   it('the rejection carries the owner label and the waited duration', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers()
     try {
-      const queue = createMutationQueue({ queueAdmissionTimeoutMs: 50 });
-      const blocking = deferred<void>();
-      queue.enqueue(() => blocking.promise);
-      const p2 = queue.enqueue(() => 'second', { owner: 'my-owner' });
-      let caught: { detail?: { owner?: string; waitedMs?: number } } | undefined;
+      const queue = createMutationQueue({ queueAdmissionTimeoutMs: 50 })
+      const blocking = deferred<void>()
+      queue.enqueue(() => blocking.promise)
+      const p2 = queue.enqueue(() => 'second', { owner: 'my-owner' })
+      let caught: { detail?: { owner?: string; waitedMs?: number } } | undefined
       const assertion = p2.catch((error: unknown) => {
-        caught = error as typeof caught;
-      });
-      await vi.advanceTimersByTimeAsync(51);
-      await assertion;
-      expect(caught?.detail?.owner).toBe('my-owner');
-      expect(caught?.detail?.waitedMs).toBeGreaterThanOrEqual(50);
+        caught = error as typeof caught
+      })
+      await vi.advanceTimersByTimeAsync(51)
+      await assertion
+      expect(caught?.detail?.owner).toBe('my-owner')
+      expect(caught?.detail?.waitedMs).toBeGreaterThanOrEqual(50)
     } finally {
-      vi.useRealTimers();
+      vi.useRealTimers()
     }
-  });
+  })
 
   it('queueAdmissionTimeoutMs: false disables rejection entirely for a queued task', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers()
     try {
-      const queue = createMutationQueue({ queueAdmissionTimeoutMs: false });
-      const blocking = deferred<void>();
-      const p1 = queue.enqueue(() => blocking.promise);
-      const p2 = queue.enqueue(() => 'second');
-      await vi.advanceTimersByTimeAsync(1_000_000);
-      blocking.resolve();
-      await p1;
-      await expect(p2).resolves.toBe('second');
+      const queue = createMutationQueue({ queueAdmissionTimeoutMs: false })
+      const blocking = deferred<void>()
+      const p1 = queue.enqueue(() => blocking.promise)
+      const p2 = queue.enqueue(() => 'second')
+      await vi.advanceTimersByTimeAsync(1_000_000)
+      blocking.resolve()
+      await p1
+      await expect(p2).resolves.toBe('second')
     } finally {
-      vi.useRealTimers();
+      vi.useRealTimers()
     }
-  });
+  })
 
   it('a per-call queueAdmissionTimeoutMs override takes priority over the queue-level default', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers()
     try {
-      const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10_000 });
-      const blocking = deferred<void>();
-      queue.enqueue(() => blocking.promise);
-      const p2 = queue.enqueue(() => 'second', { queueAdmissionTimeoutMs: 20 });
+      const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10_000 })
+      const blocking = deferred<void>()
+      queue.enqueue(() => blocking.promise)
+      const p2 = queue.enqueue(() => 'second', { queueAdmissionTimeoutMs: 20 })
       const assertion = expect(p2).rejects.toThrowError(
         expect.objectContaining({ code: LifecycleErrorCode.queueAdmissionTimeout })
-      );
-      await vi.advanceTimersByTimeAsync(21);
-      await assertion;
+      )
+      await vi.advanceTimersByTimeAsync(21)
+      await assertion
     } finally {
-      vi.useRealTimers();
+      vi.useRealTimers()
     }
-  });
+  })
 
   it('a per-call override of `false` can turn off the queue-level default for one task', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers()
     try {
-      const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10 });
-      const blocking = deferred<void>();
-      const p1 = queue.enqueue(() => blocking.promise);
-      const p2 = queue.enqueue(() => 'second', { queueAdmissionTimeoutMs: false });
-      await vi.advanceTimersByTimeAsync(1000);
-      blocking.resolve();
-      await p1;
-      await expect(p2).resolves.toBe('second');
+      const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10 })
+      const blocking = deferred<void>()
+      const p1 = queue.enqueue(() => blocking.promise)
+      const p2 = queue.enqueue(() => 'second', { queueAdmissionTimeoutMs: false })
+      await vi.advanceTimersByTimeAsync(1000)
+      blocking.resolve()
+      await p1
+      await expect(p2).resolves.toBe('second')
     } finally {
-      vi.useRealTimers();
+      vi.useRealTimers()
     }
-  });
-});
+  })
+})
 
 describe('MutationQueue: owner self-dependency detection', () => {
   it('rejects immediately when a running task’s owner enqueues a new task under the same owner', async () => {
-    const queue = createMutationQueue();
-    let rejection: unknown;
+    const queue = createMutationQueue()
+    let rejection: unknown
     const outer = queue.enqueue(
       async () => {
         try {
-          await queue.enqueue(() => 'inner', { owner: 'same' });
+          await queue.enqueue(() => 'inner', { owner: 'same' })
         } catch (error) {
-          rejection = error;
+          rejection = error
         }
       },
       { owner: 'same' }
-    );
-    await outer;
-    expect((rejection as { code?: string })?.code).toBe(LifecycleErrorCode.queueSelfDependency);
-  });
+    )
+    await outer
+    expect((rejection as { code?: string })?.code).toBe(LifecycleErrorCode.queueSelfDependency)
+  })
 
   it('does not flag two different owners — a task submitted from within a running task, under a different owner, is queued normally and runs once the outer task lets go (it must not be awaited by the outer task itself, or the strictly-serial queue would deadlock on its own — no label needed to explain that)', async () => {
-    const queue = createMutationQueue();
-    const results: string[] = [];
-    let innerPromise: Promise<unknown> | undefined;
+    const queue = createMutationQueue()
+    const results: string[] = []
+    let innerPromise: Promise<unknown> | undefined
     await queue.enqueue(
       () => {
-        results.push('outer');
+        results.push('outer')
         // Fire-and-forget: the outer task does not await its own successor.
         innerPromise = queue.enqueue(
           () => {
-            results.push('inner');
+            results.push('inner')
           },
           { owner: 'inner-owner' }
-        );
+        )
       },
       { owner: 'outer-owner' }
-    );
-    await innerPromise;
-    expect(results).toEqual(['outer', 'inner']);
-  });
+    )
+    await innerPromise
+    expect(results).toEqual(['outer', 'inner'])
+  })
 
   it('does not reject an unlabeled task purely for being enqueued while something else runs', async () => {
-    const queue = createMutationQueue();
-    const blocking = deferred<void>();
-    const p1 = queue.enqueue(() => blocking.promise);
-    const p2 = queue.enqueue(() => 'second'); // no owner — never flagged as self-dependency
-    blocking.resolve();
-    await p1;
-    await expect(p2).resolves.toBe('second');
-  });
-});
+    const queue = createMutationQueue()
+    const blocking = deferred<void>()
+    const p1 = queue.enqueue(() => blocking.promise)
+    const p2 = queue.enqueue(() => 'second') // no owner — never flagged as self-dependency
+    blocking.resolve()
+    await p1
+    await expect(p2).resolves.toBe('second')
+  })
+})
 
 describe('R-9 scheduler 注入（manualScheduler）', () => {
   it('推进才触发 watchdog 超时，未推进不触发', async () => {
-    const manual = createManualScheduler();
-    const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10, scheduler: manual });
-    const blocking = deferred<void>();
+    const manual = createManualScheduler()
+    const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10, scheduler: manual })
+    const blocking = deferred<void>()
     const p1 = queue.enqueue(async () => {
-      await blocking.promise;
-    });
-    const p2 = queue.enqueue(() => 'second');
+      await blocking.promise
+    })
+    const p2 = queue.enqueue(() => 'second')
     // 未推进：second 不应超时
-    await Promise.resolve();
-    manual.advance(11);
-    await expect(p2).rejects.toMatchObject({ code: LifecycleErrorCode.queueAdmissionTimeout });
-    blocking.resolve();
-    await p1;
-  });
-});
+    await Promise.resolve()
+    manual.advance(11)
+    await expect(p2).rejects.toMatchObject({ code: LifecycleErrorCode.queueAdmissionTimeout })
+    blocking.resolve()
+    await p1
+  })
+})
 
 describe('L-T51 MutationQueue: synchronous timeout task cancellation', () => {
   it('cancels a synchronously fired timeout task exactly once and keeps queue usable', async () => {
-    const cancel = vi.fn();
+    const cancel = vi.fn()
     const scheduler = {
       now: () => 0,
       schedule: (callback: () => void) => {
-        callback();
-        return { cancel };
+        callback()
+        return { cancel }
       }
-    };
-    const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10, scheduler });
-    const blocking = deferred<void>();
-    const first = queue.enqueue(() => blocking.promise);
-    const timedOut = queue.enqueue(() => 'timed out');
+    }
+    const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10, scheduler })
+    const blocking = deferred<void>()
+    const first = queue.enqueue(() => blocking.promise)
+    const timedOut = queue.enqueue(() => 'timed out')
 
     await expect(timedOut).rejects.toMatchObject({
       code: LifecycleErrorCode.queueAdmissionTimeout
-    });
-    expect(cancel).toHaveBeenCalledTimes(1);
+    })
+    expect(cancel).toHaveBeenCalledTimes(1)
 
-    blocking.resolve();
-    await first;
-    await expect(queue.enqueue(() => 'usable')).resolves.toBe('usable');
-  });
+    blocking.resolve()
+    await first
+    await expect(queue.enqueue(() => 'usable')).resolves.toBe('usable')
+  })
 
   it('keeps timeout primary and exposes returned-task cancel failure', async () => {
-    const cancelError = new Error('timeout task cancel failed');
+    const cancelError = new Error('timeout task cancel failed')
     const scheduler = {
       now: () => 0,
       schedule: (callback: () => void) => {
-        callback();
+        callback()
         return {
           cancel: () => {
-            throw cancelError;
+            throw cancelError
           }
-        };
+        }
       }
-    };
-    const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10, scheduler });
-    const blocking = deferred<void>();
-    const first = queue.enqueue(() => blocking.promise);
-    const timedOut = queue.enqueue(() => 'timed out');
-
-    let thrown: unknown;
-    try {
-      await timedOut;
-    } catch (error) {
-      thrown = error;
     }
-    expect((thrown as { code?: string }).code).toBe(LifecycleErrorCode.queueAdmissionTimeout);
-    expect((thrown as { errors?: readonly unknown[] }).errors).toContain(cancelError);
+    const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10, scheduler })
+    const blocking = deferred<void>()
+    const first = queue.enqueue(() => blocking.promise)
+    const timedOut = queue.enqueue(() => 'timed out')
 
-    blocking.resolve();
-    await first;
-    await expect(queue.enqueue(() => 'usable')).resolves.toBe('usable');
-  });
-});
+    let thrown: unknown
+    try {
+      await timedOut
+    } catch (error) {
+      thrown = error
+    }
+    expect((thrown as { code?: string }).code).toBe(LifecycleErrorCode.queueAdmissionTimeout)
+    expect((thrown as { errors?: readonly unknown[] }).errors).toContain(cancelError)
+
+    blocking.resolve()
+    await first
+    await expect(queue.enqueue(() => 'usable')).resolves.toBe('usable')
+  })
+})
 
 describe('L-T54 MutationQueue: normal dequeue cancellation failure isolation', () => {
   it('reports a dequeue watchdog cancel failure, still settles B, and runs C without unhandled rejection', async () => {
-    const cancelError = new Error('dequeue watchdog cancel failed');
-    const diagnostics = vi.fn();
-    const cancelers: Array<ReturnType<typeof vi.fn>> = [];
-    let scheduleCount = 0;
+    const cancelError = new Error('dequeue watchdog cancel failed')
+    const diagnostics = vi.fn()
+    const cancelers: Array<ReturnType<typeof vi.fn>> = []
+    let scheduleCount = 0
     const scheduler = {
       now: () => 0,
       schedule: () => {
-        const shouldThrow = scheduleCount++ === 0;
+        const shouldThrow = scheduleCount++ === 0
         const cancel = vi.fn(() => {
-          if (shouldThrow) throw cancelError;
-        });
-        cancelers.push(cancel);
+          if (shouldThrow) throw cancelError
+        })
+        cancelers.push(cancel)
         return {
           cancel
-        };
+        }
       }
-    };
+    }
     const queue = createMutationQueue({
       queueAdmissionTimeoutMs: 100,
       scheduler,
       onAdmissionDiagnostic: diagnostics
-    });
-    const gate = deferred<void>();
+    })
+    const gate = deferred<void>()
     const pA = queue.enqueue(
       async () => {
-        await gate.promise;
-        return 'A';
+        await gate.promise
+        return 'A'
       },
       { owner: 'A' }
-    );
-    const pB = queue.enqueue(() => 'B', { owner: 'B' });
-    const pC = queue.enqueue(() => 'C', { owner: 'C' });
+    )
+    const pB = queue.enqueue(() => 'B', { owner: 'B' })
+    const pC = queue.enqueue(() => 'C', { owner: 'C' })
 
-    gate.resolve();
-    await expect(pA).resolves.toBe('A');
-    await expect(pB).resolves.toBe('B');
-    await expect(pC).resolves.toBe('C');
-    expect(cancelers[0]).toHaveBeenCalledTimes(1);
-    expect(cancelers[1]).toHaveBeenCalledTimes(1);
+    gate.resolve()
+    await expect(pA).resolves.toBe('A')
+    await expect(pB).resolves.toBe('B')
+    await expect(pC).resolves.toBe('C')
+    expect(cancelers[0]).toHaveBeenCalledTimes(1)
+    expect(cancelers[1]).toHaveBeenCalledTimes(1)
     expect(diagnostics).toHaveBeenCalledWith(
       expect.objectContaining({
         owner: 'B',
         error: expect.objectContaining({ code: LifecycleErrorCode.queueAdmissionTimeout })
       })
-    );
-  });
-});
+    )
+  })
+})
 
 describe('AF-T32 mutation queue scheduling failure leaves no ghost task', () => {
   it('scheduler.now() throw removes the record and keeps the queue usable', async () => {
-    const boom = new Error('now boom');
+    const boom = new Error('now boom')
     const scheduler = {
       now: () => {
-        throw boom;
+        throw boom
       },
       schedule: () => ({ cancel: () => {} })
-    };
-    const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10, scheduler });
-    const blocking = deferred<void>();
+    }
+    const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10, scheduler })
+    const blocking = deferred<void>()
     void queue.enqueue(async () => {
-      await blocking.promise;
-    });
-    await Promise.resolve();
-    await expect(queue.enqueue(() => 'ghost')).rejects.toBe(boom);
-    expect(queue.size).toBe(1);
-    blocking.resolve();
-    await new Promise((r) => setTimeout(r, 0));
-    expect(queue.size).toBe(0);
-  });
+      await blocking.promise
+    })
+    await Promise.resolve()
+    await expect(queue.enqueue(() => 'ghost')).rejects.toBe(boom)
+    expect(queue.size).toBe(1)
+    blocking.resolve()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(queue.size).toBe(0)
+  })
 
   it('scheduler.schedule() throw removes the record', async () => {
-    const boom = new Error('schedule boom');
+    const boom = new Error('schedule boom')
     const scheduler = {
       now: () => 0,
       schedule: () => {
-        throw boom;
+        throw boom
       }
-    };
-    const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10, scheduler });
-    const blocking = deferred<void>();
+    }
+    const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10, scheduler })
+    const blocking = deferred<void>()
     void queue.enqueue(async () => {
-      await blocking.promise;
-    });
-    await Promise.resolve();
-    await expect(queue.enqueue(() => 'ghost')).rejects.toBe(boom);
-    expect(queue.size).toBe(1);
-    blocking.resolve();
-    await new Promise((r) => setTimeout(r, 0));
-    expect(queue.size).toBe(0);
-  });
+      await blocking.promise
+    })
+    await Promise.resolve()
+    await expect(queue.enqueue(() => 'ghost')).rejects.toBe(boom)
+    expect(queue.size).toBe(1)
+    blocking.resolve()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(queue.size).toBe(0)
+  })
 
   it('scheduler.schedule() returning an invalid handle is rejected without a ghost task', async () => {
     const scheduler = {
       now: () => 0,
       schedule: () => ({}) // no cancel()
-    };
-    const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10, scheduler: scheduler as any });
-    const blocking = deferred<void>();
+    }
+    const queue = createMutationQueue({ queueAdmissionTimeoutMs: 10, scheduler: scheduler as any })
+    const blocking = deferred<void>()
     void queue.enqueue(async () => {
-      await blocking.promise;
-    });
-    await Promise.resolve();
+      await blocking.promise
+    })
+    await Promise.resolve()
     await expect(queue.enqueue(() => 'ghost')).rejects.toMatchObject({
       code: LifecycleErrorCode.invalidOption
-    });
-    expect(queue.size).toBe(1);
-    blocking.resolve();
-    await new Promise((r) => setTimeout(r, 0));
-    expect(queue.size).toBe(0);
-  });
-});
+    })
+    expect(queue.size).toBe(1)
+    blocking.resolve()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(queue.size).toBe(0)
+  })
+})
 
 describe('AF-T33 admission diagnostic callback isolation', () => {
   it('rejects invalid diagnostic delay without retaining queued task', async () => {
-    const manual = createManualScheduler();
+    const manual = createManualScheduler()
     const queue = createMutationQueue({
       scheduler: manual,
       admissionDiagnosticMs: Number.NaN,
       onAdmissionDiagnostic: () => {}
-    });
-    const blocking = deferred<void>();
-    void queue.enqueue(() => blocking.promise);
+    })
+    const blocking = deferred<void>()
+    void queue.enqueue(() => blocking.promise)
     await expect(queue.enqueue(() => 'ghost')).rejects.toMatchObject({
       code: LifecycleErrorCode.invalidOption
-    });
-    expect(queue.size).toBe(1);
-    blocking.resolve();
-  });
+    })
+    expect(queue.size).toBe(1)
+    blocking.resolve()
+  })
 
   it('rejects invalid admission delay without retaining queued task', async () => {
-    const manual = createManualScheduler();
-    const queue = createMutationQueue({ scheduler: manual, queueAdmissionTimeoutMs: -1 });
-    const blocking = deferred<void>();
-    void queue.enqueue(() => blocking.promise);
+    const manual = createManualScheduler()
+    const queue = createMutationQueue({ scheduler: manual, queueAdmissionTimeoutMs: -1 })
+    const blocking = deferred<void>()
+    void queue.enqueue(() => blocking.promise)
     await expect(queue.enqueue(() => 'ghost')).rejects.toMatchObject({
       code: LifecycleErrorCode.invalidOption
-    });
-    expect(queue.size).toBe(1);
-    blocking.resolve();
-  });
+    })
+    expect(queue.size).toBe(1)
+    blocking.resolve()
+  })
 
   it('sync-throwing diagnostic does not break the queue or advance()', async () => {
-    const manual = createManualScheduler();
-    const diagnostics: string[] = [];
+    const manual = createManualScheduler()
+    const diagnostics: string[] = []
     const queue = createMutationQueue({
       scheduler: manual,
       admissionDiagnosticMs: 5,
       onAdmissionDiagnostic: () => {
-        throw new Error('diag boom');
+        throw new Error('diag boom')
       }
-    });
-    const blocking = deferred<void>();
+    })
+    const blocking = deferred<void>()
     void queue.enqueue(async () => {
-      await blocking.promise;
-    });
-    const second = queue.enqueue(() => 'second');
-    void second.catch(() => {});
-    await Promise.resolve();
-    manual.advance(6); // 诊断回调同步抛错，不得中断 advance
-    blocking.resolve();
-    await expect(second).resolves.toBe('second');
-    expect(diagnostics).toHaveLength(0);
-  });
+      await blocking.promise
+    })
+    const second = queue.enqueue(() => 'second')
+    void second.catch(() => {})
+    await Promise.resolve()
+    manual.advance(6) // 诊断回调同步抛错，不得中断 advance
+    blocking.resolve()
+    await expect(second).resolves.toBe('second')
+    expect(diagnostics).toHaveLength(0)
+  })
 
   it('async-rejecting diagnostic does not produce an unhandled rejection', async () => {
-    const manual = createManualScheduler();
+    const manual = createManualScheduler()
     const queue = createMutationQueue({
       scheduler: manual,
       admissionDiagnosticMs: 5,
       onAdmissionDiagnostic: () => Promise.reject(new Error('async diag boom'))
-    });
-    const blocking = deferred<void>();
+    })
+    const blocking = deferred<void>()
     void queue.enqueue(async () => {
-      await blocking.promise;
-    });
-    const second = queue.enqueue(() => 'second');
-    await Promise.resolve();
-    manual.advance(6);
-    blocking.resolve();
-    await expect(second).resolves.toBe('second');
-  });
-});
+      await blocking.promise
+    })
+    const second = queue.enqueue(() => 'second')
+    await Promise.resolve()
+    manual.advance(6)
+    blocking.resolve()
+    await expect(second).resolves.toBe('second')
+  })
+})

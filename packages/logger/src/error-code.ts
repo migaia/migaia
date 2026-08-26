@@ -105,6 +105,6 @@ export const LoggerErrorCode = {
    * 调用方检查 extends 拓扑，拆除环路。
    */
   extendsCycle: 'EXTENDS_CYCLE'
-} as const;
+} as const
 
-export type ILoggerErrorCode = (typeof LoggerErrorCode)[keyof typeof LoggerErrorCode];
+export type ILoggerErrorCode = (typeof LoggerErrorCode)[keyof typeof LoggerErrorCode]

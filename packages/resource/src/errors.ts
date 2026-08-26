@@ -1,14 +1,14 @@
 /** `source` value stamped onto every error this package throws. */
-export const RESOURCE_SOURCE = '@migaia/resource';
+export const RESOURCE_SOURCE = '@migaia/resource'
 
 /**
  * 全仓统一的结构契约（`docs/contracts/error-codes.md` §2）：错误以属性形式携带 `source`/`code`， 从不替换错误本身——依赖 `instanceof
  * DOMException`/`RangeError` 等类型判断的调用方不受影响。
  */
 export type IResourceError = Error & {
-  readonly source: string;
-  readonly code: string;
-};
+  readonly source: string
+  readonly code: string
+}
 
 /** 构造一个携带 `(source, code)` 的普通 `Error`，从不改写 `stack`——引擎在构造时就已经填好， 本函数不会重新赋值，原始抛出点始终可见。 */
 export function createResourceError(
@@ -16,8 +16,8 @@ export function createResourceError(
   message: string,
   options?: { readonly cause?: unknown }
 ): IResourceError {
-  const error = new Error(message, options);
-  return attachErrorIdentity(error, { source: RESOURCE_SOURCE, code }) as IResourceError;
+  const error = new Error(message, options)
+  return attachErrorIdentity(error, { source: RESOURCE_SOURCE, code }) as IResourceError
 }
 
 /**
@@ -27,6 +27,6 @@ export function createResourceError(
  * `Error`：TypeScript 的 `DOMException` 类型不是 `Error` 的子类型，但两者在运行时都是可挂只读属性的普通对象。
  */
 export function tagResourceError<E extends object>(error: E, code: string): E {
-  return attachErrorIdentity(error as Error, { source: RESOURCE_SOURCE, code }) as E;
+  return attachErrorIdentity(error as Error, { source: RESOURCE_SOURCE, code }) as E
 }
-import { attachErrorIdentity } from '@migaia/utils/error';
+import { attachErrorIdentity } from '@migaia/utils/error'

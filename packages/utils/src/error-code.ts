@@ -18,6 +18,6 @@ export const UtilsErrorCode = {
   configPathInvalid: 'CONFIG_PATH_INVALID',
   /** The supplied string or tuple cannot safely identify an object path. */
   objectPathInvalid: 'OBJECT_PATH_INVALID'
-} as const;
+} as const
 
-export type IUtilsErrorCode = (typeof UtilsErrorCode)[keyof typeof UtilsErrorCode];
+export type IUtilsErrorCode = (typeof UtilsErrorCode)[keyof typeof UtilsErrorCode]

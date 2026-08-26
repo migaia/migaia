@@ -1,60 +1,60 @@
-import { describe, expect, it, vi } from 'vitest';
-import { createRuntime } from '@migaia/reactive';
-import { Resource } from '../src/index.js';
-import { ResourceErrorCode } from '../src/error-code.js';
+import { describe, expect, it, vi } from 'vitest'
+import { createRuntime } from '@migaia/reactive'
+import { Resource } from '../src/index.js'
+import { ResourceErrorCode } from '../src/error-code.js'
 
 describe('Round24 R-T01 Resource option admission', () => {
   it('snapshots every public option once before ownership, listeners, or fetch', () => {
-    const runtime = createRuntime();
-    const reads = new Map<string, number>();
+    const runtime = createRuntime()
+    const reads = new Map<string, number>()
     const count = (name: string): void => {
-      reads.set(name, (reads.get(name) ?? 0) + 1);
-    };
-    const fetcher = vi.fn(() => 'value');
+      reads.set(name, (reads.get(name) ?? 0) + 1)
+    }
+    const fetcher = vi.fn(() => 'value')
     const scheduler = {
       now: () => 0,
       schedule: () => ({ cancel: () => undefined })
-    };
+    }
     const options = {
       get debugName() {
-        count('debugName');
-        return 'round24';
+        count('debugName')
+        return 'round24'
       },
       get ttl() {
-        count('ttl');
-        return 10;
+        count('ttl')
+        return 10
       },
       get autoStart() {
-        count('autoStart');
-        return false;
+        count('autoStart')
+        return false
       },
       get staleWhileRevalidate() {
-        count('staleWhileRevalidate');
-        return true;
+        count('staleWhileRevalidate')
+        return true
       },
       get retry() {
-        count('retry');
-        return 1;
+        count('retry')
+        return 1
       },
       get retryDelay() {
-        count('retryDelay');
-        return 2;
+        count('retryDelay')
+        return 2
       },
       get keepAlive() {
-        count('keepAlive');
-        return true;
+        count('keepAlive')
+        return true
       },
       get initialSnapshot() {
-        count('initialSnapshot');
-        return undefined;
+        count('initialSnapshot')
+        return undefined
       },
       get scheduler() {
-        count('scheduler');
-        return scheduler;
+        count('scheduler')
+        return scheduler
       }
-    };
+    }
 
-    const resource = new Resource(fetcher, runtime, options);
+    const resource = new Resource(fetcher, runtime, options)
 
     expect([...reads.entries()]).toEqual([
       ['debugName', 1],
@@ -66,20 +66,20 @@ describe('Round24 R-T01 Resource option admission', () => {
       ['keepAlive', 1],
       ['initialSnapshot', 1],
       ['scheduler', 1]
-    ]);
-    expect(fetcher).not.toHaveBeenCalled();
-    resource.dispose();
-  });
+    ])
+    expect(fetcher).not.toHaveBeenCalled()
+    resource.dispose()
+  })
 
   it('rejects a hostile option getter before runtime ownership or fetch side effects', () => {
-    const runtime = createRuntime();
-    const cause = new Error('retry getter failed');
-    const fetcher = vi.fn(() => 'unexpected');
+    const runtime = createRuntime()
+    const cause = new Error('retry getter failed')
+    const fetcher = vi.fn(() => 'unexpected')
     const options = {
       get retry(): number {
-        throw cause;
+        throw cause
       }
-    };
+    }
 
     expect(() => new Resource(fetcher, runtime, options)).toThrowError(
       expect.objectContaining({
@@ -87,9 +87,9 @@ describe('Round24 R-T01 Resource option admission', () => {
         code: ResourceErrorCode.invalidOption,
         cause
       })
-    );
-    expect(fetcher).not.toHaveBeenCalled();
-  });
+    )
+    expect(fetcher).not.toHaveBeenCalled()
+  })
 
   it.each([
     'ttl',
@@ -99,16 +99,16 @@ describe('Round24 R-T01 Resource option admission', () => {
     'keepAlive',
     'scheduler'
   ] as const)('wraps hostile %s option getters before admission', (property) => {
-    const runtime = createRuntime();
-    const cause = new Error(`${property} getter failed`);
-    const fetcher = vi.fn(() => 'unexpected');
-    const options = {} as Record<string, unknown>;
+    const runtime = createRuntime()
+    const cause = new Error(`${property} getter failed`)
+    const fetcher = vi.fn(() => 'unexpected')
+    const options = {} as Record<string, unknown>
     Object.defineProperty(options, property, {
       configurable: true,
       get: () => {
-        throw cause;
+        throw cause
       }
-    });
+    })
 
     expect(() => new Resource(fetcher, runtime, options)).toThrowError(
       expect.objectContaining({
@@ -116,13 +116,13 @@ describe('Round24 R-T01 Resource option admission', () => {
         code: ResourceErrorCode.invalidOption,
         cause
       })
-    );
-    expect(fetcher).not.toHaveBeenCalled();
-  });
+    )
+    expect(fetcher).not.toHaveBeenCalled()
+  })
 
   it('rejects an invalid option value before ownership or fetch side effects', () => {
-    const runtime = createRuntime();
-    const fetcher = vi.fn(() => 'unexpected');
+    const runtime = createRuntime()
+    const fetcher = vi.fn(() => 'unexpected')
 
     expect(
       () =>
@@ -135,7 +135,7 @@ describe('Round24 R-T01 Resource option admission', () => {
         source: '@migaia/resource',
         code: ResourceErrorCode.invalidOption
       })
-    );
-    expect(fetcher).not.toHaveBeenCalled();
-  });
-});
+    )
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+})

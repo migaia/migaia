@@ -26,4 +26,4 @@ export const UtilsErrorText = {
     `[utils] invalid config path at ${path}: ${reason}`,
   objectPathInvalid: (path: string, reason: string) =>
     `[utils] invalid object path at ${path}: ${reason}`
-} as const;
+} as const
