@@ -34,6 +34,7 @@ window.runLoggerScenario = async (): Promise<void> => {
     }
   })
   const logger = new Logger({
+    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
     plugins: [
       batch({ maxSize: 2, maxWaitMs: 100 }),
       http({
@@ -79,7 +80,9 @@ window.runLoggerScenario = async (): Promise<void> => {
 }
 
 window.runLoggerDeadlineScenario = async (): Promise<void> => {
-  const logger = new Logger()
+  const logger = new Logger({
+    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+  })
   logger.useSink(() => new Promise<void>(() => undefined))
   logger.log('deadline', 'never-settling')
   const startedAt = performance.now()

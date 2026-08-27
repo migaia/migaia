@@ -8,6 +8,7 @@ import type {
   IPluginConfig,
   IPluginConstraint,
   IPluginHostOptions,
+  IPluginHostDisposalResult,
   IPipelineConfig,
   IPipelineMode
 } from '@migaia/plugin-host'
@@ -214,7 +215,7 @@ export type ILoggerCore<
 
   /** Shutdown disposes installed plugins after draining; subsequent log calls are ignored. */
   onShutdown(fn: IShutdownHandler): IOff
-  shutdown(reason: IShutdownReason): Promise<void>
+  shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>
 
   use<const NewP extends readonly ILoggerPluginConstraint[]>(
     ...plugins: NewP
@@ -336,6 +337,8 @@ export type ILoggerOptions<
   P extends readonly ILoggerPluginConstraint[] = [],
   TMode extends IPipelineMode = 'sync'
 > = {
+  /** Explicit PluginHost operation and drain budgets; `false` opts into unbounded waiting. */
+  execution: IPluginHostOptions['execution']
   context?: string[]
   /** 这个 logger 自己的 topic，用于 extends() 组合时展示 `[topic1 -> topic2]` 链路 */
   topic?: string
@@ -358,7 +361,7 @@ export type IStaticLoggerCtor = {
     const LocalP extends readonly ILoggerPluginConstraint[] = readonly [],
     const TMode extends IPipelineMode = 'sync'
   >(
-    options?: ILoggerOptions<LocalP, TMode>
+    options: ILoggerOptions<LocalP, TMode>
   ): Omit<ILoggerCore<TMode, IResolvedPluginShared<LocalP>>, 'config' | 'onDispose'> & {
     readonly config: ILoggerConfig
   } & IMergePluginExts<LocalP>

@@ -88,12 +88,13 @@ class ColorPlugin implements ILoggerPlugin<
   }
 
   install(core: ILoggerPluginCore): IEmptyPluginExt {
-    core.useSink((entry) => {
+    const off = core.useSink((entry) => {
       // data.silent 是给"只想进 http/batch 之类下游 sink，不想在控制台重复打印"的
       // entry 用的标记（reasoning 插件会用到），约定由 ansis 这个控制台 sink 负责识别
       if (entry.data.silent) return
       this.#render(entry, this.#paint, this.#dim)
     })
+    core.onDispose(off)
 
     return {}
   }

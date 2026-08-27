@@ -85,6 +85,7 @@ function createBoundaryLogger(boundary: IBoundary, thenable: unknown): ITestLogg
   }
 
   return new Logger({
+    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
     pipeline: boundary === 'pipeline' ? { mode: 'async' } : undefined,
     plugins: [plugin]
   }) as unknown as ITestLogger
@@ -154,7 +155,9 @@ describe('LG-T12 hostile thenable boundaries', () => {
   it('contains failure-hook rejection without duplicate diagnostics or unhandled rejection', async () => {
     const hostile = createHostileThenable('reject', 'failure-hook')
     const primary = new Error('sink-primary')
-    const logger = new Logger() as unknown as ITestLogger
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    }) as unknown as ITestLogger
     const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const unhandled: unknown[] = []
     const onUnhandled = (reason: unknown): void => {

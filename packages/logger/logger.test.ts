@@ -23,7 +23,10 @@ describe('logger plugin host integration', () => {
       write: (text) => writes.push(text)
     })
     try {
-      const logger = new Logger({ plugins: [processPlugin()] })
+      const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [processPlugin()]
+      })
       logger.raw('browser log')
       expect(logger.ctx.id).toBe('browser-id')
       expect(writes).toEqual(['browser log'])
@@ -57,7 +60,10 @@ describe('logger plugin host integration', () => {
       write: () => undefined
     })
     try {
-      const first = new Logger({ plugins: [processPlugin()] })
+      const first = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [processPlugin()]
+      })
       expect(listeners.get('SIGINT')?.size).toBe(1)
       let flushes = 0
       first.onFlush(() => {
@@ -70,7 +76,10 @@ describe('logger plugin host integration', () => {
       expect(flushes).toBe(1)
       await first.unUse('process')
       expect(listeners.get('SIGINT')?.size).toBe(0)
-      const second = new Logger({ plugins: [processPlugin()] })
+      const second = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [processPlugin()]
+      })
       expect(listeners.get('SIGINT')?.size).toBe(1)
       await second.unUse('process')
     } finally {
@@ -101,6 +110,7 @@ describe('logger plugin host integration', () => {
     })
     try {
       const first = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         plugins: [processPlugin({ interceptProcessExit: true, shutdownTimeoutMs: 50 })]
       })
       let flushes = 0
@@ -119,6 +129,7 @@ describe('logger plugin host integration', () => {
       expect(runtimeProcess.exit).toBe(originalExit)
 
       const second = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         plugins: [processPlugin({ interceptProcessExit: true, shutdownTimeoutMs: 50 })]
       })
       expect(runtimeProcess.exit).not.toBe(originalExit)
@@ -164,10 +175,17 @@ describe('logger plugin host integration', () => {
     })
     try {
       expect(
-        () => new Logger({ plugins: [processPlugin({ interceptProcessExit: true })] })
+        () =>
+          new Logger({
+            execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+            plugins: [processPlugin({ interceptProcessExit: true })]
+          })
       ).toThrow('exit-setter-after-commit')
       expect(runtimeProcess.exit).toBe(originalExit)
-      const reinstall = new Logger({ plugins: [processPlugin()] })
+      const reinstall = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [processPlugin()]
+      })
       expect(runtimeProcess.exit).toBe(originalExit)
       await reinstall.unUse('process')
     } finally {
@@ -204,7 +222,10 @@ describe('logger plugin host integration', () => {
     try {
       let failure: unknown
       try {
-        new Logger({ plugins: [processPlugin({ interceptProcessExit: true })] })
+        new Logger({
+          execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+          plugins: [processPlugin({ interceptProcessExit: true })]
+        })
       } catch (error) {
         failure = error
       }
@@ -235,6 +256,7 @@ describe('logger plugin host integration', () => {
     })
     try {
       const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         scheduler,
         plugins: [http({ url: 'https://example.test/logs', retries: 1, requestTimeoutMs: 10 })]
       })
@@ -276,6 +298,7 @@ describe('logger plugin host integration', () => {
     })
     try {
       const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         plugins: [
           processPlugin({ shutdownTimeoutMs: 50 }),
           {
@@ -299,7 +322,10 @@ describe('logger plugin host integration', () => {
   })
 
   it('exposes isolated plugin config snapshots on the logger facade', async () => {
-    const logger = new Logger({ plugins: [level({ level: 'warn' })] })
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      plugins: [level({ level: 'warn' })]
+    })
     expect(logger.config.get('level.level')).toBe('warn')
     await logger.config.update('level', () => ({ level: 'error' }))
     expect(logger.config.get('level.level')).toBe('error')
@@ -316,6 +342,7 @@ describe('logger plugin host integration', () => {
       })
       try {
         const logger = new Logger({
+          execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
           pipeline: { mode },
           plugins: [
             level({ level: 'error' }),
@@ -344,6 +371,7 @@ describe('logger plugin host integration', () => {
   it('contains synchronous pipeline errors during default dispatch', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       plugins: [
         {
           name: 'throwing-sync-stage',
@@ -376,6 +404,7 @@ describe('logger plugin host integration', () => {
       }
     }
     const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       plugins: [plugin]
     })
 
@@ -403,6 +432,7 @@ describe('logger plugin host integration', () => {
       }
     }
     const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       plugins: [plugin]
     })
 
@@ -424,6 +454,7 @@ describe('logger plugin host integration', () => {
       }
     }
     const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       plugins: [plugin]
     })
     const args: unknown[] = [{ consoleOnly: true }]
@@ -452,6 +483,7 @@ describe('logger plugin host integration', () => {
     try {
       const failures: Array<{ source: string; error: unknown }> = []
       const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         plugins: [http({ url: 'https://example.test/logs', retries: 2 })]
       })
       logger.onFailure((failure) => failures.push(failure))
@@ -480,7 +512,10 @@ describe('logger plugin host integration', () => {
     })
     try {
       const failures: string[] = []
-      const logger = new Logger({ plugins: [http({ url: 'https://example.test/logs' })] })
+      const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [http({ url: 'https://example.test/logs' })]
+      })
       logger.onFailure((failure) => failures.push(failure.source))
       const cyclic: Record<string, unknown> = {}
       cyclic.self = cyclic
@@ -496,6 +531,7 @@ describe('logger plugin host integration', () => {
   it('flushes an unfinished reasoning phase before switching phase', async () => {
     const entries: ILogEntry[] = []
     const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       plugins: [
         reasoning(),
         {
@@ -528,6 +564,7 @@ describe('logger plugin host integration', () => {
     })
     try {
       const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         plugins: [http({ url: 'https://example.test/logs', retries: 1 })]
       })
       logger.log('info', 'message')
@@ -555,6 +592,7 @@ describe('logger plugin host integration', () => {
     })
     try {
       const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         plugins: [http({ url: 'https://example.test/logs', retries: 1 })]
       })
       logger.log('info', 'message')
@@ -585,7 +623,10 @@ describe('logger plugin host integration', () => {
     })
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     try {
-      const logger = new Logger({ plugins: [http({ url: 'https://example.test/logs' })] })
+      const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [http({ url: 'https://example.test/logs' })]
+      })
       logger.log('info', 'message')
       await logger.shutdown('manual')
       expect(signal?.aborted).toBe(true)
@@ -598,6 +639,7 @@ describe('logger plugin host integration', () => {
   it('drains asynchronous work forwarded through multiple extends targets', async () => {
     let release!: () => void
     const leaf = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       plugins: [
         {
           name: 'leaf-async-sink',
@@ -608,8 +650,12 @@ describe('logger plugin host integration', () => {
         }
       ]
     })
-    const middle = new Logger().extends(leaf)
-    const root = new Logger().extends(middle)
+    const middle = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    }).extends(leaf)
+    const root = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    }).extends(middle)
     root.log('info', 'message')
     const flushed = root.flush()
     release()
@@ -619,6 +665,7 @@ describe('logger plugin host integration', () => {
   it('shares concurrent shutdown work and preserves the first reason', async () => {
     const reasons: string[] = []
     const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       plugins: [
         {
           name: 'shutdown-observer',
@@ -642,8 +689,13 @@ describe('logger plugin host integration', () => {
       shared: () => ({ answer: 42, format: (value: number) => String(value) }),
       install: () => ({})
     }
-    const logger = new Logger({ plugins: [sharedPlugin] })
-    const dynamicLogger = await new Logger().use(sharedPlugin)
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      plugins: [sharedPlugin]
+    })
+    const dynamicLogger = await new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    }).use(sharedPlugin)
 
     expectTypeOf(logger.getShared('answer')).toEqualTypeOf<number | undefined>()
     expectTypeOf(logger.getShared('format')).toEqualTypeOf<
@@ -667,7 +719,10 @@ describe('logger plugin host integration', () => {
         await Promise.resolve()
       }
     }
-    const logger = new Logger({ plugins: [plugin] })
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      plugins: [plugin]
+    })
 
     await Promise.all([
       logger.config.update('serial-update', () => ({ value: 1 })),
@@ -692,7 +747,10 @@ describe('logger plugin host integration', () => {
         await core.flush()
       }
     }
-    const logger = new Logger({ plugins: [plugin] })
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      plugins: [plugin]
+    })
 
     const update = logger.config.update('flush-in-update', () => ({ value: 1 }))
     await expect(
@@ -716,12 +774,18 @@ describe('logger plugin host integration', () => {
         await Promise.resolve()
       }
     }
-    const logger = new Logger({ plugins: [plugin] })
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      plugins: [plugin]
+    })
 
     await Promise.all([logger.unUse('serial-dispose'), logger.unUse('serial-dispose')])
 
     expect(disposed).toBe(1)
-    await expect(logger.unUse('serial-dispose')).resolves.toBeUndefined()
+    await expect(logger.unUse('serial-dispose')).resolves.toMatchObject({
+      ok: true,
+      removed: false
+    })
   })
 
   it('starts rollback cleanup after sync install fails', async () => {
@@ -738,7 +802,9 @@ describe('logger plugin host integration', () => {
         disposed += 1
       }
     }
-    const logger = new Logger()
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
 
     await expect(logger.use(plugin)).rejects.toThrow('install failed')
     expect(disposed).toBe(1)
@@ -746,7 +812,10 @@ describe('logger plugin host integration', () => {
 
   it('keeps constructor hooks outside plugin scope', async () => {
     let called = 0
-    const logger = new Logger({ on: { before: () => void (called += 1) } })
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      on: { before: () => void (called += 1) }
+    })
 
     logger.log('info', 'message')
     await logger.flush()
@@ -762,7 +831,13 @@ describe('logger plugin host integration', () => {
       }
     }
 
-    expect(() => new Logger({ plugins: [plugin] })).toThrow('constructor install failed')
+    expect(
+      () =>
+        new Logger({
+          execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+          plugins: [plugin]
+        })
+    ).toThrow('constructor install failed')
   })
 
   it('rejects async plugins in the constructor before returning a partial logger', () => {
@@ -771,14 +846,19 @@ describe('logger plugin host integration', () => {
       install: async () => ({ ready: true })
     }
 
-    expect(() => new Logger({ plugins: [plugin] })).toThrow(
-      'returned an awaitable during synchronous installation'
-    )
+    expect(
+      () =>
+        new Logger({
+          execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+          plugins: [plugin]
+        })
+    ).toThrow('returned an awaitable during synchronous installation')
   })
 
   it('colors first message content when colorMessage is head', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       plugins: [
         level(),
         color({ color: 'always', colorMessage: 'head', format: 'pretty', timestamp: false })
@@ -799,6 +879,7 @@ describe('logger plugin host integration', () => {
     async (colorMessage) => {
       const info = vi.spyOn(console, 'log').mockImplementation(() => {})
       const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         plugins: [
           level(),
           color({ color: 'always', colorMessage, format: 'pretty', timestamp: false })
@@ -816,6 +897,7 @@ describe('logger plugin host integration', () => {
   it('colors every primitive argument when colorMessage is all', async () => {
     const info = vi.spyOn(console, 'log').mockImplementation(() => {})
     const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       plugins: [
         level(),
         color({ color: 'always', colorMessage: 'all', format: 'pretty', timestamp: false })
@@ -838,6 +920,7 @@ describe('logger plugin host integration', () => {
   it('colors only the final argument when colorMessage is tail', async () => {
     const info = vi.spyOn(console, 'log').mockImplementation(() => {})
     const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       plugins: [
         level(),
         color({ color: 'always', colorMessage: 'tail', format: 'pretty', timestamp: false })
@@ -858,6 +941,7 @@ describe('logger plugin host integration', () => {
   it('colors only the first and final arguments when colorMessage is head-tail', async () => {
     const info = vi.spyOn(console, 'log').mockImplementation(() => {})
     const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       plugins: [
         level(),
         color({
@@ -883,6 +967,7 @@ describe('logger plugin host integration', () => {
   it('accepts a non-string first argument like console.log', async () => {
     const info = vi.spyOn(console, 'log').mockImplementation(() => {})
     const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       plugins: [level(), color({ color: 'never', format: 'pretty', timestamp: false })]
     })
     const value = { answer: 42 }
@@ -897,6 +982,7 @@ describe('logger plugin host integration', () => {
   it('outputs level logs synchronously by default', () => {
     const info = vi.spyOn(console, 'log').mockImplementation(() => {})
     const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       plugins: [level(), color({ color: 'never', format: 'pretty', timestamp: false })]
     })
 
@@ -909,6 +995,7 @@ describe('logger plugin host integration', () => {
   it('defers level logs only when asyncOutput is enabled', async () => {
     const info = vi.spyOn(console, 'log').mockImplementation(() => {})
     const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       plugins: [
         level({ asyncOutput: true }),
         color({ color: 'never', format: 'pretty', timestamp: false })
@@ -935,7 +1022,10 @@ describe('logger plugin host integration', () => {
         return {}
       }
     }
-    const logger = new Logger({ plugins: [reasoning({ asyncOutput: true }), collector] })
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      plugins: [reasoning({ asyncOutput: true }), collector]
+    })
 
     logger.response('answer')
     logger.endResponse()
@@ -967,7 +1057,10 @@ describe('logger plugin host integration', () => {
         return {}
       }
     }
-    const logger = new Logger({ plugins: [batch(), consumer] })
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      plugins: [batch(), consumer]
+    })
 
     logger.log('info', 'deferred-1')
     logger.log('info', 'deferred-2')
@@ -996,7 +1089,10 @@ describe('logger plugin host integration', () => {
         return {}
       }
     }
-    const logger = new Logger({ plugins: [batch({ asyncOutput: false }), consumer] })
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      plugins: [batch({ asyncOutput: false }), consumer]
+    })
 
     logger.log('info', 'immediate')
 
@@ -1027,6 +1123,7 @@ describe('logger plugin host integration', () => {
       }
     }
     const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       pipeline: { mode },
       plugins: [collector]
     })
@@ -1060,6 +1157,7 @@ describe('logger plugin host integration', () => {
       }
     }
     const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       pipeline: { mode: 'generator' },
       plugins: [generatorPlugin]
     })
@@ -1070,14 +1168,20 @@ describe('logger plugin host integration', () => {
   })
 
   it('types pipeline methods from constructor mode', () => {
-    const asyncLogger = new Logger({ pipeline: { mode: 'async' } })
+    const asyncLogger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      pipeline: { mode: 'async' }
+    })
     expect(() => asyncLogger.useAsyncPipeline(async (entry, next) => next(entry))).not.toThrow()
     // oxlint-disable-next-line no-constant-condition
     if (false) {
       // @ts-expect-error async mode only exposes async pipeline registration
       asyncLogger.usePipeline((entry, next) => next(entry))
     }
-    const generatorLogger = new Logger({ pipeline: { mode: 'generator' } })
+    const generatorLogger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      pipeline: { mode: 'generator' }
+    })
     expect(() =>
       generatorLogger.useGeneratorPipeline(function* (entry) {
         yield entry
@@ -1116,13 +1220,17 @@ describe('logger plugin host integration', () => {
       }
     }
 
-    const logger = new Logger()
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
     await expect(logger.use(outer)).rejects.toThrow()
   })
 
   it('awaits async cleanup when async installation fails', async () => {
     const events: string[] = []
-    const logger = new Logger()
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
     const plugin: ILoggerPlugin = {
       name: 'async-failed-install',
       install: () => {
@@ -1150,6 +1258,7 @@ describe('logger plugin host integration', () => {
       }
     }
     const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       pipeline: { mode: 'generator' },
       plugins: [level(), collector]
     })

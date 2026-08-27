@@ -27,7 +27,9 @@ describe('phase hook tracking', () => {
   it.each(phaseCases)(
     'reports one upstream $label rejection and drains it',
     async ({ hookName, label }) => {
-      const logger = new Logger()
+      const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
       const rejection = new Error(`${label}-upstream`)
       const failures: ILogFailure[] = []
       logger.onFailure((failure) => failures.push(failure))
@@ -42,7 +44,9 @@ describe('phase hook tracking', () => {
   )
 
   it('reports one synchronous before continuation failure and drains it', async () => {
-    const logger = new Logger()
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
     const continuationError = new Error('before-continuation')
     const failures: ILogFailure[] = []
     const tag = {
@@ -65,7 +69,9 @@ describe('phase hook tracking', () => {
   ])(
     'reports one synchronous $label continuation failure and drains it',
     async ({ hookName, label }) => {
-      const logger = new Logger()
+      const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
       const continuationError = new Error(`${label}-continuation`)
       const failures: ILogFailure[] = []
       let contextReads = 0

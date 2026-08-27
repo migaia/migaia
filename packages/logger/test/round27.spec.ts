@@ -76,6 +76,11 @@ function findLoggerCleanupError(value: unknown): Error & { cause?: unknown } {
       return candidate as Error & { cause?: unknown }
     if (candidate instanceof AggregateError) pending.push(...candidate.errors)
     if (candidate instanceof Error) pending.push(candidate.cause)
+    if (candidate && typeof candidate === 'object') {
+      const record = candidate as { readonly cleanupErrors?: unknown; readonly error?: unknown }
+      if (Array.isArray(record.cleanupErrors)) pending.push(...record.cleanupErrors)
+      if (record.error !== undefined) pending.push(record.error)
+    }
   }
   throw new Error('logger shutdown cleanup diagnostic not found')
 }
@@ -153,7 +158,10 @@ describe('Round27 logger final cleanup containment', () => {
     })
 
     try {
-      const first = new Logger({ plugins: [processPlugin({ interceptProcessExit: true })] })
+      const first = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [processPlugin({ interceptProcessExit: true })]
+      })
       expect([...listeners.keys()]).toEqual([
         'SIGINT',
         'SIGTERM',
@@ -161,12 +169,7 @@ describe('Round27 logger final cleanup containment', () => {
         'uncaughtException',
         'unhandledRejection'
       ])
-      let failure: unknown
-      try {
-        await first.unUse('process')
-      } catch (error) {
-        failure = error
-      }
+      const failure = await first.unUse('process')
 
       expect(removeAttempts).toEqual([
         'SIGINT',
@@ -204,9 +207,15 @@ describe('Round27 logger final cleanup containment', () => {
       failCleanup = false
       exitValue = originalExit
       listeners.clear()
-      const second = new Logger({ plugins: [processPlugin({ interceptProcessExit: true })] })
+      const second = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [processPlugin({ interceptProcessExit: true })]
+      })
       expect(runtimeProcess.exit).not.toBe(originalExit)
-      await expect(second.unUse('process')).resolves.toBeUndefined()
+      await expect(second.unUse('process')).resolves.toMatchObject({
+        ok: true,
+        removed: true
+      })
       expect(runtimeProcess.exit).toBe(originalExit)
     } finally {
       allowRestore = true
@@ -259,7 +268,10 @@ describe('Round27 logger runtime reporter containment', () => {
       process.on('unhandledRejection', onUnhandled)
 
       try {
-        new Logger({ plugins: [processPlugin()] })
+        new Logger({
+          execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+          plugins: [processPlugin()]
+        })
         expect(() => listeners.get('SIGINT')?.()).not.toThrow()
         await new Promise<void>((resolve) => setTimeout(resolve, 0))
 
@@ -327,7 +339,10 @@ describe('Round27 logger runtime reporter containment', () => {
     process.on('unhandledRejection', onUnhandled)
 
     try {
-      new Logger({ plugins: [processPlugin()] })
+      new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [processPlugin()]
+      })
       expect(() => listeners.get('SIGINT')?.()).not.toThrow()
       await new Promise<void>((resolve) => setTimeout(resolve, 0))
       expect(write).toHaveBeenCalledTimes(1)

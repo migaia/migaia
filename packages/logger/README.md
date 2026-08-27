@@ -38,6 +38,7 @@ import { Logger } from '@migaia/logger';
 import { color, level } from '@migaia/logger/plugins';
 
 const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
   context: ['api'],
   plugins: [level({ level: 'info' }), color({ format: 'pretty', color: 'auto' })]
 });
@@ -55,6 +56,7 @@ import { Logger } from '@migaia/logger';
 import { batch, http, level, process } from '@migaia/logger/plugins';
 
 const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
   plugins: [
     level({ level: 'info' }),
     batch({ maxSize: 50, maxWaitMs: 1000 }),

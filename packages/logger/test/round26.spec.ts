@@ -53,6 +53,7 @@ async function runHttp(
   })
   try {
     const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       scheduler,
       plugins: [http({ url: 'https://example.test/logs', retries })]
     })
@@ -246,14 +247,20 @@ describe('Round26 HTTP scheduler callback ownership', () => {
     try {
       let failure: unknown
       try {
-        new Logger({ plugins: [processPlugin()] })
+        new Logger({
+          execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+          plugins: [processPlugin()]
+        })
       } catch (error) {
         failure = error
       }
       expect((failure as Error & { cause?: unknown }).cause).toBe(primary)
       expect([...listeners.values()].every((group) => group.size === 0)).toBe(true)
 
-      const reinstall: any = new Logger({ plugins: [processPlugin()] })
+      const reinstall: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [processPlugin()]
+      })
       await reinstall.unUse('process')
       expect([...listeners.values()].every((group) => group.size === 0)).toBe(true)
     } finally {
@@ -298,7 +305,10 @@ describe('Round26 HTTP scheduler callback ownership', () => {
     try {
       let failure: unknown
       try {
-        new Logger({ plugins: [processPlugin()] })
+        new Logger({
+          execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+          plugins: [processPlugin()]
+        })
       } catch (error) {
         failure = error
       }
@@ -310,7 +320,10 @@ describe('Round26 HTTP scheduler callback ownership', () => {
       expect((installFailure as AggregateError).errors).toEqual([primary, rollback])
       expect([...listeners.values()].every((group) => group.size === 0)).toBe(true)
 
-      const reinstall: any = new Logger({ plugins: [processPlugin()] })
+      const reinstall: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [processPlugin()]
+      })
       await reinstall.unUse('process')
       expect([...listeners.values()].every((group) => group.size === 0)).toBe(true)
     } finally {
@@ -341,6 +354,7 @@ describe('Round26 HTTP scheduler callback ownership', () => {
 
     try {
       const logger: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         scheduler,
         plugins: [processPlugin({ shutdownTimeoutMs: 10 })]
       })
@@ -358,7 +372,11 @@ describe('Round26 HTTP scheduler callback ownership', () => {
   it('LG-T47 cancels a synchronous BatchPlugin debounce handle after callback return', async () => {
     const scheduler = createSyncScheduler({ onSchedule: (callback) => callback() })
     const batches: string[][] = []
-    const logger: any = new Logger({ scheduler, plugins: [batch()] })
+    const logger: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      scheduler,
+      plugins: [batch()]
+    })
     const batcher = logger.getShared('createBatcher')(
       { maxSize: 10, maxWaitMs: 5 },
       (items: string[]) => {
