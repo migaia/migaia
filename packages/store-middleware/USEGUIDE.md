@@ -124,7 +124,10 @@ import { createMutationPolicy, bindStoreMiddleware } from '@migaia/store-middlew
 const mutationPolicy = createMutationPolicy('actions-only');
 
 const store = createStore(shape, { mutationPolicy }); // ① Store 自己的字段写入走这个实例判断
-const host = bindStoreMiddleware(store, { mutationPolicy }); // ② Host 拿到的是同一个实例
+const host = bindStoreMiddleware(store, {
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  mutationPolicy
+}); // ② Host 拿到的是同一个实例
 ```
 
 - ① 是真正生效的一半：Store 的 `$batch()`/`$set()`/action 方法调用会经过 `mutationPolicy.runInAction(() => runtime.batch(fn))`，直接字段赋值（比如 `store.count = 1`）会先过 `assertMutationAllowed('set(count)')`。
@@ -204,6 +207,10 @@ type IStoreMiddlewareCore<S> = {
 
 ```ts
 type IStoreMiddlewareBindingOptions = {
+  execution: {
+    mutationTimeoutMs: number | false;
+    pipelineDrainTimeoutMs: number | false;
+  };
   mutationPolicy?: MutationPolicy;
   actionPrefix?: string;
   clone?: (state: Record<string, unknown>) => Record<string, unknown>; // 默认 structuredClone
@@ -215,7 +222,7 @@ type IStoreMiddlewareBinding<S extends Record<string, unknown>> = StoreMiddlewar
 
 function bindStoreMiddleware<S extends Record<string, unknown>>(
   store: IReactiveStore<S>,
-  options?: IStoreMiddlewareBindingOptions
+  options: IStoreMiddlewareBindingOptions
 ): IStoreMiddlewareBinding<S>;
 ```
 

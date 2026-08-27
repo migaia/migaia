@@ -8,6 +8,9 @@ import {
   type IMiddlewareEvent
 } from '../src/index'
 
+/** Explicit unbounded policy used by legacy Store behavior tests. */
+const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const
+
 describe('bindStoreMiddleware', () => {
   it('contains rollback reporter failure when host disposal also rejects', async () => {
     const runtime = createRuntime()
@@ -31,7 +34,7 @@ describe('bindStoreMiddleware', () => {
       }
     } as never
 
-    expect(() => bindStoreMiddleware(fakeStore)).toThrow()
+    expect(() => bindStoreMiddleware(fakeStore, { execution })).toThrow()
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
     expect(reporterCalled).toBe(true)
     disposeSpy.mockRestore()
@@ -55,7 +58,7 @@ describe('bindStoreMiddleware', () => {
 
     let thrown: unknown
     try {
-      bindStoreMiddleware(fakeStore)
+      bindStoreMiddleware(fakeStore, { execution })
     } catch (error) {
       thrown = error
     }
@@ -68,7 +71,7 @@ describe('bindStoreMiddleware', () => {
 
   it('default clone (structuredClone) produces independent previous/next snapshots', () => {
     const store = createStore({ value: 1 })
-    const host = bindStoreMiddleware(store)
+    const host = bindStoreMiddleware(store, { execution })
     const events: IMiddlewareEvent<Record<string, unknown>>[] = []
     host.attachBindingDisposer(() => undefined)
     const seen: Array<{ previous: unknown; next: unknown }> = []
@@ -105,6 +108,7 @@ describe('bindStoreMiddleware', () => {
     const store = createStore({ value: 1 })
     const calls: Record<string, unknown>[] = []
     const host = bindStoreMiddleware(store, {
+      execution,
       clone: (state) => {
         calls.push(state)
         return { ...state }
@@ -119,7 +123,7 @@ describe('bindStoreMiddleware', () => {
   it('captures "previous" as the state at bind time, not at store-creation time', async () => {
     const store = createStore({ value: 1 })
     store.value = 5 // mutate BEFORE binding
-    const host = bindStoreMiddleware(store)
+    const host = bindStoreMiddleware(store, { execution })
     const seen: Array<{ previous: unknown; next: unknown }> = []
     await host.use({
       name: 'capture',
@@ -149,7 +153,7 @@ describe('bindStoreMiddleware', () => {
       },
       { debugName: 'Counter' }
     )
-    const host = bindStoreMiddleware(store)
+    const host = bindStoreMiddleware(store, { execution })
     const events: IMiddlewareEvent<Record<string, unknown>>[] = []
     await host.use({
       name: 'capture',
@@ -180,7 +184,7 @@ describe('bindStoreMiddleware', () => {
       },
       { debugName: 'Counter' }
     )
-    const host = bindStoreMiddleware(store)
+    const host = bindStoreMiddleware(store, { execution })
     const events: IMiddlewareEvent<Record<string, unknown>>[] = []
     await host.use({
       name: 'capture',
@@ -211,7 +215,7 @@ describe('bindStoreMiddleware', () => {
       },
       { debugName: 'Counter' }
     )
-    const host = bindStoreMiddleware(store, { actionPrefix: 'Counter.allowed' })
+    const host = bindStoreMiddleware(store, { execution, actionPrefix: 'Counter.allowed' })
     const events: IMiddlewareEvent<Record<string, unknown>>[] = []
     await host.use({
       name: 'capture',
@@ -233,7 +237,7 @@ describe('bindStoreMiddleware', () => {
 
   it('dispose() unsubscribes both bindings: no further events after dispose, and the store itself keeps working', async () => {
     const store = createStore({ value: 1 })
-    const host = bindStoreMiddleware(store)
+    const host = bindStoreMiddleware(store, { execution })
     const events: IMiddlewareEvent<Record<string, unknown>>[] = []
     await host.use({
       name: 'capture',
@@ -257,7 +261,7 @@ describe('bindStoreMiddleware', () => {
 
   it('returns the host with a readonly `.store` property pointing back at the original store', () => {
     const store = createStore({ value: 1 })
-    const host = bindStoreMiddleware(store)
+    const host = bindStoreMiddleware(store, { execution })
     expect(host.store).toBe(store)
     return host.dispose()
   })
@@ -265,7 +269,7 @@ describe('bindStoreMiddleware', () => {
   it('forwards a supplied mutationPolicy instance to the underlying host', () => {
     const store = createStore({ value: 1 })
     const policy = createMutationPolicy('actions-only')
-    const host = bindStoreMiddleware(store, { mutationPolicy: policy })
+    const host = bindStoreMiddleware(store, { execution, mutationPolicy: policy })
     expect(host.mutationPolicy).toBe(policy)
     return host.dispose()
   })
