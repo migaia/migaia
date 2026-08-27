@@ -6,6 +6,8 @@ import type {
   IPluginConfig,
   IPluginResource,
   IPluginHostCore,
+  IPluginOperationContext,
+  IPluginRegistrationContext,
   IReadonlyConfig,
   IPipelineMode,
   ISyncPipelineStage
@@ -28,6 +30,8 @@ export type IPluginCoreContext<TDomainCore extends object, TValue> = {
   readonly onPipelineViolation: (kind: IPluginHostPipelineViolation) => void
   readonly registerResource: (resource: IPluginResource) => void
   readonly registerStage: (stage: Function, kind: IPipelineMode) => void
+  readonly operation: () => IPluginOperationContext
+  readonly lifecycle: () => IPluginRegistrationContext
 }
 
 export const createPluginCore = <TDomainCore extends object, TValue>(
@@ -39,6 +43,8 @@ export const createPluginCore = <TDomainCore extends object, TValue>(
     throw createPluginHostTypeError('domain core must be a plain object')
   const reservedKeys = new Set<PropertyKey>([
     'config',
+    'operation',
+    'lifecycle',
     'getShared',
     'onDispose',
     'usePipeline',
@@ -68,6 +74,16 @@ export const createPluginCore = <TDomainCore extends object, TValue>(
       context.assertRegistrationValid()
       return readonlyConfig(context.registration.config) as IReadonlyConfig<T>
     }
+  })
+  Object.defineProperty(facade, 'operation', {
+    enumerable: true,
+    configurable: false,
+    get: () => Object.freeze(context.operation())
+  })
+  Object.defineProperty(facade, 'lifecycle', {
+    enumerable: true,
+    configurable: false,
+    get: () => Object.freeze(context.lifecycle())
   })
   define('getShared', (key: PropertyKey) => {
     context.assertRegistrationValid()

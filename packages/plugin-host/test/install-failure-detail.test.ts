@@ -7,7 +7,15 @@ type IInstallCore = {
 }
 
 class Host extends PluginHost<Record<string, never>, number> {
-  installSync(plugins: readonly unknown[]): this {
+  /** Supplies an explicit unbounded test policy while preserving test overrides. */
+  constructor(options: any = {}) {
+    super({
+      ...options,
+      execution: options.execution ?? { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+  }
+
+  installSync(plugins: readonly unknown[]) {
     return this.useSync(plugins as never)
   }
 }

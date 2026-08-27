@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { PluginHost } from '../src/host-runtime.js'
 
-class Host extends PluginHost<Record<string, never>> {}
+class Host extends PluginHost<Record<string, never>> {
+  /** Supplies an explicit unbounded test policy. */
+  constructor(options: any = {}) {
+    super({
+      ...options,
+      execution: options.execution ?? { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+  }
+}
 
 /** Install one public plugin config and optionally make its update hook fail. */
 const installConfig = async (

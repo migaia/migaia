@@ -1,5 +1,6 @@
 import { asyncDisposeKey, disposeKey } from './symbols.js'
-import type { ILifecycleScheduler } from '@migaia/lifecycle'
+import type { IAbortSignal, ILifecycleScheduler } from '@migaia/lifecycle'
+import type { PluginHostError } from './error-text.js'
 
 /** 插件生命周期资源的清理函数。 */
 export type IPluginDisposer = () => void | Promise<void>
@@ -35,9 +36,28 @@ export type IPluginLifecycleConfig<TConfig extends IPluginConfig = IPluginConfig
   get(): IReadonlyConfig<TConfig>
 }
 
+/** Operation-scoped cancellation and deadline exposed to one plugin hook invocation. */
+export type IPluginOperationContext = {
+  readonly signal: IAbortSignal
+  readonly deadlineAt: number | undefined
+}
+
+/** Registration-scoped lifetime signal that remains valid until logical revocation. */
+export type IPluginRegistrationContext = {
+  readonly signal: IAbortSignal
+}
+
+/** Disposal context passed to a V2 plugin dispose hook. */
+export type IPluginDisposalContext = Readonly<{
+  readonly signal: IAbortSignal
+  readonly deadlineAt: number | undefined
+}>
+
 /** Plugin-facing config capability; TConfig is fixed by the plugin declaration. */
 export type IPluginLifecycleCore<TConfig extends IPluginConfig = IPluginConfig> = {
   readonly config: IPluginLifecycleConfig<TConfig>
+  readonly operation: IPluginOperationContext
+  readonly lifecycle: IPluginRegistrationContext
 }
 
 /**
@@ -125,7 +145,7 @@ export type IPlugin<
     next: IReadonlyConfig<TConfig>,
     core: TCore & IPluginLifecycleCore<TConfig>
   ) => void | Promise<void>
-  dispose?: () => void | Promise<void>
+  dispose?: (context?: IPluginDisposalContext) => void | Promise<void>
   [asyncDisposeKey]?: () => void | Promise<void>
   [disposeKey]?: () => void
 }
@@ -139,7 +159,7 @@ export type IPluginConstraint<TCore> = {
     core: TCore & IPluginLifecycleCore<any>
   ) => Record<string, unknown> | Promise<Record<string, unknown>>
   update?: (next: never, core: TCore & IPluginLifecycleCore<any>) => void | Promise<void>
-  dispose?: () => void | Promise<void>
+  dispose?: (context?: IPluginDisposalContext) => void | Promise<void>
   [asyncDisposeKey]?: () => void | Promise<void>
   [disposeKey]?: () => void
 }
@@ -209,6 +229,8 @@ export interface IPluginHostCore<
   TConfig extends IPluginConfig = IPluginConfig
 > {
   readonly config: IPluginLifecycleConfig<TConfig>
+  readonly operation: IPluginOperationContext
+  readonly lifecycle: IPluginRegistrationContext
   getShared<TKey extends keyof TShared>(key: TKey): TShared[TKey] | undefined
   getShared(key: PropertyKey): unknown
   onDispose(resource: IPluginResource): void
@@ -218,51 +240,12 @@ export interface IPluginHostCore<
   useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): this
 }
 
-/** Public Host protocol; excludes plugin lifecycle core capabilities. */
-export type IPluginHostPublic<
-  TDomainCore,
-  TValue = never,
-  TInstalled extends readonly IPluginConstraint<any>[] = readonly []
-> = TDomainCore &
-  IMergePluginExts<TInstalled> & {
-    readonly config: IPluginHostConfigFor<TInstalled>
-    readonly pipelineMode: IPipelineMode
-    getShared<TKey extends keyof IMergePluginShared<TInstalled>>(
-      key: TKey
-    ): IMergePluginShared<TInstalled>[TKey] | undefined
-    getShared(key: PropertyKey): unknown
-    usePipeline(
-      stage: ISyncPipelineStage<TValue>
-    ): IPluginHostPublic<TDomainCore, TValue, TInstalled>
-    useAsyncPipeline(
-      stage: IAsyncPipelineStage<TValue>
-    ): IPluginHostPublic<TDomainCore, TValue, TInstalled>
-    useGeneratorPipeline(
-      stage: IGeneratorPipelineStage<TValue>
-    ): IPluginHostPublic<TDomainCore, TValue, TInstalled>
-    useAsyncGeneratorPipeline(
-      stage: IAsyncGeneratorPipelineStage<TValue>
-    ): IPluginHostPublic<TDomainCore, TValue, TInstalled>
-    use<
-      const TPlugins extends readonly IPluginConstraint<
-        TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>
-      >[]
-    >(
-      ...plugins: TPlugins
-    ): Promise<IPluginHostPublic<TDomainCore, TValue, [...TInstalled, ...TPlugins]>>
-    unUse(name: string): Promise<void>
-    dispose(): Promise<void>
-    [asyncDisposeKey]?: () => Promise<void>
-  }
-
-/** Compatibility alias for the public Host protocol. */
-export type IPluginHost<
-  TDomainCore,
-  TValue = never,
-  TInstalled extends readonly IPluginConstraint<any>[] = readonly []
-> = IPluginHostPublic<TDomainCore, TValue, TInstalled>
-
 export type IPluginHostOptions = {
+  /** Explicit operation and pipeline drain budgets; `false` opts into unbounded waiting. */
+  readonly execution: {
+    readonly mutationTimeoutMs: number | false
+    readonly pipelineDrainTimeoutMs: number | false
+  }
   pipeline?: IPipelineConfig
   diagnostic?: (message: string, code?: IPluginHostErrorCode) => void
   /** 时间域与排程来源（默认 lifecycle `systemScheduler`）；queue watchdog / dispose timeout 共用。 */
@@ -274,3 +257,78 @@ export type IPluginHostOptions = {
   /** 单个 disposer 步的最大等待时间；`false` 表示永久等待（不触发 force）。 */
   disposeStepTimeoutMs?: number | false
 }
+
+/** Immutable publication view returned by V2 composition and removal operations. */
+export type IPluginHostView<
+  THost,
+  TInstalled extends readonly IPluginConstraint<any>[] = readonly []
+> = Readonly<{
+  readonly host: THost
+  readonly extensions: Readonly<IMergePluginExts<TInstalled>>
+  readonly config: IPluginHostConfigFor<TInstalled>
+  getShared<TKey extends keyof IMergePluginShared<TInstalled>>(
+    key: TKey
+  ): IMergePluginShared<TInstalled>[TKey] | undefined
+  getShared(key: PropertyKey): unknown
+  use<const TPlugins extends readonly IPluginConstraint<any>[]>(
+    ...plugins: TPlugins
+  ): Promise<IPluginHostView<THost, [...TInstalled, ...TPlugins]>>
+  unUse<const TName extends IInstalledPluginName<TInstalled>>(
+    name: TName
+  ): Promise<IPluginRemovalResult<IPluginHostView<THost, IRemovePluginByName<TInstalled, TName>>>>
+  unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<THost>>>
+}>
+
+/** Runtime-unknown view returned when a dynamic plugin name cannot be narrowed statically. */
+export type IPluginHostDynamicView<THost> = Readonly<{
+  readonly host: THost
+  readonly extensions: Readonly<Record<PropertyKey, unknown>>
+  readonly config: {
+    get(path: string): unknown
+    update(
+      name: string,
+      recipe: (previous: IReadonlyConfig<IPluginConfig>) => Partial<IPluginConfig>
+    ): Promise<void>
+  }
+  getShared(key: PropertyKey): unknown
+  use(...plugins: readonly IPluginConstraint<any>[]): Promise<IPluginHostDynamicView<THost>>
+  unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<THost>>>
+}>
+
+/** Structured result for logical removal and any cleanup errors. */
+export type IPluginRemovalResult<TView> =
+  | Readonly<{ ok: true; removed: boolean; view: TView }>
+  | Readonly<{ ok: false; removed: boolean; view: TView; error: PluginHostError }>
+
+/** Physical completion detail for work that outlives bounded logical disposal. */
+export type IPluginHostPhysicalCleanupResult = Readonly<{
+  readonly cleanupErrors: readonly unknown[]
+}>
+
+/** Structured logical terminal result; cleanup failures never reopen or reject the Host. */
+export type IPluginHostDisposalResult = Readonly<{
+  readonly logicalTerminal: true
+  readonly cleanupComplete: boolean
+  readonly cleanupErrors: readonly unknown[]
+  readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>
+}>
+
+type IInstalledPluginName<TInstalled extends readonly IPluginConstraint<any>[]> =
+  TInstalled[number] extends infer TPlugin
+    ? TPlugin extends { readonly name: infer TName extends string }
+      ? TName
+      : never
+    : never
+
+type IRemovePluginByName<
+  TInstalled extends readonly IPluginConstraint<any>[],
+  TName extends string
+> = TInstalled extends readonly [infer THead, ...infer TTail]
+  ? THead extends { readonly name: TName }
+    ? TTail extends readonly IPluginConstraint<any>[]
+      ? TTail
+      : readonly []
+    : TTail extends readonly IPluginConstraint<any>[]
+      ? readonly [THead & IPluginConstraint<any>, ...IRemovePluginByName<TTail, TName>]
+      : readonly []
+  : readonly []

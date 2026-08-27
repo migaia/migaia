@@ -1,8 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PluginHost } from '../src/host-runtime'
+import { PluginHost, PluginHostError } from '../src/index.js'
 import { createManualScheduler } from '@migaia/lifecycle'
 
-class Host extends PluginHost<Record<string, never>, string> {}
+class Host extends PluginHost<Record<string, never>, string> {
+  /** Supplies an explicit test policy while preserving each test's option override. */
+  constructor(options: any = {}) {
+    super({
+      ...options,
+      execution: options.execution ?? { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+  }
+}
 
 describe('AF-T10 plugin-host scheduler/policy options', () => {
   it('rejects NaN/Infinity/negative timeout options with INVALID_OPTION', () => {
@@ -12,7 +20,7 @@ describe('AF-T10 plugin-host scheduler/policy options', () => {
     }
   })
 
-  it('unconfigured queue timeout only diagnoses, never rejects', async () => {
+  it('rejects external mutation while a lifecycle hook is active', async () => {
     vi.useFakeTimers()
     try {
       const diagnostics: string[] = []
@@ -24,20 +32,18 @@ describe('AF-T10 plugin-host scheduler/policy options', () => {
           return {}
         }
       } as any)
-      const queued = host.use({ name: 'queued', install: () => ({}) } as any)
-      await vi.advanceTimersByTimeAsync(2_000)
-      expect(diagnostics.length).toBeGreaterThan(0)
-      expect(diagnostics[0]).toMatch(/queued|mutation/i)
-      // 未配置 reject 阈值：任务仍在排队，不被拒绝。
-      await vi.advanceTimersByTimeAsync(8_000)
+      expect(() => host.use({ name: 'queued', install: () => ({}) } as any)).toThrow(
+        PluginHostError
+      )
+      await vi.advanceTimersByTimeAsync(10_000)
       await expect(blocking).resolves.toBeDefined()
-      await expect(queued).resolves.toBeDefined()
+      expect(diagnostics).toHaveLength(0)
     } finally {
       vi.useRealTimers()
     }
   })
 
-  it('queueAdmissionTimeoutMs: false never rejects and never diagnoses', async () => {
+  it('queueAdmissionTimeoutMs: false does not alter lifecycle fail-fast admission', async () => {
     vi.useFakeTimers()
     try {
       const diagnostics: string[] = []
@@ -52,17 +58,18 @@ describe('AF-T10 plugin-host scheduler/policy options', () => {
           return {}
         }
       } as any)
-      const queued = host.use({ name: 'queued', install: () => ({}) } as any)
+      expect(() => host.use({ name: 'queued', install: () => ({}) } as any)).toThrow(
+        PluginHostError
+      )
       await vi.advanceTimersByTimeAsync(10_000)
       await expect(blocking).resolves.toBeDefined()
-      await expect(queued).resolves.toBeDefined()
       expect(diagnostics).toHaveLength(0)
     } finally {
       vi.useRealTimers()
     }
   })
 
-  it('queueAdmissionTimeoutMs: number rejects exactly at the configured time', async () => {
+  it('queueAdmissionTimeoutMs does not defer lifecycle fail-fast admission', async () => {
     vi.useFakeTimers()
     try {
       const host = new Host({ queueAdmissionTimeoutMs: 1_000 } as any)
@@ -74,13 +81,11 @@ describe('AF-T10 plugin-host scheduler/policy options', () => {
         }
       } as any)
       void blocking.catch(() => undefined)
-      const queued = host.use({ name: 'queued', install: () => ({}) } as any)
-      let rejected: unknown
-      void queued.catch((error) => (rejected = error))
-      await vi.advanceTimersByTimeAsync(999)
-      expect(rejected).toBeUndefined()
-      await vi.advanceTimersByTimeAsync(1)
-      expect((rejected as { code?: string } | undefined)?.code).toBe('MUTATION_QUEUE_TIMEOUT')
+      expect(() => host.use({ name: 'queued', install: () => ({}) } as any)).toThrow(
+        PluginHostError
+      )
+      await vi.advanceTimersByTimeAsync(10_000)
+      await expect(blocking).resolves.toBeDefined()
     } finally {
       vi.useRealTimers()
     }
@@ -103,7 +108,7 @@ describe('AF-T10 plugin-host scheduler/policy options', () => {
       } as any)
       const disposePromise = host.dispose()
       await vi.advanceTimersByTimeAsync(10_000)
-      await expect(disposePromise).resolves.toBeUndefined()
+      await expect(disposePromise).resolves.toMatchObject({ logicalTerminal: true })
       expect(disposed).toBe(true)
     } finally {
       vi.useRealTimers()
@@ -128,12 +133,12 @@ describe('AF-T10 plugin-host scheduler/policy options', () => {
       }
     } as any)
     const disposePromise = host.dispose()
-    await Promise.resolve()
-    await Promise.resolve()
+    for (let index = 0; index < 10; index += 1) await Promise.resolve()
     // 只推进注入的 manual scheduler；真实 host timer 不参与。
     scheduler.advance(100)
     const outcome = await disposePromise.catch((error: unknown) => error)
-    expect(String((outcome as any)?.cause?.cause?.message ?? outcome)).toMatch(/等待超过 100ms/)
+    expect((outcome as any).cleanupComplete).toBe(false)
+    expect((outcome as any).cleanupErrors.length).toBeGreaterThan(0)
   })
 
   it('AF-T28: hostile scheduler getter is wrapped as INVALID_OPTION with the original as cause', () => {

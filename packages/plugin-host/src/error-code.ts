@@ -190,7 +190,18 @@ export const PluginHostErrorCode = {
    * 落实 `docs/contracts/error-codes.md` §7「裸抛扫描」门禁与 `error-code-rollout.sdd.md` §3「参数校验统一」归纳原则。调用方修正
    * 输入后重试；这是编程错误，不是运行时状态问题。
    */
-  invalidOption: 'INVALID_OPTION'
+  invalidOption: 'INVALID_OPTION',
+  /** A lifecycle hook exceeded the admitted mutation budget and lost commit authority. */
+  mutationExecutionTimeout: 'MUTATION_EXECUTION_TIMEOUT',
+
+  /** A previously published view was logically revoked by removal or disposal. */
+  viewRevoked: 'VIEW_REVOKED',
+
+  /** Active pipeline work did not drain before the explicit disposal budget elapsed. */
+  pipelineDrainTimeout: 'PIPELINE_DRAIN_TIMEOUT',
+
+  /** Logical disposal completed while one or more physical cleanup tasks remain unsettled. */
+  cleanupIncomplete: 'CLEANUP_INCOMPLETE'
 } as const
 
 export type IPluginHostErrorCode = (typeof PluginHostErrorCode)[keyof typeof PluginHostErrorCode]
