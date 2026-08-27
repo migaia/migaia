@@ -14,6 +14,9 @@ import { ClonePolicy } from '../src/tolerant-clone'
 
 type IState = { readonly value: number }
 
+/** Explicit unbounded policy used by legacy Store behavior tests. */
+const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const
+
 function makeRuntime() {
   const errors: Array<{ error: unknown; phase: string }> = []
   const runtime = createRuntime({
@@ -26,6 +29,7 @@ describe('StoreMiddlewareHost construction', () => {
   it('rejects an invalid DevTools adapter before plugin installation', async () => {
     const { runtime } = makeRuntime()
     const host = createStoreMiddlewareHost({
+      execution,
       runtime,
       getState: () => ({ value: 0 })
     })
@@ -62,7 +66,7 @@ describe('StoreMiddlewareHost construction', () => {
   it('default state snapshots tolerate functions and non-cloneable values', async () => {
     const runtime = createRuntime()
     const store = createStore({ value: 1, handler: () => 1 }, { runtime })
-    const binding = bindStoreMiddleware(store)
+    const binding = bindStoreMiddleware(store, { execution })
     expect(() => store.value++).not.toThrow()
     await binding.dispose()
     store.$dispose()
@@ -70,6 +74,7 @@ describe('StoreMiddlewareHost construction', () => {
   it('forces pipeline mode to sync even when caller passes pipeline.mode: "async"', async () => {
     const { runtime } = makeRuntime()
     const host = createStoreMiddlewareHost<IState>({
+      execution,
       runtime,
       getState: () => ({ value: 0 }),
       pipeline: { mode: 'async' }
@@ -92,7 +97,11 @@ describe('StoreMiddlewareHost construction', () => {
 
   it('defaults mutationPolicy to a fresh "off" instance when none is supplied', () => {
     const { runtime } = makeRuntime()
-    const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => ({ value: 0 }) })
+    const host = createStoreMiddlewareHost<IState>({
+      execution,
+      runtime,
+      getState: () => ({ value: 0 })
+    })
     expect(() => host.mutationPolicy.assertMutationAllowed()).not.toThrow()
   })
 
@@ -100,6 +109,7 @@ describe('StoreMiddlewareHost construction', () => {
     const { runtime } = makeRuntime()
     const policy = createMutationPolicy('actions-only')
     const host = createStoreMiddlewareHost<IState>({
+      execution,
       runtime,
       getState: () => ({ value: 0 }),
       mutationPolicy: policy
@@ -111,6 +121,7 @@ describe('StoreMiddlewareHost construction', () => {
 it('snapshots accessor-backed host options before construction reuses them', async () => {
   const { runtime } = makeRuntime()
   const options = {
+    execution,
     runtime,
     getState: () => ({ value: 0 })
   } as Record<string, unknown>
@@ -130,7 +141,11 @@ it('snapshots accessor-backed host options before construction reuses them', asy
 describe('StoreMiddlewareHost.emit', () => {
   it('reports a trace-listener error when a pipeline stage never calls next()', async () => {
     const { runtime, errors } = makeRuntime()
-    const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => ({ value: 0 }) })
+    const host = createStoreMiddlewareHost<IState>({
+      execution,
+      runtime,
+      getState: () => ({ value: 0 })
+    })
     await host.use({
       name: 'swallow',
       install: (core) => {
@@ -151,7 +166,11 @@ describe('StoreMiddlewareHost.emit', () => {
 
   it('does not report an error when every stage calls next()', async () => {
     const { runtime, errors } = makeRuntime()
-    const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => ({ value: 0 }) })
+    const host = createStoreMiddlewareHost<IState>({
+      execution,
+      runtime,
+      getState: () => ({ value: 0 })
+    })
     const seen: IMiddlewareEvent<IState>[] = []
     await host.use(
       middlewarePlugin<IState>('capture', (event, _ctx, next) => {
@@ -174,7 +193,11 @@ describe('StoreMiddlewareHost.emit', () => {
     })
     vi.stubGlobal('reportError', hostReportError)
     try {
-      const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => ({ value: 0 }) })
+      const host = createStoreMiddlewareHost<IState>({
+        execution,
+        runtime,
+        getState: () => ({ value: 0 })
+      })
       await host.use({
         name: 'swallow-hostile-reporter',
         install: (core) => {
@@ -197,7 +220,11 @@ describe('StoreMiddlewareHost.emit', () => {
 describe('StoreMiddlewareHost.runAction', () => {
   it('dispatches action:start then action:end with a numeric durationMs, and returns fn result', async () => {
     const { runtime } = makeRuntime()
-    const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => ({ value: 0 }) })
+    const host = createStoreMiddlewareHost<IState>({
+      execution,
+      runtime,
+      getState: () => ({ value: 0 })
+    })
     const events: IMiddlewareEvent<IState>[] = []
     await host.use(
       middlewarePlugin<IState>('capture', (event, _ctx, next) => {
@@ -223,6 +250,7 @@ describe('StoreMiddlewareHost.runAction', () => {
     const { runtime } = makeRuntime()
     const policy = createMutationPolicy('actions-only')
     const host = createStoreMiddlewareHost<IState>({
+      execution,
       runtime,
       getState: () => ({ value: 0 }),
       mutationPolicy: policy
@@ -238,7 +266,11 @@ describe('StoreMiddlewareHost.runAction', () => {
 
   it('on fn error: dispatches action:error and rethrows the original error unchanged', async () => {
     const { runtime } = makeRuntime()
-    const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => ({ value: 0 }) })
+    const host = createStoreMiddlewareHost<IState>({
+      execution,
+      runtime,
+      getState: () => ({ value: 0 })
+    })
     const events: IMiddlewareEvent<IState>[] = []
     await host.use(
       middlewarePlugin<IState>('capture', (event, _ctx, next) => {
@@ -265,7 +297,11 @@ describe('StoreMiddlewareHost.runAction', () => {
 describe('StoreMiddlewareHost.recordState / recordError', () => {
   it('recordState dispatches a "state" event with previous/next verbatim', async () => {
     const { runtime } = makeRuntime()
-    const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => ({ value: 0 }) })
+    const host = createStoreMiddlewareHost<IState>({
+      execution,
+      runtime,
+      getState: () => ({ value: 0 })
+    })
     const events: IMiddlewareEvent<IState>[] = []
     await host.use(
       middlewarePlugin<IState>('capture', (event, _ctx, next) => {
@@ -288,7 +324,11 @@ describe('StoreMiddlewareHost.recordState / recordError', () => {
 
   it('recordError dispatches an "error" event carrying the phase and error', async () => {
     const { runtime } = makeRuntime()
-    const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => ({ value: 0 }) })
+    const host = createStoreMiddlewareHost<IState>({
+      execution,
+      runtime,
+      getState: () => ({ value: 0 })
+    })
     const events: IMiddlewareEvent<IState>[] = []
     await host.use(
       middlewarePlugin<IState>('capture', (event, _ctx, next) => {
@@ -306,7 +346,11 @@ describe('StoreMiddlewareHost.recordState / recordError', () => {
 
   it('recordError re-entrancy: a nested recordError call while handling one bypasses the pipeline', async () => {
     const { runtime, errors } = makeRuntime()
-    const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => ({ value: 0 }) })
+    const host = createStoreMiddlewareHost<IState>({
+      execution,
+      runtime,
+      getState: () => ({ value: 0 })
+    })
     const events: IMiddlewareEvent<IState>[] = []
     let triggeredNested = false
     await host.use(
@@ -339,7 +383,11 @@ describe('StoreMiddlewareHost.recordState / recordError', () => {
 describe('StoreMiddlewareHost.attachBindingDisposer / dispose', () => {
   it('is single-flight and replays binding cleanup failure to every caller', async () => {
     const { runtime } = makeRuntime()
-    const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => ({ value: 0 }) })
+    const host = createStoreMiddlewareHost<IState>({
+      execution,
+      runtime,
+      getState: () => ({ value: 0 })
+    })
     const cleanupError = new Error('binding cleanup failed')
     host.attachBindingDisposer(() => {
       throw cleanupError
@@ -348,13 +396,21 @@ describe('StoreMiddlewareHost.attachBindingDisposer / dispose', () => {
     const first = host.dispose()
     const second = host.dispose()
     expect(second).toBe(first)
-    await expect(first).rejects.toBe(cleanupError)
+    await expect(first).resolves.toMatchObject({
+      logicalTerminal: true,
+      cleanupComplete: true,
+      cleanupErrors: [cleanupError]
+    })
     expect(host.dispose()).toBe(first)
   })
 
   it('runs attached disposers in LIFO order before super.dispose() tears down plugins', async () => {
     const { runtime } = makeRuntime()
-    const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => ({ value: 0 }) })
+    const host = createStoreMiddlewareHost<IState>({
+      execution,
+      runtime,
+      getState: () => ({ value: 0 })
+    })
     const order: string[] = []
     host.attachBindingDisposer(() => {
       order.push('first-attached')
@@ -380,7 +436,11 @@ describe('StoreMiddlewareHost.attachBindingDisposer / dispose', () => {
 describe('loggerMiddleware', () => {
   it('uses console.log as the default sink, called with (event, state)', async () => {
     const { runtime } = makeRuntime()
-    const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => ({ value: 9 }) })
+    const host = createStoreMiddlewareHost<IState>({
+      execution,
+      runtime,
+      getState: () => ({ value: 9 })
+    })
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined)
     await host.use(loggerMiddleware<IState>())
     host.recordState('name', { value: 1 }, { value: 2 })
@@ -401,6 +461,7 @@ describe('loggerMiddleware', () => {
     const { runtime } = makeRuntime()
     let currentValue = 1
     const host = createStoreMiddlewareHost<IState>({
+      execution,
       runtime,
       getState: () => ({ value: currentValue })
     })
@@ -430,7 +491,11 @@ describe('loggerMiddleware', () => {
 describe('StoreMiddlewareHost.connectDevTools', () => {
   it('contains revoked adapter proxies as tagged configuration errors', async () => {
     const { runtime } = makeRuntime()
-    const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => ({ value: 0 }) })
+    const host = createStoreMiddlewareHost<IState>({
+      execution,
+      runtime,
+      getState: () => ({ value: 0 })
+    })
     const { proxy, revoke } = Proxy.revocable({}, {})
     revoke()
     await expect(host.connectDevTools(proxy as never)).rejects.toMatchObject({
@@ -464,7 +529,7 @@ describe('StoreMiddlewareHost.connectDevTools', () => {
   it('calls adapter.init(getState()) at install time, then adapter.send() for every event', async () => {
     const { runtime } = makeRuntime()
     let state: IState = { value: 5 }
-    const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => state })
+    const host = createStoreMiddlewareHost<IState>({ execution, runtime, getState: () => state })
     const { adapter, initCalls, sendCalls } = makeAdapter(() => state)
     await host.connectDevTools(adapter)
     expect(initCalls).toEqual([{ value: 5 }])
@@ -477,7 +542,7 @@ describe('StoreMiddlewareHost.connectDevTools', () => {
   it('re-inits the adapter with the current state on a "commit" command', async () => {
     const { runtime } = makeRuntime()
     let state: IState = { value: 1 }
-    const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => state })
+    const host = createStoreMiddlewareHost<IState>({ execution, runtime, getState: () => state })
     const { adapter, initCalls, emit } = makeAdapter(() => state)
     await host.connectDevTools(adapter)
     state = { value: 2 }
@@ -490,6 +555,7 @@ describe('StoreMiddlewareHost.connectDevTools', () => {
     const { runtime } = makeRuntime()
     let state: IState = { value: 1 }
     const host = createStoreMiddlewareHost<IState>({
+      execution,
       runtime,
       getState: () => state,
       applyState: (s) => {
@@ -509,7 +575,11 @@ describe('StoreMiddlewareHost.connectDevTools', () => {
 
   it('throws "[store] DevTools state command requires applyState" when applyState was not configured', async () => {
     const { runtime } = makeRuntime()
-    const host = createStoreMiddlewareHost<IState>({ runtime, getState: () => ({ value: 1 }) })
+    const host = createStoreMiddlewareHost<IState>({
+      execution,
+      runtime,
+      getState: () => ({ value: 1 })
+    })
     const { adapter, emit } = makeAdapter(() => ({ value: 1 }))
     await host.connectDevTools(adapter)
     expect(() => emit({ type: 'reset', state: { value: 0 } })).toThrow(

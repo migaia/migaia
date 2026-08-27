@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { createMutationPolicy, createStoreMiddlewareHost, middlewarePlugin } from '../src/index'
 import { createRuntime } from '@migaia/reactive'
 
+/** Explicit unbounded policy used by the Store export smoke test. */
+const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const
+
 describe('store-middleware exports', () => {
   it('exposes mutation policy', () => {
     const policy = createMutationPolicy('actions-only')
@@ -12,6 +15,7 @@ describe('store-middleware exports', () => {
     const runtime = createRuntime()
     const events: string[] = []
     const host = createStoreMiddlewareHost({
+      execution,
       runtime,
       getState: () => ({ value: 1 }),
       pipeline: { mode: 'async' }

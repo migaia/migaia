@@ -97,6 +97,7 @@ const adapter = createReduxDevToolsAdapter(connection); // connection: { init, s
 
 ```ts
 const host = createStoreMiddlewareHost({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
   runtime,
   getState: () => currentState
 });
@@ -114,11 +115,15 @@ const host = createStoreMiddlewareHost({
 **`StoreMiddlewareHost`｜10 秒上手** —— `createStoreMiddlewareHost()` 背后的类，`extends PluginHost`：
 
 ```ts
-const host = new StoreMiddlewareHost({ runtime, getState: () => state });
+const host = new StoreMiddlewareHost({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  runtime,
+  getState: () => state
+});
 host.runAction('increment', () => {
   state = { ...state, count: state.count + 1 };
 });
-await host.dispose();
+  await host.dispose(); // returns the structured PluginHost disposal result
 ```
 
 构造参数同 `createStoreMiddlewareHost`。实例成员：
@@ -169,13 +174,18 @@ const store = createStore(
   },
   { mutationPolicy }
 );
-const host = bindStoreMiddleware(store, { mutationPolicy });
+const host = bindStoreMiddleware(store, {
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  mutationPolicy
+});
 
 store.increment(); // 允许：action 内
 await host.dispose(); // 只释放这次绑定，Store 本身不受影响
 ```
 
-第二参数 `IStoreMiddlewareBindingOptions`（全部可选）：
+第二参数 `IStoreMiddlewareBindingOptions`：`execution` 必填，其余字段可选。
+
+- `execution: { mutationTimeoutMs, pipelineDrainTimeoutMs }` —— 两个字段均须为非负有限毫秒数或 `false`；`false` 表示不设截止时间。
 
 - `mutationPolicy?: MutationPolicy` —— 要和传给 `createStore()` 的是同一个实例，`actions-only` 才真正生效
 - `actionPrefix?: string` —— 只转发 `event.name` 以该前缀开头的 Runtime action trace
@@ -306,7 +316,10 @@ const store = createStore(
   { mutationPolicy }
 );
 
-const host = bindStoreMiddleware(store, { mutationPolicy });
+const host = bindStoreMiddleware(store, {
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  mutationPolicy
+});
 await host.use(loggerMiddleware());
 await host.connectDevTools(createReduxDevToolsAdapter(connection));
 
@@ -367,7 +380,10 @@ import { bindStoreMiddleware, ClonePolicy } from '@migaia/store-middleware';
 // 默认 clone 是 ClonePolicy.diagnostic（尽力而为、逐层深拷贝）；
 // 状态树很大或事件很密集时，改成零拷贝的 opaque 换取性能，
 // 代价是中间件之间、以及和 Store 本身共享同一份引用。
-const host = bindStoreMiddleware(store, { clone: ClonePolicy.opaque });
+const host = bindStoreMiddleware(store, {
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  clone: ClonePolicy.opaque
+});
 ```
 
 ### 5. 手动构造 Host（不经 `bindStoreMiddleware`），支持 DevTools 时间旅行
@@ -377,6 +393,7 @@ import { createStoreMiddlewareHost, createReduxDevToolsAdapter } from '@migaia/s
 
 let state = { count: 0 };
 const host = createStoreMiddlewareHost({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
   runtime,
   getState: () => state,
   applyState: (next) => {

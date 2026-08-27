@@ -18,6 +18,7 @@ import {
   type MutationPolicy,
   type IStoreMiddleware
 } from './middleware.js'
+import type { IPluginHostDisposalResult } from '@migaia/plugin-host'
 import { ClonePolicy } from './tolerant-clone.js'
 import { MiddlewareEventPhase, MiddlewareEventType } from './event-constants.js'
 
@@ -119,7 +120,7 @@ export class StoreMiddlewareHost<S> extends PluginHost<
   #reportingError = false
   #bindingDisposers: IDisposer[] = []
   /** Stable disposal completion shared by concurrent and repeated callers. */
-  #disposePromise: Promise<void> | undefined
+  #disposePromise: Promise<IPluginHostDisposalResult> | undefined
 
   constructor(options: IStoreMiddlewareHostOptions<S>) {
     super((options = snapshotHostOptions(options)))
@@ -289,13 +290,13 @@ export class StoreMiddlewareHost<S> extends PluginHost<
     this.#bindingDisposers.push(disposer)
   }
 
-  override dispose(): Promise<void> {
+  override dispose(): Promise<IPluginHostDisposalResult> {
     this.#disposePromise ??= this.#disposeOnce()
     return this.#disposePromise
   }
 
   /** Releases Store bindings before delegating to PluginHost cleanup. */
-  async #disposeOnce(): Promise<void> {
+  async #disposeOnce(): Promise<IPluginHostDisposalResult> {
     const errors: unknown[] = []
     for (const disposer of this.#bindingDisposers.splice(0).reverse()) {
       try {
@@ -304,18 +305,23 @@ export class StoreMiddlewareHost<S> extends PluginHost<
         errors.push(error)
       }
     }
+    let pluginResult: IPluginHostDisposalResult
     try {
-      await super.dispose()
+      pluginResult = await super.dispose()
     } catch (error) {
-      errors.push(error)
+      pluginResult = {
+        logicalTerminal: true,
+        cleanupComplete: false,
+        cleanupErrors: Object.freeze([error])
+      }
     }
-    if (errors.length === 1) throw errors[0]
-    if (errors.length > 1)
-      throw createStoreMiddlewareAggregateError(
-        StoreMiddlewareErrorCode.cleanupFailed,
-        errors,
-        StoreMiddlewareErrorText.cleanupFailed
-      )
+    const cleanupErrors = Object.freeze([...errors, ...pluginResult.cleanupErrors])
+    return Object.freeze({
+      ...pluginResult,
+      // Synchronous binding failures are settled observations, not unfinished physical cleanup.
+      cleanupComplete: pluginResult.cleanupComplete,
+      cleanupErrors
+    })
   }
 }
 
@@ -364,6 +370,7 @@ export function loggerMiddleware<S>(
 }
 
 export type IStoreMiddlewareBindingOptions = {
+  readonly execution: IPluginHostOptions['execution']
   readonly mutationPolicy?: MutationPolicy
   readonly actionPrefix?: string
   readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>
@@ -377,11 +384,12 @@ export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = StoreMi
 
 export function bindStoreMiddleware<S extends Record<string, unknown>>(
   store: IReactiveStore<S>,
-  options: IStoreMiddlewareBindingOptions = {}
+  options: IStoreMiddlewareBindingOptions
 ): IStoreMiddlewareBinding<S> {
   const clone = options.clone ?? ((state) => ClonePolicy.diagnostic(state))
   let previous = clone(store.$plain())
   const host = new StoreMiddlewareHost<Record<string, unknown>>({
+    execution: options.execution,
     runtime: store.$runtime,
     getState: () => clone(store.$plain()),
     applyState: (state) => store.$hydrate(state),
