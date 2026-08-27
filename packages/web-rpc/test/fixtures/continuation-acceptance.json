@@ -7614,7 +7614,7 @@
       "id": "WRC-C-T32",
       "kind": "assertion",
       "path": "packages/web-rpc/test/tree-shaking/b11f-candidate.test.ts",
-      "line": 464,
+      "line": 514,
       "title": "keeps legacy and unselected concrete owners outside every selected closure"
     },
     {
@@ -7656,7 +7656,7 @@
       "id": "WRC-C-T39",
       "kind": "assertion",
       "path": "packages/web-rpc/test/tree-shaking/b11f-candidate.test.ts",
-      "line": 228,
+      "line": 247,
       "title": "matches canonical root, five-consumer closure, provenance, and causal attribution"
     },
     {
@@ -7796,7 +7796,7 @@
       "id": "WRC-C-T74",
       "kind": "assertion",
       "path": "packages/web-rpc/test/tree-shaking/b11f-candidate.test.ts",
-      "line": 228,
+      "line": 247,
       "title": "matches canonical root, five-consumer closure, provenance, and causal attribution"
     },
     {

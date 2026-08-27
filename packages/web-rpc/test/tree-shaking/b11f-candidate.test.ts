@@ -79,6 +79,24 @@ type ICandidateCausality = {
   readonly incomingEdges: readonly IIncomingEdge[]
 }
 
+/** Describes the current event-subscriber increment separately from historical cumulative drift. */
+type IIncrementalCausality = {
+  readonly cause: string
+  readonly owner: string
+  readonly module: string
+  readonly fromTuple: ITuple
+  readonly toTuple: ITuple
+  readonly measuredDelta: Required<ITuple>
+  readonly byteAttribution: {
+    readonly before: Omit<IModuleAttribution, 'module'>
+    readonly after: Omit<IModuleAttribution, 'module'>
+  }
+  readonly retainedBy: readonly IConsumer[]
+  readonly moduleSetChanged: boolean
+  readonly endpointStaticImportCountChanged: boolean
+  readonly webRpcProductionSourceDelta: number
+}
+
 type IPostMigrationCandidate = {
   readonly schema: string
   readonly status: 'approved'
@@ -99,6 +117,7 @@ type IPostMigrationCandidate = {
   readonly removedModules: readonly ICandidateModule[]
   readonly runtimeOwnerAllocation: Readonly<Record<IConsumer, readonly string[]>>
   readonly causality: ICandidateCausality
+  readonly incrementalCausality: IIncrementalCausality
   readonly causalSchema: string
 }
 
@@ -241,8 +260,8 @@ describe('WRC-C-B11f approved post-migration candidate', () => {
     expect(candidate.status).toBe('approved')
     expect(candidate.approval).toEqual({
       status: 'approved',
-      decisionId: 'WRC-C-B11-decision-20260827-05',
-      keyId: 'coordinator-ed25519-37182544d93c586a',
+      decisionId: 'WRC-C-B11-decision-20260827-06',
+      keyId: 'coordinator-ed25519-35f1f9bd39e4a6b8',
       digest: candidate.provenanceDigest,
       oldTuple: {
         moduleCount: candidate.oldTuple.moduleCount,
@@ -343,6 +362,37 @@ describe('WRC-C-B11f approved post-migration candidate', () => {
       retainedBy: pluginHostCausal?.retainedBy,
       incomingEdges: pluginHostCausal?.incomingEdges
     })
+    expect(candidate.incrementalCausality).toEqual({
+      cause: 'event-subscriber styled handle and invoke migration',
+      owner: '@migaia/event-subscriber',
+      module: 'workspace:packages/event-subscriber/dist/index.js',
+      fromTuple: {
+        moduleCount: 66,
+        rawBytes: 474929,
+        gzipBytes: 113059,
+        endpointStaticImportCount: 12
+      },
+      toTuple: {
+        moduleCount: 66,
+        rawBytes: 475863,
+        gzipBytes: 113255,
+        endpointStaticImportCount: 12
+      },
+      measuredDelta: {
+        moduleCount: 0,
+        rawBytes: 934,
+        gzipBytes: 196,
+        endpointStaticImportCount: 0
+      },
+      byteAttribution: {
+        before: { originalBytes: 21790, renderedBytes: 16053 },
+        after: { originalBytes: 22721, renderedBytes: 16987 }
+      },
+      retainedBy: ['core', 'client', 'provider', 'full', 'custom'],
+      moduleSetChanged: false,
+      endpointStaticImportCountChanged: false,
+      webRpcProductionSourceDelta: 0
+    })
     for (const entry of candidate.addedModules) {
       expect(entry.owner.length).toBeGreaterThan(0)
       expect(entry.requirements.length).toBeGreaterThan(0)
@@ -374,15 +424,15 @@ describe('WRC-C-B11f approved post-migration candidate', () => {
       ],
       [
         'tree-shaking-baseline.json',
-        '3c0d4ac9ae730b4603761ed9ac18111b31bd5e5ff17f8d41e6d74f0de4afe350'
+        '6868ac292dcebc2c59222c4ae38ccf708bb0b1037a26ebd8850aae5be6a573af'
       ],
       [
         'baseline-authority.json',
-        'e7fc9aea569194960d2bf3d7aea780a0c03125f007815518e4647f3bcecffc85'
+        'a317b7a2bcb554bbe095be9e3e38509dc468d51554ae4413db3e71aa05ed50dc'
       ],
       [
         'baseline-authorization.json',
-        '22689c28ca2a07f526d09e0c102306fd8836667c5f6a6aa21e9477abc61976ad'
+        '408f40440b5c476262bd91d5ac696332991603486c0c4a197ca3dc2aac690a8e'
       ]
     ] as const
 

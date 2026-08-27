@@ -334,19 +334,19 @@ const reportSystemTerminal = (
 /** Creates a canonical transient channel backed by an O(1) linked registration list. */
 export function createCanonicalChannel<T, R, const S extends IEventApiStyle>(
   options: IStyledEventChannelOptions<T, S>
-): ICanonicalEventChannel<T, R> & IStyledEventChannel<T, R, S>
+): ICanonicalEventChannel<T, R, S> & IStyledEventChannel<T, R, S>
 export function createCanonicalChannel<T, R = void>(
   options: Omit<IEventChannelOptions<T>, 'style'> & { readonly style: 'subscribe-publish' }
 ): ICanonicalEventChannel<T, R>
 export function createCanonicalChannel<T, R = void>(
   options: Omit<IEventChannelOptions<T>, 'style'> & { readonly style: 'on-emit' }
-): ICanonicalEventChannel<T, R> & IStyledEventChannel<T, R, 'on-emit'>
+): ICanonicalEventChannel<T, R, 'on-emit'> & IStyledEventChannel<T, R, 'on-emit'>
 export function createCanonicalChannel<T, R = void>(
   options: Omit<IEventChannelOptions<T>, 'style'> & { readonly style: 'on-trigger' }
-): ICanonicalEventChannel<T, R> & IStyledEventChannel<T, R, 'on-trigger'>
+): ICanonicalEventChannel<T, R, 'on-trigger'> & IStyledEventChannel<T, R, 'on-trigger'>
 export function createCanonicalChannel<T, R = void>(
   options: Omit<IEventChannelOptions<T>, 'style'> & { readonly style: 'listen-fire' }
-): ICanonicalEventChannel<T, R> & IStyledEventChannel<T, R, 'listen-fire'>
+): ICanonicalEventChannel<T, R, 'listen-fire'> & IStyledEventChannel<T, R, 'listen-fire'>
 export function createCanonicalChannel<T, R = void>(
   options?: IEventChannelOptions<T>
 ): ICanonicalEventChannel<T, R>
@@ -508,16 +508,20 @@ export function createCanonicalChannel<T, R = void>(
       }
       const taskId = readTaskOption(listenerOptions)
       const release = registerRaw(listener, taskId)
-      return createSubscriptionHandle(release, (nextListener, nextOptions) => {
-        if (typeof nextListener !== 'function') {
-          throw createEventTypeError(
-            EventSubscriberErrorCode.invalidListener,
-            eventErrorText(EventSubscriberErrorCode.invalidListener)
-          )
-        }
-        const nextTaskId = readTaskOption(nextOptions)
-        return registerRaw(nextListener, nextTaskId)
-      })
+      return createSubscriptionHandle(
+        release,
+        (nextListener, nextOptions) => {
+          if (typeof nextListener !== 'function') {
+            throw createEventTypeError(
+              EventSubscriberErrorCode.invalidListener,
+              eventErrorText(EventSubscriberErrorCode.invalidListener)
+            )
+          }
+          const nextTaskId = readTaskOption(nextOptions)
+          return registerRaw(nextListener, nextTaskId)
+        },
+        stylePlan
+      )
     },
     subscribeOnce(listener, listenerOptions) {
       return subscribeOnce(channel, listener, listenerOptions)

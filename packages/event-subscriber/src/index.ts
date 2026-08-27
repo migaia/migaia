@@ -2,12 +2,12 @@ export { subscribeOnce, subscribeSubscriber, subscribeUntil } from './channel.js
 export { createCanonicalChannel as createEventChannel } from './channel.js'
 export { createEventHub } from './hub.js'
 export {
-  publishParallel,
-  publishParallelSettled,
-  publishSerial,
-  publishSerialSettled,
-  publishTask,
-  publishTaskSettled
+  invokeParallel,
+  invokeParallelSettled,
+  invokeSerial,
+  invokeSerialSettled,
+  invokeTask,
+  invokeTaskSettled
 } from './async.js'
 export { EVENT_SUBSCRIBER_SOURCE, EventSubscriberErrorCode } from './error-code.js'
 export { EventDispatchPolicy, EventSubscriberState } from './state-constants.js'

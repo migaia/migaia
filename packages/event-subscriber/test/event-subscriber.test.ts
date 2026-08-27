@@ -3,10 +3,10 @@ import {
   EventSubscriberErrorCode,
   createEventChannel,
   createEventHub,
-  publishParallelSettled,
-  publishSerialSettled,
-  publishTask,
-  publishTaskSettled,
+  invokeParallelSettled,
+  invokeSerialSettled,
+  invokeTask,
+  invokeTaskSettled,
   subscribeSubscriber,
   subscribeUntil
 } from '../src/index.js'
@@ -124,8 +124,8 @@ describe('event channel', () => {
   it('ES-T07 treats an empty channel as a synchronous and async no-op', async () => {
     const channel = createEventChannel<number>()
     expect(() => channel.publish(1)).not.toThrow()
-    await expect(publishParallelSettled(channel, 1)).resolves.toEqual([])
-    await expect(publishSerialSettled(channel, 1)).resolves.toEqual([])
+    await expect(invokeParallelSettled(channel, 1)).resolves.toEqual([])
+    await expect(invokeSerialSettled(channel, 1)).resolves.toEqual([])
     expect(channel.size).toBe(0)
   })
 
@@ -192,7 +192,7 @@ describe('event channel', () => {
     })
     channel.subscribe(() => thenable as never)
 
-    await expect(publishParallelSettled(channel, 1)).resolves.toEqual([
+    await expect(invokeParallelSettled(channel, 1)).resolves.toEqual([
       { status: 'fulfilled', value: 'first' }
     ])
   })
@@ -200,16 +200,16 @@ describe('event channel', () => {
   it('ES-T39 supports task selection and rejects ambiguous selection synchronously', async () => {
     const channel = createEventChannel<number, number>()
     channel.subscribe((event) => event.value + 1, { taskId: 'one' })
-    const settled = await publishTaskSettled(channel, 'one', 2)
+    const settled = await invokeTaskSettled(channel, 'one', 2)
     expect(settled.status).toBe('fulfilled')
     if (settled.status === 'fulfilled') expect(settled.value).toBe(3)
-    await expect(publishTask(channel, 'one', 2)).resolves.toBe(3)
-    expect(() => publishTaskSettled(channel, 'missing', 1)).toThrowError(
+    await expect(invokeTask(channel, 'one', 2)).resolves.toBe(3)
+    expect(() => invokeTaskSettled(channel, 'missing', 1)).toThrowError(
       expect.objectContaining({ code: EventSubscriberErrorCode.taskNotFound })
     )
     channel.subscribe(() => 4, { taskId: 'duplicate' })
     channel.subscribe(() => 5, { taskId: 'duplicate' })
-    expect(() => publishTask(channel, 'duplicate', 1)).toThrowError(
+    expect(() => invokeTask(channel, 'duplicate', 1)).toThrowError(
       expect.objectContaining({ code: EventSubscriberErrorCode.taskNotUnique })
     )
   })
@@ -235,7 +235,7 @@ describe('event channel', () => {
     const view = channel.filterTaskId('selected')
 
     expect('subscribe' in view).toBe(false)
-    expect(await publishTaskSettled(channel, 'selected', 3)).toMatchObject({
+    expect(await invokeTaskSettled(channel, 'selected', 3)).toMatchObject({
       status: 'fulfilled',
       value: 3
     })
@@ -250,11 +250,11 @@ describe('event channel', () => {
 
     expect('subscribe' in view).toBe(false)
     expect('publish' in view).toBe(false)
-    await expect(publishParallelSettled(view, 4)).resolves.toMatchObject([
+    await expect(invokeParallelSettled(view, 4)).resolves.toMatchObject([
       { status: 'fulfilled', value: 5 }
     ])
     stop()
-    await expect(publishParallelSettled(view, 4)).resolves.toEqual([])
+    await expect(invokeParallelSettled(view, 4)).resolves.toEqual([])
     expect(channel.size).toBe(0)
   })
 
@@ -275,7 +275,7 @@ describe('event channel', () => {
       order.push('second')
       return 2
     })
-    const parallel = publishParallelSettled(channel, 1)
+    const parallel = invokeParallelSettled(channel, 1)
     expect(order).toEqual(['start-1', 'second'])
     resolveParallel()
     await parallel
@@ -295,7 +295,7 @@ describe('event channel', () => {
       order.push('serial-second')
       return 2
     })
-    const serial = publishSerialSettled(serialChannel, 2)
+    const serial = invokeSerialSettled(serialChannel, 2)
     await Promise.resolve()
     expect(order).toEqual(['serial-first'])
     resolveSerial()
@@ -512,7 +512,7 @@ describe('hub', () => {
         event.setTaskId('new')
         if (!reentered) {
           reentered = true
-          void publishTaskSettled(channel, 'new', event.value).then((result) => {
+          void invokeTaskSettled(channel, 'new', event.value).then((result) => {
             if (result.status === 'fulfilled') calls.push(`inner:${result.status}`)
           })
         }

@@ -7,9 +7,14 @@ import {
   createEventHub,
   defineEventApiStyle,
   EventApiStyle,
-  EventSubscriberErrorCode
+  EventSubscriberErrorCode,
+  invokeParallelSettled,
+  subscribeOnce,
+  subscribeSubscriber,
+  subscribeUntil
 } from '../src/index.js'
 import type { IEventContext } from '../src/index.js'
+import { createRawSubscriptionOwner } from '../src/internal/subscription.js'
 import { normalizeEventApiStyle, projectEventApiStyle } from '../src/style.js'
 
 /** Invokes the public factory at its JavaScript boundary for hostile-value coverage. */
@@ -21,6 +26,317 @@ const callUntrustedHub = (options: unknown): unknown =>
   (createEventHub as unknown as (options: unknown) => unknown)(options)
 
 describe('event API style projection', () => {
+  it('ES-T134 ESV2H-T01/T02: normalizes cancellation names for presets and custom styles', () => {
+    expect(normalizeEventApiStyle(undefined)).toEqual({
+      subscribe: 'subscribe',
+      publish: 'publish',
+      unsubscribe: 'unsubscribe'
+    })
+    expect(normalizeEventApiStyle('subscribe-publish')).toEqual({
+      subscribe: 'subscribe',
+      publish: 'publish',
+      unsubscribe: 'unsubscribe'
+    })
+    expect(normalizeEventApiStyle('on-emit')).toEqual({
+      subscribe: 'on',
+      publish: 'emit',
+      unsubscribe: 'off'
+    })
+    expect(normalizeEventApiStyle('on-trigger')).toEqual({
+      subscribe: 'on',
+      publish: 'trigger',
+      unsubscribe: 'off'
+    })
+    expect(normalizeEventApiStyle('listen-fire')).toEqual({
+      subscribe: 'listen',
+      publish: 'fire',
+      unsubscribe: 'unlisten'
+    })
+    expect(normalizeEventApiStyle({ subscribe: 'observe', publish: 'dispatch' })).toEqual({
+      subscribe: 'observe',
+      publish: 'dispatch',
+      unsubscribe: 'unsubscribe'
+    })
+    expect(
+      normalizeEventApiStyle({ subscribe: 'observe', publish: 'dispatch', unsubscribe: 'dispose' })
+    ).toEqual({ subscribe: 'observe', publish: 'dispatch', unsubscribe: 'dispose' })
+    expect(() => normalizeEventApiStyle('emit-on')).toThrowError(
+      expect.objectContaining({ code: EventSubscriberErrorCode.invalidOptions })
+    )
+  })
+
+  it('ES-T135 ESV2H-T03/T05/T09/T10: projects styled Channel aliases onto one callable handle', () => {
+    const channel = createEventChannel<number>({ style: 'on-emit' })
+    const seen: number[] = []
+    const handle = channel
+      .on((event) => {
+        seen.push(event.value)
+      })
+      .on((event) => {
+        seen.push(event.value)
+      })
+
+    expect(handle.on).toBe(handle.subscribe)
+    expect(handle.off).toBe(handle)
+    expect(handle.unsubscribe).toBe(handle)
+    expect(Object.getOwnPropertyDescriptor(handle, 'on')).toMatchObject({
+      configurable: false,
+      enumerable: false,
+      writable: false,
+      value: handle.subscribe
+    })
+    expect(Object.getOwnPropertyDescriptor(handle, 'off')).toMatchObject({
+      configurable: false,
+      enumerable: false,
+      writable: false,
+      value: handle
+    })
+
+    channel.emit(7)
+    expect(seen).toEqual([7, 7])
+    handle.off()
+    expect(channel.size).toBe(0)
+  })
+
+  it('ES-T136 ESV2H-T04/T08/T15: projects styled Hub aliases across finite key chains', () => {
+    const hub = createEventHub<{ ready: number; done: string }>({ style: 'on-emit' })
+    const seen: string[] = []
+    const handle = hub
+      .on('ready', (event) => {
+        seen.push(String(event.value))
+      })
+      .on('done', (event) => {
+        seen.push(event.value)
+      })
+
+    expect(handle.on).toBe(handle.subscribe)
+    expect(handle.off).toBe(handle)
+    const sendEvent = hub.emit
+    sendEvent('ready', 3)
+    sendEvent('done', 'ok')
+    expect(seen).toEqual(['3', 'ok'])
+    handle.off()
+    expect(hub.size()).toBe(0)
+  })
+
+  it('ES-T137 ESV2H-T15: closed styled handles reject before reading hostile arguments', () => {
+    const hub = createEventHub<{ ready: number }>({ style: 'on-emit' })
+    const handle = hub.on('ready', () => undefined)
+    handle.off()
+    let reads = 0
+    const hostile = new Proxy(
+      {},
+      {
+        get() {
+          reads += 1
+          throw new Error('closed alias read')
+        }
+      }
+    )
+
+    expect(() => handle.on('ready' as never, hostile as never)).toThrowError(
+      expect.objectContaining({ code: EventSubscriberErrorCode.subscriptionClosed })
+    )
+    expect(reads).toBe(0)
+  })
+
+  it('ES-T138 ESV2H-T16: rolls back first registration when handle projection fails', () => {
+    const first = vi.fn()
+    const extend = vi.fn()
+    const projectionOriginal = new Error('projection plan failed')
+    const stylePlan = {
+      get subscribe() {
+        throw projectionOriginal
+      },
+      publish: 'emit',
+      unsubscribe: 'off'
+    }
+
+    expect(() => createRawSubscriptionOwner(first, extend, stylePlan as never)).toThrowError(
+      expect.objectContaining({
+        code: EventSubscriberErrorCode.subscriptionHandleProjectionFailed,
+        cause: projectionOriginal
+      })
+    )
+    expect(first).toHaveBeenCalledTimes(1)
+    expect(extend).not.toHaveBeenCalled()
+  })
+
+  it('ES-T139 ESV2H-T09/T10: projects custom and listen-fire cancellation identities', () => {
+    const customStyle = defineEventApiStyle({
+      subscribe: 'observe',
+      publish: 'dispatch',
+      unsubscribe: 'dispose'
+    })
+    const customChannel = createEventChannel<number, void, typeof customStyle>({
+      style: customStyle
+    })
+    const customHandle = customChannel.observe(() => undefined)
+
+    expect(customHandle.dispose).toBe(customHandle)
+    expect(customHandle.unsubscribe).toBe(customHandle)
+    expect(Object.getOwnPropertyDescriptor(customHandle, 'dispose')).toMatchObject({
+      configurable: false,
+      enumerable: false,
+      writable: false,
+      value: customHandle
+    })
+    customHandle.dispose()
+    customHandle.unsubscribe()
+    expect(customChannel.size).toBe(0)
+
+    const listenChannel = createEventChannel<number>({ style: 'listen-fire' })
+    const listenHandle = listenChannel.listen(() => undefined)
+    expect(listenHandle.unlisten).toBe(listenHandle)
+    expect(listenHandle.unsubscribe).toBe(listenHandle)
+    expect(Object.getOwnPropertyDescriptor(listenHandle, 'unlisten')).toMatchObject({
+      configurable: false,
+      enumerable: false,
+      writable: false,
+      value: listenHandle
+    })
+    listenHandle.unlisten()
+    expect(listenChannel.size).toBe(0)
+  })
+
+  it('ES-T140 ESV2H-T09/T11/T12: preserves mixed chain identity and default handle shape', () => {
+    const channel = createEventChannel<number>({ style: 'on-emit' })
+    const seen: number[] = []
+    const mixedFromCanonical = channel
+      .subscribe((event) => {
+        seen.push(event.value)
+      })
+      .on((event) => {
+        seen.push(event.value * 10)
+      })
+    expect(mixedFromCanonical).toBe(mixedFromCanonical.subscribe(() => undefined))
+    expect(mixedFromCanonical.on).toBe(mixedFromCanonical.subscribe)
+
+    const mixedFromAlias = channel.on((event) => {
+      seen.push(event.value * 100)
+    })
+    expect(mixedFromAlias).toBe(mixedFromAlias.subscribe(() => undefined))
+    channel.emit(2)
+    expect(seen).toEqual([2, 20, 200])
+    mixedFromCanonical.off()
+    mixedFromAlias.off()
+    expect(channel.size).toBe(0)
+
+    const defaultHandle = createEventChannel<number>({ style: 'subscribe-publish' }).subscribe(
+      () => undefined
+    )
+    expect(Object.keys(defaultHandle)).toEqual([])
+    expect(Object.getOwnPropertyNames(defaultHandle).sort()).toEqual(
+      ['length', 'name', 'subscribe', 'unsubscribe'].sort()
+    )
+    expect(defaultHandle.subscribe).toBeTypeOf('function')
+    expect(defaultHandle.unsubscribe).toBe(defaultHandle)
+    defaultHandle()
+  })
+
+  it('ES-T141 ESV2H-T09/T16: releases owner registrations in reverse order and preserves both rollback errors', () => {
+    const registered: string[] = []
+    const released: string[] = []
+    const owner = createRawSubscriptionOwner(
+      () => {
+        released.push('first')
+      },
+      (...args: never[]) => {
+        const name = args[0] as unknown as string
+        registered.push(name)
+        return () => {
+          released.push(name)
+        }
+      },
+      normalizeEventApiStyle('on-emit')
+    )
+    owner.subscribe('second' as never)
+    owner.subscribe('third' as never)
+    owner()
+    owner()
+    expect(registered).toEqual(['second', 'third'])
+    expect(released).toEqual(['third', 'second', 'first'])
+
+    const projectionOriginal = new Error('projection failed')
+    const rollbackOriginal = new Error('rollback failed')
+    let rollbackError: unknown
+    try {
+      createRawSubscriptionOwner(
+        () => {
+          throw rollbackOriginal
+        },
+        () => undefined,
+        {
+          get subscribe() {
+            throw projectionOriginal
+          },
+          publish: 'emit',
+          unsubscribe: 'off'
+        } as never
+      )
+    } catch (error) {
+      rollbackError = error
+    }
+    expect(rollbackError).toBeInstanceOf(AggregateError)
+    expect(rollbackError).toMatchObject({
+      source: expect.any(String),
+      code: EventSubscriberErrorCode.subscriptionHandleProjectionFailed,
+      cause: projectionOriginal
+    })
+    expect((rollbackError as AggregateError).errors).toEqual([projectionOriginal, rollbackOriginal])
+  })
+
+  it('ES-T142 ESV2H-T17/T18: keeps helpers and filtered views canonical on styled channels', async () => {
+    const channel = createEventChannel<number>({ style: 'on-emit' })
+    const onceListener = vi.fn((event: IEventContext<number>) => {
+      void event.value
+    })
+    const onceStop = subscribeOnce(channel, onceListener)
+    const subscriberHandle = vi.fn((event: IEventContext<number>) => {
+      void event.value
+    })
+    const subscriberStop = subscribeSubscriber(channel, { handle: subscriberHandle })
+    const addAbortListener = vi.fn()
+    const removeAbortListener = vi.fn()
+    const untilStop = subscribeUntil(
+      channel,
+      {
+        aborted: false,
+        addEventListener: addAbortListener,
+        removeEventListener: removeAbortListener
+      } as never,
+      () => undefined
+    )
+
+    expect(onceStop).toBeTypeOf('function')
+    expect(subscriberStop).toBeTypeOf('function')
+    expect(untilStop).toBeTypeOf('function')
+    expect('on' in onceStop).toBe(false)
+    expect('off' in subscriberStop).toBe(false)
+    expect('on' in untilStop).toBe(false)
+    channel.emit(3)
+    channel.emit(4)
+    expect(onceListener).toHaveBeenCalledTimes(1)
+    expect(subscriberHandle).toHaveBeenCalledTimes(2)
+    onceStop()
+    subscriberStop()
+    untilStop()
+    expect(removeAbortListener).toHaveBeenCalledTimes(1)
+
+    const filteredChannel = createEventChannel<number, number>({ style: 'on-emit' })
+    const selectedListener = vi.fn((event: IEventContext<number>) => event.value)
+    const selectedStop = filteredChannel.on(selectedListener, { taskId: 'selected' })
+    const selected = filteredChannel.filterTaskId('selected')
+    expect(Object.keys(selected)).toEqual([])
+    expect('on' in selected).toBe(false)
+    expect('off' in selected).toBe(false)
+    await expect(invokeParallelSettled(selected, 9)).resolves.toMatchObject([
+      { status: 'fulfilled', value: 9 }
+    ])
+    expect(selectedListener).toHaveBeenCalledTimes(1)
+    selectedStop()
+  })
+
   it('ES-T123 ESV2-T01/T02/T16: keeps the default surface unchanged', () => {
     const omitted = createEventChannel<number>()
     const explicit = createEventChannel<number>({ style: 'subscribe-publish' })
@@ -188,6 +504,14 @@ describe('event API style projection', () => {
       { subscribe: 'observe', publish: 'size' },
       { subscribe: 'observe', publish: '__proto__' },
       { subscribe: 'observe', publish: 'prototype' },
+      { subscribe: 'observe', publish: 'emit', unsubscribe: '' },
+      { subscribe: 'observe', publish: 'emit', unsubscribe: 'observe' },
+      { subscribe: 'observe', publish: 'emit', unsubscribe: 'publish' },
+      { subscribe: 'observe', publish: 'emit', unsubscribe: 'subscribe' },
+      { subscribe: 'observe', publish: 'emit', unsubscribe: '__proto__' },
+      { subscribe: 'observe', publish: 'emit', unsubscribe: 'prototype' },
+      { subscribe: 'observe', publish: 'emit', unsubscribe: 'constructor' },
+      { subscribe: 'observe', publish: 'emit', unsubscribe: 1 },
       { subscribe: 1, publish: 'emit' },
       null,
       'unknown-preset'
@@ -236,6 +560,46 @@ describe('event API style projection', () => {
     expect(styleReads).toBe(1)
     expect(sequence).toEqual(['style', 'subscribe'])
     expect(original.stack).toBeTruthy()
+
+    const orderedReads: string[] = []
+    const orderedStyle = {
+      get subscribe() {
+        orderedReads.push('subscribe')
+        return 'observe'
+      },
+      get publish() {
+        orderedReads.push('publish')
+        return 'dispatch'
+      },
+      get unsubscribe() {
+        orderedReads.push('unsubscribe')
+        return 'dispose'
+      }
+    }
+    const orderedOptions = {
+      get style() {
+        orderedReads.push('style')
+        return orderedStyle
+      }
+    }
+    expect(() => callUntrustedChannel(orderedOptions)).not.toThrow()
+    expect(orderedReads).toEqual(['style', 'subscribe', 'publish', 'unsubscribe'])
+
+    const unsubscribeOriginal = new Error('unsubscribe getter failed')
+    const unsubscribeStyle = {
+      subscribe: 'observe',
+      publish: 'dispatch',
+      get unsubscribe() {
+        throw unsubscribeOriginal
+      }
+    }
+    expect(() => callUntrustedChannel({ style: unsubscribeStyle })).toThrowError(
+      expect.objectContaining({
+        code: EventSubscriberErrorCode.invalidOptions,
+        cause: unsubscribeOriginal
+      })
+    )
+    expect(unsubscribeOriginal.stack).toBeTruthy()
 
     const proxyOriginal = new Error('options proxy failed')
     const proxiedOptions = new Proxy(

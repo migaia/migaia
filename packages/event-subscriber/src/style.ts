@@ -16,6 +16,7 @@ type IEventApiReservedName =
   | 'subscribeOnce'
   | 'subscribeUntil'
   | 'publish'
+  | 'unsubscribe'
   | 'filterTaskId'
   | 'clear'
   | 'size'
@@ -25,10 +26,14 @@ type IEventApiReservedName =
 
 /** Maps each preset to its semantic method names without introducing a second runtime owner. */
 const eventApiStyleNames = {
-  [EventApiStyle.subscribePublish]: { subscribe: 'subscribe', publish: 'publish' },
-  [EventApiStyle.onEmit]: { subscribe: 'on', publish: 'emit' },
-  [EventApiStyle.onTrigger]: { subscribe: 'on', publish: 'trigger' },
-  [EventApiStyle.listenFire]: { subscribe: 'listen', publish: 'fire' }
+  [EventApiStyle.subscribePublish]: {
+    subscribe: 'subscribe',
+    publish: 'publish',
+    unsubscribe: 'unsubscribe'
+  },
+  [EventApiStyle.onEmit]: { subscribe: 'on', publish: 'emit', unsubscribe: 'off' },
+  [EventApiStyle.onTrigger]: { subscribe: 'on', publish: 'trigger', unsubscribe: 'off' },
+  [EventApiStyle.listenFire]: { subscribe: 'listen', publish: 'fire', unsubscribe: 'unlisten' }
 } as const
 
 /** Own-key lookup prevents inherited Object prototype names from becoming presets. */
@@ -41,6 +46,7 @@ const eventApiReservedNames = new Set<IEventApiReservedName>([
   'subscribeOnce',
   'subscribeUntil',
   'publish',
+  'unsubscribe',
   'filterTaskId',
   'clear',
   'size',
@@ -51,16 +57,19 @@ const eventApiReservedNames = new Set<IEventApiReservedName>([
 
 export type IEventApiStyleNames<
   TSubscribe extends string = string,
-  TPublish extends string = string
+  TPublish extends string = string,
+  TUnsubscribe extends string = string
 > = {
   readonly subscribe: TSubscribe
   readonly publish: TPublish
+  readonly unsubscribe?: TUnsubscribe
 }
 
 export type IEventApiStyle = EventApiStyle | IEventApiStyleNames
 
 type IEventApiForbiddenSubscribeName = Exclude<IEventApiReservedName, 'subscribe'>
 type IEventApiForbiddenPublishName = Exclude<IEventApiReservedName, 'publish'>
+type IEventApiForbiddenUnsubscribeName = Exclude<IEventApiReservedName, 'unsubscribe'>
 
 export type IEventApiStyleOption<S extends IEventApiStyle | undefined> = S extends undefined
   ? undefined
@@ -73,8 +82,17 @@ export type IEventApiStyleOption<S extends IEventApiStyle | undefined> = S exten
           ? never
           : Extract<TSubscribe, IEventApiForbiddenSubscribeName> extends never
             ? Extract<TPublish, IEventApiForbiddenPublishName> extends never
-              ? Extract<TSubscribe, TPublish> extends never
-                ? S
+              ? IEventApiStyleNamesAreDistinct<
+                  TSubscribe,
+                  TPublish,
+                  IEventApiStyleCancellationName<S>
+                > extends true
+                ? Extract<
+                    IEventApiStyleCancellationName<S>,
+                    IEventApiForbiddenUnsubscribeName
+                  > extends never
+                  ? S
+                  : never
                 : never
               : never
             : never
@@ -86,11 +104,40 @@ export type IEventApiStyleMethodNames<S extends IEventApiStyle | undefined> =
     : S extends IEventApiStyleNames<infer TSubscribe, infer TPublish>
       ? string extends TSubscribe | TPublish
         ? never
-        : IEventApiStyleNames<TSubscribe, TPublish>
+        : IEventApiStyleResolvedNames<TSubscribe, TPublish, IEventApiStyleCancellationName<S>>
       : never
 
 /** The normalized immutable plan consumed once during surface construction. */
-export type IEventApiStylePlan = Readonly<IEventApiStyleNames<string, string>>
+export type IEventApiStylePlan = Readonly<IEventApiStyleResolvedNames<string, string, string>>
+
+/** The required shape after optional custom cancellation naming is resolved. */
+type IEventApiStyleResolvedNames<
+  TSubscribe extends string,
+  TPublish extends string,
+  TUnsubscribe extends string
+> = {
+  readonly subscribe: TSubscribe
+  readonly publish: TPublish
+  readonly unsubscribe: TUnsubscribe
+}
+
+/** Falls back to canonical cancellation when a legacy two-field style omits it. */
+type IEventApiStyleCancellationName<S> = S extends {
+  readonly unsubscribe: infer TUnsubscribe extends string
+}
+  ? TUnsubscribe
+  : 'unsubscribe'
+
+/** Checks semantic names without rejecting legacy two-field custom styles. */
+type IEventApiStyleNamesAreDistinct<
+  TSubscribe extends string,
+  TPublish extends string,
+  TUnsubscribe extends string
+> = TSubscribe extends TPublish | TUnsubscribe
+  ? false
+  : TPublish extends TUnsubscribe
+    ? false
+    : true
 
 /** Returns the input identity while preserving literal names for predeclared style objects. */
 export const defineEventApiStyle = <const S extends IEventApiStyleNames>(style: S): S => style
@@ -104,12 +151,26 @@ export const normalizeEventApiStyle = (value: unknown): IEventApiStylePlan => {
   } else if (isRecord(value)) {
     const subscribe = value.subscribe
     const publish = value.publish
-    const validatedSubscribe = validateStyleName(subscribe, 'subscribe')
-    const validatedPublish = validateStyleName(publish, 'publish')
-    if (validatedSubscribe === validatedPublish) throw invalidStyle()
+    const unsubscribe = value.unsubscribe
+    const validatedSubscribe = validateStyleName(subscribe)
+    const validatedPublish = validateStyleName(publish)
+    const validatedUnsubscribe = validateStyleName(
+      unsubscribe === undefined ? 'unsubscribe' : unsubscribe
+    )
+    if (
+      validatedSubscribe === validatedPublish ||
+      validatedSubscribe === validatedUnsubscribe ||
+      validatedPublish === validatedUnsubscribe
+    )
+      throw invalidStyle()
     if (isReservedForOtherMethod(validatedSubscribe, 'subscribe')) throw invalidStyle()
     if (isReservedForOtherMethod(validatedPublish, 'publish')) throw invalidStyle()
-    return Object.freeze({ subscribe: validatedSubscribe, publish: validatedPublish })
+    if (isReservedForOtherMethod(validatedUnsubscribe, 'unsubscribe')) throw invalidStyle()
+    return Object.freeze({
+      subscribe: validatedSubscribe,
+      publish: validatedPublish,
+      unsubscribe: validatedUnsubscribe
+    })
   }
   throw invalidStyle()
 }
@@ -149,15 +210,16 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
 /** Validates one semantic method name before it enters a descriptor plan. */
-const validateStyleName = (value: unknown, semantic: 'subscribe' | 'publish'): string => {
+const validateStyleName = (value: unknown): string => {
   if (typeof value !== 'string' || value.length === 0) throw invalidStyle()
-  if (semantic === 'subscribe' && value === 'publish') throw invalidStyle()
-  if (semantic === 'publish' && value === 'subscribe') throw invalidStyle()
   return value
 }
 
 /** Rejects public members that would shadow a canonical operation or prototype escape hatch. */
-const isReservedForOtherMethod = (value: string, semantic: 'subscribe' | 'publish'): boolean => {
+const isReservedForOtherMethod = (
+  value: string,
+  semantic: 'subscribe' | 'publish' | 'unsubscribe'
+): boolean => {
   if (value === semantic) return false
   return eventApiReservedNames.has(value as IEventApiReservedName)
 }

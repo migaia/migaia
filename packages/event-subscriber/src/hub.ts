@@ -139,8 +139,10 @@ export function createEventHub<C extends IEventMap>(options: unknown = {}): IEve
       listener: IEventListener<C[K]>
     ): IEventHubSubscription<C, K> {
       const release = registerRaw(key, listener)
-      return createRawSubscriptionOwner(release, (nextKey, nextListener) =>
-        registerRaw(nextKey, nextListener)
+      return createRawSubscriptionOwner(
+        release,
+        (nextKey, nextListener) => registerRaw(nextKey, nextListener),
+        stylePlan
       ) as IEventHubSubscription<C, K>
     },
     publish<K extends keyof C>(key: K, value: C[K]): void {

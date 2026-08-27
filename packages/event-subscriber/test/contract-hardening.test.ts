@@ -4,12 +4,12 @@ import {
   EventSubscriberErrorCode,
   createEventChannel,
   createEventHub,
-  publishParallel,
-  publishParallelSettled,
-  publishSerial,
-  publishTaskSettled,
-  publishSerialSettled,
-  publishTask,
+  invokeParallel,
+  invokeParallelSettled,
+  invokeSerial,
+  invokeTaskSettled,
+  invokeSerialSettled,
+  invokeTask,
   subscribeOnce,
   subscribeSubscriber,
   subscribeUntil
@@ -100,7 +100,7 @@ describe('event-subscriber contract hardening', () => {
       return 2
     })
 
-    const results = await publishSerialSettled(channel, 1)
+    const results = await invokeSerialSettled(channel, 1)
     expect(calls).toEqual(['first', 'second'])
     expect(results[0].status).toBe('rejected')
     expect(results[1]).toMatchObject({ status: 'fulfilled', value: 2 })
@@ -112,11 +112,11 @@ describe('event-subscriber contract hardening', () => {
     const original = new Error('failure')
     channel.subscribe(() => Promise.reject(original))
 
-    await expect(publishParallel(channel, 1)).rejects.toMatchObject({
+    await expect(invokeParallel(channel, 1)).rejects.toMatchObject({
       code: EventSubscriberErrorCode.publishFailed,
       cause: original
     })
-    await expect(publishSerial(channel, 1)).rejects.toMatchObject({
+    await expect(invokeSerial(channel, 1)).rejects.toMatchObject({
       code: EventSubscriberErrorCode.publishFailed,
       cause: original
     })
@@ -128,8 +128,8 @@ describe('event-subscriber contract hardening', () => {
     channel.subscribe(async (event) => event.value + 1)
     channel.subscribe((event) => event.value + 2)
 
-    await expect(publishParallel(channel, 10)).resolves.toEqual([11, 12])
-    await expect(publishSerial(channel, 10)).resolves.toEqual([11, 12])
+    await expect(invokeParallel(channel, 10)).resolves.toEqual([11, 12])
+    await expect(invokeSerial(channel, 10)).resolves.toEqual([11, 12])
   })
 
   it('ES-T37 keeps task selection on the immutable snapshot while allowing live retagging', async () => {
@@ -150,7 +150,7 @@ describe('event-subscriber contract hardening', () => {
     )
 
     channel.publish(1)
-    await publishTask(channel, 'new', 2)
+    await invokeTask(channel, 'new', 2)
     expect(calls).toEqual(['outer:old', 'stable:stable', 'outer:new'])
   })
 
@@ -161,14 +161,14 @@ describe('event-subscriber contract hardening', () => {
     channel.subscribe(listener, { taskId: 'same' })
     channel.subscribe(listener, { taskId: 'same' })
 
-    expect(() => publishTaskSettled(channel, 'missing', 1)).toThrowError(
+    expect(() => invokeTaskSettled(channel, 'missing', 1)).toThrowError(
       expect.objectContaining({
         code: EventSubscriberErrorCode.taskNotFound,
         taskId: 'missing',
         matchCount: 0
       })
     )
-    expect(() => publishTaskSettled(channel, 'same', 1)).toThrowError(
+    expect(() => invokeTaskSettled(channel, 'same', 1)).toThrowError(
       expect.objectContaining({
         code: EventSubscriberErrorCode.taskNotUnique,
         taskId: 'same',
@@ -185,7 +185,7 @@ describe('event-subscriber contract hardening', () => {
     const channel = createEventChannel<number>({ report })
     channel.subscribe(() => Promise.reject(failure), { taskId: 'task' })
 
-    await expect(publishTaskSettled(channel, 'task', 1)).resolves.toMatchObject({
+    await expect(invokeTaskSettled(channel, 'task', 1)).resolves.toMatchObject({
       status: 'rejected',
       reason: failure
     })
@@ -197,7 +197,7 @@ describe('event-subscriber contract hardening', () => {
     const channel = createEventChannel<number>({ report: vi.fn() })
     channel.subscribe(() => Promise.reject(failure), { taskId: 'unique' })
 
-    await expect(publishTask(channel, 'unique', 1)).rejects.toMatchObject({
+    await expect(invokeTask(channel, 'unique', 1)).rejects.toMatchObject({
       code: EventSubscriberErrorCode.publishFailed,
       cause: failure
     })
@@ -341,7 +341,7 @@ describe('event-subscriber contract hardening', () => {
       { taskId: 'initial' }
     )
     release()
-    await expect(publishParallelSettled(channel.filterTaskId('retagged'), 1)).resolves.toEqual([])
+    await expect(invokeParallelSettled(channel.filterTaskId('retagged'), 1)).resolves.toEqual([])
     expect(calls).toEqual([])
   })
 

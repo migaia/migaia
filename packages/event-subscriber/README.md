@@ -20,7 +20,7 @@ pnpm add @migaia/event-subscriber
 
 - [Channel：创建与订阅](#channel-模块)
 - [订阅 Helper：`subscribeOnce` / `subscribeUntil` / `subscribeSubscriber`](#helper-模块)
-- [异步发布：`publishParallel` 等](#async-模块)
+- [异步调用：`invokeParallel` 等](#async-模块)
 - [Event Hub：多事件类型路由](#hub-模块)
 - [常量与错误](#错误模块)
 - [高阶组合示例](#高阶组合示例)
@@ -59,7 +59,7 @@ unsubscribe()
 
 返回的 `channel` 上的方法与字段：
 
-- `subscribe(listener, options?: { taskId?: string }): subscription` —— 返回可直接调用的 handle；handle 同时提供 `unsubscribe` 自身别名与链式 `subscribe`。解除会按逆序释放整条 chain；关闭后再扩展抛 `SUBSCRIPTION_CLOSED`。
+- `subscribe(listener, options?: { taskId?: string }): subscription` —— 返回可直接调用的 handle；handle 同时提供 `unsubscribe` 自身别名与链式 `subscribe`。styled handle 还提供对应的 subscribe/cancellation aliases（如 `on`/`off`）。解除会按逆序释放整条 chain；关闭后再扩展抛 `SUBSCRIPTION_CLOSED`。
 - `subscribeOnce` / `subscribeUntil`（见下方 Helper 模块，channel 上也直接暴露同名方法）
 - `publish(value: T): void` —— 按快照顺序同步调用全部 listener，不等待 Promise；默认同步重入 publish 递归交付，`dispatchPolicy: 'queued'` 才会排队到当前快照完成后再交付；同步失败以 `PUBLISH_FAILED` 的 `AggregateError` 抛出
 - `filterTaskId(taskId: string): IFilteredEventChannel<T, R>` —— 创建只读 task 选择 view，交给异步发布 helper
@@ -70,22 +70,27 @@ unsubscribe()
 
 ### 可选 API 命名风格
 
-命名风格只是 canonical `subscribe`/`publish` 的方法名投影，不会创建新的 dispatcher、listener registry 或调度语义。canonical 方法始终保留，alias 与 canonical 方法是同一函数引用；默认不增加 own key，非默认 alias 为不可枚举、不可写、不可配置的数据属性。
+命名风格只是 canonical `subscribe`/`publish`/`unsubscribe` 的方法名投影，不会创建新的 dispatcher、listener registry 或调度语义。canonical 方法始终保留；handle subscribe alias 与 `.subscribe` 同引用，cancellation alias 与 handle 自身同引用。默认不增加 own key，非默认 alias 为不可枚举、不可写、不可配置的数据属性。
 
 ```ts
 const events = createEventChannel<number>({ style: 'on-emit' })
 const stop = events.on((event) => console.log(event.value))
 events.emit(1)
-stop()
+stop.off()
 ```
 
 内置 preset：`subscribe-publish`（默认）、`on-emit`、`on-trigger`、`listen-fire`。自定义 style 使用语义到名称的对象映射；预声明变量可用 `defineEventApiStyle()` 保留字面量：
 
 ```ts
-const style = defineEventApiStyle({ subscribe: 'observe', publish: 'dispatch' })
+const style = defineEventApiStyle({
+  subscribe: 'observe',
+  publish: 'dispatch',
+  unsubscribe: 'dispose'
+})
 const events = createEventChannel<number, void, typeof style>({ style })
-events.observe((event) => console.log(event.value))
+const handle = events.observe((event) => console.log(event.value))
 events.dispatch(1)
+handle.dispose()
 ```
 
 Channel 的泛型顺序是 `<T, R, S>`，其中 `S` 是 custom style；因此显式指定 `T` 时，内联 custom style 必须显式提供第三个泛型。`createEventChannel<number>({ style: { subscribe: 'observe', publish: 'dispatch' } })` 不会声称推导出精确 alias。Hub 的顺序是 `<C, S>`。
@@ -149,59 +154,59 @@ subscribeSubscriber(channel, new Counter())
 
 ```ts
 import {
-  publishParallel,
-  publishParallelSettled,
-  publishSerial,
-  publishSerialSettled,
-  publishTask,
-  publishTaskSettled,
+  invokeParallel,
+  invokeParallelSettled,
+  invokeSerial,
+  invokeSerialSettled,
+  invokeTask,
+  invokeTaskSettled,
   type IListenerResult
 } from '@migaia/event-subscriber'
 ```
 
 均只接受由 `createEventChannel()` 产出的 canonical channel 或其 `filterTaskId()` view——伪造对象或另一份物理包副本创建的 channel 会得到 `INVALID_CHANNEL`。
 
-**`publishParallelSettled`｜5 秒上手** —— 全部 listener 立即启动，等待全部 settle，从不 reject：
+**`invokeParallelSettled`｜5 秒上手** —— 全部 listener 立即启动，等待全部 settle，从不 reject：
 
 ```ts
-const results = await publishParallelSettled(channel, payload)
+const results = await invokeParallelSettled(channel, payload)
 // [{ status: 'fulfilled', value }, { status: 'rejected', reason }, ...]
 ```
 
 参数：`channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>`（必填）、`value: T`（必填），无选项。结果按注册顺序排列，不按完成时间排序。
 
-**`publishParallel`｜3 秒上手** —— 同上，但任一失败时整体以 `PUBLISH_FAILED` 的 `AggregateError` reject（仍会等待全部目标执行完）：
+**`invokeParallel`｜3 秒上手** —— 同上，但任一失败时整体以 `PUBLISH_FAILED` 的 `AggregateError` reject（仍会等待全部目标执行完）：
 
 ```ts
-const values = await publishParallel(channel, payload) // Awaited<R>[]
+const values = await invokeParallel(channel, payload) // Awaited<R>[]
 ```
 
-**`publishSerialSettled`｜5 秒上手** —— 前一个 listener settle 后才启动下一个，settled 结果数组：
+**`invokeSerialSettled`｜5 秒上手** —— 前一个 listener settle 后才启动下一个，settled 结果数组：
 
 ```ts
-const results = await publishSerialSettled(channel, payload)
+const results = await invokeSerialSettled(channel, payload)
 ```
 
-参数同 `publishParallelSettled`。注意：不是 waterfall——每个 listener 收到同一个 `payload`，前一个的返回值不会传给下一个；需要值变换见 `@migaia/middleware-pipeline`。
+参数同 `invokeParallelSettled`。注意：不是 waterfall——每个 listener 收到同一个 `payload`，前一个的返回值不会传给下一个；需要值变换见 `@migaia/middleware-pipeline`。
 
-**`publishSerial`｜3 秒上手** —— 串行 + throwing 版本：
+**`invokeSerial`｜3 秒上手** —— 串行 + throwing 版本：
 
 ```ts
-const values = await publishSerial(channel, payload)
+const values = await invokeSerial(channel, payload)
 ```
 
-**`publishTaskSettled`｜10 秒上手** —— 精确选择唯一一个 `taskId` 并等待其结算，不调用 reporter：
+**`invokeTaskSettled`｜10 秒上手** —— 精确选择唯一一个 `taskId` 并等待其结算，不调用 reporter：
 
 ```ts
-const result = await publishTaskSettled(tasks, 'email', job)
+const result = await invokeTaskSettled(tasks, 'email', job)
 ```
 
 参数：`channel: ICanonicalEventChannel<T, R>`（必填）、`taskId: string`（必填）、`value: T`（必填），无选项。入口快照匹配数为 0 时同步抛 `TASK_NOT_FOUND`；多个时同步抛 `TASK_NOT_UNIQUE`（错误对象携带可枚举的 `taskId`/`matchCount`），选择动作发生在任何 listener 调用之前。
 
-**`publishTask`｜3 秒上手** —— 同上，但 listener 失败时以 `PUBLISH_FAILED` reject：
+**`invokeTask`｜3 秒上手** —— 同上，但 listener 失败时以 `PUBLISH_FAILED` reject：
 
 ```ts
-const value = await publishTask(tasks, 'email', job) // Awaited<R>
+const value = await invokeTask(tasks, 'email', job) // Awaited<R>
 ```
 
 `IListenerResult<R>` 类型：`{ status: 'fulfilled', value: Awaited<R> } | { status: 'rejected', reason: unknown }`。
@@ -289,19 +294,19 @@ if (error.code === EventSubscriberErrorCode.publishFailed) {
 ### 1. 按 `taskId` 定向到唯一订阅者并等待结果
 
 ```ts
-import { createEventChannel, publishTask } from '@migaia/event-subscriber'
+import { createEventChannel, invokeTask } from '@migaia/event-subscriber'
 
 const jobs = createEventChannel<string, string>()
 jobs.subscribe((event) => `email:${event.value}`, { taskId: 'email' })
 jobs.subscribe((event) => `audit:${event.value}`, { taskId: 'audit' })
 
-const emailResult = await publishTask(jobs, 'email', 'created')
+const emailResult = await invokeTask(jobs, 'email', 'created')
 ```
 
 ### 2. 并行结算 + 集中上报未处理的迟到失败
 
 ```ts
-import { createEventChannel, publishParallelSettled } from '@migaia/event-subscriber'
+import { createEventChannel, invokeParallelSettled } from '@migaia/event-subscriber'
 
 const checks = createEventChannel<string, boolean>({
   terminalReport: (diagnostic) => emergencySink.capture(diagnostic)
@@ -309,7 +314,7 @@ const checks = createEventChannel<string, boolean>({
 checks.subscribe(async (event) => event.value.length > 0)
 checks.subscribe(async (event) => event.value.startsWith('usr_'))
 
-const results = await publishParallelSettled(checks, 'usr_42')
+const results = await invokeParallelSettled(checks, 'usr_42')
 ```
 
 ### 3. `subscribeUntil` + `AbortController` 管理订阅生命周期
@@ -342,7 +347,7 @@ events.publish('warning', { message: 'cache is stale' })
 ### 5. 对象订阅者 + 串行结算，保证副作用按序执行
 
 ```ts
-import { createEventChannel, subscribeSubscriber, publishSerial } from '@migaia/event-subscriber'
+import { createEventChannel, subscribeSubscriber, invokeSerial } from '@migaia/event-subscriber'
 
 const pipeline = createEventChannel<string, void>()
 subscribeSubscriber(pipeline, {
@@ -352,7 +357,7 @@ subscribeSubscriber(pipeline, {
   handle: async (event) => notifyDownstream(event.value)
 })
 
-await publishSerial(pipeline, 'order-created')
+await invokeSerial(pipeline, 'order-created')
 ```
 
 ---
