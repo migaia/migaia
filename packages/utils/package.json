@@ -34,6 +34,10 @@
       "types": "./dist/object.d.ts",
       "default": "./dist/object.js"
     },
+    "./object-path": {
+      "types": "./dist/object-path.d.ts",
+      "default": "./dist/object-path.js"
+    },
     "./typing": {
       "types": "./dist/typing.d.ts",
       "default": "./dist/typing.js"

@@ -34,6 +34,9 @@
     "release:pack": "pnpm pack --pack-destination /tmp",
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
+  "dependencies": {
+    "@migaia/utils": "workspace:^"
+  },
   "devDependencies": {
     "typescript": "~6.0.2",
     "vitest": "4.1.10"

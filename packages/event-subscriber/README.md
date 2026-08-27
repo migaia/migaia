@@ -360,6 +360,22 @@ subscribeSubscriber(pipeline, {
 await invokeSerial(pipeline, 'order-created')
 ```
 
+### 6. 用静态路径为 context 增加只读 alias
+
+```ts
+type IEvent = { readonly data: { readonly id: number } }
+const valueConfig = { readPath: 'data.id', alias: 'resource' } as const
+const channel = createEventChannel<IEvent, void, undefined, typeof valueConfig>({ valueConfig })
+
+channel.subscribe((event) => {
+  event.value // 原始 IEvent，identity 保留
+  event.resource // number | undefined；alias 可任意命名
+  event.abort()
+})
+```
+
+`readPath` 为空或仅空白时等同未配置。路径 missing、blocked 或 getter failure 会通过 `report`/`terminalReport` 报告 `VALUE_PROJECTION_FAILED`，listener 仍会收到 `undefined` alias；真实 leaf 为 `undefined` 不会报告。第一版只接受静态配置对象，不接受函数 selector、transform 或 operator。
+
 ---
 
 <a id="构建门禁"></a>

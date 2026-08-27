@@ -1,13 +1,16 @@
 import { EventSubscriberErrorCode } from './error-code.js'
 import { createCanonicalChannel } from './channel.js'
+import { createEventValueProjectionPlan, type IEventProjectionPlan } from './value-projection.js'
 import { createEventTypeError, eventErrorText } from './errors.js'
 import type {
   ICanonicalEventChannel,
   IEventHub,
   IEventHubOptions,
+  IEventChannelOptions,
   IEventMap,
   IEventListener,
   IEventHubSubscription,
+  IEventValueConfig,
   IStyledEventHub,
   IStyledEventHubOptions
 } from './types.js'
@@ -20,25 +23,38 @@ import {
 } from './style.js'
 
 /** Creates a lazy keyed synchronous hub with O(1) total size accounting. */
-export function createEventHub<C extends IEventMap, const S extends IEventApiStyle>(
-  options: IStyledEventHubOptions<C, S>
-): IStyledEventHub<C, S>
-export function createEventHub<C extends IEventMap>(
-  options: Omit<IEventHubOptions<C>, 'style'> & { readonly style: 'subscribe-publish' }
-): IEventHub<C>
-export function createEventHub<C extends IEventMap>(
-  options: Omit<IEventHubOptions<C>, 'style'> & { readonly style: 'on-emit' }
-): IStyledEventHub<C, 'on-emit'>
-export function createEventHub<C extends IEventMap>(
-  options: Omit<IEventHubOptions<C>, 'style'> & { readonly style: 'on-trigger' }
-): IStyledEventHub<C, 'on-trigger'>
-export function createEventHub<C extends IEventMap>(
-  options: Omit<IEventHubOptions<C>, 'style'> & { readonly style: 'listen-fire' }
-): IStyledEventHub<C, 'listen-fire'>
-export function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>
-export function createEventHub<C extends IEventMap>(options: unknown = {}): IEventHub<C> {
-  let report: IEventHubOptions<C>['report']
-  let terminalReport: IEventHubOptions<C>['terminalReport']
+export function createEventHub<
+  C extends IEventMap,
+  const S extends IEventApiStyle,
+  const V = undefined
+>(options: IStyledEventHubOptions<C, S, V>): IStyledEventHub<C, S, V>
+export function createEventHub<C extends IEventMap, const S extends undefined, const V = undefined>(
+  options: IEventHubOptions<C, S, V>
+): IEventHub<C, S, V>
+export function createEventHub<C extends IEventMap, const V = undefined>(
+  options: Omit<IEventHubOptions<C, undefined, V>, 'style'> & {
+    readonly style: 'subscribe-publish'
+  }
+): IEventHub<C, undefined, V>
+export function createEventHub<C extends IEventMap, const V = undefined>(
+  options: Omit<IEventHubOptions<C, undefined, V>, 'style'> & { readonly style: 'on-emit' }
+): IStyledEventHub<C, 'on-emit', V>
+export function createEventHub<C extends IEventMap, const V = undefined>(
+  options: Omit<IEventHubOptions<C, undefined, V>, 'style'> & { readonly style: 'on-trigger' }
+): IStyledEventHub<C, 'on-trigger', V>
+export function createEventHub<C extends IEventMap, const V = undefined>(
+  options: Omit<IEventHubOptions<C, undefined, V>, 'style'> & { readonly style: 'listen-fire' }
+): IStyledEventHub<C, 'listen-fire', V>
+export function createEventHub<C extends IEventMap, const V = undefined>(
+  options?: IEventHubOptions<C, undefined, V>
+): IEventHub<C, undefined, V>
+export function createEventHub<C extends IEventMap, V = undefined>(
+  options: unknown = {}
+): IEventHub<C, undefined, V> {
+  let report: IEventHubOptions<C, undefined, V>['report']
+  let terminalReport: IEventHubOptions<C, undefined, V>['terminalReport']
+  let valueConfig: unknown
+  let projectionPlan: IEventProjectionPlan | undefined
   let style: IEventApiStyle | undefined
   let stylePlan: IEventApiStylePlan
   try {
@@ -48,9 +64,10 @@ export function createEventHub<C extends IEventMap>(options: unknown = {}): IEve
         eventErrorText(EventSubscriberErrorCode.invalidOptions)
       )
     }
-    const optionRecord = options as IEventHubOptions<C, IEventApiStyle | undefined>
+    const optionRecord = options as IEventHubOptions<C, IEventApiStyle | undefined, V>
     report = optionRecord.report
     terminalReport = optionRecord.terminalReport
+    valueConfig = optionRecord.valueConfig as unknown
   } catch (error) {
     let isOptionsError = false
     try {
@@ -102,8 +119,12 @@ export function createEventHub<C extends IEventMap>(options: unknown = {}): IEve
       eventErrorText(EventSubscriberErrorCode.invalidReporter)
     )
   }
-  const channels = new Map<PropertyKey, ICanonicalEventChannel<unknown, void>>()
-  const registrations = new Map<ICanonicalEventChannel<unknown, void>, Set<() => void>>()
+  projectionPlan = createEventValueProjectionPlan(valueConfig)
+  const channels = new Map<PropertyKey, ICanonicalEventChannel<unknown, void, undefined, V>>()
+  const registrations = new Map<
+    ICanonicalEventChannel<unknown, void, undefined, V>,
+    Set<() => void>
+  >()
   let totalSize = 0
   const validateKey = (key: PropertyKey): PropertyKey => {
     if (typeof key !== 'string' && typeof key !== 'number' && typeof key !== 'symbol') {
@@ -118,7 +139,7 @@ export function createEventHub<C extends IEventMap>(options: unknown = {}): IEve
     const validated = validateKey(key as PropertyKey)
     let channel = channels.get(validated)
     if (!channel) {
-      channel = createCanonicalChannel<unknown, void>({
+      const channelOptions: IEventChannelOptions<unknown, undefined, V> = {
         report: report
           ? (failure) =>
               report?.({
@@ -127,23 +148,27 @@ export function createEventHub<C extends IEventMap>(options: unknown = {}): IEve
                 error: failure.error
               } as never)
           : undefined,
-        terminalReport
-      })
+        terminalReport,
+        valueConfig: valueConfig as IEventChannelOptions<unknown, undefined, V>['valueConfig']
+      }
+      channel = projectionPlan
+        ? createCanonicalChannel<unknown, void, V>(channelOptions, projectionPlan)
+        : createCanonicalChannel<unknown, void, V>(channelOptions)
       channels.set(validated, channel)
     }
     return { channel, validated }
   }
-  const hub: IEventHub<C> = {
+  const hub: IEventHub<C, undefined, V> = {
     subscribe<K extends keyof C>(
       key: K,
-      listener: IEventListener<C[K]>
-    ): IEventHubSubscription<C, K> {
+      listener: IEventListener<C[K], void, V extends IEventValueConfig<C[K]> ? V : undefined>
+    ): IEventHubSubscription<C, K, undefined, V> {
       const release = registerRaw(key, listener)
       return createRawSubscriptionOwner(
         release,
         (nextKey, nextListener) => registerRaw(nextKey, nextListener),
         stylePlan
-      ) as IEventHubSubscription<C, K>
+      ) as IEventHubSubscription<C, K, undefined, V>
     },
     publish<K extends keyof C>(key: K, value: C[K]): void {
       const channel = channels.get(validateKey(key as PropertyKey))
@@ -174,7 +199,10 @@ export function createEventHub<C extends IEventMap>(options: unknown = {}): IEve
       return channels.get(validateKey(key as PropertyKey))?.size ?? 0
     }
   }
-  function registerRaw<K extends keyof C>(key: K, listener: IEventListener<C[K]>): () => void {
+  function registerRaw<K extends keyof C>(
+    key: K,
+    listener: IEventListener<C[K], void, V extends IEventValueConfig<C[K]> ? V : undefined>
+  ): () => void {
     if (typeof listener !== 'function') {
       throw createEventTypeError(
         EventSubscriberErrorCode.invalidListener,
@@ -184,7 +212,7 @@ export function createEventHub<C extends IEventMap>(options: unknown = {}): IEve
     const { channel, validated } = getChannel(key)
     let deactivateRegistration: (() => void) | undefined
     const channelRelease = channel.subscribe((event) => {
-      return listener({
+      const context = {
         get value() {
           return event.value
         },
@@ -204,7 +232,18 @@ export function createEventHub<C extends IEventMap>(options: unknown = {}): IEve
         setTaskId(taskId: string | undefined) {
           event.setTaskId(taskId)
         }
-      } as never)
+      }
+      for (const key of Reflect.ownKeys(event as object)) {
+        const descriptor = Object.getOwnPropertyDescriptor(event as object, key)
+        if (descriptor && 'value' in descriptor)
+          Object.defineProperty(context, key, {
+            configurable: false,
+            enumerable: descriptor.enumerable,
+            writable: false,
+            value: descriptor.value
+          })
+      }
+      return listener(context as never)
     })
     totalSize += 1
     let active = true

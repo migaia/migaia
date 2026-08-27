@@ -135,6 +135,8 @@ export const eventErrorText = (code: IEventSubscriberErrorCode): string => {
     [EventSubscriberErrorCode.invalidTaskId]: EventSubscriberErrorText.invalidTaskId,
     [EventSubscriberErrorCode.invalidOptions]: EventSubscriberErrorText.invalidOptions,
     [EventSubscriberErrorCode.publishFailed]: EventSubscriberErrorText.publishFailed,
+    [EventSubscriberErrorCode.valueProjectionFailed]:
+      EventSubscriberErrorText.valueProjectionFailed,
     [EventSubscriberErrorCode.subscriptionClosed]: EventSubscriberErrorText.subscriptionClosed,
     [EventSubscriberErrorCode.unhandledListenerFailure]:
       EventSubscriberErrorText.unhandledListenerFailure,
