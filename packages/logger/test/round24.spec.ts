@@ -70,7 +70,10 @@ describe('Round24 logger construction admission', () => {
       expect(resourceState).toEqual({ installs: 0, disposals: 0 })
       expect([...listeners.values()].every((group) => group.size === 0)).toBe(true)
 
-      const reinstall = new Logger({ plugins: [processPlugin()] })
+      const reinstall = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [processPlugin()]
+      })
       expect([...listeners.values()].some((group) => group.size > 0)).toBe(true)
       await reinstall.unUse('process')
       expect([...listeners.values()].every((group) => group.size === 0)).toBe(true)
@@ -184,6 +187,7 @@ describe('Round24 HTTP shutdown admission', () => {
 
     try {
       const logger: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         scheduler,
         plugins: [http({ url: 'https://example.test/logs', retries: 2 })]
       })
@@ -191,7 +195,10 @@ describe('Round24 HTTP shutdown admission', () => {
         logger.log('info', 'late-shutdown-entry')
       })
 
-      await expect(logger.shutdown('manual')).resolves.toBeUndefined()
+      await expect(logger.shutdown('manual')).resolves.toMatchObject({
+        logicalTerminal: true,
+        cleanupComplete: true
+      })
       expect(fetch).not.toHaveBeenCalled()
       expect(controllers.length).toBe(2)
       expect(controllers[1]?.signal.aborted).toBe(true)

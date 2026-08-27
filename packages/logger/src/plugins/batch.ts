@@ -277,8 +277,15 @@ class BatchPlugin implements ILoggerPlugin<
       return cleanupErrors
     }
 
-    core.onFlush(flush)
-    return { push, flush, dispose }
+    // Dynamic batchers may be created after plugin installation. Keep their flusher paired with
+    // the batcher's own idempotent disposer; `onDispose` is intentionally install-scoped in V2.
+    const offFlush = core.onFlush(flush)
+    const originalDispose = dispose
+    const disposeWithFlush = (): readonly unknown[] => {
+      offFlush()
+      return originalDispose()
+    }
+    return { push, flush, dispose: disposeWithFlush }
   }
 
   /** Returns an inert batcher to retained factories after their plugin has been uninstalled. */

@@ -29,6 +29,19 @@ const findLoggerError = (value: unknown, code: string): (Error & { code?: string
       const found = visit((candidate as Error & { cause?: unknown }).cause)
       if (found) return found
     }
+    if (candidate && typeof candidate === 'object') {
+      const result = candidate as { readonly cleanupErrors?: unknown; readonly error?: unknown }
+      if (Array.isArray(result.cleanupErrors)) {
+        for (const nested of result.cleanupErrors) {
+          const found = visit(nested)
+          if (found) return found
+        }
+      }
+      if (result.error !== undefined) {
+        const found = visit(result.error)
+        if (found) return found
+      }
+    }
     return undefined
   }
   return visit(value)
@@ -37,7 +50,9 @@ const findLoggerError = (value: unknown, code: string): (Error & { code?: string
 describe('#1 shutting-down 期间 raw() 拒绝但 dispatchRaw() 照收', () => {
   it('两条入口对同一状态的判定不一致', async () => {
     const seen: string[] = []
-    const log: any = new Logger()
+    const log: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
     log.useSink((entry: ILogEntry) => {
       seen.push(entry.message)
     })
@@ -55,7 +70,9 @@ describe('#1 shutting-down 期间 raw() 拒绝但 dispatchRaw() 照收', () => {
 describe('#2 sink 在派发中注销自己会跳过下一个 sink', () => {
   it('#sinks 是活数组，splice 使 for...of 漏项', () => {
     const called: string[] = []
-    const log: any = new Logger()
+    const log: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
     const off = log.useSink(() => {
       called.push('a')
       off()
@@ -71,7 +88,10 @@ describe('#2 sink 在派发中注销自己会跳过下一个 sink', () => {
 describe('#3 ctx 的「逐层冻结」声明不成立', () => {
   it('createdAt 与 options 的嵌套值仍可被插件改写', () => {
     const nested = { flag: true }
-    const log: any = new Logger({ options: { nested } })
+    const log: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      options: { nested }
+    })
 
     log.ctx.createdAt.setTime(0)
     expect(log.ctx.createdAt.getTime()).toBe(0)
@@ -83,11 +103,17 @@ describe('#3 ctx 的「逐层冻结」声明不成立', () => {
 
 describe('#4 用户可控的 data.extendPath 能关掉 extends 转发', () => {
   it('调用方伪造 extendPath 即可让目标收不到日志', () => {
-    const target: any = new Logger({ topic: 'target' })
+    const target: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      topic: 'target'
+    })
     const received: string[] = []
     target.useSink((entry: ILogEntry) => received.push(entry.message))
 
-    const source: any = new Logger({ topic: 'source' })
+    const source: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      topic: 'source'
+    })
     source.extends(target)
 
     source.dispatchRaw({ tag: 't', message: 'normal' })
@@ -104,7 +130,9 @@ describe('#4 用户可控的 data.extendPath 能关掉 extends 转发', () => {
 
 describe('#5 onFlush 处理器在一次 flush() 里被调用多次', () => {
   it('flusher 自身产生 pending 时循环会重跑 flusher', async () => {
-    const log: any = new Logger()
+    const log: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
     let flusherCalls = 0
     let scheduled = false
 
@@ -124,8 +152,9 @@ describe('#5 onFlush 处理器在一次 flush() 里被调用多次', () => {
 })
 
 describe('#6 shutdown 失败会把实例卡在 shutting-down', () => {
-  it('插件 dispose 抛错后 shutdown 永久 reject，且实例仍接受日志', async () => {
+  it('插件 dispose 抛错后 shutdown 返回结构化错误，且实例仍拒绝日志', async () => {
     const log: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       plugins: [
         {
           name: 'boom',
@@ -142,7 +171,9 @@ describe('#6 shutdown 失败会把实例卡在 shutting-down', () => {
     const failures: unknown[] = []
     log.onFailure((failure: unknown) => failures.push(failure))
 
-    await expect(log.shutdown('manual')).rejects.toThrow()
+    const shutdown = await log.shutdown('manual')
+    expect(shutdown.cleanupComplete).toBe(true)
+    expect(shutdown.cleanupErrors.length).toBeGreaterThan(0)
 
     // Failed shutdown is terminal and must not route entries into a disposed host.
     log.log('t', 'after-failed-shutdown')
@@ -150,7 +181,8 @@ describe('#6 shutdown 失败会把实例卡在 shutting-down', () => {
     expect(failures).toHaveLength(0)
 
     // 终态失败仍复用同一个 rejected promise，不伪装成成功。
-    await expect(log.shutdown('manual')).rejects.toThrow()
+    const repeated = await log.shutdown('manual')
+    expect(repeated).toBe(shutdown)
   })
 })
 
@@ -190,7 +222,13 @@ describe('third adversarial pass', () => {
       write: () => undefined
     })
     try {
-      expect(() => new Logger({ plugins: [processPlugin()] })).toThrow('listener-boom')
+      expect(
+        () =>
+          new Logger({
+            execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+            plugins: [processPlugin()]
+          })
+      ).toThrow('listener-boom')
       expect([...listeners.values()].every((group) => group.size === 0)).toBe(true)
     } finally {
       restore()
@@ -222,7 +260,10 @@ describe('third adversarial pass', () => {
     try {
       let failure: unknown
       try {
-        new Logger({ plugins: [processPlugin()] })
+        new Logger({
+          execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+          plugins: [processPlugin()]
+        })
       } catch (error) {
         failure = error
       }
@@ -244,7 +285,9 @@ describe('third adversarial pass', () => {
   })
 
   it('runs async before hooks in registration order', async () => {
-    const log: any = new Logger()
+    const log: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
     const seen: boolean[] = []
     let release!: () => void
     const gate = new Promise<void>((resolve) => {
@@ -268,7 +311,9 @@ describe('third adversarial pass', () => {
     expect(seen).toEqual([true, true])
   })
   it('waits for asynchronous before hooks before entering the sink', async () => {
-    const log: any = new Logger()
+    const log: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
     const seen: unknown[] = []
     log.hook('before', async (entry: ILogEntry) => {
       await Promise.resolve()
@@ -304,8 +349,17 @@ describe('third adversarial pass', () => {
       write: () => undefined
     })
     try {
-      const first: any = new Logger({ plugins: [processPlugin({ shutdownTimeoutMs: 10 })] })
-      expect(() => new Logger({ plugins: [processPlugin({ shutdownTimeoutMs: 20 })] })).toThrow()
+      const first: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [processPlugin({ shutdownTimeoutMs: 10 })]
+      })
+      expect(
+        () =>
+          new Logger({
+            execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+            plugins: [processPlugin({ shutdownTimeoutMs: 20 })]
+          })
+      ).toThrow()
       await first.shutdown('manual')
       expect(listeners.get('SIGINT')?.size ?? 0).toBe(0)
     } finally {
@@ -328,6 +382,7 @@ describe('shutdown dispatch admission', () => {
       unhandled.push(reason)
     }
     const log: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       plugins: [
         {
           name: 'disposer-log',
@@ -395,7 +450,9 @@ describe('shutdown dispatch admission', () => {
 
 describe('#7（批次0）fireHook 遍历活数组，派发期间新注册的 hook 会在本轮内被调用', () => {
   it('hook A 在自己的回调里注册 hook B，B 在同一轮 fireHook 内就被执行', () => {
-    const log: any = new Logger()
+    const log: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
     const order: string[] = []
 
     log.hook('custom', () => {
@@ -410,11 +467,17 @@ describe('#7（批次0）fireHook 遍历活数组，派发期间新注册的 hoo
 
 describe('#8（批次0）#snapshotEntry 只隔离 sink，"after" hook 的变更能泄漏进 extends 转发', () => {
   it('sink 拿到派发前的快照，extends 目标拿到 after-hook 修改之后的值', () => {
-    const target: any = new Logger({ topic: 'target' })
+    const target: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      topic: 'target'
+    })
     const forwarded: unknown[] = []
     target.useSink((entry: ILogEntry) => forwarded.push((entry.data as any).injected))
 
-    const source: any = new Logger({ topic: 'source' })
+    const source: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      topic: 'source'
+    })
     const sourceSeen: unknown[] = []
     source.useSink((entry: ILogEntry) => sourceSeen.push((entry.data as any).injected))
     source.extends(target)
@@ -434,7 +497,10 @@ describe('second adversarial pass', () => {
   it('LG-R4-1: batch flush returns after deadline when onBatch never settles', async () => {
     vi.useFakeTimers()
     try {
-      const log: any = new Logger({ plugins: [batch()] })
+      const log: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [batch()]
+      })
       const createBatcher = log.getShared('createBatcher')
       const batcher = createBatcher({ maxSize: 1 }, () => new Promise<void>(() => undefined))
       batcher.push('stuck')
@@ -449,7 +515,9 @@ describe('second adversarial pass', () => {
   it('LG-R4-2: one flush shares one absolute deadline across phases and extends targets', async () => {
     vi.useFakeTimers()
     try {
-      const log: any = new Logger()
+      const log: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
       log.extends({
         ctx: { id: 'never-flush', topic: 'target' },
         dispatchRaw: () => undefined,
@@ -464,7 +532,9 @@ describe('second adversarial pass', () => {
   })
 
   it('flush deadline cannot interrupt a never-settling tracked sink', async () => {
-    const log: any = new Logger()
+    const log: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
     log.useSink(() => new Promise<void>(() => undefined))
     log.log('t', 'never')
     const outcome = await Promise.race([
@@ -475,7 +545,9 @@ describe('second adversarial pass', () => {
   })
 
   it('LG-R3-2 fixed: cross-realm-style thenables (not instanceof Promise) are tracked by flush', async () => {
-    const log: any = new Logger()
+    const log: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
     let settled = false
     log.useSink(
       () =>
@@ -495,7 +567,9 @@ describe('second adversarial pass', () => {
   })
 
   it('LG-R3-3 fixed: reentrant shutdown() calls alias to the same in-flight promise instead of starting a second pass', async () => {
-    const log: any = new Logger()
+    const log: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
     let calls = 0
     let reentrantPromise: Promise<void> | undefined
     log.onShutdown(() => {
@@ -516,7 +590,10 @@ describe('second adversarial pass', () => {
   })
 
   it('runtime extend guard does not propagate through a structural logger target', () => {
-    const source: any = new Logger({ topic: 'source' })
+    const source: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      topic: 'source'
+    })
     let deliveries = 0
     const structuralTarget: any = {
       ctx: { id: 'structural', topic: 'target' },
@@ -540,7 +617,9 @@ describe('fifth adversarial pass', () => {
     // for every other pending source.
     vi.useFakeTimers()
     try {
-      const log: any = new Logger()
+      const log: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
       log.onShutdown(() => new Promise<void>(() => undefined))
       const pending = log.shutdown('manual')
       let settled = false
@@ -557,7 +636,9 @@ describe('fifth adversarial pass', () => {
   it('LG-R5-1: shutdown handlers registered after a stuck one are still invoked, only their wait is bounded', async () => {
     vi.useFakeTimers()
     try {
-      const log: any = new Logger()
+      const log: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
       const order: string[] = []
       log.onShutdown(() => {
         order.push('stuck-start')
@@ -588,7 +669,9 @@ describe('fifth adversarial pass', () => {
   it('LG-R5-2: #drain clears its per-round deadline timer once pending work settles before the deadline', async () => {
     vi.useFakeTimers()
     try {
-      const log: any = new Logger()
+      const log: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
       log.useSink(() => Promise.resolve())
       log.log('t', 'x')
       await log.flush()
@@ -648,6 +731,7 @@ describe('AF-66/AF-67 scheduler and terminal reporter boundaries', () => {
     let optionReads = 0
     let pluginScheduler: unknown
     const options = {
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       get scheduler() {
         optionReads += 1
         return scheduler
@@ -678,7 +762,9 @@ describe('AF-66/AF-67 scheduler and terminal reporter boundaries', () => {
         await Promise.resolve()
       expect(pendingTasks.length).toBeGreaterThan(0)
       for (const callback of pendingTasks.splice(0)) callback()
-      await expect(shutdown).rejects.toThrow()
+      const result = await shutdown
+      expect(result.cleanupComplete).toBe(false)
+      expect(result.cleanupErrors.length).toBeGreaterThan(0)
       expect(receivers.length).toBeGreaterThan(0)
       expect(receivers.every((receiver) => receiver === scheduler)).toBe(true)
     } finally {
@@ -711,7 +797,9 @@ describe('AF-66/AF-67 scheduler and terminal reporter boundaries', () => {
             : {})
         })
         try {
-          const log: any = new Logger()
+          const log: any = new Logger({
+            execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+          })
           log.onFailure(() => {
             throw new Error('sync-hook-failed')
           })
@@ -773,8 +861,12 @@ describe('Round18 logger scheduler and uninstall regressions', () => {
       write: () => undefined
     })
     try {
-      const first = new Logger({ plugins: [processPlugin({ interceptProcessExit: true })] })
-      await expect(first.unUse('process')).rejects.toThrow()
+      const first = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [processPlugin({ interceptProcessExit: true })]
+      })
+      const uninstall = await first.unUse('process')
+      expect(uninstall).toMatchObject({ ok: false, removed: true })
       expect(removeAttempts).toEqual([
         'SIGINT',
         'SIGTERM',
@@ -785,7 +877,10 @@ describe('Round18 logger scheduler and uninstall regressions', () => {
       expect(runtimeProcess.exit).toBe(originalExit)
 
       failRemove = false
-      const second = new Logger({ plugins: [processPlugin({ interceptProcessExit: true })] })
+      const second = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [processPlugin({ interceptProcessExit: true })]
+      })
       expect(runtimeProcess.exit).not.toBe(originalExit)
       await second.unUse('process')
       expect(runtimeProcess.exit).toBe(originalExit)
@@ -825,6 +920,7 @@ describe('Round18 logger scheduler and uninstall regressions', () => {
     process.on('unhandledRejection', onUnhandled)
     try {
       const logger: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         scheduler,
         plugins: [http({ url: 'https://example.test/logs', retries: 0 })]
       })
@@ -873,7 +969,11 @@ describe('Round18 logger scheduler and uninstall regressions', () => {
       }
     })
     try {
-      const batchLogger: any = new Logger({ scheduler, plugins: [batch()] })
+      const batchLogger: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        scheduler,
+        plugins: [batch()]
+      })
       const createBatcher = batchLogger.getShared('createBatcher')
       const batcher = createBatcher({ maxSize: 2, maxWaitMs: 10 }, (items: string[]) => {
         batches.push(items)
@@ -887,6 +987,7 @@ describe('Round18 logger scheduler and uninstall regressions', () => {
       await batchLogger.shutdown('manual')
 
       const httpLogger: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         scheduler,
         plugins: [http({ url: 'https://example.test/logs', retries: 1, requestTimeoutMs: 100 })]
       })
@@ -902,6 +1003,7 @@ describe('Round18 logger scheduler and uninstall regressions', () => {
       await httpLogger.shutdown('manual')
 
       const processLogger: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         scheduler,
         plugins: [processPlugin({ shutdownTimeoutMs: 25 })]
       })
@@ -956,8 +1058,16 @@ describe('Round21 ProcessPlugin scheduler-domain admission', () => {
       write: () => undefined
     })
     try {
-      const first = new Logger({ scheduler, plugins: [processPlugin()] })
-      const second = new Logger({ scheduler, plugins: [processPlugin()] })
+      const first = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        scheduler,
+        plugins: [processPlugin()]
+      })
+      const second = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        scheduler,
+        plugins: [processPlugin()]
+      })
       expect(first.scheduler).not.toBe(second.scheduler)
       expect(listeners.get('SIGINT')?.size).toBe(1)
 
@@ -998,11 +1108,19 @@ describe('Round21 ProcessPlugin scheduler-domain admission', () => {
       write: () => undefined
     })
     try {
-      const first = new Logger({ scheduler: firstScheduler, plugins: [processPlugin()] })
+      const first = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        scheduler: firstScheduler,
+        plugins: [processPlugin()]
+      })
       const before = [...(listeners.get('SIGINT') ?? [])]
       let failure: unknown
       try {
-        new Logger({ scheduler: secondScheduler, plugins: [processPlugin()] })
+        new Logger({
+          execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+          scheduler: secondScheduler,
+          plugins: [processPlugin()]
+        })
       } catch (error) {
         failure = error
       }
@@ -1020,7 +1138,11 @@ describe('Round21 ProcessPlugin scheduler-domain admission', () => {
       expect(flushed).toBe(1)
 
       await first.unUse('process')
-      const replacement = new Logger({ scheduler: secondScheduler, plugins: [processPlugin()] })
+      const replacement = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        scheduler: secondScheduler,
+        plugins: [processPlugin()]
+      })
       expect(listeners.get('SIGINT')?.size).toBe(1)
       await replacement.unUse('process')
     } finally {
@@ -1051,7 +1173,11 @@ describe('Round21 ProcessPlugin scheduler-domain admission', () => {
       write: () => undefined
     })
     try {
-      const logger = new Logger({ ...options, plugins: [processPlugin()] })
+      const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        ...options,
+        plugins: [processPlugin()]
+      })
       expect(schedulerReads).toBe(1)
       await logger.unUse('process')
     } finally {
@@ -1120,6 +1246,7 @@ describe('Round23 HTTP response-commit cleanup failures', () => {
     process.on('unhandledRejection', onUnhandled)
     try {
       const logger: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         scheduler,
         plugins: [http({ url: 'https://example.test/logs', retries: 2 })]
       })
@@ -1174,6 +1301,7 @@ describe('Round23 HTTP response-commit cleanup failures', () => {
     process.on('unhandledRejection', onUnhandled)
     try {
       const logger: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         scheduler,
         plugins: [http({ url: 'https://example.test/logs', retries: 1 })]
       })
@@ -1247,7 +1375,10 @@ describe('Logger-owned scheduler option admission', () => {
   it('rejects an invalid scheduler shape with logger TypeError and no foreign error owner', () => {
     let failure: unknown
     try {
-      new Logger({ scheduler: { now: () => 0 } } as any)
+      new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        scheduler: { now: () => 0 }
+      } as any)
     } catch (error) {
       failure = error
     }
@@ -1272,7 +1403,10 @@ describe('Logger-owned scheduler option admission', () => {
     }
     let failure: unknown
     try {
-      new Logger({ scheduler } as any)
+      new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        scheduler
+      } as any)
     } catch (error) {
       failure = error
     }
@@ -1318,7 +1452,11 @@ describe('Round20 logger uninstall isolation', () => {
       write: () => undefined
     })
     try {
-      const logger: any = new Logger({ scheduler, plugins: [batch()] })
+      const logger: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        scheduler,
+        plugins: [batch()]
+      })
       const oldFactory = logger.getShared('createBatcher')
       const oldBatcher = oldFactory({ maxSize: 3, maxWaitMs: 10 }, (items: string[]) =>
         oldBatches.push(items)
@@ -1330,12 +1468,7 @@ describe('Round20 logger uninstall isolation', () => {
       secondOldBatcher.push('drop-two')
       expect(scheduled).toHaveLength(2)
 
-      let uninstallFailure: unknown
-      try {
-        await logger.unUse('batch')
-      } catch (error) {
-        uninstallFailure = error
-      }
+      const uninstallFailure = await logger.unUse('batch')
       expect(uninstallFailure).toBeDefined()
       const taggedUninstall = findLoggerError(
         uninstallFailure,
@@ -1363,7 +1496,11 @@ describe('Round20 logger uninstall isolation', () => {
       inertBatcher.push('retained-factory')
       expect(scheduled).toHaveLength(2)
 
-      const reinstalled: any = new Logger({ scheduler, plugins: [batch()] })
+      const reinstalled: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        scheduler,
+        plugins: [batch()]
+      })
       const newFactory = reinstalled.getShared('createBatcher')
       const newBatcher = newFactory({ maxSize: 2, maxWaitMs: 10 }, (items: string[]) =>
         newBatches.push(items)
@@ -1384,7 +1521,10 @@ describe('Round20 logger uninstall isolation', () => {
   it('LG-T25 / LG-R23 contains synchronous batch callback failure without throwing from push', async () => {
     const callbackError = new Error('batch-callback-failed')
     const failures: Array<{ source: string; error: unknown }> = []
-    const logger: any = new Logger({ plugins: [batch()] })
+    const logger: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      plugins: [batch()]
+    })
     logger.onFailure((failure: { source: string; error: unknown }) => failures.push(failure))
     const createBatcher = logger.getShared('createBatcher')
     const batcher = createBatcher({ maxSize: 1, asyncOutput: false }, () => {
@@ -1413,7 +1553,9 @@ describe('phase transition continuation containment', () => {
     const onUnhandled = (reason: unknown) => unhandled.push(reason)
     process.on('unhandledRejection', onUnhandled)
     try {
-      const log: any = new Logger()
+      const log: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
       log.onFailure((failure: { source: string; error: unknown }) => failures.push(failure))
       log.hook('before', async () => undefined)
       log.dispatchRaw({ tag, message: 'before-continuation' })
@@ -1430,7 +1572,9 @@ describe('phase transition continuation containment', () => {
 
   it('drains tagBefore, after, and tagAfter continuation chains in order', async () => {
     const order: string[] = []
-    const log: any = new Logger()
+    const log: any = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
     log.hook('before', async () => {
       order.push('before-start')
       await Promise.resolve()
@@ -1489,13 +1633,17 @@ describe('phase transition continuation containment', () => {
           flush: () => Promise.resolve()
         }
       }
-      const afterLog: any = new Logger()
+      const afterLog: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
       afterLog.onFailure((failure: { source: string; error: unknown }) => failures.push(failure))
       afterLog.extends(makeTarget(afterError))
       afterLog.hook('after', async () => undefined)
       afterLog.log('info', 'after-continuation')
 
-      const tagAfterLog: any = new Logger()
+      const tagAfterLog: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
       tagAfterLog.onFailure((failure: { source: string; error: unknown }) => failures.push(failure))
       tagAfterLog.extends(makeTarget(tagAfterError))
       tagAfterLog.hook('after:info', async () => undefined)

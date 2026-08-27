@@ -18,6 +18,7 @@ describe('logger error-code contract (E-T9)', () => {
     let failure: unknown
     try {
       new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         scheduler: {
           get now(): never {
             throw cause
@@ -55,11 +56,17 @@ describe('logger error-code contract (E-T9)', () => {
       write: () => undefined
     })
     try {
-      const first = new Logger({ plugins: [processPlugin()] })
+      const first = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [processPlugin()]
+      })
       listeners.get('SIGINT')?.values().next().value?.()
       let failure: unknown
       try {
-        new Logger({ plugins: [processPlugin()] })
+        new Logger({
+          execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+          plugins: [processPlugin()]
+        })
       } catch (error) {
         failure = error
       }
@@ -98,10 +105,16 @@ describe('logger error-code contract (E-T9)', () => {
       write: () => undefined
     })
     try {
-      const first = new Logger({ plugins: [processPlugin()] })
+      const first = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [processPlugin()]
+      })
       let failure: unknown
       try {
-        new Logger({ plugins: [processPlugin({ shutdownTimeoutMs: 7 })] })
+        new Logger({
+          execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+          plugins: [processPlugin({ shutdownTimeoutMs: 7 })]
+        })
       } catch (error) {
         failure = error
       }
@@ -127,6 +140,7 @@ describe('logger error-code contract (E-T9)', () => {
     })
     try {
       const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         plugins: [http({ url: 'https://example.test/logs', retries: 0 })]
       })
       let failure: unknown
@@ -156,6 +170,7 @@ describe('logger error-code contract (E-T9)', () => {
     })
     try {
       const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         plugins: [http({ url: 'https://example.test/logs', retries: 0 })]
       })
       let failure: unknown
@@ -188,6 +203,7 @@ describe('logger error-code contract (E-T9)', () => {
     })
     try {
       const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         plugins: [http({ url: 'https://example.test/logs', retries: 0 })]
       })
       let failure: unknown
@@ -224,6 +240,7 @@ describe('logger error-code contract (E-T9)', () => {
     })
     try {
       const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         plugins: [http({ url: 'https://example.test/logs', retries: 0 })]
       })
       const failures: Array<{ source: string; error: unknown }> = []
@@ -267,6 +284,7 @@ describe('logger error-code contract (E-T9)', () => {
     })
     try {
       const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         plugins: [http({ url: 'https://example.test/logs', retries: 2 })]
       })
       const failures: Array<{ source: string; error: unknown }> = []
@@ -307,7 +325,9 @@ describe('logger error-code contract (E-T9)', () => {
     vi.useFakeTimers()
     let release: (() => void) | undefined
     try {
-      const logger = new Logger()
+      const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
       let failure: unknown
       logger.onFailure(({ error }) => {
         failure = error
@@ -364,7 +384,10 @@ describe('logger error-code contract (E-T9)', () => {
     try {
       let failure: unknown
       try {
-        new Logger({ plugins: [processPlugin()] })
+        new Logger({
+          execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+          plugins: [processPlugin()]
+        })
       } catch (error) {
         failure = error
       }
@@ -416,13 +439,11 @@ describe('logger error-code contract (E-T9)', () => {
       write: () => undefined
     })
     try {
-      const logger: any = new Logger({ plugins: [processPlugin({ interceptProcessExit: true })] })
-      let failure: unknown
-      try {
-        await logger.unUse('process')
-      } catch (error) {
-        failure = error
-      }
+      const logger: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [processPlugin({ interceptProcessExit: true })]
+      })
+      const failure = await logger.unUse('process')
       expect(failure).toBeDefined()
       const tagged = ((): Error & { source?: string; code?: string; cause?: unknown } => {
         const pending: unknown[] = [failure]
@@ -439,6 +460,14 @@ describe('logger error-code contract (E-T9)', () => {
             return candidate
           if (candidate instanceof AggregateError) pending.push(...candidate.errors)
           if (candidate instanceof Error) pending.push(candidate.cause)
+          if (candidate && typeof candidate === 'object') {
+            const result = candidate as {
+              readonly cleanupErrors?: unknown
+              readonly error?: unknown
+            }
+            if (Array.isArray(result.cleanupErrors)) pending.push(...result.cleanupErrors)
+            if (result.error !== undefined) pending.push(result.error)
+          }
         }
         throw new Error('tagged uninstall error not found')
       })()
@@ -490,6 +519,7 @@ describe('logger error-code contract (E-T9)', () => {
     })
     try {
       const logger: any = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         scheduler,
         plugins: [processPlugin({ shutdownTimeoutMs: 10 })]
       })
@@ -531,7 +561,9 @@ describe('logger error-code contract (E-T9)', () => {
       }
     })
     try {
-      const logger = new Logger()
+      const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
       logger.onFailure(() => {
         throw reporterFailure
       })
@@ -552,7 +584,9 @@ describe('logger error-code contract (E-T9)', () => {
   })
 
   it('EXTENDS_SELF rejects self forwarding with logger identity', async () => {
-    const logger = new Logger()
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
     let failure: unknown
     try {
       logger.extends(logger)
@@ -567,8 +601,14 @@ describe('logger error-code contract (E-T9)', () => {
   })
 
   it('EXTENDS_CYCLE rejects a cycle in the real extends graph', async () => {
-    const first = new Logger({ topic: 'first' })
-    const second = new Logger({ topic: 'second' })
+    const first = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      topic: 'first'
+    })
+    const second = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      topic: 'second'
+    })
     first.extends(second)
     let failure: unknown
     try {

@@ -161,6 +161,7 @@ async function runScenario(
 
   try {
     const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       scheduler,
       plugins: [http({ url: 'https://example.test/logs', retries: 2 })]
     })
@@ -169,7 +170,10 @@ async function runScenario(
     const flush = logger.flush()
     await expect(flush).resolves.toBeUndefined()
     const shutdown = logger.shutdown('manual')
-    await expect(shutdown).resolves.toBeUndefined()
+    await expect(shutdown).resolves.toMatchObject({
+      logicalTerminal: true,
+      cleanupComplete: true
+    })
   } finally {
     await Promise.resolve()
     process.off('unhandledRejection', onUnhandled)
@@ -255,6 +259,7 @@ describe('Round25 HTTP abort-listener partial registration', () => {
     })
     try {
       const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
         scheduler,
         plugins: [http({ url: 'https://example.test/logs', retries: 2 })]
       })
@@ -262,7 +267,10 @@ describe('Round25 HTTP abort-listener partial registration', () => {
       logger.log('info', 'round25-repeat-one')
       logger.log('info', 'round25-repeat-two')
       await expect(logger.flush()).resolves.toBeUndefined()
-      await expect(logger.shutdown('manual')).resolves.toBeUndefined()
+      await expect(logger.shutdown('manual')).resolves.toMatchObject({
+        logicalTerminal: true,
+        cleanupComplete: true
+      })
     } finally {
       restoreRuntime()
       harness.restore()

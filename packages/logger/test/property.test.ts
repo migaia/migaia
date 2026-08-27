@@ -8,6 +8,7 @@ describe('Logger configuration properties', () => {
       fc.asyncProperty(fc.array(fc.integer(), { maxLength: 12 }), async (values) => {
         const seen: number[] = []
         const logger = new Logger({
+          execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
           plugins: [
             {
               name: 'property-update',

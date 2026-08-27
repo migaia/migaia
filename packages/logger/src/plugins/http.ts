@@ -99,18 +99,18 @@ class HttpPlugin implements ILoggerPlugin<
     this.#resolvedConfig = core.config.get<IHttpPluginConfig>() ?? this.config
     this.#scheduler = core.scheduler
     this.#controller = typeof AbortController === 'function' ? new AbortController() : undefined
-    core.onShutdown(() => this.#controller?.abort())
+    core.onDispose(core.onShutdown(() => this.#controller?.abort()))
 
     const send = (entries: ILogEntry[]): Promise<void> => this.#send(entries)
     const createBatcher = core.getShared('createBatcher')
 
     if (createBatcher) {
       const batcher = createBatcher<ILogEntry>(this.#resolvedConfig.batch ?? {}, send)
-      core.useSink((entry) => batcher.push(entry))
+      core.onDispose(core.useSink((entry) => batcher.push(entry)))
       // batch 插件自己已经通过 core.onFlush(flush) 注册了缓冲区的清空逻辑，
       // 这条路径的可靠退出保障由 batch 插件负责，这里不需要重复处理。
     } else {
-      core.useSink((entry) => send([entry]))
+      core.onDispose(core.useSink((entry) => send([entry])))
     }
 
     return {}

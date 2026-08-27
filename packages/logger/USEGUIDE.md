@@ -35,6 +35,7 @@ Logger 核心只通过一个内部的 "runtime manager" 间接使用 `process`�
 
 ```ts
 const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
   context: ['app', 'api'],
   topic: 'gateway',
   options: { service: 'gateway' },
@@ -47,6 +48,7 @@ const log = new Logger({
 | 构造选项        | 类型                               | 必填性 | 默认值   | 作用                                                                      |
 | --------------- | ---------------------------------- | ------ | -------- | ------------------------------------------------------------------------- |
 | `context`       | `string[]`                         | 可选   | `[]`     | 每条 entry 默认的 context 路径（未显式传 `context` 时使用）。             |
+| `execution`     | `{ mutationTimeoutMs: number \| false; pipelineDrainTimeoutMs: number \| false }` | 必填 | — | PluginHost 操作与 pipeline drain 的截止策略；`false` 表示不设截止时间。 |
 | `topic`         | `string`                           | 可选   | `''`     | `extends()` 转发时用于展示的链路节点名。                                  |
 | `options`       | `Record<string, unknown>`          | 可选   | `{}`     | 冻结后公开给插件读取的业务只读配置（通过 `ctx.options`）。                |
 | `on`            | `Record<string, ILogHookFn>`       | 可选   | `{}`     | 构造时注册 hook 的简写，等价于对每一项调用一次 `log.hook(name, fn)`。     |
@@ -252,10 +254,10 @@ Node/Bun 风格的进程适配器，运行时环境没有 `process` 全局对象
 ## 10. extends：多 logger 转发
 
 ```ts
-const audit = new Logger({ topic: 'audit' });
+const audit = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }, topic: 'audit' });
 audit.useSink((entry) => sendToAuditSystem(entry));
 
-const api = new Logger({ topic: 'api' });
+const api = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }, topic: 'api' });
 api.extends(audit);
 
 api.info('user created'); // 同时经过 api 自己的 pipeline/sink，也完整转发给 audit
@@ -297,6 +299,7 @@ import { Logger } from '@migaia/logger';
 import { batch, color, http, level, process, uuid } from '@migaia/logger/plugins';
 
 const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
   context: ['worker'],
   plugins: [
     level({ level: 'info' }),

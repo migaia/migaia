@@ -1,5 +1,10 @@
 import { PluginHost } from '@migaia/plugin-host'
-import type { IPluginHostOptions, IPipelineMode, ISyncPipelineStage } from '@migaia/plugin-host'
+import type {
+  IPluginHostDisposalResult,
+  IPluginHostOptions,
+  IPipelineMode,
+  ISyncPipelineStage
+} from '@migaia/plugin-host'
 import { createLoggerError, createLoggerTypeError, LoggerErrorCode } from './errors.js'
 import type {
   IFlusher,
@@ -68,6 +73,7 @@ function resolveLoggerScheduler(value: unknown): ILifecycleScheduler {
 }
 
 type ILoggerConstructorSnapshot = {
+  readonly execution: IPluginHostOptions['execution']
   readonly scheduler: unknown
   readonly context: string[]
   readonly topic: string
@@ -95,8 +101,10 @@ function snapshotLoggerOptions(options: unknown): ILoggerConstructorSnapshot {
     const rawContext = source.context as string[] | undefined
     const rawOn = source.on as Record<string, ILogHookFn> | undefined
     const rawOptions = source.options as Record<string, unknown> | undefined
+    const rawExecution = source.execution as IPluginHostOptions['execution']
     const rawPlugins = source.plugins as readonly ILoggerPluginConstraint[] | undefined
     return {
+      execution: rawExecution,
       scheduler,
       context: rawContext === undefined ? [] : [...rawContext],
       topic: (source.topic as string | undefined) ?? '',
@@ -142,7 +150,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   #dispatchAdmissionOpen = true
   #status: ILoggerStatus = LoggerStatus.active
   #flushPromise: Promise<void> | undefined
-  #shutdownPromise: Promise<void> | undefined
+  #shutdownPromise: Promise<IPluginHostDisposalResult> | undefined
   /** Extends() 注册的转发目标 */
   #extendTargets: ILoggerExtendsTarget<IPipelineMode>[] = []
   /** 单调时钟源（R-9）；`flush`/`shutdown`/`#drain` 的 deadline 与 `boundedWait` 共用。 */
@@ -156,7 +164,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     userOptions: Readonly<Record<string, unknown>>,
     path: string[],
     topic: string,
-    hostOptions: IPluginHostOptions = {},
+    hostOptions: IPluginHostOptions,
     plugins: readonly ILoggerPluginConstraint[] = [],
     scheduler: ILifecycleScheduler = systemScheduler
   ) {
@@ -193,7 +201,18 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
       configurable: false,
       enumerable: true
     })
-    this.useSync(plugins)
+    /** Materialized consumer facade; PluginHost V2 keeps extension publication off its engine. */
+    const view = this.useSync(plugins)
+    for (const key of Reflect.ownKeys(view.extensions)) {
+      const descriptor = Object.getOwnPropertyDescriptor(view.extensions, key)
+      if (!descriptor || !('value' in descriptor)) continue
+      Object.defineProperty(this, key, {
+        value: descriptor.value,
+        enumerable: true,
+        configurable: false,
+        writable: false
+      })
+    }
   }
 
   protected createPluginDomainCore(): ILoggerDomainCore<IPipelineMode> {
@@ -235,7 +254,6 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   useSink(sink: ISink): () => void {
     this.#sinks.push(sink)
     const off = () => this.#removeItem(this.#sinks, sink)
-    this.trackPluginResourceIfInstalling(off)
     return off
   }
 
@@ -256,14 +274,12 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
           current.filter((f) => f !== fn)
         )
     }
-    this.trackPluginResourceIfInstalling(dispose)
     return dispose
   }
 
   onFailure(fn: ILogFailureHook): () => void {
     this.#failureHooks.push(fn)
     const off = () => this.#removeItem(this.#failureHooks, fn)
-    this.trackPluginResourceIfInstalling(off)
     return off
   }
 
@@ -396,7 +412,6 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   onFlush(fn: IFlusher): () => void {
     this.#flushers.push(fn)
     const off = () => this.#removeItem(this.#flushers, fn)
-    this.trackPluginResourceIfInstalling(off)
     return off
   }
 
@@ -469,13 +484,17 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   onShutdown(fn: IShutdownHandler): () => void {
     this.#shutdownHandlers.push(fn)
     const off = () => this.#removeItem(this.#shutdownHandlers, fn)
-    this.trackPluginResourceIfInstalling(off)
     return off
   }
 
-  shutdown(reason: IShutdownReason): Promise<void> {
+  shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult> {
     if (this.#shutdownPromise) return this.#shutdownPromise
-    if (this.#status === LoggerStatus.closed) return Promise.resolve()
+    if (this.#status === LoggerStatus.closed)
+      return Promise.resolve({
+        logicalTerminal: true,
+        cleanupComplete: true,
+        cleanupErrors: Object.freeze([])
+      })
     this.#status = LoggerStatus.shuttingDown
     // Publish #shutdownPromise synchronously, before any handler runs. An async IIFE's body
     // starts executing immediately up to its first await — if the first shutdown handler is a
@@ -484,9 +503,9 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     // so the early-return guards above see #shutdownPromise still undefined and #status already
     // 'shutting-down' (not 'closed') — neither guard fires, and a second shutdown pass starts,
     // running every handler a second time. Creating the deferred first closes that window.
-    let settle: (() => void) | undefined
+    let settle: ((result: IPluginHostDisposalResult) => void) | undefined
     let fail: ((error: unknown) => void) | undefined
-    this.#shutdownPromise = new Promise<void>((resolve, reject) => {
+    this.#shutdownPromise = new Promise<IPluginHostDisposalResult>((resolve, reject) => {
       settle = resolve
       fail = reject
     })
@@ -529,10 +548,11 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
       // normal dispatch before PluginHost invokes plugin disposers so disposer-era logs cannot
       // enter a host whose lifecycle is already being torn down and create late #pending work.
       this.#dispatchAdmissionOpen = false
-      await super.dispose()
+      const result = (await super.dispose()) as IPluginHostDisposalResult
       this.#status = LoggerStatus.closed
+      return result
     })().then(
-      () => settle?.(),
+      (result) => settle?.(result),
       (error) => {
         // PluginHost disposal is terminal even when one disposer fails. Keep Logger
         // terminal too; accepting new entries would route them into a disposed host.
@@ -544,7 +564,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     return this.#shutdownPromise
   }
 
-  dispose(): Promise<void> {
+  dispose(): Promise<IPluginHostDisposalResult> {
     return this.shutdown('manual')
   }
 
@@ -835,7 +855,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
  * `Logger` 这个值的类型标注（IStaticLoggerCtor）来 承担，这个 class 只负责运行时行为是否正确。
  */
 class LoggerImpl<const P extends readonly ILoggerPluginConstraint[] = []> {
-  constructor(options: ILoggerOptions<P> = {}) {
+  constructor(options: ILoggerOptions<P>) {
     const snapshot = snapshotLoggerOptions(options)
     const scheduler = resolveLoggerScheduler(snapshot.scheduler)
     const core = new LoggerCore(
@@ -843,6 +863,7 @@ class LoggerImpl<const P extends readonly ILoggerPluginConstraint[] = []> {
       snapshot.context,
       snapshot.topic,
       {
+        execution: snapshot.execution,
         pipeline: snapshot.pipeline,
         scheduler
       },
