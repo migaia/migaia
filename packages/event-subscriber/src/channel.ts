@@ -31,36 +31,47 @@ import {
   createSystemTerminalRuntime,
   type IEventTerminalRuntime
 } from './internal/terminal-runtime.js'
+import {
+  addEventProjection,
+  createEventValueProjectionPlan,
+  projectEventValue,
+  reportEventProjectionFailure,
+  type IEventProjectionOutcome,
+  type IEventProjectionPlan
+} from './value-projection.js'
 
-type IRegistrationOwner<T, R> = {
-  listener: IEventListener<T, R>
+type IRegistrationOwner<T, R, V> = {
+  listener: IEventListener<T, R, V>
   active: boolean
   aborted: boolean
   abortReason: unknown
   currentTaskId: string | undefined
-  previous: IRegistrationOwner<T, R> | undefined
-  next: IRegistrationOwner<T, R> | undefined
+  previous: IRegistrationOwner<T, R, V> | undefined
+  next: IRegistrationOwner<T, R, V> | undefined
   release: IUnsubscribe
 }
 
-type IChannelCapability<T, R> = {
-  snapshot(taskId?: string): readonly IEventDispatchSnapshot<T, R>[]
+type IChannelCapability<T, R, V = undefined> = {
+  snapshot(taskId?: string): readonly IEventDispatchSnapshot<T, R, V>[]
+  project(value: T): IEventProjectionOutcome
+  readonly plan: IEventProjectionPlan | undefined
+  readonly options: IEventChannelOptions<T, IEventApiStyle | undefined, V>
 }
 
-type IFilteredCapability<T, R> = {
-  readonly channel: ICanonicalEventChannel<T, R>
+type IFilteredCapability<T, R, V = undefined> = {
+  readonly channel: ICanonicalEventChannel<T, R, undefined, V>
   readonly taskId: string
 }
 
-type IValidatedChannel<T, R> = IEventChannelLike<T, R> & {
-  readonly subscribe: IEventChannelLike<T, R>['subscribe']
+type IValidatedChannel<T, R, V = undefined> = IEventChannelLike<T, R, V> & {
+  readonly subscribe: IEventChannelLike<T, R, V>['subscribe']
 }
 
 /** Runtime identity for canonical channels; structural lookalikes never enter async helpers. */
-const channelCapabilities = new WeakMap<object, IChannelCapability<unknown, unknown>>()
+const channelCapabilities = new WeakMap<object, IChannelCapability<unknown, unknown, unknown>>()
 
 /** Runtime identity for filtered views; the public object carries no mutable channel state. */
-const filteredCapabilities = new WeakMap<object, IFilteredCapability<unknown, unknown>>()
+const filteredCapabilities = new WeakMap<object, IFilteredCapability<unknown, unknown, unknown>>()
 
 /** The host adapter is lazy and does not inspect globals until a terminal failure occurs. */
 const systemTerminalRuntime = createSystemTerminalRuntime()
@@ -109,7 +120,9 @@ const readTaskOption = (options: unknown): string | undefined => {
 }
 
 /** Validates a structural channel before registration state can be changed. */
-export const validateChannelLike = <T, R>(channel: unknown): IValidatedChannel<T, R> => {
+export const validateChannelLike = <T, R, V = undefined>(
+  channel: unknown
+): IValidatedChannel<T, R, V> => {
   try {
     if (!isRecord(channel) && typeof channel !== 'function') {
       throw createEventTypeError(
@@ -129,7 +142,7 @@ export const validateChannelLike = <T, R>(channel: unknown): IValidatedChannel<T
   return {
     subscribe(listener, options) {
       try {
-        return (channel as IEventChannelLike<T, R>).subscribe(listener, options)
+        return (channel as IEventChannelLike<T, R, V>).subscribe(listener, options)
       } catch (error) {
         throw codeExistingError(error, EventSubscriberErrorCode.invalidChannel)
       }
@@ -138,32 +151,39 @@ export const validateChannelLike = <T, R>(channel: unknown): IValidatedChannel<T
 }
 
 /** Creates a live event context over a registration owner. */
-export const createEventContext = <T, R>(
+export const createEventContext = <T, R, V = undefined>(
   value: T,
-  snapshot: IEventDispatchSnapshot<T, R>
-): IEventContext<T> => ({
-  get value() {
-    return value
-  },
-  get aborted() {
-    return snapshot.control.aborted
-  },
-  get abortReason() {
-    return snapshot.control.abortReason
-  },
-  get taskId() {
-    return snapshot.taskId
-  },
-  abort(reason?: unknown) {
-    snapshot.control.abort(reason)
-  },
-  setTaskId(taskId: string | undefined) {
-    snapshot.control.setTaskId(taskId)
+  snapshot: IEventDispatchSnapshot<T, R, V>,
+  projection?: { readonly plan: IEventProjectionPlan; readonly outcome: IEventProjectionOutcome }
+): IEventContext<T> => {
+  const context = {
+    get value() {
+      return value
+    },
+    get aborted() {
+      return snapshot.control.aborted
+    },
+    get abortReason() {
+      return snapshot.control.abortReason
+    },
+    get taskId() {
+      return snapshot.taskId
+    },
+    abort(reason?: unknown) {
+      snapshot.control.abort(reason)
+    },
+    setTaskId(taskId: string | undefined) {
+      snapshot.control.setTaskId(taskId)
+    }
   }
-})
+  if (projection) addEventProjection(context, projection.plan, projection.outcome)
+  return context
+}
 
 /** Builds a snapshot whose task label is frozen while abort state remains live. */
-const snapshotOwner = <T, R>(owner: IRegistrationOwner<T, R>): IEventDispatchSnapshot<T, R> =>
+const snapshotOwner = <T, R, V>(
+  owner: IRegistrationOwner<T, R, V>
+): IEventDispatchSnapshot<T, R, V> =>
   Object.freeze({
     listener: owner.listener,
     taskId: owner.currentTaskId,
@@ -191,21 +211,22 @@ const snapshotOwner = <T, R>(owner: IRegistrationOwner<T, R>): IEventDispatchSna
   })
 
 /** Invokes one snapshot entry and returns its raw listener result. */
-export const invokeSnapshot = <T, R>(
-  snapshot: IEventDispatchSnapshot<T, R>,
-  value: T
-): R | PromiseLike<R> => snapshot.listener(createEventContext(value, snapshot))
+export const invokeSnapshot = <T, R, V = undefined>(
+  snapshot: IEventDispatchSnapshot<T, R, V>,
+  value: T,
+  projection?: { readonly plan: IEventProjectionPlan; readonly outcome: IEventProjectionOutcome }
+): R | PromiseLike<R> => snapshot.listener(createEventContext(value, snapshot, projection) as never)
 
 /** Reads one dispatch snapshot from a canonical channel or filtered capability. */
-export const getCapability = <T, R>(
-  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>
-): { readonly capability: IChannelCapability<T, R>; readonly taskId: string | undefined } => {
+export const getCapability = <T, R, V = undefined>(
+  channel: ICanonicalEventChannel<T, R, undefined, V> | IFilteredEventChannel<T, R, V>
+): { readonly capability: IChannelCapability<T, R, V>; readonly taskId: string | undefined } => {
   const filtered = filteredCapabilities.get(channel as object) as
-    | IFilteredCapability<T, R>
+    | IFilteredCapability<T, R, V>
     | undefined
   if (filtered) {
     const capability = channelCapabilities.get(filtered.channel as object) as
-      | IChannelCapability<T, R>
+      | IChannelCapability<T, R, V>
       | undefined
     if (!capability)
       throw createEventTypeError(
@@ -215,7 +236,7 @@ export const getCapability = <T, R>(
     return { capability, taskId: filtered.taskId }
   }
   const capability = channelCapabilities.get(channel as object) as
-    | IChannelCapability<T, R>
+    | IChannelCapability<T, R, V>
     | undefined
   if (!capability)
     throw createEventTypeError(
@@ -226,8 +247,12 @@ export const getCapability = <T, R>(
 }
 
 /** Reports a late listener rejection without making synchronous publish awaitable. */
-export const reportLateFailure = <T>(
-  options: IEventChannelOptions<T>,
+export const reportLateFailure = <
+  T,
+  S extends IEventApiStyle | undefined = undefined,
+  V = undefined
+>(
+  options: IEventChannelOptions<T, S, V>,
   event: IEventContext<T>,
   failure: unknown
 ): void => {
@@ -240,7 +265,7 @@ export const reportLateFailure = <T>(
   if (report) {
     let reportResult: void | PromiseLike<void>
     try {
-      reportResult = report({ event, error: failure })
+      reportResult = report({ event: event as never, error: failure })
     } catch (error) {
       reportTerminal(options, diagnostic, error)
       return
@@ -269,8 +294,8 @@ export const observePromiseLike = (
 }
 
 /** Final fallback chain. Runtime access is isolated here so core channel code has no host branch. */
-const reportTerminal = <T>(
-  options: IEventChannelOptions<T>,
+const reportTerminal = <T, S extends IEventApiStyle | undefined = undefined, V = undefined>(
+  options: IEventChannelOptions<T, S, V>,
   diagnostic: AggregateError,
   failure: unknown
 ): void => {
@@ -332,30 +357,49 @@ const reportSystemTerminal = (
 }
 
 /** Creates a canonical transient channel backed by an O(1) linked registration list. */
-export function createCanonicalChannel<T, R, const S extends IEventApiStyle>(
-  options: IStyledEventChannelOptions<T, S>
-): ICanonicalEventChannel<T, R, S> & IStyledEventChannel<T, R, S>
-export function createCanonicalChannel<T, R = void>(
-  options: Omit<IEventChannelOptions<T>, 'style'> & { readonly style: 'subscribe-publish' }
+export function createCanonicalChannel<
+  T,
+  R,
+  const S extends IEventApiStyle | undefined,
+  const V = undefined
+>(
+  options: S extends IEventApiStyle
+    ? IStyledEventChannelOptions<T, S, V>
+    : IEventChannelOptions<T, undefined, V>
+): ICanonicalEventChannel<T, R, S, V> &
+  (S extends IEventApiStyle ? IStyledEventChannel<T, R, S, V> : Record<never, never>)
+export function createCanonicalChannel<T, R = void, const V = undefined>(
+  options: IEventChannelOptions<T, undefined, V>
+): ICanonicalEventChannel<T, R, undefined, V>
+export function createCanonicalChannel<T, R = void, const V = undefined>(
+  options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & {
+    readonly style: 'subscribe-publish'
+  }
 ): ICanonicalEventChannel<T, R>
-export function createCanonicalChannel<T, R = void>(
-  options: Omit<IEventChannelOptions<T>, 'style'> & { readonly style: 'on-emit' }
-): ICanonicalEventChannel<T, R, 'on-emit'> & IStyledEventChannel<T, R, 'on-emit'>
-export function createCanonicalChannel<T, R = void>(
-  options: Omit<IEventChannelOptions<T>, 'style'> & { readonly style: 'on-trigger' }
-): ICanonicalEventChannel<T, R, 'on-trigger'> & IStyledEventChannel<T, R, 'on-trigger'>
-export function createCanonicalChannel<T, R = void>(
-  options: Omit<IEventChannelOptions<T>, 'style'> & { readonly style: 'listen-fire' }
-): ICanonicalEventChannel<T, R, 'listen-fire'> & IStyledEventChannel<T, R, 'listen-fire'>
-export function createCanonicalChannel<T, R = void>(
-  options?: IEventChannelOptions<T>
-): ICanonicalEventChannel<T, R>
-export function createCanonicalChannel<T, R = void>(
-  options: IEventChannelOptions<T, IEventApiStyle | undefined> = {}
-): ICanonicalEventChannel<T, R> {
-  let report: IEventChannelOptions<T>['report']
-  let terminalReport: IEventChannelOptions<T>['terminalReport']
-  let dispatchPolicy: IEventChannelOptions<T>['dispatchPolicy']
+export function createCanonicalChannel<T, R = void, const V = undefined>(
+  options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & { readonly style: 'on-emit' }
+): ICanonicalEventChannel<T, R, 'on-emit', V> & IStyledEventChannel<T, R, 'on-emit', V>
+export function createCanonicalChannel<T, R = void, const V = undefined>(
+  options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & { readonly style: 'on-trigger' }
+): ICanonicalEventChannel<T, R, 'on-trigger', V> & IStyledEventChannel<T, R, 'on-trigger', V>
+export function createCanonicalChannel<T, R = void, const V = undefined>(
+  options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & { readonly style: 'listen-fire' }
+): ICanonicalEventChannel<T, R, 'listen-fire', V> & IStyledEventChannel<T, R, 'listen-fire', V>
+export function createCanonicalChannel<T, R = void, const V = undefined>(
+  options?: IEventChannelOptions<T, undefined, V>
+): ICanonicalEventChannel<T, R, undefined, V>
+export function createCanonicalChannel<T, R = void, V = undefined>(
+  options: IEventChannelOptions<T, IEventApiStyle | undefined, V>,
+  projectionPlan: IEventProjectionPlan
+): ICanonicalEventChannel<T, R, undefined, V>
+export function createCanonicalChannel<T, R = void, V = undefined>(
+  options: IEventChannelOptions<T, IEventApiStyle | undefined, V> = {},
+  suppliedProjectionPlan?: IEventProjectionPlan
+): ICanonicalEventChannel<T, R, undefined, V> {
+  let report: IEventChannelOptions<T, undefined, V>['report']
+  let terminalReport: IEventChannelOptions<T, undefined, V>['terminalReport']
+  let dispatchPolicy: IEventChannelOptions<T, undefined, V>['dispatchPolicy']
+  let valueConfig: unknown
   let style: IEventApiStyle | undefined
   let stylePlan: IEventApiStylePlan
   try {
@@ -368,6 +412,7 @@ export function createCanonicalChannel<T, R = void>(
     report = options.report
     terminalReport = options.terminalReport
     dispatchPolicy = options.dispatchPolicy ?? EventDispatchPolicy.recursive
+    valueConfig = options.valueConfig as unknown
   } catch (error) {
     throw codeExistingError(error, EventSubscriberErrorCode.invalidOptions)
   }
@@ -410,20 +455,25 @@ export function createCanonicalChannel<T, R = void>(
       eventErrorText(EventSubscriberErrorCode.invalidOptions)
     )
   }
-  const normalizedOptions: IEventChannelOptions<T> = { report, terminalReport }
-  let first: IRegistrationOwner<T, R> | undefined
-  let last: IRegistrationOwner<T, R> | undefined
+  const normalizedOptions: IEventChannelOptions<T, undefined, V> = {
+    report,
+    terminalReport,
+    valueConfig: valueConfig as IEventChannelOptions<T, undefined, V>['valueConfig']
+  }
+  const projectionPlan = suppliedProjectionPlan ?? createEventValueProjectionPlan(valueConfig)
+  let first: IRegistrationOwner<T, R, V> | undefined
+  let last: IRegistrationOwner<T, R, V> | undefined
   let count = 0
   /** Queued values used only when the caller explicitly opts into queued reentrancy. */
   let publishing = false
   const pendingValues: T[] = []
   let pendingIndex = 0
   const registerRaw = (
-    listener: IEventListener<T, R>,
+    listener: IEventListener<T, R, V>,
     taskId: string | undefined
   ): (() => void) => {
     let released = false
-    const owner = {} as IRegistrationOwner<T, R>
+    const owner = {} as IRegistrationOwner<T, R, V>
     const release = (): void => {
       if (released || !owner.active) return
       released = true
@@ -453,21 +503,31 @@ export function createCanonicalChannel<T, R = void>(
   /** Delivers one value while preserving listener snapshots and late-failure reporting. */
   const dispatchValue = (value: T, failures: unknown[]): void => {
     const snapshots = capability.snapshot()
+    if (snapshots.length === 0) return
+    const projection = projectionPlan
+      ? { plan: projectionPlan, outcome: capability.project(value) }
+      : undefined
     for (const snapshot of snapshots) {
       let result: R | PromiseLike<R>
       try {
-        result = invokeSnapshot(snapshot, value)
+        result = invokeSnapshot(snapshot, value, projection)
       } catch (error) {
         failures.push(error)
         continue
       }
-      const context = createEventContext(value, snapshot)
+      const context = createEventContext(value, snapshot, projection)
       observePromiseLike(
         result,
         () => undefined,
-        (error) => reportLateFailure(normalizedOptions, context, error)
+        (error) => reportLateFailure<T, undefined, V>(normalizedOptions, context, error)
       )
     }
+    if (projection?.outcome.diagnostic)
+      reportEventProjectionFailure<T, undefined, V>(
+        normalizedOptions,
+        createEventContext(value, snapshots[0]!, projection),
+        projection.outcome.diagnostic
+      )
   }
 
   /** Delivers a value recursively by default, or drains an explicit queued policy. */
@@ -534,9 +594,9 @@ export function createCanonicalChannel<T, R = void>(
     },
     filterTaskId(taskId) {
       const validated = validateTaskId(taskId, false) as string
-      const filtered = {} as IFilteredEventChannel<T, R>
+      const filtered = {} as IFilteredEventChannel<T, R, V>
       filteredCapabilities.set(filtered as object, {
-        channel: channel as ICanonicalEventChannel<unknown, unknown>,
+        channel: channel as ICanonicalEventChannel<unknown, unknown, undefined, unknown>,
         taskId: validated
       })
       return filtered
@@ -557,10 +617,15 @@ export function createCanonicalChannel<T, R = void>(
     get size() {
       return count
     }
-  } as ICanonicalEventChannel<T, R>
-  const capability: IChannelCapability<T, R> = {
+  } as ICanonicalEventChannel<T, R, undefined, V>
+  const capability: IChannelCapability<T, R, V> = {
+    plan: projectionPlan,
+    options: normalizedOptions,
+    project(value) {
+      return projectEventValue(value, projectionPlan)
+    },
     snapshot(taskId) {
-      const snapshots: IEventDispatchSnapshot<T, R>[] = []
+      const snapshots: IEventDispatchSnapshot<T, R, V>[] = []
       let current = first
       while (current) {
         if (taskId === undefined || current.currentTaskId === taskId)
@@ -575,7 +640,10 @@ export function createCanonicalChannel<T, R = void>(
   } catch (error) {
     throw codeExistingError(error, EventSubscriberErrorCode.invalidOptions)
   }
-  channelCapabilities.set(channel as object, capability as IChannelCapability<unknown, unknown>)
+  channelCapabilities.set(
+    channel as object,
+    capability as IChannelCapability<unknown, unknown, unknown>
+  )
   return channel
 }
 
@@ -674,12 +742,12 @@ export const subscribeSubscriber = <T, R>(
 }
 
 /** Installs once semantics on any event-subscriber-compatible structural channel. */
-export const subscribeOnce = <T, R>(
-  channel: IEventChannelLike<T, R>,
-  listener: IEventListener<T, R>,
+export const subscribeOnce = <T, R, V = undefined>(
+  channel: IEventChannelLike<T, R, V>,
+  listener: IEventListener<T, R, V>,
   options?: { readonly taskId?: string }
 ): IUnsubscribe => {
-  const validated = validateChannelLike<T, R>(channel)
+  const validated = validateChannelLike<T, R, V>(channel)
   const taskId = readTaskOption(options)
   if (typeof listener !== 'function') {
     throw createEventTypeError(
@@ -743,13 +811,13 @@ export const subscribeOnce = <T, R>(
 }
 
 /** Installs abort-linked subscription with a helper-owned overlay and closed race protocol. */
-export const subscribeUntil = <T, R>(
-  channel: IEventChannelLike<T, R>,
+export const subscribeUntil = <T, R, V = undefined>(
+  channel: IEventChannelLike<T, R, V>,
   signal: IEventAbortSignal,
-  listener: IEventListener<T, R>,
+  listener: IEventListener<T, R, V>,
   options?: { readonly taskId?: string }
 ): IUnsubscribe => {
-  const validated = validateChannelLike<T, R>(channel)
+  const validated = validateChannelLike<T, R, V>(channel)
   const taskId = readTaskOption(options)
   if (typeof listener !== 'function') {
     throw createEventTypeError(
@@ -912,7 +980,7 @@ export const subscribeUntil = <T, R>(
             return undefined as R
           }
           if (overlayAborted) return undefined as R
-          return listener(eventWrapper(event))
+          return listener(eventWrapper(event) as never)
         },
         taskId === undefined ? undefined : { taskId }
       )

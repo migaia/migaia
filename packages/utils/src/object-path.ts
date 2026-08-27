@@ -232,11 +232,11 @@ export function parseObjectPath(path: string | IObjectPathTuple): IObjectPathTup
 }
 
 /** Traverses each segment once and preserves missing, blocked, and thrown-getter diagnostics. */
-export function probeObjectPath<T, P extends IObjectPathInput<T>>(
+function probeParsedObjectPath<T, P extends IObjectPathInput<T>>(
   object: T,
-  path: P
+  path: P,
+  segments: IObjectPathTuple
 ): IPathProbe<T, P> {
-  const segments = parseObjectPath(path)
   let parent: unknown = object
   for (let index = 0; index < segments.length; index++) {
     const key = segments[index]
@@ -264,6 +264,22 @@ export function probeObjectPath<T, P extends IObjectPathInput<T>>(
     }
   }
   return { kind: 'value', originKey: path, segments, value: parent as IObjectPathValue<T, P> }
+}
+
+/** Parses and probes one path in a single operation. */
+export function probeObjectPath<T, P extends IObjectPathInput<T>>(
+  object: T,
+  path: P
+): IPathProbe<T, P> {
+  return probeParsedObjectPath(object, path, parseObjectPath(path))
+}
+
+/** Probes an already parsed tuple without reparsing it during delivery. */
+export function probeObjectPathSegments<T, P extends IObjectPathInput<T>>(
+  object: T,
+  segments: P
+): IPathProbe<T, P> {
+  return probeParsedObjectPath(object, segments, segments as IObjectPathTuple)
 }
 
 /** Reads one path; missing/blocked paths yield undefined while getter failures remain observable. */

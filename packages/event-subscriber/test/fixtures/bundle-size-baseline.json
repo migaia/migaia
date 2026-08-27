@@ -1,8 +1,8 @@
 {
   "fixture": "dist/index.js",
   "algorithm": "minified+gzip",
-  "bytes": 4955,
+  "bytes": 6842,
   "absoluteLimitBytes": 12288,
   "regressionLimit": "max(observed * 10%, 1024 bytes)",
-  "recordedAfter": "B2 initial implementation"
+  "recordedAfter": "ESVA-R01..R11 implementation"
 }

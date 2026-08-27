@@ -13,6 +13,7 @@ export default defineConfig({
         error: 'src/error.ts',
         bytes: 'src/bytes.ts',
         object: 'src/object.ts',
+        'object-path': 'src/object-path.ts',
         typing: 'src/typing.ts',
         config: 'src/config.ts',
         function: 'src/function.ts'

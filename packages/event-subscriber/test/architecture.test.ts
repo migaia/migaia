@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { ACTIVE_CALLABLE_CASES, assertSdd, authoritativeSdd, parseSdd } from './sdd-validator.js'
 
 describe('runtime-neutral boundary', () => {
-  it('ES-T12 ships one side-effect-free root without workspace runtime dependencies', () => {
+  it('ES-T12 ships one side-effect-free root with only the admitted utils foundation dependency', () => {
     const packageRoot = resolve(import.meta.dirname, '..')
     const manifest = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8')) as {
       readonly sideEffects?: boolean
@@ -12,7 +12,7 @@ describe('runtime-neutral boundary', () => {
       readonly exports?: Record<string, unknown>
     }
     expect(manifest.sideEffects).toBe(false)
-    expect(manifest.dependencies ?? {}).toEqual({})
+    expect(manifest.dependencies ?? {}).toEqual({ '@migaia/utils': 'workspace:^' })
     expect(Object.keys(manifest.exports ?? {})).toEqual(['.'])
   })
 

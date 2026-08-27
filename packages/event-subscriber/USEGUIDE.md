@@ -596,6 +596,23 @@ subscribeSubscriber(pipeline, {
 await invokeSerial(pipeline, 'order-created')
 ```
 
+### 6. 静态 value path alias
+
+`createEventChannel` 的第四泛型 `V`、`createEventHub` 的第三泛型 `V` 表示静态 `valueConfig`。调用方应使用 `as const` 或显式 `V` 保留 literal path 与 alias；alias 没有 `resource` 等保留名称，只需避开 context 成员和危险 prototype key。
+
+```ts
+type IEvent = { readonly data: { readonly id: number } }
+const valueConfig = { readPath: 'data.id', alias: 'resource' } as const
+const channel = createEventChannel<IEvent, void, undefined, typeof valueConfig>({ valueConfig })
+channel.subscribe((event) => {
+  event.value // 原始 published value
+  event.resource // number | undefined
+  event.abort() // 原有 context controls 保留
+})
+```
+
+每次 publish/invoke 对 active path 只 probe 一次，所有目标 context 都取得同一 projected identity；alias 是 enumerable、non-writable、non-configurable own data property。空字符串或 trim 后为空的 `readPath` 静默禁用 projection，不读取 alias、不 parse、不 probe、不 report。missing、blocked 和 getter failure 会进入既有 report/terminal 链并携带 `VALUE_PROJECTION_FAILED`；listener 仍调用且 alias 为 `undefined`，但存在的 `undefined` leaf 是成功。函数 selector、transform、operator、fallback 与 lazy per-listener projection 不属于本版契约。
+
 ---
 
 <a id="排查与构建门禁"></a>

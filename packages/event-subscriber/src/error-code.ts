@@ -31,6 +31,8 @@ export const EventSubscriberErrorCode = {
   invalidOptions: 'INVALID_OPTIONS',
   /** One or more listeners failed after the full target snapshot was processed. */
   publishFailed: 'PUBLISH_FAILED',
+  /** A configured value path was missing, blocked, or threw while delivering an event. */
+  valueProjectionFailed: 'VALUE_PROJECTION_FAILED',
   /**
    * A fire-and-forget listener failure reached terminal diagnostics after report handling failed or
    * was absent.

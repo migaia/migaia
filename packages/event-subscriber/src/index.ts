@@ -31,6 +31,7 @@ export type {
   IEventMap,
   IEventReport,
   IEventSubscriber,
+  IEventValueConfig,
   IFilteredEventChannel,
   IListenerResult,
   IUnsubscribe

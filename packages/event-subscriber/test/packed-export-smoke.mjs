@@ -15,6 +15,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const packageDirectory = resolve(fileURLToPath(new URL('..', import.meta.url)))
+const utilsPackageDirectory = resolve(packageDirectory, '../utils')
 const smokeDirectory = mkdtempSync(join(tmpdir(), 'migaia-event-subscriber-packed-'))
 const extractDirectory = join(smokeDirectory, 'extract')
 const consumerDirectory = join(smokeDirectory, 'consumer')
@@ -27,8 +28,14 @@ function main() {
   try {
     mkdirSync(extractDirectory, { recursive: true })
     mkdirSync(join(consumerDirectory, 'node_modules', '@migaia'), { recursive: true })
-    const packedPackage = join(extractDirectory, 'package')
-    execFileSync('tar', ['-xzf', pack(), '-C', extractDirectory])
+    const eventExtractDirectory = join(extractDirectory, 'event')
+    const utilsExtractDirectory = join(extractDirectory, 'utils')
+    mkdirSync(eventExtractDirectory, { recursive: true })
+    mkdirSync(utilsExtractDirectory, { recursive: true })
+    const packedPackage = join(eventExtractDirectory, 'package')
+    const packedUtilsPackage = join(utilsExtractDirectory, 'package')
+    execFileSync('tar', ['-xzf', pack(packageDirectory, 'event'), '-C', eventExtractDirectory])
+    execFileSync('tar', ['-xzf', pack(utilsPackageDirectory, 'utils'), '-C', utilsExtractDirectory])
     const packedFiles = readdirSync(join(packedPackage, 'dist'), { recursive: true })
     if (
       packedFiles.some((entry) => {
@@ -47,6 +54,9 @@ function main() {
       join(consumerDirectory, 'node_modules', '@migaia/event-subscriber'),
       'dir'
     )
+    symlinkSync(packedUtilsPackage, join(consumerDirectory, 'node_modules', '@migaia/utils'), 'dir')
+    mkdirSync(join(packedPackage, 'node_modules', '@migaia'), { recursive: true })
+    symlinkSync(packedUtilsPackage, join(packedPackage, 'node_modules', '@migaia/utils'), 'dir')
     writeFileSync(join(consumerDirectory, 'package.json'), '{"type":"module"}\n', 'utf8')
     writeFileSync(
       join(consumerDirectory, 'runtime.mjs'),
@@ -86,11 +96,11 @@ function main() {
 }
 
 /** Packs the current package and returns the only generated tarball. */
-function pack() {
-  const packDirectory = join(smokeDirectory, 'pack')
+function pack(packageRoot, packageLabel) {
+  const packDirectory = join(smokeDirectory, `pack-${packageLabel}`)
   mkdirSync(packDirectory, { recursive: true })
   execFileSync('pnpm', ['pack', '--pack-destination', packDirectory], {
-    cwd: packageDirectory,
+    cwd: packageRoot,
     stdio: 'inherit'
   })
   const tarballs = readdirSync(packDirectory).filter((entry) => entry.endsWith('.tgz'))
