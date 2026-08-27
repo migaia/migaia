@@ -89,9 +89,9 @@ describe('WRC-C-B11 retained provenance', () => {
     )
     expect(report.approval.status).toBe('approved')
     expect(report.approval.approvalRecord).toMatchObject({
-      decisionId: 'WRC-C-B11-decision-20260826-03',
-      keyId: 'coordinator-ed25519-04ad8e84b3d15997',
-      digest: '90a3641073cf1d77459e7765751708433245f9c54faeeca8a188c7526a5555f6'
+      decisionId: 'WRC-C-B11-decision-20260827-04',
+      keyId: 'coordinator-ed25519-7556143481d08058',
+      digest: '93b3a88bd97a79efecf8ed2acc465e19576023fa5fb40bbf9af757e128ad0129'
     })
     expect(
       validateAuthorization(report.approval, report.subject, {

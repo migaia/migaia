@@ -1,0 +1,170 @@
+import { EventSubscriberErrorCode } from './error-code.js'
+import { createEventTypeError, eventErrorText } from './errors.js'
+
+/** Stable preset names shared by Channel and Hub style projections. */
+export const EventApiStyle = {
+  subscribePublish: 'subscribe-publish',
+  onEmit: 'on-emit',
+  onTrigger: 'on-trigger',
+  listenFire: 'listen-fire'
+} as const
+
+export type EventApiStyle = (typeof EventApiStyle)[keyof typeof EventApiStyle]
+
+type IEventApiReservedName =
+  | 'subscribe'
+  | 'subscribeOnce'
+  | 'subscribeUntil'
+  | 'publish'
+  | 'filterTaskId'
+  | 'clear'
+  | 'size'
+  | '__proto__'
+  | 'prototype'
+  | 'constructor'
+
+/** Maps each preset to its semantic method names without introducing a second runtime owner. */
+const eventApiStyleNames = {
+  [EventApiStyle.subscribePublish]: { subscribe: 'subscribe', publish: 'publish' },
+  [EventApiStyle.onEmit]: { subscribe: 'on', publish: 'emit' },
+  [EventApiStyle.onTrigger]: { subscribe: 'on', publish: 'trigger' },
+  [EventApiStyle.listenFire]: { subscribe: 'listen', publish: 'fire' }
+} as const
+
+/** Own-key lookup prevents inherited Object prototype names from becoming presets. */
+const hasEventApiStylePreset = (value: string): value is EventApiStyle =>
+  Object.hasOwn(eventApiStyleNames, value)
+
+/** Names reserved by either canonical surface or by JavaScript prototype hazards. */
+const eventApiReservedNames = new Set<IEventApiReservedName>([
+  'subscribe',
+  'subscribeOnce',
+  'subscribeUntil',
+  'publish',
+  'filterTaskId',
+  'clear',
+  'size',
+  '__proto__',
+  'prototype',
+  'constructor'
+])
+
+export type IEventApiStyleNames<
+  TSubscribe extends string = string,
+  TPublish extends string = string
+> = {
+  readonly subscribe: TSubscribe
+  readonly publish: TPublish
+}
+
+export type IEventApiStyle = EventApiStyle | IEventApiStyleNames
+
+type IEventApiForbiddenSubscribeName = Exclude<IEventApiReservedName, 'subscribe'>
+type IEventApiForbiddenPublishName = Exclude<IEventApiReservedName, 'publish'>
+
+export type IEventApiStyleOption<S extends IEventApiStyle | undefined> = S extends undefined
+  ? undefined
+  : S extends EventApiStyle
+    ? S
+    : S extends IEventApiStyleNames<infer TSubscribe, infer TPublish>
+      ? string extends TSubscribe | TPublish
+        ? S
+        : '' extends TSubscribe | TPublish
+          ? never
+          : Extract<TSubscribe, IEventApiForbiddenSubscribeName> extends never
+            ? Extract<TPublish, IEventApiForbiddenPublishName> extends never
+              ? Extract<TSubscribe, TPublish> extends never
+                ? S
+                : never
+              : never
+            : never
+      : never
+
+export type IEventApiStyleMethodNames<S extends IEventApiStyle | undefined> =
+  S extends EventApiStyle
+    ? (typeof eventApiStyleNames)[S]
+    : S extends IEventApiStyleNames<infer TSubscribe, infer TPublish>
+      ? string extends TSubscribe | TPublish
+        ? never
+        : IEventApiStyleNames<TSubscribe, TPublish>
+      : never
+
+/** The normalized immutable plan consumed once during surface construction. */
+export type IEventApiStylePlan = Readonly<IEventApiStyleNames<string, string>>
+
+/** Returns the input identity while preserving literal names for predeclared style objects. */
+export const defineEventApiStyle = <const S extends IEventApiStyleNames>(style: S): S => style
+
+/** Resolves a public style value and rejects collisions before a surface can escape. */
+export const normalizeEventApiStyle = (value: unknown): IEventApiStylePlan => {
+  if (value === undefined)
+    return Object.freeze({ ...eventApiStyleNames[EventApiStyle.subscribePublish] })
+  if (typeof value === 'string') {
+    if (hasEventApiStylePreset(value)) return Object.freeze({ ...eventApiStyleNames[value] })
+  } else if (isRecord(value)) {
+    const subscribe = value.subscribe
+    const publish = value.publish
+    const validatedSubscribe = validateStyleName(subscribe, 'subscribe')
+    const validatedPublish = validateStyleName(publish, 'publish')
+    if (validatedSubscribe === validatedPublish) throw invalidStyle()
+    if (isReservedForOtherMethod(validatedSubscribe, 'subscribe')) throw invalidStyle()
+    if (isReservedForOtherMethod(validatedPublish, 'publish')) throw invalidStyle()
+    return Object.freeze({ subscribe: validatedSubscribe, publish: validatedPublish })
+  }
+  throw invalidStyle()
+}
+
+/** Builds only non-canonical alias descriptors; canonical members remain the original methods. */
+export const projectEventApiStyle = <T extends object>(surface: T, plan: IEventApiStylePlan): T => {
+  const descriptors: PropertyDescriptorMap = {}
+  const aliasNames = [plan.subscribe, plan.publish].filter(
+    (name, index, names) =>
+      name !== (index === 0 ? 'subscribe' : 'publish') && names.indexOf(name) === index
+  )
+  if (!Object.isExtensible(surface)) throw invalidStyle()
+  for (const name of aliasNames) {
+    const existing = Object.getOwnPropertyDescriptor(surface, name)
+    if (existing && !existing.configurable) throw invalidStyle()
+  }
+  if (plan.subscribe !== 'subscribe')
+    descriptors[plan.subscribe] = {
+      configurable: false,
+      enumerable: false,
+      value: (surface as Record<string, unknown>).subscribe,
+      writable: false
+    }
+  if (plan.publish !== 'publish')
+    descriptors[plan.publish] = {
+      configurable: false,
+      enumerable: false,
+      value: (surface as Record<string, unknown>).publish,
+      writable: false
+    }
+  Object.defineProperties(surface, descriptors)
+  return surface
+}
+
+/** Reads a style field only through ordinary object data/getter semantics. */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+/** Validates one semantic method name before it enters a descriptor plan. */
+const validateStyleName = (value: unknown, semantic: 'subscribe' | 'publish'): string => {
+  if (typeof value !== 'string' || value.length === 0) throw invalidStyle()
+  if (semantic === 'subscribe' && value === 'publish') throw invalidStyle()
+  if (semantic === 'publish' && value === 'subscribe') throw invalidStyle()
+  return value
+}
+
+/** Rejects public members that would shadow a canonical operation or prototype escape hatch. */
+const isReservedForOtherMethod = (value: string, semantic: 'subscribe' | 'publish'): boolean => {
+  if (value === semantic) return false
+  return eventApiReservedNames.has(value as IEventApiReservedName)
+}
+
+/** Creates the package-owned native error used for every invalid style boundary. */
+const invalidStyle = (): TypeError =>
+  createEventTypeError(
+    EventSubscriberErrorCode.invalidOptions,
+    eventErrorText(EventSubscriberErrorCode.invalidOptions)
+  )

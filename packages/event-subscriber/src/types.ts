@@ -1,5 +1,6 @@
 import { EventSubscriberState } from './state-constants.js'
 import type { IEventDispatchPolicy } from './state-constants.js'
+import type { IEventApiStyle, IEventApiStyleMethodNames, IEventApiStyleOption } from './style.js'
 
 export type IUnsubscribe = () => void
 
@@ -96,6 +97,21 @@ export type IEventChannelLike<T, R = void> = {
   subscribe(listener: IEventListener<T, R>, options?: { readonly taskId?: string }): IUnsubscribe
 }
 
+type IEventChannelStyleProjection<T, R, S extends IEventApiStyle | undefined> = [
+  IEventApiStyleMethodNames<S>
+] extends [never]
+  ? Record<never, never>
+  : IEventApiStyleMethodNames<S> extends {
+        readonly subscribe: infer TSubscribe extends string
+        readonly publish: infer TPublish extends string
+      }
+    ? {
+        readonly [K in Exclude<TSubscribe, 'subscribe'>]: IEventChannel<T, R>['subscribe']
+      } & {
+        readonly [K in Exclude<TPublish, 'publish'>]: (value: T) => void
+      }
+    : Record<never, never>
+
 export type IEventChannel<T, R = void> = {
   subscribe(
     listener: IEventListener<T, R>,
@@ -115,6 +131,12 @@ export type IEventChannel<T, R = void> = {
   clear(): void
   readonly size: number
 }
+
+export type IStyledEventChannel<
+  T,
+  R = void,
+  S extends IEventApiStyle | undefined = undefined
+> = IEventChannel<T, R> & IEventChannelStyleProjection<T, R, S>
 
 declare const filteredChannelBrand: unique symbol
 declare const canonicalChannelBrand: unique symbol
@@ -137,9 +159,13 @@ export type IEventHubReport<C extends IEventMap> = {
   }
 }[keyof C]
 
-export type IEventHubOptions<C extends IEventMap> = {
+export type IEventHubOptions<
+  C extends IEventMap,
+  S extends IEventApiStyle | undefined = undefined
+> = {
   readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>
   readonly terminalReport?: (error: unknown) => void | PromiseLike<void>
+  readonly style?: IEventApiStyleOption<S>
 }
 
 export type IEventHub<C extends IEventMap> = {
@@ -152,7 +178,27 @@ export type IEventHub<C extends IEventMap> = {
   size(key?: keyof C): number
 }
 
-export type IEventChannelOptions<T> = {
+type IEventHubStyleProjection<C extends IEventMap, S extends IEventApiStyle | undefined> = [
+  IEventApiStyleMethodNames<S>
+] extends [never]
+  ? Record<never, never>
+  : IEventApiStyleMethodNames<S> extends {
+        readonly subscribe: infer TSubscribe extends string
+        readonly publish: infer TPublish extends string
+      }
+    ? {
+        readonly [K in Exclude<TSubscribe, 'subscribe'>]: IEventHub<C>['subscribe']
+      } & {
+        readonly [K in Exclude<TPublish, 'publish'>]: IEventHub<C>['publish']
+      }
+    : Record<never, never>
+
+export type IStyledEventHub<
+  C extends IEventMap,
+  S extends IEventApiStyle | undefined = undefined
+> = IEventHub<C> & IEventHubStyleProjection<C, S>
+
+export type IEventChannelOptions<T, S extends IEventApiStyle | undefined = undefined> = {
   readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>
   readonly terminalReport?: (error: unknown) => void | PromiseLike<void>
   /**
@@ -161,4 +207,23 @@ export type IEventChannelOptions<T> = {
    * finish before a reentrant value is delivered.
    */
   readonly dispatchPolicy?: IEventDispatchPolicy
+  readonly style?: IEventApiStyleOption<S>
 }
+
+export type IStyledEventChannelOptions<T, S extends IEventApiStyle> = Omit<
+  IEventChannelOptions<T>,
+  'style'
+> & {
+  readonly style: S
+} & (IEventApiStyleOption<S> extends never
+    ? { readonly __invalidEventApiStyle: never }
+    : Record<never, never>)
+
+export type IStyledEventHubOptions<C extends IEventMap, S extends IEventApiStyle> = Omit<
+  IEventHubOptions<C>,
+  'style'
+> & {
+  readonly style: S
+} & (IEventApiStyleOption<S> extends never
+    ? { readonly __invalidEventApiStyle: never }
+    : Record<never, never>)

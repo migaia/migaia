@@ -2,8 +2,8 @@
   "entry": "root",
   "root": {
     "moduleCount": 66,
-    "rawBytes": 455256,
-    "gzipBytes": 107623,
+    "rawBytes": 458010,
+    "gzipBytes": 108255,
     "endpointStaticImportCount": 12
   },
   "modules": [
@@ -78,7 +78,7 @@
     {
       "module": "/Users/kaeo/workspack/migai/packages/plugin-host/dist/index.js",
       "originalBytes": 94824,
-      "renderedBytes": 93880
+      "renderedBytes": 94426
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/discovery-attachment.ts",
@@ -107,8 +107,8 @@
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/event-subscriber/dist/index.js",
-      "originalBytes": 19181,
-      "renderedBytes": 13851
+      "originalBytes": 21790,
+      "renderedBytes": 16059
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/outbound-sender.ts",

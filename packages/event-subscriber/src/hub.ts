@@ -7,16 +7,40 @@ import type {
   IEventHubOptions,
   IEventMap,
   IEventListener,
-  IEventHubSubscription
+  IEventHubSubscription,
+  IStyledEventHub,
+  IStyledEventHubOptions
 } from './types.js'
 import { createRawSubscriptionOwner } from './internal/subscription.js'
+import {
+  normalizeEventApiStyle,
+  projectEventApiStyle,
+  type IEventApiStyle,
+  type IEventApiStylePlan
+} from './style.js'
 
 /** Creates a lazy keyed synchronous hub with O(1) total size accounting. */
-export const createEventHub = <C extends IEventMap>(
-  options: IEventHubOptions<C> = {}
-): IEventHub<C> => {
+export function createEventHub<C extends IEventMap, const S extends IEventApiStyle>(
+  options: IStyledEventHubOptions<C, S>
+): IStyledEventHub<C, S>
+export function createEventHub<C extends IEventMap>(
+  options: Omit<IEventHubOptions<C>, 'style'> & { readonly style: 'subscribe-publish' }
+): IEventHub<C>
+export function createEventHub<C extends IEventMap>(
+  options: Omit<IEventHubOptions<C>, 'style'> & { readonly style: 'on-emit' }
+): IStyledEventHub<C, 'on-emit'>
+export function createEventHub<C extends IEventMap>(
+  options: Omit<IEventHubOptions<C>, 'style'> & { readonly style: 'on-trigger' }
+): IStyledEventHub<C, 'on-trigger'>
+export function createEventHub<C extends IEventMap>(
+  options: Omit<IEventHubOptions<C>, 'style'> & { readonly style: 'listen-fire' }
+): IStyledEventHub<C, 'listen-fire'>
+export function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>
+export function createEventHub<C extends IEventMap>(options: unknown = {}): IEventHub<C> {
   let report: IEventHubOptions<C>['report']
   let terminalReport: IEventHubOptions<C>['terminalReport']
+  let style: IEventApiStyle | undefined
+  let stylePlan: IEventApiStylePlan
   try {
     if (typeof options !== 'object' || options === null || Array.isArray(options)) {
       throw createEventTypeError(
@@ -24,8 +48,9 @@ export const createEventHub = <C extends IEventMap>(
         eventErrorText(EventSubscriberErrorCode.invalidOptions)
       )
     }
-    report = options.report
-    terminalReport = options.terminalReport
+    const optionRecord = options as IEventHubOptions<C, IEventApiStyle | undefined>
+    report = optionRecord.report
+    terminalReport = optionRecord.terminalReport
   } catch (error) {
     let isOptionsError = false
     try {
@@ -40,6 +65,25 @@ export const createEventHub = <C extends IEventMap>(
       )
     }
     if (isOptionsError) throw error
+    throw createEventTypeError(
+      EventSubscriberErrorCode.invalidOptions,
+      eventErrorText(EventSubscriberErrorCode.invalidOptions),
+      error
+    )
+  }
+  try {
+    const optionRecord = options as IEventHubOptions<C, IEventApiStyle | undefined>
+    style = optionRecord.style
+  } catch (error) {
+    throw createEventTypeError(
+      EventSubscriberErrorCode.invalidOptions,
+      eventErrorText(EventSubscriberErrorCode.invalidOptions),
+      error
+    )
+  }
+  try {
+    stylePlan = normalizeEventApiStyle(style)
+  } catch (error) {
     throw createEventTypeError(
       EventSubscriberErrorCode.invalidOptions,
       eventErrorText(EventSubscriberErrorCode.invalidOptions),
@@ -181,6 +225,15 @@ export const createEventHub = <C extends IEventMap>(
       deactivate()
     }
     return release
+  }
+  try {
+    projectEventApiStyle(hub, stylePlan)
+  } catch (error) {
+    throw createEventTypeError(
+      EventSubscriberErrorCode.invalidOptions,
+      eventErrorText(EventSubscriberErrorCode.invalidOptions),
+      error
+    )
   }
   return hub
 }

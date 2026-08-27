@@ -112,8 +112,8 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
 
     expect(candidate.default.status).toBe('approved')
     expect(candidate.default.approval).toEqual({
-      decisionId: 'WRC-C-B11-decision-20260826-03',
-      keyId: 'coordinator-ed25519-04ad8e84b3d15997',
+      decisionId: 'WRC-C-B11-decision-20260827-04',
+      keyId: 'coordinator-ed25519-7556143481d08058',
       digest: candidate.default.provenanceDigest,
       newTuple: {
         moduleCount: candidate.default.newTuple.moduleCount,
@@ -129,8 +129,8 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
     expect(live.root.endpointStaticImportCount).toBe(
       candidate.default.newTuple.endpointStaticImportCount
     )
-    expect(live.root.rawBytes - historicalBaseline.default.root.rawBytes).toBe(205127)
-    expect(live.root.gzipBytes - historicalBaseline.default.root.gzipBytes).toBe(46452)
+    expect(live.root.rawBytes - historicalBaseline.default.root.rawBytes).toBe(207881)
+    expect(live.root.gzipBytes - historicalBaseline.default.root.gzipBytes).toBe(47084)
     expect(live.moduleAttribution).toHaveLength(live.modules.length)
     expect(
       live.moduleAttribution.every(
