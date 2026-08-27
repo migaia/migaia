@@ -2,8 +2,8 @@
   "entry": "root",
   "root": {
     "moduleCount": 66,
-    "rawBytes": 458010,
-    "gzipBytes": 108255,
+    "rawBytes": 474929,
+    "gzipBytes": 113059,
     "endpointStaticImportCount": 12
   },
   "modules": [
@@ -77,333 +77,333 @@
   "moduleAttribution": [
     {
       "module": "/Users/kaeo/workspack/migai/packages/plugin-host/dist/index.js",
-      "originalBytes": 94824,
-      "renderedBytes": 94426
+      "originalBytes": 110814,
+      "renderedBytes": 110674
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/discovery-attachment.ts",
       "originalBytes": 63792,
-      "renderedBytes": 48665
+      "renderedBytes": 48648
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/lifecycle/dist/index.js",
       "originalBytes": 42924,
-      "renderedBytes": 32852
+      "renderedBytes": 32846
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/outbound-attachment.ts",
       "originalBytes": 31591,
-      "renderedBytes": 22394
+      "renderedBytes": 22377
+    },
+    {
+      "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/plugin-translator.ts",
+      "originalBytes": 26618,
+      "renderedBytes": 17180
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/discovery-registry.ts",
       "originalBytes": 21560,
-      "renderedBytes": 16515
-    },
-    {
-      "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/plugin-translator.ts",
-      "originalBytes": 25564,
-      "renderedBytes": 16350
+      "renderedBytes": 16498
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/event-subscriber/dist/index.js",
       "originalBytes": 21790,
-      "renderedBytes": 16059
+      "renderedBytes": 16053
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/outbound-sender.ts",
       "originalBytes": 16075,
-      "renderedBytes": 11960
+      "renderedBytes": 11943
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/plugin-inventory.ts",
-      "originalBytes": 19669,
+      "originalBytes": 19740,
       "renderedBytes": 9909
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/endpoint-kernel.ts",
       "originalBytes": 13925,
-      "renderedBytes": 9502
+      "renderedBytes": 9485
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/endpoint-bootstrap.ts",
       "originalBytes": 14547,
-      "renderedBytes": 8806
+      "renderedBytes": 8789
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/control-attachment.ts",
       "originalBytes": 11902,
-      "renderedBytes": 8445
+      "renderedBytes": 8428
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/provider-attachment.ts",
       "originalBytes": 11213,
-      "renderedBytes": 8364
+      "renderedBytes": 8347
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/capability/dist/graph/topology.js",
       "originalBytes": 9264,
-      "renderedBytes": 8125
+      "renderedBytes": 8119
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/endpoint-modules.ts",
       "originalBytes": 12013,
-      "renderedBytes": 7891
+      "renderedBytes": 7874
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/provider-executor.ts",
       "originalBytes": 10735,
-      "renderedBytes": 7154
+      "renderedBytes": 7137
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/error-serialization.ts",
       "originalBytes": 17532,
-      "renderedBytes": 7007
+      "renderedBytes": 6990
+    },
+    {
+      "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/core.ts",
+      "originalBytes": 12906,
+      "renderedBytes": 6954
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/wire.ts",
       "originalBytes": 13731,
-      "renderedBytes": 6750
-    },
-    {
-      "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/core.ts",
-      "originalBytes": 12349,
-      "renderedBytes": 6656
+      "renderedBytes": 6733
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/error-code.ts",
       "originalBytes": 10195,
-      "renderedBytes": 6329
+      "renderedBytes": 6312
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/error-text.ts",
       "originalBytes": 6305,
-      "renderedBytes": 6188
+      "renderedBytes": 6171
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/async-control.ts",
       "originalBytes": 7181,
-      "renderedBytes": 4923
+      "renderedBytes": 4906
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/chunk.ts",
       "originalBytes": 6964,
-      "renderedBytes": 4825
+      "renderedBytes": 4808
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/disposal-translation.ts",
       "originalBytes": 5766,
-      "renderedBytes": 4571
+      "renderedBytes": 4554
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/construction-install.ts",
       "originalBytes": 7051,
-      "renderedBytes": 4536
+      "renderedBytes": 4519
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/identity.ts",
       "originalBytes": 5256,
-      "renderedBytes": 4490
+      "renderedBytes": 4473
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/endpoint-projection.ts",
       "originalBytes": 4831,
-      "renderedBytes": 3739
+      "renderedBytes": 3722
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/resource-scope.ts",
       "originalBytes": 5030,
-      "renderedBytes": 3425
+      "renderedBytes": 3408
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/errors.ts",
       "originalBytes": 5798,
-      "renderedBytes": 3301
+      "renderedBytes": 3284
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/test-observer.ts",
       "originalBytes": 9740,
-      "renderedBytes": 3199
+      "renderedBytes": 3182
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/request-replay-ledger.ts",
       "originalBytes": 4139,
-      "renderedBytes": 3198
+      "renderedBytes": 3181
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/inbound-identity.ts",
       "originalBytes": 5159,
-      "renderedBytes": 3168
+      "renderedBytes": 3151
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/plugin-contract.ts",
       "originalBytes": 9432,
-      "renderedBytes": 3121
+      "renderedBytes": 3104
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/chunk-attachment.ts",
       "originalBytes": 4165,
-      "renderedBytes": 2936
+      "renderedBytes": 2919
+    },
+    {
+      "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/web-rpc-plugin-host.ts",
+      "originalBytes": 4625,
+      "renderedBytes": 2777
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/variation-coordinator.ts",
       "originalBytes": 3370,
-      "renderedBytes": 2672
+      "renderedBytes": 2655
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/variation-admission.ts",
       "originalBytes": 2910,
-      "renderedBytes": 2609
+      "renderedBytes": 2592
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/replay.ts",
       "originalBytes": 2741,
-      "renderedBytes": 2486
-    },
-    {
-      "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/web-rpc-plugin-host.ts",
-      "originalBytes": 3943,
-      "renderedBytes": 2339
+      "renderedBytes": 2469
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/id.ts",
       "originalBytes": 2724,
-      "renderedBytes": 2045
+      "renderedBytes": 2028
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/hooks.ts",
       "originalBytes": 3219,
-      "renderedBytes": 2009
+      "renderedBytes": 1992
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/features/discovery.ts",
       "originalBytes": 3711,
-      "renderedBytes": 1982
+      "renderedBytes": 1965
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/operation-scope.ts",
       "originalBytes": 2347,
-      "renderedBytes": 1865
+      "renderedBytes": 1848
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/contract.ts",
       "originalBytes": 2611,
-      "renderedBytes": 1727
+      "renderedBytes": 1710
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/features/provider.ts",
       "originalBytes": 3677,
-      "renderedBytes": 1726
+      "renderedBytes": 1709
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/safe-value.ts",
       "originalBytes": 2110,
-      "renderedBytes": 1526
+      "renderedBytes": 1509
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/time-port.ts",
       "originalBytes": 2139,
-      "renderedBytes": 1446
+      "renderedBytes": 1429
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/utils/dist/error-text-AvoAS3qw.js",
       "originalBytes": 2048,
-      "renderedBytes": 1343
+      "renderedBytes": 1337
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/provider-admission.ts",
       "originalBytes": 1462,
-      "renderedBytes": 1332
+      "renderedBytes": 1315
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/plugin-shared-keys.ts",
       "originalBytes": 8999,
-      "renderedBytes": 1309
+      "renderedBytes": 1292
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/retry.ts",
       "originalBytes": 2210,
-      "renderedBytes": 1273
+      "renderedBytes": 1256
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/features/control.ts",
       "originalBytes": 2526,
-      "renderedBytes": 1270
+      "renderedBytes": 1253
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/provider-claim-authority.ts",
       "originalBytes": 1343,
-      "renderedBytes": 1268
+      "renderedBytes": 1251
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/provider.ts",
       "originalBytes": 1531,
-      "renderedBytes": 1264
+      "renderedBytes": 1247
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/features/outbound.ts",
       "originalBytes": 2465,
-      "renderedBytes": 1257
+      "renderedBytes": 1240
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/transport-activation.ts",
       "originalBytes": 1516,
-      "renderedBytes": 1252
+      "renderedBytes": 1235
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/features/chunk.ts",
       "originalBytes": 2248,
-      "renderedBytes": 1247
+      "renderedBytes": 1230
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/pending.ts",
       "originalBytes": 1635,
-      "renderedBytes": 1236
+      "renderedBytes": 1219
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/plugin-descriptor.ts",
       "originalBytes": 1895,
-      "renderedBytes": 1235
-    },
-    {
-      "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/source-identity.ts",
-      "originalBytes": 1092,
-      "renderedBytes": 1097
+      "renderedBytes": 1218
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/utils/dist/bytes.js",
       "originalBytes": 4405,
-      "renderedBytes": 1091
+      "renderedBytes": 1085
+    },
+    {
+      "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/source-identity.ts",
+      "originalBytes": 1092,
+      "renderedBytes": 1080
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/utf8.ts",
       "originalBytes": 1037,
-      "renderedBytes": 837
+      "renderedBytes": 820
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/protocol-constants.ts",
       "originalBytes": 3343,
-      "renderedBytes": 536
+      "renderedBytes": 519
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/internal/composed-disposal-observer.ts",
       "originalBytes": 877,
-      "renderedBytes": 448
+      "renderedBytes": 431
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/utils/dist/error.js",
       "originalBytes": 2216,
-      "renderedBytes": 378
+      "renderedBytes": 372
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/src/full.ts",
       "originalBytes": 2407,
-      "renderedBytes": 190
+      "renderedBytes": 173
     },
     {
       "module": "/Users/kaeo/workspack/migai/packages/web-rpc/test/fixtures/tree-shaking/root-entry.ts",
       "originalBytes": 111,
-      "renderedBytes": 114
+      "renderedBytes": 97
     }
   ]
 }

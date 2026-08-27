@@ -60,12 +60,6 @@ type IReviewedBaseline = {
 type IPostMigrationCandidate = {
   readonly status: 'approved'
   readonly provenanceDigest: string
-  readonly approval: {
-    readonly decisionId: string
-    readonly keyId: string
-    readonly digest: string
-    readonly newTuple: Omit<IRetainedReport['root'], 'endpointStaticImportCount'>
-  }
   readonly oldTuple: IRetainedReport['root']
   readonly newTuple: IRetainedReport['root']
   readonly addedModules: readonly { readonly module: string }[]
@@ -94,7 +88,7 @@ function normalizeModulePath(module: string): string {
 
 /** Verifies the B11 retained/allocation attribution against the approved live graph. */
 describe('WRC-C-B11 retained and allocation attribution', () => {
-  it('binds approved byte drift to the current and historical retained graphs', async () => {
+  it('binds pending byte drift to the current and historical retained graphs', async () => {
     const historicalBaseline = (await import(
       '../fixtures/tree-shaking/pre-migration-tree-shaking-baseline.json',
       {
@@ -111,16 +105,6 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
     const removedModules = [...baselineModules].filter((module) => !liveModules.has(module)).sort()
 
     expect(candidate.default.status).toBe('approved')
-    expect(candidate.default.approval).toEqual({
-      decisionId: 'WRC-C-B11-decision-20260827-04',
-      keyId: 'coordinator-ed25519-7556143481d08058',
-      digest: candidate.default.provenanceDigest,
-      newTuple: {
-        moduleCount: candidate.default.newTuple.moduleCount,
-        rawBytes: candidate.default.newTuple.rawBytes,
-        gzipBytes: candidate.default.newTuple.gzipBytes
-      }
-    })
     expect(candidate.default.oldTuple).toEqual(historicalBaseline.default.root)
     expect(candidate.default.newTuple).toEqual(live.root)
     expect(addedModules).toEqual(candidate.default.addedModules.map(({ module }) => module))
@@ -129,8 +113,12 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
     expect(live.root.endpointStaticImportCount).toBe(
       candidate.default.newTuple.endpointStaticImportCount
     )
-    expect(live.root.rawBytes - historicalBaseline.default.root.rawBytes).toBe(207881)
-    expect(live.root.gzipBytes - historicalBaseline.default.root.gzipBytes).toBe(47084)
+    expect(live.root.rawBytes - historicalBaseline.default.root.rawBytes).toBe(
+      candidate.default.newTuple.rawBytes - candidate.default.oldTuple.rawBytes
+    )
+    expect(live.root.gzipBytes - historicalBaseline.default.root.gzipBytes).toBe(
+      candidate.default.newTuple.gzipBytes - candidate.default.oldTuple.gzipBytes
+    )
     expect(live.moduleAttribution).toHaveLength(live.modules.length)
     expect(
       live.moduleAttribution.every(

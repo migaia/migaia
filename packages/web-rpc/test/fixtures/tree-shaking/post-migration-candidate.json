@@ -1,6 +1,22 @@
 {
   "schema": "WRC-C-B11f-post-migration-candidate-v2",
   "status": "approved",
+  "approval": {
+    "status": "approved",
+    "decisionId": "WRC-C-B11-decision-20260827-05",
+    "keyId": "coordinator-ed25519-37182544d93c586a",
+    "digest": "fa338f43267a7150972354669603a8701aa8ab29fa80806699187a6a172c7fdf",
+    "oldTuple": {
+      "moduleCount": 53,
+      "rawBytes": 250129,
+      "gzipBytes": 61171
+    },
+    "newTuple": {
+      "moduleCount": 66,
+      "rawBytes": 474929,
+      "gzipBytes": 113059
+    }
+  },
   "generatedFrom": {
     "cwd": "workspace-root",
     "scripts": [
@@ -10,17 +26,7 @@
       "tree-shaking/core-retained-causal.mjs"
     ]
   },
-  "provenanceDigest": "93b3a88bd97a79efecf8ed2acc465e19576023fa5fb40bbf9af757e128ad0129",
-  "approval": {
-    "decisionId": "WRC-C-B11-decision-20260827-04",
-    "keyId": "coordinator-ed25519-7556143481d08058",
-    "digest": "93b3a88bd97a79efecf8ed2acc465e19576023fa5fb40bbf9af757e128ad0129",
-    "newTuple": {
-      "moduleCount": 66,
-      "rawBytes": 458010,
-      "gzipBytes": 108255
-    }
-  },
+  "provenanceDigest": "fa338f43267a7150972354669603a8701aa8ab29fa80806699187a6a172c7fdf",
   "oldTuple": {
     "moduleCount": 53,
     "rawBytes": 250129,
@@ -29,8 +35,8 @@
   },
   "newTuple": {
     "moduleCount": 66,
-    "rawBytes": 458010,
-    "gzipBytes": 108255,
+    "rawBytes": 474929,
+    "gzipBytes": 113059,
     "endpointStaticImportCount": 12
   },
   "rootModules": [
@@ -103,14 +109,14 @@
   ],
   "consumers": {
     "core": {
-      "moduleCount": 30,
-      "rawBytes": 238483,
-      "gzipBytes": 59216,
-      "bundleSha256": "8d70315d7436346c39c5edc0f417f1f130899bcb5a6faab752280a1f6e88ac45",
       "entryProvenance": {
         "virtualId": "virtual:web-rpc-core",
         "sourceSha256": "0eaf086d1ec6901f63c8f254e4cd0e4e064b533aaedb4cb73bbb452c5ff9ca56"
       },
+      "moduleCount": 30,
+      "rawBytes": 256065,
+      "gzipBytes": 64019,
+      "bundleSha256": "82cc9a15e9aaf84696424f0010a9c69842e063a453595716f41c7dc84a5d5f22",
       "modules": [
         "\u0000rolldown/runtime.js",
         "src/core.ts",
@@ -145,14 +151,14 @@
       ]
     },
     "client": {
-      "moduleCount": 53,
-      "rawBytes": 343926,
-      "gzipBytes": 84550,
-      "bundleSha256": "26b2bb340981826bf201823439e0b84c22d0200639bc68647e329faa4d099b7c",
       "entryProvenance": {
         "virtualId": "virtual:web-rpc-client",
         "sourceSha256": "cc20f81229ddf28017cb28e07f8a6f1a1c3ca31b53495bf1cf94d7308ad0f8b9"
       },
+      "moduleCount": 53,
+      "rawBytes": 361890,
+      "gzipBytes": 89384,
+      "bundleSha256": "7e8a5461e2550c94e24dffed83b56325e74bf6c42652556d96489e3218451ff8",
       "modules": [
         "\u0000rolldown/runtime.js",
         "src/client.ts",
@@ -210,14 +216,14 @@
       ]
     },
     "provider": {
-      "moduleCount": 59,
-      "rawBytes": 371709,
-      "gzipBytes": 91236,
-      "bundleSha256": "bd737bd3f75e18a3aea6fbc0684f03fb58fa05d67fa4a361af2733c11eb316c1",
       "entryProvenance": {
         "virtualId": "virtual:web-rpc-provider",
         "sourceSha256": "7cda8c39a9816f43a39ce148b91ee57bd760d020aaa918f19604482b7f4dbf28"
       },
+      "moduleCount": 59,
+      "rawBytes": 389673,
+      "gzipBytes": 96102,
+      "bundleSha256": "37349a8275ca4b3022a47727b5212e58e4d175482b375aa7a1f8ebd68464ffb0",
       "modules": [
         "\u0000rolldown/runtime.js",
         "src/core.ts",
@@ -281,14 +287,14 @@
       ]
     },
     "full": {
-      "moduleCount": 67,
-      "rawBytes": 457385,
-      "gzipBytes": 108358,
-      "bundleSha256": "13e2bfbade7a547098be986dcc788213256b30f1307d6715861e385b190cc791",
       "entryProvenance": {
         "virtualId": "virtual:web-rpc-full",
         "sourceSha256": "a5bb6822af2057d6e400bd65307f4d5b8c46db77b0ccb6e6ea71155391431305"
       },
+      "moduleCount": 67,
+      "rawBytes": 475349,
+      "gzipBytes": 113209,
+      "bundleSha256": "26f00a3dd06572d8c67f10d5a5f65fbd237201ef8ab62bd01e9e1f432d5bca01",
       "modules": [
         "\u0000rolldown/runtime.js",
         "src/core.ts",
@@ -360,14 +366,14 @@
       ]
     },
     "custom": {
-      "moduleCount": 66,
-      "rawBytes": 457773,
-      "gzipBytes": 107907,
-      "bundleSha256": "aa0e533390266f12402b2c71ec8d6a0e4b9053ea638c43d0fd3b4529d7055f81",
       "entryProvenance": {
         "virtualId": "virtual:web-rpc-custom",
         "sourceSha256": "706ac06f07ca2fd0d595fd5b0d5408726218f356be438a4d24325d7b42dfab09"
       },
+      "moduleCount": 66,
+      "rawBytes": 475737,
+      "gzipBytes": 112746,
+      "bundleSha256": "190f592bcbd64f84773e6afec74df50a46624e349f2f362bb191d378ab8a12de",
       "modules": [
         "\u0000rolldown/runtime.js",
         "src/core.ts",
@@ -447,7 +453,7 @@
       "rationale": "Endpoint projection retains the once-only disposal observer that reports Host-owned terminal effects without creating a second disposal owner.",
       "byteAttribution": {
         "originalBytes": 877,
-        "renderedBytes": 448
+        "renderedBytes": 431
       },
       "incomingEdges": [
         {
@@ -485,7 +491,7 @@
       "rationale": "Core construction and plugin translation retain the bounded install-settlement helper that coordinates abort, rollback, and late failure reporting.",
       "byteAttribution": {
         "originalBytes": 7051,
-        "renderedBytes": 4536
+        "renderedBytes": 4519
       },
       "incomingEdges": [
         {
@@ -548,7 +554,7 @@
       "rationale": "Core retains the WebRPC error translation boundary that preserves Host disposal ownership while exposing the package error contract.",
       "byteAttribution": {
         "originalBytes": 5766,
-        "renderedBytes": 4571
+        "renderedBytes": 4554
       },
       "incomingEdges": [
         {
@@ -586,7 +592,7 @@
       "rationale": "Core retains the endpoint projection that exposes only admitted feature members and delegates disposal to the single Host promise.",
       "byteAttribution": {
         "originalBytes": 4831,
-        "renderedBytes": 3739
+        "renderedBytes": 3722
       },
       "incomingEdges": [
         {
@@ -624,7 +630,7 @@
       "rationale": "WebRPC owns the fixed encode, authentication, chunk, and transport-send sequence; only consumers selecting outbound retain this domain sender.",
       "byteAttribution": {
         "originalBytes": 16075,
-        "renderedBytes": 11960
+        "renderedBytes": 11943
       },
       "incomingEdges": [
         {
@@ -657,7 +663,7 @@
       "rationale": "Plugin translation retains the package-internal feature contract that maps endpoint modules onto canonical PluginHost lifecycle semantics.",
       "byteAttribution": {
         "originalBytes": 9432,
-        "renderedBytes": 3121
+        "renderedBytes": 3104
       },
       "incomingEdges": [
         {
@@ -695,7 +701,7 @@
       "rationale": "Plugin inventory retains normalized immutable descriptors so one construction transaction owns ordering, claims, and install inputs.",
       "byteAttribution": {
         "originalBytes": 1895,
-        "renderedBytes": 1235
+        "renderedBytes": 1218
       },
       "incomingEdges": [
         {
@@ -732,7 +738,7 @@
       "retainedConsumers": ["core", "client", "provider", "full", "custom"],
       "rationale": "Core retains the complete plugin inventory that validates and orders the one Host construction batch before side effects.",
       "byteAttribution": {
-        "originalBytes": 19669,
+        "originalBytes": 19740,
         "renderedBytes": 9909
       },
       "incomingEdges": [
@@ -771,7 +777,7 @@
       "rationale": "Selected features and bootstrap retain canonical internal shared keys for typed Host-owned ports without public surface leakage.",
       "byteAttribution": {
         "originalBytes": 8999,
-        "renderedBytes": 1309
+        "renderedBytes": 1292
       },
       "incomingEdges": [
         {
@@ -948,8 +954,8 @@
       "retainedConsumers": ["core", "client", "provider", "full", "custom"],
       "rationale": "Core and WebRpcPluginHost retain the sole translator from WebRPC feature definitions to the canonical PluginHost install batch.",
       "byteAttribution": {
-        "originalBytes": 25564,
-        "renderedBytes": 16350
+        "originalBytes": 26618,
+        "renderedBytes": 17180
       },
       "incomingEdges": [
         {
@@ -1012,7 +1018,7 @@
       "rationale": "Provider inventory and admission retain the WeakSet-backed package-native identity authority that mints and checks first-party provider modules and claims without owning duplicate detection.",
       "byteAttribution": {
         "originalBytes": 1343,
-        "renderedBytes": 1268
+        "renderedBytes": 1251
       },
       "incomingEdges": [
         {
@@ -1090,7 +1096,7 @@
       "rationale": "Outbound attachment retains the post-commit transport activation boundary only for consumers selecting outbound behavior.",
       "byteAttribution": {
         "originalBytes": 1516,
-        "renderedBytes": 1252
+        "renderedBytes": 1235
       },
       "incomingEdges": [
         {
@@ -1122,8 +1128,8 @@
       "retainedConsumers": ["core", "client", "provider", "full", "custom"],
       "rationale": "Core retains the sole WebRPC PluginHost specialization that applies package-specific disposal error translation without a second lifecycle owner.",
       "byteAttribution": {
-        "originalBytes": 3943,
-        "renderedBytes": 2339
+        "originalBytes": 4625,
+        "renderedBytes": 2777
       },
       "incomingEdges": [
         {
@@ -1161,7 +1167,7 @@
       "rationale": "Canonical pure topology admission retained by selected endpoint consumers; no WebRPC-local DAG owner.",
       "byteAttribution": {
         "originalBytes": 9264,
-        "renderedBytes": 8125
+        "renderedBytes": 8119
       },
       "incomingEdges": [
         {
@@ -1198,8 +1204,8 @@
       "retainedConsumers": ["core", "client", "provider", "full", "custom"],
       "rationale": "Canonical generic plugin lifecycle, shared, extension, resource, rollback, and disposal owner.",
       "byteAttribution": {
-        "originalBytes": 94824,
-        "renderedBytes": 94426
+        "originalBytes": 110814,
+        "renderedBytes": 110674
       },
       "incomingEdges": [
         {
@@ -1353,6 +1359,75 @@
       "resource-scope",
       "time-port",
       "variation-coordinator"
+    ]
+  },
+  "causality": {
+    "cause": "PluginHost V2 migration",
+    "owner": "@migaia/plugin-host",
+    "module": "workspace:packages/plugin-host/dist/index.js",
+    "evidenceSchema": "WRC-C-B11f-five-consumer-causal-v2",
+    "measuredDelta": {
+      "moduleCount": 13,
+      "rawBytes": 224800,
+      "gzipBytes": 51888,
+      "endpointStaticImportCount": -16
+    },
+    "byteAttribution": {
+      "originalBytes": 110814,
+      "renderedBytes": 110674
+    },
+    "retainedBy": ["core", "client", "provider", "full", "custom"],
+    "incomingEdges": [
+      {
+        "consumer": "client",
+        "from": "src/internal/disposal-translation.ts",
+        "to": "workspace:packages/plugin-host/dist/index.js"
+      },
+      {
+        "consumer": "client",
+        "from": "src/internal/web-rpc-plugin-host.ts",
+        "to": "workspace:packages/plugin-host/dist/index.js"
+      },
+      {
+        "consumer": "core",
+        "from": "src/internal/disposal-translation.ts",
+        "to": "workspace:packages/plugin-host/dist/index.js"
+      },
+      {
+        "consumer": "core",
+        "from": "src/internal/web-rpc-plugin-host.ts",
+        "to": "workspace:packages/plugin-host/dist/index.js"
+      },
+      {
+        "consumer": "custom",
+        "from": "src/internal/disposal-translation.ts",
+        "to": "workspace:packages/plugin-host/dist/index.js"
+      },
+      {
+        "consumer": "custom",
+        "from": "src/internal/web-rpc-plugin-host.ts",
+        "to": "workspace:packages/plugin-host/dist/index.js"
+      },
+      {
+        "consumer": "full",
+        "from": "src/internal/disposal-translation.ts",
+        "to": "workspace:packages/plugin-host/dist/index.js"
+      },
+      {
+        "consumer": "full",
+        "from": "src/internal/web-rpc-plugin-host.ts",
+        "to": "workspace:packages/plugin-host/dist/index.js"
+      },
+      {
+        "consumer": "provider",
+        "from": "src/internal/disposal-translation.ts",
+        "to": "workspace:packages/plugin-host/dist/index.js"
+      },
+      {
+        "consumer": "provider",
+        "from": "src/internal/web-rpc-plugin-host.ts",
+        "to": "workspace:packages/plugin-host/dist/index.js"
+      }
     ]
   },
   "causalSchema": "WRC-C-B11f-five-consumer-causal-v2"

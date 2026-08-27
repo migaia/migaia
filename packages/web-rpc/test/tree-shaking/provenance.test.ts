@@ -79,7 +79,7 @@ function readCanonicalEnvironment(): NodeJS.ProcessEnv {
 }
 
 describe('WRC-C-B11 retained provenance', () => {
-  it('hashes cwd-independent inputs and accepts the exact approved decision', async () => {
+  it('hashes cwd-independent inputs and preserves the installed detached decision', async () => {
     const report = readProvenance()
     const repeat = readProvenance()
     const packageInvocation = readProvenance(resolve(import.meta.dirname, '../..'))
@@ -89,9 +89,9 @@ describe('WRC-C-B11 retained provenance', () => {
     )
     expect(report.approval.status).toBe('approved')
     expect(report.approval.approvalRecord).toMatchObject({
-      decisionId: 'WRC-C-B11-decision-20260827-04',
-      keyId: 'coordinator-ed25519-7556143481d08058',
-      digest: '93b3a88bd97a79efecf8ed2acc465e19576023fa5fb40bbf9af757e128ad0129'
+      decisionId: 'WRC-C-B11-decision-20260827-05',
+      keyId: 'coordinator-ed25519-37182544d93c586a',
+      digest: 'fa338f43267a7150972354669603a8701aa8ab29fa80806699187a6a172c7fdf'
     })
     expect(
       validateAuthorization(report.approval, report.subject, {

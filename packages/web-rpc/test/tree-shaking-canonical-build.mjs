@@ -16,6 +16,7 @@ const canonicalBuildConfig = {
 
 /** Resolves the exact config used by the canonical retained-graph build. */
 export async function resolveCanonicalBuildConfig() {
+  process.chdir(packageDirectory)
   return resolveConfig(canonicalBuildConfig, 'build')
 }
 
@@ -24,6 +25,7 @@ export async function resolveCanonicalBuildConfig() {
  * call path shared prevents evidence instrumentation from changing output.
  */
 export async function buildCanonicalRetainedGraph() {
+  process.chdir(packageDirectory)
   return build(canonicalBuildConfig)
 }
 

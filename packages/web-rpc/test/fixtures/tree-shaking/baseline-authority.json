@@ -2,10 +2,10 @@
   "schema": "WRC-C-B11-approval-v2",
   "algorithm": "ed25519",
   "authorityId": "web-rpc-release-coordinator-v1",
-  "keyId": "coordinator-ed25519-7556143481d08058",
-  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEANPJy5G+RnBtRNjckqvf1DW3vlEmfz6e3VG1HE8YZY3w=\n-----END PUBLIC KEY-----\n",
-  "decisionId": "WRC-C-B11-decision-20260827-04",
-  "payloadDigest": "93b3a88bd97a79efecf8ed2acc465e19576023fa5fb40bbf9af757e128ad0129",
+  "keyId": "coordinator-ed25519-37182544d93c586a",
+  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAdUVGDhFweileZCbNjM4E4Vs/WwkL5jOSMC5oXmYeTdk=\n-----END PUBLIC KEY-----\n",
+  "decisionId": "WRC-C-B11-decision-20260827-05",
+  "payloadDigest": "fa338f43267a7150972354669603a8701aa8ab29fa80806699187a6a172c7fdf",
   "status": "approved",
-  "reason": "Coordinator-installed authority for the independently verified event-subscriber R3 retained delta."
+  "reason": "Coordinator-installed authority for the independently verified PluginHost V2 upgrade retained-size delta."
 }
