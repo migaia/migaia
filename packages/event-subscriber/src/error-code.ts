@@ -37,7 +37,12 @@ export const EventSubscriberErrorCode = {
    */
   unhandledListenerFailure: 'UNHANDLED_LISTENER_FAILURE',
   /** A callable subscription chain was closed; caller must retain a live handle. */
-  subscriptionClosed: 'SUBSCRIPTION_CLOSED'
+  subscriptionClosed: 'SUBSCRIPTION_CLOSED',
+  /**
+   * Handle descriptor projection failed after registration; the package rolls back the first
+   * registration and preserves the projection failure as the primary cause.
+   */
+  subscriptionHandleProjectionFailed: 'SUBSCRIPTION_HANDLE_PROJECTION_FAILED'
 } as const
 
 export type IEventSubscriberErrorCode =

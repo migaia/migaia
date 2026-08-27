@@ -3,9 +3,9 @@
   "status": "approved",
   "approval": {
     "status": "approved",
-    "decisionId": "WRC-C-B11-decision-20260827-05",
-    "keyId": "coordinator-ed25519-37182544d93c586a",
-    "digest": "fa338f43267a7150972354669603a8701aa8ab29fa80806699187a6a172c7fdf",
+    "decisionId": "WRC-C-B11-decision-20260827-06",
+    "keyId": "coordinator-ed25519-35f1f9bd39e4a6b8",
+    "digest": "ccc299b2a1b2905822bb0cb607ac24050e20aae4ff07d2bc524e1fdad8c4b1c1",
     "oldTuple": {
       "moduleCount": 53,
       "rawBytes": 250129,
@@ -13,8 +13,8 @@
     },
     "newTuple": {
       "moduleCount": 66,
-      "rawBytes": 474929,
-      "gzipBytes": 113059
+      "rawBytes": 475863,
+      "gzipBytes": 113255
     }
   },
   "generatedFrom": {
@@ -26,7 +26,7 @@
       "tree-shaking/core-retained-causal.mjs"
     ]
   },
-  "provenanceDigest": "fa338f43267a7150972354669603a8701aa8ab29fa80806699187a6a172c7fdf",
+  "provenanceDigest": "ccc299b2a1b2905822bb0cb607ac24050e20aae4ff07d2bc524e1fdad8c4b1c1",
   "oldTuple": {
     "moduleCount": 53,
     "rawBytes": 250129,
@@ -35,8 +35,8 @@
   },
   "newTuple": {
     "moduleCount": 66,
-    "rawBytes": 474929,
-    "gzipBytes": 113059,
+    "rawBytes": 475863,
+    "gzipBytes": 113255,
     "endpointStaticImportCount": 12
   },
   "rootModules": [
@@ -156,9 +156,9 @@
         "sourceSha256": "cc20f81229ddf28017cb28e07f8a6f1a1c3ca31b53495bf1cf94d7308ad0f8b9"
       },
       "moduleCount": 53,
-      "rawBytes": 361890,
-      "gzipBytes": 89384,
-      "bundleSha256": "7e8a5461e2550c94e24dffed83b56325e74bf6c42652556d96489e3218451ff8",
+      "rawBytes": 362824,
+      "gzipBytes": 89545,
+      "bundleSha256": "9cce869727bbc8b919754643174e2ce39461ebc4b784968b601494568210eecb",
       "modules": [
         "\u0000rolldown/runtime.js",
         "src/client.ts",
@@ -221,9 +221,9 @@
         "sourceSha256": "7cda8c39a9816f43a39ce148b91ee57bd760d020aaa918f19604482b7f4dbf28"
       },
       "moduleCount": 59,
-      "rawBytes": 389673,
-      "gzipBytes": 96102,
-      "bundleSha256": "37349a8275ca4b3022a47727b5212e58e4d175482b375aa7a1f8ebd68464ffb0",
+      "rawBytes": 390607,
+      "gzipBytes": 96299,
+      "bundleSha256": "d91d899169221c5f91deaf9ec695c64cf02c3714681035f76d9a667796243a0c",
       "modules": [
         "\u0000rolldown/runtime.js",
         "src/core.ts",
@@ -292,9 +292,9 @@
         "sourceSha256": "a5bb6822af2057d6e400bd65307f4d5b8c46db77b0ccb6e6ea71155391431305"
       },
       "moduleCount": 67,
-      "rawBytes": 475349,
-      "gzipBytes": 113209,
-      "bundleSha256": "26f00a3dd06572d8c67f10d5a5f65fbd237201ef8ab62bd01e9e1f432d5bca01",
+      "rawBytes": 476283,
+      "gzipBytes": 113403,
+      "bundleSha256": "d1f7d063ab2a2b73a4c66d5661ff7e52d1892ae9418adbb7938f85f759e5dc1d",
       "modules": [
         "\u0000rolldown/runtime.js",
         "src/core.ts",
@@ -371,9 +371,9 @@
         "sourceSha256": "706ac06f07ca2fd0d595fd5b0d5408726218f356be438a4d24325d7b42dfab09"
       },
       "moduleCount": 66,
-      "rawBytes": 475737,
-      "gzipBytes": 112746,
-      "bundleSha256": "190f592bcbd64f84773e6afec74df50a46624e349f2f362bb191d378ab8a12de",
+      "rawBytes": 476671,
+      "gzipBytes": 112906,
+      "bundleSha256": "a7f9eab6a8898e5daaa4a2f225f41123d74592ac4650e5d532cae9647df66114",
       "modules": [
         "\u0000rolldown/runtime.js",
         "src/core.ts",
@@ -1368,8 +1368,8 @@
     "evidenceSchema": "WRC-C-B11f-five-consumer-causal-v2",
     "measuredDelta": {
       "moduleCount": 13,
-      "rawBytes": 224800,
-      "gzipBytes": 51888,
+      "rawBytes": 225734,
+      "gzipBytes": 52084,
       "endpointStaticImportCount": -16
     },
     "byteAttribution": {
@@ -1429,6 +1429,43 @@
         "to": "workspace:packages/plugin-host/dist/index.js"
       }
     ]
+  },
+  "incrementalCausality": {
+    "cause": "event-subscriber styled handle and invoke migration",
+    "owner": "@migaia/event-subscriber",
+    "module": "workspace:packages/event-subscriber/dist/index.js",
+    "fromTuple": {
+      "moduleCount": 66,
+      "rawBytes": 474929,
+      "gzipBytes": 113059,
+      "endpointStaticImportCount": 12
+    },
+    "toTuple": {
+      "moduleCount": 66,
+      "rawBytes": 475863,
+      "gzipBytes": 113255,
+      "endpointStaticImportCount": 12
+    },
+    "measuredDelta": {
+      "moduleCount": 0,
+      "rawBytes": 934,
+      "gzipBytes": 196,
+      "endpointStaticImportCount": 0
+    },
+    "byteAttribution": {
+      "before": {
+        "originalBytes": 21790,
+        "renderedBytes": 16053
+      },
+      "after": {
+        "originalBytes": 22721,
+        "renderedBytes": 16987
+      }
+    },
+    "retainedBy": ["core", "client", "provider", "full", "custom"],
+    "moduleSetChanged": false,
+    "endpointStaticImportCountChanged": false,
+    "webRpcProductionSourceDelta": 0
   },
   "causalSchema": "WRC-C-B11f-five-consumer-causal-v2"
 }

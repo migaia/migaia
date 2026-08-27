@@ -48,7 +48,7 @@ const targetSnapshots = <T, R>(
 }
 
 /** Runs all listener calls immediately, then waits for all settlements in registration order. */
-export const publishParallelSettled = <T, R>(
+export const invokeParallelSettled = <T, R>(
   channel: IAsyncChannel<T, R>,
   value: T
 ): Promise<readonly IListenerResult<R>[]> => {
@@ -58,7 +58,7 @@ export const publishParallelSettled = <T, R>(
 }
 
 /** Runs one listener only after the previous listener has settled. */
-export const publishSerialSettled = <T, R>(
+export const invokeSerialSettled = <T, R>(
   channel: IAsyncChannel<T, R>,
   value: T
 ): Promise<readonly IListenerResult<R>[]> => {
@@ -97,16 +97,16 @@ const throwOnFailures = <R>(results: readonly IListenerResult<R>[]): readonly Aw
 }
 
 /** Parallel throwing publish; no listener failure is reported twice. */
-export const publishParallel = <T, R>(
+export const invokeParallel = <T, R>(
   channel: IAsyncChannel<T, R>,
   value: T
-): Promise<readonly Awaited<R>[]> => publishParallelSettled(channel, value).then(throwOnFailures)
+): Promise<readonly Awaited<R>[]> => invokeParallelSettled(channel, value).then(throwOnFailures)
 
 /** Serial throwing publish; all listeners still run before failure is returned. */
-export const publishSerial = <T, R>(
+export const invokeSerial = <T, R>(
   channel: IAsyncChannel<T, R>,
   value: T
-): Promise<readonly Awaited<R>[]> => publishSerialSettled(channel, value).then(throwOnFailures)
+): Promise<readonly Awaited<R>[]> => invokeSerialSettled(channel, value).then(throwOnFailures)
 
 /** Selects exactly one task registration synchronously before returning its settlement Promise. */
 const selectTask = <T, R>(
@@ -130,19 +130,19 @@ const selectTask = <T, R>(
 }
 
 /** Strict single-task settled publish; selection errors are synchronous throws. */
-export const publishTaskSettled = <T, R>(
+export const invokeTaskSettled = <T, R>(
   channel: ICanonicalEventChannel<T, R>,
   taskId: string,
   value: T
 ): Promise<IListenerResult<R>> => settleSnapshot(selectTask(channel, taskId), value)
 
 /** Strict single-task throwing publish; selection errors are synchronous throws. */
-export const publishTask = <T, R>(
+export const invokeTask = <T, R>(
   channel: ICanonicalEventChannel<T, R>,
   taskId: string,
   value: T
 ): Promise<Awaited<R>> => {
-  return publishTaskSettled(channel, taskId, value).then((result) => {
+  return invokeTaskSettled(channel, taskId, value).then((result) => {
     if (result.status === EventSubscriberState.rejected) {
       throw createEventAggregateError(
         EventSubscriberErrorCode.publishFailed,

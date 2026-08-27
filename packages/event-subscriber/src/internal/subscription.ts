@@ -1,6 +1,12 @@
 import { EventSubscriberErrorCode } from '../error-code.js'
-import { createEventError, eventErrorText } from '../errors.js'
+import {
+  createEventAggregateError,
+  createEventError,
+  createEventTypeError,
+  eventErrorText
+} from '../errors.js'
 import type { IUnsubscribe } from '../types.js'
+import type { IEventApiStylePlan } from '../style.js'
 
 /** Builds one callable, chain-owning subscription handle. */
 type ISubscriptionHandle<T> = IUnsubscribe & {
@@ -10,7 +16,8 @@ type ISubscriptionHandle<T> = IUnsubscribe & {
 
 export const createRawSubscriptionOwner = <T extends ISubscriptionHandle<unknown>>(
   first: () => void,
-  extend: (...args: never[]) => void | (() => void)
+  extend: (...args: never[]) => void | (() => void),
+  stylePlan: IEventApiStylePlan
 ): T => {
   const disposers: Array<() => void> = [first]
   let closed = false
@@ -22,25 +29,60 @@ export const createRawSubscriptionOwner = <T extends ISubscriptionHandle<unknown
     }
     disposers.length = 0
   }) as T
-  Object.defineProperties(handle, {
-    unsubscribe: { value: handle, enumerable: false, writable: false, configurable: false },
-    subscribe: {
-      value: (...args: never[]) => {
-        if (closed) {
-          throw createEventError(
-            EventSubscriberErrorCode.subscriptionClosed,
-            eventErrorText(EventSubscriberErrorCode.subscriptionClosed)
-          )
-        }
-        const disposer = extend(...args)
-        if (typeof disposer === 'function') disposers.push(disposer)
-        return handle
-      },
-      enumerable: false,
-      writable: false,
-      configurable: false
+  try {
+    const subscribe = (...args: never[]): ISubscriptionHandle<T> => {
+      if (closed) {
+        throw createEventError(
+          EventSubscriberErrorCode.subscriptionClosed,
+          eventErrorText(EventSubscriberErrorCode.subscriptionClosed)
+        )
+      }
+      const disposer = extend(...args)
+      if (typeof disposer === 'function') disposers.push(disposer)
+      return handle
     }
-  })
+    const descriptors: PropertyDescriptorMap = {
+      unsubscribe: { value: handle, enumerable: false, writable: false, configurable: false },
+      subscribe: {
+        value: subscribe,
+        enumerable: false,
+        writable: false,
+        configurable: false
+      }
+    }
+    if (stylePlan.subscribe !== 'subscribe') {
+      descriptors[stylePlan.subscribe] = {
+        value: subscribe,
+        enumerable: false,
+        writable: false,
+        configurable: false
+      }
+    }
+    if (stylePlan.unsubscribe !== 'unsubscribe') {
+      descriptors[stylePlan.unsubscribe] = {
+        value: handle,
+        enumerable: false,
+        writable: false,
+        configurable: false
+      }
+    }
+    Object.defineProperties(handle, descriptors)
+  } catch (error) {
+    try {
+      handle()
+    } catch (rollbackError) {
+      throw createEventAggregateError(
+        EventSubscriberErrorCode.subscriptionHandleProjectionFailed,
+        [error, rollbackError],
+        eventErrorText(EventSubscriberErrorCode.subscriptionHandleProjectionFailed)
+      )
+    }
+    throw createEventTypeError(
+      EventSubscriberErrorCode.subscriptionHandleProjectionFailed,
+      eventErrorText(EventSubscriberErrorCode.subscriptionHandleProjectionFailed),
+      error
+    )
+  }
   return handle
 }
 

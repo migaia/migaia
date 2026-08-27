@@ -1,14 +1,14 @@
 {
   "status": "approved",
-  "requirement": "PHV2-R20 / PHV2-T29",
-  "reason": "Independent Sol verification EVT-000108 approved the deterministic PluginHost V2 upgrade retained-size delta and exact causal evidence.",
+  "requirement": "ESV2H-R11 / ESV2H-T22",
+  "reason": "Independent Sol verification EVT-000088 approved the exact event-subscriber style-handle and invoke migration retained-size delta and causal evidence.",
   "approvalRecord": {
     "schema": "WRC-C-B11-approval-v2",
     "authorityId": "web-rpc-release-coordinator-v1",
-    "keyId": "coordinator-ed25519-37182544d93c586a",
-    "decisionId": "WRC-C-B11-decision-20260827-05",
-    "issuedAt": "2026-08-27T04:52:02.921Z",
-    "rationale": "Independent Sol verification EVT-000108 approved the deterministic PluginHost V2 upgrade retained-size delta and exact causal evidence.",
+    "keyId": "coordinator-ed25519-35f1f9bd39e4a6b8",
+    "decisionId": "WRC-C-B11-decision-20260827-06",
+    "issuedAt": "2026-08-27T07:39:36.805Z",
+    "rationale": "Independent Sol verification EVT-000088 approved the exact event-subscriber style-handle and invoke migration retained-size delta and causal evidence.",
     "oldTuple": {
       "moduleCount": 53,
       "rawBytes": 250129,
@@ -16,18 +16,18 @@
     },
     "newTuple": {
       "moduleCount": 66,
-      "rawBytes": 474929,
-      "gzipBytes": 113059
+      "rawBytes": 475863,
+      "gzipBytes": 113255
     },
-    "digest": "fa338f43267a7150972354669603a8701aa8ab29fa80806699187a6a172c7fdf",
-    "signature": "2j2sW58AvkCbklLxI3oo89BWs/TjNFErRfemSUADzSP2a7Ba8nOqdJzNF1rXiyvhlJ7CxktJx5Z/B1YE6KcQAg==",
+    "digest": "ccc299b2a1b2905822bb0cb607ac24050e20aae4ff07d2bc524e1fdad8c4b1c1",
+    "signature": "pFXViG4XlamcsTUSSwUAr0wOQI3gHLq/uoqGsxWHC+OFRXQPg6a30EC3UnzW0m2Z7GI3hjxPZ2GTbQkyeVGgBw==",
     "payload": {
       "schema": "WRC-C-B11-approval-v2",
       "authorityId": "web-rpc-release-coordinator-v1",
-      "keyId": "coordinator-ed25519-37182544d93c586a",
-      "decisionId": "WRC-C-B11-decision-20260827-05",
-      "issuedAt": "2026-08-27T04:52:02.921Z",
-      "rationale": "Independent Sol verification EVT-000108 approved the deterministic PluginHost V2 upgrade retained-size delta and exact causal evidence.",
+      "keyId": "coordinator-ed25519-35f1f9bd39e4a6b8",
+      "decisionId": "WRC-C-B11-decision-20260827-06",
+      "issuedAt": "2026-08-27T07:39:36.805Z",
+      "rationale": "Independent Sol verification EVT-000088 approved the exact event-subscriber style-handle and invoke migration retained-size delta and causal evidence.",
       "oldTuple": {
         "moduleCount": 53,
         "rawBytes": 250129,
@@ -35,10 +35,10 @@
       },
       "newTuple": {
         "moduleCount": 66,
-        "rawBytes": 474929,
-        "gzipBytes": 113059
+        "rawBytes": 475863,
+        "gzipBytes": 113255
       },
-      "digest": "fa338f43267a7150972354669603a8701aa8ab29fa80806699187a6a172c7fdf"
+      "digest": "ccc299b2a1b2905822bb0cb607ac24050e20aae4ff07d2bc524e1fdad8c4b1c1"
     }
   }
 }

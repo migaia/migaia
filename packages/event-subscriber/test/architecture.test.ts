@@ -237,7 +237,7 @@ describe('runtime-neutral boundary', () => {
     expect(eventHub.size()).toBe(0)
     const channelSource = readFileSync(resolve(import.meta.dirname, '../src/channel.ts'), 'utf8')
     expect(channelSource).toContain('const release = registerRaw(listener, taskId)')
-    expect(channelSource).toContain('createSubscriptionHandle(release')
+    expect(channelSource).toContain('createSubscriptionHandle(')
     expect(channelSource).toContain('return registerRaw(nextListener, nextTaskId)')
   })
 

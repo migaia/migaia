@@ -25,5 +25,7 @@ export const EventSubscriberErrorText = {
   /** Stable text for fire-and-forget failures that reached terminal diagnostics. */
   unhandledListenerFailure: 'event-subscriber listener failure was not handled',
   /** Stable text for extension after chain teardown; used by subscription handles. */
-  subscriptionClosed: 'event-subscriber subscription is closed'
+  subscriptionClosed: 'event-subscriber subscription is closed',
+  /** Stable text for failed handle descriptor projection; used by the raw subscription owner. */
+  subscriptionHandleProjectionFailed: 'event-subscriber subscription handle projection failed'
 } as const

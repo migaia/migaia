@@ -4,21 +4,29 @@ import type { IEventApiStyle, IEventApiStyleMethodNames, IEventApiStyleOption } 
 
 export type IUnsubscribe = () => void
 
-export type IEventChannelSubscription<T, R = void> = IUnsubscribe & {
-  readonly unsubscribe: IEventChannelSubscription<T, R>
+export type IEventChannelSubscription<
+  T,
+  R = void,
+  S extends IEventApiStyle | undefined = undefined
+> = IUnsubscribe & {
+  readonly unsubscribe: IEventChannelSubscription<T, R, S>
   readonly subscribe: (
     listener: IEventListener<T, R>,
     options?: { readonly taskId?: string }
-  ) => IEventChannelSubscription<T, R>
-}
+  ) => IEventChannelSubscription<T, R, S>
+} & IEventChannelSubscriptionStyleProjection<T, R, S>
 
-export type IEventHubSubscription<C extends IEventMap, UsedKeys = never> = IUnsubscribe & {
-  readonly unsubscribe: IEventHubSubscription<C, UsedKeys>
+export type IEventHubSubscription<
+  C extends IEventMap,
+  UsedKeys = never,
+  S extends IEventApiStyle | undefined = undefined
+> = IUnsubscribe & {
+  readonly unsubscribe: IEventHubSubscription<C, UsedKeys, S>
   readonly subscribe: <K extends IEventHubAvailableKey<C, UsedKeys>>(
     key: K,
     listener: IEventListener<C[K]>
-  ) => IEventHubSubscription<C, IEventHubNextUsedKey<C, UsedKeys, K>>
-}
+  ) => IEventHubSubscription<C, IEventHubNextUsedKey<C, UsedKeys, K>, S>
+} & IEventHubSubscriptionStyleProjection<C, UsedKeys, S>
 
 type IIsUnion<T, U = T> = T extends unknown ? ([U] extends [T] ? false : true) : never
 type IEventHubNextUsedKey<C extends IEventMap, UsedKeys, K> = string extends keyof C
@@ -106,17 +114,38 @@ type IEventChannelStyleProjection<T, R, S extends IEventApiStyle | undefined> = 
         readonly publish: infer TPublish extends string
       }
     ? {
-        readonly [K in Exclude<TSubscribe, 'subscribe'>]: IEventChannel<T, R>['subscribe']
+        readonly [K in Exclude<TSubscribe, 'subscribe'>]: (
+          listener: IEventListener<T, R>,
+          options?: { readonly taskId?: string }
+        ) => IEventChannelSubscription<T, R, S>
       } & {
         readonly [K in Exclude<TPublish, 'publish'>]: (value: T) => void
       }
     : Record<never, never>
 
-export type IEventChannel<T, R = void> = {
+type IEventChannelSubscriptionStyleProjection<T, R, S extends IEventApiStyle | undefined> = [
+  IEventApiStyleMethodNames<S>
+] extends [never]
+  ? Record<never, never>
+  : IEventApiStyleMethodNames<S> extends {
+        readonly subscribe: infer TSubscribe extends string
+        readonly unsubscribe: infer TUnsubscribe extends string
+      }
+    ? {
+        readonly [K in Exclude<TSubscribe, 'subscribe'>]: (
+          listener: IEventListener<T, R>,
+          options?: { readonly taskId?: string }
+        ) => IEventChannelSubscription<T, R, S>
+      } & {
+        readonly [K in Exclude<TUnsubscribe, 'unsubscribe'>]: IEventChannelSubscription<T, R, S>
+      }
+    : Record<never, never>
+
+export type IEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined> = {
   subscribe(
     listener: IEventListener<T, R>,
     options?: { readonly taskId?: string }
-  ): IEventChannelSubscription<T, R>
+  ): IEventChannelSubscription<T, R, S>
   subscribeOnce(
     listener: IEventListener<T, R>,
     options?: { readonly taskId?: string }
@@ -136,7 +165,7 @@ export type IStyledEventChannel<
   T,
   R = void,
   S extends IEventApiStyle | undefined = undefined
-> = IEventChannel<T, R> & IEventChannelStyleProjection<T, R, S>
+> = IEventChannel<T, R, S> & IEventChannelStyleProjection<T, R, S>
 
 declare const filteredChannelBrand: unique symbol
 declare const canonicalChannelBrand: unique symbol
@@ -145,7 +174,11 @@ export type IFilteredEventChannel<T, R = void> = {
   readonly [filteredChannelBrand]: { readonly value: T; readonly result: R }
 }
 
-export type ICanonicalEventChannel<T, R = void> = IEventChannel<T, R> & {
+export type ICanonicalEventChannel<
+  T,
+  R = void,
+  S extends IEventApiStyle | undefined = undefined
+> = IEventChannel<T, R, S> & {
   readonly [canonicalChannelBrand]: true
 }
 
@@ -168,11 +201,11 @@ export type IEventHubOptions<
   readonly style?: IEventApiStyleOption<S>
 }
 
-export type IEventHub<C extends IEventMap> = {
+export type IEventHub<C extends IEventMap, S extends IEventApiStyle | undefined = undefined> = {
   subscribe<K extends keyof C>(
     key: K,
     listener: IEventListener<C[K]>
-  ): IEventHubSubscription<C, IEventHubNextUsedKey<C, never, K>>
+  ): IEventHubSubscription<C, IEventHubNextUsedKey<C, never, K>, S>
   publish<K extends keyof C>(key: K, value: C[K]): void
   clear(key?: keyof C): void
   size(key?: keyof C): number
@@ -187,16 +220,37 @@ type IEventHubStyleProjection<C extends IEventMap, S extends IEventApiStyle | un
         readonly publish: infer TPublish extends string
       }
     ? {
-        readonly [K in Exclude<TSubscribe, 'subscribe'>]: IEventHub<C>['subscribe']
+        readonly [K in Exclude<TSubscribe, 'subscribe'>]: IEventHub<C, S>['subscribe']
       } & {
         readonly [K in Exclude<TPublish, 'publish'>]: IEventHub<C>['publish']
+      }
+    : Record<never, never>
+
+type IEventHubSubscriptionStyleProjection<
+  C extends IEventMap,
+  UsedKeys,
+  S extends IEventApiStyle | undefined
+> = [IEventApiStyleMethodNames<S>] extends [never]
+  ? Record<never, never>
+  : IEventApiStyleMethodNames<S> extends {
+        readonly subscribe: infer TSubscribe extends string
+        readonly unsubscribe: infer TUnsubscribe extends string
+      }
+    ? {
+        readonly [K in Exclude<TSubscribe, 'subscribe'>]: IEventHubSubscription<
+          C,
+          UsedKeys,
+          S
+        >['subscribe']
+      } & {
+        readonly [K in Exclude<TUnsubscribe, 'unsubscribe'>]: IEventHubSubscription<C, UsedKeys, S>
       }
     : Record<never, never>
 
 export type IStyledEventHub<
   C extends IEventMap,
   S extends IEventApiStyle | undefined = undefined
-> = IEventHub<C> & IEventHubStyleProjection<C, S>
+> = IEventHub<C, S> & IEventHubStyleProjection<C, S>
 
 export type IEventChannelOptions<T, S extends IEventApiStyle | undefined = undefined> = {
   readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>

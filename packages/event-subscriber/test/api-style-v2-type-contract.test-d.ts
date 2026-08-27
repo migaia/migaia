@@ -38,6 +38,29 @@ const asConstChannel = createEventChannel<number, void, typeof asConstStyle>({
 asConstChannel.watch(() => undefined)
 asConstChannel.send(1)
 
+const fullStyle = defineEventApiStyle({
+  subscribe: 'observe',
+  publish: 'dispatch',
+  unsubscribe: 'dispose'
+})
+const fullChannel = createEventChannel<number, void, typeof fullStyle>({ style: fullStyle })
+fullChannel.observe(() => undefined)
+fullChannel.dispatch(1)
+const fullHandle = fullChannel.observe(() => undefined).observe(() => undefined)
+fullHandle.dispose()
+
+const styledChannel = createEventChannel<number>({ style: 'on-emit' })
+const styledHandle = styledChannel.on(() => undefined).on(() => undefined)
+styledHandle.off()
+
+const invalidFullStyle = {
+  subscribe: 'observe',
+  publish: 'dispatch',
+  unsubscribe: 'observe'
+} as const
+// @ts-expect-error all three semantic names must be pairwise distinct.
+createEventChannel<number, void, typeof invalidFullStyle>({ style: invalidFullStyle })
+
 type IEvents = { readonly ready: number; readonly done: string }
 // @ts-expect-error custom Hub names cannot be inferred without the second style generic.
 createEventHub<IEvents>({ style: { subscribe: 'observe', publish: 'dispatch' } })
@@ -49,6 +72,12 @@ hub.listen('ready', (event) => {
 hub.fire('done', 'ok')
 // @ts-expect-error Hub aliases preserve keyed payload association.
 hub.fire('ready', 'wrong')
+
+const styledHub = createEventHub<IEvents>({ style: 'on-emit' })
+const styledHubHandle = styledHub.on('ready', () => undefined).on('done', () => undefined)
+// @ts-expect-error finite Hub chains cannot reuse a literal key through an alias.
+styledHubHandle.on('ready', () => undefined)
+styledHubHandle.off()
 
 const widenedStyle: IEventApiStyleNames = { subscribe: 'observe', publish: 'dispatch' }
 const widenedChannel = createEventChannel<number, void, typeof widenedStyle>({
