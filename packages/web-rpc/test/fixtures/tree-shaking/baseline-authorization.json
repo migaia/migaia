@@ -1,14 +1,14 @@
 {
   "status": "approved",
-  "requirement": "ESV2-R12 / ESV2-T22",
-  "reason": "Independent Sol verification approved the event-subscriber API-style retained delta within the R3 raw and gzip bounds.",
+  "requirement": "PHV2-R20 / PHV2-T29",
+  "reason": "Independent Sol verification EVT-000108 approved the deterministic PluginHost V2 upgrade retained-size delta and exact causal evidence.",
   "approvalRecord": {
     "schema": "WRC-C-B11-approval-v2",
     "authorityId": "web-rpc-release-coordinator-v1",
-    "keyId": "coordinator-ed25519-7556143481d08058",
-    "decisionId": "WRC-C-B11-decision-20260827-04",
-    "issuedAt": "2026-08-26T23:58:56.306Z",
-    "rationale": "Independent Sol verification approved the event-subscriber API-style retained delta within the R3 raw and gzip bounds.",
+    "keyId": "coordinator-ed25519-37182544d93c586a",
+    "decisionId": "WRC-C-B11-decision-20260827-05",
+    "issuedAt": "2026-08-27T04:52:02.921Z",
+    "rationale": "Independent Sol verification EVT-000108 approved the deterministic PluginHost V2 upgrade retained-size delta and exact causal evidence.",
     "oldTuple": {
       "moduleCount": 53,
       "rawBytes": 250129,
@@ -16,18 +16,18 @@
     },
     "newTuple": {
       "moduleCount": 66,
-      "rawBytes": 458010,
-      "gzipBytes": 108255
+      "rawBytes": 474929,
+      "gzipBytes": 113059
     },
-    "digest": "93b3a88bd97a79efecf8ed2acc465e19576023fa5fb40bbf9af757e128ad0129",
-    "signature": "1A83n023GZ2qIxUg9cGVskdYYzG54QqlE0X91n/UbjRXeqG32UNvElqunR+gFlnhApHLYQTeYqwpk1EdQBTCBw==",
+    "digest": "fa338f43267a7150972354669603a8701aa8ab29fa80806699187a6a172c7fdf",
+    "signature": "2j2sW58AvkCbklLxI3oo89BWs/TjNFErRfemSUADzSP2a7Ba8nOqdJzNF1rXiyvhlJ7CxktJx5Z/B1YE6KcQAg==",
     "payload": {
       "schema": "WRC-C-B11-approval-v2",
       "authorityId": "web-rpc-release-coordinator-v1",
-      "keyId": "coordinator-ed25519-7556143481d08058",
-      "decisionId": "WRC-C-B11-decision-20260827-04",
-      "issuedAt": "2026-08-26T23:58:56.306Z",
-      "rationale": "Independent Sol verification approved the event-subscriber API-style retained delta within the R3 raw and gzip bounds.",
+      "keyId": "coordinator-ed25519-37182544d93c586a",
+      "decisionId": "WRC-C-B11-decision-20260827-05",
+      "issuedAt": "2026-08-27T04:52:02.921Z",
+      "rationale": "Independent Sol verification EVT-000108 approved the deterministic PluginHost V2 upgrade retained-size delta and exact causal evidence.",
       "oldTuple": {
         "moduleCount": 53,
         "rawBytes": 250129,
@@ -35,10 +35,10 @@
       },
       "newTuple": {
         "moduleCount": 66,
-        "rawBytes": 458010,
-        "gzipBytes": 108255
+        "rawBytes": 474929,
+        "gzipBytes": 113059
       },
-      "digest": "93b3a88bd97a79efecf8ed2acc465e19576023fa5fb40bbf9af757e128ad0129"
+      "digest": "fa338f43267a7150972354669603a8701aa8ab29fa80806699187a6a172c7fdf"
     }
   }
 }

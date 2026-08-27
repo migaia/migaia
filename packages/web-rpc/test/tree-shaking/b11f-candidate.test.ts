@@ -68,16 +68,29 @@ type ICandidateModule = {
   readonly incomingEdges: readonly IIncomingEdge[]
 }
 
+type ICandidateCausality = {
+  readonly cause: string
+  readonly owner: string
+  readonly module: string
+  readonly evidenceSchema: string
+  readonly measuredDelta: ITuple
+  readonly byteAttribution: Omit<IModuleAttribution, 'module'>
+  readonly retainedBy: readonly IConsumer[]
+  readonly incomingEdges: readonly IIncomingEdge[]
+}
+
 type IPostMigrationCandidate = {
   readonly schema: string
   readonly status: 'approved'
-  readonly provenanceDigest: string
   readonly approval: {
+    readonly status: 'approved'
     readonly decisionId: string
     readonly keyId: string
     readonly digest: string
+    readonly oldTuple: Omit<ITuple, 'endpointStaticImportCount'>
     readonly newTuple: Omit<ITuple, 'endpointStaticImportCount'>
   }
+  readonly provenanceDigest: string
   readonly oldTuple: ITuple
   readonly newTuple: ITuple
   readonly rootModules: readonly string[]
@@ -85,6 +98,7 @@ type IPostMigrationCandidate = {
   readonly addedModules: readonly ICandidateModule[]
   readonly removedModules: readonly ICandidateModule[]
   readonly runtimeOwnerAllocation: Readonly<Record<IConsumer, readonly string[]>>
+  readonly causality: ICandidateCausality
   readonly causalSchema: string
 }
 
@@ -177,7 +191,7 @@ function hashFile(path: string): string {
   return createHash('sha256').update(readFileSync(path)).digest('hex')
 }
 
-describe('WRC-C-B11f pending post-migration candidate', () => {
+describe('WRC-C-B11f approved post-migration candidate', () => {
   it('attributes provider claim authority to R50 package-native identity admission', async () => {
     const { default: rawCandidate } = await import(
       '../fixtures/tree-shaking/post-migration-candidate.json',
@@ -226,9 +240,15 @@ describe('WRC-C-B11f pending post-migration candidate', () => {
     expect(candidate.causalSchema).toBe('WRC-C-B11f-five-consumer-causal-v2')
     expect(candidate.status).toBe('approved')
     expect(candidate.approval).toEqual({
-      decisionId: 'WRC-C-B11-decision-20260827-04',
-      keyId: 'coordinator-ed25519-7556143481d08058',
+      status: 'approved',
+      decisionId: 'WRC-C-B11-decision-20260827-05',
+      keyId: 'coordinator-ed25519-37182544d93c586a',
       digest: candidate.provenanceDigest,
+      oldTuple: {
+        moduleCount: candidate.oldTuple.moduleCount,
+        rawBytes: candidate.oldTuple.rawBytes,
+        gzipBytes: candidate.oldTuple.gzipBytes
+      },
       newTuple: {
         moduleCount: candidate.newTuple.moduleCount,
         rawBytes: candidate.newTuple.rawBytes,
@@ -250,7 +270,14 @@ describe('WRC-C-B11f pending post-migration candidate', () => {
       rawBytes: candidate.newTuple.rawBytes,
       gzipBytes: candidate.newTuple.gzipBytes
     })
-    expect(provenance.approval.approvalRecord).toMatchObject(candidate.approval)
+    expect(provenance.approval.approvalRecord).toMatchObject({
+      digest: candidate.provenanceDigest,
+      newTuple: {
+        moduleCount: candidate.newTuple.moduleCount,
+        rawBytes: candidate.newTuple.rawBytes,
+        gzipBytes: candidate.newTuple.gzipBytes
+      }
+    })
     assertExactRuntimeOwnerAllocation(candidate.runtimeOwnerAllocation)
 
     for (const consumer of consumers) {
@@ -289,6 +316,33 @@ describe('WRC-C-B11f pending post-migration candidate', () => {
         entry
       ])
     )
+    const pluginHostModule = 'workspace:packages/plugin-host/dist/index.js'
+    const pluginHostAttribution = baseline.moduleAttribution.find(
+      (entry) => normalizeRootModule(entry.module) === pluginHostModule
+    )
+    const pluginHostCausal = causal.candidateAttribution.find(
+      (entry) => entry.module === pluginHostModule
+    )
+    expect(candidate.causality).toEqual({
+      cause: 'PluginHost V2 migration',
+      owner: '@migaia/plugin-host',
+      module: pluginHostModule,
+      evidenceSchema: candidate.causalSchema,
+      measuredDelta: {
+        moduleCount: candidate.newTuple.moduleCount - candidate.oldTuple.moduleCount,
+        rawBytes: candidate.newTuple.rawBytes - candidate.oldTuple.rawBytes,
+        gzipBytes: candidate.newTuple.gzipBytes - candidate.oldTuple.gzipBytes,
+        endpointStaticImportCount:
+          (candidate.newTuple.endpointStaticImportCount ?? 0) -
+          (candidate.oldTuple.endpointStaticImportCount ?? 0)
+      },
+      byteAttribution: {
+        originalBytes: pluginHostAttribution?.originalBytes,
+        renderedBytes: pluginHostAttribution?.renderedBytes
+      },
+      retainedBy: pluginHostCausal?.retainedBy,
+      incomingEdges: pluginHostCausal?.incomingEdges
+    })
     for (const entry of candidate.addedModules) {
       expect(entry.owner.length).toBeGreaterThan(0)
       expect(entry.requirements.length).toBeGreaterThan(0)
@@ -307,7 +361,7 @@ describe('WRC-C-B11f pending post-migration candidate', () => {
     }
   })
 
-  it('preserves frozen authority inputs and unique runtime owner allocation', async () => {
+  it('preserves installed approval custody and unique runtime owner allocation', async () => {
     const { default: rawCandidate } = await import(
       '../fixtures/tree-shaking/post-migration-candidate.json',
       { with: { type: 'json' } }
@@ -320,15 +374,15 @@ describe('WRC-C-B11f pending post-migration candidate', () => {
       ],
       [
         'tree-shaking-baseline.json',
-        'fd9e6f8b64fab40cb51230c6d9a806ed352e6af0962f5924d861fedae633b73c'
+        '3c0d4ac9ae730b4603761ed9ac18111b31bd5e5ff17f8d41e6d74f0de4afe350'
       ],
       [
         'baseline-authority.json',
-        'dc875c8bff6dacde017ca0aa272657197e619ee68c33c76ab4a7ccd7ba6f7f86'
+        'e7fc9aea569194960d2bf3d7aea780a0c03125f007815518e4647f3bcecffc85'
       ],
       [
         'baseline-authorization.json',
-        '1f65d1b2144cf9fa2b626a342aab4c2245b8f57eb591502441ec925c7b760822'
+        '22689c28ca2a07f526d09e0c102306fd8836667c5f6a6aa21e9477abc61976ad'
       ]
     ] as const
 
@@ -380,10 +434,21 @@ describe('WRC-C-B11f pending post-migration candidate', () => {
         readonly keyId: string
         readonly digest: string
         readonly signature: string
+        readonly oldTuple: Omit<ITuple, 'endpointStaticImportCount'>
+        readonly newTuple: Omit<ITuple, 'endpointStaticImportCount'>
       }
     }
     expect(authority.status).toBe('approved')
     expect(authorization.status).toBe('approved')
+    expect(candidate.status).toBe('approved')
+    expect(candidate.approval).toMatchObject({
+      status: authorization.status,
+      decisionId: authorization.approvalRecord.decisionId,
+      keyId: authorization.approvalRecord.keyId,
+      digest: authorization.approvalRecord.digest,
+      oldTuple: authorization.approvalRecord.oldTuple,
+      newTuple: authorization.approvalRecord.newTuple
+    })
     expect(authorization.approvalRecord).toMatchObject({
       decisionId: authority.decisionId,
       keyId: authority.keyId,
