@@ -173,7 +173,8 @@ describe('candidate-specific duplicate-owner contracts', () => {
       'candidate-007',
       transport,
       createConstructionControl({ signal: new AbortController().signal as IWebRpcAbortSignal }),
-      () => undefined
+      () => undefined,
+      { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     )
     const first = {
       name: 'candidate-007-first',
@@ -349,13 +350,15 @@ describe('candidate-specific duplicate-owner contracts', () => {
       'candidate-019-first',
       firstTransport,
       createConstructionControl({ signal: new AbortController().signal as IWebRpcAbortSignal }),
-      () => undefined
+      () => undefined,
+      { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     )
     const secondHost = new WebRpcPluginHost(
       'candidate-019-second',
       secondTransport,
       createConstructionControl({ signal: new AbortController().signal as IWebRpcAbortSignal }),
-      () => undefined
+      () => undefined,
+      { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     )
     await firstHost.use({
       name: 'candidate-019-owner',
@@ -524,7 +527,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
       transport,
       createConstructionControl({ signal: new AbortController().signal as IWebRpcAbortSignal }),
       () => undefined,
-      {},
+      { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
       () => [{ resource: 'candidate-032', error: cleanup }]
     )
     await host.use({
@@ -575,7 +578,7 @@ describe('MET-RED-022/035 projection and public lifecycle surface', () => {
       hostTransport,
       createConstructionControl({ signal: new AbortController().signal as IWebRpcAbortSignal }),
       () => undefined,
-      {},
+      { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
       () => [{ resource: 'resource disposer', error: cleanup }]
     )
     await webRpcHost.use({

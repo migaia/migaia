@@ -31,6 +31,7 @@ import type {
   IWebRpcProvider
 } from '../../src/typing.js'
 import { WebRpcPluginHost } from '../../src/internal/web-rpc-plugin-host.js'
+import type { IPluginHostDisposalResult } from '@migaia/plugin-host'
 import {
   createConstructionControl,
   runConstructionInstall
@@ -329,7 +330,13 @@ async function createProductionBatch(
     timeoutMs: options.construction?.timeoutMs
   })
   const hookEvents: IWebRpcHookEvent[] = []
-  const host = new WebRpcPluginHost(deferred.id, deferred.transport, construction, () => undefined)
+  const host = new WebRpcPluginHost(
+    deferred.id,
+    deferred.transport,
+    construction,
+    () => undefined,
+    { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+  )
   let prepared: IPreparedEndpoint<string> | undefined
   let activated = false
   let runtimeState: IWebRpcComposedRuntimeState | undefined
@@ -835,7 +842,8 @@ describe('B12a atomic middleware and claim contracts', () => {
         failedRole,
         transport,
         createConstructionControl({ signal: new AbortController().signal as IWebRpcAbortSignal }),
-        () => undefined
+        () => undefined,
+        { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
       )
       const definitions = roles.map(
         (role, index) =>
@@ -1879,21 +1887,23 @@ describe('B12a atomic middleware and claim contracts', () => {
       expect(events.filter((event) => event === 'uniqueTargetIdFactory')).toHaveLength(1)
       expect(contexts).toHaveLength(1)
       expect(contexts[0]).toMatchObject({ endpointId: expect.any(String), platform: 'Memory' })
-      const publishedAfterFinalization = batch.host.getShared(WebRpcSharedKey.connect)
+      const publishedAfterFinalization = batch.host.getShared(WebRpcSharedKey.connect) as
+        | IWebRpcConnectCapability
+        | undefined
       const finalizedConnect = batch.getPrepared()?.options.connect as
         | IWebRpcConnectCapability
         | undefined
-      expect(sharedBeforeFinalization).toBeDefined()
+      // The external Host view remains isolated until the complete async batch commits.
+      expect(sharedBeforeFinalization).toBeUndefined()
       expect(publishedAfterFinalization).toBeDefined()
-      expect(publishedAfterFinalization).toBe(sharedBeforeFinalization)
-      expect(sharedBeforeFinalization?.uniqueTargetIdFactory).toBe(uniqueTargetIdFactory)
+      expect(publishedAfterFinalization?.uniqueTargetIdFactory).toBe(uniqueTargetIdFactory)
       expect(finalizedConnect?.uniqueTargetId).toBe('generated-target')
       expect(finalizedConnect?.uniqueTargetIdFactory).toBe(uniqueTargetIdFactory)
       expect(finalizedConnect?.discoveryMode).toBe('manual')
       expect(finalizedConnect?.receiverSelector).toBe(receiverSelector)
       expect(finalizedConnect?.identifier).toBe(identifier)
-      expect(finalizedConnect?.transport).toBe(sharedBeforeFinalization?.transport)
-      expect(finalizedConnect?.verify).toBe(sharedBeforeFinalization?.verify)
+      expect(finalizedConnect?.transport).toBe(publishedAfterFinalization?.transport)
+      expect(finalizedConnect?.verify).toBe(publishedAfterFinalization?.verify)
       expect(consumedConnect).toBe(finalizedConnect)
       expect(consumedConnect?.uniqueTargetId).toBe('generated-target')
     } finally {
@@ -3521,9 +3531,11 @@ describe('B12a atomic middleware and claim contracts', () => {
               }
             : original
       })
-      await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
+      const installed = await batch.host.installBatch(
+        batch.translated.map(({ definition }) => definition)
+      )
       expect(() =>
-        assertPluginClaimParity(batch.claims, batch.descriptors, batch.host, batch.kernel, {
+        assertPluginClaimParity(batch.claims, batch.descriptors, installed, batch.kernel, {
           activated: batch.isActivated(),
           translated: batch.translated,
           onMismatch: (error) => {
@@ -6002,7 +6014,11 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     expect(translated.getLiveInstallationObservation().installed).toBe(false)
     const dispose = batch.host.dispose()
     expect(batch.host.dispose()).toBe(dispose)
-    await expect(dispose).resolves.toBeUndefined()
+    await expect(dispose).resolves.toMatchObject({
+      logicalTerminal: true,
+      cleanupComplete: true,
+      cleanupErrors: []
+    })
     expect(batch.host.dispose()).toBe(dispose)
   })
 
@@ -6130,8 +6146,8 @@ describe('B12c01 outbound feature production-seam matrix', () => {
       observe: boolean
     ): Promise<{
       readonly translated: IWebRpcTranslatedPlugin
-      readonly firstDispose: Promise<void>
-      readonly repeatedDispose: Promise<void>
+      readonly firstDispose: Promise<IPluginHostDisposalResult>
+      readonly repeatedDispose: Promise<IPluginHostDisposalResult>
       readonly observerCalls: number
       readonly reportCount: number
       readonly reported: readonly unknown[]
@@ -6170,7 +6186,11 @@ describe('B12c01 outbound feature production-seam matrix', () => {
       const firstDispose = batch.host.dispose()
       const repeatedDispose = batch.host.dispose()
       expect(repeatedDispose).toBe(firstDispose)
-      await expect(firstDispose).resolves.toBeUndefined()
+      await expect(firstDispose).resolves.toMatchObject({
+        logicalTerminal: true,
+        cleanupComplete: true,
+        cleanupErrors: []
+      })
       expect(batch.host.dispose()).toBe(firstDispose)
       return {
         translated,

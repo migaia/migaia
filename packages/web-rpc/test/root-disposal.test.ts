@@ -10,7 +10,15 @@ import { createEndpoint, WebRpcLifecycleError, type IWebRpcTransport } from '../
 import { translateEndpointDisposalError } from '../src/internal/disposal-translation.js'
 import { connect } from '../src/middleware/connect.js'
 
-class DisposalHost extends PluginHost<Record<string, never>, unknown> {}
+class DisposalHost extends PluginHost<Record<string, never>, unknown> {
+  /** Supplies an explicit unbounded test policy. */
+  constructor(options: any = {}) {
+    super({
+      ...options,
+      execution: options.execution ?? { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+  }
+}
 
 const disposeHostWithRawErrors = async (errors: readonly unknown[]) => {
   const host = new DisposalHost()
@@ -26,7 +34,7 @@ const disposeHostWithRawErrors = async (errors: readonly unknown[]) => {
   } as never)
   const first = host.dispose()
   expect(host.dispose()).toBe(first)
-  return { failure: await first.catch((error: unknown) => error), promise: first }
+  return { failure: await first, promise: first }
 }
 
 describe('composed endpoint root disposal boundary', () => {
@@ -43,26 +51,10 @@ describe('composed endpoint root disposal boundary', () => {
       }
     } as never)
 
-    const hostFailure = await host.dispose().catch((error: unknown) => error)
-    expect(hostFailure).toMatchObject({
-      name: 'PluginHostError',
-      source: '@migaia/plugin-host',
-      code: 'HOST_DISPOSE_FAILED'
-    })
+    const hostResult = await host.dispose()
+    expect(hostResult).toMatchObject({ logicalTerminal: true, cleanupComplete: true })
     expect(PluginHostErrorCode.hostDisposeFailed).toBe('HOST_DISPOSE_FAILED')
-    expect(readPluginHostDisposalProvenance(hostFailure)).toEqual({
-      kind: PluginHostDisposalNodeKind.hostError,
-      phase: 'host disposal'
-    })
-    const hostAggregate = (hostFailure as { readonly cause: AggregateError }).cause
-    expect(readPluginHostDisposalProvenance(hostAggregate)).toEqual({
-      kind: PluginHostDisposalNodeKind.aggregate,
-      phase: 'host disposal'
-    })
-    const hostChild =
-      hostAggregate instanceof AggregateError
-        ? hostAggregate.errors[0]
-        : (hostAggregate as { readonly cause?: unknown }).cause
+    const hostChild = hostResult.cleanupErrors[0]
     expect(readPluginHostDisposalProvenance(hostChild)).toEqual({
       kind: PluginHostDisposalNodeKind.disposerWrapper,
       phase: 'resource disposer'
@@ -81,7 +73,7 @@ describe('composed endpoint root disposal boundary', () => {
       disposerWrapper: 'disposer-wrapper'
     })
     expect(() => Object.setPrototypeOf(PluginHostDisposalNodeKind, null)).toThrow()
-    const translated = translateEndpointDisposalError(hostFailure)
+    const translated = translateEndpointDisposalError(new AggregateError(hostResult.cleanupErrors))
     expect(translated.cause).toBe(raw)
     expect(translated.cleanupErrors).toEqual([{ resource: 'resource disposer', error: raw }])
   })
@@ -97,19 +89,22 @@ describe('composed endpoint root disposal boundary', () => {
       message: 'cross-realm-like raw value',
       cause: firstInner
     }
-    const { failure: hostFailure } = await disposeHostWithRawErrors([
+    const { failure: hostResult } = await disposeHostWithRawErrors([
       firstRaw,
       secondRaw,
       customRaw,
       structuralRaw
     ])
 
-    const translated = translateEndpointDisposalError(hostFailure, [
-      { resource: 'first root', error: firstRaw },
-      { resource: 'second root', error: secondRaw },
-      { resource: 'custom root', error: customRaw },
-      { resource: 'structural root', error: structuralRaw }
-    ])
+    const translated = translateEndpointDisposalError(
+      new AggregateError(hostResult.cleanupErrors),
+      [
+        { resource: 'first root', error: firstRaw },
+        { resource: 'second root', error: secondRaw },
+        { resource: 'custom root', error: customRaw },
+        { resource: 'structural root', error: structuralRaw }
+      ]
+    )
 
     expect(translated.cause).toBe(firstRaw)
     expect(translated.cleanupErrors).toEqual([

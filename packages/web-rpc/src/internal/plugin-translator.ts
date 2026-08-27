@@ -419,10 +419,35 @@ export function assertPluginClaimParity(
     actualRoutes.some((route) => !expectedRoutes.has(route))
   )
     fail()
-  for (const key of new Set(claims.flatMap((claim) => claim.exposedKeys))) {
-    const descriptor = Object.getOwnPropertyDescriptor(host, key)
-    if (!descriptor || !('value' in descriptor)) fail()
+  if (runtime.activationPhase !== 'pre-activation') {
+    const publication = readPublishedExtensions(host)
+    for (const key of new Set(claims.flatMap((claim) => claim.exposedKeys))) {
+      const descriptor = Object.getOwnPropertyDescriptor(publication, key)
+      if (!descriptor || !('value' in descriptor)) fail()
+    }
   }
+}
+
+/** Reads V2's immutable extension publication and fails closed for non-view inputs. */
+function readPublishedExtensions(host: object): object {
+  const descriptor = Object.getOwnPropertyDescriptor(host, 'extensions')
+  if (descriptor && 'value' in descriptor && descriptor.value !== null) {
+    const extensions = descriptor.value
+    if (typeof extensions === 'object' || typeof extensions === 'function') return extensions
+  }
+  if (descriptor && ('get' in descriptor || 'set' in descriptor)) {
+    try {
+      const extensions = (host as { readonly extensions?: unknown }).extensions
+      if (
+        extensions !== null &&
+        (typeof extensions === 'object' || typeof extensions === 'function')
+      )
+        return extensions
+    } catch {
+      // A revoked V2 view fails closed through the normal parity assertion below.
+    }
+  }
+  throw new WebRpcConfigurationError(WebRpcErrorText.endpointModuleInvalid)
 }
 
 /**

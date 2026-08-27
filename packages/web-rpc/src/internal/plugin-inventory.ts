@@ -107,7 +107,10 @@ export type IWebRpcComposedPluginBuilderOptions = {
     state: IWebRpcComposedRuntimeState
   ) => IWebRpcComposedRuntimeState | Promise<IWebRpcComposedRuntimeState>
   /** Runs the complete activation parity gate before any feature activation callback. */
-  readonly onActivationPreflight?: (state: IWebRpcComposedRuntimeState) => void
+  readonly onActivationPreflight?: (
+    state: IWebRpcComposedRuntimeState,
+    getShared: (key: PropertyKey) => unknown
+  ) => void
   /** Reports endpoint-root cleanup identities without changing Host's own error contract. */
   readonly onRootDisposalErrors?: (errors: readonly IWebRpcCleanupError[]) => void
   /** Observes canonical outbound results without supplying or altering command behavior. */
@@ -457,7 +460,7 @@ export function buildComposedPluginInventory(
           { kind: 'activation' },
           { routeKeys: options.kernel.routeKeys, activated: true }
         ) ?? { routeKeys: options.kernel.routeKeys, activated: true })
-        options.onActivationPreflight?.(state)
+        options.onActivationPreflight?.(state, scope.getShared)
         for (const item of options.getFeatureInstallations()) {
           const installation = item.getInstallation()
           if (installation === undefined)
