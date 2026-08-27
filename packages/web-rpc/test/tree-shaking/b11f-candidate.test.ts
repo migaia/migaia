@@ -226,8 +226,8 @@ describe('WRC-C-B11f pending post-migration candidate', () => {
     expect(candidate.causalSchema).toBe('WRC-C-B11f-five-consumer-causal-v2')
     expect(candidate.status).toBe('approved')
     expect(candidate.approval).toEqual({
-      decisionId: 'WRC-C-B11-decision-20260826-03',
-      keyId: 'coordinator-ed25519-04ad8e84b3d15997',
+      decisionId: 'WRC-C-B11-decision-20260827-04',
+      keyId: 'coordinator-ed25519-7556143481d08058',
       digest: candidate.provenanceDigest,
       newTuple: {
         moduleCount: candidate.newTuple.moduleCount,
@@ -320,15 +320,15 @@ describe('WRC-C-B11f pending post-migration candidate', () => {
       ],
       [
         'tree-shaking-baseline.json',
-        'e75b1ffefc516b283f693293e53b951e5c4bdb64f7a2fae849efb60e796a7bde'
+        'fd9e6f8b64fab40cb51230c6d9a806ed352e6af0962f5924d861fedae633b73c'
       ],
       [
         'baseline-authority.json',
-        'bf280070d9b4beff4e49c43f300282fa8ad9a7abe3b7b4e651f2015079fde923'
+        'dc875c8bff6dacde017ca0aa272657197e619ee68c33c76ab4a7ccd7ba6f7f86'
       ],
       [
         'baseline-authorization.json',
-        'b5db5370857882c73f6b81a6df64d9c70393b2ef361775ce4db6d9d8c588af0e'
+        '1f65d1b2144cf9fa2b626a342aab4c2245b8f57eb591502441ec925c7b760822'
       ]
     ] as const
 

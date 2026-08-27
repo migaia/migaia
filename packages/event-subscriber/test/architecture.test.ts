@@ -89,7 +89,7 @@ describe('runtime-neutral boundary', () => {
     const contractRows = [
       [readme, 'subscribe(listener, options?: { taskId?: string }): subscription'],
       [readme, '动态 key 允许运行时 fan-out；finite key 链禁止重复 key'],
-      [useguide, 'channelHandle.unsubscribe(); // same function identity; releases whole chain'],
+      [useguide, 'channelHandle.unsubscribe() // same function identity; releases whole chain'],
       [useguide, 'finite literal maps reject a repeated key on this chain'],
       [useguide, 'widened key: runtime fan-out'],
       [useguide, 'extension is non-transactional; earlier registration'],

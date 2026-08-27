@@ -15,10 +15,18 @@ import type {
   IEventListener,
   IEventAbortSignal,
   IFilteredEventChannel,
-  IUnsubscribe
+  IUnsubscribe,
+  IStyledEventChannel,
+  IStyledEventChannelOptions
 } from './types.js'
 import { createSubscriptionHandle } from './internal/subscription.js'
 import { EventDispatchPolicy, EventSubscriberState } from './state-constants.js'
+import {
+  normalizeEventApiStyle,
+  projectEventApiStyle,
+  type IEventApiStyle,
+  type IEventApiStylePlan
+} from './style.js'
 import {
   createSystemTerminalRuntime,
   type IEventTerminalRuntime
@@ -324,12 +332,32 @@ const reportSystemTerminal = (
 }
 
 /** Creates a canonical transient channel backed by an O(1) linked registration list. */
-export const createCanonicalChannel = <T, R = void>(
-  options: IEventChannelOptions<T> = {}
-): ICanonicalEventChannel<T, R> => {
+export function createCanonicalChannel<T, R, const S extends IEventApiStyle>(
+  options: IStyledEventChannelOptions<T, S>
+): ICanonicalEventChannel<T, R> & IStyledEventChannel<T, R, S>
+export function createCanonicalChannel<T, R = void>(
+  options: Omit<IEventChannelOptions<T>, 'style'> & { readonly style: 'subscribe-publish' }
+): ICanonicalEventChannel<T, R>
+export function createCanonicalChannel<T, R = void>(
+  options: Omit<IEventChannelOptions<T>, 'style'> & { readonly style: 'on-emit' }
+): ICanonicalEventChannel<T, R> & IStyledEventChannel<T, R, 'on-emit'>
+export function createCanonicalChannel<T, R = void>(
+  options: Omit<IEventChannelOptions<T>, 'style'> & { readonly style: 'on-trigger' }
+): ICanonicalEventChannel<T, R> & IStyledEventChannel<T, R, 'on-trigger'>
+export function createCanonicalChannel<T, R = void>(
+  options: Omit<IEventChannelOptions<T>, 'style'> & { readonly style: 'listen-fire' }
+): ICanonicalEventChannel<T, R> & IStyledEventChannel<T, R, 'listen-fire'>
+export function createCanonicalChannel<T, R = void>(
+  options?: IEventChannelOptions<T>
+): ICanonicalEventChannel<T, R>
+export function createCanonicalChannel<T, R = void>(
+  options: IEventChannelOptions<T, IEventApiStyle | undefined> = {}
+): ICanonicalEventChannel<T, R> {
   let report: IEventChannelOptions<T>['report']
   let terminalReport: IEventChannelOptions<T>['terminalReport']
   let dispatchPolicy: IEventChannelOptions<T>['dispatchPolicy']
+  let style: IEventApiStyle | undefined
+  let stylePlan: IEventApiStylePlan
   try {
     if (!isRecord(options)) {
       throw createEventTypeError(
@@ -342,6 +370,24 @@ export const createCanonicalChannel = <T, R = void>(
     dispatchPolicy = options.dispatchPolicy ?? EventDispatchPolicy.recursive
   } catch (error) {
     throw codeExistingError(error, EventSubscriberErrorCode.invalidOptions)
+  }
+  try {
+    style = options.style
+  } catch (error) {
+    throw createEventTypeError(
+      EventSubscriberErrorCode.invalidOptions,
+      eventErrorText(EventSubscriberErrorCode.invalidOptions),
+      error
+    )
+  }
+  try {
+    stylePlan = normalizeEventApiStyle(style)
+  } catch (error) {
+    throw createEventTypeError(
+      EventSubscriberErrorCode.invalidOptions,
+      eventErrorText(EventSubscriberErrorCode.invalidOptions),
+      error
+    )
   }
   if (report !== undefined && typeof report !== 'function') {
     throw createEventTypeError(
@@ -519,6 +565,11 @@ export const createCanonicalChannel = <T, R = void>(
       }
       return Object.freeze(snapshots)
     }
+  }
+  try {
+    projectEventApiStyle(channel, stylePlan)
+  } catch (error) {
+    throw codeExistingError(error, EventSubscriberErrorCode.invalidOptions)
   }
   channelCapabilities.set(channel as object, capability as IChannelCapability<unknown, unknown>)
   return channel

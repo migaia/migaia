@@ -4,7 +4,7 @@
 
 ## 目录
 
-- [Channel 模块](#channel-模块)：`createEventChannel`、`IEventChannel`、`IEventContext`
+- [Channel 模块](#channel-模块)：`createEventChannel`、`IEventChannel`、`IEventContext`、API style
 - [订阅 Helper 模块](#helper-模块)：`subscribeOnce`、`subscribeUntil`、`subscribeSubscriber`
 - [异步发布模块](#async-模块)：`publishParallel`/`publishParallelSettled`、`publishSerial`/`publishSerialSettled`、`publishTask`/`publishTaskSettled`
 - [Hub 模块](#hub-模块)：`createEventHub`
@@ -32,7 +32,7 @@ import {
   type IEventListener,
   type IFilteredEventChannel,
   type IUnsubscribe
-} from '@migaia/event-subscriber';
+} from '@migaia/event-subscriber'
 ```
 
 只有 root 导出，没有子路径导出，零 workspace 运行时依赖。
@@ -42,24 +42,35 @@ import {
 ```ts
 function createEventChannel<T, R = void>(
   options?: IEventChannelOptions<T>
-): ICanonicalEventChannel<T, R>;
+): ICanonicalEventChannel<T, R>
 
 type IEventChannelOptions<T> = {
-  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>;
-  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>;
-  readonly dispatchPolicy?: EventDispatchPolicy;
-};
+  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>
+  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>
+  readonly dispatchPolicy?: EventDispatchPolicy
+  readonly style?: IEventApiStyle
+}
 
-type IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown };
+type IEventApiStyleNames<TSubscribe extends string = string, TPublish extends string = string> = {
+  readonly subscribe: TSubscribe
+  readonly publish: TPublish
+}
+
+type IEventApiStyle =
+  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames
+
+declare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S
+
+type IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }
 ```
 
 创建一个事件 channel（O(1) 链表存储登记）：
 
 ```ts
-const channel = createEventChannel<{ readonly text: string }>();
-const unsubscribe = channel.subscribe((event) => console.log(event.value.text));
-channel.publish({ text: 'ready' });
-unsubscribe();
+const channel = createEventChannel<{ readonly text: string }>()
+const unsubscribe = channel.subscribe((event) => console.log(event.value.text))
+channel.publish({ text: 'ready' })
+unsubscribe()
 ```
 
 类型参数：`T`（payload 类型）、`R`（listener 结果类型，默认 `void`）。`options.report`：处理 `publish()` 之后**迟到**的 Promise/thenable rejection（同步 listener 失败不走这里，会在 `publish()` 遍历完成后聚合抛出）；`options.terminalReport`：`report` 缺失、抛错，或其返回的 thenable reject 时的兜底诊断出口；`report`/`terminalReport` 提供但不是函数抛 `INVALID_REPORTER`；`options` 本身不是普通对象（`null`/数组/非对象）抛 `INVALID_OPTIONS`。若 `report`/`terminalReport`（包括其返回的 Promise）都失败或缺失，最终会尝试 `runtime.reportError`（如全局 `reportError` 钩子）→ `console.error` → 排入下一个宏任务重新抛出，逐级降级，绝不静默吞掉。
@@ -73,21 +84,21 @@ type IEventChannel<T, R = void> = {
   subscribe(
     listener: IEventListener<T, R>,
     options?: { readonly taskId?: string }
-  ): IEventChannelSubscription<T, R>;
+  ): IEventChannelSubscription<T, R>
   subscribeOnce(
     listener: IEventListener<T, R>,
     options?: { readonly taskId?: string }
-  ): IUnsubscribe;
+  ): IUnsubscribe
   subscribeUntil(
     signal: IEventAbortSignal,
     listener: IEventListener<T, R>,
     options?: { readonly taskId?: string }
-  ): IUnsubscribe;
-  publish(value: T): void;
-  filterTaskId(taskId: string): IFilteredEventChannel<T, R>;
-  clear(): void;
-  readonly size: number;
-};
+  ): IUnsubscribe
+  publish(value: T): void
+  filterTaskId(taskId: string): IFilteredEventChannel<T, R>
+  clear(): void
+  readonly size: number
+}
 ```
 
 - `subscribe(listener, options?)` —— 登记一个 listener，返回可直接调用的[订阅句柄](#订阅句柄)（同时是 `unsubscribe` 函数、`.unsubscribe` 自身别名、可链式 `.subscribe()` 追加更多订阅）。`listener` 非函数抛 `INVALID_LISTENER`；`options.taskId` 提供但非非空字符串抛 `INVALID_TASK_ID`；`options` 本身不是普通对象抛 `INVALID_OPTIONS`。相同 listener 重复订阅会产生两份独立 registration（各自可单独退订）。
@@ -97,17 +108,45 @@ type IEventChannel<T, R = void> = {
 - `clear()` —— 清空全部 registration，**不**执行 listener 自身的 cleanup（listener 本身没有 dispose 概念，只是不再被调用）。
 - `size: number`（只读）—— 当前 active registration 数量。
 
+### API style
+
+style 是构造阶段的一次性命名投影。四个 preset 映射如下：
+
+| preset              | subscribe alias | publish alias |
+| ------------------- | --------------- | ------------- |
+| `subscribe-publish` | `subscribe`     | `publish`     |
+| `on-emit`           | `on`            | `emit`        |
+| `on-trigger`        | `on`            | `trigger`     |
+| `listen-fire`       | `listen`        | `fire`        |
+
+自定义对象的方向固定为 `{ subscribe: 'observe', publish: 'dispatch' }`。Channel 泛型顺序是 `<T, R, S>`，Hub 是 `<C, S>`；显式提供 payload/event map 后，custom style 必须显式提供对应的 `S`，不会依赖 partial generic inference。预声明对象推荐 `defineEventApiStyle()`，也可以使用 TypeScript 的 `as const`；widened 为普通 `string` 的对象不会产生任意字符串 index signature，因此不能据此声称存在精确 alias。
+
+```ts
+const events = createEventChannel<number>({ style: 'on-trigger' })
+events.on((event) => console.log(event.value))
+events.trigger(1)
+
+const style = defineEventApiStyle({ subscribe: 'observe', publish: 'dispatch' })
+const custom = createEventChannel<number, void, typeof style>({ style })
+custom.observe((event) => console.log(event.value))
+custom.dispatch(1)
+```
+
+例如，`createEventChannel<number>({ style: { subscribe: 'observe', publish: 'dispatch' } })` 会被 TypeScript 拒绝；请写成 `createEventChannel<number, void, typeof style>({ style })`，或直接在第三个泛型中给出 custom style。Hub 同理使用第二个泛型。
+
+canonical `subscribe`、`publish`、helpers、subscription handle、`clear` 和 `size` 永远保留。alias 只是同一函数引用的不可枚举、不可写、不可配置 own data property；它不会改变 listener 顺序、重入、错误、taskId 或生命周期。非法 style（空名、重复名、跨语义/保留名、非字符串或未知 preset）在构造时抛 `INVALID_OPTIONS`，getter 抛出的原始对象保留在 `cause`。
+
 ### `IEventContext<T>`
 
 ```ts
 type IEventContext<T> = {
-  readonly value: T;
-  readonly aborted: boolean;
-  readonly abortReason: unknown;
-  readonly taskId: string | undefined;
-  abort(reason?: unknown): void;
-  setTaskId(taskId: string | undefined): void;
-};
+  readonly value: T
+  readonly aborted: boolean
+  readonly abortReason: unknown
+  readonly taskId: string | undefined
+  abort(reason?: unknown): void
+  setTaskId(taskId: string | undefined): void
+}
 ```
 
 每次调用 listener 时传入的活对象：`value` 是本次发布的 payload；`aborted`/`abortReason` 是该 registration 的活状态；`abort(reason?)` 撤销当前 registration 并令其退订（幂等，对已非活跃的 registration 调用是空操作）；`setTaskId(taskId)` 修改该 registration 的 task 标签，**只影响之后的快照**（当前正在进行的这次 `publish()` 已经取好的快照不受影响）。
@@ -124,7 +163,7 @@ import {
   subscribeUntil,
   subscribeSubscriber,
   type IEventSubscriber
-} from '@migaia/event-subscriber';
+} from '@migaia/event-subscriber'
 ```
 
 这三个 helper 只需要结构化 `IEventChannelLike<T, R>`（有 `subscribe(listener, options?)` 方法即可），因此也能用于兼容结构的第三方 channel，不要求是 `createEventChannel()` 产出的实例。
@@ -136,13 +175,13 @@ function subscribeOnce<T, R>(
   channel: IEventChannelLike<T, R>,
   listener: IEventListener<T, R>,
   options?: { readonly taskId?: string }
-): IUnsubscribe;
+): IUnsubscribe
 ```
 
 只执行一次，调用 listener **之前**先退订：
 
 ```ts
-subscribeOnce(channel, (event) => console.log('only once', event.value));
+subscribeOnce(channel, (event) => console.log('only once', event.value))
 ```
 
 `channel`、`listener` 均必填；`options.taskId` 可选。因为退订发生在调用 listener 之前，listener 内的同步重入、`throw`、返回 rejected Promise 都不会导致第二次执行。若传入的 `channel` 不满足结构契约（无 `subscribe` 方法、或 `subscribe()` 同步交付了一个不返回函数的取消句柄）抛 `INVALID_CHANNEL`；返回值 `IUnsubscribe` 可重复调用，幂等。
@@ -155,26 +194,22 @@ function subscribeUntil<T, R>(
   signal: IEventAbortSignal,
   listener: IEventListener<T, R>,
   options?: { readonly taskId?: string }
-): IUnsubscribe;
+): IUnsubscribe
 
 type IEventAbortSignal = {
-  readonly aborted: boolean;
-  readonly reason?: unknown;
-  addEventListener(
-    type: 'abort',
-    listener: () => void,
-    options?: { readonly once?: boolean }
-  ): void;
-  removeEventListener(type: 'abort', listener: () => void): void;
-};
+  readonly aborted: boolean
+  readonly reason?: unknown
+  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void
+  removeEventListener(type: 'abort', listener: () => void): void
+}
 ```
 
 `signal` 中止时自动退订：
 
 ```ts
-const controller = new AbortController();
-subscribeUntil(channel, controller.signal, (event) => consume(event.value));
-controller.abort('owner closed');
+const controller = new AbortController()
+subscribeUntil(channel, controller.signal, (event) => consume(event.value))
+controller.abort('owner closed')
 ```
 
 `channel`、`signal`、`listener` 均必填；`options.taskId` 可选。`signal` 结构上兼容标准 `AbortSignal`（原生 `AbortSignal` 可直接传入）。已 `aborted` 的 `signal` 直接返回 no-op unsubscribe，不创建任何 registration。`abort()` 只撤销 registration，**不会中断已经开始执行**的 listener。`signal` 不满足结构契约（缺 `addEventListener`/`removeEventListener`，或 `aborted` 不是布尔值）抛 `INVALID_SIGNAL`；`listener` 非函数抛 `INVALID_LISTENER`。返回的 `IUnsubscribe` 可重复调用，幂等。
@@ -185,21 +220,21 @@ controller.abort('owner closed');
 function subscribeSubscriber<T, R>(
   channel: IEventChannelLike<T, R>,
   subscriber: IEventSubscriber<T, R>
-): IUnsubscribe;
+): IUnsubscribe
 
-type IEventSubscriber<T, R = void> = { handle(event: IEventContext<T>): R | PromiseLike<R> };
+type IEventSubscriber<T, R = void> = { handle(event: IEventContext<T>): R | PromiseLike<R> }
 ```
 
 用对象而非函数订阅，保留 `this`：
 
 ```ts
 class Counter implements IEventSubscriber<number> {
-  total = 0;
+  total = 0
   handle(event: { readonly value: number }) {
-    this.total += event.value;
+    this.total += event.value
   }
 }
-subscribeSubscriber(channel, new Counter());
+subscribeSubscriber(channel, new Counter())
 ```
 
 `channel`、`subscriber` 均必填，`subscriber` 必须是携带可调用 `handle` 方法的对象。`subscriber` 非对象或缺少可调用 `handle` 抛 `INVALID_SUBSCRIBER`。返回 `IUnsubscribe`。
@@ -219,7 +254,7 @@ import {
   publishTask,
   publishTaskSettled,
   type IListenerResult
-} from '@migaia/event-subscriber';
+} from '@migaia/event-subscriber'
 ```
 
 均只接受由 `createEventChannel()` 产出的 canonical channel 或其 `filterTaskId()` view（内部通过 `WeakMap` 校验运行时身份）——伪造对象或另一份物理包副本创建的 channel 会得到 `INVALID_CHANNEL`。
@@ -227,7 +262,7 @@ import {
 ```ts
 type IListenerResult<R> =
   | { readonly status: 'fulfilled'; readonly value: Awaited<R> }
-  | { readonly status: 'rejected'; readonly reason: unknown };
+  | { readonly status: 'rejected'; readonly reason: unknown }
 ```
 
 ### `publishParallelSettled` / `publishParallel`
@@ -236,17 +271,17 @@ type IListenerResult<R> =
 function publishParallelSettled<T, R>(
   channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,
   value: T
-): Promise<readonly IListenerResult<R>[]>;
+): Promise<readonly IListenerResult<R>[]>
 function publishParallel<T, R>(
   channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,
   value: T
-): Promise<readonly Awaited<R>[]>;
+): Promise<readonly Awaited<R>[]>
 ```
 
 `publishParallelSettled`：全部 listener **立即启动**，等待全部 settle，从不 reject：
 
 ```ts
-const results = await publishParallelSettled(channel, payload);
+const results = await publishParallelSettled(channel, payload)
 // [{ status: 'fulfilled', value }, { status: 'rejected', reason }, ...]
 ```
 
@@ -258,17 +293,17 @@ const results = await publishParallelSettled(channel, payload);
 function publishSerialSettled<T, R>(
   channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,
   value: T
-): Promise<readonly IListenerResult<R>[]>;
+): Promise<readonly IListenerResult<R>[]>
 function publishSerial<T, R>(
   channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,
   value: T
-): Promise<readonly Awaited<R>[]>;
+): Promise<readonly Awaited<R>[]>
 ```
 
 `publishSerialSettled`：前一个 listener settle 后才启动下一个：
 
 ```ts
-const results = await publishSerialSettled(channel, payload);
+const results = await publishSerialSettled(channel, payload)
 ```
 
 注意：**不是 waterfall**——每个 listener 收到的都是同一个 `payload`，前一个的返回值不会传给下一个；需要值变换见 `@migaia/middleware-pipeline`。`publishSerial` 是它的 throwing 版本，语义与 `publishParallel` 对 `publishParallelSettled` 的关系相同。
@@ -280,18 +315,18 @@ function publishTaskSettled<T, R>(
   channel: ICanonicalEventChannel<T, R>,
   taskId: string,
   value: T
-): Promise<IListenerResult<R>>;
+): Promise<IListenerResult<R>>
 function publishTask<T, R>(
   channel: ICanonicalEventChannel<T, R>,
   taskId: string,
   value: T
-): Promise<Awaited<R>>;
+): Promise<Awaited<R>>
 ```
 
 精确选择唯一一个 `taskId` 并等待其结算，不调用 `report`：
 
 ```ts
-const result = await publishTaskSettled(tasks, 'email', job);
+const result = await publishTaskSettled(tasks, 'email', job)
 ```
 
 入口快照匹配数为 0 时**同步**抛 `TASK_NOT_FOUND`；匹配数大于 1 时**同步**抛 `TASK_NOT_UNIQUE`（错误对象携带可枚举的 `taskId`/`matchCount` 字段）；选择动作发生在任何 listener 调用之前。`publishTask` 是 throwing 版本：listener 失败时以携带 `PUBLISH_FAILED` 码的 `AggregateError`（内含单个原始失败）reject。
@@ -309,31 +344,31 @@ import {
   type IEventHubOptions,
   type IEventMap,
   type IEventHubReport
-} from '@migaia/event-subscriber';
+} from '@migaia/event-subscriber'
 ```
 
 ### `createEventHub`
 
 ```ts
-function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>;
+function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>
 
-type IEventMap = object; // 事件名到 payload 类型的映射
+type IEventMap = object // 事件名到 payload 类型的映射
 type IEventHubOptions<C extends IEventMap> = {
-  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>;
-  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>;
-};
+  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>
+  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>
+}
 type IEventHubReport<C extends IEventMap> = {
-  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown };
-}[keyof C];
+  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }
+}[keyof C]
 ```
 
 多事件类型的按 key 懒创建路由（每个 key 首次被 `subscribe()`/`publish()` 时才内部创建一个 canonical channel）：
 
 ```ts
-type IEvents = { ready: { readonly at: number }; warning: { readonly message: string } };
-const hub = createEventHub<IEvents>();
-const stop = hub.subscribe('warning', (event) => console.warn(event.value.message));
-hub.publish('warning', { message: 'cache is stale' });
+type IEvents = { ready: { readonly at: number }; warning: { readonly message: string } }
+const hub = createEventHub<IEvents>()
+const stop = hub.subscribe('warning', (event) => console.warn(event.value.message))
+hub.publish('warning', { message: 'cache is stale' })
 ```
 
 `options.report`：失败对象额外携带 `key`（标识来自哪个事件类型）；`options.terminalReport`：同 Channel 模块的兜底诊断出口。校验规则与 `createEventChannel` 一致（`INVALID_OPTIONS`/`INVALID_REPORTER`）。
@@ -342,12 +377,14 @@ hub.publish('warning', { message: 'cache is stale' });
 
 ```ts
 type IEventHub<C extends IEventMap> = {
-  subscribe<K extends keyof C>(key: K, listener: IEventListener<C[K]>): IEventHubSubscription<C, K>;
-  publish<K extends keyof C>(key: K, value: C[K]): void;
-  clear(key?: keyof C): void;
-  size(key?: keyof C): number;
-};
+  subscribe<K extends keyof C>(key: K, listener: IEventListener<C[K]>): IEventHubSubscription<C, K>
+  publish<K extends keyof C>(key: K, value: C[K]): void
+  clear(key?: keyof C): void
+  size(key?: keyof C): number
+}
 ```
+
+`createEventHub<IEvents>({ style: 'on-emit' })` 同样提供 `hub.on` 与 `hub.emit`。它们分别与 `hub.subscribe`、`hub.publish` 同引用；key/payload 推导、lazy channel、registration accounting、stale unsubscribe 和 clear 语义仍由 canonical Hub owner 执行。自定义 Hub style 的泛型形状与 Channel 相同。
 
 - `subscribe(key, listener)` —— `key` 必须是 `string`/`number`/`symbol`（否则抛 `INVALID_EVENT_KEY`），`listener` 必须是函数（否则抛 `INVALID_LISTENER`）。返回值同样是可链式扩展的[订阅句柄](#订阅句柄)。**Hub listener 返回类型固定为 `void`/`PromiseLike<void>`，不做 async 结果聚合**；需要结果时应为该事件单独用 `createEventChannel<T, R>()` 创建带 `R` 的 channel。
 - `publish(key, value)` —— 该 `key` 尚未创建过 channel（从未被订阅过）时是 no-op，不会报错。
@@ -361,29 +398,29 @@ type IEventHub<C extends IEventMap> = {
 ## 订阅句柄
 
 ```ts
-import type { IEventChannelSubscription, IEventHubSubscription } from '@migaia/event-subscriber';
+import type { IEventChannelSubscription, IEventHubSubscription } from '@migaia/event-subscriber'
 ```
 
 `channel.subscribe()`/`hub.subscribe()` 返回的都是一个**可直接调用**的函数，同时携带链式扩展能力：
 
 ```ts
-const channelHandle = channel.subscribe(onReady);
-channelHandle.subscribe(onWarning, { taskId: 'audit' });
- channelHandle.unsubscribe(); // same function identity; releases whole chain
+const channelHandle = channel.subscribe(onReady)
+channelHandle.subscribe(onWarning, { taskId: 'audit' })
+channelHandle.unsubscribe() // same function identity; releases whole chain
 
-const hubHandle = hub.subscribe('ready', onReady);
+const hubHandle = hub.subscribe('ready', onReady)
 // 有限字面量 key map 在同一条链上禁止重复 key；要用同一个 key 订阅两次，另起一个新的 hub.subscribe()
-hubHandle.subscribe('warning', onWarning);
+hubHandle.subscribe('warning', onWarning)
 
-const maybeKey: keyof IEvents = getRuntimeKey();
-const dynamicHandle = hub.subscribe(maybeKey, onReady);
-dynamicHandle.subscribe(maybeKey, onReady); // key 类型被拓宽为运行时值：允许同 key fan-out，编译期不做重复声明检查
+const maybeKey: keyof IEvents = getRuntimeKey()
+const dynamicHandle = hub.subscribe(maybeKey, onReady)
+dynamicHandle.subscribe(maybeKey, onReady) // key 类型被拓宽为运行时值：允许同 key fan-out，编译期不做重复声明检查
 
-const owned = channel.subscribe(onReady);
+const owned = channel.subscribe(onReady)
 try {
-  owned.subscribe(getPossiblyInvalidListener());
+  owned.subscribe(getPossiblyInvalidListener())
 } catch {
-  owned.unsubscribe(); // 链式扩展不是事务性的：扩展失败，之前已经注册成功的那一条仍然有效、仍归 owned 所有
+  owned.unsubscribe() // 链式扩展不是事务性的：扩展失败，之前已经注册成功的那一条仍然有效、仍归 owned 所有
 }
 ```
 
@@ -398,9 +435,9 @@ For hub chains, finite literal maps reject a repeated key on this chain; a widen
 - `handle.unsubscribe` 是只读属性（`writable: false, configurable: false`），值就是 `handle` 自身，可读性别名而非另一个函数。
 
 ```ts
-const handle = channel.subscribe(onReady).subscribe(onWarning, { taskId: 'audit' });
-handle(); // 或 handle.unsubscribe()：逆序退订 onWarning、再退订 onReady
-handle.subscribe(onOther); // 抛 SUBSCRIPTION_CLOSED，链已关闭
+const handle = channel.subscribe(onReady).subscribe(onWarning, { taskId: 'audit' })
+handle() // 或 handle.unsubscribe()：逆序退订 onWarning、再退订 onReady
+handle.subscribe(onOther) // 抛 SUBSCRIPTION_CLOSED，链已关闭
 ```
 
 ---
@@ -414,7 +451,7 @@ import {
   EventSubscriberErrorCode,
   EVENT_SUBSCRIBER_SOURCE,
   type IEventSubscriberErrorCode
-} from '@migaia/event-subscriber';
+} from '@migaia/event-subscriber'
 ```
 
 稳定错误码表，**13 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。
@@ -444,7 +481,7 @@ import {
 ## 诊断消息
 
 ```ts
-import { EventSubscriberErrorText } from '@migaia/event-subscriber';
+import { EventSubscriberErrorText } from '@migaia/event-subscriber'
 ```
 
 （未从包入口显式导出为公开类型，但错误消息文本稳定，可用于断言。）全部键与固定文本：`invalidListener`（`'event-subscriber listener must be a function'`）、`invalidReporter`、`invalidChannel`、`invalidSignal`、`invalidSubscriber`、`invalidEventKey`、`taskNotFound`、`taskNotUnique`、`invalidTaskId`、`invalidOptions`、`publishFailed`、`unhandledListenerFailure`、`subscriptionClosed`，逐一对应上方错误码表的 13 个码，文本内容见源码 `src/error-text.ts`。
@@ -456,15 +493,15 @@ import { EventSubscriberErrorText } from '@migaia/event-subscriber';
 ## 状态常量
 
 ```ts
-import { EventSubscriberState } from '@migaia/event-subscriber';
+import { EventSubscriberState } from '@migaia/event-subscriber'
 ```
 
 协议常量，无调用参数：
 
 ```ts
-EventSubscriberState.abort; // 'abort' —— IEventAbortSignal 的事件类型
-EventSubscriberState.fulfilled; // 'fulfilled' —— IListenerResult 的状态判别值
-EventSubscriberState.rejected; // 'rejected'
+EventSubscriberState.abort // 'abort' —— IEventAbortSignal 的事件类型
+EventSubscriberState.fulfilled // 'fulfilled' —— IListenerResult 的状态判别值
+EventSubscriberState.rejected // 'rejected'
 ```
 
 ---
@@ -476,70 +513,70 @@ EventSubscriberState.rejected; // 'rejected'
 ### 1. 按 `taskId` 定向到唯一订阅者并等待结果
 
 ```ts
-import { createEventChannel, publishTask } from '@migaia/event-subscriber';
+import { createEventChannel, publishTask } from '@migaia/event-subscriber'
 
-const jobs = createEventChannel<string, string>();
-jobs.subscribe((event) => `email:${event.value}`, { taskId: 'email' });
-jobs.subscribe((event) => `audit:${event.value}`, { taskId: 'audit' });
+const jobs = createEventChannel<string, string>()
+jobs.subscribe((event) => `email:${event.value}`, { taskId: 'email' })
+jobs.subscribe((event) => `audit:${event.value}`, { taskId: 'audit' })
 
-const emailResult = await publishTask(jobs, 'email', 'created');
+const emailResult = await publishTask(jobs, 'email', 'created')
 ```
 
 ### 2. 并行结算 + 集中上报未处理的迟到失败
 
 ```ts
-import { createEventChannel, publishParallelSettled } from '@migaia/event-subscriber';
+import { createEventChannel, publishParallelSettled } from '@migaia/event-subscriber'
 
 const checks = createEventChannel<string, boolean>({
   terminalReport: (diagnostic) => emergencySink.capture(diagnostic)
-});
-checks.subscribe(async (event) => event.value.length > 0);
-checks.subscribe(async (event) => event.value.startsWith('usr_'));
+})
+checks.subscribe(async (event) => event.value.length > 0)
+checks.subscribe(async (event) => event.value.startsWith('usr_'))
 
-const results = await publishParallelSettled(checks, 'usr_42');
+const results = await publishParallelSettled(checks, 'usr_42')
 ```
 
 ### 3. `subscribeUntil` + `AbortController` 管理订阅生命周期
 
 ```ts
-import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber';
+import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'
 
-const controller = new AbortController();
-const channel = createEventChannel<number>();
-subscribeUntil(channel, controller.signal, (event) => consume(event.value));
+const controller = new AbortController()
+const channel = createEventChannel<number>()
+subscribeUntil(channel, controller.signal, (event) => consume(event.value))
 // 组件卸载 / 请求结束时统一中止
-controller.abort('scope closed');
+controller.abort('scope closed')
 ```
 
 ### 4. 用 Hub 统一路由多种事件并集中上报
 
 ```ts
-import { createEventHub } from '@migaia/event-subscriber';
+import { createEventHub } from '@migaia/event-subscriber'
 
-type IAppEvents = { ready: { readonly at: number }; warning: { readonly message: string } };
+type IAppEvents = { ready: { readonly at: number }; warning: { readonly message: string } }
 
 const events = createEventHub<IAppEvents>({
   report: ({ key, event, error }) => monitoring.capture(error, { key, payload: event.value })
-});
+})
 
-events.subscribe('warning', (event) => console.warn(event.value.message));
-events.publish('warning', { message: 'cache is stale' });
+events.subscribe('warning', (event) => console.warn(event.value.message))
+events.publish('warning', { message: 'cache is stale' })
 ```
 
 ### 5. 对象订阅者 + 串行结算，保证副作用按序执行
 
 ```ts
-import { createEventChannel, subscribeSubscriber, publishSerial } from '@migaia/event-subscriber';
+import { createEventChannel, subscribeSubscriber, publishSerial } from '@migaia/event-subscriber'
 
-const pipeline = createEventChannel<string, void>();
+const pipeline = createEventChannel<string, void>()
 subscribeSubscriber(pipeline, {
   handle: async (event) => writeAuditLog(event.value)
-});
+})
 subscribeSubscriber(pipeline, {
   handle: async (event) => notifyDownstream(event.value)
-});
+})
 
-await publishSerial(pipeline, 'order-created');
+await publishSerial(pipeline, 'order-created')
 ```
 
 ---

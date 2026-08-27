@@ -10,15 +10,15 @@
       "tree-shaking/core-retained-causal.mjs"
     ]
   },
-  "provenanceDigest": "90a3641073cf1d77459e7765751708433245f9c54faeeca8a188c7526a5555f6",
+  "provenanceDigest": "93b3a88bd97a79efecf8ed2acc465e19576023fa5fb40bbf9af757e128ad0129",
   "approval": {
-    "decisionId": "WRC-C-B11-decision-20260826-03",
-    "keyId": "coordinator-ed25519-04ad8e84b3d15997",
-    "digest": "90a3641073cf1d77459e7765751708433245f9c54faeeca8a188c7526a5555f6",
+    "decisionId": "WRC-C-B11-decision-20260827-04",
+    "keyId": "coordinator-ed25519-7556143481d08058",
+    "digest": "93b3a88bd97a79efecf8ed2acc465e19576023fa5fb40bbf9af757e128ad0129",
     "newTuple": {
       "moduleCount": 66,
-      "rawBytes": 455256,
-      "gzipBytes": 107623
+      "rawBytes": 458010,
+      "gzipBytes": 108255
     }
   },
   "oldTuple": {
@@ -29,8 +29,8 @@
   },
   "newTuple": {
     "moduleCount": 66,
-    "rawBytes": 455256,
-    "gzipBytes": 107623,
+    "rawBytes": 458010,
+    "gzipBytes": 108255,
     "endpointStaticImportCount": 12
   },
   "rootModules": [
@@ -146,9 +146,9 @@
     },
     "client": {
       "moduleCount": 53,
-      "rawBytes": 341172,
-      "gzipBytes": 83895,
-      "bundleSha256": "d298b1631ee8d0d994de62c068ae7f213d0a6de610012c3dd909e7ba74121c87",
+      "rawBytes": 343926,
+      "gzipBytes": 84550,
+      "bundleSha256": "26b2bb340981826bf201823439e0b84c22d0200639bc68647e329faa4d099b7c",
       "entryProvenance": {
         "virtualId": "virtual:web-rpc-client",
         "sourceSha256": "cc20f81229ddf28017cb28e07f8a6f1a1c3ca31b53495bf1cf94d7308ad0f8b9"
@@ -211,9 +211,9 @@
     },
     "provider": {
       "moduleCount": 59,
-      "rawBytes": 368955,
-      "gzipBytes": 90598,
-      "bundleSha256": "87ee6d04a4de5caa10680f697d1afcec70b29fe39c9e383fe2a61561d04c2e48",
+      "rawBytes": 371709,
+      "gzipBytes": 91236,
+      "bundleSha256": "bd737bd3f75e18a3aea6fbc0684f03fb58fa05d67fa4a361af2733c11eb316c1",
       "entryProvenance": {
         "virtualId": "virtual:web-rpc-provider",
         "sourceSha256": "7cda8c39a9816f43a39ce148b91ee57bd760d020aaa918f19604482b7f4dbf28"
@@ -282,9 +282,9 @@
     },
     "full": {
       "moduleCount": 67,
-      "rawBytes": 454631,
-      "gzipBytes": 107722,
-      "bundleSha256": "1cab0c4809b9ca29d8ee0542827c26db5531a2fefd0f4b9901393461d3f43538",
+      "rawBytes": 457385,
+      "gzipBytes": 108358,
+      "bundleSha256": "13e2bfbade7a547098be986dcc788213256b30f1307d6715861e385b190cc791",
       "entryProvenance": {
         "virtualId": "virtual:web-rpc-full",
         "sourceSha256": "a5bb6822af2057d6e400bd65307f4d5b8c46db77b0ccb6e6ea71155391431305"
@@ -361,9 +361,9 @@
     },
     "custom": {
       "moduleCount": 66,
-      "rawBytes": 455019,
-      "gzipBytes": 107282,
-      "bundleSha256": "0cfae677c7439f66c4318fa607a453afbd9f5f099c90038e3c155a16c72f129a",
+      "rawBytes": 457773,
+      "gzipBytes": 107907,
+      "bundleSha256": "aa0e533390266f12402b2c71ec8d6a0e4b9053ea638c43d0fd3b4529d7055f81",
       "entryProvenance": {
         "virtualId": "virtual:web-rpc-custom",
         "sourceSha256": "706ac06f07ca2fd0d595fd5b0d5408726218f356be438a4d24325d7b42dfab09"
@@ -1199,7 +1199,7 @@
       "rationale": "Canonical generic plugin lifecycle, shared, extension, resource, rollback, and disposal owner.",
       "byteAttribution": {
         "originalBytes": 94824,
-        "renderedBytes": 93880
+        "renderedBytes": 94426
       },
       "incomingEdges": [
         {

@@ -11,9 +11,12 @@ export {
 } from './async.js'
 export { EVENT_SUBSCRIBER_SOURCE, EventSubscriberErrorCode } from './error-code.js'
 export { EventDispatchPolicy, EventSubscriberState } from './state-constants.js'
+export { defineEventApiStyle, EventApiStyle } from './style.js'
 export type { IEventSubscriberErrorCode } from './error-code.js'
 export type { IEventDispatchPolicy } from './state-constants.js'
 export type { IEventChannelSubscription, IEventHubSubscription } from './types.js'
+export type { IEventApiStyle, IEventApiStyleNames } from './style.js'
+export type { IStyledEventChannel, IStyledEventHub } from './types.js'
 export type {
   ICanonicalEventChannel,
   IEventAbortSignal,
