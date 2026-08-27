@@ -1,5 +1,6 @@
 import type { IPluginDisposer, IPluginResource } from './typing.js'
 import { asyncDisposeKey, asyncDisposeKeys, disposeKey, disposeKeys } from './symbols.js'
+import { invokeCaptured } from './invocation.js'
 
 export { asyncDisposeKey, disposeKey }
 
@@ -20,7 +21,7 @@ export type IDisposerSnapshot = {
 const invokeCapturedDisposer = (
   disposer: (...args: never[]) => void | Promise<void>,
   receiver: object
-): void | Promise<void> => Reflect.apply(disposer, receiver, [])
+): void | Promise<void> => invokeCaptured(disposer, receiver, [])
 
 /** Read all equivalent symbol keys once and capture the first async-then-sync disposer. */
 export const snapshotDisposer = (resource: IPluginResource): IDisposerSnapshot => {

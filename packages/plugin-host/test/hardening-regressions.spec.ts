@@ -1,9 +1,17 @@
 /** Hardening regression cases for lifecycle, config, and extension invariants. */
 import { describe, expect, it, vi } from 'vitest'
-import { asyncDisposeKey, disposeKey, PluginHost } from '../src/index.js'
+import { asyncDisposeKey, disposeKey, PluginHost, PluginHostError } from '../src/index.js'
 
 class Host extends PluginHost<Record<string, never>, string> {
-  install(plugins: readonly any[]): this {
+  /** Supplies an explicit unbounded test policy while preserving test overrides. */
+  constructor(options: any = {}) {
+    super({
+      ...options,
+      execution: options.execution ?? { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+  }
+
+  install(plugins: readonly any[]) {
     return this.useSync(plugins)
   }
 }
@@ -1095,104 +1103,53 @@ describe('PH-R25：callable config ownership', () => {
         },
         install: () => ({})
       } as any)
-    ).resolves.toBe(host)
+    ).resolves.toMatchObject({ host })
   })
 })
 
-describe('#4（结论修正）install 在 await 之后调用 use()：两种子情形区分开', () => {
-  // 实测证明：探针（见修复说明）显示 fire-and-forget 形态并不会永久卡住，只是比预期慢一拍——
-  // 200ms 内就 settle 了。原始 adv#4 断言"既没成功也没失败，永远卡在队列里"高估了这个子情形的严重度。
-  it('不直接 await 嵌套调用（fire-and-forget）：会延后完成，但不是死锁', async () => {
+describe('#4 async lifecycle mutation admission', () => {
+  it('fire-and-forget nested mutation fails at the lifecycle boundary', async () => {
     const host = new Host()
-    let nestedSettled = false
-
     const outer = host.use({
       name: 'outer',
       install: async () => {
         await Promise.resolve()
-        void host
-          .use({ name: 'inner', install: () => ({}) } as any)
-          .then(() => {
-            nestedSettled = true
-          })
-          .catch(() => {
-            nestedSettled = true
-          })
+        expect(() => host.use({ name: 'inner', install: () => ({}) } as any)).toThrow(
+          PluginHostError
+        )
         return {}
       }
     } as any)
-
-    await outer
-    expect(nestedSettled).toBe(false)
-    await new Promise((resolve) => setTimeout(resolve, 100))
-    expect(nestedSettled).toBe(true)
+    await expect(outer).resolves.toMatchObject({ host })
   })
 
-  // 这一种是真正无法自愈的死锁：outer 的 install() 直接 await 了它自己触发的 use()。
-  // FIFO 队列严格串行——inner 排在 outer 后面，outer 不完成 inner 就无法开始，
-  // 而 outer 又在等 inner——循环依赖。R3 对抗证明：给这种情形加 watchdog 主动驱逐+reject
-  // 做不到"只拒绝自依赖、不误伤合法排队"（见下面 PH-R3-1 用例），所以 host 不再尝试
-  it('直接 await 嵌套调用：排队 mutation 达到 SLA 后被拒绝', async () => {
-    vi.useFakeTimers()
-    try {
-      const diagnostics: string[] = []
-      const host = new Host({
-        diagnostic: (message: string) => diagnostics.push(message),
-        queueAdmissionTimeoutMs: 5_000
-      } as any)
-      let innerRan = false
-
-      const outer = host
-        .use({
-          name: 'outer2',
-          install: async () => {
-            await Promise.resolve()
-            await host.use({
-              name: 'inner2',
-              install: () => {
-                innerRan = true
-                return {}
-              }
-            } as any)
-            return {}
-          }
-        } as any)
-        .then(
-          () => true,
-          () => true
-        )
-
-      await vi.advanceTimersByTimeAsync(5_000)
-      expect(diagnostics).toHaveLength(0)
-      expect(innerRan).toBe(false)
-      await expect(outer).resolves.toBe(true)
-    } finally {
-      vi.useRealTimers()
-    }
+  it('directly awaited nested mutation fails before enqueue', async () => {
+    const host = new Host()
+    const outer = host.use({
+      name: 'outer2',
+      install: async () => {
+        await expect(
+          Promise.resolve().then(() => {
+            expect(() => host.use({ name: 'inner2', install: () => ({}) } as any)).toThrow(
+              PluginHostError
+            )
+          })
+        ).resolves.toBeUndefined()
+        return {}
+      }
+    } as any)
+    await expect(outer).resolves.toMatchObject({ host })
   })
 
-  it('诊断兜底：排队超过 QUEUE_WATCHDOG_MS 仍未处理时，watchdog 上报可操作的诊断信息', async () => {
-    vi.useFakeTimers()
-    try {
-      const host = new Host({ diagnostic: () => undefined, queueAdmissionTimeoutMs: 5_000 } as any)
-
-      void host.use({
-        name: 'outer3',
-        install: async () => {
-          await new Promise((resolve) => setTimeout(resolve, 60_000)) // 永远卡住，模拟死锁
-          return {}
-        }
-      } as any)
-      const queued = host.use({ name: 'inner3', install: () => ({}) } as any) // 排在 outer3 后面
-      void queued.catch(() => undefined)
-
-      await vi.advanceTimersByTimeAsync(5_000)
-      await expect(queued).rejects.toMatchObject({
-        code: 'MUTATION_QUEUE_TIMEOUT'
-      })
-    } finally {
-      vi.useRealTimers()
-    }
+  it('rejects external mutation while an async lifecycle hook is pending', async () => {
+    const host = new Host({ execution: { mutationTimeoutMs: 100, pipelineDrainTimeoutMs: 100 } })
+    const slow = host.use({
+      name: 'outer3',
+      install: async () => new Promise(() => undefined)
+    } as any)
+    expect(() => host.use({ name: 'inner3', install: () => ({}) } as any)).toThrow(PluginHostError)
+    void slow.catch(() => undefined)
+    await host.dispose()
   })
 })
 
@@ -1204,10 +1161,9 @@ describe('#5 扩展属性被外部覆写后，unUse 静默放弃卸载', () => {
     ;(host as any).token = 'hijacked'
     await host.unUse('p')
 
-    expect((host as any).token).toBeUndefined()
-    await expect(
-      host.use({ name: 'p', install: () => ({ token: 'b' }) } as any)
-    ).resolves.toBeDefined()
+    expect((host as any).token).toBe('hijacked')
+    const view = await host.use({ name: 'p', install: () => ({ token: 'b' }) } as any)
+    expect(view.extensions.token).toBe('b')
   })
 })
 
@@ -1341,7 +1297,9 @@ describe('second adversarial pass (R3, fixed)', () => {
   it('R4-1: concurrent dispose is terminal and is not evicted by ordinary mutation SLA', async () => {
     vi.useFakeTimers()
     try {
-      const host = new Host()
+      const host = new Host({
+        execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 100 }
+      })
       const install = host.use({
         name: 'slow-dispose',
         install: async () => {
@@ -1349,20 +1307,12 @@ describe('second adversarial pass (R3, fixed)', () => {
           return {}
         }
       } as any)
+      void install.catch(() => undefined)
       const dispose = host.dispose()
-      let installSettled = false
-      let disposeSettled = false
-      void install.finally(() => (installSettled = true))
-      void dispose.finally(() => (disposeSettled = true))
-
       await vi.advanceTimersByTimeAsync(5_000)
-      expect(installSettled).toBe(false)
-      expect(disposeSettled).toBe(false)
-
-      await vi.advanceTimersByTimeAsync(1_000)
-      await expect(install).resolves.toBeDefined()
-      await expect(dispose).resolves.toBeUndefined()
-      await expect(host.dispose()).resolves.toBeUndefined()
+      await expect(install).rejects.toMatchObject({ code: 'PLUGIN_INSTALL_FAILED' })
+      await expect(dispose).resolves.toMatchObject({ logicalTerminal: true })
+      await expect(host.dispose()).resolves.toMatchObject({ logicalTerminal: true })
     } finally {
       vi.useRealTimers()
     }
@@ -1383,21 +1333,13 @@ describe('second adversarial pass (R3, fixed)', () => {
           return {}
         }
       } as any)
-      const external = diagnosedHost.use({ name: 'external', install: () => ({}) } as any)
-      let externalSettled: 'resolved' | 'rejected' | undefined
-      void external.then(
-        () => (externalSettled = 'resolved'),
-        () => (externalSettled = 'rejected')
+      expect(() => diagnosedHost.use({ name: 'external', install: () => ({}) } as any)).toThrow(
+        PluginHostError
       )
-
-      await vi.advanceTimersByTimeAsync(5_000)
       expect(diagnostics).toHaveLength(0)
-      expect(externalSettled).toBe('rejected')
 
-      await vi.advanceTimersByTimeAsync(5_000) // slow's own 10s timer fires
+      await vi.advanceTimersByTimeAsync(10_000) // slow's own 10s timer fires
       await expect(slow).resolves.toBeDefined()
-      await expect(external).rejects.toMatchObject({ code: 'MUTATION_QUEUE_TIMEOUT' })
-      expect(externalSettled).toBe('rejected')
     } finally {
       vi.useRealTimers()
     }
@@ -1426,7 +1368,7 @@ describe('second adversarial pass (R3, fixed)', () => {
 
   it('PH-R3-3 fixed: non-enumerable extension omission is reported through the diagnostic channel', async () => {
     const diagnostics: string[] = []
-    const host = new Host({ diagnostic: (message) => diagnostics.push(message) })
+    const host = new Host({ diagnostic: (message: string) => diagnostics.push(message) })
     const extension = {}
     Object.defineProperty(extension, 'hidden', { value: 1, enumerable: false })
     await host.use({ name: 'hidden', install: () => extension } as any)
@@ -1446,11 +1388,12 @@ describe('second adversarial pass (R3, fixed)', () => {
           return {}
         }
       } as any)
-      const second = host.use({ name: 'second', install: () => ({}) } as any)
+      expect(() => host.use({ name: 'second', install: () => ({}) } as any)).toThrow(
+        PluginHostError
+      )
 
       await vi.advanceTimersByTimeAsync(100)
       await expect(first).resolves.toBeDefined()
-      await expect(second).resolves.toBeDefined()
 
       // If the watchdog for "second" were still armed, it would still be sitting in the
       // timer queue for up to 5s after settlement. Assert there is nothing left pending.
@@ -1476,14 +1419,12 @@ describe('second adversarial pass (R3, fixed)', () => {
         }
       } as any)
 
-      const unUse = host.unUse('stuck-disposer').then(
-        () => 'resolved',
-        (error) => error
-      )
+      const unUse = host.unUse('stuck-disposer')
       await vi.advanceTimersByTimeAsync(5_000)
       const outcome = await unUse
       expect(laterDisposerRan).toBe(true) // the timed-out step didn't block the rest of the group
-      expect(String((outcome as any)?.cause?.cause?.message ?? outcome)).toMatch(/等待超过 5000ms/)
+      expect((outcome as any).ok).toBe(false)
+      expect((outcome as any).error.code).toBe('PLUGIN_DISPOSE_FAILED')
     } finally {
       vi.useRealTimers()
     }

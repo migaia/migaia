@@ -10,7 +10,15 @@ type ICallableParent = ((value: number) => { value: number }) & {
 
 type IPropertyOrder = 'parent-first' | 'child-first'
 
-class Host extends PluginHost<Record<string, never>> {}
+class Host extends PluginHost<Record<string, never>> {
+  /** Supplies an explicit unbounded test policy. */
+  constructor(options: any = {}) {
+    super({
+      ...options,
+      execution: options.execution ?? { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+  }
+}
 
 /** Build the callable parent and child prototype graph in one requested property order. */
 const createConfig = (order: IPropertyOrder): Record<string, unknown> => {

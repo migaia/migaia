@@ -224,9 +224,7 @@ describe('AF-T34 rule gate: no Function.prototype call/apply/bind; Reflect.apply
       'capability/src/index.ts',
       'lifecycle/src/errors.ts',
       'lifecycle/src/scheduler.ts',
-      'plugin-host/src/config.ts',
-      'plugin-host/src/disposal.ts',
-      'plugin-host/src/host-runtime.ts',
+      'plugin-host/src/invocation.ts',
       'reactive/src/runtime/receiver.ts'
     ])
   })

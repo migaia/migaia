@@ -4,6 +4,12 @@ import type {
   IPluginDisposer,
   IPluginHostCore
 } from './typing.js'
+import type {
+  IAbortController,
+  IGenerationRequest,
+  ILifecycleScope,
+  IProvisionalScope
+} from '@migaia/lifecycle'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
 
 export type IPluginDefinition<TCore> = {
@@ -24,10 +30,14 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   config: IPluginConfig
   extensions: IExtensionOwnership[]
   pipelineDisposers: IPluginDisposer[]
-  disposers: IPluginDisposer[]
   shared: PropertyKey[]
   installed: boolean
   lifecycle: (typeof PluginHostRegistrationLifecycle)[keyof typeof PluginHostRegistrationLifecycle]
+  lifecycleController?: IAbortController
+  operation?: IGenerationRequest
+  operationDeadlineAt?: number
+  provisional?: IProvisionalScope
+  scope?: ILifecycleScope
   core?: TDomainCore & IPluginHostCore<TValue>
 }
 

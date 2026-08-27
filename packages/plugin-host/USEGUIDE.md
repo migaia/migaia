@@ -261,7 +261,7 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 
 ## 9. 错误码完整参考
 
-`PluginHostErrorCode` 导出以下 24 个稳定错误码，均可通过 `error.code` 分支处理：
+`PluginHostErrorCode` 导出以下 28 个稳定错误码，均可通过 `error.code` 分支处理：
 
 | code                               | 含义                                                                                                                                                                                                                                                                             |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -288,6 +288,10 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 | `PIPELINE_FAILED`                  | async pipeline 的 stage 与 downstream 同时失败，聚合为 `errors` 顺序固定为 `[stageError, downstreamError]` 的 `AggregateError`。                                                                                                                                                 |
 | `MUTATION_QUEUE_TIMEOUT`           | mutation 在 FIFO 队列中等待超过**已配置**的 `queueAdmissionTimeoutMs` 阈值后被拒绝（默认未配置该阈值，不会触发）；不会中断已经开始执行的插件代码。语义是**终止**：该 mutation 不会再被执行。                                                                                     |
 | `DISPOSE_STEP_TIMEOUT`             | disposal 期间单个 pipeline disposer / 插件 dispose 钩子 / resource disposer 等待超过 `disposeStepTimeoutMs`（默认 5000ms）仍未完成（含反过来 await 触发它的那次 `dispose()` 调用这种自依赖）。语义是**降级继续**：该步骤被计为失败，disposal 事务继续推进直至收敛到 `disposed`。 |
+| `MUTATION_EXECUTION_TIMEOUT`       | 已取得执行权的 lifecycle hook 超过 mutation 预算；提交资格已撤销，协作插件应停止并清理其 operation 资源。                                                                                                                                                              |
+| `VIEW_REVOKED`                     | 已撤销的 immutable view 或其 core 被访问；调用方应改用最近一次返回的 view。                                                                                                                                                                                               |
+| `PIPELINE_DRAIN_TIMEOUT`           | Host 进入逻辑终态前 active pipeline 未在 drain 预算内归零；检查返回的 disposal result 与 physical completion。                                                                                                                                                           |
+| `CLEANUP_INCOMPLETE`               | 逻辑清理已提交但仍有物理 cleanup 未完成；调用方应观察 `physicalCompletion`。                                                                                                                                                                                               |
 | `INVALID_OPTION`                   | 入参校验失败（`TypeError`）：插件名/配置路径/pipeline stage/extension/domain core/资源 disposer/构造选项等输入不满足契约，检查用 `error instanceof TypeError`，不按 `PluginHostError` 分支。                                                                                     |
 
 ```ts

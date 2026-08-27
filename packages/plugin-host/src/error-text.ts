@@ -48,14 +48,9 @@ export function createPluginHostTypeError(
 }
 
 const PREFIX = '[plugin-host] '
-let localeKey: ILocaleKey = 'zh'
 
-/** 设置 PluginHost 全局错误语言。 */
-export const setErrorLocale = (nextLocale: ILocaleKey): void => {
-  localeKey = nextLocale
-}
-
-const localize = (zh: string, en: string): string => `${PREFIX}${localeKey === 'zh' ? zh : en}`
+/** Uses stable English package text; consumers localize by `(source, code)` at their boundary. */
+const localize = (_zh: string, en: string): string => `${PREFIX}${en}`
 
 /** PluginHost 错误与诊断文本集中维护处，便于调用方和维护者查找。 */
 const ERROR_TEXT = {
@@ -211,6 +206,26 @@ const ERROR_TEXT = {
           `disposer awaits the very host.dispose() call that triggered it, this wait can never ` +
           `complete on its own`
       )
+  },
+  /** Stable text for an admitted hook that exceeded its operation deadline. */
+  MUTATION_EXECUTION_TIMEOUT: (waitedMs: number) =>
+    localize(
+      `mutation 执行超过 ${waitedMs}ms，已撤销提交资格`,
+      `mutation exceeded its ${waitedMs}ms execution budget and lost commit authority`
+    ),
+  /** Stable text for access through a logically revoked immutable view. */
+  get VIEW_REVOKED() {
+    return localize('宿主视图已撤销', 'plugin-host view has been revoked')
+  },
+  /** Stable diagnostic text for an active pipeline that missed the disposal drain budget. */
+  PIPELINE_DRAIN_TIMEOUT: (waitedMs: number) =>
+    localize(
+      `pipeline drain 超过 ${waitedMs}ms，已进入逻辑终态`,
+      `pipeline drain exceeded its ${waitedMs}ms budget and entered logical terminal`
+    ),
+  /** Stable text for logical cleanup that still has physical work outstanding. */
+  get CLEANUP_INCOMPLETE() {
+    return localize('清理尚未物理完成', 'physical cleanup is incomplete')
   }
 } as const
 

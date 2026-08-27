@@ -3,7 +3,15 @@ import { PluginHost } from '../src/host-runtime.js'
 
 type IPrototypeOrder = 'child-first' | 'root-first'
 
-class Host extends PluginHost<Record<string, never>> {}
+class Host extends PluginHost<Record<string, never>> {
+  /** Supplies an explicit unbounded test policy. */
+  constructor(options: any = {}) {
+    super({
+      ...options,
+      execution: options.execution ?? { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+  }
+}
 
 /** Build an ordinary object whose custom prototype points back to its owning object. */
 const createConfig = (order: IPrototypeOrder): Record<string, unknown> => {

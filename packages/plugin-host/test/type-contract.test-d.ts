@@ -14,9 +14,8 @@ declare const contractB: IContractB
 const accumulatedContract = async (): Promise<void> => {
   const appA = await contractHost.use(contractA)
   const appAB = await appA.use(contractB)
-  void appAB.aExtension
-  void appAB.bExtension
-  void appAB.pipelineMode
+  void appAB.extensions.aExtension
+  void appAB.extensions.bExtension
   appAB.getShared('aShared')
   appAB.getShared('bShared')
   appAB.getShared('optional-plugin-feature')

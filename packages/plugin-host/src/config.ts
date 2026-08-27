@@ -2,6 +2,7 @@ import ERROR_TEXT, { createPluginHostTypeError } from './error-text.js'
 import { assimilateCapturedThen, probeThenable } from '@migaia/lifecycle'
 import { parseConfigPath as parseUtilsConfigPath } from '@migaia/utils/config'
 import type { IPluginConfig } from './typing.js'
+import { invokeCaptured } from './invocation.js'
 
 const dangerousKeys = new Set(['__proto__', 'constructor', 'prototype'])
 /** Intrinsic prototype objects stay on native clone targets for brand/method semantics. */
@@ -273,7 +274,7 @@ const createReadonlyFacadeTarget = (
       } else {
         Object.defineProperty(target, key, {
           get: descriptor.get
-            ? () => mapValue(Reflect.apply(descriptor.get!, source, []))
+            ? () => mapValue(invokeCaptured(descriptor.get!, source, []))
             : undefined,
           set: descriptor.set ? rejectReadonlyMutation : undefined,
           enumerable: descriptor.enumerable,
@@ -317,11 +318,11 @@ const createReadonlyFacadeTarget = (
 
 /** Read Map entries through the captured native reader, bypassing subclass iteration hooks. */
 const readMapEntries = (value: Map<unknown, unknown>): Iterator<[unknown, unknown]> =>
-  Reflect.apply(capturedMapReaders.entries, value, [])
+  invokeCaptured(capturedMapReaders.entries, value, [])
 
 /** Read Set values through the captured native reader, bypassing subclass iteration hooks. */
 const readSetValues = (value: Set<unknown>): Iterator<unknown> =>
-  Reflect.apply(capturedSetReaders.values, value, [])
+  invokeCaptured(capturedSetReaders.values, value, [])
 
 /** Unique probe key used only to test native Map internal-slot presence. */
 const mapBrandProbe = {}
@@ -331,7 +332,7 @@ const setBrandProbe = {}
 /** Distinguish a branded Map instance from a custom prototype inheriting Map.prototype. */
 const isBrandedMap = (value: object): value is Map<unknown, unknown> => {
   try {
-    Reflect.apply(capturedMapReaders.has, value, [mapBrandProbe])
+    invokeCaptured(capturedMapReaders.has, value, [mapBrandProbe])
     return true
   } catch {
     return false
@@ -341,7 +342,7 @@ const isBrandedMap = (value: object): value is Map<unknown, unknown> => {
 /** Distinguish a branded Set instance from a custom prototype inheriting Set.prototype. */
 const isBrandedSet = (value: object): value is Set<unknown> => {
   try {
-    Reflect.apply(capturedSetReaders.has, value, [setBrandProbe])
+    invokeCaptured(capturedSetReaders.has, value, [setBrandProbe])
     return true
   } catch {
     return false
@@ -365,11 +366,11 @@ const cloneConfigValue = (
     const clone = constructable
       ? function (this: unknown, ...args: unknown[]): unknown {
           if (new.target !== undefined) return Reflect.construct(rawValue, args, new.target)
-          return Reflect.apply(rawValue, this, args)
+          return invokeCaptured(rawValue, this, args)
         }
-      : new Proxy((...args: unknown[]): unknown => Reflect.apply(rawValue, undefined, args), {
+      : new Proxy((...args: unknown[]): unknown => invokeCaptured(rawValue, undefined, args), {
           apply(_target, thisArg, args) {
-            return Reflect.apply(rawValue, thisArg, args)
+            return invokeCaptured(rawValue, thisArg, args)
           }
         })
     seen.set(rawValue, clone)
@@ -702,7 +703,7 @@ export const readonlyConfig = <T>(value: T): Readonly<T> => {
         configurable: true,
         get: descriptor.get
           ? function (this: unknown): unknown {
-              return wrap(Reflect.apply(descriptor.get!, this, []))
+              return wrap(invokeCaptured(descriptor.get!, this, []))
             }
           : undefined,
         set: rejectReadonlyMutation
@@ -754,16 +755,16 @@ export const readonlyConfig = <T>(value: T): Readonly<T> => {
       (property === Symbol.asyncIterator && kind === 'async')
     )
       return (...args: unknown[]) => {
-        const produced = Reflect.apply(method, iterator, args)
+        const produced = invokeCaptured(method, iterator, args)
         if (produced === iterator) return readonlyProxies.get(iterator)
         return wrap(produced)
       }
     if (property === 'next' || property === 'return' || property === 'throw')
       return (...args: unknown[]) => {
-        const result = Reflect.apply(method, iterator, args)
+        const result = invokeCaptured(method, iterator, args)
         return kind === 'async' ? wrap(result) : wrapIteratorResult(result)
       }
-    return (...args: unknown[]) => Reflect.apply(method, iterator, args)
+    return (...args: unknown[]) => invokeCaptured(method, iterator, args)
   }
 
   /** Populate a fresh iterator target without exposing locked raw property values. */
@@ -883,9 +884,9 @@ export const readonlyConfig = <T>(value: T): Readonly<T> => {
   const createCallableForwardingTarget = (source: Function): Function => {
     const target = isConstructable(source)
       ? function (this: unknown, ...args: unknown[]): unknown {
-          return Reflect.apply(source, this, args)
+          return invokeCaptured(source, this, args)
         }
-      : (...args: unknown[]) => Reflect.apply(source, undefined, args)
+      : (...args: unknown[]) => invokeCaptured(source, undefined, args)
     callableTargets.set(source, target)
     return target
   }
@@ -985,12 +986,12 @@ export const readonlyConfig = <T>(value: T): Readonly<T> => {
         }
         if (property === Symbol.asyncIterator && typeof value === 'function')
           return (...args: unknown[]) => {
-            const iterator = Reflect.apply(value, candidate, args)
+            const iterator = invokeCaptured(value, candidate, args)
             return wrap(iterator)
           }
         if (property === Symbol.iterator && typeof value === 'function')
           return (...args: unknown[]) => {
-            const iterator = Reflect.apply(value, candidate, args)
+            const iterator = invokeCaptured(value, candidate, args)
             if (iterator === target) return proxy
             return wrap(iterator)
           }
@@ -998,21 +999,21 @@ export const readonlyConfig = <T>(value: T): Readonly<T> => {
         if (target instanceof Date) {
           if (property === 'setTime' || String(property).startsWith('set'))
             return rejectReadonlyMutation
-          return (...args: unknown[]) => Reflect.apply(value, target, args)
+          return (...args: unknown[]) => invokeCaptured(value, target, args)
         }
         if (target instanceof Map) {
           if (property === 'set' || property === 'delete' || property === 'clear')
             return rejectReadonlyMutation
           if (property === 'get' && value === capturedMapReaders.get)
-            return (key: unknown) => wrap(Reflect.apply(value, target, [unwrap(key)]))
+            return (key: unknown) => wrap(invokeCaptured(value, target, [unwrap(key)]))
           if (property === 'has' && value === capturedMapReaders.has)
-            return (key: unknown) => Reflect.apply(value, target, [unwrap(key)])
+            return (key: unknown) => invokeCaptured(value, target, [unwrap(key)])
           if (
             (property === 'entries' && value === capturedMapReaders.entries) ||
             (property === Symbol.iterator && value === capturedMapReaders.iterator)
           )
             return function* (): IterableIterator<[unknown, unknown]> {
-              const iterator = Reflect.apply(value, target, []) as IterableIterator<
+              const iterator = invokeCaptured(value, target, []) as IterableIterator<
                 [unknown, unknown]
               >
               let step = iterator.next()
@@ -1024,7 +1025,7 @@ export const readonlyConfig = <T>(value: T): Readonly<T> => {
             }
           if (property === 'values' && value === capturedMapReaders.values)
             return function* (): IterableIterator<unknown> {
-              const iterator = Reflect.apply(value, target, []) as IterableIterator<unknown>
+              const iterator = invokeCaptured(value, target, []) as IterableIterator<unknown>
               let step = iterator.next()
               while (!step.done) {
                 yield wrap(step.value)
@@ -1033,7 +1034,7 @@ export const readonlyConfig = <T>(value: T): Readonly<T> => {
             }
           if (property === 'keys' && value === capturedMapReaders.keys)
             return function* (): IterableIterator<unknown> {
-              const iterator = Reflect.apply(value, target, []) as IterableIterator<unknown>
+              const iterator = invokeCaptured(value, target, []) as IterableIterator<unknown>
               let step = iterator.next()
               while (!step.done) {
                 yield wrap(step.value)
@@ -1044,25 +1045,25 @@ export const readonlyConfig = <T>(value: T): Readonly<T> => {
             return (
               callback: (value: unknown, key: unknown, map: ReadonlyMap<unknown, unknown>) => void
             ) => {
-              Reflect.apply(value, target, [
+              invokeCaptured(value, target, [
                 (entry: unknown, key: unknown) =>
                   callback(wrap(entry), wrap(key), proxy as ReadonlyMap<unknown, unknown>)
               ])
             }
-          return (...args: unknown[]) => Reflect.apply(value, proxy, args)
+          return (...args: unknown[]) => invokeCaptured(value, proxy, args)
         }
         if (target instanceof Set) {
           if (property === 'add' || property === 'delete' || property === 'clear')
             return rejectReadonlyMutation
           if (property === 'has' && value === capturedSetReaders.has)
-            return (entry: unknown) => Reflect.apply(value, target, [unwrap(entry)])
+            return (entry: unknown) => invokeCaptured(value, target, [unwrap(entry)])
           if (
             (property === 'values' && value === capturedSetReaders.values) ||
             (property === 'keys' && value === capturedSetReaders.keys) ||
             (property === Symbol.iterator && value === capturedSetReaders.iterator)
           )
             return function* (): IterableIterator<unknown> {
-              const iterator = Reflect.apply(value, target, []) as IterableIterator<unknown>
+              const iterator = invokeCaptured(value, target, []) as IterableIterator<unknown>
               let step = iterator.next()
               while (!step.done) {
                 yield wrap(step.value)
@@ -1071,7 +1072,7 @@ export const readonlyConfig = <T>(value: T): Readonly<T> => {
             }
           if (property === 'entries' && value === capturedSetReaders.entries)
             return function* (): IterableIterator<[unknown, unknown]> {
-              const iterator = Reflect.apply(value, target, []) as IterableIterator<
+              const iterator = invokeCaptured(value, target, []) as IterableIterator<
                 [unknown, unknown]
               >
               let step = iterator.next()
@@ -1085,15 +1086,15 @@ export const readonlyConfig = <T>(value: T): Readonly<T> => {
             return (
               callback: (value: unknown, key: unknown, set: ReadonlySet<unknown>) => void
             ) => {
-              Reflect.apply(value, target, [
+              invokeCaptured(value, target, [
                 (entry: unknown) =>
                   callback(wrap(entry), wrap(entry), proxy as ReadonlySet<unknown>)
               ])
             }
-          return (...args: unknown[]) => Reflect.apply(value, proxy, args)
+          return (...args: unknown[]) => invokeCaptured(value, proxy, args)
         }
         if (target instanceof RegExp && (property === 'exec' || property === 'test')) {
-          return (...args: unknown[]) => Reflect.apply(value, new RegExp(target), args)
+          return (...args: unknown[]) => invokeCaptured(value, new RegExp(target), args)
         }
         return wrap(value)
       },
@@ -1125,7 +1126,9 @@ export const readonlyConfig = <T>(value: T): Readonly<T> => {
         return rejectReadonlyMutation()
       },
       apply(target, thisArg, args) {
-        return protectCallableOutput(Reflect.apply(candidate as Function, thisArg, args))
+        return protectCallableOutput(
+          invokeCaptured(candidate as (...args: never[]) => unknown, thisArg, args)
+        )
       },
       construct(target, args, newTarget) {
         if (typeof candidate !== 'function' || !isConstructable(candidate))

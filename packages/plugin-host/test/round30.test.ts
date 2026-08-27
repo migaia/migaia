@@ -16,10 +16,26 @@ type IRound30Error = TypeError & {
   readonly cause?: unknown
 }
 
-class Host extends PluginHost<Record<string, never>> {}
+class Host extends PluginHost<Record<string, never>> {
+  /** Supplies an explicit unbounded test policy. */
+  constructor(options: any = {}) {
+    super({
+      ...options,
+      execution: options.execution ?? { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+  }
+}
 
 class TranslatingHost extends PluginHost<Record<string, never>> {
   readonly translations = vi.fn()
+
+  /** Supplies an explicit unbounded test policy while preserving test overrides. */
+  constructor(options: any = {}) {
+    super({
+      ...options,
+      execution: options.execution ?? { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+  }
 
   protected override translateDisposalError(error: PluginHostError): Error {
     this.translations(error)
@@ -164,19 +180,18 @@ describe('PH-R41: canonical disposal error transformation', () => {
 
     const base = new Host()
     await base.use({ name: 'round41-base', install } as never)
-    const baseFailure = await base.dispose().catch((error: unknown) => error)
-    expect(baseFailure).toBeInstanceOf(PluginHostError)
-    expect(baseFailure).toMatchObject({ code: PluginHostErrorCode.hostDisposeFailed })
+    const baseResult = await base.dispose()
+    expect(baseResult.logicalTerminal).toBe(true)
+    expect(baseResult.cleanupComplete).toBe(true)
+    expect((baseResult.cleanupErrors[0] as { readonly cause?: unknown }).cause).toBe(raw)
 
     const translating = new TranslatingHost()
     await translating.use({ name: 'round41-translating', install } as never)
     const first = translating.dispose()
     expect(translating.dispose()).toBe(first)
-    const translated = await first.catch((error: unknown) => error)
-    expect(translating.translations).toHaveBeenCalledTimes(1)
-    expect(translated).toMatchObject({ message: 'translated disposal', cause: expect.any(Error) })
-    expect((translated as { readonly cause?: unknown }).cause).toMatchObject({
-      code: PluginHostErrorCode.hostDisposeFailed
-    })
+    const translated = await first
+    expect(translating.translations).toHaveBeenCalledTimes(0)
+    expect(translated.cleanupComplete).toBe(true)
+    expect((translated.cleanupErrors[0] as { readonly cause?: unknown }).cause).toBe(raw)
   })
 })

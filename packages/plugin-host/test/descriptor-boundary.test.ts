@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { PluginHostErrorCode } from '../src/error-code.js'
 import { PluginHost } from '../src/host-runtime.js'
 
-class Host extends PluginHost<Record<string, never>> {}
+class Host extends PluginHost<Record<string, never>> {
+  /** Supplies an explicit unbounded test policy. */
+  constructor(options: any = {}) {
+    super({
+      ...options,
+      execution: options.execution ?? { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+  }
+}
 
 type IAccessorOutput = {
   readonly nested: { value: number; self?: unknown }
