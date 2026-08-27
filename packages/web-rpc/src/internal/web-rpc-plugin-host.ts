@@ -3,8 +3,9 @@ import {
   PluginHost,
   PluginHostError,
   PluginHostErrorCode,
+  type IPluginHostDisposalResult,
   type IPluginHostOptions,
-  type IPluginHostPublic
+  type IPluginHostView
 } from '@migaia/plugin-host'
 import type { IWebRpcTransport } from '../transport.js'
 import type { IWebRpcHookEvent } from '../typing.js'
@@ -23,6 +24,8 @@ export type IWebRpcPipelineValue = unknown
 
 /** PluginHost-owned WebRPC mutation and lifecycle shell; it is not a public endpoint surface. */
 export class WebRpcPluginHost extends PluginHost<IWebRpcPluginCore, IWebRpcPipelineValue> {
+  /** Caches the one endpoint-facing disposal Promise so repeated calls preserve identity. */
+  #disposePromise: Promise<IPluginHostDisposalResult> | undefined
   readonly #domainCore: IWebRpcPluginCore
   readonly #readCleanupErrors: () => readonly IWebRpcCleanupError[]
 
@@ -31,7 +34,7 @@ export class WebRpcPluginHost extends PluginHost<IWebRpcPluginCore, IWebRpcPipel
     transport: IWebRpcTransport,
     construction: IWebRpcConstructionControl,
     hooks: (event: IWebRpcHookEvent) => void,
-    options: IPluginHostOptions = {},
+    options: IPluginHostOptions,
     readCleanupErrors: () => readonly IWebRpcCleanupError[] = () => []
   ) {
     super(options)
@@ -48,18 +51,17 @@ export class WebRpcPluginHost extends PluginHost<IWebRpcPluginCore, IWebRpcPipel
   /** Installs the complete construction batch through PluginHost's single transaction. */
   installBatch(
     plugins: readonly IWebRpcPluginConstraint[]
-  ): Promise<IPluginHostPublic<IWebRpcPluginCore>> {
+  ): Promise<IPluginHostView<WebRpcPluginHost>> {
     const admissionFailure = createNativeAdmissionFailure(plugins)
     if (admissionFailure) return Promise.reject(admissionFailure)
-    return this.use(...plugins) as unknown as Promise<IPluginHostPublic<IWebRpcPluginCore>>
+    return this.use(...plugins) as unknown as Promise<IPluginHostView<WebRpcPluginHost>>
   }
 
   /** Installs constructor-time plugins for the synchronous shell path. */
-  installBatchSync(plugins: readonly IWebRpcPluginConstraint[]): this {
+  installBatchSync(plugins: readonly IWebRpcPluginConstraint[]): IPluginHostView<WebRpcPluginHost> {
     const admissionFailure = createNativeAdmissionFailure(plugins)
     if (admissionFailure) throw admissionFailure
-    this.useSync(plugins)
-    return this
+    return this.useSync(plugins) as IPluginHostView<WebRpcPluginHost>
   }
 
   protected override createPluginDomainCore(): IWebRpcPluginCore {
@@ -72,9 +74,18 @@ export class WebRpcPluginHost extends PluginHost<IWebRpcPluginCore, IWebRpcPipel
   }
 
   /** Closes active construction races before PluginHost's terminal mutation is queued. */
-  override dispose(): Promise<void> {
+  override dispose(): Promise<IPluginHostDisposalResult> {
+    if (this.#disposePromise) return this.#disposePromise
     this.#domainCore.construction.close()
-    return super.dispose()
+    this.#disposePromise = super.dispose().then((result) => {
+      if (result.cleanupErrors.length === 0) return result
+      const cleanup =
+        result.cleanupErrors.length === 1
+          ? result.cleanupErrors[0]
+          : new AggregateError(result.cleanupErrors)
+      throw translateEndpointDisposalError(cleanup, this.#readCleanupErrors())
+    })
+    return this.#disposePromise
   }
 }
 

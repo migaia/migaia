@@ -279,7 +279,13 @@ async function createActualAdmissionFixture(
   const construction = createConstructionControl({
     signal: new AbortController().signal
   })
-  const host = new WebRpcPluginHost(deferred.id, deferred.transport, construction, () => undefined)
+  const host = new WebRpcPluginHost(
+    deferred.id,
+    deferred.transport,
+    construction,
+    () => undefined,
+    { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+  )
   let prepared: IPreparedEndpoint<string> | undefined
   let activated = false
   let translatedFeatures: IWebRpcTranslatedPlugin[] = []
@@ -391,9 +397,9 @@ async function createActualAdmissionFixture(
       (_item, index) => inventory[index]?.role.kind === 'feature'
     )
     const definitions = nextTranslated.map(({ definition }) => definition)
-    await host.installBatch(definitions)
+    const installedView = await host.installBatch(definitions)
     if (installOptions.parity)
-      assertPluginClaimParity(nextClaims, nextDescriptors, host, kernel, {
+      assertPluginClaimParity(nextClaims, nextDescriptors, installedView, kernel, {
         activated,
         translated: nextTranslated
       })
@@ -645,7 +651,7 @@ async function assertMigratedControlIgnoresD95(fixture: IActualAdmissionFixture)
   expect(fixture.getTranslatedInstallation('outbound-compatibility')).toBeUndefined()
   await fixture.install()
   expect(fixture.getTranslatedInstallation('outbound-compatibility')).toBeUndefined()
-  expect((fixture.host as unknown as { readonly ping?: unknown }).ping).toBeTypeOf('function')
+  expect((fixture.host as unknown as { readonly ping?: unknown }).ping).toBeUndefined()
   const hostDispose = fixture.host.dispose()
   expect(fixture.host.dispose()).toBe(hostDispose)
   await hostDispose
@@ -1057,7 +1063,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       })
       const hostDispose = fixture.host.dispose()
       expect(fixture.host.dispose()).toBe(hostDispose)
-      await expect(hostDispose).resolves.toBeUndefined()
+      await expect(hostDispose).resolves.toMatchObject({
+        logicalTerminal: true,
+        cleanupComplete: true,
+        cleanupErrors: []
+      })
       const terminal = fixture.snapshot()
       expect({
         shared: terminal.shared.every((value) => value === undefined),
@@ -1756,11 +1766,19 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(after.installations.some(({ installed }) => installed)).toBe(true)
       const hostDispose = fixture.host.dispose()
       expect(fixture.host.dispose()).toBe(hostDispose)
-      await expect(hostDispose).resolves.toBeUndefined()
+      await expect(hostDispose).resolves.toMatchObject({
+        logicalTerminal: true,
+        cleanupComplete: true,
+        cleanupErrors: []
+      })
       const terminalDispose = fixture.host.dispose()
       expect(fixture.host.dispose()).toBe(terminalDispose)
       expect(terminalDispose).toBe(hostDispose)
-      await expect(terminalDispose).resolves.toBeUndefined()
+      await expect(terminalDispose).resolves.toMatchObject({
+        logicalTerminal: true,
+        cleanupComplete: true,
+        cleanupErrors: []
+      })
       const terminal = fixture.snapshot()
       expect({
         shared: terminal.shared.every((value) => value === undefined),
@@ -1906,7 +1924,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(unhandled).toEqual([])
       const hostDispose = fixture.host.dispose()
       expect(fixture.host.dispose()).toBe(hostDispose)
-      await expect(hostDispose).resolves.toBeUndefined()
+      await expect(hostDispose).resolves.toMatchObject({
+        logicalTerminal: true,
+        cleanupComplete: true,
+        cleanupErrors: []
+      })
       expect(fixture.host.dispose()).toBe(hostDispose)
       const terminal = fixture.snapshot()
       expect({
@@ -2001,11 +2023,19 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(after).not.toEqual(before)
       const hostDispose = fixture.host.dispose()
       expect(fixture.host.dispose()).toBe(hostDispose)
-      await expect(hostDispose).resolves.toBeUndefined()
+      await expect(hostDispose).resolves.toMatchObject({
+        logicalTerminal: true,
+        cleanupComplete: true,
+        cleanupErrors: []
+      })
       const terminalDispose = fixture.host.dispose()
       expect(fixture.host.dispose()).toBe(terminalDispose)
       expect(terminalDispose).toBe(hostDispose)
-      await expect(terminalDispose).resolves.toBeUndefined()
+      await expect(terminalDispose).resolves.toMatchObject({
+        logicalTerminal: true,
+        cleanupComplete: true,
+        cleanupErrors: []
+      })
       const terminal = fixture.snapshot()
       const terminalResidue = {
         shared: terminal.shared.map((value) => value === undefined),
@@ -2108,20 +2138,28 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const rollbackErrors = (
       failure as { readonly detail?: { readonly rollbackErrors?: readonly unknown[] } }
     ).detail?.rollbackErrors
-    expect(rollbackErrors).toHaveLength(2)
-    const [laterRollback, resultRollback] = rollbackErrors ?? []
-    expect(laterRollback).toBeInstanceOf(AggregateError)
-    expect(resultRollback).toBeInstanceOf(AggregateError)
-    expect((laterRollback as AggregateError).errors).toEqual([secondCleanup, firstCleanup])
-    expect((resultRollback as AggregateError).errors).toEqual([resultCleanup])
+    expect(rollbackErrors).toHaveLength(3)
+    expect(
+      rollbackErrors?.flatMap((error) =>
+        error instanceof AggregateError ? [...error.errors] : [error]
+      )
+    ).toEqual([secondCleanup, firstCleanup, resultCleanup])
     expect(releases).toEqual(['later-second', 'later-first', 'provider-result'])
     const hostDispose = fixture.host.dispose()
     expect(fixture.host.dispose()).toBe(hostDispose)
-    await expect(hostDispose).resolves.toBeUndefined()
+    await expect(hostDispose).resolves.toMatchObject({
+      logicalTerminal: true,
+      cleanupComplete: true,
+      cleanupErrors: []
+    })
     const terminalDispose = fixture.host.dispose()
     expect(fixture.host.dispose()).toBe(terminalDispose)
     expect(terminalDispose).toBe(hostDispose)
-    await expect(terminalDispose).resolves.toBeUndefined()
+    await expect(terminalDispose).resolves.toMatchObject({
+      logicalTerminal: true,
+      cleanupComplete: true,
+      cleanupErrors: []
+    })
     const terminal = fixture.snapshot()
     expect(terminal).not.toEqual(before)
     const terminalResidue = {
@@ -2780,7 +2818,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     await fixture.install()
     const firstDispose = fixture.host.dispose()
     expect(fixture.host.dispose()).toBe(firstDispose)
-    await expect(firstDispose).resolves.toBeUndefined()
+    await expect(firstDispose).resolves.toMatchObject({
+      logicalTerminal: true,
+      cleanupComplete: true,
+      cleanupErrors: []
+    })
     const terminal = fixture.snapshot()
     expect(terminal.activeSubscriptions).toBe(0)
     expect(terminal.resources).toBe(0)
@@ -5446,7 +5488,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(after.resources).toBe(0)
       const disposePromise = fixture.host.dispose()
       expect(fixture.host.dispose()).toBe(disposePromise)
-      await expect(disposePromise).resolves.toBeUndefined()
+      await expect(disposePromise).resolves.toMatchObject({
+        logicalTerminal: true,
+        cleanupComplete: true,
+        cleanupErrors: []
+      })
       expect(fixture.snapshot()).toEqual(after)
     } finally {
       await fixture.dispose()
@@ -5512,7 +5558,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(after.resources).toBe(0)
       const disposePromise = fixture.host.dispose()
       expect(fixture.host.dispose()).toBe(disposePromise)
-      await expect(disposePromise).resolves.toBeUndefined()
+      await expect(disposePromise).resolves.toMatchObject({
+        logicalTerminal: true,
+        cleanupComplete: true,
+        cleanupErrors: []
+      })
       expect(fixture.snapshot()).toEqual(after)
     } finally {
       await fixture.dispose()
@@ -5585,7 +5635,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(after.resources).toBe(0)
       const disposePromise = fixture.host.dispose()
       expect(fixture.host.dispose()).toBe(disposePromise)
-      await expect(disposePromise).resolves.toBeUndefined()
+      await expect(disposePromise).resolves.toMatchObject({
+        logicalTerminal: true,
+        cleanupComplete: true,
+        cleanupErrors: []
+      })
       expect(fixture.snapshot()).toEqual(after)
     } finally {
       await fixture.dispose()
@@ -7115,7 +7169,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(cleanupTrace).toEqual(['controlled-consumer'])
       const hostDispose = fixture.host.dispose()
       expect(fixture.host.dispose()).toBe(hostDispose)
-      await expect(hostDispose).resolves.toBeUndefined()
+      await expect(hostDispose).resolves.toMatchObject({
+        logicalTerminal: true,
+        cleanupComplete: true,
+        cleanupErrors: []
+      })
       const terminal = fixture.snapshot()
       expect(terminal).not.toEqual(before)
       expect({

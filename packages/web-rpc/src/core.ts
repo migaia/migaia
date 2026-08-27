@@ -105,6 +105,7 @@ export async function createComposedEndpoint<
   })) as IDeferredPreparedEndpoint<TTargetId>
   let kernel: IEndpointKernelHost | undefined
   let host: WebRpcPluginHost | undefined
+  let hostView: import('@migaia/plugin-host').IPluginHostView<WebRpcPluginHost> | undefined
   let construction: ReturnType<typeof createConstructionControl> | undefined
   let prepared: IPreparedEndpoint<TTargetId> | undefined
   let installed: unknown[] = []
@@ -125,12 +126,22 @@ export async function createComposedEndpoint<
       deferred.transport,
       construction,
       (event) => hookEvents.push(event),
-      {},
+      {
+        execution: {
+          mutationTimeoutMs: constructionConfig?.timeoutMs ?? false,
+          pipelineDrainTimeoutMs: constructionConfig?.timeoutMs ?? false
+        }
+      },
       () => rootCleanupErrors
     )
     let activationCommitted = false
     let translatedFeatures: IWebRpcTranslatedPlugin[] = []
-    let activationPreflight: ((state: IWebRpcComposedRuntimeState) => void) | undefined
+    let activationPreflight:
+      | ((
+          state: IWebRpcComposedRuntimeState,
+          host: { readonly getShared: (key: PropertyKey) => unknown }
+        ) => void)
+      | undefined
     const inventory = buildComposedPluginInventory({
       definitions,
       config,
@@ -159,7 +170,7 @@ export async function createComposedEndpoint<
       onRootDisposalErrors: (errors) => {
         rootCleanupErrors = [...rootCleanupErrors, ...errors]
       },
-      onActivationPreflight: (state) => activationPreflight?.(state)
+      onActivationPreflight: (state, getShared) => activationPreflight?.(state, { getShared })
     })
     const descriptors = inventory.map(({ descriptor }) => descriptor)
     publicKeys = [...new Set(descriptors.flatMap((descriptor) => descriptor.claims.publicKeys))]
@@ -175,15 +186,15 @@ export async function createComposedEndpoint<
     const activationKernel = kernel
     if (!activationHost || !activationKernel)
       throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleInvalid)
-    activationPreflight = (state) =>
-      assertPluginClaimParity(claims, descriptors, activationHost, activationKernel, {
+    activationPreflight = (state, candidateHost) =>
+      assertPluginClaimParity(claims, descriptors, candidateHost, activationKernel, {
         activated: state.activated,
         activationPhase: 'pre-activation',
         routeKeys: state.routeKeys,
         translated
       })
-    await host.installBatch(translated.map((item) => item.definition))
-    assertPluginClaimParity(claims, descriptors, host, kernel, {
+    hostView = await host.installBatch(translated.map((item) => item.definition))
+    assertPluginClaimParity(claims, descriptors, hostView, kernel, {
       activated: activationCommitted,
       translated
     })
@@ -264,9 +275,10 @@ export async function createComposedEndpoint<
     (value) => typeof (value as { on?: unknown }).on === 'function'
   ) as { on: IWebRpcEndpoint['on'] } | undefined
   let publicSurface: object
+  let endpointHostDispose: Promise<void> | undefined
   try {
     publicSurface = createEndpointProjection({
-      host: host!,
+      host: hostView?.extensions ?? host!,
       publicKeys,
       exposedKeys,
       on: (...args) => {
@@ -278,7 +290,7 @@ export async function createComposedEndpoint<
         return onOwner.on(args[0] as string, args[1] as Parameters<IWebRpcEndpoint['on']>[1])
       },
       hooks: hookOwner?.hooks,
-      hostDispose: () => host!.dispose(),
+      hostDispose: () => (endpointHostDispose ??= host!.dispose().then(() => undefined)),
       beforeDispose: (endpoint) => {
         const cleanupFaults = readDiscoveryCleanupFaults(endpoint)
         if (!cleanupFaults) return

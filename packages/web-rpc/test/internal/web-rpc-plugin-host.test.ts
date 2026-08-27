@@ -23,7 +23,8 @@ describe('B12a WebRPC PluginHost shell', () => {
       'shell',
       transport,
       createConstructionControl({ signal }),
-      () => undefined
+      () => undefined,
+      { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     )
     const protocolPort: IWebRpcProtocolPort = {
       encode: (value) => value,
@@ -347,7 +348,8 @@ describe('B12a WebRPC PluginHost shell', () => {
         'shell',
         transport,
         createConstructionControl({ signal }),
-        () => undefined
+        () => undefined,
+        { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
       )
     const successEvents: string[] = []
     let subscriptions = 0
@@ -417,7 +419,8 @@ describe('B12a WebRPC PluginHost shell', () => {
       'shell',
       transport,
       createConstructionControl({ signal }),
-      () => undefined
+      () => undefined,
+      { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     )
     host.installBatchSync([
       {
@@ -452,7 +455,7 @@ describe('B12a WebRPC PluginHost shell', () => {
         transport,
         createConstructionControl({ signal }),
         () => undefined,
-        { diagnostic }
+        { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }, diagnostic }
       )
     const rollbackPlugin = (name: string, error: Error): IWebRpcPluginConstraint => ({
       name,

@@ -222,7 +222,7 @@ describe('canonical endpoint projection', () => {
         signal: new AbortController().signal as IWebRpcAbortSignal
       }),
       () => undefined,
-      {},
+      { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
       () => [{ resource: 'resource disposer', error: cleanup }]
     )
     const plugin: IWebRpcPluginConstraint = {
@@ -241,7 +241,7 @@ describe('canonical endpoint projection', () => {
       exposedKeys: [],
       on: () => undefined,
       hooks: Object.freeze({}),
-      hostDispose: () => host.dispose()
+      hostDispose: () => host.dispose() as unknown as Promise<void>
     }) as Readonly<{ readonly dispose: () => Promise<void> }>
     const hostDisposeSpy = vi.spyOn(host, 'dispose')
     try {

@@ -11,10 +11,16 @@ import {
 import type { IWebRpcPlugin, IWebRpcPluginInstallResult } from '../src/typing.js'
 import type { IWebRpcHookEvent } from '../src/typing.js'
 import type { IWebRpcPluginConstraint } from '../src/internal/plugin-contract.js'
+import type { IPluginHostDisposalResult } from '@migaia/plugin-host'
 
 type IObservedHost = {
   readonly config: { readonly get: (path: string) => unknown }
-  readonly dispose: () => Promise<void>
+  readonly dispose: () => Promise<IPluginHostDisposalResult>
+  readonly getShared: (key: PropertyKey) => unknown
+}
+
+type IObservedView = {
+  readonly extensions: Readonly<Record<PropertyKey, unknown>>
   readonly getShared: (key: PropertyKey) => unknown
 }
 
@@ -25,7 +31,7 @@ type IObservedBatch = {
 
 type IObservedDisposal = {
   readonly host: IObservedHost
-  readonly promise: Promise<void>
+  readonly promise: Promise<IPluginHostDisposalResult>
 }
 
 const observed = vi.hoisted(() => ({
@@ -34,7 +40,8 @@ const observed = vi.hoisted(() => ({
   events: [] as string[],
   hookEvents: [] as IWebRpcHookEvent[],
   throwFromHook: false,
-  hosts: [] as IObservedHost[]
+  hosts: [] as IObservedHost[],
+  views: [] as IObservedView[]
 }))
 
 vi.mock('../src/internal/web-rpc-plugin-host.js', async () => {
@@ -60,16 +67,18 @@ vi.mock('../src/internal/web-rpc-plugin-host.js', async () => {
       observed.hosts.push(this)
     }
 
-    override installBatch(plugins: readonly IWebRpcPluginConstraint[]) {
+    override async installBatch(plugins: readonly IWebRpcPluginConstraint[]) {
       observed.events.push('host:installBatch')
       observed.batches.push({
         host: this,
         names: plugins.map((plugin) => plugin.name)
       })
-      return super.installBatch(plugins)
+      const view = await super.installBatch(plugins)
+      observed.views.push(view)
+      return view
     }
 
-    override dispose(): Promise<void> {
+    override dispose(): Promise<IPluginHostDisposalResult> {
       observed.events.push('host:dispose')
       const promise = super.dispose()
       observed.disposals.push({ host: this, promise })
@@ -164,6 +173,7 @@ afterEach(() => {
   observed.hookEvents.length = 0
   observed.throwFromHook = false
   observed.hosts.length = 0
+  observed.views.length = 0
 })
 
 describe('MET-RED-006 PluginHost batch completeness', () => {
@@ -214,9 +224,7 @@ describe('MET-RED-007 Host rollback ownership', () => {
     const primaryFailure = new Error('later batch member failed')
     const failingFeature = createFeatureModule('transaction-failing-feature', async () => {
       const host = observed.hosts[0]
-      observedExtension = host
-        ? Object.getOwnPropertyDescriptor(host, 'transactionExtension')?.value
-        : undefined
+      observedExtension = undefined
       observedShared = host?.getShared(sharedKey)
       throw primaryFailure
     })
@@ -226,8 +234,10 @@ describe('MET-RED-007 Host rollback ownership', () => {
     ).catch((error: unknown) => error)
 
     expect(failure).toBe(primaryFailure)
-    expect(observedShared).toBe(firstValue)
-    expect(observedExtension).toBe(extensionValue)
+    // Async batch publication is atomic: an external Host observer cannot see a candidate
+    // registration before the later member succeeds.
+    expect(observedShared).toBeUndefined()
+    expect(observedExtension).toBeUndefined()
     expect(resourceDisposals).toBe(1)
     expect(featureDisposals).toBe(1)
     expect(observed.hosts).toHaveLength(1)
