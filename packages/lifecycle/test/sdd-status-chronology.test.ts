@@ -244,6 +244,15 @@ const mappings: readonly IStatusMapping[] = [
   }
 ]
 
+/**
+ * Retains the historical cross-SDD chronology audit while its ownership and oracle are reviewed.
+ *
+ * This suite reads ignored workspace-local documents owned by several packages, and currently
+ * couples historical umbrella findings to current package requirement statuses. Its failures must
+ * not be treated as lifecycle runtime or package-acceptance failures until the foundation/SDD
+ * validation owner confirms that this package is the correct owner and that the historical/current
+ * status model is intentional.
+ */
 describe('cross-SDD status chronology', () => {
   it('preserves historical clause chronology after the package current status is verified', () => {
     const foundation = readDocument(
