@@ -12,26 +12,39 @@
 - [序列化（codec）模块](#序列化-codec-模块)
 - [Schema 模块](#schema-模块)
 - [Entity 模块](#entity-模块)
+- [StorageHost 与 plugins](#constructor-first-host-初始化)
+- [Reactive adapter 与 live query](#reactive-adapter-与-live-query)
 - [错误模块](#错误模块)
 - [组合工作流示例](#组合工作流示例)
 - [排查与构建门禁](#排查与构建门禁)
 
-包导出面分两个入口：
+包导出面按职责拆分为根契约、backend、Host、plugin、reactive-adapter、entity、schema 与 serialize 精确子路径：
 
 ```ts
-// 主入口：含 DOM 后端（localStorage/sessionStorage/cookies/indexedDb）+ memoryStorage + 全部扩展点
-import {
-  localStorage,
-  indexedDb,
-  memoryStorage,
-  defineEntity /* ... */
-} from '@migaia/storage-web';
-
-// DOM-free 子路径：只有 memoryStorage，SSR/Node/Worker 环境用，不引入 DOM/IDB 类型
-import { memoryStorage } from '@migaia/storage-web/memory';
+// 按后端与扩展点分别导入，避免把 DOM/IDB 类型拉入无关消费者
+import { localStorage } from '@migaia/storage-web/local-storage'
+import { indexedDb } from '@migaia/storage-web/indexed-db'
+import { memoryStorage } from '@migaia/storage-web/memory'
+import { defineEntity } from '@migaia/storage-web/entity'
 ```
 
-`package.json` 的 `exports` 只声明 `.` 与 `./memory` 两个子路径，其余源码目录（`backends/`、`core/`、`entity/` 等）不是公开导入点。
+`package.json` 的 `exports` 只声明根错误/命名空间契约与各个精确 backend/entity/schema/serialize/host/plugin 子路径，其余源码目录（`backends/`、`core/` 等）不是公开导入点。
+
+### Constructor-first Host 初始化
+
+首次安装使用始终异步的 `createStorageHost({ plugins })`；动态 `host.use(...)` 只用于 Host 已创建后的后续安装。plugin 从精确子路径导入，避免把未选择的 backend 引入调用方模块图。
+
+```ts
+import { createStorageHost } from '@migaia/storage-web/host'
+import { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'
+
+const host = await createStorageHost({
+  plugins: [memoryBackendPlugin({ id: 'cache' })] as const
+})
+const cache = host.backend('cache')
+await cache.set('theme', 'dark')
+await host.dispose()
+```
 
 ---
 
@@ -44,15 +57,15 @@ import { memoryStorage } from '@migaia/storage-web/memory';
 ### `localStorage`
 
 ```ts
-function localStorage(options?: ILocalStorageOptions): ISyncCapableStore<IKeyValueStore>;
+function localStorage(options?: ILocalStorageOptions): ISyncCapableStore<IKeyValueStore>
 
 type ILocalStorageOptions = IWebStorageOptions & {
-  readonly storage?: IWebStorageLike;
-};
+  readonly storage?: IWebStorageLike
+}
 type IWebStorageOptions = {
-  readonly namespace?: string;
-  readonly namespaceCodec?: INamespaceCodec;
-};
+  readonly namespace?: string
+  readonly namespaceCodec?: INamespaceCodec
+}
 ```
 
 - `namespace?: string` —— 默认 `'default'`。构造期校验：必须是非空字符串，否则抛 `StorageError(INVALID_CONFIG)`。同命名空间内的 `keys()`/`clearValues()`/`clearAll()` 互相隔离，不同命名空间的同名 key 互不影响。
@@ -63,13 +76,13 @@ type IWebStorageOptions = {
 
 ```ts
 type IWebStorageLike = {
-  readonly length: number;
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-  clear(): void;
-  key(index: number): string | null;
-};
+  readonly length: number
+  getItem(key: string): string | null
+  setItem(key: string, value: string): void
+  removeItem(key: string): void
+  clear(): void
+  key(index: number): string | null
+}
 ```
 
 **构造期探测**：`createWebStorageBackend` 在返回 store 前，会用 `probeWebStorage` 真实写一次探测 key（`namespacedKey(namespace, '__probe__', ...)`）再删除/还原。Safari 隐私模式下 `localStorage` 对象存在但 `setItem` 抛异常（旧版本 `SecurityError`，新版本 quota=0 的 `QuotaExceededError`），只有真实写入才能可靠探测到这种情况；探测失败立即抛 `StorageError(BACKEND_UNAVAILABLE)`，而不是等到第一次业务写入才发现。若探测 key 原本已存在非空值，探测会退避到一个带时间戳/随机数后缀的临时 key，避免覆盖调用方数据。
@@ -83,6 +96,8 @@ type IWebStorageLike = {
   records: false,
   transactions: false,
   iteration: false,
+  secondaryIndexes: false,
+  changeFeed: false,
   maxValueBytes: 5 * 1024 * 1024, // 近似上限，不是精确配额
   opaqueEntries: false
 }
@@ -94,13 +109,13 @@ type IWebStorageLike = {
 
 ```ts
 type ISyncKeyValueStore = {
-  get(key: string): string | null;
-  set(key: string, value: string, options?: ISyncWriteOptions): void; // { conflictPolicy? }
-  remove(key: string): void;
-  has(key: string): boolean;
-  keys(): string[];
-  clearValues(): void;
-};
+  get(key: string): string | null
+  set(key: string, value: string, options?: ISyncWriteOptions): void // { conflictPolicy? }
+  remove(key: string): void
+  has(key: string): boolean
+  keys(): string[]
+  clearValues(): void
+}
 ```
 
 - `get(key)`：物理 key 不存在返回 `null`。宿主 `getItem` 抛错（例如配额/隐私模式变化）经 `normalizeStorageException` 归一化：quota 类异常 → `QUOTA_EXCEEDED`，其余 → `BACKEND_UNAVAILABLE`。
@@ -118,35 +133,35 @@ type ISyncKeyValueStore = {
 **5 秒可运行示例**：
 
 ```ts
-import { localStorage } from '@migaia/storage-web';
+import { localStorage } from '@migaia/storage-web/local-storage'
 
-const store = localStorage({ namespace: 'settings' });
-await store.set('theme', 'dark');
-console.log(await store.get('theme')); // 'dark'
-store.sync.set('theme', 'light'); // 同步 API，Web Storage 天然同步
-console.log(store.sync.get('theme')); // 'light'
-await store.remove('theme');
-console.log(await store.has('theme')); // false
-await store.dispose();
+const store = localStorage({ namespace: 'settings' })
+await store.set('theme', 'dark')
+console.log(await store.get('theme')) // 'dark'
+store.sync.set('theme', 'light') // 同步 API，Web Storage 天然同步
+console.log(store.sync.get('theme')) // 'light'
+await store.remove('theme')
+console.log(await store.has('theme')) // false
+await store.dispose()
 ```
 
 ### `sessionStorage`
 
 ```ts
-function sessionStorage(options?: ISessionStorageOptions): ISyncCapableStore<IKeyValueStore>;
+function sessionStorage(options?: ISessionStorageOptions): ISyncCapableStore<IKeyValueStore>
 
 type ISessionStorageOptions = IWebStorageOptions & {
-  readonly storage?: IWebStorageLike;
-};
+  readonly storage?: IWebStorageLike
+}
 ```
 
 选项与行为与 `localStorage` **完全一致**，唯一区别是默认注入 `globalThis.sessionStorage` 而非 `globalThis.localStorage`；`backend` 字段为 `'session'`。
 
 ```ts
-import { sessionStorage } from '@migaia/storage-web';
+import { sessionStorage } from '@migaia/storage-web/session-storage'
 
-const store = sessionStorage({ storage: myFakeStorage }); // 测试环境注入
-await store.set('draft', JSON.stringify({ step: 1 }));
+const store = sessionStorage({ storage: myFakeStorage }) // 测试环境注入
+await store.set('draft', JSON.stringify({ step: 1 }))
 ```
 
 ---
@@ -158,22 +173,22 @@ await store.set('draft', JSON.stringify({ step: 1 }));
 源码：`src/backends/cookie.ts`。基于 `document.cookie` 的读写封装，不处理服务端 cookie（SSR 场景由调用方在服务端自行解析 `req.headers.cookie` 后注入 `memoryStorage`）。
 
 ```ts
-function cookies(options?: ICookiesOptions): ISyncCapableStore<ICookieStore>;
+function cookies(options?: ICookiesOptions): ISyncCapableStore<ICookieStore>
 
 type ICookiesOptions = {
-  readonly namespace?: string;
-  readonly namespaceCodec?: INamespaceCodec;
-  readonly scope?: ICookieScope;
-  readonly document?: ICookieDocument; // { cookie: string }
-};
+  readonly namespace?: string
+  readonly namespaceCodec?: INamespaceCodec
+  readonly scope?: ICookieScope
+  readonly document?: ICookieDocument // { cookie: string }
+}
 
 type ICookieScope = {
-  readonly path?: string;
-  readonly domain?: string;
-  readonly sameSite?: 'strict' | 'lax' | 'none';
-  readonly secure?: boolean;
-  readonly partitioned?: boolean;
-};
+  readonly path?: string
+  readonly domain?: string
+  readonly sameSite?: 'strict' | 'lax' | 'none'
+  readonly secure?: boolean
+  readonly partitioned?: boolean
+}
 ```
 
 ### 构造期校验
@@ -194,34 +209,34 @@ type ICookieScope = {
 
 ```ts
 type ICookieStore = Omit<IKeyValueStore, 'set' | 'remove' | 'sync'> & {
-  set(key: string, value: string, ctx?: ICookieWriteContext): Promise<void>;
-  remove(key: string, ctx?: ICookieRemoveContext): Promise<void>;
-  readonly sync?: ISyncCookieStore;
-};
+  set(key: string, value: string, ctx?: ICookieWriteContext): Promise<void>
+  remove(key: string, ctx?: ICookieRemoveContext): Promise<void>
+  readonly sync?: ISyncCookieStore
+}
 
 type ICookieWriteContext = {
-  readonly signal?: IAbortSignal;
-  readonly timeoutMs?: number;
-  readonly expires?: Date;
-  readonly maxAge?: number;
-};
+  readonly signal?: IAbortSignal
+  readonly timeoutMs?: number
+  readonly expires?: Date
+  readonly maxAge?: number
+}
 type ICookieRemoveContext = {
-  readonly signal?: IAbortSignal;
-  readonly timeoutMs?: number;
-};
+  readonly signal?: IAbortSignal
+  readonly timeoutMs?: number
+}
 
 type ISyncCookieStore = {
-  get(key: string): string | null;
+  get(key: string): string | null
   set(
     key: string,
     value: string,
     ctx?: { readonly expires?: Date; readonly maxAge?: number } & ISyncWriteOptions
-  ): void;
-  remove(key: string): void;
-  has(key: string): boolean;
-  keys(): string[];
-  clearValues(): void;
-};
+  ): void
+  remove(key: string): void
+  has(key: string): boolean
+  keys(): string[]
+  clearValues(): void
+}
 ```
 
 - `get(key, ctx?)` / `sync.get(key)`：返回该命名空间下唯一可见的值，找不到返回 `null`。若同一物理 cookie 名同时被多个 scope 写入、导致 `document.cookie` 中出现重复同名条目，抛 `StorageError(COOKIE_SCOPE_AMBIGUOUS)`——**不会**随意返回其中一个，因为无法确定归属。
@@ -251,6 +266,8 @@ type ISyncCookieStore = {
   records: false,
   transactions: false,
   iteration: false,
+  secondaryIndexes: false,
+  changeFeed: false,
   maxValueBytes: 4096,
   opaqueEntries: true
 }
@@ -261,13 +278,13 @@ type ISyncCookieStore = {
 **5 秒可运行示例**：
 
 ```ts
-import { cookies } from '@migaia/storage-web';
+import { cookies } from '@migaia/storage-web/cookies'
 
-const jar = cookies({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } });
-await jar.set('session', 'abc123', { maxAge: 3600 });
-console.log(await jar.get('session')); // 'abc123'
-await jar.remove('session');
-console.log(await jar.get('session')); // null
+const jar = cookies({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })
+await jar.set('session', 'abc123', { maxAge: 3600 })
+console.log(await jar.get('session')) // 'abc123'
+await jar.remove('session')
+console.log(await jar.get('session')) // null
 ```
 
 ---
@@ -279,17 +296,17 @@ console.log(await jar.get('session')); // null
 源码：`src/backends/indexed-db.ts`。是本包中唯一原生支持字节（bytes）、记录（record，structured clone）、事务（transaction）与游标迭代（iteration）的浏览器后端。实现体量最大，下面按选项、生命周期、能力、L0/L1 方法、事务、迭代分别展开。
 
 ```ts
-function indexedDb<TValue = unknown>(options?: IIndexedDbOptions): IRecordStore<TValue>;
+function indexedDb<TValue = unknown>(options?: IIndexedDbOptions): IRecordStore<TValue>
 
 type IIndexedDbOptions = {
-  readonly dbName?: string;
-  readonly kvStoreName?: string;
-  readonly bytesStoreName?: string;
-  readonly recordsStoreName?: string;
-  readonly cleanupLegacyRecords?: boolean;
-  readonly factory?: IDBFactory;
-  readonly keyRange?: typeof IDBKeyRange;
-};
+  readonly dbName?: string
+  readonly kvStoreName?: string
+  readonly bytesStoreName?: string
+  readonly recordsStoreName?: string
+  readonly cleanupLegacyRecords?: boolean
+  readonly factory?: IDBFactory
+  readonly keyRange?: typeof IDBKeyRange
+}
 ```
 
 ### 构造期选项校验
@@ -321,6 +338,8 @@ type IIndexedDbOptions = {
   records: true,
   transactions: true,
   iteration: true,
+  secondaryIndexes: true,
+  changeFeed: coordinationAdmitted, // 同源 coordination transport 成功接纳时才为 true
   maxValueBytes: undefined, // 受磁盘配额约束，无单值硬上限
   opaqueEntries: false
 }
@@ -368,13 +387,13 @@ iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterato
 **可运行示例**：
 
 ```ts
-import { indexedDb } from '@migaia/storage-web';
+import { indexedDb } from '@migaia/storage-web/indexed-db'
 
-const db = indexedDb<{ id: string; name: string }>({ dbName: 'app-data' });
-await db.putRecord({ id: 'ada', name: 'Ada' }, 'ada');
-console.log(await db.getRecord('ada')); // { id: 'ada', name: 'Ada' }
-for await (const [key, value] of db.iterateRecords()) console.log(key, value);
-await db.dispose();
+const db = indexedDb<{ id: string; name: string }>({ dbName: 'app-data' })
+await db.putRecord({ id: 'ada', name: 'Ada' }, 'ada')
+console.log(await db.getRecord('ada')) // { id: 'ada', name: 'Ada' }
+for await (const [key, value] of db.iterateRecords()) console.log(key, value)
+await db.dispose()
 ```
 
 ### 事务：`transaction`
@@ -406,9 +425,9 @@ type ITransactionScope<TValue> = {
 ```ts
 try {
   await db.transaction(async (tx) => {
-    const current = await tx.get('counter');
-    await tx.put((Number(current ?? 0) + 1).toString(), 'counter');
-  });
+    const current = await tx.get('counter')
+    await tx.put((Number(current ?? 0) + 1).toString(), 'counter')
+  })
 } catch (error) {
   if (error instanceof StorageError && error.code === StorageErrorCode.transactionConflict) {
     // 并发写冲突：重读后重试整个回调
@@ -437,7 +456,7 @@ readonly metadata: {
 源码：`src/backends/memory.ts`。
 
 ```ts
-function memoryStorage<TValue = unknown>(): ISyncCapableStore<IRecordStore<TValue>>;
+function memoryStorage<TValue = unknown>(): ISyncCapableStore<IRecordStore<TValue>>
 ```
 
 无入参，无选项。每次调用创建一个独立、进程内、易失的存储，天然隔离，不需要命名空间参数。实现全部 L0（值）+ L1（字节/记录/迭代/事务）接口，`record` 通道使用 `structuredClone` 做深拷贝隔离（因此不能存函数、不可克隆的宿主对象等）。
@@ -451,6 +470,8 @@ function memoryStorage<TValue = unknown>(): ISyncCapableStore<IRecordStore<TValu
   records: true,
   transactions: true,
   iteration: true,
+  secondaryIndexes: false,
+  changeFeed: true,
   maxValueBytes: undefined,
   opaqueEntries: false
 }
@@ -468,14 +489,14 @@ function memoryStorage<TValue = unknown>(): ISyncCapableStore<IRecordStore<TValu
 **可运行示例**：
 
 ```ts
-import { memoryStorage } from '@migaia/storage-web'; // 或 '@migaia/storage-web/memory'
+import { memoryStorage } from '@migaia/storage-web/memory'
 
-const store = memoryStorage<{ id: string }>();
-await store.putRecord({ id: '1' }, '1');
-console.log(await store.getRecord('1')); // { id: '1' }
+const store = memoryStorage<{ id: string }>()
+await store.putRecord({ id: '1' }, '1')
+console.log(await store.getRecord('1')) // { id: '1' }
 await store.transaction(async (tx) => {
-  await tx.put({ id: '2' }, '2');
-});
+  await tx.put({ id: '2' }, '2')
+})
 ```
 
 ---
@@ -487,8 +508,8 @@ await store.transaction(async (tx) => {
 ### `isRecordStore` / `asRecordStore`
 
 ```ts
-function isRecordStore(store: IKeyValueStore): store is IRecordStore;
-function asRecordStore<T = unknown>(store: IKeyValueStore): IRecordStore<T>;
+function isRecordStore(store: IKeyValueStore): store is IRecordStore
+function asRecordStore<T = unknown>(store: IKeyValueStore): IRecordStore<T>
 ```
 
 单参数，均无选项。判定逻辑（`inspectStoreShape`，源自 `@migaia/storage-contract`）：
@@ -500,18 +521,19 @@ function asRecordStore<T = unknown>(store: IKeyValueStore): IRecordStore<T>;
 `isRecordStore` 是类型守卫，返回 `boolean`，读取任何字段抛错时视为 `false`（不上抛）。`asRecordStore` 收窄失败时抛 `StorageContractError(UNSUPPORTED_CAPABILITY)`（`backend` 字段取判定过程中读到的种类，若种类本身不合法则为 `undefined`）。
 
 ```ts
-import { asRecordStore, indexedDb, isRecordStore } from '@migaia/storage-web';
+import { asRecordStore, isRecordStore } from '@migaia/storage-contract'
+import { indexedDb } from '@migaia/storage-web/indexed-db'
 
-const store = indexedDb();
-if (isRecordStore(store)) await store.putRecord({ a: 1 }, 'k');
-const records = asRecordStore(store); // 能力不足时抛 StorageContractError(UNSUPPORTED_CAPABILITY)
+const store = indexedDb()
+if (isRecordStore(store)) await store.putRecord({ a: 1 }, 'k')
+const records = asRecordStore(store) // 能力不足时抛 StorageContractError(UNSUPPORTED_CAPABILITY)
 ```
 
 ### `ConflictPolicy`
 
 ```ts
-const ConflictPolicy: { readonly conflict: 'conflict'; readonly replace: 'replace' };
-type IConflictPolicy = 'conflict' | 'replace';
+const ConflictPolicy: { readonly conflict: 'conflict'; readonly replace: 'replace' }
+type IConflictPolicy = 'conflict' | 'replace'
 ```
 
 常量对象，无调用参数。作用于所有写方法的 `IWriteOptions.conflictPolicy`（默认 `'conflict'`）：一个逻辑 key 同时占用 value / bytes / record 三个通道之一时，若另一通道尝试写入同名 key 且策略为默认的 `'conflict'`，抛 `StorageError(DUPLICATE_KEY, { existingChannel, attemptedChannel })`；显式传 `'replace'` 才会在同一原子写入内先删除其他通道的同名值再写入目标通道。跨通道冲突解析统一由内部 `planChannelWrite`（`src/core/channel-write.ts`）计算：
@@ -524,29 +546,29 @@ function planChannelWrite(
   existing: ReadonlySet<'value' | 'bytes' | 'record'>,
   policy?: IConflictPolicy, // 默认 'conflict'
   backend?: IBackendKind
-): { readonly remove: readonly IStorageChannel[] };
+): { readonly remove: readonly IStorageChannel[] }
 ```
 
 ```ts
-await store.set('k', 'v', { conflictPolicy: ConflictPolicy.replace });
+await store.set('k', 'v', { conflictPolicy: ConflictPolicy.replace })
 ```
 
 ### `lengthPrefixedNamespaceCodec` 与 `INamespaceCodec`
 
 ```ts
 type INamespaceCodec = {
-  encode(namespace: string, key: string): string;
-  decode(namespace: string, physicalKey: string): string | undefined;
-};
-const lengthPrefixedNamespaceCodec: INamespaceCodec;
+  encode(namespace: string, key: string): string
+  decode(namespace: string, physicalKey: string): string | undefined
+}
+const lengthPrefixedNamespaceCodec: INamespaceCodec
 ```
 
 默认物理 key 编码器（`localStorage`/`sessionStorage`/`cookies` 的 `namespaceCodec` 默认值）。编码格式：`sw1:<命名空间 UTF-8 字节长度>:<encodeURIComponent(命名空间)>:<key>`——长度前缀 + 编码后的命名空间共同防止“命名空间 A 的 key 恰好是命名空间 B 前缀”这种碰撞。`decode` 只在物理 key 精确匹配该命名空间时返回原始逻辑 key，否则返回 `undefined`（不属于该命名空间，调用方应跳过而非报错）。
 
 ```ts
-lengthPrefixedNamespaceCodec.encode('app', 'theme'); // 'sw1:3:app:theme'
-lengthPrefixedNamespaceCodec.decode('app', 'sw1:3:app:theme'); // 'theme'
-lengthPrefixedNamespaceCodec.decode('other', 'sw1:3:app:theme'); // undefined
+lengthPrefixedNamespaceCodec.encode('app', 'theme') // 'sw1:3:app:theme'
+lengthPrefixedNamespaceCodec.decode('app', 'sw1:3:app:theme') // 'theme'
+lengthPrefixedNamespaceCodec.decode('other', 'sw1:3:app:theme') // undefined
 ```
 
 自定义 `INamespaceCodec`（传给 `namespaceCodec` 选项）需要保证 `encode`/`decode` 互为逆运算且不同命名空间不产生物理 key 碰撞；自定义 codec 自行承担迁移与防碰撞责任，库不做二次校验（仅校验 `encode`/`decode` 是否为函数、返回值类型是否正确——`encode` 必须返回 `string`，`decode` 必须返回 `string | undefined`，否则经 `normalizeError` 归一化为 `StorageError(EXTENSION_FAILED, { extensionStage: 'codec' })`）。
@@ -557,67 +579,69 @@ lengthPrefixedNamespaceCodec.decode('other', 'sw1:3:app:theme'); // undefined
 
 ```ts
 type IKeyValueStore = {
-  readonly backend: IBackendKind; // 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory'
-  readonly capabilities: IStorageCapabilities;
-  get(key: string, ctx?: IOperationContext): Promise<string | null>;
-  set(key: string, value: string, ctx?: IWriteOptions): Promise<void>;
-  remove(key: string, ctx?: IOperationContext): Promise<void>;
-  has(key: string, ctx?: IOperationContext): Promise<boolean>;
-  keys(ctx?: IOperationContext): Promise<string[]>;
-  clearValues(ctx?: IOperationContext): Promise<void>;
-  clearAll(ctx?: IOperationContext): Promise<void>;
-  dispose(): Promise<void>;
-  readonly sync?: ISyncKeyValueStore; // 仅同步后端提供
-};
+  readonly backend: IBackendKind // 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory'
+  readonly capabilities: IStorageCapabilities
+  get(key: string, ctx?: IOperationContext): Promise<string | null>
+  set(key: string, value: string, ctx?: IWriteOptions): Promise<void>
+  remove(key: string, ctx?: IOperationContext): Promise<void>
+  has(key: string, ctx?: IOperationContext): Promise<boolean>
+  keys(ctx?: IOperationContext): Promise<string[]>
+  clearValues(ctx?: IOperationContext): Promise<void>
+  clearAll(ctx?: IOperationContext): Promise<void>
+  dispose(): Promise<void>
+  readonly sync?: ISyncKeyValueStore // 仅同步后端提供
+}
 
 type IRecordStore<TValue = unknown> = IKeyValueStore & {
-  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;
-  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;
-  clearBytes(ctx?: IOperationContext): Promise<void>;
-  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;
-  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;
-  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;
-  clearRecords(ctx?: IOperationContext): Promise<void>;
+  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>
+  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>
+  clearBytes(ctx?: IOperationContext): Promise<void>
+  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>
+  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>
+  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>
+  clearRecords(ctx?: IOperationContext): Promise<void>
   readonly metadata?: {
-    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>;
-    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>;
-    delete(key: string, ctx?: IOperationContext): Promise<void>;
-  };
+    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>
+    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>
+    delete(key: string, ctx?: IOperationContext): Promise<void>
+  }
   iterateRecords(
     range?: IKeyRange,
     ctx?: IOperationContext
-  ): AsyncIterableIterator<[IStorageKey, TValue]>;
+  ): AsyncIterableIterator<[IStorageKey, TValue]>
   transaction<T>(
     run: (tx: ITransactionScope<TValue>) => Promise<T>,
     ctx?: IOperationContext
-  ): Promise<T>;
-};
+  ): Promise<T>
+}
 
 type IStorageCapabilities = {
-  readonly syncRead: boolean;
-  readonly binary: boolean;
-  readonly records: boolean;
-  readonly transactions: boolean;
-  readonly iteration: boolean;
-  readonly maxValueBytes: number | undefined;
-  readonly opaqueEntries: boolean;
-};
+  readonly syncRead: boolean
+  readonly binary: boolean
+  readonly records: boolean
+  readonly transactions: boolean
+  readonly iteration: boolean
+  readonly secondaryIndexes: boolean
+  readonly changeFeed: boolean
+  readonly maxValueBytes: number | undefined
+  readonly opaqueEntries: boolean
+}
 
 type IOperationContext = {
-  readonly signal?: IAbortSignal; // 协作式取消
-  readonly timeoutMs?: number; // 内部合成为 signal；与外部 signal 同时存在时取先触发者
-  readonly pageSize?: number; // IndexedDB 游标分页大小，默认 128
-};
-type IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy };
-type ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy };
+  readonly signal?: IAbortSignal // 协作式取消
+  readonly timeoutMs?: number // 内部合成为 signal；与外部 signal 同时存在时取先触发者
+  readonly pageSize?: number // IndexedDB 游标分页大小，默认 128
+}
+type IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy }
+type ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy }
 
-type IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[];
+type IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[]
 type IKeyRange = {
-  readonly lower?: IStorageKey;
-  readonly lowerOpen?: boolean;
-  readonly upper?: IStorageKey;
-  readonly upperOpen?: boolean;
-};
+  readonly lower?: IStorageKey
+  readonly lowerOpen?: boolean
+  readonly upper?: IStorageKey
+  readonly upperOpen?: boolean
+}
 ```
 
 **Key 域限制**（`KEY_DOMAIN_LIMITS`，来自 `@migaia/storage-contract`）：`maxDepth: 32`（嵌套数组最大深度）、`maxNodes: 4096`（校验期间遍历的节点总数上限）、`maxBinaryBytes: 1024 * 1024`（`ArrayBuffer` 作为 key 时的最大字节数）。超出任一限制，或 key 是空数组、包含循环引用、类型不在 `IStorageKey` 联合内，`assertStorageKey`/`snapshotStorageKey` 抛 `StorageContractError(INVALID_KEY)`。
@@ -626,11 +650,11 @@ type IKeyRange = {
 
 ```ts
 type ITransactionScope<TValue = unknown> = {
-  get(key: IStorageKey): Promise<TValue | undefined>;
-  put(value: TValue, key?: IStorageKey, options?: ITransactionWriteOptions): Promise<IStorageKey>;
-  delete(key: IStorageKey): Promise<void>;
-};
-type ITransactionWriteOptions = { readonly conflictPolicy?: IConflictPolicy };
+  get(key: IStorageKey): Promise<TValue | undefined>
+  put(value: TValue, key?: IStorageKey, options?: ITransactionWriteOptions): Promise<IStorageKey>
+  delete(key: IStorageKey): Promise<void>
+}
+type ITransactionWriteOptions = { readonly conflictPolicy?: IConflictPolicy }
 ```
 
 ---
@@ -641,17 +665,17 @@ type ITransactionWriteOptions = { readonly conflictPolicy?: IConflictPolicy };
 
 ```ts
 type ICodec<TValue = unknown, TRaw = unknown> = {
-  readonly name: string;
-  readonly output: 'text' | 'structured' | 'binary';
-  encode(value: TValue, ctx?: IOperationContext): Promise<TRaw>;
-  decode(raw: TRaw, ctx?: IOperationContext): Promise<TValue>;
-};
+  readonly name: string
+  readonly output: 'text' | 'structured' | 'binary'
+  encode(value: TValue, ctx?: IOperationContext): Promise<TRaw>
+  decode(raw: TRaw, ctx?: IOperationContext): Promise<TValue>
+}
 ```
 
 ### `jsonCodec`
 
 ```ts
-const jsonCodec: ICodec<unknown, string>;
+const jsonCodec: ICodec<unknown, string>
 ```
 
 默认 codec，零依赖，全后端可用。`output: 'text'`。
@@ -660,33 +684,33 @@ const jsonCodec: ICodec<unknown, string>;
 - `decode(raw)`：`JSON.parse(raw)`；抛错归一化为 `StorageError(DESERIALIZE_FAILED)`。
 
 ```ts
-await jsonCodec.encode({ a: 1 }); // '{"a":1}'
-await jsonCodec.decode('{"a":1}'); // { a: 1 }
-await jsonCodec.encode(undefined); // 'null'
+await jsonCodec.encode({ a: 1 }) // '{"a":1}'
+await jsonCodec.decode('{"a":1}') // { a: 1 }
+await jsonCodec.encode(undefined) // 'null'
 ```
 
 ### `structuredCodec`
 
 ```ts
-const structuredCodec: ICodec<unknown, unknown>;
+const structuredCodec: ICodec<unknown, unknown>
 ```
 
 `output: 'structured'`。`encode`/`decode` 都是恒等函数（`async (value) => value`），完全交给后端自身的 structured clone（IndexedDB）。只能用于 `capabilities.records === true` 的后端；可直接存 `Blob`/`File`/`ArrayBuffer`/`Map`/`Set`/`Date`，甚至循环引用——这些结构无法用 JSON 表达。
 
 ```ts
-await structuredCodec.encode({ date: new Date(), blob: myBlob }); // 原样返回
+await structuredCodec.encode({ date: new Date(), blob: myBlob }) // 原样返回
 ```
 
 ### `binaryCodec`
 
 ```ts
-const binaryCodec: ICodec<Uint8Array, Uint8Array>;
+const binaryCodec: ICodec<Uint8Array, Uint8Array>
 ```
 
 `output: 'binary'`。`encode`/`decode` 均校验入参是 `Uint8Array`（`isUint8Array`），不是则分别抛 `SERIALIZE_FAILED`/`DESERIALIZE_FAILED`；类型正确时原样返回（不拷贝）。
 
 ```ts
-await binaryCodec.encode(new Uint8Array([1, 2, 3])); // 原样返回（仅校验类型）
+await binaryCodec.encode(new Uint8Array([1, 2, 3])) // 原样返回（仅校验类型）
 ```
 
 ### `selectCodec`
@@ -696,12 +720,12 @@ function selectCodec(
   codec: ICodec,
   capabilities: IStorageCapabilities,
   onDiagnostic?: (message: string) => void
-): ISelectedCodec;
+): ISelectedCodec
 
 type ISelectedCodec = {
-  encode(value: unknown, ctx?: { signal?: IAbortSignal }): Promise<string | Uint8Array | unknown>;
-  decode(raw: string | Uint8Array | unknown, ctx?: { signal?: IAbortSignal }): Promise<unknown>;
-};
+  encode(value: unknown, ctx?: { signal?: IAbortSignal }): Promise<string | Uint8Array | unknown>
+  decode(raw: string | Uint8Array | unknown, ctx?: { signal?: IAbortSignal }): Promise<unknown>
+}
 ```
 
 - `codec`（必填）：经 `snapshotCodec` 校验为合法的 `ICodec` 描述符（`name`/`output`/`encode`/`decode` 齐备），否则抛契约级 `INVALID_ARGUMENT`。
@@ -715,15 +739,17 @@ type ISelectedCodec = {
 3. 其余情况（`output === 'text'`，或已经匹配能力的 `binary`/`structured`）原样直连返回。
 
 ```ts
-import { binaryCodec, selectCodec, sessionStorage, memoryStorage } from '@migaia/storage-web';
+import { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'
+import { sessionStorage } from '@migaia/storage-web/session-storage'
+import { memoryStorage } from '@migaia/storage-web/memory'
 
-const textOnly = sessionStorage();
-const selected = selectCodec(binaryCodec, textOnly.capabilities, (msg) => console.warn(msg));
-await selected.encode(new Uint8Array([1, 2, 3])); // base64 字符串，触发一次诊断
+const textOnly = sessionStorage()
+const selected = selectCodec(binaryCodec, textOnly.capabilities, (msg) => console.warn(msg))
+await selected.encode(new Uint8Array([1, 2, 3])) // base64 字符串，触发一次诊断
 
-const recordBackend = memoryStorage();
-const direct = selectCodec(binaryCodec, recordBackend.capabilities);
-await direct.encode(new Uint8Array([1, 2, 3])); // 原样透传，无降级
+const recordBackend = memoryStorage()
+const direct = selectCodec(binaryCodec, recordBackend.capabilities)
+await direct.encode(new Uint8Array([1, 2, 3])) // 原样透传，无降级
 ```
 
 ---
@@ -734,12 +760,12 @@ await direct.encode(new Uint8Array([1, 2, 3])); // 原样透传，无降级
 
 ```ts
 type ISchemaAdapter<TDomain, TStored = TDomain> = {
-  readonly name: string;
-  validate(value: unknown, ctx?: IOperationContext): Promise<TDomain>;
-  encode?(value: TDomain, ctx?: IOperationContext): Promise<TStored>;
-  decode?(raw: TStored, ctx?: IOperationContext): Promise<TDomain>;
-  normalize?(value: TDomain, ctx?: IOperationContext): Promise<TDomain>;
-};
+  readonly name: string
+  validate(value: unknown, ctx?: IOperationContext): Promise<TDomain>
+  encode?(value: TDomain, ctx?: IOperationContext): Promise<TStored>
+  decode?(raw: TStored, ctx?: IOperationContext): Promise<TDomain>
+  normalize?(value: TDomain, ctx?: IOperationContext): Promise<TDomain>
+}
 ```
 
 Schema 层是面向开发者的开放契约，不绑定任何校验库，也不强制使用。`encode`/`decode` 处理**领域表示**（例如 `Date` ↔ ISO 字符串、内部字段裁剪），与 codec 处理的**存储格式**（对象 ↔ 字符串/字节）分工不同。执行顺序：写入 `validate → normalize → encode → codec.encode`，读取 `codec.decode → decode → validate`（`validateOnRead` 为 `true` 时）。
@@ -747,20 +773,20 @@ Schema 层是面向开发者的开放契约，不绑定任何校验库，也不�
 ### `passthrough`
 
 ```ts
-function passthrough<T = unknown>(): ISchemaAdapter<T, T>;
+function passthrough<T = unknown>(): ISchemaAdapter<T, T>
 ```
 
 无参数（泛型指定类型）。零校验直接透传，返回 `{ name: 'passthrough', validate: async (value) => value as T }`；不提供 `encode`/`decode`/`normalize`（均视为恒等）。这是 `defineEntity` 未传 `schema` 选项时的默认值。
 
 ```ts
-const schema = passthrough<{ id: string }>();
-await schema.validate({ id: 'x' }); // { id: 'x' }（不做任何检查）
+const schema = passthrough<{ id: string }>()
+await schema.validate({ id: 'x' }) // { id: 'x' }（不做任何检查）
 ```
 
 ### `fromStandardSchema`
 
 ```ts
-function fromStandardSchema<T>(schema: IStandardSchemaV1<unknown, T>): ISchemaAdapter<T, T>;
+function fromStandardSchema<T>(schema: IStandardSchemaV1<unknown, T>): ISchemaAdapter<T, T>
 ```
 
 单参数 `schema`（必填），无选项。适配任意实现 [Standard Schema](https://standardschema.dev) v1 规范的库（zod ≥3.24、valibot ≥1.0、arktype ≥2.0）——本包不 import 任何一家，也不把它们列为 peerDependency，只依赖 `schema['~standard']` 上的 `version`/`vendor`/`validate` 三个字段。
@@ -774,12 +800,12 @@ function fromStandardSchema<T>(schema: IStandardSchemaV1<unknown, T>): ISchemaAd
 - `name` 为 `` `standard-schema:${vendor}` ``（例如 `'standard-schema:zod'`）。
 
 ```ts
-import { z } from 'zod';
-import { fromStandardSchema } from '@migaia/storage-web';
+import { z } from 'zod'
+import { fromStandardSchema } from '@migaia/storage-web/schema'
 
-const schema = fromStandardSchema(z.object({ id: z.string() }));
+const schema = fromStandardSchema(z.object({ id: z.string() }))
 try {
-  await schema.validate({ id: 42 });
+  await schema.validate({ id: 42 })
 } catch (error) {
   // StorageError(VALIDATION_FAILED)，cause.message 是各条 issue 用 '; ' 拼接的结果
 }
@@ -794,14 +820,14 @@ function runMigrations(
   toVersion: number,
   migrations: Record<number, IMigration> | undefined,
   signal?: IAbortSignal
-): Promise<unknown>;
+): Promise<unknown>
 
-type IMigration = (previous: unknown, ctx: IMigrationContext) => Promise<unknown>;
+type IMigration = (previous: unknown, ctx: IMigrationContext) => Promise<unknown>
 type IMigrationContext = {
-  readonly fromVersion: number;
-  readonly toVersion: number;
-  readonly signal?: IAbortSignal;
-};
+  readonly fromVersion: number
+  readonly toVersion: number
+  readonly signal?: IAbortSignal
+}
 ```
 
 按版本升序执行迁移函数链，独立于 entity 层可单独调用。
@@ -815,13 +841,13 @@ type IMigrationContext = {
 - 迁移函数执行抛错（非取消类）归一化为 `StorageError(MIGRATION_FAILED)`；取消（`UtilsAbortError` 或已中止信号）归一化为契约级 `ABORTED`。
 
 ```ts
-import { runMigrations } from '@migaia/storage-web';
+import { runMigrations } from '@migaia/storage-web/schema'
 
 await runMigrations(oldValue, 1, 3, {
   2: async (value) => ({ ...(value as object), addedInV2: true }),
   3: async (value) => ({ ...(value as object), addedInV3: true })
   // 缺失版本号对应的迁移不会报错，只是原样透传
-});
+})
 ```
 
 ---
@@ -835,25 +861,25 @@ await runMigrations(oldValue, 1, 3, {
 ```ts
 function defineEntity<TDomain, TStored = TDomain>(
   options: IEntityOptions<TDomain, TStored>
-): IEntityDefinition<TDomain>;
+): IEntityDefinition<TDomain>
 
 type IEntityDefinition<TDomain> = {
-  readonly name: string;
-  readonly version: number;
-  connect(store: IKeyValueStore): IRepository<TDomain>;
-};
+  readonly name: string
+  readonly version: number
+  connect(store: IKeyValueStore): IRepository<TDomain>
+}
 
 type IEntityOptions<TDomain, TStored = TDomain> = {
-  readonly name: string;
-  readonly key: Extract<keyof TDomain, string>;
-  readonly schema?: ISchemaAdapter<TDomain, TStored>;
-  readonly codec?: ICodec<unknown, unknown>;
-  readonly version?: number;
-  readonly migrations?: Record<number, IMigration>;
-  readonly validateOnRead?: boolean;
-  readonly onDiagnostic?: (message: string) => void;
-  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number;
-};
+  readonly name: string
+  readonly key: Extract<keyof TDomain, string>
+  readonly schema?: ISchemaAdapter<TDomain, TStored>
+  readonly codec?: ICodec<unknown, unknown>
+  readonly version?: number
+  readonly migrations?: Record<number, IMigration>
+  readonly validateOnRead?: boolean
+  readonly onDiagnostic?: (message: string) => void
+  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number
+}
 ```
 
 声明式定义一类记录（record）。`connect(store)` 把定义绑定到具体后端，产出可反复调用 `get`/`put`/`remove`/`list`/`stream`/`migrate`/`batch` 的仓储（repository）对象。同一个 definition 可以 `connect` 到多个后端，行为在两者上保持一致；同一个 `store` 实例也可以被多个 entity definition 共用（内部会把 entity 名编入实际存储 key，避免不同 entity 的同 `id` 记录互相覆盖）。
@@ -872,35 +898,35 @@ type IEntityOptions<TDomain, TStored = TDomain> = {
 **`codec` 选项的延迟决策**：未显式提供时，`defineEntity` 本身不会默认成任何具体 codec（不能默认成 `jsonCodec`，因为结构化后端与 KV 后端的合理默认不同，且只有 `connect(store)` 时才知道实际连接的是哪种后端）。真正的默认值由 `createRepository` 在 `connect` 阶段决定：结构化后端（IndexedDB/memory，`isRecordStore(store) === true`）默认 `structuredCodec`；KV-only 后端（local/session/cookie）默认 `jsonCodec`。显式提供的 `codec` 会在 `connect` 阶段经 `selectCodec` 按后端能力选路，不会被结构化后端“绕过”默认值逻辑。
 
 ```ts
-type IPreference = { id: string; theme: 'light' | 'dark' };
+type IPreference = { id: string; theme: 'light' | 'dark' }
 
 const definition = defineEntity<IPreference>({
   name: 'preferences',
   key: 'id',
   version: 2,
   migrations: { 2: async (previous) => ({ ...(previous as { id: string }), theme: 'light' }) }
-});
+})
 
-const preferences = definition.connect(indexedDb({ dbName: 'app-data' }));
-await preferences.put({ id: 'appearance', theme: 'dark' });
-console.log(await preferences.get('appearance')); // { id: 'appearance', theme: 'dark' }
+const preferences = definition.connect(indexedDb({ dbName: 'app-data' }))
+await preferences.put({ id: 'appearance', theme: 'dark' })
+console.log(await preferences.get('appearance')) // { id: 'appearance', theme: 'dark' }
 ```
 
 ### `IRepository<TDomain>`（`connect(store)` 的返回值）
 
 ```ts
 type IRepository<TDomain> = {
-  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>;
-  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>;
-  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>;
-  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>;
-  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>;
-  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>;
+  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>
+  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>
+  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>
+  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>
+  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>
+  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>
   batch<T>(
     run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,
     ctx?: IOperationContext
-  ): Promise<T>;
-};
+  ): Promise<T>
+}
 ```
 
 `connect(store)` 本身会校验 `store` 是否实现最小 `IKeyValueStore` 契约（`backend` 是已知种类、`capabilities` 各布尔字段齐全、L0 全部方法存在），不满足抛 `StorageError(INVALID_CONFIG)`。
@@ -923,19 +949,19 @@ type IRepository<TDomain> = {
 
 ```ts
 type IListOptions<TRecord = unknown> = {
-  readonly range?: IKeyRange;
-  readonly limit?: number;
-  readonly orderBy?: (left: TRecord, right: TRecord) => number;
+  readonly range?: IKeyRange
+  readonly limit?: number
+  readonly orderBy?: (left: TRecord, right: TRecord) => number
   readonly onInvalid?:
-    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw');
-};
+    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')
+}
 type IInvalidRecordIssue<TRecord = unknown> = {
-  readonly key: IStorageKey;
-  readonly raw: unknown;
-  readonly record?: TRecord;
-  readonly stage: 'decode' | 'migrate' | 'validate';
-  readonly cause: unknown;
-};
+  readonly key: IStorageKey
+  readonly raw: unknown
+  readonly record?: TRecord
+  readonly stage: 'decode' | 'migrate' | 'validate'
+  readonly cause: unknown
+}
 ```
 
 - `range`：作用于原始 `id` 空间（不是编排后的物理 key），经 `snapshotKeyRange` 校验。
@@ -949,18 +975,18 @@ type IInvalidRecordIssue<TRecord = unknown> = {
 
 ```ts
 type IMigrateOptions<TRecord = unknown> = {
-  readonly batchSize?: number; // 默认 100，正安全整数
+  readonly batchSize?: number // 默认 100，正安全整数
   readonly onInvalid?:
-    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw');
-};
+    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')
+}
 type IMigrateResult = {
-  readonly scanned: number;
-  readonly eligible: number;
-  readonly migrated: number;
-  readonly skipped: number;
-  readonly alreadyCurrent: number;
-  readonly conflicted: number;
-};
+  readonly scanned: number
+  readonly eligible: number
+  readonly migrated: number
+  readonly skipped: number
+  readonly alreadyCurrent: number
+  readonly conflicted: number
+}
 ```
 
 批量把库中全部记录升级到当前 entity `version`（同时把历史存储形态的记录搬迁为 v2 key 形态）。返回值各字段：`scanned`（扫描到的记录总数）、`eligible`（版本低于当前、需要迁移的记录数）、`migrated`（成功迁移的记录数）、`skipped`（因 `onInvalid` 策略被跳过的坏记录数）、`alreadyCurrent`（扫描时已经是当前版本，无需迁移）、`conflicted`（结构化后端事务提交冲突后，逐条重试仍失败/让位给并发写入的记录数）。
@@ -970,18 +996,18 @@ type IMigrateResult = {
 - 记录解码/迁移/校验失败时按 `onInvalid` 策略处理，逻辑与 `list`/`stream` 一致（`skip` 计入 `skipped`，`throw` 直接抛出对应错误码并中断整个 `migrate()` 调用）。
 
 ```ts
-const result = await preferences.migrate({ batchSize: 200, onInvalid: 'skip' });
-console.log(result.migrated, result.conflicted, result.alreadyCurrent);
+const result = await preferences.migrate({ batchSize: 200, onInvalid: 'skip' })
+console.log(result.migrated, result.conflicted, result.alreadyCurrent)
 ```
 
 #### `batch(run, ctx?)`
 
 ```ts
 type IEntityTransactionScope<TDomain> = {
-  get(id: IStorageKey): Promise<TDomain | undefined>;
-  put(value: TDomain): Promise<IStorageKey>;
-  remove(id: IStorageKey): Promise<void>;
-};
+  get(id: IStorageKey): Promise<TDomain | undefined>
+  put(value: TDomain): Promise<IStorageKey>
+  remove(id: IStorageKey): Promise<void>
+}
 ```
 
 仅结构化后端（有真正事务）支持；`run` 收到的 `scope` 是对底层 `ITransactionScope` 的封装，内部替调用方完成 envelope 编解码与物理 key 编排。**KV-only 后端（local/session/cookie）调用 `batch` 会抛 `StorageContractError(UNSUPPORTED_CAPABILITY)`**——这些后端没有原生事务，不做“伪事务”模拟以免给出错误的原子性假象。`scope` 内的读写共享同一份乐观并发检测（见 IndexedDB/memoryStorage 章节的事务语义），整个回调作为一个原子单元提交，冲突时抛 `TRANSACTION_CONFLICT`。
@@ -989,22 +1015,171 @@ type IEntityTransactionScope<TDomain> = {
 ```ts
 const orders = defineEntity<{ id: string; total: number }>({ name: 'orders', key: 'id' }).connect(
   indexedDb()
-);
+)
 
 const applyBatch = async (items: Array<{ id: string; total: number }>): Promise<void> => {
   try {
     await orders.batch(async (tx) => {
-      for (const item of items) await tx.put(item);
-    });
+      for (const item of items) await tx.put(item)
+    })
   } catch (error) {
     if (error instanceof StorageError && error.code === StorageErrorCode.transactionConflict) {
-      await applyBatch(items); // 并发冲突：重读后重试整个回调
+      await applyBatch(items) // 并发冲突：重读后重试整个回调
     } else {
-      throw error;
+      throw error
     }
   }
-};
+}
 ```
+
+### 二级索引
+
+索引属于 entity 定义，不属于某个 backend schema。为保留索引名称与查询 key 的精确推导，带索引的实体使用 curried 声明形式：
+
+```ts
+type IUser = {
+  id: string
+  email: string
+  profile: { city: string }
+  tags: readonly string[]
+}
+
+const users = defineEntity<IUser>()({
+  name: 'users',
+  key: 'id',
+  indexes: {
+    byEmail: { path: 'email', unique: true },
+    byCityAndEmail: { paths: ['profile.city', 'email'] },
+    byTag: { path: 'tags', multiEntry: true },
+    byNormalizedEmail: {
+      revision: 1,
+      unique: true,
+      select: (user) => ({ kind: 'single', key: user.email.toLowerCase() })
+    }
+  }
+}).connect(indexedDb({ dbName: 'app-data' }))
+
+const ada = await users.findBy('byEmail', 'ada@example.com')
+const london = await users.findManyBy('byCityAndEmail', {
+  lower: ['London', ''],
+  upper: ['London', '\uffff']
+})
+for await (const user of users.streamBy('byTag', { lower: 'compiler', upper: 'compiler' })) {
+  console.log(user.id)
+}
+```
+
+索引形态：
+
+- `{ path, unique?, multiEntry?, revision? }`：单一路径；`multiEntry: true` 将数组的每个元素投影成独立 key。
+- `{ paths, unique?, revision? }`：compound key；`multiEntry` 必须为 `false` 或省略。
+- `{ select, unique?, revision }`：自定义 selector；必须显式提高 `revision` 才能使持久化投影失效并重建。
+
+`findBy` 返回第一条或 `undefined`；`findManyBy` 返回数组；`streamBy` 保持异步迭代。`list`/`stream` 也接受带 `index` 的判别式选项。IndexedDB 把投影维护在固定 sidecar 中，并在 record 写入、删除和迁移事务内原子更新；其 `secondaryIndexes` 为 `true`。其他后端使用同一个投影与比较语义做 fallback，不虚报原生能力。unique 冲突在提交前失败，不能留下 record 与 sidecar 不一致的半提交。
+
+---
+
+<a id="constructor-first-host-初始化"></a>
+
+## StorageHost 与 plugins
+
+### 创建、安装与查询 backend
+
+```ts
+import { createStorageHost } from '@migaia/storage-web/host'
+import { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'
+import { indexedDbBackendPlugin } from '@migaia/storage-web/plugins/indexed-db'
+
+const host = await createStorageHost({
+  installTimeoutMs: 30_000,
+  plugins: [
+    memoryBackendPlugin({ id: 'cache' }),
+    indexedDbBackendPlugin({ id: 'primary', dbName: 'app-data' })
+  ] as const
+})
+
+host.backend('cache') // 精确推导 memory store
+host.backend('primary') // 精确推导 IndexedDB record store
+host.hasBackend('cache')
+host.backends() // mutation-incapable snapshot
+```
+
+内置 plugin 子路径及默认 ID：
+
+| 子路径                    | factory                       | 默认 ID      |
+| ------------------------- | ----------------------------- | ------------ |
+| `plugins/memory`          | `memoryBackendPlugin`         | `memory`     |
+| `plugins/local-storage`   | `localStorageBackendPlugin`   | `local`      |
+| `plugins/session-storage` | `sessionStorageBackendPlugin` | `session`    |
+| `plugins/cookies`         | `cookieBackendPlugin`         | `cookies`    |
+| `plugins/indexed-db`      | `indexedDbBackendPlugin`      | `indexed-db` |
+
+`createStorageHost({ plugins })` 是首次安装入口且始终异步；后续才用 `await host.use(...)`。literal plugin tuple 会把 ID 精确映射到 store 类型，并在编译期拒绝重复 ID；运行时仍会对伪造 handle、重复 provider、错误 feature 拓扑和失效 store 做 fail-closed 校验。一个 batch 只有全部 create/prepare/plugin install 成功后才原子发布 registry；失败会 rollback 已接纳资源，不暴露半安装 backend。
+
+`installTimeoutMs` 默认 30 秒，作用于整个安装 batch；`scheduler` 可注入确定性时间；`report` 只接收 late rejection/cleanup 等诊断，reporter 自己失败不会覆盖主错误。安装中再次 `use()` 会抛 `STORAGE_HOST_BUSY`。
+
+### Dispose
+
+`host.dispose()` 同步关闭新 admission，取消正在安装的 batch，等待已接纳 mutation/query quiescent，再按 PluginHost/lifecycle 所有权释放 adapter、store 和 transport。它是幂等的：同一 tick 的重复调用返回同一个 Promise。dispose 后的 `backend`、`use`、`liveQuery` 等调用都失败，不会复活 Host；cleanup 错误被聚合且原始 cause 保持可达。
+
+---
+
+<a id="reactive-adapter-与-live-query"></a>
+
+## Reactive adapter 与 live query
+
+### 内置 reactive plugin
+
+五个 canonical reactive factory 位于 `plugins/reactive/*`：`memoryReactive`、`localStorageReactive`、`sessionStorageReactive`、`cookiesReactive`、`indexedDbReactive`。它们同时创建 backend 并安装该 backend 的唯一 reactive adapter；普通 `*BackendPlugin` 不携带 reactive capability。
+
+```ts
+import { createRuntime } from '@migaia/reactive'
+import { createStorageHost } from '@migaia/storage-web/host'
+import { indexedDbReactive } from '@migaia/storage-web/plugins/reactive/indexed-db'
+
+const runtime = createRuntime()
+const host = await createStorageHost({
+  plugins: [indexedDbReactive({ id: 'primary', dbName: 'app-data' })] as const
+})
+
+const handle = host.reactiveBackend('primary')
+const query = host.liveQuery({
+  backendId: 'primary',
+  runtime,
+  scope: 'users',
+  query: ({ store, signal }) => store.getRecord(['users', 'ada'], { signal }),
+  matches: (change) => change.scope === 'users',
+  keepPreviousData: true,
+  timeoutMs: 5_000,
+  report: (error) => console.error('late reactive failure', error)
+})
+
+await query.ready
+console.log(query.state.value)
+await query.refresh()
+await query.dispose()
+await host.dispose()
+```
+
+`ILiveQuery`：
+
+- `state` 是同一 `@migaia/reactive` runtime 上的只读 computed projection，状态为 `loading | ready | refreshing | error | disposed`。
+- `ready` 在首个 generation 成功或失败 settlement 后结束；不会因为后续 refresh 改变身份。
+- `refresh()` 请求新 generation；旧 generation 的 late settlement 不得覆盖新值。
+- `keepPreviousData: true` 在刷新时保留旧值并进入 `refreshing`。
+- `equals(previous, next)` 可阻止语义相同的值替换可见 projection；回调失败走 `report` 并保持可追溯。
+- `signal` 取消整个 query；`timeoutMs` 是每个 generation 的 deadline。
+- `scope` 和 `matches(change)` 只做安全失效过滤；无法证明无关的 change 会保守 refresh。
+- `dispose()` 关闭 refresh admission、取消当前 generation、释放 subscription；幂等且等待已接纳工作结束。
+
+`query.consistency` 冻结 adapter 的实际承诺：
+
+- memory：instance-local push。
+- local/session storage：浏览器事件或 polling 驱动的 eventual visibility，受文档/顶层上下文边界限制。
+- cookies：只能观察 JS 可见 cookie，HttpOnly 永远不可见。
+- IndexedDB：commit-after change feed 加同源协调；内部写入提交后才 invalidation，跨上下文为 eventual，不承诺捕获绕过本库的任意 raw writer。
+
+自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`，但必须把 adapter 绑定到同一个 opaque backend-kind token。该 API 只定义 storage-domain 的 source/visibility；generation、refresh、取消、quiescence 和 fanout 仍分别由 Resource、lifecycle 与 event-subscriber 持有，不允许自建第二套状态机或资源注册表。
 
 ---
 
@@ -1013,40 +1188,39 @@ const applyBatch = async (items: Array<{ id: string; total: number }>): Promise<
 ## 错误模块
 
 ```ts
+import { StorageError, StorageErrorCode } from '@migaia/storage-web'
 import {
-  StorageError,
-  StorageErrorCode,
   StorageContractError,
   StorageContractErrorCode,
   isStorageContractError
-} from '@migaia/storage-web';
+} from '@migaia/storage-contract'
 ```
 
 ### `StorageError`
 
 ```ts
 class StorageError extends Error {
-  readonly source: '@migaia/storage-web';
-  readonly code: IStorageErrorCode;
-  readonly backend?: IBackendKind;
-  readonly key?: string | IStorageKey;
-  readonly existingChannel?: 'value' | 'bytes' | 'record';
-  readonly attemptedChannel?: 'value' | 'bytes' | 'record';
-  readonly extensionStage?: 'schema' | 'codec' | 'migration' | 'comparator' | 'diagnostic';
-  readonly operation?: string;
+  readonly source: '@migaia/storage-web'
+  readonly code: IStorageErrorCode
+  readonly backend?: IBackendKind
+  readonly key?: string | IStorageKey
+  readonly existingChannel?: 'value' | 'bytes' | 'record'
+  readonly attemptedChannel?: 'value' | 'bytes' | 'record'
+  readonly extensionStage?: 'schema' | 'codec' | 'migration' | 'comparator' | 'diagnostic'
+  readonly operation?: string
   constructor(
     code: IStorageErrorCode,
     details?: {
-      readonly backend?: IBackendKind;
-      readonly key?: string | IStorageKey;
-      readonly existingChannel?: 'value' | 'bytes' | 'record';
-      readonly attemptedChannel?: 'value' | 'bytes' | 'record';
-      readonly extensionStage?: 'schema' | 'codec' | 'migration' | 'comparator' | 'diagnostic';
-      readonly operation?: string;
-      readonly cause?: unknown;
+      readonly backend?: IBackendKind
+      readonly key?: string | IStorageKey
+      readonly existingChannel?: 'value' | 'bytes' | 'record'
+      readonly attemptedChannel?: 'value' | 'bytes' | 'record'
+      readonly extensionStage?: 'schema' | 'codec' | 'migration' | 'comparator' | 'diagnostic'
+      readonly operation?: string
+      readonly cause?: unknown
     },
     message?: string
-  );
+  )
 }
 ```
 
@@ -1072,9 +1246,35 @@ class StorageError extends Error {
 | `cookieScopeAmbiguous` | `COOKIE_SCOPE_AMBIGUOUS` | Cookie 同名多 scope 可见，无法确定目标值归属                                           |
 | `invalidConfig`        | `INVALID_CONFIG`         | Web adapter 专有输入/配置校验失败（选项形状、cookie scope、IndexedDB store 名等）      |
 
+V4 索引、Host 与 reactive 追加错误码：
+
+| 常量                           | 值                                | 调用方处置                                                               |
+| ------------------------------ | --------------------------------- | ------------------------------------------------------------------------ |
+| `indexOrphan`                  | `INDEX_ORPHAN`                    | sidecar 指向的 authoritative record 不存在；修复或重建索引。             |
+| `indexUniqueConflict`          | `INDEX_UNIQUE_CONFLICT`           | unique key 已属于另一记录；修改值或删除竞争记录后重试。                  |
+| `indexQueryInvalidated`        | `INDEX_QUERY_INVALIDATED`         | 分页期间 epoch 改变；从头重启查询。                                      |
+| `indexBackfillStale`           | `INDEX_BACKFILL_STALE`            | owner/generation/checkpoint 已过期；重新取得 repository session 后重试。 |
+| `backendIdInvalid`             | `BACKEND_ID_INVALID`              | 修正 backend ID。                                                        |
+| `backendDuplicate`             | `BACKEND_DUPLICATE`               | 使用不同 ID，或等待既有安装完成。                                        |
+| `backendNotInstalled`          | `BACKEND_NOT_INSTALLED`           | 安装并选择精确 ID；没有隐式 default。                                    |
+| `backendPluginInvalid`         | `BACKEND_PLUGIN_INVALID`          | 修复 plugin/store 契约或伪造 handle。                                    |
+| `backendInstallFailed`         | `BACKEND_INSTALL_FAILED`          | 检查 `cause`；失败 batch 未发布，可修复后重试。                          |
+| `storageHostBusy`              | `STORAGE_HOST_BUSY`               | 等当前安装 batch settle 后显式重试。                                     |
+| `storageHostDisposed`          | `STORAGE_HOST_DISPOSED`           | Host 已 terminal；创建新 Host。                                          |
+| `storageHostDisposeFailed`     | `STORAGE_HOST_DISPOSE_FAILED`     | Host 仍 terminal；检查 aggregate cleanup errors。                        |
+| `liveQueryDisposed`            | `LIVE_QUERY_DISPOSED`             | query 已 terminal；创建新 query。                                        |
+| `liveQueryDisposeFailed`       | `LIVE_QUERY_DISPOSE_FAILED`       | 检查 `AggregateError.errors`；不得复活 query。                           |
+| `reactiveFeatureInvalid`       | `REACTIVE_FEATURE_INVALID`        | 修复 feature 与 opaque backend kind 的绑定。                             |
+| `reactiveTopologyInvalid`      | `REACTIVE_TOPOLOGY_INVALID`       | 修复未知、重复或循环 feature graph。                                     |
+| `reactiveServiceNotInstalled`  | `REACTIVE_SERVICE_NOT_INSTALLED`  | 安装 reactive plugin 后再创建 query。                                    |
+| `reactiveAdapterNotInstalled`  | `REACTIVE_ADAPTER_NOT_INSTALLED`  | 选择已安装且 reactive 的 backend ID。                                    |
+| `reactiveAdapterFailed`        | `REACTIVE_ADAPTER_FAILED`         | 观察 query error；后续 invalidation/poll 可触发恢复。                    |
+| `reactiveAdapterDisposeFailed` | `REACTIVE_ADAPTER_DISPOSE_FAILED` | adapter 已 terminal；检查 cleanup errors。                               |
+| `backendDisposeFailed`         | `BACKEND_DISPOSE_FAILED`          | backend 已 terminal；检查 quiescence/transport cleanup errors。          |
+
 ```ts
 try {
-  await store.set('k', 'v', { conflictPolicy: ConflictPolicy.conflict });
+  await store.set('k', 'v', { conflictPolicy: ConflictPolicy.conflict })
 } catch (error) {
   if (error instanceof StorageError && error.code === StorageErrorCode.duplicateKey) {
     // error.backend / error.key / error.existingChannel / error.attemptedChannel 均可读
@@ -1086,18 +1286,18 @@ try {
 
 ```ts
 class StorageContractError extends Error {
-  readonly source: '@migaia/storage-contract';
-  readonly code: IStorageContractErrorCode;
+  readonly source: '@migaia/storage-contract'
+  readonly code: IStorageContractErrorCode
   // 结构与 StorageError 相似（backend/key/cause 等），但错误码集合不同
 }
 const StorageContractErrorCode: {
-  readonly invalidArgument: 'INVALID_ARGUMENT';
-  readonly invalidKey: 'INVALID_KEY';
-  readonly unsupported: 'UNSUPPORTED_CAPABILITY';
-  readonly disposed: 'STORE_DISPOSED';
-  readonly aborted: 'ABORTED';
-};
-function isStorageContractError(value: unknown): value is StorageContractError;
+  readonly invalidArgument: 'INVALID_ARGUMENT'
+  readonly invalidKey: 'INVALID_KEY'
+  readonly unsupported: 'UNSUPPORTED_CAPABILITY'
+  readonly disposed: 'STORE_DISPOSED'
+  readonly aborted: 'ABORTED'
+}
+function isStorageContractError(value: unknown): value is StorageContractError
 ```
 
 | 常量              | 值                       | 触发场景                                                                                                               |
@@ -1119,10 +1319,12 @@ function isStorageContractError(value: unknown): value is StorageContractError;
 ### 1. IndexedDB + Standard Schema + 版本迁移
 
 ```ts
-import { z } from 'zod';
-import { defineEntity, fromStandardSchema, indexedDb } from '@migaia/storage-web';
+import { z } from 'zod'
+import { defineEntity } from '@migaia/storage-web/entity'
+import { fromStandardSchema } from '@migaia/storage-web/schema'
+import { indexedDb } from '@migaia/storage-web/indexed-db'
 
-const UserV2 = z.object({ id: z.string(), email: z.string(), verified: z.boolean() });
+const UserV2 = z.object({ id: z.string(), email: z.string(), verified: z.boolean() })
 
 const users = defineEntity({
   name: 'users',
@@ -1130,11 +1332,11 @@ const users = defineEntity({
   schema: fromStandardSchema(UserV2),
   version: 2,
   migrations: { 2: async (previous) => ({ ...(previous as object), verified: false }) }
-}).connect(indexedDb({ dbName: 'app-data' }));
+}).connect(indexedDb({ dbName: 'app-data' }))
 
-await users.put({ id: 'ada', email: 'ada@example.com', verified: true });
-const result = await users.migrate({ batchSize: 200, onInvalid: 'skip' });
-console.log(result.migrated, result.conflicted);
+await users.put({ id: 'ada', email: 'ada@example.com', verified: true })
+const result = await users.migrate({ batchSize: 200, onInvalid: 'skip' })
+console.log(result.migrated, result.conflicted)
 ```
 
 ### 2. 取消与超时
@@ -1142,11 +1344,12 @@ console.log(result.migrated, result.conflicted);
 `IOperationContext.signal`/`timeoutMs` 在所有异步方法上一致生效；同时提供两者时取先触发者。取消/超时统一以契约级 `StorageContractError(ABORTED)` 结束等待，已进入原子提交阶段的写不会被伪报回滚。
 
 ```ts
-import { indexedDb, isStorageContractError, StorageContractErrorCode } from '@migaia/storage-web';
+import { indexedDb } from '@migaia/storage-web/indexed-db'
+import { isStorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 
-const db = indexedDb();
+const db = indexedDb()
 try {
-  await db.putRecord({ id: '1' }, '1', { timeoutMs: 50 });
+  await db.putRecord({ id: '1' }, '1', { timeoutMs: 50 })
 } catch (error) {
   if (isStorageContractError(error) && error.code === StorageContractErrorCode.aborted) {
     // 50ms 内未完成
@@ -1157,25 +1360,28 @@ try {
 ### 3. KV-only 后端上做能力检查后再决定用记录还是值
 
 ```ts
-import { asRecordStore, cookies, isRecordStore, memoryStorage } from '@migaia/storage-web';
+import { asRecordStore, isRecordStore } from '@migaia/storage-contract'
+import { cookies } from '@migaia/storage-web/cookies'
+import { memoryStorage } from '@migaia/storage-web/memory'
 
-const primary = cookies({ scope: { path: '/', secure: true, sameSite: 'lax' } });
-const fallback = memoryStorage();
-const store = isRecordStore(primary) ? asRecordStore(primary) : fallback;
+const primary = cookies({ scope: { path: '/', secure: true, sameSite: 'lax' } })
+const fallback = memoryStorage()
+const store = isRecordStore(primary) ? asRecordStore(primary) : fallback
 // cookies 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorage 分支
 ```
 
 ### 4. 命名空间隔离 + 显式 replace 冲突策略
 
 ```ts
-import { ConflictPolicy, localStorage } from '@migaia/storage-web';
+import { ConflictPolicy } from '@migaia/storage-contract'
+import { localStorage } from '@migaia/storage-web/local-storage'
 
-const teamA = localStorage({ namespace: 'team-a' });
-const teamB = localStorage({ namespace: 'team-b' });
-await teamA.set('config', '{}');
-await teamB.set('config', '{}'); // 不同命名空间，互不冲突
+const teamA = localStorage({ namespace: 'team-a' })
+const teamB = localStorage({ namespace: 'team-b' })
+await teamA.set('config', '{}')
+await teamB.set('config', '{}') // 不同命名空间，互不冲突
 
-await teamA.clearValues(); // 只清 team-a 命名空间下的键，team-b 不受影响
+await teamA.clearValues() // 只清 team-a 命名空间下的键，team-b 不受影响
 ```
 
 ---
@@ -1194,7 +1400,7 @@ await teamA.clearValues(); // 只清 team-a 命名空间下的键，team-b 不�
 - **`defineEntity` 抛 `INVALID_CONFIG`（migration graph 相关）**：`version > 1` 时 `migrations` 必须完整覆盖第 2 到 `version` 的每一步，不能有缺口——这与 `runMigrations()` 独立调用时“缺失即 no-op”的宽容策略不同。
 - **`selectCodec`/`entity` 遇到 structured codec 抛 `UNSUPPORTED_CAPABILITY`**：目标后端 `capabilities.records === false`（KV-only），structured clone 能力（Blob/Map/Set/循环引用）无法用 JSON 无损表达，库不做静默降级；改用 `jsonCodec` 并自行处理不可 JSON 化的字段，或换成结构化后端。
 - **二进制值在 KV-only 后端体积膨胀 33%**：`selectCodec` 对 `binaryCodec` 在 text-only 后端上的必然行为（base64 编码），会经 `onDiagnostic` 报告一次；只有换成 IndexedDB/memoryStorage 才能避免。
-- **需要跨标签页订阅存储变化**：本包不暴露 `storage` 事件；订阅属于上层状态管理职责，不在本包范围内。
+- **需要跨标签页刷新查询**：不要直接消费宿主 `storage`/`BroadcastChannel` 事件；安装对应 `*Reactive` plugin 并使用 `liveQuery`。一致性以 `query.consistency.visibility` 为准：它是 eventual requery hint，不是跨设备复制或任意 raw writer 的强一致事件流。
 
 ```bash
 pnpm --filter @migaia/storage-web run fmt
