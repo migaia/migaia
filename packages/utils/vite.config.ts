@@ -16,7 +16,10 @@ export default defineConfig({
         'object-path': 'src/object-path.ts',
         typing: 'src/typing.ts',
         config: 'src/config.ts',
-        function: 'src/function.ts'
+        function: 'src/function.ts',
+        value: 'src/value.ts',
+        string: 'src/string.ts',
+        number: 'src/number.ts'
       },
       formats: ['es'],
       fileName: (_format, entryName) => `${entryName}.js`

@@ -17,7 +17,13 @@ export const UtilsErrorCode = {
   configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED',
   configPathInvalid: 'CONFIG_PATH_INVALID',
   /** The supplied string or tuple cannot safely identify an object path. */
-  objectPathInvalid: 'OBJECT_PATH_INVALID'
+  objectPathInvalid: 'OBJECT_PATH_INVALID',
+  /** Template syntax, placeholder boundaries, or a resolved value cannot be formatted safely. */
+  formatInvalid: 'FORMAT_INVALID',
+  /** Strict template formatting could not resolve one requested placeholder path. */
+  formatValueMissing: 'FORMAT_VALUE_MISSING',
+  /** Intl rejected a locale, number-format option, currency, or numeric value. */
+  numberFormatInvalid: 'NUMBER_FORMAT_INVALID'
 } as const
 
 export type IUtilsErrorCode = (typeof UtilsErrorCode)[keyof typeof UtilsErrorCode]

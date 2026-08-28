@@ -987,6 +987,16 @@ await request.catch(() => undefined);
 
 ---
 
+## `/value`、`/string`、`/number` 高频工具
+
+`isEmptyValue` 只把 `null`、`undefined`、空白字符串和 `NaN` 判为空；`0`、`0n`、`false`、数组和对象保持有效。`isPrimitive` 覆盖 JavaScript 七类 primitive，不生成额外类型标签。
+
+`format(source, values, options?)` 使用线性扫描替换 `{path}`，嵌套路径只读取 own property；缺失值默认保留占位符。`options.placeholder` 可配置 `{ open, close }`，`missing` 可选 `preserve | empty | throw`，`nullish` 可选 `empty | stringify`。双写边界字符用于输出字面量边界。
+
+`formatNumber`、`formatCurrency`、`formatPercent`、`formatInteger`、`formatCompactNumber` 共享一个 64 项有界 `Intl.NumberFormat` 缓存。高频表格、行情或库存循环使用 `createNumberFormatter(options)`，避免每项重复解析配置。所有 locale、币种、精度和舍入规则由调用方显式拥有。
+
+---
+
 <a id="排查与构建门禁"></a>
 
 ## 排查与构建门禁
