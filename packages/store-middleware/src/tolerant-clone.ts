@@ -21,32 +21,48 @@ export type IClonePolicyMode = 'immutable' | 'opaque' | 'diagnostic'
 import { createStoreMiddlewareError } from './errors.js'
 import { StoreMiddlewareErrorCode } from './error-code.js'
 import { StoreMiddlewareErrorText } from './error-text.js'
+import {
+  identitySnapshot,
+  immutableSnapshot,
+  structuredDiagnosticSnapshot
+} from '@migaia/utils/object'
+import { UtilsErrorCode } from '@migaia/utils/error'
 
 /**
  * Real independent copy, or throw. Prefers `structuredClone`; the engine not having it at all is
  * itself a reason to refuse rather than guess.
  */
 export function immutableSnapshotClone<T>(value: T): T {
-  if (typeof structuredClone !== 'function') {
-    throw createStoreMiddlewareError(
-      StoreMiddlewareErrorCode.envUnsupported,
-      StoreMiddlewareErrorText.immutableClone
-    )
-  }
   try {
-    return structuredClone(value)
+    return immutableSnapshot(value)
   } catch (error) {
+    const errorCode =
+      typeof error === 'object' && error !== null && 'code' in error
+        ? (error as { readonly code?: unknown }).code
+        : undefined
+    if (errorCode === UtilsErrorCode.envUnsupported)
+      throw createStoreMiddlewareError(
+        StoreMiddlewareErrorCode.envUnsupported,
+        StoreMiddlewareErrorText.immutableClone
+      )
+    const cause =
+      errorCode === UtilsErrorCode.cloneUnsupported &&
+      typeof error === 'object' &&
+      error !== null &&
+      'cause' in error
+        ? (error as { readonly cause?: unknown }).cause
+        : error
     throw createStoreMiddlewareError(
       StoreMiddlewareErrorCode.cloneUnsupported,
       StoreMiddlewareErrorText.cloneUnsupported,
-      { cause: error }
+      { cause }
     )
   }
 }
 
 /** No copy. The returned value is the same reference — the caller has opted out of independence. */
 export function opaqueReferenceClone<T>(value: T): T {
-  return value
+  return identitySnapshot(value)
 }
 
 /**
@@ -63,63 +79,7 @@ export function opaqueReferenceClone<T>(value: T): T {
  * around it still gets a real, independent copy.
  */
 export function diagnosticClone<T>(value: T): T {
-  if (typeof structuredClone === 'function') {
-    try {
-      return structuredClone(value)
-    } catch {
-      // Something in the tree is not cloneable — fall through to the
-      // recursive fallback, which isolates exactly that value by reference
-      // instead of giving up on the whole tree.
-    }
-  }
-  return fallbackClone(value, new WeakMap()) as T
-}
-
-function fallbackClone(value: unknown, seen: WeakMap<object, unknown>): unknown {
-  if (value === null || typeof value !== 'object') return value
-  const cached = seen.get(value)
-  if (cached !== undefined) return cached
-
-  if (Array.isArray(value)) {
-    const output: unknown[] = []
-    seen.set(value, output)
-    for (const item of value) output.push(fallbackClone(item, seen))
-    return output
-  }
-
-  // Anything that isn't a plain object (Map, Set, Date, RegExp, a class
-  // instance, a Proxy, a host object) is exactly the kind of value
-  // structuredClone already tried and this codec cannot safely reconstruct.
-  // Keep it by reference rather than inventing a lossy plain-object stand-in
-  // that silently drops its prototype, accessors, and methods.
-  const prototype = Object.getPrototypeOf(value)
-  if (prototype !== Object.prototype && prototype !== null) return value
-
-  const output: Record<PropertyKey, unknown> = Object.create(prototype)
-  seen.set(value, output)
-  for (const key of Reflect.ownKeys(value)) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, key)
-    if (!descriptor || !descriptor.enumerable) continue
-    // An accessor descriptor has no `value` — structuredClone itself reads
-    // (not preserves) an accessor's current value into a plain data
-    // property on the clone. Matching that instead of skipping the key
-    // outright keeps this fallback path from silently dropping the
-    // property when the primary path would have kept its value.
-    const raw =
-      'value' in descriptor ? descriptor.value : (value as Record<PropertyKey, unknown>)[key]
-    const cloned = fallbackClone(raw, seen)
-    if (key === '__proto__') {
-      Object.defineProperty(output, key, {
-        value: cloned,
-        enumerable: true,
-        writable: true,
-        configurable: true
-      })
-    } else {
-      output[key] = cloned
-    }
-  }
-  return output
+  return structuredDiagnosticSnapshot(value).value
 }
 
 export const ClonePolicy = {
