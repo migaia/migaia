@@ -25,6 +25,7 @@ export { snapshotStorageCapabilities, isStorageCapabilities } from './capabiliti
 export type { ICodec, ICodecOutput } from './codec.js'
 
 export type {
+  IKeyValueStoreAdmission,
   IKeyValueStore,
   ISyncKeyValueStore,
   IRecordStore,
@@ -35,6 +36,7 @@ export {
   asRecordStore,
   isRecordStore,
   snapshotKeyValueStore,
+  snapshotKeyValueStoreDetailed,
   snapshotRecordStore
 } from './store.js'
 

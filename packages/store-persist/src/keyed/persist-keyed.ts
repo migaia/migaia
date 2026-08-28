@@ -1,6 +1,6 @@
 import type { IAtomStore, IWritableAtomDefinition } from '@migaia/store-keyed'
 import { persistUnit } from '../core/persist-unit.js'
-import type { ICodec } from '@migaia/storage-web'
+import type { ICodec } from '@migaia/storage-contract'
 import type { IPersistStorage, IPersistUnit } from '../core/types.js'
 import { snapshotPersistOptions, assertPersistString } from '../core/options.js'
 import { createStorePersistTypeError } from '../errors.js'

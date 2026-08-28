@@ -71,6 +71,14 @@ export const structuredEntityRange = (
   upper: [entityName, []]
 })
 
+/** Build a valid IndexedDB range for legacy entity keys without admitting canonical v2 keys. */
+export const legacyEntityRange = (
+  entityName: string
+): { readonly lower: IStorageKey; readonly upper: IStorageKey } => ({
+  lower: [entityName],
+  upper: [entityName, '\uffff']
+})
+
 /**
  * 把调用方提供的 range（作用于原始 id 空间）与 entity 前缀复合，结果恒为 `[entityName, ...]` 形状。调用方传入的 lower/upper 只会被当作 id
  * 部分 使用，不可能被拼成跨 entity 的复合键——即使调用方误传一个本就带 entityName 前缀的复合键，外层也会再包一层 `[entityName, [entityName,

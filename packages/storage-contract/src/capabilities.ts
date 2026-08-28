@@ -16,9 +16,15 @@ export type IStorageCapabilities = {
   readonly opaqueEntries: boolean
 }
 
-/** Snapshot a capability descriptor once; invalid or throwing accessors return undefined. */
-export const snapshotStorageCapabilities = (value: unknown): IStorageCapabilities | undefined => {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+export type IStorageCapabilitiesInspection = {
+  readonly value: IStorageCapabilities | undefined
+  readonly cause: unknown
+}
+
+/** Inspect capability accessors once while retaining a hostile getter failure for boundary owners. */
+const inspectStorageCapabilities = (value: unknown): IStorageCapabilitiesInspection => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    return { value: undefined, cause: undefined }
   const candidate = value as Record<string, unknown>
   let syncRead: unknown
   let binary: unknown
@@ -39,8 +45,8 @@ export const snapshotStorageCapabilities = (value: unknown): IStorageCapabilitie
     opaqueEntries = candidate.opaqueEntries
     secondaryIndexes = candidate.secondaryIndexes
     changeFeed = candidate.changeFeed
-  } catch {
-    return undefined
+  } catch (cause) {
+    return { value: undefined, cause }
   }
   if (
     [syncRead, binary, records, transactions, iteration, opaqueEntries].some(
@@ -53,18 +59,29 @@ export const snapshotStorageCapabilities = (value: unknown): IStorageCapabilitie
         !Number.isSafeInteger(maxValueBytes) ||
         maxValueBytes < 0))
   )
-    return undefined
+    return { value: undefined, cause: undefined }
   return {
-    syncRead: syncRead as boolean,
-    binary: binary as boolean,
-    records: records as boolean,
-    transactions: transactions as boolean,
-    iteration: iteration as boolean,
-    maxValueBytes: maxValueBytes as number | undefined,
-    opaqueEntries: opaqueEntries as boolean,
-    secondaryIndexes: secondaryIndexes === undefined ? false : (secondaryIndexes as boolean),
-    changeFeed: changeFeed === undefined ? false : (changeFeed as boolean)
+    value: {
+      syncRead: syncRead as boolean,
+      binary: binary as boolean,
+      records: records as boolean,
+      transactions: transactions as boolean,
+      iteration: iteration as boolean,
+      maxValueBytes: maxValueBytes as number | undefined,
+      opaqueEntries: opaqueEntries as boolean,
+      secondaryIndexes: secondaryIndexes === undefined ? false : (secondaryIndexes as boolean),
+      changeFeed: changeFeed === undefined ? false : (changeFeed as boolean)
+    },
+    cause: undefined
   }
+}
+
+/** Return capability facts and preserve the exact accessor failure for a composing guard. */
+export const snapshotStorageCapabilitiesDetailed = inspectStorageCapabilities
+
+/** Snapshot a capability descriptor once; invalid or throwing accessors return undefined. */
+export const snapshotStorageCapabilities = (value: unknown): IStorageCapabilities | undefined => {
+  return inspectStorageCapabilities(value).value
 }
 
 /** Validate the complete runtime capability descriptor shared by public boundaries. */

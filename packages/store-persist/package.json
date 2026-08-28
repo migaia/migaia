@@ -37,17 +37,19 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
     "lint": "oxlint src test",
-    "test": "vitest run test"
+    "test": "vitest run test",
+    "test:packed": "pnpm run build && node test/packed-export-smoke.mjs"
   },
   "dependencies": {
     "@migaia/reactive": "workspace:^",
-    "@migaia/storage-web": "workspace:^",
+    "@migaia/storage-contract": "workspace:^",
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
     "@migaia/store-indexed": "workspace:^",
     "@migaia/store-keyed": "workspace:^",
     "@migaia/store-light": "workspace:^",
+    "@migaia/storage-web": "workspace:^",
     "typescript": "~6.0.2",
     "vitest": "4.1.10"
   },

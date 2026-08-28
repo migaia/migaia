@@ -47,6 +47,7 @@ import type { ICodec } from '../serialize/types.js'
 import type { ISelectedCodec } from '../serialize/registry.js'
 import type {
   IEntityTransactionScope,
+  IIndexedListOptions,
   IInvalidRecordHandler,
   IListOptions,
   IInvalidRecordAction,
@@ -56,8 +57,10 @@ import type {
 } from './types.js'
 import type { ISnapshotEntityIndexes } from './index-projection.js'
 import { projectEntityIndexes } from './index-projection.js'
+import { safeJsonPayloadByteLength } from '../utils/json.js'
 import {
   asIndexedDbBackfillStore,
+  IndexedDbBackfillPhase,
   isBackfillContentionFailure,
   type IIndexedDbBackfillPreparation
 } from '../backends/indexed-db-backfill.js'
@@ -74,18 +77,6 @@ type IEnvelope = { readonly __v: number; readonly data: unknown }
 type IStageFailure = Error & {
   readonly stage: IStorageRecordStage
   readonly cause: unknown
-}
-
-/** Estimate the decoded entity payload for the backend-owned one-batch soft cap. */
-const estimateBackfillDecodedBytes = (value: unknown): number => {
-  try {
-    const serialized = JSON.stringify(value)
-    if (serialized === undefined) return 0
-    if (typeof TextEncoder === 'function') return new TextEncoder().encode(serialized).byteLength
-    return serialized.length * 2
-  } catch {
-    return Number.MAX_SAFE_INTEGER
-  }
 }
 
 type IWriteTarget = { readonly documentKey?: IStorageKey; readonly flatKey?: string }
@@ -222,10 +213,14 @@ const idOf = <TDomain>(
   return id
 }
 
-export const createRepository = <TDomain, TStored>(
+export const createRepository = <
+  TDomain,
+  TStored,
+  TIndexes extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>
+>(
   config: IRepositoryConfig<TDomain, TStored>,
   store: IKeyValueStore
-): IRepository<TDomain> => {
+): IRepository<TDomain, TIndexes> => {
   assertKeyValueStore(store)
   const {
     name,
@@ -272,66 +267,124 @@ export const createRepository = <TDomain, TStored>(
     const allowComplete =
       migrationState?.status === StorageMigrationStatus.complete &&
       migrationState.schemaFingerprint === migrationFingerprint
-    const session = await capability.openBackfillSession(
+    let session = await capability.openBackfillSession(
       handle,
-      { range: repositoryEntityRange(name), allowComplete },
+      {
+        range: repositoryEntityRange(name),
+        // Legacy keys can contain arbitrarily nested valid array IDs; the backend scans bounded
+        // pages and this preparation classifies entity ownership without a lossy prefix range.
+        legacyRange: undefined,
+        includeLegacy: true,
+        allowComplete
+      },
       ctx
     )
+    let sessionReleased = false
     try {
-      await session.renew(ctx)
-      const batch = await session.readBatch(ctx, {
-        prepare: async (candidate): Promise<IIndexedDbBackfillPreparation> => {
-          await session.renew(ctx)
-          const runtime = createStorageOperationRuntime()
-          let domain: TDomain | undefined
-          try {
-            const envelope = await decodeEnvelope(candidate.raw, ctx, runtime)
-            domain = await materialize(envelope, ctx, runtime)
-          } catch (cause) {
-            emitDiagnostic(
-              `[storage-web] entity "${name}" skipped invalid index backfill record ${String(candidate.key)}: ${String(cause)}`
-            )
-            return { decodedBytes: 0, outcome: 'skipped' }
+      let finished = false
+      while (!finished) {
+        await session.renew(ctx)
+        const batch = await session.readBatch(ctx, {
+          prepare: async (candidate): Promise<IIndexedDbBackfillPreparation> => {
+            await session.renew(ctx)
+            const runtime = createStorageOperationRuntime()
+            let domain: TDomain | undefined
+            try {
+              if (candidate.phase === IndexedDbBackfillPhase.legacy) {
+                const canonicalId = decodeRepositoryKey(name, candidate.key)
+                const legacyId =
+                  Array.isArray(candidate.key) &&
+                  candidate.key.length === 2 &&
+                  candidate.key[0] === name &&
+                  (typeof candidate.key[1] === 'string' || Array.isArray(candidate.key[1]))
+                    ? (candidate.key[1] as IStorageKey)
+                    : undefined
+                if (canonicalId === undefined && legacyId === undefined)
+                  return { decodedBytes: 0, outcome: 'skipped', counted: false }
+                if (canonicalId !== undefined)
+                  return { decodedBytes: 0, outcome: 'skipped', counted: false }
+                if (legacyId !== undefined) {
+                  const id = legacyId
+                  const canonicalRaw = await recordStore!.getRecord(
+                    composeRepositoryKey(name, id),
+                    ctx
+                  )
+                  if (canonicalRaw !== undefined)
+                    return { decodedBytes: 0, outcome: 'skipped', counted: false }
+                }
+              }
+              const envelope = await decodeEnvelope(candidate.raw, ctx, runtime)
+              domain = await materialize(envelope, ctx, runtime)
+            } catch (cause) {
+              emitDiagnostic(
+                `[storage-web] entity "${name}" skipped invalid index backfill record ${String(candidate.key)}: ${String(cause)}`
+              )
+              return { decodedBytes: 0, outcome: 'skipped' }
+            }
+            return {
+              decodedBytes: safeJsonPayloadByteLength(domain),
+              outcome: domain === undefined ? 'skipped' : 'indexed',
+              projection:
+                domain === undefined
+                  ? undefined
+                  : projectEntityIndexes(config.indexes, domain, store.backend)
+            }
           }
-          return {
-            decodedBytes: estimateBackfillDecodedBytes(domain),
-            outcome: domain === undefined ? 'skipped' : 'indexed',
-            projection:
-              domain === undefined
-                ? undefined
-                : projectEntityIndexes(config.indexes, domain, store.backend)
-          }
-        }
-      })
-      if (batch.preparations === undefined || batch.preparations.length !== batch.candidates.length)
-        throw new StorageError(StorageErrorCode.invalidConfig, {
-          backend: store.backend
         })
-      const projections = batch.candidates.map((candidate, index) => {
-        const preparation = batch.preparations![index]!
-        return {
-          key: candidate.key,
-          expectedRevision: candidate.revision,
-          outcome: preparation.outcome,
-          projection: preparation.projection
+        if (
+          batch.preparations === undefined ||
+          batch.preparations.length !== batch.candidates.length
+        )
+          throw new StorageError(StorageErrorCode.invalidConfig, {
+            backend: store.backend
+          })
+        const projections = batch.candidates.map((candidate, index) => {
+          const preparation = batch.preparations![index]!
+          return {
+            key: candidate.key,
+            expectedRevision: candidate.revision,
+            outcome: preparation.outcome,
+            projection: preparation.projection,
+            counted: preparation.counted
+          }
+        })
+        const nextCheckpoint = batch.candidates.at(-1)?.key
+        await session.renew(ctx)
+        await session.commitBatch(
+          {
+            phase: batch.phase ?? IndexedDbBackfillPhase.canonical,
+            generation: session.generation,
+            ownerToken: session.ownerToken,
+            checkpoint: batch.checkpoint,
+            nextCheckpoint,
+            endOfScan: batch.endOfScan,
+            projections
+          },
+          ctx
+        )
+        finished =
+          (batch.phase ?? IndexedDbBackfillPhase.canonical) === IndexedDbBackfillPhase.legacy &&
+          batch.endOfScan
+        if (!finished) {
+          session.release()
+          sessionReleased = true
+          session = await capability.openBackfillSession(
+            handle,
+            {
+              range: repositoryEntityRange(name),
+              legacyRange: undefined,
+              includeLegacy: true,
+              allowComplete
+            },
+            ctx
+          )
+          sessionReleased = false
         }
-      })
-      const nextCheckpoint = batch.candidates.at(-1)?.key
-      await session.renew(ctx)
-      await session.commitBatch(
-        {
-          generation: session.generation,
-          ownerToken: session.ownerToken,
-          checkpoint: batch.checkpoint,
-          nextCheckpoint,
-          endOfScan: batch.endOfScan,
-          projections
-        },
-        ctx
-      )
+      }
     } catch (cause) {
       if (isStorageContractError(cause) && cause.code === StorageContractErrorCode.aborted)
         throw cause
+      if (sessionReleased) throw cause
       try {
         await session.fail(cause, ctx)
       } catch (persistFailure) {
@@ -344,7 +397,6 @@ export const createRepository = <TDomain, TStored>(
       session.release()
     }
   }
-
   const migrationFingerprint = [
     name,
     String(version),
@@ -528,7 +580,10 @@ export const createRepository = <TDomain, TStored>(
 
   /** Snapshot list options once so getters cannot change values after validation. */
   const normalizeListOptions = (
-    options: IListOptions<TDomain> | undefined
+    options:
+      | IListOptions<TDomain>
+      | IIndexedListOptions<TDomain, Readonly<Record<string, IStorageKey>>>
+      | undefined
   ): IListOptions<TDomain> | undefined => {
     validateListOptions(options, store.backend)
     if (options === undefined) return undefined
@@ -558,7 +613,68 @@ export const createRepository = <TDomain, TStored>(
         cause: new TypeError('list direction must be next or prev')
       })
     validateInvalidHandler(onInvalid)
-    return { range: rangeSnapshot, limit, orderBy, direction, onInvalid }
+    return Object.freeze({ range: rangeSnapshot, limit, orderBy, direction, onInvalid })
+  }
+
+  /** Immutable indexed-query input captured before any query route consumes it. */
+  type IIndexedListSnapshot = {
+    readonly index: string
+    readonly range: IListOptions<TDomain>['range']
+    readonly options: IListOptions<TDomain> | undefined
+  }
+
+  /** Read every indexed-list option once and convert it to a guarded snapshot. */
+  const snapshotIndexedListOptions = (
+    options:
+      | IListOptions<TDomain>
+      | IIndexedListOptions<TDomain, Readonly<Record<string, IStorageKey>>>
+      | undefined
+  ): IIndexedListSnapshot | undefined => {
+    validateListOptions(options, store.backend)
+    if (options === undefined) return undefined
+    let index: unknown
+    let range: IListOptions<TDomain>['range']
+    let limit: IListOptions<TDomain>['limit']
+    let orderBy: IListOptions<TDomain>['orderBy']
+    let direction: IListOptions<TDomain>['direction']
+    let onInvalid: IListOptions<TDomain>['onInvalid']
+    try {
+      index = (options as { readonly index?: unknown }).index
+      if (index === undefined) return undefined
+      range = options.range
+      limit = options.limit
+      orderBy = options.orderBy
+      direction = options.direction
+      onInvalid = options.onInvalid
+    } catch (cause) {
+      throw new StorageError(StorageErrorCode.invalidConfig, {
+        backend: store.backend,
+        cause
+      })
+    }
+    if (typeof index !== 'string' || index.length === 0)
+      throw new StorageError(StorageErrorCode.invalidConfig, {
+        backend: store.backend,
+        cause: new TypeError('indexed list index must be a non-empty string')
+      })
+    const normalized = normalizeListOptions(
+      Object.freeze({ range, limit, orderBy, direction, onInvalid })
+    )
+    return Object.freeze({ index, range: normalized?.range, options: normalized })
+  }
+
+  /** Build an indexed snapshot for the findManyBy/findBy/streamBy APIs. */
+  const createIndexedListSnapshot = (
+    index: string,
+    range: IListOptions<TDomain>['range'],
+    options:
+      | IListOptions<TDomain>
+      | IIndexedListOptions<TDomain, Readonly<Record<string, IStorageKey>>>
+      | undefined
+  ): IIndexedListSnapshot => {
+    const normalized = normalizeListOptions(options)
+    const rangeSnapshot = snapshotKeyRange(range, store.backend)
+    return Object.freeze({ index, range: rangeSnapshot, options: normalized })
   }
 
   /** Snapshot migration options once before checkpoint or record work begins. */
@@ -821,20 +937,18 @@ export const createRepository = <TDomain, TStored>(
 
   /** Execute indexed queries through one projection/filter/order/limit owner. */
   const queryByIndex = async (
-    indexName: string,
-    range: IListOptions<TDomain>['range'],
-    options: IListOptions<TDomain> | undefined,
+    snapshot: IIndexedListSnapshot,
     ctx: IOperationContext | undefined
   ): Promise<TDomain[]> => {
-    const index = config.indexes[indexName]
+    const index = config.indexes[snapshot.index]
     if (index === undefined)
       throw new StorageError(StorageErrorCode.invalidConfig, {
         backend: store.backend,
-        cause: new TypeError(`entity "${name}" index "${indexName}" is not declared`)
+        cause: new TypeError(`entity "${name}" index "${snapshot.index}" is not declared`)
       })
     const context = snapshotOperationContext(ctx)
-    const normalized = normalizeListOptions(options)
-    const indexRange = snapshotKeyRange(range, store.backend)
+    const normalized = snapshot.options
+    const indexRange = snapshot.range
     const matches: IIndexedQueryMatch[] = []
     const seen = new Set<string>()
     const accept = (value: TDomain): void => {
@@ -858,8 +972,79 @@ export const createRepository = <TDomain, TStored>(
         if (!isBackfillContentionFailure(cause)) throw cause
       }
     }
+    const nativeIndexStore =
+      recordStore !== undefined && isSecondaryIndexRecordStore(recordStore)
+        ? recordStore
+        : undefined
+    if (nativeIndexStore !== undefined && capability !== undefined) {
+      const handle = await capability.ensureRecordIndexes(
+        name,
+        Object.values(config.indexes).map((entry) => entry.definition),
+        context
+      )
+      const readiness = await capability.getRecordIndexReadiness(handle, context)
+      if (readiness.status === 'complete') {
+        const runtime = createStorageOperationRuntime()
+        for await (const [recordKey, raw] of nativeIndexStore.iterateRecordIndex(
+          {
+            handle,
+            index: snapshot.index,
+            range: indexRange,
+            direction: normalized?.direction
+          },
+          context
+        )) {
+          try {
+            const envelope = await decodeEnvelope(raw, context, runtime)
+            const value = await materialize(envelope, context, runtime)
+            if (value !== undefined) accept(value)
+          } catch (cause) {
+            const issue: IInvalidRecordIssue<TDomain> = {
+              key: recordKey,
+              raw,
+              stage: (cause as Partial<IStageFailure>).stage ?? 'validate',
+              cause
+            }
+            const action = invalidAction(issue, normalized)
+            if (action === 'throw') throwInvalid(issue)
+            emitDiagnostic(
+              `[storage-web] entity "${name}" skipped invalid indexed record ${String(recordKey)}`
+            )
+          }
+        }
+        const comparator = normalized?.orderBy ?? defaultOrderBy
+        if (comparator) {
+          try {
+            matches.sort((left, right) => {
+              const result = comparator(left.value, right.value)
+              if (typeof result !== 'number' || Number.isNaN(result))
+                throw new TypeError('entity orderBy comparator must return a number')
+              if (result !== 0) return normalized?.direction === 'prev' ? -result : result
+              const byIndex = compareStorageKeys(left.indexKey, right.indexKey)
+              const ordered = byIndex === 0 ? compareStorageKeys(left.id, right.id) : byIndex
+              return normalized?.direction === 'prev' ? -ordered : ordered
+            })
+          } catch (cause) {
+            throw new StorageError(StorageErrorCode.extensionFailed, {
+              backend: store.backend,
+              cause,
+              operation: StorageOperation.entityOrderBy,
+              extensionStage: 'comparator'
+            })
+          }
+        } else {
+          matches.sort((left, right) => {
+            const byIndex = compareStorageKeys(left.indexKey, right.indexKey)
+            const ordered = byIndex === 0 ? compareStorageKeys(left.id, right.id) : byIndex
+            return normalized?.direction === 'prev' ? -ordered : ordered
+          })
+        }
+        const values = matches.map((match) => match.value)
+        return normalized?.limit === undefined ? values : values.slice(0, normalized.limit)
+      }
+    }
     emitDiagnostic(
-      `[storage-web] entity "${name}" index "${indexName}" uses authoritative full-scan fallback`
+      `[storage-web] entity "${name}" index "${snapshot.index}" uses authoritative full-scan fallback`
     )
     const scanOptions =
       normalized === undefined
@@ -868,8 +1053,29 @@ export const createRepository = <TDomain, TStored>(
     const runtime = createStorageOperationRuntime()
     for await (const value of streamImpl(scanOptions, context, runtime, false)) accept(value)
     const values = matches.map((match) => match.value)
-    if (normalized?.orderBy) sortRecords(values, normalized.orderBy)
-    else {
+    const comparator = normalized?.orderBy ?? defaultOrderBy
+    if (comparator) {
+      try {
+        matches.sort((left, right) => {
+          const result = comparator(left.value, right.value)
+          if (typeof result !== 'number' || Number.isNaN(result))
+            throw new TypeError('entity orderBy comparator must return a number')
+          if (result !== 0) return normalized?.direction === 'prev' ? -result : result
+          const byIndex = compareStorageKeys(left.indexKey, right.indexKey)
+          const ordered = byIndex === 0 ? compareStorageKeys(left.id, right.id) : byIndex
+          return normalized?.direction === 'prev' ? -ordered : ordered
+        })
+      } catch (cause) {
+        throw new StorageError(StorageErrorCode.extensionFailed, {
+          backend: store.backend,
+          cause,
+          operation: StorageOperation.entityOrderBy,
+          extensionStage: 'comparator'
+        })
+        /* c8 ignore stop */
+      }
+      values.splice(0, values.length, ...matches.map((match) => match.value))
+    } else {
       matches.sort((left, right) => {
         const byIndex = compareStorageKeys(left.indexKey, right.indexKey)
         const ordered = byIndex === 0 ? compareStorageKeys(left.id, right.id) : byIndex
@@ -967,6 +1173,8 @@ export const createRepository = <TDomain, TStored>(
     },
 
     list: async (options, ctx) => {
+      const indexedSnapshot = snapshotIndexedListOptions(options)
+      if (indexedSnapshot !== undefined) return queryByIndex(indexedSnapshot, ctx)
       const context = snapshotOperationContext(ctx)
       const runtime = createStorageOperationRuntime()
       const normalized = normalizeListOptions(options)
@@ -979,13 +1187,21 @@ export const createRepository = <TDomain, TStored>(
     },
 
     stream: (options, ctx) => {
+      const indexedSnapshot = snapshotIndexedListOptions(options)
+      if (indexedSnapshot !== undefined)
+        return (async function* () {
+          for (const value of await queryByIndex(indexedSnapshot, ctx)) yield value
+        })()
       const runtime = createStorageOperationRuntime()
       return streamImpl(normalizeListOptions(options), snapshotOperationContext(ctx), runtime)
     },
 
     findBy: async (index, key, ctx) => {
       assertStorageKey(key, store.backend, `entity "${name}" index query`)
-      const results = await queryByIndex(index, { lower: key, upper: key }, undefined, ctx)
+      const results = await queryByIndex(
+        createIndexedListSnapshot(index, { lower: key, upper: key }, undefined),
+        ctx
+      )
       const definition = config.indexes[index]?.definition
       if (definition !== undefined && !definition.unique && results.length > 1)
         emitDiagnostic(
@@ -994,10 +1210,70 @@ export const createRepository = <TDomain, TStored>(
       return results[0]
     },
 
-    findManyBy: (index, range, options, ctx) => queryByIndex(index, range, options, ctx),
+    findManyBy: (index, range, options, ctx) =>
+      queryByIndex(createIndexedListSnapshot(index, range, options), ctx),
 
     streamBy: async function* (index, range, options, ctx) {
-      for (const value of await queryByIndex(index, range, options, ctx)) yield value
+      const snapshot = createIndexedListSnapshot(index, range, options)
+      const nativeCapability = asIndexedDbBackfillStore<unknown>(store)
+      const nativeIndexStore =
+        recordStore !== undefined && isSecondaryIndexRecordStore(recordStore)
+          ? recordStore
+          : undefined
+      const normalized = snapshot.options
+      if (
+        nativeCapability !== undefined &&
+        nativeIndexStore !== undefined &&
+        !(normalized?.orderBy ?? defaultOrderBy)
+      ) {
+        try {
+          await backfillIndexes(ctx)
+          const handle = await nativeCapability.ensureRecordIndexes(
+            name,
+            Object.values(config.indexes).map((entry) => entry.definition),
+            ctx
+          )
+          const readiness = await nativeCapability.getRecordIndexReadiness(handle, ctx)
+          if (readiness.status === 'complete') {
+            const runtime = createStorageOperationRuntime()
+            let yielded = 0
+            for await (const [recordKey, raw] of nativeIndexStore.iterateRecordIndex(
+              {
+                handle,
+                index,
+                range: snapshot.range,
+                direction: normalized?.direction
+              },
+              ctx
+            )) {
+              try {
+                const envelope = await decodeEnvelope(raw, ctx, runtime)
+                const value = await materialize(envelope, ctx, runtime)
+                if (value === undefined) continue
+                yield value
+                yielded += 1
+                if (normalized?.limit !== undefined && yielded >= normalized.limit) return
+              } catch (cause) {
+                const issue: IInvalidRecordIssue<TDomain> = {
+                  key: recordKey,
+                  raw,
+                  stage: (cause as Partial<IStageFailure>).stage ?? 'validate',
+                  cause
+                }
+                const action = invalidAction(issue, normalized)
+                if (action === 'throw') throwInvalid(issue)
+                emitDiagnostic(
+                  `[storage-web] entity "${name}" skipped invalid indexed record ${String(recordKey)}`
+                )
+              }
+            }
+            return
+          }
+        } catch (cause) {
+          if (!isBackfillContentionFailure(cause)) throw cause
+        }
+      }
+      for (const value of await queryByIndex(snapshot, ctx)) yield value
     },
 
     migrate: async (options: IMigrateOptions<TDomain> = {}, ctx) => {
@@ -1470,5 +1746,5 @@ export const createRepository = <TDomain, TStored>(
         context
       )
     }
-  }
+  } as IRepository<TDomain, TIndexes>
 }

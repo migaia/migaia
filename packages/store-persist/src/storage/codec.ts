@@ -1,4 +1,4 @@
-import type { ICodec } from '@migaia/storage-web'
+import type { ICodec } from '@migaia/storage-contract'
 import { isUint8Array } from '@migaia/utils/bytes'
 import type { IPersistStorage, IPersistByteStorage } from '../core/types.js'
 import { createStorePersistTypeError } from '../errors.js'

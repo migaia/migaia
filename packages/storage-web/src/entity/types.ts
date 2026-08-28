@@ -4,7 +4,7 @@ import type { ISchemaAdapter } from '../schema/types.js'
 import type { IMigration } from '../schema/migrate.js'
 import type { ICodec } from '../serialize/types.js'
 import type { IStorageInvalidRecordAction, IStorageRecordStage } from '../constants.js'
-import type { IObjectPathInput } from '@migaia/utils/object'
+import type { IObjectPathInput, IObjectPathValue } from '@migaia/utils/object'
 
 export type IEntityIndex<TDomain> =
   | {
@@ -20,13 +20,62 @@ export type IEntityIndex<TDomain> =
       readonly revision?: number
     }
   | {
-      readonly select: (value: TDomain) => IStorageKey | readonly IStorageKey[] | undefined
+      readonly select: (
+        value: TDomain
+      ) =>
+        | { readonly kind: 'single'; readonly key: IStorageKey }
+        | { readonly kind: 'multiple'; readonly keys: readonly IStorageKey[] }
+        | undefined
       readonly unique?: boolean
-      readonly multiEntry?: boolean
       readonly revision: number
     }
 
-export type IEntityOptions<TDomain, TStored = TDomain, TIndexes extends string = string> = {
+type IEntityIndexDefinitions<TDomain> = Readonly<Record<string, IEntityIndex<TDomain>>>
+
+type IEntityIndexQueryKey<TDomain, TIndex> = TIndex extends {
+  readonly path: infer TPath
+}
+  ? TPath extends IObjectPathInput<TDomain>
+    ? TIndex extends { readonly multiEntry: true }
+      ? IObjectPathValue<TDomain, TPath> extends readonly (infer TElement)[]
+        ? Extract<TElement, IStorageKey>
+        : never
+      : Extract<IObjectPathValue<TDomain, TPath>, IStorageKey>
+    : never
+  : TIndex extends { readonly paths: infer TPaths }
+    ? TPaths extends readonly IObjectPathInput<TDomain>[]
+      ? {
+          readonly [TIndexPosition in keyof TPaths]: TPaths[TIndexPosition] extends IObjectPathInput<TDomain>
+            ? Extract<IObjectPathValue<TDomain, TPaths[TIndexPosition]>, IStorageKey>
+            : never
+        }
+      : never
+    : TIndex extends {
+          readonly select: (value: TDomain) => infer TProjection
+        }
+      ? TProjection extends { readonly kind: 'single'; readonly key: infer TKey }
+        ? Extract<TKey, IStorageKey>
+        : TProjection extends {
+              readonly kind: 'multiple'
+              readonly keys: readonly (infer TKey)[]
+            }
+          ? Extract<TKey, IStorageKey>
+          : never
+      : never
+
+/** Compile-time query-key map derived from each declared index projection. */
+export type IEntityIndexMap<
+  TDomain,
+  TIndexes extends IEntityIndexDefinitions<TDomain> = IEntityIndexDefinitions<TDomain>
+> = Readonly<{
+  [TName in keyof TIndexes & string]: IEntityIndexQueryKey<TDomain, TIndexes[TName]>
+}>
+
+export type IEntityOptions<
+  TDomain,
+  TStored = TDomain,
+  TIndexes extends IEntityIndexDefinitions<TDomain> | undefined = undefined
+> = {
   readonly name: string
   /** 领域对象上作为主键的属性名。 */
   readonly key: Extract<keyof TDomain, string>
@@ -45,19 +94,29 @@ export type IEntityOptions<TDomain, TStored = TDomain, TIndexes extends string =
   readonly onDiagnostic?: (message: string) => void
   readonly defaultOrderBy?: IRecordComparator<TDomain>
   /** Secondary projections are entity-owned and backend-neutral. */
-  readonly indexes?: Readonly<Record<TIndexes, IEntityIndex<TDomain>>>
+  readonly indexes?: TIndexes
 }
 
 export type IRecordComparator<TRecord> = (left: TRecord, right: TRecord) => number
 
-export type IListOptions<TRecord = unknown> = {
+export type IListOptions<TRecord = unknown, TKey extends IStorageKey = IStorageKey> = {
   /** V2 record key 先隔离 entity；legacy 兼容记录在显式 migrate 前仍需全库扫描。 */
-  readonly range?: IKeyRange
+  readonly range?: IKeyRange<TKey>
+  /** Indexed queries use IIndexedListOptions so their index key remains correlated. */
+  readonly index?: never
   readonly limit?: number
   readonly orderBy?: IRecordComparator<TRecord>
   readonly direction?: 'next' | 'prev'
   readonly onInvalid?: IInvalidRecordAction | IInvalidRecordHandler<TRecord>
 }
+
+/** Indexed list options reuse the repository query pipeline with an exact index key range. */
+export type IIndexedListOptions<TRecord, TIndexes extends object> = {
+  [TName in keyof TIndexes & string]: Omit<IListOptions<TRecord>, 'range' | 'index'> & {
+    readonly index: TName
+    readonly range?: IKeyRange<TIndexes[TName] & IStorageKey>
+  }
+}[keyof TIndexes & string]
 
 export type IInvalidRecordAction = IStorageInvalidRecordAction
 export type IInvalidRecordIssue<TRecord = unknown> = {
@@ -91,24 +150,37 @@ export type IEntityTransactionScope<TDomain> = {
   remove(id: IStorageKey): Promise<void>
 }
 
-export type IRepository<TDomain, TIndexes extends string = never> = {
+export type IRepository<
+  TDomain,
+  TIndexes extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>
+> = {
   get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>
   put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>
   remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>
   /** V2 结构化记录按 entity 物理前缀扫描并用共享 comparator 过滤；legacy 兼容记录会暂时走全库扫描。 */
-  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>
-  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>
-  findBy(index: TIndexes, key: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>
-  findManyBy(
-    index: TIndexes,
-    range?: IKeyRange,
-    options?: IListOptions<TDomain>,
+  list(
+    options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>,
     ctx?: IOperationContext
   ): Promise<TDomain[]>
-  streamBy(
-    index: TIndexes,
-    range?: IKeyRange,
-    options?: IListOptions<TDomain>,
+  stream(
+    options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>,
+    ctx?: IOperationContext
+  ): AsyncIterableIterator<TDomain>
+  findBy<TName extends keyof TIndexes & string>(
+    index: TName,
+    key: TIndexes[TName],
+    ctx?: IOperationContext
+  ): Promise<TDomain | undefined>
+  findManyBy<TName extends keyof TIndexes & string>(
+    index: TName,
+    range?: IKeyRange<TIndexes[TName]>,
+    options?: Omit<IListOptions<TDomain>, 'range'>,
+    ctx?: IOperationContext
+  ): Promise<TDomain[]>
+  streamBy<TName extends keyof TIndexes & string>(
+    index: TName,
+    range?: IKeyRange<TIndexes[TName]>,
+    options?: Omit<IListOptions<TDomain>, 'range'>,
     ctx?: IOperationContext
   ): AsyncIterableIterator<TDomain>
   migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>
@@ -119,7 +191,10 @@ export type IRepository<TDomain, TIndexes extends string = never> = {
   ): Promise<T>
 }
 
-export type IEntityDefinition<TDomain, TIndexes extends string = never> = {
+export type IEntityDefinition<
+  TDomain,
+  TIndexes extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>
+> = {
   readonly name: string
   readonly version: number
   connect(store: IKeyValueStore): IRepository<TDomain, TIndexes>

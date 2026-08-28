@@ -1,6 +1,6 @@
 import type { IRuntime } from '@migaia/reactive'
 import { persistUnit } from '../core/persist-unit.js'
-import type { ICodec } from '@migaia/storage-web'
+import type { ICodec } from '@migaia/storage-contract'
 import type { IPersistHandle, IPersistStorage, IPersistUnit } from '../core/types.js'
 import { snapshotPersistOptions } from '../core/options.js'
 

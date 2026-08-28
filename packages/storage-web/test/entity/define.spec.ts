@@ -22,7 +22,10 @@ describe('defineEntity runtime contract', () => {
         key: 'id',
         indexes: {
           email: { path: 'profile.email' },
-          selector: { select: (value: { id: string }) => value.id, revision: 2 }
+          selector: {
+            select: (value: { id: string }) => ({ kind: 'single' as const, key: value.id }),
+            revision: 2
+          }
         }
       })
     ).not.toThrow()
@@ -30,14 +33,23 @@ describe('defineEntity runtime contract', () => {
       defineEntity<{ id: string }>()({
         name: 'ambiguous-index',
         key: 'id',
-        indexes: { invalid: { path: 'id', select: (value: { id: string }) => value.id } as never }
+        indexes: {
+          invalid: {
+            path: 'id',
+            select: (value: { id: string }) => ({ kind: 'single' as const, key: value.id })
+          } as never
+        }
       })
     ).toThrow(StorageErrorCode.invalidConfig)
     expect(() =>
       defineEntity<{ id: string }>()({
         name: 'unversioned-selector',
         key: 'id',
-        indexes: { invalid: { select: (value: { id: string }) => value.id } as never }
+        indexes: {
+          invalid: {
+            select: (value: { id: string }) => ({ kind: 'single' as const, key: value.id })
+          } as never
+        }
       })
     ).toThrow(StorageErrorCode.invalidConfig)
     expect(() =>
@@ -266,6 +278,53 @@ describe('defineEntity runtime contract', () => {
       expect(() =>
         defineEntity({ name: 'validate-on-read-guard', key: 'id', validateOnRead } as never)
       ).toThrow(StorageErrorCode.invalidConfig)
+  })
+
+  it('rejects malformed key, diagnostic, ordering, and schema contracts', () => {
+    expect(() => defineEntity({ name: 'invalid-key', key: '' })).toThrow(
+      StorageErrorCode.invalidConfig
+    )
+    expect(() =>
+      defineEntity({ name: 'invalid-diagnostic', key: 'id', onDiagnostic: 'warn' } as never)
+    ).toThrow(StorageErrorCode.invalidConfig)
+    expect(() =>
+      defineEntity({ name: 'invalid-order', key: 'id', defaultOrderBy: 'order' } as never)
+    ).toThrow(StorageErrorCode.invalidConfig)
+    for (const field of ['encode', 'decode', 'normalize'])
+      expect(() =>
+        defineEntity({
+          name: `invalid-schema-${field}`,
+          key: 'id',
+          schema: { name: 'schema', validate: async (value: unknown) => value, [field]: true }
+        } as never)
+      ).toThrow(StorageErrorCode.invalidConfig)
+
+    const schemaError = new Error('schema getter failed')
+    expect(() =>
+      defineEntity({
+        name: 'hostile-schema',
+        key: 'id',
+        schema: Object.defineProperty({}, 'name', {
+          get: () => {
+            throw schemaError
+          }
+        })
+      } as never)
+    ).toThrow(StorageErrorCode.invalidConfig)
+    const migrationError = new Error('migration getter failed')
+    expect(() =>
+      defineEntity({
+        name: 'hostile-migrations',
+        key: 'id',
+        version: 2,
+        migrations: Object.defineProperty({}, '2', {
+          enumerable: true,
+          get: () => {
+            throw migrationError
+          }
+        })
+      } as never)
+    ).toThrow(StorageErrorCode.invalidConfig)
   })
 
   it('rejects malformed migration containers at definition time', () => {

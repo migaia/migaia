@@ -40,6 +40,30 @@
       "types": "./dist/indexed-db.d.ts",
       "default": "./dist/indexed-db.js"
     },
+    "./host": {
+      "types": "./dist/host.d.ts",
+      "default": "./dist/host.js"
+    },
+    "./plugins/memory": {
+      "types": "./dist/plugins/memory.d.ts",
+      "default": "./dist/plugins/memory.js"
+    },
+    "./plugins/local-storage": {
+      "types": "./dist/plugins/local-storage.d.ts",
+      "default": "./dist/plugins/local-storage.js"
+    },
+    "./plugins/session-storage": {
+      "types": "./dist/plugins/session-storage.d.ts",
+      "default": "./dist/plugins/session-storage.js"
+    },
+    "./plugins/cookies": {
+      "types": "./dist/plugins/cookies.d.ts",
+      "default": "./dist/plugins/cookies.js"
+    },
+    "./plugins/indexed-db": {
+      "types": "./dist/plugins/indexed-db.d.ts",
+      "default": "./dist/plugins/indexed-db.js"
+    },
     "./entity": {
       "types": "./dist/entity.d.ts",
       "default": "./dist/entity.js"
@@ -52,9 +76,33 @@
       "types": "./dist/serialize.d.ts",
       "default": "./dist/serialize.js"
     },
-    "./reactive": {
-      "types": "./dist/reactive.d.ts",
-      "default": "./dist/reactive.js"
+    "./reactive-adapter": {
+      "types": "./dist/reactive-adapter.d.ts",
+      "default": "./dist/reactive-adapter.js"
+    },
+    "./plugins/reactive": {
+      "types": "./dist/plugins/reactive/index.d.ts",
+      "default": "./dist/plugins/reactive/index.js"
+    },
+    "./plugins/reactive/memory": {
+      "types": "./dist/plugins/reactive/memory.d.ts",
+      "default": "./dist/plugins/reactive/memory.js"
+    },
+    "./plugins/reactive/local-storage": {
+      "types": "./dist/plugins/reactive/local-storage.d.ts",
+      "default": "./dist/plugins/reactive/local-storage.js"
+    },
+    "./plugins/reactive/session-storage": {
+      "types": "./dist/plugins/reactive/session-storage.d.ts",
+      "default": "./dist/plugins/reactive/session-storage.js"
+    },
+    "./plugins/reactive/cookies": {
+      "types": "./dist/plugins/reactive/cookies.d.ts",
+      "default": "./dist/plugins/reactive/cookies.js"
+    },
+    "./plugins/reactive/indexed-db": {
+      "types": "./dist/plugins/reactive/indexed-db.d.ts",
+      "default": "./dist/plugins/reactive/indexed-db.js"
     }
   },
   "publishConfig": {
@@ -69,6 +117,7 @@
     "check:error-registry": "node test/reconcile-error-registry.mjs",
     "lint": "oxlint src test e2e",
     "test": "pnpm run build && vitest run --coverage",
+    "test:packed": "pnpm run build && vitest run test/bundle-boundary.spec.ts",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",
     "release:patch": "pnpm version patch --no-git-tag-version",
     "release:pack": "pnpm pack --pack-destination /tmp",
@@ -76,8 +125,11 @@
   },
   "dependencies": {
     "@migaia/event-subscriber": "workspace:^",
+    "@migaia/capability": "workspace:^",
     "@migaia/lifecycle": "workspace:^",
+    "@migaia/plugin-host": "workspace:^",
     "@migaia/reactive": "workspace:^",
+    "@migaia/resource": "workspace:^",
     "@migaia/storage-contract": "workspace:^",
     "@migaia/utils": "workspace:^"
   },

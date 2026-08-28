@@ -17,6 +17,74 @@ export type IStorageErrorDetails = {
   readonly cause?: unknown
 }
 
+/** Native admission error enriched with this package's stable boundary identity. */
+export type IStorageTypeError = TypeError & {
+  readonly source: string
+  readonly code: IStorageErrorCode
+}
+
+/** Native aggregate carrying storage-web identity while preserving every cleanup failure object. */
+export type IStorageAggregateError = AggregateError & {
+  readonly source: string
+  readonly code: IStorageErrorCode
+}
+
+/**
+ * Creates one coded native AggregateError whose cause and errors retain the first/original
+ * failures.
+ */
+export const createStorageAggregateError = (
+  code: IStorageErrorCode,
+  message: string,
+  errors: readonly unknown[]
+): IStorageAggregateError => {
+  const aggregate = new AggregateError(errors, message, {
+    cause: errors[0]
+  }) as IStorageAggregateError
+  Object.defineProperty(aggregate, 'source', {
+    configurable: false,
+    enumerable: false,
+    value: STORAGE_WEB_SOURCE,
+    writable: false
+  })
+  Object.defineProperty(aggregate, 'code', {
+    configurable: false,
+    enumerable: false,
+    value: code,
+    writable: false
+  })
+  return aggregate
+}
+
+/**
+ * Creates a native TypeError while attaching the package source/code without replacing its native
+ * prototype or its exact cause. Host descriptor and store admission use this helper so callers can
+ * branch on TypeError and still traverse the original failure.
+ */
+export const createStorageTypeError = (
+  code: IStorageErrorCode,
+  message: string,
+  cause?: unknown
+): IStorageTypeError => {
+  const error = new TypeError(
+    message,
+    cause === undefined ? undefined : { cause }
+  ) as IStorageTypeError
+  Object.defineProperty(error, 'source', {
+    configurable: false,
+    enumerable: false,
+    value: STORAGE_WEB_SOURCE,
+    writable: false
+  })
+  Object.defineProperty(error, 'code', {
+    configurable: false,
+    enumerable: false,
+    value: code,
+    writable: false
+  })
+  return error
+}
+
 export type IStorageChannel = 'value' | 'bytes' | 'record'
 export type IExtensionStage = 'schema' | 'codec' | 'migration' | 'comparator' | 'diagnostic'
 

@@ -1,6 +1,7 @@
 import {
   StorageContractError,
   StorageContractErrorCode,
+  isChangeFeedStore,
   type IStorageChange,
   type IStorageKey
 } from '@migaia/storage-contract'
@@ -9,9 +10,15 @@ import { describe, expect, it, vi } from 'vitest'
 import { indexedDb } from '../../src/backends/indexed-db'
 import {
   asIndexedDbBackfillStore,
+  IndexedDbBackfillPhase,
   isBackfillContentionFailure
 } from '../../src/backends/indexed-db-backfill.js'
-import { composeRepositoryKey, repositoryEntityRange } from '../../src/entity/key.js'
+import {
+  composeRepositoryKey,
+  legacyEntityRange,
+  repositoryEntityRange
+} from '../../src/entity/key.js'
+import { encodeFlatStorageKey } from '../../src/core/key-domain.js'
 
 const encoder = new TextEncoder()
 
@@ -28,6 +35,55 @@ const backfillOptions = {
   range: { lower: '', upper: '\uffff' },
   allowComplete: true
 } as const
+
+type ITestBroadcastMessage = {
+  readonly data: unknown
+}
+
+/** Minimal in-process BroadcastChannel transport for deterministic same-page coordination tests. */
+class TestBroadcastChannel {
+  static readonly channels = new Map<string, Set<TestBroadcastChannel>>()
+  static readonly instances: TestBroadcastChannel[] = []
+  static closedCount = 0
+  readonly name: string
+  onmessage: ((event: ITestBroadcastMessage) => void) | null = null
+  /** Tracks the one terminal close transition used by the fake transport. */
+  #closed = false
+
+  constructor(name: string) {
+    this.name = name
+    TestBroadcastChannel.instances.push(this)
+    const members = TestBroadcastChannel.channels.get(name) ?? new Set<TestBroadcastChannel>()
+    members.add(this)
+    TestBroadcastChannel.channels.set(name, members)
+  }
+
+  addEventListener(type: string, listener: (event: ITestBroadcastMessage) => void): void {
+    if (type === 'message') this.onmessage = listener
+  }
+
+  removeEventListener(type: string, listener: (event: ITestBroadcastMessage) => void): void {
+    if (type === 'message' && this.onmessage === listener) this.onmessage = null
+  }
+
+  postMessage(data: unknown): void {
+    if (this.#closed) throw new Error('closed test channel')
+    const members = TestBroadcastChannel.channels.get(this.name) ?? new Set()
+    for (const member of members) {
+      if (member === this || member.#closed || member.onmessage === null) continue
+      queueMicrotask(() => member.onmessage?.({ data }))
+    }
+  }
+
+  close(): void {
+    if (this.#closed) return
+    this.#closed = true
+    TestBroadcastChannel.closedCount += 1
+    const members = TestBroadcastChannel.channels.get(this.name)
+    members?.delete(this)
+    if (members?.size === 0) TestBroadcastChannel.channels.delete(this.name)
+  }
+}
 
 describe('indexedDb backend', () => {
   it('SWV2-T43 record mutations advance global epoch and invalidate open transactions', async () => {
@@ -55,7 +111,7 @@ describe('indexedDb backend', () => {
       'transactionIndexed'
     ] as const
     for (const route of requiredRoutes) expect(typeof store[route]).toBe('function')
-    expect(store.capabilities.secondaryIndexes).toBe(false)
+    expect(store.capabilities.secondaryIndexes).toBe(true)
     await store.dispose()
   })
 
@@ -116,6 +172,69 @@ describe('indexedDb backend', () => {
     })
     batch.release()
     await expect(batch.readBatch()).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
+    await store.dispose()
+  })
+
+  it('SWV4-R06 resumes from canonical phase into bounded legacy phase', async () => {
+    const store = freshDb()
+    await store.putRecord({ value: 1 }, composeRepositoryKey('phased', 'canonical'))
+    await store.putRecord({ value: 2 }, ['phased', 'legacy'])
+    const handle = await store.ensureRecordIndexes('phased', [
+      { name: 'value', unique: false, multiEntry: false, revision: 1 }
+    ])
+    const capability = asIndexedDbBackfillStore(store)!
+    const options = {
+      range: repositoryEntityRange('phased'),
+      legacyRange: legacyEntityRange('phased'),
+      includeLegacy: true,
+      allowComplete: true,
+      batchSize: 1
+    } as const
+    const canonical = await capability.openBackfillSession(handle, options)
+    const canonicalBatch = await canonical.readBatch()
+    expect(canonicalBatch.phase).toBe(IndexedDbBackfillPhase.canonical)
+    expect(canonicalBatch.candidates).toHaveLength(1)
+    await canonical.commitBatch({
+      phase: canonicalBatch.phase,
+      generation: handle.generation,
+      ownerToken: canonical.ownerToken,
+      checkpoint: canonicalBatch.checkpoint,
+      nextCheckpoint: canonicalBatch.candidates[0]!.key,
+      endOfScan: canonicalBatch.endOfScan,
+      projections: [
+        {
+          key: canonicalBatch.candidates[0]!.key,
+          expectedRevision: canonicalBatch.candidates[0]!.revision,
+          outcome: 'indexed',
+          projection: { value: { kind: 'single', key: 1 } }
+        }
+      ]
+    })
+    canonical.release()
+
+    const legacy = await capability.openBackfillSession(handle, options)
+    const legacyBatch = await legacy.readBatch()
+    expect(legacyBatch.phase).toBe(IndexedDbBackfillPhase.legacy)
+    expect(legacyBatch.candidates).toHaveLength(1)
+    await expect(
+      legacy.commitBatch({
+        phase: legacyBatch.phase,
+        generation: handle.generation,
+        ownerToken: legacy.ownerToken,
+        checkpoint: legacyBatch.checkpoint,
+        nextCheckpoint: legacyBatch.candidates[0]!.key,
+        endOfScan: legacyBatch.endOfScan,
+        projections: [
+          {
+            key: legacyBatch.candidates[0]!.key,
+            expectedRevision: legacyBatch.candidates[0]!.revision,
+            outcome: 'indexed',
+            projection: { value: { kind: 'single', key: 2 } }
+          }
+        ]
+      })
+    ).resolves.toMatchObject({ status: 'complete', scanned: 2, indexed: 2 })
+    legacy.release()
     await store.dispose()
   })
 
@@ -374,6 +493,130 @@ describe('indexedDb backend', () => {
       Object.defineProperty(globalThis, 'crypto', { configurable: true, value: originalCrypto })
     }
   })
+
+  it('SWV4-R07-004 keeps hostile scopes out of private generation tokens', async () => {
+    const factory = freshFactory()
+    const dbName = 'indexed-generation-hostile-scope'
+    const store = indexedDb({ factory, keyRange: IDBKeyRange, dbName })
+    const capability = asIndexedDbBackfillStore(store)!
+    const scopes = ['scope\u0000with-nul', `scope-${String.fromCodePoint(0x10ffff)}`]
+    const definitions = [{ name: 'value', unique: false, multiEntry: false, revision: 1 }] as const
+
+    await store.putRecord({ value: 'indexed' }, 'hostile-scope-record')
+    for (const scope of scopes) {
+      const handle = await store.ensureRecordIndexes(scope, definitions)
+      expect(handle.generation).toMatch(/^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/)
+      expect(handle.generation.length).toBeLessThanOrEqual(128)
+      expect(handle.generation).not.toContain(scope)
+      const session = await capability.openBackfillSession(handle, {
+        ...backfillOptions,
+        batchSize: 1
+      })
+      const batch = await session.readBatch()
+      const candidate = batch.candidates[0]!
+      await session.commitBatch({
+        generation: handle.generation,
+        ownerToken: session.ownerToken,
+        checkpoint: batch.checkpoint,
+        nextCheckpoint: candidate.key,
+        endOfScan: batch.endOfScan,
+        projections: [
+          {
+            key: candidate.key,
+            expectedRevision: candidate.revision,
+            outcome: 'indexed',
+            projection: { value: { kind: 'single', key: 'indexed' } }
+          }
+        ]
+      })
+      session.release()
+      const entries = []
+      for await (const entry of store.iterateRecordIndex({ handle, index: 'value' }))
+        entries.push(entry)
+      expect(entries).toEqual([['hostile-scope-record', { value: 'indexed' }]])
+    }
+    await store.dispose()
+  })
+
+  it('SWV4-R07-004 rotates malformed persisted generations once and rejects old handles', async () => {
+    const factory = freshFactory()
+    const dbName = 'indexed-generation-recovery'
+    const store = indexedDb({ factory, keyRange: IDBKeyRange, dbName })
+    const definitions = [{ name: 'value', unique: false, multiEntry: false, revision: 1 }] as const
+    const scope = 'recovery-scope'
+    const handle = await store.ensureRecordIndexes(scope, definitions)
+    await store.dispose()
+
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = factory.open(dbName)
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    const malformedHandle = { ...handle, generation: `${scope}:persisted\u0000generation` }
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction('storage-web:meta', 'readwrite')
+      transaction.objectStore('storage-web:meta').put(
+        {
+          handle: malformedHandle,
+          currentGeneration: malformedHandle.generation,
+          readiness: { status: 'complete', scanned: 0, indexed: 0 }
+        },
+        ['__storage_web_internal__', 'index', scope]
+      )
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+    })
+    database.close()
+
+    const firstConnection = indexedDb({ factory, keyRange: IDBKeyRange, dbName })
+    const secondConnection = indexedDb({ factory, keyRange: IDBKeyRange, dbName })
+    const [recovered, adopted] = await Promise.all([
+      firstConnection.ensureRecordIndexes(scope, definitions),
+      secondConnection.ensureRecordIndexes(scope, definitions)
+    ])
+    expect(adopted).toEqual(recovered)
+    expect(recovered.generation).not.toBe(malformedHandle.generation)
+    expect(recovered.generation).toMatch(/^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/)
+    await expect(firstConnection.ensureRecordIndexes(scope, definitions)).resolves.toEqual(
+      recovered
+    )
+    await expect(secondConnection.ensureRecordIndexes(scope, definitions)).resolves.toEqual(
+      recovered
+    )
+    await expect(firstConnection.getRecordIndexReadiness(malformedHandle)).rejects.toMatchObject({
+      code: 'INDEX_BACKFILL_STALE'
+    })
+    await expect(
+      firstConnection.putIndexedRecord({ value: 'old' }, 'old-handle-record', malformedHandle, {
+        value: { kind: 'single', key: 'old' }
+      })
+    ).rejects.toMatchObject({ code: 'INDEX_BACKFILL_STALE' })
+    await expect(
+      firstConnection.iterateRecordIndex({ handle: malformedHandle, index: 'value' }).next()
+    ).rejects.toMatchObject({ code: 'INDEX_BACKFILL_STALE' })
+    await firstConnection.dispose()
+    await secondConnection.dispose()
+
+    const inspected = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = factory.open(dbName)
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    const metadataKeys = await new Promise<IDBValidKey[]>((resolve, reject) => {
+      const transaction = inspected.transaction('storage-web:meta', 'readonly')
+      const request = transaction.objectStore('storage-web:meta').getAllKeys()
+      request.onsuccess = () => resolve(request.result as IDBValidKey[])
+      request.onerror = () => reject(request.error)
+    })
+    expect(
+      metadataKeys.filter(
+        (key) =>
+          Array.isArray(key) && key[0] === '__storage_web_internal__' && key[1] === 'index-stale'
+      )
+    ).toHaveLength(1)
+    inspected.close()
+  })
+
   it('构造期拒绝 null、数组和 primitive options', () => {
     for (const options of [null, [], 'options', 1])
       expect(() => indexedDb(options as never)).toThrowError(
@@ -680,6 +923,33 @@ describe('indexedDb backend', () => {
     iterateRecordIndex: (query: unknown) => AsyncIterableIterator<[IStorageKey, { value: number }]>
   }
 
+  it('SWV4-R28 rejects nested undefined in the raw backfill budget before sidecar writes', async () => {
+    const store = freshDb()
+    const scope = 'raw-nested-undefined'
+    await store.putRecord({ payload: { nested: undefined } }, composeRepositoryKey(scope, 'id-0'))
+    const indexed = store as unknown as IIndexedTestStore
+    const handle = await indexed.ensureRecordIndexes(scope, [
+      { name: 'payload', unique: false, multiEntry: false, revision: 1 }
+    ])
+    const capability = asIndexedDbBackfillStore(store)!
+    const session = await capability.openBackfillSession(handle, {
+      range: repositoryEntityRange(scope),
+      allowComplete: true,
+      batchSize: 1
+    })
+    await expect(session.readBatch()).rejects.toMatchObject({
+      code: 'VALUE_TOO_LARGE',
+      cause: expect.any(RangeError)
+    })
+    await expect(capability.getRecordIndexReadiness(handle)).resolves.toMatchObject({
+      status: 'running',
+      scanned: 0,
+      indexed: 0
+    })
+    session.release()
+    await store.dispose()
+  })
+
   /**
    * Registers scope's `value` index and drives it to `complete` over seed records written at the
    * scope's own canonical entity key shape (`composeRepositoryKey`) — the physical format entity
@@ -808,20 +1078,102 @@ describe('indexedDb backend', () => {
       batchSize: 2,
       leaseMs: 5_000
     })
-    const batch = await session.readBatch()
-    expect(batch.candidates).toHaveLength(1)
-    expect(batch.endOfScan).toBe(false)
+    await expect(session.readBatch()).rejects.toMatchObject({
+      code: 'VALUE_TOO_LARGE',
+      cause: expect.any(RangeError)
+    })
     session.release()
+    await store.dispose()
+  })
+
+  it('SWV4-E28 rejects two-item aggregate decoded overflow before issuing a partial page', async () => {
+    const store = freshDb()
+    const scope = 'decoded-aggregate-cap'
+    await store.putRecord({ value: 1 }, composeRepositoryKey(scope, 'id-0'))
+    await store.putRecord({ value: 2 }, composeRepositoryKey(scope, 'id-1'))
+    const indexed = store as unknown as IIndexedTestStore
+    const handle = await indexed.ensureRecordIndexes(scope, [
+      { name: 'value', unique: false, multiEntry: false, revision: 1 }
+    ])
+    const capability = asIndexedDbBackfillStore(store)!
+    const session = await capability.openBackfillSession(handle, {
+      range: repositoryEntityRange(scope),
+      allowComplete: true,
+      batchSize: 2
+    })
+    await expect(
+      session.readBatch(undefined, {
+        prepare: async () => ({ decodedBytes: 600_000, outcome: 'skipped' as const })
+      })
+    ).rejects.toMatchObject({
+      code: 'VALUE_TOO_LARGE',
+      cause: expect.any(RangeError)
+    })
+    await expect(capability.getRecordIndexReadiness(handle)).resolves.toMatchObject({
+      status: 'running',
+      scanned: 0,
+      indexed: 0
+    })
+    session.release()
+    await store.dispose()
+  })
+
+  it('SWV4-E28 accounts the exact persisted tuple and accepts its byte boundary', async () => {
+    const store = freshDb()
+    const scope = 's'.repeat(120)
+    const indexName = 'i'.repeat(120)
+    const indexed = store as unknown as IIndexedTestStore
+    await store.putRecord({ value: 1 }, composeRepositoryKey(scope, 'id-0'))
+    const handle = await indexed.ensureRecordIndexes(scope, [
+      { name: indexName, unique: false, multiEntry: false, revision: 1 }
+    ])
+    const capability = asIndexedDbBackfillStore(store)!
+    const session = await capability.openBackfillSession(handle, {
+      range: repositoryEntityRange(scope),
+      allowComplete: true,
+      batchSize: 1
+    })
+    const recordKey = composeRepositoryKey(scope, 'id-0')
+    const tupleBytes = (indexValue: string): number =>
+      encoder.encode(
+        encodeFlatStorageKey([scope, indexName, handle.generation, indexValue, recordKey])
+      ).byteLength
+    let low = 0
+    let high = 2 * 1024 * 1024
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2)
+      if (tupleBytes('x'.repeat(middle)) < 2 * 1024 * 1024) low = middle + 1
+      else high = middle
+    }
+    const exactIndexValue = 'x'.repeat(low)
+    expect(tupleBytes(exactIndexValue)).toBe(2 * 1024 * 1024)
+    const batch = await session.readBatch(undefined, {
+      prepare: async () => ({
+        decodedBytes: 1,
+        outcome: 'indexed' as const,
+        projection: { [indexName]: { kind: 'single' as const, key: exactIndexValue } }
+      })
+    })
+    expect(batch.candidates).toHaveLength(1)
     await expect(
       session.commitBatch({
+        phase: batch.phase,
         generation: handle.generation,
         ownerToken: session.ownerToken,
         checkpoint: batch.checkpoint,
         nextCheckpoint: batch.candidates[0]!.key,
-        endOfScan: false,
-        projections: []
+        endOfScan: batch.endOfScan,
+        projections: [
+          {
+            key: recordKey,
+            expectedRevision: batch.candidates[0]!.revision,
+            outcome: 'indexed',
+            projection: batch.preparations![0]!.projection
+          }
+        ]
       })
-    ).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
+    ).resolves.toMatchObject({ status: 'complete', indexed: 1 })
+    session.release()
     await store.dispose()
   })
 
@@ -1550,7 +1902,7 @@ describe('indexedDb backend', () => {
           handle,
           readiness: { status: 'complete', scanned: 1, indexed: 1 }
         },
-        'index:users'
+        ['__storage_web_internal__', 'index', 'users']
       )
       transaction.objectStore('storage-web:index-records').put({
         scope: 'users',
@@ -3437,13 +3789,15 @@ describe('indexedDb backend change feed (SWV2-B05, record channel + clearAll onl
     await store.dispose()
   })
 
-  it("SOL-SWV2-056 capabilities.changeFeed stays false: a second indexedDb() instance on the same physical database receives none of the first instance's events despite plainly reading its data — the reasoning that justified flipping the memory backend's flag (a second instance sharing its data cannot exist) inverts here, where it is the normal case", async () => {
+  it('R09 injected factories keep public changeFeed false while same-page handles retain private coordination', async () => {
     const factory = freshFactory()
     const dbName = `shared-${Math.random().toString(36).slice(2)}`
     const writer = indexedDb({ factory, keyRange: IDBKeyRange, dbName })
     const reader = indexedDb({ factory, keyRange: IDBKeyRange, dbName })
     expect(writer.capabilities.changeFeed).toBe(false)
     expect(reader.capabilities.changeFeed).toBe(false)
+    expect(isChangeFeedStore(writer)).toBe(false)
+    expect(isChangeFeedStore(reader)).toBe(false)
     const writerEvents: IStorageChange[] = []
     const readerEvents: IStorageChange[] = []
     writer.subscribeChanges((c) => writerEvents.push(c))
@@ -3452,11 +3806,183 @@ describe('indexedDb backend change feed (SWV2-B05, record channel + clearAll onl
     await writer.set('k', 'from-writer')
 
     expect(writerEvents.map((c) => `${c.channel}:${c.kind}`)).toEqual(['value:put'])
-    // The disproof: the reader can read what the writer wrote, but its own subscription never
-    // fired — there is no cross-instance delivery, so the capability must not claim there is.
-    expect(readerEvents).toEqual([])
+    // The private same-page hint is delivered, but the public capability remains false because an
+    // injected factory cannot prove this realm's BroadcastChannel data universe.
+    expect(readerEvents.map((c) => `${c.channel}:${c.kind}`)).toEqual(['value:put'])
     await expect(reader.get('k')).resolves.toBe('from-writer')
     await writer.dispose()
     await reader.dispose()
+  })
+
+  it('R09 admits realm-default BroadcastChannel coordination with metadata-only validation and refcount cleanup', async () => {
+    const factory = freshFactory()
+    const dbName = `r09-wire-${Math.random().toString(36).slice(2)}`
+    const indexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB')
+    const broadcastDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'BroadcastChannel')
+    let writer: ReturnType<typeof indexedDb> | undefined
+    let reader: ReturnType<typeof indexedDb> | undefined
+    let rogue: TestBroadcastChannel | undefined
+    try {
+      Object.defineProperty(globalThis, 'indexedDB', {
+        configurable: true,
+        get: () => factory
+      })
+      Object.defineProperty(globalThis, 'BroadcastChannel', {
+        configurable: true,
+        value: TestBroadcastChannel
+      })
+      TestBroadcastChannel.instances.length = 0
+      TestBroadcastChannel.closedCount = 0
+      writer = indexedDb({ dbName, keyRange: IDBKeyRange })
+      reader = indexedDb({ dbName, keyRange: IDBKeyRange })
+      expect(writer.capabilities.changeFeed).toBe(true)
+      expect(reader.capabilities.changeFeed).toBe(true)
+      expect(isChangeFeedStore(writer)).toBe(true)
+      expect(TestBroadcastChannel.instances).toHaveLength(1)
+      const readerEvents: IStorageChange[] = []
+      reader.subscribeChanges((change) => readerEvents.push(change))
+
+      await writer.set('wire-key', 'value')
+      await new Promise<void>((resolve) => queueMicrotask(resolve))
+      expect(readerEvents).toHaveLength(1)
+      expect(readerEvents[0]).toMatchObject({ channel: 'value', kind: 'put', keys: ['wire-key'] })
+
+      rogue = new TestBroadcastChannel(TestBroadcastChannel.instances[0]!.name)
+      rogue.postMessage({
+        version: 1,
+        origin: 'remote-origin',
+        sequence: 1,
+        channel: 'value',
+        kind: 'put',
+        keys: [encodeFlatStorageKey('remote-key')]
+      })
+      rogue.postMessage({
+        version: 1,
+        origin: 'remote-origin',
+        sequence: 3,
+        channel: 'value',
+        kind: 'put',
+        keys: [encodeFlatStorageKey('remote-newer-key')]
+      })
+      rogue.postMessage({
+        version: 1,
+        origin: 'remote-origin',
+        sequence: 2,
+        channel: 'value',
+        kind: 'put',
+        keys: [encodeFlatStorageKey('remote-stale-key')]
+      })
+      rogue.postMessage({
+        version: 2,
+        origin: 'spoofed-version',
+        sequence: 1,
+        channel: 'value',
+        kind: 'put'
+      })
+      rogue.postMessage({
+        version: 1,
+        origin: 'oversized',
+        sequence: 2,
+        channel: 'value',
+        kind: 'put',
+        keys: [encodeFlatStorageKey('x'.repeat(20_000))]
+      })
+      rogue.postMessage({
+        version: 1,
+        origin: 'unknown-field',
+        sequence: 3,
+        channel: 'value',
+        kind: 'put',
+        unexpected: true
+      })
+      let statefulKeysReads = 0
+      rogue.postMessage({
+        version: 1,
+        origin: 'stateful-accessor',
+        sequence: 10,
+        channel: 'value',
+        kind: 'put',
+        get keys() {
+          statefulKeysReads += 1
+          return statefulKeysReads === 1
+            ? [encodeFlatStorageKey('stateful-key')]
+            : Array.from({ length: 129 }, (_, index) => encodeFlatStorageKey(`oversized-${index}`))
+        }
+      })
+      await new Promise<void>((resolve) => queueMicrotask(resolve))
+      expect(readerEvents).toHaveLength(4)
+      expect(statefulKeysReads).toBe(1)
+      expect(readerEvents[1]).toMatchObject({ keys: ['remote-key'] })
+      expect(readerEvents[2]).toMatchObject({ keys: ['remote-newer-key'], sequence: 3 })
+      expect(readerEvents[3]).toMatchObject({ keys: ['stateful-key'], sequence: 10 })
+
+      await writer.dispose()
+      expect(TestBroadcastChannel.closedCount).toBe(0)
+      rogue.postMessage({
+        version: 1,
+        origin: 'remote-origin',
+        sequence: 4,
+        channel: 'value',
+        kind: 'put',
+        keys: [encodeFlatStorageKey('after-writer-dispose')]
+      })
+      await new Promise<void>((resolve) => queueMicrotask(resolve))
+      expect(readerEvents).toHaveLength(5)
+      expect(readerEvents[4]).toMatchObject({ keys: ['after-writer-dispose'], sequence: 4 })
+      await reader.dispose()
+      expect(TestBroadcastChannel.closedCount).toBe(1)
+      rogue.close()
+    } finally {
+      if (writer !== undefined) await writer.dispose()
+      if (reader !== undefined) await reader.dispose()
+      rogue?.close()
+      if (indexedDbDescriptor === undefined) Reflect.deleteProperty(globalThis, 'indexedDB')
+      else Object.defineProperty(globalThis, 'indexedDB', indexedDbDescriptor)
+      if (broadcastDescriptor === undefined) Reflect.deleteProperty(globalThis, 'BroadcastChannel')
+      else Object.defineProperty(globalThis, 'BroadcastChannel', broadcastDescriptor)
+    }
+  })
+
+  it('R09 snapshots platform getters once, opens no database, and fails closed without transport', async () => {
+    const factory = freshFactory()
+    const dbName = `r09-admission-${Math.random().toString(36).slice(2)}`
+    const indexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB')
+    const broadcastDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'BroadcastChannel')
+    let indexedDbReads = 0
+    let broadcastReads = 0
+    let store: ReturnType<typeof indexedDb> | undefined
+    const openSpy = vi.spyOn(factory, 'open')
+    try {
+      Object.defineProperty(globalThis, 'indexedDB', {
+        configurable: true,
+        get: () => {
+          indexedDbReads += 1
+          return factory
+        }
+      })
+      Object.defineProperty(globalThis, 'BroadcastChannel', {
+        configurable: true,
+        get: () => {
+          broadcastReads += 1
+          return undefined
+        }
+      })
+      store = indexedDb({ dbName, keyRange: IDBKeyRange })
+      expect(indexedDbReads).toBe(1)
+      expect(broadcastReads).toBe(1)
+      expect(store.capabilities.changeFeed).toBe(false)
+      expect(isChangeFeedStore(store)).toBe(false)
+      expect(openSpy).not.toHaveBeenCalled()
+      await store.set('admitted-later', 'value')
+      expect(await store.get('admitted-later')).toBe('value')
+      expect(openSpy).toHaveBeenCalled()
+    } finally {
+      if (store !== undefined) await store.dispose()
+      openSpy.mockRestore()
+      if (indexedDbDescriptor === undefined) Reflect.deleteProperty(globalThis, 'indexedDB')
+      else Object.defineProperty(globalThis, 'indexedDB', indexedDbDescriptor)
+      if (broadcastDescriptor === undefined) Reflect.deleteProperty(globalThis, 'BroadcastChannel')
+      else Object.defineProperty(globalThis, 'BroadcastChannel', broadcastDescriptor)
+    }
   })
 })

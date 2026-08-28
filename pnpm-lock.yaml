@@ -184,15 +184,24 @@ importers:
 
   packages/storage-web:
     dependencies:
+      '@migaia/capability':
+        specifier: workspace:^
+        version: link:../capability
       '@migaia/event-subscriber':
         specifier: workspace:^
         version: link:../event-subscriber
       '@migaia/lifecycle':
         specifier: workspace:^
         version: link:../lifecycle
+      '@migaia/plugin-host':
+        specifier: workspace:^
+        version: link:../plugin-host
       '@migaia/reactive':
         specifier: workspace:^
         version: link:../reactive
+      '@migaia/resource':
+        specifier: workspace:^
+        version: link:../resource
       '@migaia/storage-contract':
         specifier: workspace:^
         version: link:../storage-contract
@@ -340,9 +349,9 @@ importers:
       '@migaia/reactive':
         specifier: workspace:^
         version: link:../reactive
-      '@migaia/storage-web':
+      '@migaia/storage-contract':
         specifier: workspace:^
-        version: link:../storage-web
+        version: link:../storage-contract
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
@@ -356,6 +365,9 @@ importers:
       '@migaia/store-light':
         specifier: workspace:^
         version: link:../store-light
+      '@migaia/storage-web':
+        specifier: workspace:^
+        version: link:../storage-web
       typescript:
         specifier: ~6.0.2
         version: 6.0.2

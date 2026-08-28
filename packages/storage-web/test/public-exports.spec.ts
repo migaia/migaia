@@ -11,7 +11,13 @@ import * as storageWeb from '../src/index'
  * 用 process.cwd() 而不是 import.meta.url：vitest 在 jsdom environment 下 转换后的 import.meta.url 不总是真实
  * file:// scheme，new URL() 会抛错； vitest 的 cwd 固定是本包根目录（vitest.config.ts 所在处），足够可靠。
  */
-const baselinePath = resolve(process.cwd(), '../../docs/store/public-exports.baseline.json')
+const expectedRootExports = [
+  'STORAGE_WEB_SOURCE',
+  'StorageError',
+  'StorageErrorCode',
+  'StorageErrorText',
+  'lengthPrefixedNamespaceCodec'
+] as const
 
 /** Every sibling route forbidden from a memory-only packed consumer bundle. */
 const forbiddenSiblingModules = [
@@ -22,6 +28,22 @@ const forbiddenSiblingModules = [
   '@migaia/storage-web/dist/reactive-hostile.js',
   '@migaia/storage-web/dist/session-storage-hostile.js',
   '@migaia/storage-web/dist/web-storage-hostile.js'
+] as const
+
+/** Tracked direct-consumer files must use exact V4 subpaths after the breaking cutover. */
+const directConsumerFiles = [
+  '../../../fixtures/consumers/browser.ts',
+  '../../../fixtures/consumers/worker.ts',
+  '../../../fixtures/consumers/electron-renderer.ts'
+] as const
+
+/** Built reactive entries must retain the canonical function identity and diagnostic name. */
+const canonicalReactiveEntries = [
+  ['memory', 'memoryReactive'],
+  ['local-storage', 'localStorageReactive'],
+  ['session-storage', 'sessionStorageReactive'],
+  ['cookies', 'cookiesReactive'],
+  ['indexed-db', 'indexedDbReactive']
 ] as const
 
 /** Reads built JavaScript after the package test script has completed its mandatory build step. */
@@ -36,14 +58,8 @@ const readBuiltJavaScript = (): string => {
 
 describe('public exports baseline', () => {
   it('实际运行时导出与 baseline 完全一致（新增/移除导出都需要同步更新 baseline）', () => {
-    const baseline = JSON.parse(readFileSync(baselinePath, 'utf8')) as {
-      packages: Record<string, Record<string, string[]>>
-    }
-    const recorded = baseline.packages['@migaia/storage-web']?.['.']
-    expect(recorded).toBeDefined()
-
     const actual = Object.keys(storageWeb).sort()
-    expect(actual).toEqual([...recorded!].sort())
+    expect(actual).toEqual([...expectedRootExports].sort())
   })
 })
 
@@ -63,5 +79,25 @@ describe('SWV2-T49 package-owner bundle boundary', () => {
       expect(() => assertExactRetainedModules([injectedModule], [])).toThrow(
         `unexpected retained module: ${injectedModule}`
       )
+  })
+})
+
+describe('SWV4-R13 atomic consumer and artifact correction', () => {
+  it('rejects removed root backend imports in every tracked direct consumer', () => {
+    for (const file of directConsumerFiles) {
+      const source = readFileSync(resolve(import.meta.dirname, file), 'utf8')
+      expect(source, file).not.toMatch(/from ['"]@migaia\/storage-web['"]/)
+    }
+  })
+
+  it('retains canonical reactive names and exact aggregate identity in built artifacts', async () => {
+    const aggregate = await import('../dist/plugins/reactive/index.js')
+    for (const [entry, exportName] of canonicalReactiveEntries) {
+      const exact = await import(`../dist/plugins/reactive/${entry}.js`)
+      const factory = exact[exportName as keyof typeof exact]
+      expect(factory).toBe(aggregate[exportName as keyof typeof aggregate])
+      expect(factory).toBeTypeOf('function')
+      expect((factory as { readonly name: string }).name).toBe(exportName)
+    }
   })
 })

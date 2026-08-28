@@ -1,5 +1,8 @@
-import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import { toPromise } from '@migaia/utils/promise'
+import {
+  StorageContractError,
+  StorageContractErrorCode,
+  type IStorageChange
+} from '@migaia/storage-contract'
 import { snapshotSyncWriteOptions, throwIfAborted, withAbort } from '../core/operation.js'
 import {
   lengthPrefixedNamespaceCodec,
@@ -13,6 +16,10 @@ import { normalizeStorageException } from '../utils/quota.js'
 import { StorageError, StorageErrorCode } from '../types/errors.js'
 import type { IKeyValueStore, ISyncKeyValueStore, IWebStorageLike } from '../types/storage.js'
 import type { IBackendKind, IStorageCapabilities } from '../types/capabilities.js'
+import {
+  createBackendReactiveController,
+  registerBackendReactiveController
+} from './reactive-controller.js'
 
 const CAPABILITIES: IStorageCapabilities = Object.freeze({
   syncRead: true,
@@ -122,9 +129,26 @@ export const createWebStorageBackend = (
 
   const live = storage as IWebStorageLike
   let disposed = false
+  /** Seals new operations synchronously when disposal begins, before controller draining completes. */
+  let disposalRequested = false
+  /** Store-level disposal Promise cached to preserve identity across repeated calls. */
+  let disposePromise: Promise<void> | undefined
+
+  /** Private commit-after controller shared by direct and Host-created exact stores. */
+  const controller = createBackendReactiveController({
+    backend,
+    platform: live,
+    options: Object.freeze({ namespace, namespaceCodec })
+  })
+
+  /** Publish only after the underlying Web Storage operation has returned successfully. */
+  const publishChange = (change: Omit<IStorageChange, 'sequence' | 'origin' | 'scope'>): void => {
+    controller.publish(change)
+  }
 
   const assertLive = (): void => {
-    if (disposed) throw new StorageContractError(StorageContractErrorCode.disposed, { backend })
+    if (disposed || disposalRequested)
+      throw new StorageContractError(StorageContractErrorCode.disposed, { backend })
   }
 
   const namespacedEntries = (): Array<{
@@ -171,6 +195,7 @@ export const createWebStorageBackend = (
         throw normalizeStorageException(error, backend, entry.logicalKey, operation)
       }
     }
+    if (entries.length > 0) publishChange({ channel: 'value', kind: 'clear' })
   }
 
   const sync: ISyncKeyValueStore = {
@@ -193,6 +218,7 @@ export const createWebStorageBackend = (
         })
       try {
         live.setItem(namespacedKey(namespace, key, namespaceCodec, backend), value)
+        publishChange({ channel: 'value', kind: 'put', keys: [key] })
       } catch (error) {
         throw normalizeStorageException(error, backend, key)
       }
@@ -200,7 +226,10 @@ export const createWebStorageBackend = (
     remove: (key) => {
       assertLive()
       try {
-        live.removeItem(namespacedKey(namespace, key, namespaceCodec, backend))
+        const physicalKey = namespacedKey(namespace, key, namespaceCodec, backend)
+        const existed = live.getItem(physicalKey) !== null
+        live.removeItem(physicalKey)
+        if (existed) publishChange({ channel: 'value', kind: 'remove', keys: [key] })
       } catch (error) {
         throw normalizeStorageException(error, backend, key)
       }
@@ -227,7 +256,7 @@ export const createWebStorageBackend = (
     }
   }
 
-  return {
+  const store: IKeyValueStore = {
     backend,
     capabilities: CAPABILITIES,
     sync,
@@ -246,9 +275,16 @@ export const createWebStorageBackend = (
         assertLive()
         clearNamespacedEntries(`${backend}.clearAll`, signal)
       }),
-    dispose: () =>
-      toPromise(() => {
+    dispose: () => {
+      if (disposePromise !== undefined) return disposePromise
+      disposalRequested = true
+      const controllerDispose = controller.dispose()
+      disposePromise = controllerDispose.then(() => {
         disposed = true
       })
+      return disposePromise
+    }
   }
+  registerBackendReactiveController(store, controller)
+  return store
 }

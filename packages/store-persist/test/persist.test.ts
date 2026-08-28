@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { memoryStorage } from '@migaia/storage-web'
+import { memoryStorage } from '@migaia/storage-web/memory'
 import { createStore } from '@migaia/store-light'
 import { persist } from '../src/light-index'
 

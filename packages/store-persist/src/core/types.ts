@@ -1,5 +1,5 @@
 import type { IComputedValue, IDisposer, IRuntime } from '@migaia/reactive'
-import type { ICodec, IKeyValueStore, IRecordStore } from '@migaia/storage-web'
+import type { ICodec, IKeyValueStore, IRecordStore } from '@migaia/storage-contract'
 import { PersistState } from '../state-constants.js'
 
 /**

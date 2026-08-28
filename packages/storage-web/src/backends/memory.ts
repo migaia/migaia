@@ -5,13 +5,7 @@ import {
   type IStorageChange
 } from '@migaia/storage-contract'
 import { isStorageErrorFamily } from '../core/error-family.js'
-import {
-  createStorageOperationReporter,
-  createStorageOperationRuntime,
-  reportCleanupError
-} from '../core/operation-reporter.js'
-import { createEventChannel, EventDispatchPolicy } from '@migaia/event-subscriber'
-import { toPromise } from '@migaia/utils/promise'
+import { createStorageOperationRuntime } from '../core/operation-reporter.js'
 import {
   mergeSignals,
   snapshotSyncWriteOptions,
@@ -29,12 +23,10 @@ import { isStorageKeyInRange } from '../core/query.js'
 import { StorageBackend, StorageChannel, StorageOperation } from '../constants.js'
 import { isUint8Array } from '../core/bytes.js'
 import { planChannelWrite } from '../core/channel-write.js'
-/**
- * Change-feed events on the `record` channel report a `scope` (SWV2-§4.6) derived from the
- * canonical entity key shape; see `entity/key.ts`'s doc comment on why importing this leaf constant
- * here creates no cycle with `entity/repository.ts` (which depends on this file).
- */
-import { REPOSITORY_KEY_PREFIX } from '../entity/key.js'
+import {
+  createBackendReactiveController,
+  registerBackendReactiveController
+} from './reactive-controller.js'
 import { StorageError, StorageErrorCode } from '../types/errors.js'
 import type { IStorageKey } from '../types/context.js'
 import type { IRecordStore, ISyncCapableStore, ISyncKeyValueStore } from '../types/storage.js'
@@ -90,43 +82,13 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
   const recordRevisions = new Map<string, number>()
   let recordEpoch = 0
   let disposed = false
+  /** Seals new operations synchronously when disposal begins, before controller draining completes. */
+  let disposalRequested = false
+  /** Store-level disposal Promise cached to preserve identity across repeated calls. */
+  let disposePromise: Promise<void> | undefined
 
-  /** Distinguishes this store instance's own events from another's (SWV2-I11 groundwork). */
-  const origin = autoKey()
-  let changeSequence = 0
-  /** Canonical transient owner for listener registration, snapshots, reentrancy, and disposal. */
-  const changeReporter = createStorageOperationReporter()
-  const changeChannel = createEventChannel<IStorageChange>({
-    report: ({ error }) => reportCleanupError(changeReporter, error),
-    dispatchPolicy: EventDispatchPolicy.queued
-  })
-
-  /** SWV2-§4.6: "keys 超过 128 时省略 keys，消费者按 scope 全量失效". */
-  const MAX_CHANGE_EVENT_KEYS = 128
-
-  /** A canonical entity key's scope component, or `undefined` for any other key shape. */
-  const canonicalScopeOf = (key: IStorageKey): string | undefined =>
-    Array.isArray(key) &&
-    key.length === 3 &&
-    key[0] === REPOSITORY_KEY_PREFIX &&
-    typeof key[1] === 'string' &&
-    typeof key[2] === 'string'
-      ? key[1]
-      : undefined
-
-  /**
-   * SWV2-§4.6 requires a `scope` a consumer can invalidate against once `keys` is omitted above the
-   * cap. Only meaningful for the `record` channel (canonical entity keys); `value`/`bytes` have no
-   * entity-scope concept, so callers never ask this for those channels. Best-effort: a `record`
-   * batch touching more than one scope (or any non-canonical key) has no single scope to report and
-   * leaves the field `undefined` rather than guessing.
-   */
-  const deriveScope = (keys: readonly IStorageKey[] | undefined): string | undefined => {
-    if (keys === undefined || keys.length === 0) return undefined
-    const first = canonicalScopeOf(keys[0]!)
-    if (first === undefined) return undefined
-    return keys.every((key) => canonicalScopeOf(key) === first) ? first : undefined
-  }
+  /** Private commit-after controller shared with direct consumers and Host materialization. */
+  const controller = createBackendReactiveController({ backend: StorageBackend.memory })
 
   /**
    * SWV2-R16/I05/I06/E08: fires only after a mutation has fully and durably committed (never from
@@ -135,23 +97,11 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
    * corrupt the write that already happened — the write itself is done by the time this runs.
    */
   const publishChange = (change: Omit<IStorageChange, 'sequence' | 'origin' | 'scope'>): void => {
-    changeSequence += 1
-    const keys =
-      change.keys !== undefined && change.keys.length > MAX_CHANGE_EVENT_KEYS
-        ? undefined
-        : change.keys
-    const scope = change.channel === 'record' ? deriveScope(change.keys) : undefined
-    const event: IStorageChange = { ...change, keys, scope, sequence: changeSequence, origin }
-    try {
-      changeChannel.publish(event)
-    } catch (cause) {
-      // The memory mutation is already committed; listener failures are diagnostics only.
-      reportCleanupError(changeReporter, cause)
-    }
+    controller.publish(change)
   }
 
   const assertLive = (): void => {
-    if (disposed)
+    if (disposed || disposalRequested)
       throw new StorageContractError(StorageContractErrorCode.disposed, {
         backend: StorageBackend.memory
       })
@@ -394,7 +344,7 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
     return result
   }
 
-  return {
+  const store: ISyncCapableStore<IRecordStore<TValue>> & IChangeFeedStore = {
     backend: StorageBackend.memory,
     capabilities: CAPABILITIES,
     sync,
@@ -426,14 +376,18 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
         recordEpoch += 1
         if (hadEntries) publishChange({ channel: 'all', kind: 'clear' })
       }),
-    dispose: () =>
-      toPromise(() => {
+    dispose: () => {
+      if (disposePromise !== undefined) return disposePromise
+      disposalRequested = true
+      const controllerDispose = controller.dispose()
+      disposePromise = controllerDispose.then(() => {
         disposed = true
         kv.clear()
         bytes.clear()
         documents.clear()
-        changeChannel.clear()
-      }),
+      })
+      return disposePromise
+    },
 
     getBytes: (key, ctx) =>
       withAbort(ctx, async () => {
@@ -535,12 +489,15 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
     transaction: (run, ctx) => {
       return withAbort(ctx, (signal) => {
         assertTransactionCallback(run, StorageBackend.memory)
-        return runTransaction(run, signal)
+        const release = controller.beginMutation()
+        return runTransaction(run, signal).finally(release)
       })
     },
     subscribeChanges: (listener) => {
       assertLive()
-      return changeChannel.subscribe((event) => listener(event.value))
+      return controller.subscribe(listener)
     }
   }
+  registerBackendReactiveController(store, controller)
+  return store
 }

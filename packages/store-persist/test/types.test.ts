@@ -1,5 +1,5 @@
 import { expectTypeOf, it } from 'vitest'
-import type { IKeyValueStore, IRecordStore, IStorageCapabilities } from '@migaia/storage-web'
+import type { IKeyValueStore, IRecordStore, IStorageCapabilities } from '@migaia/storage-contract'
 import type { IPersistStorage, IPersistByteStorage } from '../src/core/types.js'
 
 it('IPersistStorage 是最小投影：text-only adapter 无需 backend/has/clearValues/clearAll/dispose', () => {

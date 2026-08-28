@@ -1,6 +1,6 @@
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
 import {
-  snapshotStorageCapabilities,
+  snapshotStorageCapabilitiesDetailed,
   type IBackendKind,
   type IStorageCapabilities
 } from './capabilities.js'
@@ -81,22 +81,48 @@ type IStoreShapeInspection = {
   readonly valid: boolean
   readonly backend: IBackendKind | undefined
   readonly capabilities: IStorageCapabilities | undefined
+  readonly dispose: (() => Promise<void>) | undefined
+  readonly cause: unknown
 }
+
+/** Detailed one-read admission result retained for lifecycle owners at package boundaries. */
+export type IKeyValueStoreAdmission =
+  | {
+      readonly valid: true
+      readonly store: IKeyValueStore
+      readonly backend: IBackendKind
+      readonly capabilities: IStorageCapabilities
+      readonly dispose: () => Promise<void>
+      readonly receiver: object
+    }
+  | {
+      readonly valid: false
+      readonly cause: unknown
+    }
 
 /** Inspect each public store field once and never leak accessor failures from a predicate. */
 const inspectStoreShape = (store: unknown, records: boolean): IStoreShapeInspection => {
   if (typeof store !== 'object' || store === null || Array.isArray(store))
-    return { valid: false, backend: undefined, capabilities: undefined }
+    return {
+      valid: false,
+      backend: undefined,
+      capabilities: undefined,
+      dispose: undefined,
+      cause: undefined
+    }
   const candidate = store as Record<string, unknown>
   let backend: unknown
   let capabilitiesValue: unknown
   let methods: unknown[]
+  let dispose: unknown
   try {
     backend = candidate.backend
     capabilitiesValue = candidate.capabilities
-    methods = ['get', 'set', 'remove', 'has', 'keys', 'clearValues', 'clearAll', 'dispose'].map(
+    methods = ['get', 'set', 'remove', 'has', 'keys', 'clearValues', 'clearAll'].map(
       (name) => candidate[name]
     )
+    dispose = candidate.dispose
+    methods.push(dispose)
     if (records)
       methods.push(
         ...[
@@ -111,13 +137,20 @@ const inspectStoreShape = (store: unknown, records: boolean): IStoreShapeInspect
           'transaction'
         ].map((name) => candidate[name])
       )
-  } catch {
-    return { valid: false, backend: undefined, capabilities: undefined }
+  } catch (cause) {
+    return {
+      valid: false,
+      backend: undefined,
+      capabilities: undefined,
+      dispose: undefined,
+      cause
+    }
   }
   const normalizedBackend = BACKEND_KINDS.has(backend as IBackendKind)
     ? (backend as IBackendKind)
     : undefined
-  const capabilities = snapshotStorageCapabilities(capabilitiesValue)
+  const capabilitiesInspection = snapshotStorageCapabilitiesDetailed(capabilitiesValue)
+  const capabilities = capabilitiesInspection.value
   const validCapabilities =
     capabilities !== undefined &&
     (!records ||
@@ -131,7 +164,29 @@ const inspectStoreShape = (store: unknown, records: boolean): IStoreShapeInspect
       validCapabilities &&
       methods.every((method) => typeof method === 'function'),
     backend: normalizedBackend,
-    capabilities
+    capabilities,
+    dispose: typeof dispose === 'function' ? (dispose as () => Promise<void>) : undefined,
+    cause: capabilitiesInspection.cause
+  }
+}
+
+/** Admit one key-value store while preserving the exact hostile accessor failure, if any. */
+export const snapshotKeyValueStoreDetailed = (store: unknown): IKeyValueStoreAdmission => {
+  const inspection = inspectStoreShape(store, false)
+  if (
+    !inspection.valid ||
+    inspection.backend === undefined ||
+    inspection.capabilities === undefined ||
+    inspection.dispose === undefined
+  )
+    return { valid: false, cause: inspection.cause }
+  return {
+    valid: true,
+    store: store as IKeyValueStore,
+    backend: inspection.backend,
+    capabilities: inspection.capabilities,
+    dispose: inspection.dispose,
+    receiver: store as object
   }
 }
 
@@ -145,11 +200,11 @@ export const snapshotKeyValueStore = (
       readonly capabilities: IStorageCapabilities
     }
   | undefined => {
-  const inspection = inspectStoreShape(store, false)
-  if (!inspection.valid || inspection.capabilities === undefined) return undefined
+  const inspection = snapshotKeyValueStoreDetailed(store)
+  if (!inspection.valid) return undefined
   return {
-    store: store as IKeyValueStore,
-    backend: inspection.backend!,
+    store: inspection.store,
+    backend: inspection.backend,
     capabilities: inspection.capabilities
   }
 }

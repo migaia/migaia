@@ -63,6 +63,11 @@ type IPreauthorizedPackageIdentity = {
 const repositoryRoot = resolve(import.meta.dirname, '..', '..', '..')
 /** Exact package-manager version whose virtual-store naming algorithm is reproduced below. */
 const pinnedPnpmVersion = storageV2PinnedPnpmVersion
+/** Uses pnpm's configured cache so offline packed installs exercise normal dependency resolution. */
+const configuredPnpmStoreDirectory = execFileSync('pnpm', ['store', 'path'], {
+  cwd: repositoryRoot,
+  encoding: 'utf8'
+}).trim()
 /** Pnpm 11.20.0 default persisted in the fresh consumer's `.modules.yaml`. */
 const pnpmVirtualStoreDirMaxLength = storageV2VirtualStoreDirMaxLength
 /** D18 foundation order and exact versions authorized for the C2-R4 rehearsal. */
@@ -74,19 +79,41 @@ const releasePackages: readonly IPackageDefinition[] = [
   { directory: 'storage-contract', name: '@migaia/storage-contract', version: '0.0.2' },
   { directory: 'storage-web', name: '@migaia/storage-web', version: '0.0.3' }
 ]
+/** Full packed dependency closure required for a normal-resolution storage-web install. */
+const packedPackages: readonly IPackageDefinition[] = [
+  { directory: 'utils', name: '@migaia/utils', version: '0.0.2' },
+  { directory: 'event-subscriber', name: '@migaia/event-subscriber', version: '0.0.3' },
+  { directory: 'lifecycle', name: '@migaia/lifecycle', version: '0.0.2' },
+  { directory: 'reactive', name: '@migaia/reactive', version: '0.0.2' },
+  { directory: 'middleware-pipeline', name: '@migaia/middleware-pipeline', version: '0.0.2' },
+  { directory: 'resource', name: '@migaia/resource', version: '0.0.2' },
+  { directory: 'storage-contract', name: '@migaia/storage-contract', version: '0.0.2' },
+  { directory: 'plugin-host', name: '@migaia/plugin-host', version: '0.0.5' },
+  { directory: 'capability', name: '@migaia/capability', version: '0.0.1' },
+  { directory: 'storage-web', name: '@migaia/storage-web', version: '0.0.3' }
+]
 /** Exact memory-only retained graph after package-manager installation of the packed root. */
 const expectedRetainedModules = [
   '@migaia/event-subscriber/dist/index.js',
+  '@migaia/lifecycle/dist/error-code.js',
+  '@migaia/lifecycle/dist/errors.js',
+  '@migaia/lifecycle/dist/quiescence-tracker.js',
+  '@migaia/lifecycle/dist/utils/dist/error-text-AvoAS3qw.js',
+  '@migaia/lifecycle/dist/utils/dist/error.js',
   '@migaia/storage-contract/dist/index.js',
-  '@migaia/storage-web/dist/async-CyDwc6I6.js',
   '@migaia/storage-web/dist/constants-dsZodWbf.js',
-  '@migaia/storage-web/dist/errors-CbYrsXwm.js',
-  '@migaia/storage-web/dist/key-CD4tRJxe.js',
-  '@migaia/storage-web/dist/memory-BlSFJasI.js',
-  '@migaia/storage-web/dist/operation-D-iLqVmL.js',
-  '@migaia/storage-web/dist/transaction-DCYlmk4y.js',
+  '@migaia/storage-web/dist/errors-QY7pE_Oy.js',
+  '@migaia/storage-web/dist/key-Cp7wL7rA.js',
+  '@migaia/storage-web/dist/memory-Dx5-UDXz.js',
+  '@migaia/storage-web/dist/operation-DeSu1sk5.js',
+  '@migaia/storage-web/dist/operation-reporter-CxbWTNcw.js',
+  '@migaia/storage-web/dist/query-DPXXsCtN.js',
+  '@migaia/storage-web/dist/reactive-controller-B5Zxko2x.js',
+  '@migaia/storage-web/dist/transaction-Bi-i3iMi.js',
   '@migaia/utils/dist/bytes.js',
   '@migaia/utils/dist/error-text-AvoAS3qw.js',
+  '@migaia/utils/dist/error.js',
+  '@migaia/utils/dist/object-path.js',
   '@migaia/utils/dist/promise.js',
   'app/bundle-entry.js'
 ] as const
@@ -124,7 +151,7 @@ describe('SWV2-T58 C2-R4 host and release boundary', () => {
         nextImporter === -1 ? lockfile.length : nextImporter
       )
       const dependencies = (manifest.dependencies ?? {}) as Record<string, string>
-      for (const dependency of releasePackages) {
+      for (const dependency of packedPackages) {
         if (dependencies[dependency.name] !== 'workspace:^') continue
         expect(importer, `${definition.directory} -> ${dependency.name}`).toContain(
           `specifier: workspace:^\n        version: link:../${dependency.directory}`
@@ -136,7 +163,7 @@ describe('SWV2-T58 C2-R4 host and release boundary', () => {
       resolve(repositoryRoot, 'packages/storage-web/src/backends/indexed-db.ts'),
       'utf8'
     )
-    expect(indexedDbSource).toMatch(/secondaryIndexes:\s*false/)
+    expect(indexedDbSource).toMatch(/secondaryIndexes:\s*true/)
     expect(indexedDbSource).toMatch(/changeFeed:\s*false/)
   })
 
@@ -145,7 +172,7 @@ describe('SWV2-T58 C2-R4 host and release boundary', () => {
     try {
       const consumerDirectory = join(smokeDirectory, 'consumer')
       const artifacts = packReleaseArtifacts(smokeDirectory)
-      installPackedConsumer(consumerDirectory, artifacts, join(smokeDirectory, 'pnpm-store'))
+      installPackedConsumer(consumerDirectory, artifacts, configuredPnpmStoreDirectory)
       const consumerManifest = readJson(join(consumerDirectory, 'package.json'))
       expect(consumerManifest.dependencies).toEqual({
         '@migaia/storage-web': `file:${artifactFor(artifacts, '@migaia/storage-web').tarballPath}`
@@ -161,7 +188,7 @@ describe('SWV2-T58 C2-R4 host and release boundary', () => {
         join(consumerDirectory, 'native-esm.mjs'),
         [
           "import { memoryStorage } from '@migaia/storage-web/memory'",
-          "const routes = ['/local-storage', '/session-storage', '/cookies', '/indexed-db', '/entity', '/schema', '/serialize', '/reactive']",
+          "const routes = ['/local-storage', '/session-storage', '/cookies', '/indexed-db', '/host', '/plugins/memory', '/plugins/local-storage', '/plugins/session-storage', '/plugins/cookies', '/plugins/indexed-db', '/plugins/reactive', '/plugins/reactive/memory', '/plugins/reactive/local-storage', '/plugins/reactive/session-storage', '/plugins/reactive/cookies', '/plugins/reactive/indexed-db', '/reactive-adapter', '/entity', '/schema', '/serialize']",
           'await Promise.all(routes.map((route) => import(`@migaia/storage-web${route}`)))',
           'const storage = memoryStorage()',
           "if (storage.capabilities.secondaryIndexes !== false) throw new Error('secondary index capability promoted')",
@@ -234,7 +261,7 @@ describe('SWV2-T58 C2-R4 host and release boundary', () => {
       installPackedConsumer(
         consumerDirectory,
         artifacts.filter(({ definition }) => definition.name !== '@migaia/event-subscriber'),
-        join(smokeDirectory, 'pnpm-store'),
+        configuredPnpmStoreDirectory,
         malformedArtifact
       )
       const result = spawnSync(
@@ -462,7 +489,7 @@ function packReleaseArtifacts(smokeDirectory: string): readonly IPackedArtifact[
   const inspectionDirectory = join(smokeDirectory, 'inspection')
   mkdirSync(packDirectory, { recursive: true })
   mkdirSync(inspectionDirectory, { recursive: true })
-  for (const definition of releasePackages) {
+  for (const definition of packedPackages) {
     const packageDirectory = resolve(repositoryRoot, 'packages', definition.directory)
     execFileSync('pnpm', ['pack', '--pack-destination', packDirectory], {
       cwd: packageDirectory,
@@ -471,7 +498,7 @@ function packReleaseArtifacts(smokeDirectory: string): readonly IPackedArtifact[
   }
 
   const tarballs = readdirSync(packDirectory).filter((entry) => entry.endsWith('.tgz'))
-  expect(tarballs).toHaveLength(releasePackages.length)
+  expect(tarballs).toHaveLength(packedPackages.length)
   return tarballs.map((tarball): IPackedArtifact => {
     const tarballPath = join(packDirectory, tarball)
     const contents = execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' })
@@ -484,7 +511,7 @@ function packReleaseArtifacts(smokeDirectory: string): readonly IPackedArtifact[
       encoding: 'utf8'
     })
     const packedManifest = JSON.parse(manifestText) as Record<string, unknown>
-    const definition = releasePackages.find(({ name }) => name === packedManifest.name)
+    const definition = packedPackages.find(({ name }) => name === packedManifest.name)
     expect(definition, String(packedManifest.name)).toBeDefined()
     expect(packedManifest.version).toBe(definition!.version)
     const extractDirectory = join(inspectionDirectory, definition!.directory)
@@ -506,7 +533,7 @@ function packReleaseArtifacts(smokeDirectory: string): readonly IPackedArtifact[
       ).toBe(true)
     }
     const dependencies = (packedManifest.dependencies ?? {}) as Record<string, string>
-    for (const dependency of releasePackages) {
+    for (const dependency of packedPackages) {
       if (!(dependency.name in dependencies)) continue
       expect(dependencies[dependency.name], `${tarball}:${dependency.name}`).toBe(
         `^${dependency.version}`
@@ -640,7 +667,7 @@ function inspectInstalledPackageRoots(
     canonicalConsumerDirectory,
     artifacts
   )
-  expect(preauthorizedPackages.size).toBe(releasePackages.length)
+  expect(preauthorizedPackages.size).toBe(packedPackages.length)
 
   const directStorageWeb = join(consumerDirectory, 'node_modules', '@migaia', 'storage-web')
   const expectedStorageWebRoot = preauthorizedPackages.get('@migaia/storage-web')?.root
@@ -650,7 +677,10 @@ function inspectInstalledPackageRoots(
   )
   const installedScope = resolve(expectedStorageWebRoot!, '..')
   expect(readdirSync(installedScope).sort()).toEqual(
-    releasePackages.map(({ name }) => name.slice('@migaia/'.length)).sort()
+    packedPackages
+      .filter(({ directory }) => directory !== 'middleware-pipeline')
+      .map(({ name }) => name.slice('@migaia/'.length))
+      .sort()
   )
 
   const installedPackages = new Map<string, IInstalledPackageIdentity>()
@@ -665,20 +695,26 @@ function inspectInstalledPackageRoots(
       definition.name === '@migaia/storage-web'
         ? directStorageWeb
         : join(installedScope, definition.directory)
-    const installedRoot = realpathSync(installedLink)
-    const installedLinkTarget = readlinkSync(installedLink)
-    expect(installedRoot, `${definition.name} pre-authorized virtual-store root`).toBe(expectedRoot)
-    expect(
-      realpathSync(resolve(dirname(installedLink), installedLinkTarget)),
-      `${definition.name} link target`
-    ).toBe(expectedRoot)
-    const manifest = readJson(join(installedRoot, 'package.json'))
-    const packedContentSha256 = packageContentSha256(artifact.extractDirectory)
-    const installedContentSha256 = packageContentSha256(installedRoot)
     const installedPackageRoots = inspectVirtualStorePackageRoots(
       consumerDirectory,
       definition.name
     )
+    const installedRoot =
+      definition.directory === 'middleware-pipeline'
+        ? installedPackageRoots[0]
+        : realpathSync(installedLink)
+    if (installedRoot === undefined) throw new Error(`missing installed root: ${definition.name}`)
+    expect(installedRoot, `${definition.name} pre-authorized virtual-store root`).toBe(expectedRoot)
+    if (definition.directory !== 'middleware-pipeline') {
+      const installedLinkTarget = readlinkSync(installedLink)
+      expect(
+        realpathSync(resolve(dirname(installedLink), installedLinkTarget)),
+        `${definition.name} link target`
+      ).toBe(expectedRoot)
+    }
+    const manifest = readJson(join(installedRoot, 'package.json'))
+    const packedContentSha256 = packageContentSha256(artifact.extractDirectory)
+    const installedContentSha256 = packageContentSha256(installedRoot)
     expect(manifest.name, definition.name).toBe(definition.name)
     expect(manifest.version, definition.name).toBe(definition.version)
     expect(installedPackageRoots, `${definition.name} virtual-store roots`).toEqual([installedRoot])
@@ -696,7 +732,7 @@ function inspectInstalledPackageRoots(
       )
     installedPackages.set(definition.name, installedIdentity)
   }
-  expect(installedPackages.size).toBe(releasePackages.length)
+  expect(installedPackages.size).toBe(packedPackages.length)
   if (expectedPackages !== undefined)
     expect([...installedPackages.keys()].sort(), 'fresh-install receipt package set').toEqual(
       [...expectedPackages.keys()].sort()

@@ -60,3 +60,4 @@ export {
   adaptSyncStageToGenerator
 } from './pipeline.js'
 export { disposeKey, asyncDisposeKey } from './symbols.js'
+export { invokeCaptured } from './invocation.js'

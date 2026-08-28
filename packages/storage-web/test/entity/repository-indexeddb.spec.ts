@@ -1,11 +1,11 @@
-import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
-import { describe, expect, it } from 'vitest'
+import { IDBFactory, IDBIndex, IDBKeyRange } from 'fake-indexeddb'
+import { describe, expect, it, vi } from 'vitest'
 import { defineEntity } from '../../src/entity'
 import { indexedDb } from '../../src/backends'
 import { StorageError, StorageErrorCode } from '../../src/types/errors'
 import type { IStorageKey } from '../../src/types/context'
 import { asIndexedDbBackfillStore } from '../../src/backends/indexed-db-backfill'
-import { repositoryEntityRange } from '../../src/entity/key'
+import { composeRepositoryKey, repositoryEntityRange } from '../../src/entity/key'
 
 type IUser = { id: string; name: string; email: string }
 
@@ -19,6 +19,153 @@ const freshIndexedDb = () =>
   })
 
 describe('repository over real indexedDb backend', () => {
+  it('SWV4-R07 uses the complete sidecar for exact/range/list/stream queries', async () => {
+    type IIndexedUser = { id: string; score: number }
+    const store = freshIndexedDb()
+    const baseline = defineEntity<IIndexedUser>({ name: 'native-users', key: 'id' }).connect(store)
+    await baseline.put({ id: 'u1', score: 2 })
+    await baseline.put({ id: 'u2', score: 1 })
+    await baseline.migrate()
+    const repository = defineEntity<IIndexedUser>()({
+      name: 'native-users',
+      key: 'id',
+      indexes: { score: { path: 'score' } }
+    }).connect(store)
+    await repository.findManyBy('score', { lower: 1, upper: 2 })
+    const fullScan = vi.spyOn(store, 'iterateRecords')
+
+    await expect(repository.findBy('score', 1)).resolves.toEqual({ id: 'u2', score: 1 })
+    await expect(
+      repository.list({
+        index: 'score',
+        range: { lower: 1, upper: 2 },
+        direction: 'prev',
+        limit: 1
+      })
+    ).resolves.toEqual([{ id: 'u1', score: 2 }])
+    const streamed: IIndexedUser[] = []
+    for await (const value of repository.streamBy('score', { lower: 1, upper: 2 }))
+      streamed.push(value)
+    expect(streamed).toEqual([
+      { id: 'u2', score: 1 },
+      { id: 'u1', score: 2 }
+    ])
+    expect(fullScan).not.toHaveBeenCalled()
+    await store.dispose()
+  })
+
+  it('SWV4-R07 compiles narrow ranges into the lookup cursor before defensive filtering', async () => {
+    type IRangeUser = { id: string; score: number }
+    const store = freshIndexedDb()
+    const baseline = defineEntity<IRangeUser>({ name: 'native-range-users', key: 'id' }).connect(
+      store
+    )
+    for (const score of [1, 2, 3, 4, 5]) await baseline.put({ id: `u${score}`, score })
+    await baseline.migrate()
+    const repository = defineEntity<IRangeUser>()({
+      name: 'native-range-users',
+      key: 'id',
+      indexes: { score: { path: 'score' } }
+    }).connect(store)
+    const observedRanges: IDBKeyRange[] = []
+    const spy = vi
+      .spyOn(IDBIndex.prototype, 'openKeyCursor')
+      .mockImplementation(function (this: IDBIndex, range, direction) {
+        if (range !== undefined && range !== null && typeof range === 'object' && 'lower' in range)
+          observedRanges.push(range as IDBKeyRange)
+        spy.mockRestore()
+        return this.openKeyCursor(range, direction)
+      })
+
+    await expect(repository.findManyBy('score', { lower: 2, upper: 4 })).resolves.toEqual([
+      { id: 'u2', score: 2 },
+      { id: 'u3', score: 3 },
+      { id: 'u4', score: 4 }
+    ])
+    expect(observedRanges.length).toBeGreaterThan(0)
+    expect(observedRanges[0]!.lower).toEqual(['native-range-users', 'score', expect.any(String), 2])
+    expect(observedRanges[0]!.upper).toEqual(['native-range-users', 'score', expect.any(String), 4])
+    spy.mockRestore()
+    await store.dispose()
+  })
+
+  it('SWV4-R07 keeps compound and deeply nested index keys inside the generation prefix', async () => {
+    type INestedRangeUser = { id: string; values: IStorageKey[] }
+    const store = freshIndexedDb()
+    const baseline = defineEntity<INestedRangeUser>({
+      name: 'native-nested-range-users',
+      key: 'id'
+    }).connect(store)
+    await baseline.put({ id: 'primitive', values: ['alpha'] })
+    await baseline.put({ id: 'empty-string', values: [''] })
+    await baseline.put({ id: 'compound-array', values: [['tenant', 'user']] })
+    await baseline.put({ id: 'deep-array', values: [[['tenant', ['region', 'user']]]] })
+    await baseline.migrate()
+    const repository = defineEntity<INestedRangeUser>()({
+      name: 'native-nested-range-users',
+      key: 'id',
+      indexes: {
+        value: {
+          select: (value) => ({ kind: 'multiple' as const, keys: value.values }),
+          revision: 1
+        }
+      }
+    }).connect(store)
+    const observedRanges: IDBKeyRange[] = []
+    const spy = vi
+      .spyOn(IDBIndex.prototype, 'openKeyCursor')
+      .mockImplementation(function (this: IDBIndex, range, direction) {
+        if (range !== undefined && range !== null && typeof range === 'object' && 'lower' in range)
+          observedRanges.push(range as IDBKeyRange)
+        spy.mockRestore()
+        return this.openKeyCursor(range, direction)
+      })
+
+    const values = await repository.findManyBy('value')
+    expect(values.map((value) => value.id).sort()).toEqual([
+      'compound-array',
+      'deep-array',
+      'empty-string',
+      'primitive'
+    ])
+    expect(observedRanges[0]!.upper).toEqual([
+      'native-nested-range-users',
+      'value',
+      expect.stringContaining('\u0000')
+    ])
+    expect((observedRanges[0]!.upper as unknown[]).length).toBe(3)
+    await store.dispose()
+  })
+
+  it('SWV4-R10 enforces a unique index atomically across two connections', async () => {
+    type IUniqueUser = { id: string; email: string }
+    const factory = new IDBFactory()
+    const dbName = `native-unique-${Math.random().toString(36).slice(2)}`
+    const firstStore = indexedDb({ factory, keyRange: IDBKeyRange, dbName })
+    const secondStore = indexedDb({ factory, keyRange: IDBKeyRange, dbName })
+    const entity = defineEntity<IUniqueUser>()({
+      name: 'native-unique-users',
+      key: 'id',
+      indexes: { email: { path: 'email', unique: true } }
+    })
+    const first = entity.connect(firstStore)
+    await first.put({ id: 'seed', email: 'seed@example.com' })
+    await first.migrate()
+    await first.findManyBy('email', { lower: 'seed@example.com', upper: 'seed@example.com' })
+    const second = entity.connect(secondStore)
+    const outcomes = await Promise.allSettled([
+      first.put({ id: 'left', email: 'same@example.com' }),
+      second.put({ id: 'right', email: 'same@example.com' })
+    ])
+    expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1)
+    expect(outcomes.filter((outcome) => outcome.status === 'rejected')).toHaveLength(1)
+    expect(outcomes.find((outcome) => outcome.status === 'rejected')).toMatchObject({
+      reason: { code: 'INDEX_UNIQUE_CONFLICT' }
+    })
+    await firstStore.dispose()
+    await secondStore.dispose()
+  })
+
   it('SWV2-T34 entity privately backfills normalized path and selector projections', async () => {
     type IIndexedUser = { id: string; profile: { email: string }; tags: string[] }
     const store = freshIndexedDb()
@@ -37,7 +184,10 @@ describe('repository over real indexedDb backend', () => {
       key: 'id',
       indexes: {
         email: { path: 'profile.email', unique: true },
-        tags: { select: (value: IIndexedUser) => value.tags, multiEntry: true, revision: 3 }
+        tags: {
+          select: (value: IIndexedUser) => ({ kind: 'multiple' as const, keys: value.tags }),
+          revision: 3
+        }
       }
     })
     const repository = indexed.connect(store)
@@ -69,7 +219,7 @@ describe('repository over real indexedDb backend', () => {
     expect(matches).toEqual([
       { id: 'u1', profile: { email: 'ada@example.com' }, tags: ['engineer', 'admin'] }
     ])
-    expect(store.capabilities.secondaryIndexes).toBe(false)
+    expect(store.capabilities.secondaryIndexes).toBe(true)
   })
 
   it('SOL-SWV2-061 measures decoded custom-codec payloads before issuing a batch', async () => {
@@ -104,23 +254,145 @@ describe('repository over real indexedDb backend', () => {
 
     await expect(
       indexed.findManyBy('email', { lower: 'large@example.com', upper: 'large@example.com' })
-    ).resolves.toHaveLength(1)
+    ).rejects.toMatchObject({
+      code: 'VALUE_TOO_LARGE',
+      cause: expect.any(RangeError)
+    })
     const capability = asIndexedDbBackfillStore(store)!
     const handle = await capability.ensureRecordIndexes('decoded-cap-codec', [
       { name: 'email', unique: false, multiEntry: false, revision: 1 }
     ])
     await expect(capability.getRecordIndexReadiness(handle)).resolves.toMatchObject({
-      status: 'running',
-      scanned: 1
+      status: 'pending',
+      scanned: 0
     })
+    await store.dispose()
+  })
+
+  it('SWV4-R28 fails closed for nested undefined in decoded entity budget', async () => {
+    const store = freshIndexedDb()
+    const baseline = defineEntity<{ id: string; email: string }>({
+      name: 'nested-undefined-codec',
+      key: 'id'
+    }).connect(store)
+    await baseline.put({ id: 'u1', email: 'nested@example.com' })
+    await baseline.migrate()
+    const indexed = defineEntity<{ id: string; email: string }>()({
+      name: 'nested-undefined-codec',
+      key: 'id',
+      codec: {
+        name: 'nested-undefined-codec',
+        output: 'structured',
+        encode: async (value) => value,
+        decode: async (value) => {
+          const envelope = value as { __v: number; data: { id: string; email: string } }
+          return {
+            __v: envelope.__v,
+            data: { ...envelope.data, nested: { value: undefined } }
+          }
+        }
+      },
+      indexes: { email: { path: 'email' } }
+    }).connect(store)
+
+    await expect(indexed.findManyBy('email')).rejects.toMatchObject({
+      code: 'VALUE_TOO_LARGE',
+      cause: expect.any(RangeError)
+    })
+    await store.dispose()
+  })
+
+  it('SWV4-R06 keeps the canonical record when a legacy shadow has the same id', async () => {
+    type IShadowedUser = { id: string; email: string }
+    const store = freshIndexedDb()
+    const entity = defineEntity<IShadowedUser>({ name: 'shadow-wins', key: 'id' })
+    await entity.connect(store).put({ id: 'same', email: 'canonical@example.com' })
+    await store.putRecord({ __v: 1, data: { id: 'same', email: 'legacy@example.com' } }, [
+      'shadow-wins',
+      'same'
+    ])
+    const indexed = defineEntity<IShadowedUser>()({
+      name: 'shadow-wins',
+      key: 'id',
+      indexes: { email: { path: 'email' } }
+    }).connect(store)
 
     await expect(
-      indexed.findManyBy('email', { lower: 'small@example.com', upper: 'small@example.com' })
-    ).resolves.toHaveLength(1)
+      indexed.findManyBy('email', {
+        lower: 'canonical@example.com',
+        upper: 'canonical@example.com'
+      })
+    ).resolves.toEqual([{ id: 'same', email: 'canonical@example.com' }])
+  })
+
+  it('SWV4-R06 scans nested legacy IDs across foreign-key adjacency', async () => {
+    type INestedUser = { id: IStorageKey; email: string }
+    const store = freshIndexedDb()
+    const entity = defineEntity<INestedUser>({ name: 'nested-legacy', key: 'id' })
+    await entity.connect(store).migrate()
+    const nestedId: IStorageKey = ['tenant', ['region', 'user-1']]
+    await store.putRecord({ __v: 1, data: { id: nestedId, email: 'nested@example.com' } }, [
+      'nested-legacy',
+      nestedId
+    ])
+    await store.putRecord({ __v: 1, data: { id: 'foreign', email: 'foreign@example.com' } }, [
+      'foreign-entity',
+      ['tenant', ['region', 'foreign']]
+    ])
+    const indexed = defineEntity<INestedUser>()({
+      name: 'nested-legacy',
+      key: 'id',
+      indexes: { email: { path: 'email' } }
+    }).connect(store)
+    await expect(indexed.findManyBy('email')).resolves.toEqual([
+      { id: nestedId, email: 'nested@example.com' }
+    ])
+    const capability = asIndexedDbBackfillStore(store)!
+    const handle = await capability.ensureRecordIndexes('nested-legacy', [
+      { name: 'email', unique: false, multiEntry: false, revision: 1 }
+    ])
     await expect(capability.getRecordIndexReadiness(handle)).resolves.toMatchObject({
       status: 'running',
-      scanned: 2
+      scanned: 1,
+      indexed: 1
     })
+    await store.dispose()
+  })
+
+  it('SWV4-E28 rejects aggregate projection rows before any sidecar write', async () => {
+    const store = freshIndexedDb()
+    const scope = 'backfill-projection-cap'
+    for (let index = 0; index < 8; index += 1)
+      await store.putRecord({ value: index }, composeRepositoryKey(scope, `id-${index}`))
+    const capability = asIndexedDbBackfillStore(store)!
+    const handle = await capability.ensureRecordIndexes(scope, [
+      { name: 'tags', unique: false, multiEntry: true, revision: 1 }
+    ])
+    const session = await capability.openBackfillSession(handle, {
+      range: repositoryEntityRange(scope),
+      allowComplete: true,
+      batchSize: 8
+    })
+    const keys = Array.from({ length: 600 }, (_, index) => `tag-${index}`)
+    await expect(
+      session.readBatch(undefined, {
+        prepare: async () => ({
+          decodedBytes: 1,
+          outcome: 'indexed' as const,
+          projection: { tags: { kind: 'multiple' as const, keys } }
+        })
+      })
+    ).rejects.toMatchObject({
+      code: 'VALUE_TOO_LARGE',
+      cause: expect.any(RangeError)
+    })
+    await expect(capability.getRecordIndexReadiness(handle)).resolves.toMatchObject({
+      status: 'running',
+      scanned: 0,
+      indexed: 0
+    })
+    session.release()
+    await store.dispose()
   })
 
   it('SWV2-T34 keeps readiness non-complete until legacy winners are migrated', async () => {
@@ -150,7 +422,9 @@ describe('repository over real indexedDb backend', () => {
     }
     await expect(capability.getRecordIndexReadiness(handle)).resolves.toMatchObject({
       status: 'running',
-      scanned: 0
+      // R06 inspects the legacy phase before readiness can become complete; migration status
+      // still keeps this generation non-authoritative until the legacy winner is promoted.
+      scanned: 1
     })
     await entity.connect(store).migrate()
     await expect(entity.connect(store).findManyBy('email')).resolves.toEqual([
@@ -279,13 +553,21 @@ describe('repository over real indexedDb backend', () => {
       }
     }).connect(store)
 
-    await expect(indexed.findManyBy('email')).rejects.toBe(selectorFailure)
     const capability = asIndexedDbBackfillStore(store)!
     const handle = await capability.ensureRecordIndexes('failed-selector-backfill', [
-      { name: 'email', unique: false, multiEntry: false, revision: 1 }
+      { name: 'email', unique: false, multiEntry: true, revision: 1 }
     ])
+
+    await expect(indexed.findManyBy('email')).rejects.toBe(selectorFailure)
     await expect(capability.getRecordIndexReadiness(handle)).resolves.toMatchObject({
       status: 'failed'
+    })
+    const freshHandle = await capability.ensureRecordIndexes('failed-selector-backfill', [
+      { name: 'email', unique: false, multiEntry: true, revision: 1 }
+    ])
+    expect(freshHandle.generation).not.toBe(handle.generation)
+    await expect(capability.getRecordIndexReadiness(freshHandle)).resolves.toMatchObject({
+      status: 'pending'
     })
   })
 
