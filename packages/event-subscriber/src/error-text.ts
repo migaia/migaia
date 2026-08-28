@@ -29,5 +29,7 @@ export const EventSubscriberErrorText = {
   /** Stable text for extension after chain teardown; used by subscription handles. */
   subscriptionClosed: 'event-subscriber subscription is closed',
   /** Stable text for failed handle descriptor projection; used by the raw subscription owner. */
-  subscriptionHandleProjectionFailed: 'event-subscriber subscription handle projection failed'
+  subscriptionHandleProjectionFailed:
+    'event-subscriber subscription handle projection failed' /** Stable text for invocation entries that are no longer callable. */,
+  invocationClosed: 'event-subscriber invocation is closed'
 } as const

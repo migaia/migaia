@@ -127,6 +127,18 @@ export type IEventDispatchSnapshot<T, R, V = undefined> = {
   readonly control: IEventDispatchControl
 }
 
+/** Opaque invocation entry used by consumers that must not receive listener ownership. */
+export type IEventInvocation<R> = {
+  readonly taskId: string | undefined
+  invoke(): R | PromiseLike<R>
+}
+
+/** Captured invocation batch; completion reports projection diagnostics and closes entries. */
+export type IEventInvocationBatch<R> = {
+  readonly entries: readonly IEventInvocation<R>[]
+  complete(): void
+}
+
 export type IEventListener<T, R = void, V = undefined> = (
   event: IProjectedEventContext<T, V>
 ) => R | PromiseLike<R>
@@ -325,6 +337,8 @@ export type IEventChannelOptions<
   readonly terminalReport?: (error: unknown) => void | PromiseLike<void>
   /** Controls synchronous nested publishes while preserving listener snapshot semantics. */
   readonly dispatchPolicy?: IEventDispatchPolicy
+  /** Controls whether one subscription handle removes only itself or all matching listeners. */
+  readonly removalPolicy?: 'handle' | 'listener-all'
   readonly style?: IEventApiStyleOption<S>
   readonly valueConfig?: IValidatedEventValueConfig<T, V>
 }

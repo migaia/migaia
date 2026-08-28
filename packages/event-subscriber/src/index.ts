@@ -1,4 +1,5 @@
 export { subscribeOnce, subscribeSubscriber, subscribeUntil } from './channel.js'
+export { invokeEachLive, invokeSnapshotEntries } from './channel.js'
 export { createCanonicalChannel as createEventChannel } from './channel.js'
 export { createEventHub } from './hub.js'
 export {
@@ -27,6 +28,8 @@ export type {
   IEventHub,
   IEventHubOptions,
   IEventHubReport,
+  IEventInvocation,
+  IEventInvocationBatch,
   IEventListener,
   IEventMap,
   IEventReport,

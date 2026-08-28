@@ -44,7 +44,9 @@ export const EventSubscriberErrorCode = {
    * Handle descriptor projection failed after registration; the package rolls back the first
    * registration and preserves the projection failure as the primary cause.
    */
-  subscriptionHandleProjectionFailed: 'SUBSCRIPTION_HANDLE_PROJECTION_FAILED'
+  subscriptionHandleProjectionFailed:
+    'SUBSCRIPTION_HANDLE_PROJECTION_FAILED' /** A captured invocation was called after completion or more than once. */,
+  invocationClosed: 'INVOCATION_CLOSED'
 } as const
 
 export type IEventSubscriberErrorCode =

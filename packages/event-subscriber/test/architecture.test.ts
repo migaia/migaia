@@ -236,9 +236,9 @@ describe('runtime-neutral boundary', () => {
     handle.unsubscribe()
     expect(eventHub.size()).toBe(0)
     const channelSource = readFileSync(resolve(import.meta.dirname, '../src/channel.ts'), 'utf8')
-    expect(channelSource).toContain('const release = registerRaw(listener, taskId)')
+    expect(channelSource).toContain('const admission = registerRaw(listener, taskId)')
     expect(channelSource).toContain('createSubscriptionHandle(')
-    expect(channelSource).toContain('return registerRaw(nextListener, nextTaskId)')
+    expect(channelSource).toContain('const nextAdmission = registerRaw(nextListener, nextTaskId)')
   })
 
   it('ES-T51 gives every package test a stable ES-T identifier', () => {

@@ -1,6 +1,11 @@
 import { EventSubscriberErrorCode } from './error-code.js'
 import { createEventAggregateError, createEventTypeError, eventErrorText } from './errors.js'
-import { createEventContext, getCapability, invokeSnapshot, validateTaskId } from './channel.js'
+import {
+  createEventContext,
+  getCapability,
+  invokeDispatchSnapshot,
+  validateTaskId
+} from './channel.js'
 import { reportEventProjectionFailure } from './value-projection.js'
 import { EventSubscriberState } from './state-constants.js'
 import type {
@@ -39,7 +44,7 @@ const settleSnapshot = async <T, R, V>(
   try {
     return {
       status: EventSubscriberState.fulfilled,
-      value: await invokeSnapshot(snapshot, value, projection)
+      value: await invokeDispatchSnapshot(snapshot, value, projection)
     }
   } catch (reason) {
     return { status: EventSubscriberState.rejected, reason }
