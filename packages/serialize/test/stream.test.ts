@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { createManualScheduler } from '@migaia/lifecycle'
 import {
   SerializeCodecError,
@@ -844,6 +845,36 @@ describe('decodeStream 与 collectStream', () => {
     expect(await collectStream(empty())).toEqual(['text', ''])
   })
 
+  it('MRC-SOL-F03 captures one encoder accessor and preserves its receiver', async () => {
+    let getterReads = 0
+    let receiver: unknown
+    const encoder = {
+      get encode() {
+        getterReads += 1
+        return function (this: unknown, input: string): Uint8Array {
+          // oxlint-disable-next-line typescript/no-this-alias
+          receiver = this
+          return new TextEncoder().encode(input)
+        }
+      }
+    }
+    async function* mixed(): AsyncGenerator<ISerializeChunk> {
+      yield ['text', 'A']
+      yield ['bytes', new Uint8Array([66])]
+    }
+
+    expect(chunkToText(await collectStream(mixed(), encoder), new TextDecoder())).toBe('AB')
+    expect(getterReads).toBe(1)
+    expect(receiver).toBe(encoder)
+  })
+
+  it('MRC-C-T02 keeps Option A as one documented stream receiver boundary', () => {
+    const source = readFileSync(new URL('../src/stream.ts', import.meta.url), 'utf8')
+    expect(source).toContain('MRC-C-R02-only receiver boundary')
+    expect(source).toContain('invokeCollectEncoderWithReceiver')
+    expect(source.match(/Reflect\.apply/g)).toHaveLength(6)
+  })
+
   it('refuses to merge a value chunk into a wire stream', async () => {
     async function* withValue(): AsyncGenerator<ISerializeChunk> {
       yield ['value', { a: 1 }]
@@ -897,7 +928,7 @@ describe('decodeStream 与 collectStream', () => {
           name: `${name}-${kind === Symbol.asyncIterator ? 'async' : 'sync'}`,
           cause,
           cleanupCalls,
-          expectedCleanup: kind === Symbol.asyncIterator ? 0 : 2,
+          expectedCleanup: kind === Symbol.asyncIterator ? 1 : 2,
           make: () => ({
             [kind]() {
               return {

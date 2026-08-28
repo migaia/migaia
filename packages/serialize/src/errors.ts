@@ -56,7 +56,15 @@ export const SerializeErrorText = {
   /** Stable prefix for a text encoder call failure during chunk collection. */
   textEncodeFailed: 'serialize text encoding failed',
   /** Stable diagnostic for an encoder result that cannot be merged as bytes. */
-  textEncoderOutputInvalid: 'serialize text encoder must return a Uint8Array'
+  textEncoderOutputInvalid: 'serialize text encoder must return a Uint8Array',
+  /** Stable text for malformed collector options before iterator acquisition. */
+  collectOptionInvalid: 'serialize collectStream options are invalid',
+  /** Stable text for an empty stream rejection requested by its consumer. */
+  collectEmpty: 'serialize stream is empty',
+  /** Stable text for a value chunk rejected from wire collection. */
+  collectValue: 'cannot collect a value chunk into a stream',
+  /** Stable text for iterator cleanup failures at the collector boundary. */
+  collectCleanupFailed: 'serialize stream iterator cleanup failed'
 } as const
 
 /** 结构化 tagged 错误：原生错误类型 `TError` 交叉附加 `source`/`code`/`context?`。运行时仍为 `TError`（`instanceof` 保持真）。 */

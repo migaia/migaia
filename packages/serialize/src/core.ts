@@ -44,6 +44,7 @@ export {
   decodeStream,
   encodeStream,
   sliceByFrameBudget,
+  type ICollectStreamOptions,
   type IEncodeStreamOptions,
   type IFrameBudgetOptions
 } from './stream.js'
