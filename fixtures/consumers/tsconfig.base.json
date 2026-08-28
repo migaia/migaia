@@ -5,6 +5,8 @@
     "noEmit": true,
     "paths": {
       "@migaia/plugin-host": ["../../packages/plugin-host/dist/index.d.ts"],
+      "@migaia/event-subscriber": ["../../packages/event-subscriber/dist/index.d.ts"],
+      "@migaia/web-rpc/*": ["../../packages/web-rpc/dist/*"],
       "@migaia/logger": ["../../packages/logger/dist/index.d.ts"],
       "@migaia/capability": ["../../packages/capability/dist/index.d.ts"],
       "@migaia/reactive": ["../../packages/reactive/dist/index.d.ts"],
@@ -22,6 +24,7 @@
       "@migaia/store-ssr": ["../../packages/store-ssr/dist/index.d.ts"],
       "@migaia/serialize": ["../../packages/serialize/dist/index.d.ts"],
       "@migaia/storage-web": ["../../packages/storage-web/dist/index.d.ts"],
+      "@migaia/storage-web/*": ["../../packages/storage-web/dist/*"],
       "@migaia/storage-web/memory": ["../../packages/storage-web/dist/memory.d.ts"],
       "@migaia/lifecycle": ["../../packages/lifecycle/dist/index.d.ts"]
     },

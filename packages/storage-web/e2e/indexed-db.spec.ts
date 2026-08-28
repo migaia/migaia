@@ -8,6 +8,40 @@ test('真实 IndexedDB 的基本 put/get 冒烟测试', async ({ page }) => {
   expect(result.metadata).toEqual({ ready: true })
 })
 
+test('R09 distinct pages receive a BroadcastChannel hint then reread authoritative IndexedDB state', async ({
+  page,
+  context
+}) => {
+  const receiverPage = page
+  const writerPage = await context.newPage()
+  const dbName = `r09-cross-page-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  try {
+    await Promise.all([receiverPage.goto('/'), writerPage.goto('/')])
+    await expect(
+      receiverPage.evaluate((name) => window.startIndexedDbCoordinationReceiver(name), dbName)
+    ).resolves.toEqual({ changeFeed: true })
+    await expect(
+      writerPage.evaluate((name) => window.startIndexedDbCoordinationWriter(name), dbName)
+    ).resolves.toEqual({ changeFeed: true })
+
+    const result = await receiverPage.evaluate(
+      (name) => window.awaitIndexedDbCoordinationHint(name),
+      dbName
+    )
+    expect(result.hint).toMatchObject({
+      channel: 'value',
+      kind: 'put',
+      keys: ['r09-cross-page-key']
+    })
+    expect(result.value).toBe('committed-by-writer')
+  } finally {
+    await writerPage
+      .evaluate((name) => window.finishIndexedDbCoordinationWriter(name), dbName)
+      .catch(() => undefined)
+    await writerPage.close()
+  }
+})
+
 test('真实浏览器 IndexedDB options 非法容器统一返回 INVALID_CONFIG', async ({ page }) => {
   await page.goto('/')
   const result = await page.evaluate(() => window.runIndexedDbOptionsGuardScenario())

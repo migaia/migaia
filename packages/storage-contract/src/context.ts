@@ -30,9 +30,9 @@ export type ISyncWriteOptions = {
 export type IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[]
 
 /** L1 范围查询边界，与 IDBKeyRange 语义对齐但不直接依赖它，便于其他结构化后端实现。 */
-export type IKeyRange = {
-  readonly lower?: IStorageKey
+export type IKeyRange<TKey extends IStorageKey = IStorageKey> = {
+  readonly lower?: TKey
   readonly lowerOpen?: boolean
-  readonly upper?: IStorageKey
+  readonly upper?: TKey
   readonly upperOpen?: boolean
 }

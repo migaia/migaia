@@ -45,6 +45,50 @@ const normalizeProjection = (
   return Object.freeze({ kind: 'single', key: value })
 }
 
+/** Validate the explicit custom projection shape without falling back to legacy return conventions. */
+const normalizeCustomProjection = (
+  value: unknown,
+  backend: IStorageBackend,
+  label: string
+): IRecordIndexProjectionValue | undefined => {
+  if (value === undefined) return undefined
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend,
+      cause: new TypeError(`entity selector index "${label}" projection must be an object`)
+    })
+  let kind: unknown
+  let key: unknown
+  let keys: unknown
+  try {
+    ;({ kind, key, keys } = value as Record<string, unknown>)
+  } catch (cause) {
+    throw new StorageError(StorageErrorCode.invalidConfig, { backend, cause })
+  }
+  if (kind === 'single') {
+    assertStorageKey(key, backend, `entity index "${label}" projection`)
+    return Object.freeze({ kind, key })
+  }
+  if (kind === 'multiple') {
+    if (!Array.isArray(keys))
+      throw new StorageError(StorageErrorCode.invalidConfig, {
+        backend,
+        cause: new TypeError(
+          `entity selector index "${label}" multiple projection must be an array`
+        )
+      })
+    const normalizedKeys = keys.map((item) => {
+      assertStorageKey(item, backend, `entity index "${label}" projection`)
+      return item
+    })
+    return Object.freeze({ kind, keys: Object.freeze(normalizedKeys) })
+  }
+  throw new StorageError(StorageErrorCode.invalidConfig, {
+    backend,
+    cause: new TypeError(`entity selector index "${label}" projection kind is invalid`)
+  })
+}
+
 /** Snapshot and validate declarations once, including hostile property access. */
 export const snapshotEntityIndexes = <TDomain>(
   configured: unknown
@@ -103,6 +147,10 @@ export const snapshotEntityIndexes = <TDomain>(
       throw new StorageError(StorageErrorCode.invalidConfig, {
         cause: new TypeError(`entity selector index "${name}" requires a function and revision`)
       })
+    if (select !== undefined && multiEntry !== undefined)
+      throw new StorageError(StorageErrorCode.invalidConfig, {
+        cause: new TypeError(`entity selector index "${name}" does not support multiEntry`)
+      })
     if (paths !== undefined && (multiEntry === true || !Array.isArray(paths) || paths.length === 0))
       throw new StorageError(StorageErrorCode.invalidConfig, {
         cause: new TypeError(`entity compound index "${name}" requires non-empty paths`)
@@ -115,7 +163,10 @@ export const snapshotEntityIndexes = <TDomain>(
     const definition = Object.freeze({
       name,
       unique: unique === true,
-      multiEntry: multiEntry === true,
+      // Custom selectors declare multiplicity in each explicit projection. The
+      // definition must retain that capability so backend fingerprints agree
+      // with a `{ kind: 'multiple' }` result instead of collapsing it to false.
+      multiEntry: select !== undefined || multiEntry === true,
       revision: normalizedRevision as number
     })
     indexes[name] = Object.freeze({
@@ -127,7 +178,9 @@ export const snapshotEntityIndexes = <TDomain>(
             : parsedPaths !== undefined
               ? parsedPaths.map((item) => get(value, item as never))
               : (select as (input: TDomain) => unknown)(value)
-        return normalizeProjection(selected, definition.multiEntry, backend, name)
+        return select === undefined
+          ? normalizeProjection(selected, definition.multiEntry, backend, name)
+          : normalizeCustomProjection(selected, backend, name)
       }
     })
   }

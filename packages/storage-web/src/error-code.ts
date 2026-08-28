@@ -153,7 +153,103 @@ export const StorageErrorCode = Object.freeze({
    * Enforces storage-v2 SWV2-E15/E18: the batch must be rejected and rolled back; callers should
    * retry through a fresh repository operation after the current handle is reacquired.
    */
-  indexBackfillStale: 'INDEX_BACKFILL_STALE'
+  indexBackfillStale: 'INDEX_BACKFILL_STALE',
+
+  /**
+   * A backend definition contains an invalid identifier. Enforces SWV4-E15/D51; callers must
+   * correct the bounded backend ID before retrying installation.
+   */
+  backendIdInvalid: 'BACKEND_ID_INVALID',
+
+  /**
+   * A backend ID is already present in the host install batch or registry. Enforces SWV4-E15/D23;
+   * callers must use a distinct ID or wait for the existing batch before retrying.
+   */
+  backendDuplicate: 'BACKEND_DUPLICATE',
+
+  /**
+   * A lookup requested a valid backend ID that has not been installed. Enforces SWV4-E15/D17;
+   * callers must install that exact backend or select an installed ID.
+   */
+  backendNotInstalled: 'BACKEND_NOT_INSTALLED',
+
+  /**
+   * A backend plugin or store failed its runtime contract check. Enforces SWV4-E16/D25; callers
+   * must repair the plugin definition rather than relying on an unvalidated store.
+   */
+  backendPluginInvalid: 'BACKEND_PLUGIN_INVALID',
+
+  /**
+   * Backend creation, preparation, or PluginHost installation failed. Enforces SWV4-E17/D30;
+   * callers may retry after fixing the cause, while the failed batch remains unpublished.
+   */
+  backendInstallFailed: 'BACKEND_INSTALL_FAILED',
+
+  /**
+   * A host mutation was requested while another install batch is active. Enforces SWV4-E36/D82;
+   * callers must wait for that batch to settle and explicitly retry.
+   */
+  storageHostBusy: 'STORAGE_HOST_BUSY',
+
+  /**
+   * A host or its public operation was used after sealing or terminal disposal. Enforces
+   * SWV4-E19/E35/D73; callers must create a new host instead of reviving this one.
+   */
+  storageHostDisposed: 'STORAGE_HOST_DISPOSED',
+
+  /**
+   * Host cleanup collected one or more failures. Enforces SWV4-E20/D18; callers must treat the host
+   * as terminal while inspecting the aggregate errors for cleanup diagnostics.
+   */
+  storageHostDisposeFailed: 'STORAGE_HOST_DISPOSE_FAILED',
+
+  /**
+   * Live-query request or owned reactive cleanup collected one or more failures. Enforces
+   * SWV4-E26/D70; callers must treat the query as terminal and inspect AggregateError.errors.
+   */
+  liveQueryDisposeFailed: 'LIVE_QUERY_DISPOSE_FAILED',
+
+  /**
+   * A reactive feature descriptor, brand, provider seam, or adapter result is invalid. Enforces
+   * SWV4-E29/D69/D78; callers must correct the exact feature/backend pairing before retrying.
+   */
+  reactiveFeatureInvalid: 'REACTIVE_FEATURE_INVALID',
+
+  /**
+   * Reactive feature topology contains an unknown, duplicate, malformed, or cyclic node. Enforces
+   * SWV4-E30/D71; callers must repair the feature set before any host mutation occurs.
+   */
+  reactiveTopologyInvalid: 'REACTIVE_TOPOLOGY_INVALID',
+
+  /**
+   * Host live-query service is not installed. Enforces SWV4-E31/D73; callers must install the
+   * admitted reactive service before requesting a query.
+   */
+  reactiveServiceNotInstalled: 'REACTIVE_SERVICE_NOT_INSTALLED',
+
+  /**
+   * The requested backend lacks its reactive adapter or is not installed. Enforces SWV4-E32/D87;
+   * callers must use an installed adapter-bound backend ID, with no default fallback.
+   */
+  reactiveAdapterNotInstalled: 'REACTIVE_ADAPTER_NOT_INSTALLED',
+
+  /**
+   * A reactive adapter event, poll, or authoritative read failed. Enforces SWV4-E33/D65; callers
+   * should observe the query error state and allow a later invalidation or poll to recover.
+   */
+  reactiveAdapterFailed: 'REACTIVE_ADAPTER_FAILED',
+
+  /**
+   * Reactive adapter, poller, query, or service cleanup collected failures. Enforces SWV4-E34/D81;
+   * callers must treat the adapter as terminal and inspect AggregateError.errors.
+   */
+  reactiveAdapterDisposeFailed: 'REACTIVE_ADAPTER_DISPOSE_FAILED',
+
+  /**
+   * Direct backend quiescence, transport, connection, or channel cleanup collected failures.
+   * Enforces SWV4-E27/D16; callers must treat the backend as terminal and inspect all errors.
+   */
+  backendDisposeFailed: 'BACKEND_DISPOSE_FAILED'
 } as const)
 
 export type IStorageErrorCode = (typeof StorageErrorCode)[keyof typeof StorageErrorCode]

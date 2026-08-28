@@ -1,2 +1,1 @@
-export { defineEntity } from './entity/index.js'
-export type * from './entity/index.js'
+export * from './entity/index.js'

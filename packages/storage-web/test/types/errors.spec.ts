@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { StorageError, StorageErrorCode } from '../../src/types/errors'
 
 describe('StorageError', () => {
-  it('公开错误码集合保持 20 个稳定值且无重复', () => {
+  it('公开错误码集合保持 36 个稳定值且无重复', () => {
     const codes = Object.values(StorageErrorCode)
-    expect(codes).toHaveLength(20)
+    expect(codes).toHaveLength(36)
     expect(new Set(codes).size).toBe(codes.length)
   })
 

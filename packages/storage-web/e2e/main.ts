@@ -1,16 +1,12 @@
-import {
-  defineEntity,
-  localStorage,
-  cookies,
-  indexedDb,
-  memoryStorage,
-  fromStandardSchema,
-  runMigrations,
-  selectCodec,
-  jsonCodec,
-  StorageError
-} from '../src/index'
-import type { IRecordIndexHandle } from '@migaia/storage-contract'
+import { cookies } from '../src/cookies.js'
+import { indexedDb } from '../src/indexed-db.js'
+import { localStorage } from '../src/local-storage.js'
+import { memoryStorage } from '../src/memory.js'
+import { defineEntity } from '../src/entity.js'
+import { fromStandardSchema, runMigrations } from '../src/schema.js'
+import { jsonCodec, selectCodec } from '../src/serialize.js'
+import { StorageError } from '../src/types/errors.js'
+import type { IRecordIndexHandle, IStorageChange } from '@migaia/storage-contract'
 import { fromIdbRequest, idbTransactionCommit } from '../src/utils/idb-request'
 import { mergeSignals, snapshotOperationContext, withAbort } from '../src/core/operation'
 import { createStorageOperationRuntime } from '../src/core/operation-reporter'
@@ -29,6 +25,16 @@ const browserBackfillLeaseContenders = new Map<
   string,
   { store: { dispose(): Promise<void> }; handle: IRecordIndexHandle }
 >()
+/** Keeps cross-page R09 receiver stores and their first transport hint waiters alive. */
+const browserCoordinationReceivers = new Map<
+  string,
+  {
+    store: ReturnType<typeof indexedDb>
+    hint: Promise<IStorageChange>
+  }
+>()
+/** Keeps cross-page R09 writer stores alive until the receiver performs its authoritative read. */
+const browserCoordinationWriters = new Map<string, ReturnType<typeof indexedDb>>()
 
 declare global {
   interface Window {
@@ -235,6 +241,13 @@ declare global {
     startIndexedDbBackfillLeaseOwner(dbName: string): Promise<void>
     contendIndexedDbBackfillLease(dbName: string): Promise<string | undefined>
     finishIndexedDbBackfillLeaseOwner(dbName: string): Promise<string | undefined>
+    startIndexedDbCoordinationReceiver(dbName: string): Promise<{ changeFeed: boolean }>
+    awaitIndexedDbCoordinationHint(dbName: string): Promise<{
+      hint: IStorageChange
+      value: string | null
+    }>
+    startIndexedDbCoordinationWriter(dbName: string): Promise<{ changeFeed: boolean }>
+    finishIndexedDbCoordinationWriter(dbName: string): Promise<void>
     runOperationLifecycleScenario(): Promise<{
       memoryTimeoutCode: string | undefined
       indexedTimeoutCode: string | undefined
@@ -2064,7 +2077,7 @@ window.runMemoryCompositeKeyOwnershipScenario = async () => {
 /** 真实浏览器验证 timeoutMs=0 与 dispose 的统一 operation lifecycle。 */
 window.runOperationLifecycleScenario = async () => {
   const operationRuntime = createStorageOperationRuntime()
-  const memory = (await import('../src/index')).memoryStorage()
+  const memory = (await import('../src/memory.js')).memoryStorage()
   let contextSnapshotReads = 0
   const contextController = new AbortController()
   await memory.set('context-snapshot', 'value', {
@@ -3381,6 +3394,54 @@ window.runIndexedDbSmokeScenario = async () => {
   const metadata = await store.metadata!.get('smoke')
   await store.dispose()
   return { ok: true, value, metadata }
+}
+
+/** Start a receiver in one browser page and retain its first remote hint for an authoritative read. */
+window.startIndexedDbCoordinationReceiver = async (dbName) => {
+  const existing = browserCoordinationReceivers.get(dbName)
+  if (existing !== undefined) await existing.store.dispose()
+  const store = indexedDb({ dbName })
+  let resolveHint!: (change: IStorageChange) => void
+  const hint = new Promise<IStorageChange>((resolve) => {
+    resolveHint = resolve
+  })
+  store.subscribeChanges((change) => {
+    if (change.channel === 'value' && change.kind === 'put') resolveHint(change)
+  })
+  browserCoordinationReceivers.set(dbName, { store, hint })
+  return { changeFeed: store.capabilities.changeFeed }
+}
+
+/** Wait for the cross-page metadata hint, then reread the committed value from IndexedDB. */
+window.awaitIndexedDbCoordinationHint = async (dbName) => {
+  const entry = browserCoordinationReceivers.get(dbName)
+  if (entry === undefined) throw new Error('missing IndexedDB coordination receiver')
+  const hint = await Promise.race([
+    entry.hint,
+    new Promise<never>((_resolve, reject) => {
+      window.setTimeout(() => reject(new Error('IndexedDB coordination hint timed out')), 5_000)
+    })
+  ])
+  const value = await entry.store.get('r09-cross-page-key')
+  await entry.store.dispose()
+  browserCoordinationReceivers.delete(dbName)
+  return { hint, value }
+}
+
+/** Commit one value from a separate browser page while retaining the transport until observation. */
+window.startIndexedDbCoordinationWriter = async (dbName) => {
+  const store = indexedDb({ dbName })
+  await store.set('r09-cross-page-key', 'committed-by-writer')
+  browserCoordinationWriters.set(dbName, store)
+  return { changeFeed: store.capabilities.changeFeed }
+}
+
+/** Dispose the retained cross-page writer after the receiver has reread durable state. */
+window.finishIndexedDbCoordinationWriter = async (dbName) => {
+  const store = browserCoordinationWriters.get(dbName)
+  if (store === undefined) return
+  browserCoordinationWriters.delete(dbName)
+  await store.dispose()
 }
 
 /** 真实浏览器验证 IndexedDB factory options 的容器边界。 */

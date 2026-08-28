@@ -150,8 +150,8 @@ describe('SWV2-T50 live-query ownership model', () => {
     const manifest = JSON.parse(
       readFileSync(resolve(import.meta.dirname, '..', 'package.json'), 'utf8')
     ) as { readonly dependencies?: Readonly<Record<string, string>> }
-    /** Reserved production entry must not pre-build another scheduler/generation/disposer stack. */
-    const entry = readFileSync(resolve(import.meta.dirname, '..', 'src', 'reactive.ts'), 'utf8')
+    /** The retired aggregate path must remain absent from the package and build surfaces. */
+    const packageManifest = readFileSync(resolve(import.meta.dirname, '..', 'package.json'), 'utf8')
     /**
      * Build config must keep the future runtime owner external before the entry starts importing
      * it.
@@ -163,7 +163,8 @@ describe('SWV2-T50 live-query ownership model', () => {
       '@migaia/lifecycle': 'workspace:^',
       '@migaia/reactive': 'workspace:^'
     })
-    expect(entry).not.toMatch(/\b(?:queueMicrotask|Set|GenerationController|disposers?)\b/)
+    expect(packageManifest).not.toContain('"./reactive"')
+    expect(buildConfig).not.toContain("'reactive': 'src/reactive.ts'")
     expect(buildConfig).toContain("'@migaia/lifecycle'")
   })
 

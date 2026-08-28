@@ -14,6 +14,15 @@ const backfillStores = new WeakMap<object, IIndexedDbBackfillStore<unknown>>()
 /** Tracks only transient lease/readiness races that may safely fall back to authoritative scans. */
 const fallbackSafeFailures = new WeakSet<object>()
 
+/** Stable persisted scan phases; canonical records are authoritative over legacy shadows. */
+export const IndexedDbBackfillPhase = {
+  canonical: 'canonical',
+  legacy: 'legacy'
+} as const
+
+export type IIndexedDbBackfillPhase =
+  (typeof IndexedDbBackfillPhase)[keyof typeof IndexedDbBackfillPhase]
+
 /** Create an internal contention failure without exposing a public marker or backend-private code. */
 export const createBackfillContentionFailure = (): StorageError => {
   const failure = new StorageError(StorageErrorCode.unavailable, {
@@ -33,6 +42,7 @@ export type IIndexedDbBackfillCandidate<TValue> = {
   readonly key: IStorageKey
   readonly raw: TValue
   readonly revision: number
+  readonly phase?: IIndexedDbBackfillPhase
 }
 
 /** Entity-owned preparation result used to enforce the decoded soft cap before issuing a batch. */
@@ -40,6 +50,8 @@ export type IIndexedDbBackfillPreparation = {
   readonly decodedBytes: number
   readonly projection?: IRecordIndexProjection
   readonly outcome: 'indexed' | 'skipped'
+  /** False only for physically scanned records outside the entity scope. */
+  readonly counted?: boolean
 }
 
 /** Optional entity projection hook; execution remains outside IndexedDB transactions. */
@@ -54,9 +66,12 @@ export type IIndexedDbBackfillProjection = {
   readonly expectedRevision: number
   readonly projection?: IRecordIndexProjection
   readonly outcome: 'indexed' | 'skipped'
+  /** False only for physically scanned records outside the entity scope. */
+  readonly counted?: boolean
 }
 
 export type IIndexedDbBackfillBatch = {
+  readonly phase?: IIndexedDbBackfillPhase
   readonly generation: string
   readonly ownerToken: string
   readonly checkpoint: IStorageKey | undefined
@@ -80,6 +95,7 @@ export type IIndexedDbBackfillSession<TValue> = {
     ctx?: IOperationContext,
     options?: IIndexedDbBackfillReadOptions<TValue>
   ): Promise<{
+    readonly phase?: IIndexedDbBackfillPhase
     readonly checkpoint: IStorageKey | undefined
     readonly endOfScan: boolean
     readonly candidates: readonly IIndexedDbBackfillCandidate<TValue>[]
@@ -94,6 +110,8 @@ export type IIndexedDbBackfillSession<TValue> = {
 }
 
 export type IIndexedDbBackfillStore<TValue> = {
+  /** Prepare the fixed physical layout without publishing any public capability. */
+  readonly prepare?: () => Promise<void>
   ensureRecordIndexes(
     scope: string,
     definitions: readonly IRecordIndexDefinition[],
@@ -107,6 +125,8 @@ export type IIndexedDbBackfillStore<TValue> = {
     handle: IRecordIndexHandle,
     options: {
       readonly range: IKeyRange
+      readonly legacyRange?: IKeyRange
+      readonly includeLegacy?: boolean
       readonly allowComplete: boolean
       readonly batchSize?: number
       readonly leaseMs?: number

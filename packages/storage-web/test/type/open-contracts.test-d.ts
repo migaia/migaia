@@ -1,6 +1,9 @@
 import { expectTypeOf } from 'vitest'
-import type { ICookiesOptions, ICookieScope, IExtensionStage, ISyncCapableStore } from '../../src'
-import { memoryStorage } from '../../src'
+import type { ICookiesOptions } from '../../src/backends/cookie.js'
+import type { ICookieScope } from '../../src/types/cookie.js'
+import type { IExtensionStage } from '../../src/types/errors.js'
+import type { ISyncCapableStore } from '../../src/types/storage.js'
+import { memoryStorage } from '../../src/memory.js'
 
 expectTypeOf<ICookiesOptions>().toMatchTypeOf<{ scope?: ICookieScope }>()
 expectTypeOf<IExtensionStage>().toEqualTypeOf<
@@ -8,7 +11,8 @@ expectTypeOf<IExtensionStage>().toEqualTypeOf<
 >()
 type IMemoryStore = ReturnType<typeof memoryStorage>
 expectTypeOf(memoryStorage()).toMatchTypeOf<ISyncCapableStore<IMemoryStore>>()
-import type { ICodec, ISchemaAdapter } from '../../src/index'
+import type { ICodec } from '../../src/serialize/index.js'
+import type { ISchemaAdapter } from '../../src/schema/index.js'
 
 /** Schema/codec 是面向开发者的开放契约：任何手写实现（不 import 任何第三方库） 都应该能被类型系统接受，不需要绕过 as any。 */
 const customCodec: ICodec<{ n: number }, string> = {

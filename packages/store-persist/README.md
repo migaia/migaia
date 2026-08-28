@@ -1,19 +1,19 @@
 # `@migaia/store-persist`
 
-给 `@migaia/store-light`/`@migaia/store-keyed`/`@migaia/store-indexed` 三种 store 形状统一接一根自动充电线，底座是 `@migaia/storage-web`：状态变了就（防抖）写进存储，页面/进程重启时自动读回来，hydrate 竞态、版本迁移、写入排队全部托管，不用自己写胶水代码。三条路径共用同一个核心引擎 `persistUnit()`。
+给 `@migaia/store-light`/`@migaia/store-keyed`/`@migaia/store-indexed` 三种 store 形状统一接一根自动充电线，底层契约是 `@migaia/storage-contract`，存储实现从 `@migaia/storage-web` 的精确 backend 子路径注入：状态变了就（防抖）写进存储，页面/进程重启时自动读回来，hydrate 竞态、版本迁移、写入排队全部托管，不用自己写胶水代码。三条路径共用同一个核心引擎 `persistUnit()`。
 
 ## 适用与不适用场景
 
 **适用**：用户设置/草稿/UI 偏好需要跨会话保留（`persist()`）；标签列表/购物车条目/按 id 索引的缓存表需要整体持久化（`persistCollection()`）；按 key 动态生成的状态（每用户/每会话各自的资料）只想持久化其中一部分（`persistKeyed()` + `partialize`/`merge`）；需要批量清空某一类 keyed 持久化记录（`clearFamily()`）；存储里可能是旧版本数据，需要 `version` + `migrate()`。
 
-**不适用**：只是想把一次性数据存进 storage-web、不需要跟内存状态双向同步/不需要迁移，直接用 `@migaia/storage-web` 的 `IKeyValueStore` 更直接。本包不提供加密——敏感数据不要无加密直接写 `localStorage`，需要的话自己实现一个 `ICodec` 传给 `codec` 选项。
+**不适用**：只是想把一次性数据存进 storage-web、不需要跟内存状态双向同步/不需要迁移，直接用 `@migaia/storage-contract` 的 `IKeyValueStore` 搭配所需 backend 子路径更直接。本包不提供加密——敏感数据不要无加密直接写 `localStorage`，需要的话自己实现一个 `ICodec` 传给 `codec` 选项。
 
-`@migaia/store-persist` 依赖 `@migaia/reactive`、`@migaia/storage-web`、`@migaia/utils`；`@migaia/store-light`/`@migaia/store-keyed`/`@migaia/store-indexed` 是可选 peerDependencies，只用得到哪条路径就只需要装对应的 store 包。
+`@migaia/store-persist` 的 production 依赖是 `@migaia/reactive`、`@migaia/storage-contract`、`@migaia/utils`；`@migaia/storage-web` 只在使用其 backend/codec 的 integration 场景作为直接依赖。`@migaia/store-light`/`@migaia/store-keyed`/`@migaia/store-indexed` 是可选 peerDependencies，只用得到哪条路径就只需要装对应的 store 包。
 
 ## 安装
 
 ```bash
-pnpm add @migaia/store-persist @migaia/storage-web
+pnpm add @migaia/store-persist @migaia/storage-contract @migaia/storage-web
 ```
 
 ## 目录
@@ -42,7 +42,7 @@ import { persist } from '@migaia/store-persist/light';
 
 ```ts
 import { createStore } from '@migaia/store-light';
-import { memoryStorage } from '@migaia/storage-web';
+import { memoryStorage } from '@migaia/storage-web/memory';
 
 const store = createStore({ theme: 'light', fontSize: 14 });
 const handle = persist(store, {
@@ -63,7 +63,7 @@ handle.dispose(); // 停止订阅、清计时器、abort 在途 I/O
 `IPersistOptions` 全部字段：
 
 - `key: string`（必填）—— 存档在 storage 里的键
-- `storage: IPersistStorage`（必填）—— `@migaia/storage-web` 的键值能力（`capabilities`/`get`/`set`/`remove`/`keys`），binary codec 另需 `getBytes`/`setBytes`
+- `storage: IPersistStorage`（必填）—— `@migaia/storage-contract` 的 `IKeyValueStore` 契约（`capabilities`/`get`/`set`/`remove`/`keys`）；`@migaia/storage-web` 的 exact backend 子路径提供实现，binary codec 另需 `getBytes`/`setBytes`
 - `codec?: ICodec` —— 默认 `defaultJsonCodec`（原生支持 Map/Set 往返）
 - `version?: number` —— 默认 `0`，必须是安全非负整数
 - `migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>` —— `version` 与存档不一致时的转换函数，不提供则版本不一致直接 hydrate 失败
@@ -86,7 +86,7 @@ import { persistCollection } from '@migaia/store-persist/indexed';
 
 ```ts
 import { observableMap } from '@migaia/store-indexed';
-import { localStorage } from '@migaia/storage-web';
+import { localStorage } from '@migaia/storage-web/local-storage';
 
 const cart = observableMap<string, number>(); // sku -> 数量
 const handle = persistCollection(cart, { key: 'cart:v1', storage: localStorage() });
@@ -116,7 +116,7 @@ import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';
 
 ```ts
 import { createAtomStore, familyDef } from '@migaia/store-keyed';
-import { indexedDb } from '@migaia/storage-web';
+import { indexedDb } from '@migaia/storage-web/indexed-db';
 
 const session = familyDef(() => ({ accessToken: '', refreshToken: '' }));
 const atomStore = createAtomStore(runtime);
@@ -186,7 +186,7 @@ await handle.clear(); // 排队删除存档，不重置内存状态
 import { createStore } from '@migaia/store-light';
 import { createAtomStore, familyDef } from '@migaia/store-keyed';
 import { observableSet } from '@migaia/store-indexed';
-import { indexedDb } from '@migaia/storage-web';
+import { indexedDb } from '@migaia/storage-web/indexed-db';
 import { persist } from '@migaia/store-persist/light';
 import { persistCollection } from '@migaia/store-persist/indexed';
 import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';

@@ -1,5 +1,8 @@
-import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import { toPromise } from '@migaia/utils/promise'
+import {
+  StorageContractError,
+  StorageContractErrorCode,
+  type IStorageChange
+} from '@migaia/storage-contract'
 import {
   snapshotOperationContext,
   snapshotSyncWriteOptions,
@@ -31,6 +34,10 @@ import type {
 import type { IStorageCapabilities } from '../types/capabilities.js'
 import type { IOperationContext } from '../types/context.js'
 import type { ISyncCapableStore } from '../types/storage.js'
+import {
+  createBackendReactiveController,
+  registerBackendReactiveController
+} from './reactive-controller.js'
 
 const CAPABILITIES: IStorageCapabilities = Object.freeze({
   syncRead: true,
@@ -224,6 +231,18 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
   const namespaceCodec = snapshotNamespaceCodec(namespaceCodecCandidate, StorageBackend.cookie)
   const doc = documentCandidate as ICookieDocument
 
+  /** Private commit-after controller shared by direct and Host-created exact stores. */
+  const controller = createBackendReactiveController({
+    backend: StorageBackend.cookie,
+    platform: doc,
+    options: Object.freeze({ namespace, namespaceCodec, scope })
+  })
+
+  /** Publish only after a visible cookie mutation has completed successfully. */
+  const publishChange = (change: Omit<IStorageChange, 'sequence' | 'origin' | 'scope'>): void => {
+    controller.publish(change)
+  }
+
   /** Read the live cookie jar while preserving host failures in the storage error protocol. */
   const readCookie = (operation: string, key?: string): string => {
     try {
@@ -256,8 +275,12 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
   }
 
   let disposed = false
+  /** Seals new operations synchronously when disposal begins, before controller draining completes. */
+  let disposalRequested = false
+  /** Store-level disposal Promise cached to preserve identity across repeated calls. */
+  let disposePromise: Promise<void> | undefined
   const assertLive = (): void => {
-    if (disposed)
+    if (disposed || disposalRequested)
       throw new StorageContractError(StorageContractErrorCode.disposed, {
         backend: StorageBackend.cookie
       })
@@ -327,6 +350,7 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
       }
       writeCookie(serializeCookieRemoval(entry.physicalKey, scope), operation, entry.logicalKey)
     }
+    if (entries.length > 0) publishChange({ channel: 'value', kind: 'clear' })
   }
 
   const sync: ISyncCookieStore = {
@@ -389,6 +413,7 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
       const expiresNow =
         (maxAge !== undefined && maxAge <= 0) ||
         (expiresTime !== undefined && expiresTime <= Date.now())
+      const visibleBefore = readVisibleCookie(physicalKey, StorageOperation.cookieSet, key)
       writeCookie(
         expiresNow
           ? serializeCookieRemoval(physicalKey, scope)
@@ -401,8 +426,15 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
         key
       )
       const visible = readVisibleCookie(physicalKey, StorageOperation.cookieSet, key)
-      if (expiresNow && visible === undefined) return
-      if (!expiresNow && visible === value) return
+      if (expiresNow && visible === undefined) {
+        if (visibleBefore !== undefined)
+          publishChange({ channel: 'value', kind: 'remove', keys: [key] })
+        return
+      }
+      if (!expiresNow && visible === value) {
+        publishChange({ channel: 'value', kind: 'put', keys: [key] })
+        return
+      }
       if (visible !== undefined)
         throw new StorageError(StorageErrorCode.cookieScopeAmbiguous, {
           backend: StorageBackend.cookie,
@@ -420,8 +452,9 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
     remove: (key) => {
       assertLive()
       const physicalKey = namespacedKey(namespace, key, namespaceCodec, StorageBackend.cookie)
-      readVisibleCookie(physicalKey, StorageOperation.cookieRemove, key)
+      const visible = readVisibleCookie(physicalKey, StorageOperation.cookieRemove, key)
       writeCookie(serializeCookieRemoval(physicalKey, scope), StorageOperation.cookieRemove, key)
+      if (visible !== undefined) publishChange({ channel: 'value', kind: 'remove', keys: [key] })
     },
     has: (key) => {
       assertLive()
@@ -443,7 +476,7 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
     }
   }
 
-  return {
+  const store: ISyncCapableStore<ICookieStore> = {
     backend: StorageBackend.cookie,
     capabilities: CAPABILITIES,
     sync,
@@ -470,9 +503,16 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
         assertLive()
         clearNamespacedEntries('cookie.clearAll', signal)
       }),
-    dispose: () =>
-      toPromise(() => {
+    dispose: () => {
+      if (disposePromise !== undefined) return disposePromise
+      disposalRequested = true
+      const controllerDispose = controller.dispose()
+      disposePromise = controllerDispose.then(() => {
         disposed = true
       })
+      return disposePromise
+    }
   }
+  registerBackendReactiveController(store, controller)
+  return store
 }

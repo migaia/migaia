@@ -41,7 +41,7 @@ function persistUnit<TState>(
 | ------------ | --------------------------------------------------------- | ------ | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `key`        | `string`                                                  | 必填   | 无                                                                   | 存档在 storage 里的键                                                                                                       |
 | `runtime`    | `IRuntime`                                                | 必填   | 无                                                                   | `status`/`error`/`hydrated` 等信号挂在哪个 Runtime 上；三条适配路径都会自动传底层 store/collection/AtomStore 自己的 runtime |
-| `storage`    | `{ capabilities, get, set, remove, keys }`                | 必填   | 无                                                                   | 对应 `@migaia/storage-web` 键值能力；可选 `getBytes`/`setBytes` 启用 binary codec                                           |
+| `storage`    | `{ capabilities, get, set, remove, keys }`                | 必填   | 无                                                                   | 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec |
 | `codec`      | `ICodec`                                                  | 可选   | `defaultJsonCodec`                                                   | 见 [§7](#7-与-storage-web-的-codec-集成)                                                                                    |
 | `version`    | `number`                                                  | 可选   | `0`                                                                  | schema 版本，必须是安全非负整数                                                                                             |
 | `migrate`    | `(persisted: TState, fromVersion: number) => TState`      | 可选   | 无                                                                   | 见 [§5](#5-存档格式与版本迁移)                                                                                              |
@@ -96,7 +96,7 @@ type IPersistOptions = {
 
 ```ts
 import { createStore } from '@migaia/store-light';
-import { indexedDb } from '@migaia/storage-web';
+import { indexedDb } from '@migaia/storage-web/indexed-db';
 import { persist } from '@migaia/store-persist';
 
 const store = createStore({ theme: 'light', fontSize: 14 });
@@ -142,7 +142,7 @@ type IPersistCollectionOptions<TState> = {
 
 ```ts
 import { observableMap } from '@migaia/store-indexed';
-import { localStorage } from '@migaia/storage-web';
+import { localStorage } from '@migaia/storage-web/local-storage';
 import { persistCollection } from '@migaia/store-persist';
 
 const cart = observableMap<string, number>(); // sku -> 数量
@@ -190,7 +190,7 @@ type IPersistKeyedHandle<T> = { readonly value: T; dispose(): void };
 
 ```ts
 import { createAtomStore, familyDef } from '@migaia/store-keyed';
-import { indexedDb } from '@migaia/storage-web';
+import { indexedDb } from '@migaia/storage-web/indexed-db';
 import { persistKeyed, clearFamily } from '@migaia/store-persist';
 
 type Session = { accessToken: string; refreshToken: string };
@@ -215,7 +215,7 @@ dispose();
 
 ### `clearFamily()`：批量清空
 
-`clearFamily(storage, namespace)` **绕开** `AtomStore`——直接问 storage-web 要该 storage 下全部 key（`await storage.keys()`），过滤出 `${namespace}:` 前缀的，逐个删除，返回删掉的条数。它**不会**、也不能顺带清理内存里已经实例化的 `AtomStore` 状态：调用方如果还持有对应的 `persistKeyed()` handle，那些 handle 的内存值不受影响，只是失去了持久化落地；下次这些 key 的值再变化，会重新写回一条新记录（因为它们各自的 `subscribe` 还挂着，跟 `clearFamily()` 无关）。需要连内存也清空，需要调用方自己对每个还持有的 handle 调用 `dispose()`。
+`clearFamily(storage, namespace)` **绕开** `AtomStore`——直接从传入的 `@migaia/storage-contract` `IKeyValueStore` 读取该 storage 下全部 key（`await storage.keys()`），过滤出 `${namespace}:` 前缀的，逐个删除，返回删掉的条数。storage-web 的 exact backend 子路径只是该契约的一个实现来源。它**不会**、也不能顺带清理内存里已经实例化的 `AtomStore` 状态：调用方如果还持有对应的 `persistKeyed()` handle，那些 handle 的内存值不受影响，只是失去了持久化落地；下次这些 key 的值再变化，会重新写回一条新记录（因为它们各自的 `subscribe` 还挂着，跟 `clearFamily()` 无关）。需要连内存也清空，需要调用方自己对每个还持有的 handle 调用 `dispose()`。
 
 ```ts
 async function logout(userId: string) {
@@ -263,11 +263,11 @@ async function logout(userId: string) {
 
 ## 7. 与 storage-web 的 codec 集成
 
-`storage` 需要 storage-web 的 `capabilities`、`get`、`set`、`remove`、`keys`；直接传
+`storage` 需要满足 `@migaia/storage-contract` `IKeyValueStore` 的 `capabilities`、`get`、`set`、`remove`、`keys`；直接传 `@migaia/storage-web` 的 exact backend 子路径实例即可：
 `memoryStorage()`、`localStorage()` 或 `indexedDb()` 的返回值即可。binary codec 另需
 `getBytes`/`setBytes`。
 
-`codec` 默认是本包自带的 `defaultJsonCodec`（`output: 'text'`，结构等价于 storage-web 的 `jsonCodec`，本包不 import 它的具体值，只按结构复刻，避免多一条运行时依赖）。这个默认 codec 额外处理了 `JSON.stringify` 原生不支持的两种形状：
+`codec` 默认是本包自带的 `defaultJsonCodec`（`output: 'text'`，遵循 `@migaia/storage-contract` 的 `ICodec` 契约；本包不运行时依赖 storage-web 的具体 codec 值）。这个默认 codec 额外处理了 `JSON.stringify` 原生不支持的两种形状：
 
 - `Map` → 编码成 `{ "__migaia_persist_map__": [[key, value], ...] }`，解码时还原成真正的 `Map` 实例。
 - `Set` → 编码成 `{ "__migaia_persist_set__": [value, ...] }`，解码时还原成真正的 `Set` 实例。
@@ -277,7 +277,7 @@ async function logout(userId: string) {
 传 binary codec 时，后端必须具备字节通道：
 
 ```ts
-import { binaryCodec } from '@migaia/storage-web';
+import { binaryCodec } from '@migaia/storage-web/serialize';
 
 const handle = persistCollection(bigDataset, {
   key: 'big',
@@ -316,7 +316,7 @@ const handle = persistCollection(bigDataset, {
 import { createStore } from '@migaia/store-light';
 import { createAtomStore, familyDef } from '@migaia/store-keyed';
 import { observableSet } from '@migaia/store-indexed';
-import { indexedDb } from '@migaia/storage-web';
+import { indexedDb } from '@migaia/storage-web/indexed-db';
 import { persist, persistCollection, persistKeyed, clearFamily } from '@migaia/store-persist';
 import { createRuntime } from '@migaia/reactive';
 
@@ -386,7 +386,7 @@ class PersistEnvelopeError extends TypeError {}
 const defaultJsonCodec: ICodec; // { name: 'json', output: 'text', encode(value): Promise<string>, decode(raw): Promise<unknown> }
 ```
 
-本包自带的默认 codec：结构上等价于 `@migaia/storage-web` 的 `jsonCodec`，额外原生支持 `Map`/`Set` 往返（编码成带 `__migaia_persist_map__`/`__migaia_persist_set__` 标签的普通对象，解码时还原成真正的 `Map`/`Set` 实例），避免 `JSON.stringify(new Map(...))` 静默丢空的问题。`encode` 遇到不可序列化的值（如循环引用）抛 `TypeError`（`code: 'ENCODE_FAILED'`）；`decode` 收到非字符串输入抛 `TypeError`（`code: 'ENVELOPE_INVALID'`）。
+本包自带的默认 codec 遵循 `@migaia/storage-contract` 的 `ICodec` 形状，额外原生支持 `Map`/`Set` 往返（编码成带 `__migaia_persist_map__`/`__migaia_persist_set__` 标签的普通对象，解码时还原成真正的 `Map`/`Set` 实例），避免 `JSON.stringify(new Map(...))` 静默丢空的问题。需要 storage-web 的 binary codec 时，从 `@migaia/storage-web/serialize` exact 子路径导入。`encode` 遇到不可序列化的值（如循环引用）抛 `TypeError`（`code: 'ENCODE_FAILED'`）；`decode` 收到非字符串输入抛 `TypeError`（`code: 'ENVELOPE_INVALID'`）。
 
 ```ts
 function writeEnvelope(

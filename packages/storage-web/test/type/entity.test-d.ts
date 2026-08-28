@@ -1,9 +1,15 @@
 import { expectTypeOf } from 'vitest'
 import { defineEntity } from '../../src/entity'
 import { memoryStorage } from '../../src/backends'
-import type { IMigrateOptions, IMigrateResult, IRepository } from '../../src/entity'
+import type { IMigrateOptions, IMigrateResult, IRepository } from '../../src/entity/types.js'
 
-type IUser = { id: string; name: string }
+type IUser = {
+  id: string
+  name: string
+  profile: { email: string }
+  tags: string[]
+  score: number
+}
 
 const users = defineEntity<IUser>({ name: 'users', key: 'id' })
 const repo = users.connect(memoryStorage())
@@ -22,15 +28,47 @@ const indexedUsers = defineEntity<IUser>()({
   key: 'id',
   indexes: {
     name: { path: 'name' },
-    id: { path: 'id', unique: true }
+    id: { path: 'id', unique: true },
+    email: { path: 'profile.email' },
+    tags: { path: 'tags', multiEntry: true },
+    compound: { paths: ['name', 'score'] },
+    custom: {
+      select: (value) => ({ kind: 'single' as const, key: value.id }),
+      revision: 1
+    },
+    customMany: {
+      select: (value) => ({ kind: 'multiple' as const, keys: value.tags }),
+      revision: 1
+    }
   }
 })
 const indexedRepo = indexedUsers.connect(memoryStorage())
-expectTypeOf(indexedRepo).toEqualTypeOf<IRepository<IUser, 'name' | 'id'>>()
+type IUserIndexMap = {
+  readonly name: string
+  readonly id: string
+  readonly email: string
+  readonly tags: string
+  readonly compound: readonly [string, number]
+  readonly custom: string
+  readonly customMany: string
+}
+expectTypeOf(indexedRepo).toEqualTypeOf<IRepository<IUser, IUserIndexMap>>()
 indexedRepo.findBy('name', 'Ada')
 indexedRepo.findManyBy('id')
-// @ts-expect-error SWV2-T06 undeclared index names are rejected by the inferred literal union.
-indexedRepo.findBy('email', 'ada@example.com')
+indexedRepo.findBy('compound', ['Ada', 1])
+indexedRepo.findBy('tags', 'admin')
+indexedRepo.findBy('customMany', 'admin')
+indexedRepo.list({ index: 'email', range: { lower: 'ada@example.com' } })
+indexedRepo.list({ index: 'compound', range: { lower: ['Ada', 1] } })
+indexedRepo.stream({ index: 'email', range: { lower: 'ada@example.com' } })
+// @ts-expect-error R05 indexed stream ranges use the exact query-key type.
+indexedRepo.stream({ index: 'name', range: { lower: 1 } })
+// @ts-expect-error undeclared index names are rejected by the inferred index map.
+indexedRepo.findBy('missing', 'ada@example.com')
+// @ts-expect-error R05 index keys are derived from the declared projection and remain exact.
+indexedRepo.findBy('tags', ['admin'])
+// @ts-expect-error R05 indexed ranges use the exact query-key type.
+indexedRepo.list({ index: 'name', range: { lower: 1 } })
 
 defineEntity<IUser>({
   name: 'direct-indexed',

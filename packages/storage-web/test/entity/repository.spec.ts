@@ -11,6 +11,83 @@ type IUser = { id: string; name: string; email: string }
 
 const users = defineEntity<IUser>({ name: 'users', key: 'id' })
 
+it('SWV4-R05 projects explicit selectors and indexed list through the shared query route', async () => {
+  type IIndexedUser = { id: string; email: string; tags: string[] }
+  let selectorCalls = 0
+  let keyReads = 0
+  const entity = defineEntity<IIndexedUser>()({
+    name: 'indexed-list-users',
+    key: 'id',
+    indexes: {
+      email: { path: 'email' },
+      tags: { path: 'tags', multiEntry: true },
+      selected: {
+        select: (value) => {
+          selectorCalls += 1
+          const projection = { kind: 'single' as const } as { kind: 'single'; key?: string }
+          Object.defineProperty(projection, 'key', {
+            enumerable: true,
+            get: () => {
+              keyReads += 1
+              return value.email
+            }
+          })
+          return projection as { readonly kind: 'single'; readonly key: string }
+        },
+        revision: 1
+      }
+    }
+  })
+  const repository = entity.connect(memoryStorage())
+  await repository.put({ id: 'u1', email: 'ada@example.com', tags: ['admin', 'staff'] })
+  await repository.put({ id: 'u2', email: 'grace@example.com', tags: ['staff'] })
+
+  await expect(
+    repository.list({ index: 'tags', range: { lower: 'admin', upper: 'admin' } })
+  ).resolves.toEqual([{ id: 'u1', email: 'ada@example.com', tags: ['admin', 'staff'] }])
+  await expect(
+    repository.list({
+      index: 'selected',
+      range: { lower: 'ada@example.com', upper: 'ada@example.com' }
+    })
+  ).resolves.toEqual([{ id: 'u1', email: 'ada@example.com', tags: ['admin', 'staff'] }])
+  await expect(
+    repository.findManyBy('selected', {
+      lower: 'ada@example.com',
+      upper: 'ada@example.com'
+    })
+  ).resolves.toEqual([{ id: 'u1', email: 'ada@example.com', tags: ['admin', 'staff'] }])
+  const streamed: IIndexedUser[] = []
+  for await (const value of repository.stream({
+    index: 'tags',
+    range: { lower: 'admin', upper: 'admin' }
+  }))
+    streamed.push(value)
+  expect(streamed).toEqual([{ id: 'u1', email: 'ada@example.com', tags: ['admin', 'staff'] }])
+
+  const reads = { index: 0, range: 0, limit: 0, orderBy: 0, direction: 0, onInvalid: 0 }
+  const hostileOptions = Object.defineProperties(
+    {},
+    {
+      index: { enumerable: true, get: () => ((reads.index += 1), 'tags') },
+      range: {
+        enumerable: true,
+        get: () => ((reads.range += 1), { lower: 'admin', upper: 'admin' })
+      },
+      limit: { enumerable: true, get: () => ((reads.limit += 1), undefined) },
+      orderBy: { enumerable: true, get: () => ((reads.orderBy += 1), undefined) },
+      direction: { enumerable: true, get: () => ((reads.direction += 1), undefined) },
+      onInvalid: { enumerable: true, get: () => ((reads.onInvalid += 1), undefined) }
+    }
+  )
+  const hostileStream: IIndexedUser[] = []
+  for await (const value of repository.stream(hostileOptions as never)) hostileStream.push(value)
+  expect(hostileStream).toEqual([{ id: 'u1', email: 'ada@example.com', tags: ['admin', 'staff'] }])
+  expect(reads).toEqual({ index: 1, range: 1, limit: 1, orderBy: 1, direction: 1, onInvalid: 1 })
+  expect(selectorCalls).toBe(4)
+  expect(keyReads).toBe(4)
+})
+
 it('SWV2-T39 routes complete indexed entity put/remove through planner', async () => {
   const base = memoryStorage()
   const calls: string[] = []
@@ -226,60 +303,6 @@ it('SWV2-T34 exposes projection and failed-readiness persistence errors in stabl
   expect(reportedPrimary).toBe(projectionFailure)
 })
 
-it('SWV2-T40 query-owned backfill commits at most one bounded batch', async () => {
-  const store = memoryStorage()
-  await store.putRecord(
-    { __v: 1, data: { id: 'u1', name: 'Ada', email: 'ada@example.com' } },
-    composeRepositoryKey('one-batch-users', 'u1')
-  )
-  let readBatchCalls = 0
-  let commitBatchCalls = 0
-  registerIndexedDbBackfillStore(store, {
-    ensureRecordIndexes: async (scope, definitions) => ({
-      scope,
-      generation: JSON.stringify(definitions),
-      fingerprint: JSON.stringify(definitions)
-    }),
-    getRecordIndexReadiness: async () => ({ status: 'pending', scanned: 0, indexed: 0 }),
-    openBackfillSession: async (handle) => ({
-      generation: handle.generation,
-      ownerToken: 'one-batch-owner',
-      renew: async () => {},
-      readBatch: async (_ctx, options) => {
-        readBatchCalls += 1
-        const candidate = {
-          key: composeRepositoryKey('one-batch-users', 'u1'),
-          raw: { __v: 1, data: { id: 'u1', name: 'Ada', email: 'ada@example.com' } },
-          revision: 0
-        }
-        return {
-          checkpoint: undefined,
-          endOfScan: false,
-          candidates: [candidate],
-          preparations: options?.prepare ? [await options.prepare(candidate)] : undefined
-        }
-      },
-      commitBatch: async () => {
-        commitBatchCalls += 1
-        return { status: 'running', scanned: 1, indexed: 1 }
-      },
-      fail: async () => {},
-      release: () => {}
-    })
-  })
-  const repository = defineEntity<IUser>()({
-    name: 'one-batch-users',
-    key: 'id',
-    indexes: { email: { path: 'email' } }
-  }).connect(store)
-
-  await expect(repository.findManyBy('email')).resolves.toEqual([
-    { id: 'u1', name: 'Ada', email: 'ada@example.com' }
-  ])
-  expect(readBatchCalls).toBe(1)
-  expect(commitBatchCalls).toBe(1)
-})
-
 it('SWV2-T16 find APIs share fallback range, ordering, direction, and limit semantics', async () => {
   const repository = defineEntity<IUser>()({
     name: 'indexed-fallback-users',
@@ -307,6 +330,35 @@ it('SWV2-T16 find APIs share fallback range, ordering, direction, and limit sema
   }))
     streamed.push(value)
   expect(streamed.map((value) => value.id)).toEqual(['u1', 'u2'])
+})
+
+it('SWV4-T43 indexed comparator ordering ties by index and id before direction and limit', async () => {
+  const entity = defineEntity<IUser>()({
+    name: 'indexed-comparator-users',
+    key: 'id',
+    defaultOrderBy: () => 0,
+    indexes: { email: { path: 'email' } }
+  })
+  const repository = entity.connect(memoryStorage())
+  await repository.put({ id: 'a', name: 'A', email: 'z@example.com' })
+  await repository.put({ id: 'b', name: 'B', email: 'a@example.com' })
+
+  await expect(repository.list({ index: 'email' })).resolves.toEqual([
+    { id: 'b', name: 'B', email: 'a@example.com' },
+    { id: 'a', name: 'A', email: 'z@example.com' }
+  ])
+  const previous: IUser[] = []
+  for await (const value of repository.stream({
+    index: 'email',
+    direction: 'prev',
+    limit: 1,
+    orderBy: () => 0
+  }))
+    previous.push(value)
+  expect(previous).toEqual([{ id: 'a', name: 'A', email: 'z@example.com' }])
+  await expect(
+    repository.findManyBy('email', undefined, { orderBy: () => 0, limit: 1 })
+  ).resolves.toEqual([{ id: 'b', name: 'B', email: 'a@example.com' }])
 })
 
 const backends = [

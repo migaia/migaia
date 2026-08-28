@@ -3,13 +3,19 @@ import { createRepository } from './repository.js'
 import type { IKeyValueStore } from '../types/storage.js'
 import type { ISchemaAdapter } from '../schema/types.js'
 import type { IMigration } from '../schema/migrate.js'
-import type { IEntityDefinition, IEntityIndex, IEntityOptions, IRepository } from './types.js'
+import type {
+  IEntityDefinition,
+  IEntityIndex,
+  IEntityIndexMap,
+  IEntityOptions,
+  IRepository
+} from './types.js'
 import { StorageError, StorageErrorCode } from '../types/errors.js'
 import { snapshotCodec } from '../serialize/registry.js'
 import { snapshotEntityIndexes } from './index-projection.js'
 
 type IEntityOptionsWithoutIndexes<TDomain, TStored> = Omit<
-  IEntityOptions<TDomain, TStored, string>,
+  IEntityOptions<TDomain, TStored, undefined>,
   'indexes'
 >
 
@@ -17,10 +23,10 @@ type IEntityOptionsWithoutIndexes<TDomain, TStored> = Omit<
 type IDefineEntityBuilder<TDomain, TStored> = {
   (
     options: IEntityOptionsWithoutIndexes<TDomain, TStored> & { readonly indexes?: undefined }
-  ): IEntityDefinition<TDomain, never>
+  ): IEntityDefinition<TDomain>
   <const TIndexes extends Readonly<Record<string, IEntityIndex<TDomain>>>>(
     options: IEntityOptionsWithoutIndexes<TDomain, TStored> & { readonly indexes: TIndexes }
-  ): IEntityDefinition<TDomain, Extract<keyof TIndexes, string>>
+  ): IEntityDefinition<TDomain, IEntityIndexMap<TDomain, TIndexes>>
 }
 
 const RESERVED_ENTITY_PREFIX = '__'
@@ -131,19 +137,26 @@ const defaultDiagnostic = (message: string): void => {
  */
 export function defineEntity<TDomain, TStored = TDomain>(
   options: IEntityOptions<TDomain, TStored, never> & { readonly indexes?: undefined }
-): IEntityDefinition<TDomain, never>
+): IEntityDefinition<TDomain>
 export function defineEntity<TDomain, TStored = TDomain>(): IDefineEntityBuilder<TDomain, TStored>
 export function defineEntity<TDomain, TStored = TDomain>(
-  options?: IEntityOptions<TDomain, TStored, string>,
+  options?: IEntityOptions<
+    TDomain,
+    TStored,
+    Readonly<Record<string, IEntityIndex<TDomain>>> | undefined
+  >,
   allowCurriedIndexes = false
-): IEntityDefinition<TDomain, string> | IDefineEntityBuilder<TDomain, TStored> {
+):
+  | IEntityDefinition<TDomain, Readonly<Record<string, import('../types/context.js').IStorageKey>>>
+  | IDefineEntityBuilder<TDomain, TStored> {
   if (arguments.length === 0) {
     const defineConfigured = defineEntity as unknown as (
-      configured: IEntityOptions<TDomain, TStored, string>,
+      configured: IEntityOptions<TDomain, TStored, Readonly<Record<string, IEntityIndex<TDomain>>>>,
       allowIndexes: boolean
-    ) => IEntityDefinition<TDomain, string>
-    return ((configured: IEntityOptions<TDomain, TStored, string>) =>
-      defineConfigured(configured, true)) as IDefineEntityBuilder<TDomain, TStored>
+    ) => IEntityDefinition<TDomain, IEntityIndexMap<TDomain>>
+    return ((
+      configured: IEntityOptions<TDomain, TStored, Readonly<Record<string, IEntityIndex<TDomain>>>>
+    ) => defineConfigured(configured, true)) as IDefineEntityBuilder<TDomain, TStored>
   }
   if (options === undefined) return invalidDefinition('entity definition must be an object')
   if (options === null || typeof options !== 'object' || Array.isArray(options))
@@ -200,7 +213,7 @@ export function defineEntity<TDomain, TStored = TDomain>(
     validateOnRead: configuredValidateOnRead,
     onDiagnostic: configuredOnDiagnostic,
     defaultOrderBy: configuredDefaultOrderBy
-  } as IEntityOptions<TDomain, TStored>
+  } as IEntityOptions<TDomain, TStored, undefined>
   validateDefinition(normalizedOptions, version)
   const validateOnRead = (configuredValidateOnRead ?? true) as boolean
   const onDiagnostic = (configuredOnDiagnostic ?? defaultDiagnostic) as (message: string) => void
@@ -209,8 +222,14 @@ export function defineEntity<TDomain, TStored = TDomain>(
   return Object.freeze({
     name,
     version,
-    connect: (store: IKeyValueStore): IRepository<TDomain> =>
-      createRepository(
+    connect: (
+      store: IKeyValueStore
+    ): IRepository<TDomain, Readonly<Record<string, import('../types/context.js').IStorageKey>>> =>
+      createRepository<
+        TDomain,
+        TStored,
+        Readonly<Record<string, import('../types/context.js').IStorageKey>>
+      >(
         {
           name,
           key,

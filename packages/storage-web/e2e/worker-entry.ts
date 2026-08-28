@@ -1,4 +1,7 @@
-import { cookies, indexedDb, localStorage, memoryStorage } from '../src/index'
+import { cookies } from '../src/cookies.js'
+import { indexedDb } from '../src/indexed-db.js'
+import { localStorage } from '../src/local-storage.js'
+import { memoryStorage } from '../src/memory.js'
 
 type IWorkerResult = {
   readonly memory: string | null
