@@ -85,7 +85,7 @@ import {
 
 包有四个导出入口：主入口 `.`（上面这份完整列表）、`./core`（零 lifecycle 依赖的纯协议子集）、`./plugins`（内置 JSON 插件）、`./registry`（仅 registry 实现面）。四者的精确导出面见 [§11](#11-子路径导出面corepluginsregistry)。
 
-运行时依赖 `@migaia/lifecycle`（`createSerializeRegistry` 用到的 `systemScheduler`/`createAbortController`/`createLifecycleScope`）与 `@migaia/utils`（Base64/UTF-8 底层算法、`attachErrorIdentity` 错误身份标注）。协作式取消信号类型 `ISerializeAbortSignal` 是包内独立定义的结构化类型（`{ aborted, reason?, addEventListener, removeEventListener }`），不依赖 DOM `AbortSignal`，但原生 `AbortSignal` 满足这个结构，可以直接传入。
+运行时依赖 `@migaia/lifecycle` 的按需子路径（`/scheduler`、`/abort`、`/scope`、`/quiescence`）与 `@migaia/utils`（Base64/UTF-8 底层算法、`attachErrorIdentity` 错误身份标注）。registry 的 pending/drain、closing controller 与 parser scope 直接复用 lifecycle leaf；Serialize 仍只拥有 codec registry、stream、context 与自身错误投影。协作式取消信号类型 `ISerializeAbortSignal` 是包内独立定义的结构化类型（`{ aborted, reason?, addEventListener, removeEventListener }`），不依赖 DOM `AbortSignal`，但原生 `AbortSignal` 满足这个结构，可以直接传入。
 
 ---
 

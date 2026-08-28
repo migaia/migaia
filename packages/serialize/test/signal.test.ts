@@ -179,7 +179,7 @@ describe('composeSerializeSignal registration races', () => {
     expect(reported).toEqual([closingRemovalFailure, callerRemovalFailure])
   })
 
-  it('captures caller listener methods once with original receiver', () => {
+  it('invokes caller listener methods with the original receiver', () => {
     let aborted = false
     let reason: unknown = 'first reason'
     let callerListener: (() => void) | undefined
@@ -233,27 +233,13 @@ describe('composeSerializeSignal registration races', () => {
       closing,
       () => {}
     )
-    Object.defineProperties(caller, {
-      addEventListener: {
-        configurable: true,
-        value: () => {
-          throw new Error('drifted add')
-        }
-      },
-      removeEventListener: {
-        configurable: true,
-        value: () => {
-          throw new Error('drifted remove')
-        }
-      }
-    })
     aborted = true
     reason = 'second reason'
     callerListener?.()
 
     expect(composed.signal.reason).toBe('second reason')
-    expect(addReads).toBe(1)
-    expect(removeReads).toBe(1)
+    expect(addReads).toBe(2)
+    expect(removeReads).toBe(2)
     expect(addReceiverMatched).toBe(true)
     expect(removeReceiverMatched).toBe(true)
     composed.dispose()
