@@ -156,8 +156,7 @@ export function tagLifecycleError<E extends Error>(error: E, code: string): E {
     existingCode.configurable === true
   ) {
     // Lifecycle deliberately reclassifies one primary Error as it crosses cancellation
-    // boundaries (ABORT_LISTENER_FAILED -> GENERATION_CANCELLATION_FAILED). Preserve the
-    // historical object identity while keeping cross-source conflicts fail-closed in utils.
+    // boundaries. Preserve object identity while keeping cross-source conflicts fail-closed.
     Object.defineProperty(error, 'code', {
       configurable: true,
       enumerable: true,

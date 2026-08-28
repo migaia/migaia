@@ -8,7 +8,12 @@ import {
 } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
-import { createAbortController, type IAbortController, type IAbortSignal } from './abort.js'
+import { type IAbortController, type IAbortSignal } from './abort.js'
+import { captureAbortControllerFactory } from './abort-factory.js'
+import {
+  observeAbortSubscription,
+  type IObservedAbortSubscription
+} from './observed-subscription.js'
 import {
   resolveSchedulerOption,
   systemScheduler,
@@ -20,16 +25,7 @@ import {
 export type IGenerationToken = object
 
 /** Tracks one parent-abort listener from registration through both normal and admission cleanup. */
-type IParentListenerRegistration = {
-  readonly signal: IAbortSignal
-  readonly listener: () => void
-  removed: boolean
-  cleanupFailed: boolean
-  registrationReturned: boolean
-  parentAbortCheckCompleted: boolean
-  parentAbortDetected: boolean
-  postRegistrationCleanupAttempted: boolean
-}
+type IParentListenerRegistration = IObservedAbortSubscription
 
 export type IGenerationRequest = {
   readonly generation: number
@@ -142,6 +138,7 @@ export function createGenerationController(
   options: IGenerationControllerOptions = {}
 ): IGenerationController {
   const scheduler = resolveSchedulerOption(options, systemScheduler)
+  const createController = captureAbortControllerFactory()
   const parentSignal = options.parentSignal
   let generation = 0
   let currentToken: IGenerationToken | undefined
@@ -149,26 +146,6 @@ export function createGenerationController(
   let currentParentRegistration: IParentListenerRegistration | undefined
   let currentTimer: IScheduledTask | undefined
   let disposed = false
-
-  /** Removes a parent listener once during normal cleanup, or forcibly after registration returns. */
-  const removeParentListener = (
-    registration: IParentListenerRegistration,
-    force: boolean
-  ): void => {
-    if (force) {
-      if (registration.postRegistrationCleanupAttempted) return
-      registration.postRegistrationCleanupAttempted = true
-    } else if (registration.removed) {
-      return
-    }
-    registration.removed = true
-    try {
-      registration.signal.removeEventListener('abort', registration.listener)
-    } catch (error) {
-      registration.cleanupFailed = true
-      throw error
-    }
-  }
 
   const abortCurrent = (reason?: unknown): void => {
     const errors: unknown[] = []
@@ -187,7 +164,26 @@ export function createGenerationController(
     currentController = undefined
     currentToken = undefined
     if (timer) runCleanup(() => timer.cancel())
-    if (parentRegistration) runCleanup(() => removeParentListener(parentRegistration, false))
+    if (parentRegistration)
+      runCleanup(() => {
+        parentRegistration.unsubscribe()
+        if (parentRegistration.failures.length === 1)
+          throw createLifecycleFailure(
+            LifecycleErrorCode.generationCancellationFailed,
+            LifecycleErrorText.generationCancellationFailed,
+            parentRegistration.failures[0]
+          )
+        if (parentRegistration.failures.length > 1) {
+          throw appendFailureErrors(
+            createLifecycleFailure(
+              LifecycleErrorCode.generationCancellationFailed,
+              LifecycleErrorText.generationCancellationFailed,
+              parentRegistration.failures[0]
+            ),
+            parentRegistration.failures.slice(1)
+          )
+        }
+      })
     if (controller) runCleanup(() => controller.abort(reason))
     if (errors.length === 1) {
       throw createLifecycleFailure(
@@ -204,22 +200,8 @@ export function createGenerationController(
     }
   }
 
-  /** Invalidates a parent-driven generation even when reading its reason fails. */
-  const abortFromParent = (): void => {
-    let reason: unknown
-    try {
-      reason = parentSignal?.reason
-    } catch (error) {
-      const cleanupErrors: unknown[] = []
-      try {
-        abortCurrent(error)
-      } catch (cleanupError) {
-        appendCleanupErrors(cleanupErrors, cleanupError)
-      }
-      throw createAdmissionFailure(error, cleanupErrors)
-    }
-    abortCurrent(reason)
-  }
+  /** Invalidates a parent-driven generation using the reason captured by the subscription. */
+  const abortFromParent = (reason: unknown): void => abortCurrent(reason)
 
   /** Rolls back a partially admitted generation and throws the original admission failure. */
   const rollbackAdmission = (
@@ -227,20 +209,12 @@ export function createGenerationController(
     registration: IParentListenerRegistration | undefined
   ): never => {
     const cleanupErrors: unknown[] = []
-    if (
-      registration &&
-      !registration.postRegistrationCleanupAttempted &&
-      (registration.cleanupFailed ||
-        !registration.registrationReturned ||
-        !registration.parentAbortCheckCompleted ||
-        registration.parentAbortDetected)
-    ) {
-      try {
-        // A hostile signal can register its listener after synchronously invoking it; force a
-        // second remove after addEventListener returns to cover that window.
-        removeParentListener(registration, true)
-      } catch (error) {
-        appendCleanupErrors(cleanupErrors, error)
+    registration?.unsubscribe()
+    const knownRegistrationFailures = registration?.failures.length ?? 0
+    registration?.retryRegistrationCleanup()
+    if (registration) {
+      for (const failure of registration.failures.slice(knownRegistrationFailures)) {
+        appendCleanupErrors(cleanupErrors, failure)
       }
     }
     try {
@@ -309,7 +283,7 @@ export function createGenerationController(
       abortCurrent('superseded by a new generation')
       generation++
       const token: IGenerationToken = {}
-      const controller = createAbortController()
+      const controller = createController()
       currentToken = token
       currentController = controller
       // parent abort 与 timeout 都原子作废当前 token（AF-14）：作废 = 取消 timer + 移除 parent listener。
@@ -323,30 +297,19 @@ export function createGenerationController(
             abortCurrent(reason)
             invalidatedByParent = true
           } else {
-            const listener = (): void => abortFromParent()
-            const registration: IParentListenerRegistration = {
-              signal: parentSignal,
-              listener,
-              removed: false,
-              cleanupFailed: false,
-              registrationReturned: false,
-              parentAbortCheckCompleted: false,
-              parentAbortDetected: false,
-              postRegistrationCleanupAttempted: false
-            }
+            const registrationErrors: unknown[] = []
+            const registration = observeAbortSubscription(parentSignal, abortFromParent, (error) =>
+              registrationErrors.push(error)
+            )
             admissionRegistration = registration
             currentParentRegistration = registration
-            parentSignal.addEventListener('abort', listener, { once: true })
-            registration.registrationReturned = true
-            const parentAborted = parentSignal.aborted
-            registration.parentAbortCheckCompleted = true
-            registration.parentAbortDetected = parentAborted
-            if (parentAborted) {
-              // Registration may synchronously race with abort and leave a residual listener after
-              // invoking `listener`; force removal after the host call has fully returned.
-              const reason = parentSignal.reason
-              abortCurrent(reason)
-              removeParentListener(registration, true)
+            registration.retryRegistrationCleanup()
+            if (registrationErrors.length > 0) {
+              currentParentRegistration = undefined
+              throw createAdmissionFailure(registrationErrors[0], registrationErrors.slice(1))
+            }
+            if (currentController === undefined || currentToken === undefined) {
+              currentParentRegistration = undefined
               invalidatedByParent = true
             }
           }

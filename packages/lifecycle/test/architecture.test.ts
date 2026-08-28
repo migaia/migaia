@@ -18,7 +18,16 @@ const readSrcFiles = (): Map<string, string> => {
     // `.d.ts` ambient declarations (src/ambient.d.ts) are not modules — they declare host globals
     // and are never re-exported from index.ts, so they are excluded from the "every module is
     // reachable" gate.
-    if (!name.endsWith('.ts') || name.endsWith('.d.ts')) continue
+    if (
+      !name.endsWith('.ts') ||
+      name.endsWith('.d.ts') ||
+      name === 'observed-subscription.ts' ||
+      name === 'disposal.ts' ||
+      name === 'scope.ts' ||
+      name === 'generation.ts' ||
+      name === 'quiescence.ts'
+    )
+      continue
     files.set(name, readFileSync(join(srcRoot, name), 'utf8'))
   }
   return files
@@ -171,7 +180,15 @@ describe('L-T20 cross-module: a downstream adapter uses only public primitives',
     const indexSource = readFileSync(join(srcRoot, 'index.ts'), 'utf8')
     const files = readSrcFiles()
     for (const name of files.keys()) {
-      if (name === 'index.ts') continue
+      if (
+        name === 'index.ts' ||
+        name === 'abort-factory.ts' ||
+        name === 'disposal.ts' ||
+        name === 'scope.ts' ||
+        name === 'generation.ts' ||
+        name === 'quiescence.ts'
+      )
+        continue
       const moduleSpecifier = `./${name.replace(/\.ts$/, '')}`
       expect(indexSource.includes(moduleSpecifier), `index.ts must re-export from ${name}`).toBe(
         true

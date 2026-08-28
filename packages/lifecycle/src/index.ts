@@ -23,6 +23,12 @@ export {
 
 export { createAbortController, type IAbortSignal, type IAbortController } from './abort.js'
 
+export {
+  createSyncStartedDisposalLedger,
+  type ISyncStartedDisposalLedger,
+  type ISyncStartedDisposalOutcome
+} from './sync-started-disposal-ledger.js'
+
 export { LifecycleErrorCode, type ILifecycleErrorCode } from './error-code.js'
 export { LifecycleErrorText, type ILifecycleErrorText } from './error-text.js'
 

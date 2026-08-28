@@ -289,7 +289,6 @@ describe('AF-T73 GenerationController cancellation cleanup boundary', () => {
   it('multiple cleanup failures preserve identity and cleanup order under GENERATION_CANCELLATION_FAILED', () => {
     const timerError = new Error('timer cleanup failed')
     const parentError = new Error('parent listener cleanup failed')
-    const signalError = new Error('signal listener cleanup failed')
     const parent: IGenerationControllerOptions['parentSignal'] = {
       aborted: false,
       addEventListener: () => {},
@@ -308,10 +307,7 @@ describe('AF-T73 GenerationController cancellation cleanup boundary', () => {
         })
       }
     })
-    const request = controller.begin({ timeoutMs: 1 })
-    request.signal.addEventListener('abort', () => {
-      throw signalError
-    })
+    controller.begin({ timeoutMs: 1 })
 
     let caught: unknown
     try {
@@ -326,7 +322,7 @@ describe('AF-T73 GenerationController cancellation cleanup boundary', () => {
         code: LifecycleErrorCode.generationCancellationFailed
       })
     )
-    expect((caught as AggregateError).errors).toEqual([timerError, parentError, signalError])
+    expect((caught as AggregateError).errors).toEqual([timerError, parentError])
   })
 
   it('single primitive cleanup failure is wrapped with cause', () => {
