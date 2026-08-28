@@ -1,4 +1,10 @@
 import { PluginHost } from '@migaia/plugin-host'
+import {
+  createEventChannel,
+  invokeEachLive,
+  invokeSnapshotEntries,
+  type ICanonicalEventChannel
+} from '@migaia/event-subscriber'
 import type {
   IPluginHostDisposalResult,
   IPluginHostOptions,
@@ -139,11 +145,11 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   // 构造函数里的 Object.defineProperty，不是 TS 能静态识别的直接赋值语句
   readonly ctx!: ILoggerContext
 
-  #sinks: ISink[] = []
-  #hooks: Map<string, ILogHookFn[]> = new Map()
-  #flushers: IFlusher[] = []
-  #shutdownHandlers: IShutdownHandler[] = []
-  #failureHooks: ILogFailureHook[] = []
+  #sinks: ICanonicalEventChannel<ILogEntry, void> = createEventChannel()
+  #hooks: Map<string, ICanonicalEventChannel<ILogEntry, void>> = new Map()
+  #flushers: ICanonicalEventChannel<undefined, void> = createEventChannel()
+  #shutdownHandlers: ICanonicalEventChannel<IShutdownReason, void> = createEventChannel()
+  #failureHooks: ICanonicalEventChannel<ILogFailure, void> = createEventChannel()
   /** Every asynchronous path enters this registry before it can affect flush completion. */
   #pending = new Set<Promise<void>>()
   /** Normal dispatch stays open for shutdown handlers, then closes before PluginHost disposal. */
@@ -252,58 +258,51 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   }
 
   useSink(sink: ISink): () => void {
-    this.#sinks.push(sink)
-    const off = () => this.#removeItem(this.#sinks, sink)
-    return off
-  }
-
-  #removeItem<T>(items: T[], item: T): void {
-    const index = items.indexOf(item)
-    if (index !== -1) items.splice(index, 1)
+    const admission = this.#sinks.subscribe((event) => sink(this.#snapshotEntry(event.value)))
+    return () => admission()
   }
 
   hook(name: string, fn: ILogHookFn): () => void {
-    const list = this.#hooks.get(name) ?? []
-    list.push(fn)
-    this.#hooks.set(name, list)
-    const dispose = () => {
-      const current = this.#hooks.get(name)
-      if (current)
-        this.#hooks.set(
-          name,
-          current.filter((f) => f !== fn)
-        )
+    const channel = this.#hooks.get(name) ?? createEventChannel({ removalPolicy: 'listener-all' })
+    this.#hooks.set(name, channel)
+    const admission = channel.subscribe((event) => fn(event.value))
+    return () => {
+      admission()
+      if (channel.size === 0 && this.#hooks.get(name) === channel) this.#hooks.delete(name)
     }
-    return dispose
   }
 
   onFailure(fn: ILogFailureHook): () => void {
-    this.#failureHooks.push(fn)
-    const off = () => this.#removeItem(this.#failureHooks, fn)
-    return off
+    const admission = this.#failureHooks.subscribe((event) => fn(event.value))
+    return () => admission()
   }
 
   #reportFailure(source: ILogFailure['source'], error: unknown): void {
     const failure: ILogFailure = { source, error }
-    for (const hook of this.#failureHooks.slice()) {
-      try {
-        const pending = captureLoggerPromiseLike(hook(failure))
-        if (pending) {
-          const observed = pending.then(
-            () => undefined,
-            (hookError) => {
-              try {
-                this.#reportFailureHookError(hookError)
-              } catch {
-                // Failure reporting is the terminal boundary; a reporter must never escape it.
+    const batch = invokeSnapshotEntries(this.#failureHooks, failure)
+    try {
+      for (const invocation of batch.entries) {
+        try {
+          const pending = captureLoggerPromiseLike(invocation.invoke())
+          if (pending) {
+            const observed = pending.then(
+              () => undefined,
+              (hookError) => {
+                try {
+                  this.#reportFailureHookError(hookError)
+                } catch {
+                  // Failure reporting is the terminal boundary; a reporter must never escape it.
+                }
               }
-            }
-          )
-          void observed.catch(() => undefined)
+            )
+            void observed.catch(() => undefined)
+          }
+        } catch (hookError) {
+          this.#reportFailureHookError(hookError)
         }
-      } catch (hookError) {
-        this.#reportFailureHookError(hookError)
       }
+    } finally {
+      batch.complete()
     }
     const labels: Record<ILogFailure['source'], string> = {
       defer: 'defer 任务异常',
@@ -348,28 +347,30 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
    * current pass, while an off() call replaces the list and does not mutate the active iterator.
    */
   fireHook(name: string, entry: ILogEntry): void {
-    const list = this.#hooks.get(name)
-    if (!list || list.length === 0) return
-    for (const fn of list) {
+    const channel = this.#hooks.get(name)
+    if (!channel) return
+    invokeEachLive(channel, entry, (invocation) => {
       try {
-        const result = fn(entry)
+        const result = invocation.invoke()
         const pending = captureLoggerPromiseLike(result)
         if (pending) this.#track('hook', pending)
       } catch (err) {
         this.#reportFailure('hook', err)
       }
-    }
+    })
   }
 
   /** Runs a hook phase in registration order and waits for asynchronous hooks. */
   #runHookPhase(name: string, entry: ILogEntry): Promise<void> | undefined {
-    const list = this.#hooks.get(name)
-    if (!list || list.length === 0) return undefined
+    const channel = this.#hooks.get(name)
+    if (!channel) return undefined
+    const batch = invokeSnapshotEntries(channel, entry)
+    if (batch.entries.length === 0) return undefined
     let chain: Promise<void> | undefined
-    for (const fn of list.slice()) {
+    for (const invocation of batch.entries) {
       const run = (): Promise<void> | undefined => {
         try {
-          const pending = captureLoggerPromiseLike(fn(entry))
+          const pending = captureLoggerPromiseLike(invocation.invoke())
           return pending?.catch((error) => {
             this.#reportFailure('hook', error)
           })
@@ -384,7 +385,11 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
         chain = run()
       }
     }
-    return chain
+    if (!chain) {
+      batch.complete()
+      return undefined
+    }
+    return chain.finally(() => batch.complete())
   }
 
   defer(task: () => void | Promise<void>): void {
@@ -410,9 +415,8 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   }
 
   onFlush(fn: IFlusher): () => void {
-    this.#flushers.push(fn)
-    const off = () => this.#removeItem(this.#flushers, fn)
-    return off
+    const admission = this.#flushers.subscribe(() => fn())
+    return () => admission()
   }
 
   /**
@@ -439,22 +443,27 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
 
   async #flush(deadlineAt: number): Promise<void> {
     await this.#drain(deadlineAt)
-    for (const flusher of this.#flushers.slice()) {
-      try {
-        if (
-          !(await boundedWait(Promise.resolve(flusher()), deadlineAt, {
-            scheduler: this.#scheduler
-          }))
-        ) {
-          this.#reportFailure(
-            'flush',
-            createLoggerError(LoggerErrorCode.lifecycleDeadline, LoggerErrorText.flushDeadline)
-          )
-          break
+    const flushBatch = invokeSnapshotEntries(this.#flushers, undefined)
+    try {
+      for (const invocation of flushBatch.entries) {
+        try {
+          if (
+            !(await boundedWait(Promise.resolve(invocation.invoke()), deadlineAt, {
+              scheduler: this.#scheduler
+            }))
+          ) {
+            this.#reportFailure(
+              'flush',
+              createLoggerError(LoggerErrorCode.lifecycleDeadline, LoggerErrorText.flushDeadline)
+            )
+            break
+          }
+        } catch (error) {
+          this.#reportFailure('flush', error)
         }
-      } catch (error) {
-        this.#reportFailure('flush', error)
       }
+    } finally {
+      flushBatch.complete()
     }
     await this.#drain(deadlineAt)
     for (const target of this.#extendTargets) {
@@ -482,9 +491,8 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   }
 
   onShutdown(fn: IShutdownHandler): () => void {
-    this.#shutdownHandlers.push(fn)
-    const off = () => this.#removeItem(this.#shutdownHandlers, fn)
-    return off
+    const admission = this.#shutdownHandlers.subscribe((event) => fn(event.value))
+    return () => admission()
   }
 
   shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult> {
@@ -520,28 +528,33 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     // docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
     const deadlineAt = this.#scheduler.now() + 3000
     ;(async () => {
-      for (const handler of this.#shutdownHandlers.slice()) {
-        try {
-          // Every handler is still invoked (unlike the flusher/extends-target loops, which `break`
-          // on timeout) — onShutdown() never promised handlers would be skipped once a prior one is
-          // slow, and changing that would be a public-behavior change this round must not make.
-          // Only the *wait* for each handler is capped at the shared remaining budget.
-          if (
-            !(await boundedWait(Promise.resolve(handler(reason)), deadlineAt, {
-              scheduler: this.#scheduler
-            }))
-          ) {
-            this.#reportFailure(
-              'shutdown',
-              createLoggerError(
-                LoggerErrorCode.lifecycleDeadline,
-                LoggerErrorText.shutdownHandlerDeadline
+      const shutdownBatch = invokeSnapshotEntries(this.#shutdownHandlers, reason)
+      try {
+        for (const invocation of shutdownBatch.entries) {
+          try {
+            // Every handler is still invoked (unlike the flusher/extends-target loops, which `break`
+            // on timeout) — onShutdown() never promised handlers would be skipped once a prior one is
+            // slow, and changing that would be a public-behavior change this round must not make.
+            // Only the *wait* for each handler is capped at the shared remaining budget.
+            if (
+              !(await boundedWait(Promise.resolve(invocation.invoke()), deadlineAt, {
+                scheduler: this.#scheduler
+              }))
+            ) {
+              this.#reportFailure(
+                'shutdown',
+                createLoggerError(
+                  LoggerErrorCode.lifecycleDeadline,
+                  LoggerErrorText.shutdownHandlerDeadline
+                )
               )
-            )
+            }
+          } catch (error) {
+            this.#reportFailure('shutdown', error)
           }
-        } catch (error) {
-          this.#reportFailure('shutdown', error)
         }
+      } finally {
+        shutdownBatch.complete()
       }
       await this.flush(deadlineAt)
       // Shutdown handlers are allowed to enqueue final work; that work was drained above. Close
@@ -697,21 +710,26 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     try {
       const pipeline = this.runPipeline(entry, (finalEntry) => {
         const committedEntry = finalEntry && finalEntry.time instanceof Date ? finalEntry : entry
-        for (const sink of this.#sinks.slice()) {
-          try {
-            const result = sink(this.#snapshotEntry(committedEntry))
-            const pending = captureLoggerPromiseLike(result)
-            if (pending) {
-              // 关键修复：sink 返回的 Promise 现在会被纳入 #pending 追踪，
-              // flush()/shutdown() 会真正等它完成，不再是单纯 fire-and-forget。
-              // 这直接关系到 http 插件没接 batch 时，进程退出前有没有可能把
-              // 还在飞行中的请求弄丢——之前这里只 .catch() 不追踪，
-              // flush() 完全不知道这个请求还没发完就已经"完成"了。
-              this.#track('sink', pending)
+        const sinkBatch = invokeSnapshotEntries(this.#sinks, committedEntry)
+        try {
+          for (const invocation of sinkBatch.entries) {
+            try {
+              const result = invocation.invoke()
+              const pending = captureLoggerPromiseLike(result)
+              if (pending) {
+                // 关键修复：sink 返回的 Promise 现在会被纳入 #pending 追踪，
+                // flush()/shutdown() 会真正等它完成，不再是单纯 fire-and-forget。
+                // 这直接关系到 http 插件没接 batch 时，进程退出前有没有可能把
+                // 还在飞行中的请求弄丢——之前这里只 .catch() 不追踪，
+                // flush() 完全不知道这个请求还没发完就已经"完成"了。
+                this.#track('sink', pending)
+              }
+            } catch (err) {
+              this.#reportFailure('sink', err)
             }
-          } catch (err) {
-            this.#reportFailure('sink', err)
           }
+        } finally {
+          sinkBatch.complete()
         }
         const after = this.#runHookPhase('after', committedEntry)
         const forward = () => {

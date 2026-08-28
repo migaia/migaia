@@ -141,7 +141,8 @@ export const eventErrorText = (code: IEventSubscriberErrorCode): string => {
     [EventSubscriberErrorCode.unhandledListenerFailure]:
       EventSubscriberErrorText.unhandledListenerFailure,
     [EventSubscriberErrorCode.subscriptionHandleProjectionFailed]:
-      EventSubscriberErrorText.subscriptionHandleProjectionFailed
+      EventSubscriberErrorText.subscriptionHandleProjectionFailed,
+    [EventSubscriberErrorCode.invocationClosed]: EventSubscriberErrorText.invocationClosed
   }
   return entry[code]
 }

@@ -80,6 +80,9 @@ importers:
 
   packages/logger:
     dependencies:
+      '@migaia/event-subscriber':
+        specifier: workspace:^
+        version: link:../event-subscriber
       '@migaia/lifecycle':
         specifier: workspace:^
         version: link:../lifecycle

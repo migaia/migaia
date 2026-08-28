@@ -12,6 +12,8 @@ import type {
   IEventChannelOptions,
   IEventContext,
   IEventDispatchSnapshot,
+  IEventInvocation,
+  IEventInvocationBatch,
   IEventListener,
   IEventAbortSignal,
   IFilteredEventChannel,
@@ -49,6 +51,13 @@ type IRegistrationOwner<T, R, V> = {
   previous: IRegistrationOwner<T, R, V> | undefined
   next: IRegistrationOwner<T, R, V> | undefined
   release: IUnsubscribe
+  committed: boolean
+  admissionEpoch: number
+}
+
+type IActiveLiveDispatch<T, R, V> = {
+  readonly epoch: number
+  readonly seen: Set<IRegistrationOwner<T, R, V>>
 }
 
 type IChannelCapability<T, R, V = undefined> = {
@@ -56,6 +65,11 @@ type IChannelCapability<T, R, V = undefined> = {
   project(value: T): IEventProjectionOutcome
   readonly plan: IEventProjectionPlan | undefined
   readonly options: IEventChannelOptions<T, IEventApiStyle | undefined, V>
+  liveVisit(
+    value: T,
+    taskId: string | undefined,
+    visitor: (invocation: IEventInvocation<R>) => void
+  ): void
 }
 
 type IFilteredCapability<T, R, V = undefined> = {
@@ -211,11 +225,65 @@ const snapshotOwner = <T, R, V>(
   })
 
 /** Invokes one snapshot entry and returns its raw listener result. */
-export const invokeSnapshot = <T, R, V = undefined>(
+export const invokeDispatchSnapshot = <T, R, V = undefined>(
   snapshot: IEventDispatchSnapshot<T, R, V>,
   value: T,
   projection?: { readonly plan: IEventProjectionPlan; readonly outcome: IEventProjectionOutcome }
 ): R | PromiseLike<R> => snapshot.listener(createEventContext(value, snapshot, projection) as never)
+
+/** Creates an opaque invocation batch over one immutable target snapshot. */
+export const invokeSnapshotEntries = <T, R, V = undefined>(
+  channel: ICanonicalEventChannel<T, R, undefined, V> | IFilteredEventChannel<T, R, V>,
+  value: T
+): IEventInvocationBatch<R> => {
+  const { capability, taskId } = getCapability(channel)
+  const snapshots = capability.snapshot(taskId)
+  const projection =
+    snapshots.length > 0 && capability.plan
+      ? { plan: capability.plan, outcome: capability.project(value) }
+      : undefined
+  let completeCalled = false
+  const entries = snapshots.map((snapshot) => {
+    let invoked = false
+    return Object.freeze({
+      taskId: snapshot.taskId,
+      invoke: (): R | PromiseLike<R> => {
+        if (completeCalled || invoked)
+          throw createEventTypeError(
+            EventSubscriberErrorCode.invocationClosed,
+            eventErrorText(EventSubscriberErrorCode.invocationClosed)
+          )
+        invoked = true
+        return invokeDispatchSnapshot(snapshot, value, projection)
+      }
+    }) as IEventInvocation<R>
+  })
+  return Object.freeze({
+    entries: Object.freeze(entries),
+    complete(): void {
+      if (completeCalled) return
+      completeCalled = true
+      if (projection?.outcome.diagnostic)
+        reportEventProjectionFailure(
+          capability.options,
+          createEventContext(value, snapshots[0]!, projection),
+          projection.outcome.diagnostic
+        )
+    }
+  })
+}
+
+/** Visits registrations with append-live visibility while always releasing dispatch bookkeeping. */
+export const invokeEachLive = <T, R, V = undefined>(
+  channel: ICanonicalEventChannel<T, R, undefined, V> | IFilteredEventChannel<T, R, V>,
+  value: T,
+  visitor: (invocation: IEventInvocation<R>) => void
+): void => {
+  const { capability, taskId } = getCapability(channel)
+  const liveVisit = capability.liveVisit
+  if (!liveVisit) return
+  liveVisit(value, taskId, visitor)
+}
 
 /** Reads one dispatch snapshot from a canonical channel or filtered capability. */
 export const getCapability = <T, R, V = undefined>(
@@ -399,6 +467,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
   let report: IEventChannelOptions<T, undefined, V>['report']
   let terminalReport: IEventChannelOptions<T, undefined, V>['terminalReport']
   let dispatchPolicy: IEventChannelOptions<T, undefined, V>['dispatchPolicy']
+  let removalPolicy: IEventChannelOptions<T, undefined, V>['removalPolicy']
   let valueConfig: unknown
   let style: IEventApiStyle | undefined
   let stylePlan: IEventApiStylePlan
@@ -412,6 +481,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     report = options.report
     terminalReport = options.terminalReport
     dispatchPolicy = options.dispatchPolicy ?? EventDispatchPolicy.recursive
+    removalPolicy = options.removalPolicy ?? 'handle'
     valueConfig = options.valueConfig as unknown
   } catch (error) {
     throw codeExistingError(error, EventSubscriberErrorCode.invalidOptions)
@@ -455,15 +525,23 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       eventErrorText(EventSubscriberErrorCode.invalidOptions)
     )
   }
+  if (removalPolicy !== 'handle' && removalPolicy !== 'listener-all')
+    throw createEventTypeError(
+      EventSubscriberErrorCode.invalidOptions,
+      eventErrorText(EventSubscriberErrorCode.invalidOptions)
+    )
   const normalizedOptions: IEventChannelOptions<T, undefined, V> = {
     report,
     terminalReport,
-    valueConfig: valueConfig as IEventChannelOptions<T, undefined, V>['valueConfig']
+    valueConfig: valueConfig as IEventChannelOptions<T, undefined, V>['valueConfig'],
+    removalPolicy
   }
   const projectionPlan = suppliedProjectionPlan ?? createEventValueProjectionPlan(valueConfig)
   let first: IRegistrationOwner<T, R, V> | undefined
   let last: IRegistrationOwner<T, R, V> | undefined
   let count = 0
+  let membershipEpoch = 0
+  const activeLiveDispatches = new Set<IActiveLiveDispatch<T, R, V>>()
   /** Queued values used only when the caller explicitly opts into queued reentrancy. */
   let publishing = false
   const pendingValues: T[] = []
@@ -471,20 +549,35 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
   const registerRaw = (
     listener: IEventListener<T, R, V>,
     taskId: string | undefined
-  ): (() => void) => {
+  ): { readonly release: IUnsubscribe; readonly commit: () => void } => {
     let released = false
+    let committed = false
     const owner = {} as IRegistrationOwner<T, R, V>
-    const release = (): void => {
-      if (released || !owner.active) return
-      released = true
-      owner.active = false
-      if (owner.previous) owner.previous.next = owner.next
-      else first = owner.next
-      if (owner.next) owner.next.previous = owner.previous
-      else last = owner.previous
-      owner.previous = undefined
-      owner.next = undefined
+    const removeOwner = (target: IRegistrationOwner<T, R, V>, incrementEpoch: boolean): void => {
+      if (!target.active || !target.committed) return
+      target.active = false
+      if (target.previous) target.previous.next = target.next
+      else first = target.next
+      if (target.next) target.next.previous = target.previous
+      else last = target.previous
+      target.previous = undefined
+      target.next = undefined
       count -= 1
+      if (incrementEpoch) membershipEpoch += 1
+    }
+    const release = (): void => {
+      if (released) return
+      released = true
+      if (removalPolicy === 'listener-all' && committed) {
+        const matching: IRegistrationOwner<T, R, V>[] = []
+        let current = first
+        while (current) {
+          if (current.listener === owner.listener) matching.push(current)
+          current = current.next
+        }
+        for (const matchingOwner of matching) removeOwner(matchingOwner, false)
+        if (matching.length > 0) membershipEpoch += 1
+      } else removeOwner(owner, true)
     }
     owner.listener = listener
     owner.active = true
@@ -494,11 +587,21 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     owner.previous = last
     owner.next = undefined
     owner.release = release
-    if (last) last.next = owner
-    else first = owner
-    last = owner
-    count += 1
-    return release
+    owner.committed = false
+    owner.admissionEpoch = membershipEpoch
+    const commit = (): void => {
+      if (committed || released) return
+      committed = true
+      owner.committed = true
+      owner.admissionEpoch = membershipEpoch
+      owner.previous = last
+      owner.next = undefined
+      if (last) last.next = owner
+      else first = owner
+      last = owner
+      count += 1
+    }
+    return { release, commit }
   }
   /** Delivers one value while preserving listener snapshots and late-failure reporting. */
   const dispatchValue = (value: T, failures: unknown[]): void => {
@@ -510,7 +613,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     for (const snapshot of snapshots) {
       let result: R | PromiseLike<R>
       try {
-        result = invokeSnapshot(snapshot, value, projection)
+        result = invokeDispatchSnapshot(snapshot, value, projection)
       } catch (error) {
         failures.push(error)
         continue
@@ -567,21 +670,30 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
         )
       }
       const taskId = readTaskOption(listenerOptions)
-      const release = registerRaw(listener, taskId)
-      return createSubscriptionHandle(
-        release,
-        (nextListener, nextOptions) => {
-          if (typeof nextListener !== 'function') {
-            throw createEventTypeError(
-              EventSubscriberErrorCode.invalidListener,
-              eventErrorText(EventSubscriberErrorCode.invalidListener)
-            )
-          }
-          const nextTaskId = readTaskOption(nextOptions)
-          return registerRaw(nextListener, nextTaskId)
-        },
-        stylePlan
-      )
+      const admission = registerRaw(listener, taskId)
+      try {
+        const handle = createSubscriptionHandle(
+          admission.release,
+          (nextListener, nextOptions) => {
+            if (typeof nextListener !== 'function') {
+              throw createEventTypeError(
+                EventSubscriberErrorCode.invalidListener,
+                eventErrorText(EventSubscriberErrorCode.invalidListener)
+              )
+            }
+            const nextTaskId = readTaskOption(nextOptions)
+            const nextAdmission = registerRaw(nextListener, nextTaskId)
+            nextAdmission.commit()
+            return nextAdmission.release
+          },
+          stylePlan
+        )
+        admission.commit()
+        return handle
+      } catch (error) {
+        admission.release()
+        throw error
+      }
     },
     subscribeOnce(listener, listenerOptions) {
       return subscribeOnce(channel, listener, listenerOptions)
@@ -602,6 +714,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       return filtered
     },
     clear() {
+      if (count > 0) membershipEpoch += 1
       let current = first
       while (current) {
         const next = current.next
@@ -633,6 +746,78 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
         current = current.next
       }
       return Object.freeze(snapshots)
+    },
+    liveVisit(value, taskId, visitor) {
+      const active: IActiveLiveDispatch<T, R, V> = {
+        epoch: membershipEpoch,
+        seen: new Set()
+      }
+      activeLiveDispatches.add(active)
+      let projection:
+        | { readonly plan: IEventProjectionPlan; readonly outcome: IEventProjectionOutcome }
+        | undefined
+      let primaryError: unknown
+      let visitorFailed = false
+      const pending: IRegistrationOwner<T, R, V>[] = []
+      const liveInvocations: Array<() => void> = []
+      try {
+        const append = (): void => {
+          let current = first
+          while (current) {
+            if (
+              current.committed &&
+              !active.seen.has(current) &&
+              (taskId === undefined || current.currentTaskId === taskId) &&
+              current.admissionEpoch === active.epoch
+            ) {
+              active.seen.add(current)
+              pending.push(current)
+            }
+            current = current.next
+          }
+        }
+        append()
+        let index = 0
+        while (index < pending.length) {
+          const owner = pending[index++]!
+          if (!projection && capability.plan)
+            projection = { plan: capability.plan, outcome: capability.project(value) }
+          const snapshot = snapshotOwner(owner)
+          let invoked = false
+          let closed = false
+          const invocation: IEventInvocation<R> = {
+            taskId: snapshot.taskId,
+            invoke: () => {
+              if (closed || invoked)
+                throw createEventTypeError(
+                  EventSubscriberErrorCode.invocationClosed,
+                  eventErrorText(EventSubscriberErrorCode.invocationClosed)
+                )
+              invoked = true
+              return invokeDispatchSnapshot(snapshot, value, projection)
+            }
+          }
+          const close = (): void => {
+            closed = true
+          }
+          liveInvocations.push(close)
+          visitor(invocation)
+          append()
+        }
+      } catch (error) {
+        visitorFailed = true
+        primaryError = error
+      } finally {
+        activeLiveDispatches.delete(active)
+        for (const close of liveInvocations) close()
+        if (projection?.outcome.diagnostic)
+          reportEventProjectionFailure(
+            normalizedOptions,
+            createEventContext(value, snapshotOwner(pending[0]!), projection),
+            projection.outcome.diagnostic
+          )
+      }
+      if (visitorFailed) throw primaryError
     }
   }
   try {
