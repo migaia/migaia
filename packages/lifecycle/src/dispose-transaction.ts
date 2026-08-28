@@ -18,7 +18,12 @@ import {
   validateSchedulerTime,
   type ILifecycleScheduler
 } from './scheduler.js'
-import { createAbortController, type IAbortSignal } from './abort.js'
+import { type IAbortSignal } from './abort.js'
+import { captureAbortControllerFactory } from './abort-factory.js'
+import {
+  observeAbortSubscription,
+  type IObservedAbortSubscription
+} from './observed-subscription.js'
 import { DisposeTransactionKind, ThenableProbeKind } from './state-constants.js'
 
 type ICallbackOutcome = { readonly ok: true } | { readonly ok: false; readonly error: unknown }
@@ -389,6 +394,7 @@ export function createDisposeTransaction(
 ): IDisposeTransaction {
   const errorPolicy = options.errorPolicy ?? 'throw'
   const scheduler = resolveSchedulerOption(options)
+  const createController = captureAbortControllerFactory()
   return {
     mode,
     async run(items) {
@@ -402,42 +408,21 @@ export function createDisposeTransaction(
       // Mirrors `options.signal` into a signal every item's context can observe (L-T26). With no
       // `options.signal` given, `controller.signal` simply never aborts — a scope that wants items
       // to see "we're closing" passes its own close()-tied signal in.
-      const controller = options.signal === undefined ? undefined : createAbortController()
-      const forwardAbort = (): void => controller?.abort(options.signal?.reason)
-      let registrationAttempted = false
-      let registrationReturned = false
-      let removalAttempted = false
-      const removeSignalListener = (force = false): void => {
-        if (!options.signal || removalAttempted) return
-        if (!force && (!registrationAttempted || !registrationReturned)) return
-        removalAttempted = true
-        options.signal.removeEventListener('abort', forwardAbort)
-      }
+      const controller = options.signal === undefined ? undefined : createController()
+      const signalCleanupErrors: unknown[] = []
+      let signalSubscription: IObservedAbortSubscription | undefined
+      const forwardAbort = (reason: unknown): void => controller?.abort(reason)
       try {
         if (options.signal?.aborted) {
           controller?.abort(options.signal.reason)
         } else if (options.signal) {
-          // Mark before calling: a hostile signal may store the listener and then throw.
-          registrationAttempted = true
-          options.signal.addEventListener('abort', forwardAbort, { once: true })
-          registrationReturned = true
-          // Observe an abort that happened during registration and remove any residual listener.
-          if (options.signal.aborted) {
-            controller?.abort(options.signal.reason)
-            try {
-              removeSignalListener(true)
-            } catch (error) {
-              cleanupErrors.push(error)
-            }
-          }
+          signalSubscription = observeAbortSubscription(options.signal, forwardAbort, (error) =>
+            signalCleanupErrors.push(error)
+          )
+          signalSubscription.retryRegistrationCleanup()
         }
       } catch (error) {
         record('transaction-signal', error)
-        try {
-          removeSignalListener(true)
-        } catch (cleanupError) {
-          cleanupErrors.push(cleanupError)
-        }
       }
       try {
         const admission = admitItems(items, mode)
@@ -461,11 +446,8 @@ export function createDisposeTransaction(
         // Input iteration failures must not bypass pending drain or collector finalization.
         record('transaction', error)
       } finally {
-        try {
-          removeSignalListener()
-        } catch (error) {
-          cleanupErrors.push(error)
-        }
+        signalSubscription?.unsubscribe()
+        cleanupErrors.push(...signalCleanupErrors)
       }
       if (options.pending) {
         try {

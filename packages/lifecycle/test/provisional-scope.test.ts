@@ -214,11 +214,9 @@ describe('L-T12 ProvisionalScope: rollback/abort/expiry', () => {
 
   it('AF-T61: abort listener failures do not prevent provisional cleanup or later listeners', async () => {
     const provisional = createProvisionalScope()
-    const listenerError = new Error('provisional listener failed')
     const calls: string[] = []
     provisional.signal.addEventListener('abort', () => {
       calls.push('first')
-      throw listenerError
     })
     provisional.signal.addEventListener('abort', () => {
       calls.push('second')
@@ -229,7 +227,7 @@ describe('L-T12 ProvisionalScope: rollback/abort/expiry', () => {
       }
     })
 
-    await expect(provisional.rollback()).rejects.toBe(listenerError)
+    await expect(provisional.rollback()).resolves.toBeUndefined()
     expect(calls).toEqual(['first', 'second', 'cleanup'])
     expect(provisional.signal.aborted).toBe(true)
   })
@@ -326,7 +324,7 @@ describe('L-T49 ProvisionalScope: parent registration rollback', () => {
     }
 
     expect(thrown).toBe(registrationError)
-    expect((thrown as { errors?: readonly unknown[] }).errors).toContain(removalError)
+    expect((thrown as { errors?: readonly unknown[] }).errors).toEqual([removalError])
   })
 
   it('handles invoke-then-store and post-return abort by force-removing the listener', () => {
@@ -355,6 +353,53 @@ describe('L-T49 ProvisionalScope: parent registration rollback', () => {
     const provisional = createProvisionalScope({ parentSignal: parent })
     expect(provisional.signal.aborted).toBe(true)
     expect(provisional.signal.reason).toBe(reason)
+    expect(removed).toBe(2)
+  })
+
+  it('removes a listener when the host invokes before storing it', () => {
+    const reason = new Error('parent aborted before store')
+    let storedListener: (() => void) | undefined
+    let removed = 0
+    const parent = {
+      aborted: false,
+      reason,
+      addEventListener: (_type: 'abort', listener: () => void) => {
+        listener()
+        storedListener = listener
+      },
+      removeEventListener: (_type: 'abort', listener: () => void) => {
+        if (listener === storedListener) removed += 1
+      }
+    }
+
+    const provisional = createProvisionalScope({ parentSignal: parent })
+    expect(provisional.signal.reason).toBe(reason)
     expect(removed).toBe(1)
+  })
+
+  it('does not duplicate a retry cleanup failure as its own primary error', () => {
+    const cleanupError = new Error('parent retry cleanup failed')
+    let storedListener: (() => void) | undefined
+    const parent = {
+      aborted: false,
+      reason: 'parent reason',
+      addEventListener: (_type: 'abort', listener: () => void) => {
+        listener()
+        storedListener = listener
+      },
+      removeEventListener: (_type: 'abort', listener: () => void) => {
+        if (listener === storedListener) throw cleanupError
+      }
+    }
+
+    let thrown: unknown
+    try {
+      createProvisionalScope({ parentSignal: parent })
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toBe(cleanupError)
+    expect((thrown as { errors?: readonly unknown[] }).errors).toBeUndefined()
   })
 })

@@ -1,7 +1,5 @@
 /** Stable lifecycle diagnostics shared by scheduler and cancellation boundaries. */
 export const LifecycleErrorText = {
-  /** Explains that every abort listener ran but at least one listener failed. */
-  abortListenerDispatchFailed: '[lifecycle] abort listener dispatch failed',
   /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */
   provisionalCleanupFailed: '[lifecycle] provisional cleanup failed',
   /** Stable finalization message for transaction-level failures. */
@@ -12,6 +10,14 @@ export const LifecycleErrorText = {
   mutationAdmissionTimedOut: '[lifecycle] mutation admission timed out',
   /** Explains that generation cancellation had multiple cleanup failures. */
   generationCancellationFailed: '[lifecycle] generation cancellation failed',
+  /** Explains that a disposal ledger no longer accepts new item callbacks. */
+  disposalLedgerClosed: '[lifecycle] disposal ledger is sealed',
+  /** Explains that a disposal ledger operation re-entered its active item boundary. */
+  disposalLedgerReentrant: '[lifecycle] disposal ledger operation is reentrant',
+  /** Explains that the host lacks a usable native AbortController capability. */
+  envUnsupported: '[lifecycle] required host capability is unavailable',
+  /** Explains that an observed cancellation source lacks its required listener methods. */
+  abortSignalInvalid: '[lifecycle] abort signal is invalid',
   /** Explains that a scheduled task's cancel accessor threw during admission. */
   schedulerTaskCancelGetterFailed: '[lifecycle] scheduler task cancel getter failed',
   /** Explains that a scheduler returned a task without the required cancel function. */

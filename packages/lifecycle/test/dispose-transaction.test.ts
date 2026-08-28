@@ -420,6 +420,45 @@ describe('L-T50 DisposeTransaction: signal registration and cleanup failures', (
     const result = await transaction.run([{ source: 'resource', descriptor: { force: vi.fn() } }])
     expect(result.map((entry) => entry.error)).toEqual([registrationError, removalError])
   })
+
+  it('removes a listener when the host invokes before storing it', async () => {
+    let storedListener: (() => void) | undefined
+    let removed = 0
+    const signal = {
+      aborted: false,
+      reason: undefined,
+      addEventListener: (_type: 'abort', listener: () => void) => {
+        listener()
+        storedListener = listener
+      },
+      removeEventListener: (_type: 'abort', listener: () => void) => {
+        if (listener === storedListener) removed += 1
+      }
+    }
+    const transaction = createDisposeTransaction({ kind: 'plan' }, { signal })
+
+    await transaction.run([])
+    expect(removed).toBe(1)
+  })
+
+  it('keeps a callback-before-store cleanup failure as one primary error', async () => {
+    const cleanupError = new Error('transaction retry cleanup failed')
+    let storedListener: (() => void) | undefined
+    const signal = {
+      aborted: false,
+      reason: undefined,
+      addEventListener: (_type: 'abort', listener: () => void) => {
+        listener()
+        storedListener = listener
+      },
+      removeEventListener: (_type: 'abort', listener: () => void) => {
+        if (listener === storedListener) throw cleanupError
+      }
+    }
+    const transaction = createDisposeTransaction({ kind: 'plan' }, { signal })
+
+    await expect(transaction.run([])).rejects.toBe(cleanupError)
+  })
 })
 
 describe('L-T14 DisposeTransaction: order mode', () => {

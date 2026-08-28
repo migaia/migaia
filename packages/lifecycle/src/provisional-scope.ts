@@ -4,7 +4,12 @@ import { createLifecycleError, tagLifecycleError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { createDisposeTransaction } from './dispose-transaction.js'
-import { createAbortController, type IAbortSignal } from './abort.js'
+import { type IAbortSignal } from './abort.js'
+import { captureAbortControllerFactory } from './abort-factory.js'
+import {
+  observeAbortSubscription,
+  type IObservedAbortSubscription
+} from './observed-subscription.js'
 import {
   DisposeTransactionKind,
   LifecycleErrorPolicy,
@@ -45,11 +50,14 @@ type IEntry = {
  * error.
  */
 const attachCleanupErrors = (primary: unknown, cleanupErrors: readonly unknown[]): unknown => {
-  if (cleanupErrors.length === 0) return primary
+  const distinctCleanupErrors = cleanupErrors.filter(
+    (error, index) => error !== primary && cleanupErrors.indexOf(error) === index
+  )
+  if (distinctCleanupErrors.length === 0) return primary
   if (primary !== null && (typeof primary === 'object' || typeof primary === 'function')) {
     try {
       Object.defineProperty(primary, 'errors', {
-        value: Object.freeze([...cleanupErrors]),
+        value: Object.freeze([...distinctCleanupErrors]),
         enumerable: true
       })
       return primary
@@ -60,7 +68,7 @@ const attachCleanupErrors = (primary: unknown, cleanupErrors: readonly unknown[]
   const message =
     primary instanceof Error ? primary.message : LifecycleErrorText.provisionalCleanupFailed
   return tagLifecycleError(
-    new AggregateError([primary, ...cleanupErrors], message),
+    new AggregateError([primary, ...distinctCleanupErrors], message),
     LifecycleErrorCode.scopeDisposalFailed
   )
 }
@@ -71,49 +79,24 @@ const attachCleanupErrors = (primary: unknown, cleanupErrors: readonly unknown[]
  * down (`rollback`) — never both, never neither (§4.9).
  */
 export function createProvisionalScope(options: IProvisionalScopeOptions = {}): IProvisionalScope {
-  const controller = createAbortController()
+  const createController = captureAbortControllerFactory()
+  const controller = createController()
   const parentSignal = options.parentSignal
-  let parentRegistrationAttempted = false
-  let parentRegistrationReturned = false
-  let parentForwardInvoked = false
-  let parentRemovalAttempted = false
-  const forwardAbort = (): void => {
-    parentForwardInvoked = true
-    controller.abort(parentSignal?.reason)
-  }
-  const detachParent = (force = false): void => {
-    if (!parentSignal || parentRemovalAttempted) return
-    if (!force && (!parentRegistrationAttempted || !parentRegistrationReturned)) return
-    parentRemovalAttempted = true
-    parentSignal.removeEventListener('abort', forwardAbort)
-  }
+  let parentSubscription: IObservedAbortSubscription | undefined
+  const registrationErrors: unknown[] = []
+  const forwardAbort = (reason: unknown): void => controller.abort(reason)
+  const detachParent = (): void => parentSubscription?.unsubscribe()
   if (parentSignal?.aborted) {
     controller.abort(parentSignal.reason)
   } else if (parentSignal) {
     try {
-      // Mark before calling: a hostile signal may store the listener and then throw, so rollback
-      // must still attempt removal even though registration did not return normally.
-      parentRegistrationAttempted = true
-      parentSignal.addEventListener('abort', forwardAbort, { once: true })
-      parentRegistrationReturned = true
-      // The signal can abort during addEventListener, including hosts that invoke before storing.
-      // Read state and reason after the host call returns, then force removal of any residual entry.
-      const parentAborted = parentSignal.aborted
-      const parentReason = parentAborted ? parentSignal.reason : undefined
-      if (parentAborted) {
-        controller.abort(parentReason)
-        detachParent(true)
-      } else if (parentForwardInvoked) {
-        detachParent(true)
-      }
+      parentSubscription = observeAbortSubscription(parentSignal, forwardAbort, (error) =>
+        registrationErrors.push(error)
+      )
+      parentSubscription.retryRegistrationCleanup()
+      if (registrationErrors.length > 0) throw registrationErrors[0]
     } catch (error) {
-      const cleanupErrors: unknown[] = []
-      try {
-        detachParent(true)
-      } catch (cleanupError) {
-        cleanupErrors.push(cleanupError)
-      }
-      throw attachCleanupErrors(error, cleanupErrors)
+      throw attachCleanupErrors(error, registrationErrors)
     }
   }
 

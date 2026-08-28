@@ -11,6 +11,7 @@ import {
   type IGraphStartContext
 } from '../../src/graph/index.js'
 import { CapabilityGraphErrorText } from '../../src/graph/error-text.js'
+import { CAPABILITY_GRAPH_SOURCE } from '../../src/graph/errors.js'
 import { buildCapabilityTopology, type ITopologyNode } from '../../src/graph/topology.js'
 
 const id = (value: string): IGraphNodeId => value as IGraphNodeId
@@ -1203,7 +1204,7 @@ describe('capability graph core', () => {
     await expect(first).rejects.toMatchObject({ code: CapabilityGraphErrorCode.graphDisposed })
   })
 
-  it('CG-T54 freezes cycle diagnostic snapshots and preserves cleanup primary', async () => {
+  it('CG-T54 freezes cycle diagnostic snapshots and preserves release cleanup primary', async () => {
     const graph = createCapabilityGraph()
     graph.register({
       id: id('a'),
@@ -1224,7 +1225,7 @@ describe('capability graph core', () => {
     expect(Object.isFrozen(detail)).toBe(true)
     expect(Object.isFrozen(detail.path)).toBe(true)
 
-    const cleanupError = new Error('abort cleanup')
+    const cleanupError = new Error('release cleanup')
     const abortGraph = createCapabilityGraph({
       onError: (error) => expect(error).toBe(cleanupError)
     })
@@ -1232,12 +1233,12 @@ describe('capability graph core', () => {
       id: id('abort'),
       kind: 'test',
       dependencies: [],
-      start: ({ signal }) => {
-        signal.addEventListener('abort', () => {
+      start: () => ({
+        value: 1,
+        release: () => {
           throw cleanupError
-        })
-        return instance(1)
-      }
+        }
+      })
     })
     await abortGraph.ready()
     let disposeError: unknown
@@ -1249,8 +1250,9 @@ describe('capability graph core', () => {
     expect(disposeError).toBe(abortGraph.error)
     expect(abortGraph.error).toBeInstanceOf(Error)
     expect(abortGraph.state).toBe(CapabilityGraphState.terminal)
-    expect((abortGraph.error as Error & { cause?: unknown }).cause).toMatchObject({
-      code: 'GENERATION_CANCELLATION_FAILED'
+    expect(abortGraph.error).toMatchObject({
+      source: CAPABILITY_GRAPH_SOURCE,
+      code: CapabilityGraphErrorCode.disposeFailed
     })
   })
 

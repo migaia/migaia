@@ -4,18 +4,53 @@
 
 ## 目录
 
-- [作用域与释放模块](#作用域与释放模块)：`createLifecycleScope`、`createSyncLifecycleScope`、`executeReleaseDescriptor`、`createDisposeTransaction`、`IReleaseDescriptor`、`IReleaseContext`
+- [公共基础类型](#公共基础类型)：owner/state/disposer/error 的共享结构
+- [作用域与释放模块](#作用域与释放模块)：`createLifecycleScope`、`createSyncLifecycleScope`、`executeReleaseDescriptor`、`createDisposeTransaction`、`createSyncStartedDisposalLedger`、`IReleaseDescriptor`、`IReleaseContext`
 - [单元与代数模块](#单元与代数模块)：`createLifecycleUnit`、`createGenerationController`
 - [静默追踪与租约模块](#静默追踪与租约模块)：`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`
 - [事务性所有权模块](#事务性所有权模块)：`createProvisionalScope`
 - [变更队列模块](#变更队列模块)：`createMutationQueue`
-- [调度器、中止与有界等待模块](#调度器中止与有界等待模块)：`systemScheduler`、`createManualScheduler`、`snapshotScheduler`、`resolveScheduler`、`resolveSchedulerOption`、`validateSchedulerDelay`、`validateSchedulerTime`、`createAbortController`、`boundedWait`、`createTerminalController`
-- [错误基础设施模块](#错误基础设施模块)：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`probeThenable`、`assimilateCapturedThen`、`createErrorCollector`
+- [调度器、中止与有界等待模块](#调度器中止与有界等待模块)：`systemScheduler`、`createManualScheduler`、`snapshotScheduler`、`resolveScheduler`、`resolveSchedulerOption`、`validateSchedulerDelay`、`validateSchedulerTime`、`addSchedulerTime`、`createAbortController`、`boundedWait`、`createTerminalController`
+- [错误基础设施模块](#错误基础设施模块)：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`createLifecycleTypeError`、`createLifecycleFailure`、`tagLifecycleError`、`containAsyncRejection`、`probeThenable`、`assimilateCapturedThen`、`createErrorCollector`
 - [状态常量模块](#状态常量模块)：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`ThenableProbeKind`、`DisposeTransactionKind`
-- [错误码](#错误码)：`LifecycleErrorCode`（21 个码）逐条语义
+- [按需导入与 tree-shaking](#按需导入与-tree-shaking)
+- [错误码](#错误码)：`LifecycleErrorCode`（20 个码）逐条语义
 - [诊断消息](#诊断消息)：`LifecycleErrorText`
 - [高阶组合示例](#高阶组合示例)
+- [全部公开 API 索引](#全部公开-api-索引)
 - [排查与构建门禁](#排查与构建门禁)
+
+---
+
+<a id="公共基础类型"></a>
+
+## 公共基础类型
+
+这些类型从根入口导出，不创建runtime state：
+
+```ts
+type IDisposer = () => void
+type ILifecycleState = 'open' | 'closing' | 'terminal'
+type IUnitState = 'idle' | 'loading' | 'loaded' | 'failed'
+
+type ILifecycleOwner = {
+  own<T>(resource: T, descriptor: IReleaseDescriptor): T
+}
+
+type ICollectedError = Readonly<{
+  source: string
+  error: unknown
+}>
+
+type IErrorPolicy = 'throw' | 'collect' | 'report' | 'firstError'
+```
+
+- `IDisposer`：调用方持有的同步、应幂等释放函数形状。
+- `ILifecycleOwner`：只表达可接收显式 `IReleaseDescriptor` 的 ownership handoff；`ProvisionalScope.commitTo()` 依赖它，因此同步/异步 scope 都能作为 parent，而无需共享各自不同的 dispose 形状。
+- `ILifecycleState`：资源容器存活轴；不要与 `IUnitState` 的加载轴混用。
+- `ICollectedError`：raw failure 加调用方提供的 source 标签；`error` 保持原始 identity。
+- `IErrorPolicy`：四种释放错误投影。新调用方通常选 `throw`、`collect` 或 `report`；`firstError` 主要服务已有 first-error-wins 迁移。
+- `IReleaseContext`、`IReleaseDescriptor` 在下一节完整说明；其他命名类型紧邻其构造函数章节。
 
 ---
 
@@ -29,6 +64,7 @@ import {
   createSyncLifecycleScope,
   executeReleaseDescriptor,
   createDisposeTransaction,
+  createSyncStartedDisposalLedger,
   type IReleaseDescriptor,
   type IReleaseContext,
   type ILifecycleScope,
@@ -39,8 +75,10 @@ import {
   type IDisposeItem,
   type IDisposeTransaction,
   type IDisposeTransactionMode,
-  type IDisposeTransactionOptions
-} from '@migaia/lifecycle';
+  type IDisposeTransactionOptions,
+  type ISyncStartedDisposalLedger,
+  type ISyncStartedDisposalOutcome
+} from '@migaia/lifecycle'
 ```
 
 两条正交轴：容器存活轴（`open → closing → terminal`，由 `close()`/`dispose()` 驱动）与资源释放本身。`close()` 永远同步、幂等、不调用用户代码；`dispose()` 永远异步。
@@ -49,14 +87,14 @@ import {
 
 ```ts
 type IReleaseDescriptor = {
-  readonly syncSafe?: boolean;
-  readonly order?: number;
-  readonly graceful?: (context: IReleaseContext) => void | PromiseLike<void>;
-  readonly gracefulTimeoutMs?: number;
-  readonly force: (context: IReleaseContext) => void | PromiseLike<void>;
-  readonly gcFallback?: boolean;
-  readonly custom?: (context: IReleaseContext) => void | PromiseLike<void>;
-};
+  readonly syncSafe?: boolean
+  readonly order?: number
+  readonly graceful?: (context: IReleaseContext) => void | PromiseLike<void>
+  readonly gracefulTimeoutMs?: number
+  readonly force: (context: IReleaseContext) => void | PromiseLike<void>
+  readonly gcFallback?: boolean
+  readonly custom?: (context: IReleaseContext) => void | PromiseLike<void>
+}
 ```
 
 字段语义：
@@ -74,36 +112,36 @@ type IReleaseDescriptor = {
 ### `createLifecycleScope`
 
 ```ts
-function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope;
+function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope
 
 type ILifecycleScopeOptions = {
-  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError'; // 默认 'throw'
-  readonly report?: (error: unknown) => void;
-  readonly deadlineAt?: number;
-  readonly scheduler?: ILifecycleScheduler; // 默认 systemScheduler
-};
+  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'
+  readonly report?: (error: unknown) => void
+  readonly deadlineAt?: number
+  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler
+}
 
 type ILifecycleScope = ILifecycleOwner & {
-  readonly lifecycle: 'open' | 'closing' | 'terminal';
-  own<T>(resource: T, descriptor: IReleaseDescriptor): T;
-  release(resource: unknown): boolean;
-  close(): void;
-  dispose(): Promise<readonly ICollectedError[]>;
-};
+  readonly lifecycle: 'open' | 'closing' | 'terminal'
+  own<T>(resource: T, descriptor: IReleaseDescriptor): T
+  release(resource: unknown): boolean
+  close(): void
+  dispose(): Promise<readonly ICollectedError[]>
+}
 ```
 
 通用异步所有权容器：
 
 ```ts
-const scope = createLifecycleScope();
+const scope = createLifecycleScope()
 const connection = scope.own(
   { close: () => undefined },
   {
     force: (ctx) => connection.close()
   }
-);
-scope.close(); // 同步、幂等，之后 own() 抛 SCOPE_CLOSED
-const failures = await scope.dispose(); // 逆序释放，'throw' 策略下失败即抛
+)
+scope.close() // 同步、幂等，之后 own() 抛 SCOPE_CLOSED
+const failures = await scope.dispose() // 逆序释放，'throw' 策略下失败即抛
 ```
 
 边界行为：
@@ -117,31 +155,31 @@ const failures = await scope.dispose(); // 逆序释放，'throw' 策略下失�
 ### `createSyncLifecycleScope`
 
 ```ts
-function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope;
+function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope
 
 type ISyncLifecycleScopeOptions = {
-  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError'; // 默认 'throw'
-  readonly report?: (error: unknown) => void;
-};
+  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'
+  readonly report?: (error: unknown) => void
+}
 
-type ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true };
+type ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }
 
 type ISyncLifecycleScope = {
-  readonly lifecycle: 'open' | 'closing' | 'terminal';
-  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T;
-  release(resource: unknown): boolean;
-  close(): void;
-  dispose(): readonly ICollectedError[]; // 永远同步
-};
+  readonly lifecycle: 'open' | 'closing' | 'terminal'
+  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T
+  release(resource: unknown): boolean
+  close(): void
+  dispose(): readonly ICollectedError[] // 永远同步
+}
 ```
 
 纯同步容器：
 
 ```ts
-const scope = createSyncLifecycleScope();
-scope.own(node, { syncSafe: true, force: () => node.detach() });
-scope.close();
-const failures = scope.dispose(); // 同步返回
+const scope = createSyncLifecycleScope()
+scope.own(node, { syncSafe: true, force: () => node.detach() })
+scope.close()
+const failures = scope.dispose() // 同步返回
 ```
 
 约束与边界：
@@ -159,7 +197,7 @@ const failures = scope.dispose(); // 同步返回
 function executeReleaseDescriptor(
   descriptor: IReleaseDescriptor,
   context: IReleaseContext
-): Promise<readonly unknown[]>;
+): Promise<readonly unknown[]>
 ```
 
 独立运行单个 descriptor 的完整降级链（`custom` → 否则 `graceful`（带超时竞速）→ `force`），不经过完整事务，常用于测试或自定义编排：
@@ -169,7 +207,7 @@ const errors = await executeReleaseDescriptor(descriptor, {
   signal: controller.signal,
   deadlineAt: undefined,
   report: (e) => console.error(e)
-});
+})
 ```
 
 `descriptor`、`context` 均必填，`context` 无可选项——必须直接构造完整对象。返回全部失败错误的数组（成功为空数组），从不抛出；`graceful` 超时时会通过 `context.report` 上报一条诊断（`DEADLINE_EXCEEDED` 或空转到 `force`），`force` 失败时额外通过 `report` 上报一条 `RELEASE_FORCE_FAILED` 标签的错误（原始错误仍原样进入返回数组）。
@@ -180,23 +218,23 @@ const errors = await executeReleaseDescriptor(descriptor, {
 function createDisposeTransaction(
   mode: { readonly kind: 'order' } | { readonly kind: 'plan' },
   options?: IDisposeTransactionOptions
-): IDisposeTransaction;
+): IDisposeTransaction
 
-type IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor };
+type IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }
 
 type IDisposeTransactionOptions = {
-  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError'; // 默认 'throw'
-  readonly report?: (error: unknown) => void;
-  readonly deadlineAt?: number;
-  readonly scheduler?: ILifecycleScheduler; // 默认 systemScheduler
-  readonly signal?: IAbortSignal;
-  readonly pending?: { drain(): Promise<void> };
-};
+  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'
+  readonly report?: (error: unknown) => void
+  readonly deadlineAt?: number
+  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler
+  readonly signal?: IAbortSignal
+  readonly pending?: { drain(): Promise<void> }
+}
 
 type IDisposeTransaction = {
-  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' };
-  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>;
-};
+  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }
+  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>
+}
 ```
 
 编排多个资源的释放，`order` 弱排序或 `plan` 强序列二选一，同一实例不能混用：
@@ -205,11 +243,11 @@ type IDisposeTransaction = {
 const transaction = createDisposeTransaction(
   { kind: 'plan' },
   { errorPolicy: 'collect', signal: controller.signal }
-);
+)
 const failures = await transaction.run([
   { source: 'db', descriptor: dbDescriptor },
   { source: 'socket', descriptor: socketDescriptor }
-]);
+])
 ```
 
 边界行为：
@@ -221,6 +259,67 @@ const failures = await transaction.run([
 - `pending?`：每个 item 释放完后调用 `pending.drain()` 等待其触发的在途工作排空（典型传 `createPendingTracker()`）。
 - descriptor 校验（`order`/`custom`/`graceful`/`gracefulTimeoutMs`/`force` 的类型与访问）逐项独立进行——一个 item 的非法 descriptor（贴 `INVALID_OPTION` 码）不阻断其余 item 的释放，会作为该 item 的失败计入错误策略。
 - `errorPolicy` 语义同 `createErrorCollector`；`throw` 策略下单错原样抛出，多错聚合为携带 `SCOPE_DISPOSAL_FAILED` 码的 `AggregateError`。
+
+### `createSyncStartedDisposalLedger`
+
+```ts
+function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger
+
+type ISyncStartedDisposalLedger = {
+  readonly lifecycle: 'open' | 'closing' | 'terminal'
+  readonly pending: number
+  start(source: string, callback: () => unknown): void
+  seal(): ISyncStartedDisposalOutcome
+  whenTerminal(): Promise<void>
+}
+
+type ISyncStartedDisposalOutcome = Readonly<{
+  synchronousErrors: readonly ICollectedError[]
+  completion: Promise<readonly ICollectedError[]>
+}>
+```
+
+用于“同步启动全部 disposer，但异步统一等待”的领域容器。Ledger 是 pending、raw error 与 terminal 的唯一事实源；调用方仍负责生成顺序计划、清空领域 registry，以及把 raw errors 投影成自己的 throw/report/aggregate 契约。
+
+```ts
+import { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'
+
+const ledger = createSyncStartedDisposalLedger()
+
+// 调用顺序由领域层决定；每个 callback 在 start() 的当前 stack 执行。
+ledger.start('connection', () => connection.close())
+ledger.start('cache', () => cache.flush())
+
+const outcome = ledger.seal()
+if (outcome.synchronousErrors.length === 1) {
+  throw outcome.synchronousErrors[0].error
+}
+
+const finalErrors = await outcome.completion
+// completion 永远 resolve；领域层在这里决定是否 reject/aggregate/report。
+```
+
+状态和 identity：
+
+- 初始 `open`；`start()` 不改变 lifecycle。
+- 首次 `seal()` 同步进入 `closing`，冻结当时全部 synchronous errors，并返回唯一 outcome；重复 `seal()` 返回同一对象，`outcome.completion` 也保持同一 Promise。
+- 已 seal 且 `pending === 0` 时进入 `terminal`；否则最后一个 thenable settle 后进入 `terminal`。`whenTerminal()` 只表达 terminal 等待，不承诺 Promise 对象 identity。
+- 合法 thenable 永不 settle 时保持 `closing`；Ledger 不自造 timeout、abort、retry 或强制 terminal。
+
+Callback 与 thenable：
+
+- `start()` 先校验 `source` 为 string、`callback` 为 function；非法输入同步抛 `INVALID_OPTION`，且不调用 callback。
+- callback 同步 throw 或读取 `.then` getter throw：记录进 `synchronousErrors` 与最终 ledger；`start()` 不重抛 item failure，因此调用方仍能启动后续 item。
+- thenable 的 `.then` 只读取一次，并以原 thenable 为 receiver 调用；resolve/reject first-settlement-wins。Rejection按 settlement observation order进入最终 ledger。
+- 每条错误是冻结的 `{ source, error }`；原始 `error` identity不被 Ledger替换。`completion` 因 item failure也不会 reject，避免 Ledger抢走领域错误政策。
+
+重入和关闭边界：
+
+- 当前 item callback/thenable probe 尚未结束时重入 `start()` 或 `seal()`，同步抛 `SCOPE_REENTRANT_OWN`（`disposalLedgerReentrant` 文案）；外层 `start()` 把它当作当前 item 的同步 failure收集。
+- seal 后再 `start()` 同步抛 `SCOPE_CLOSED`（`disposalLedgerClosed` 文案），不调用新 callback。
+- Ledger 没有 rollback：进入 closing 后只能等待 admitted thenables settle。
+
+错误政策边界：Ledger 固定采用 raw `collect`。`firstError` 是最终 ledger 的第一条 observation；`throw`、`report`、`AggregateError` message/source/code和reporter failure containment全部属于调用 adapter，不应反向写入 Ledger。
 
 ---
 
@@ -238,36 +337,36 @@ import {
   type IGenerationControllerOptions,
   type IGenerationRequest,
   type IGenerationToken
-} from '@migaia/lifecycle';
+} from '@migaia/lifecycle'
 ```
 
 ### `createLifecycleUnit`
 
 ```ts
-function createLifecycleUnit<T>(options?: ILifecycleUnitOptions): ILifecycleUnit<T>;
+function createLifecycleUnit<T>(options?: ILifecycleUnitOptions): ILifecycleUnit<T>
 
-type ILifecycleUnitOptions = { readonly report?: (error: unknown) => void };
+type ILifecycleUnitOptions = { readonly report?: (error: unknown) => void }
 
 type ILifecycleUnit<T> = {
-  readonly state: 'idle' | 'loading' | 'loaded' | 'failed';
-  readonly lifecycle: 'open' | 'closing' | 'terminal';
-  readonly value: T | undefined;
-  readonly error: unknown;
-  start(factory: () => T | PromiseLike<T>): void;
-  restart(factory: () => T | PromiseLike<T>): void; // start 的别名
-  close(): void;
-  dispose(): void; // 永远同步
-};
+  readonly state: 'idle' | 'loading' | 'loaded' | 'failed'
+  readonly lifecycle: 'open' | 'closing' | 'terminal'
+  readonly value: T | undefined
+  readonly error: unknown
+  start(factory: () => T | PromiseLike<T>): void
+  restart(factory: () => T | PromiseLike<T>): void // start 的别名
+  close(): void
+  dispose(): void // 永远同步
+}
 ```
 
 单元装载轴的状态机，内部用一个 `GenerationController` 丢弃过期结果：
 
 ```ts
-const unit = createLifecycleUnit<Config>();
-unit.start(() => fetchConfig()); // thenable → 先进 'loading'，settle 后进 'loaded'/'failed'
-unit.state; // 'loading'
-unit.value; // undefined（settle 前）
-unit.restart(() => fetchConfig()); // 新 generation，旧一次的迟到结果被静默丢弃
+const unit = createLifecycleUnit<Config>()
+unit.start(() => fetchConfig()) // thenable → 先进 'loading'，settle 后进 'loaded'/'failed'
+unit.state // 'loading'
+unit.value // undefined（settle 前）
+unit.restart(() => fetchConfig()) // 新 generation，旧一次的迟到结果被静默丢弃
 ```
 
 边界行为：
@@ -280,46 +379,47 @@ unit.restart(() => fetchConfig()); // 新 generation，旧一次的迟到结果�
 ### `createGenerationController`
 
 ```ts
-function createGenerationController(options?: IGenerationControllerOptions): IGenerationController;
+function createGenerationController(options?: IGenerationControllerOptions): IGenerationController
 
 type IGenerationControllerOptions = {
-  readonly parentSignal?: IAbortSignal;
-  readonly onSuperseded?: (info: ILifecycleError) => void;
-  readonly scheduler?: ILifecycleScheduler; // 默认 systemScheduler
-};
+  readonly parentSignal?: IAbortSignal
+  readonly onSuperseded?: (info: ILifecycleError) => void
+  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler
+}
 
-type IGenerationToken = object;
+type IGenerationToken = object
 
 type IGenerationRequest = {
-  readonly generation: number;
-  readonly token: IGenerationToken;
-  readonly signal: IAbortSignal;
-};
+  readonly generation: number
+  readonly token: IGenerationToken
+  readonly signal: IAbortSignal
+}
 
 type IGenerationController = {
-  readonly generation: number;
-  readonly disposed: boolean;
-  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest;
-  isCurrent(token: IGenerationToken): boolean;
-  supersede(reason?: unknown): void;
+  readonly generation: number
+  readonly disposed: boolean
+  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest
+  isCurrent(token: IGenerationToken): boolean
+  supersede(reason?: unknown): void
   adopt<T>(
     token: IGenerationToken,
     value: T,
     release: (value: T) => void | PromiseLike<void>,
     onReleaseError?: (error: unknown) => void
-  ): boolean;
-  dispose(reason?: unknown): void;
-};
+  ): boolean
+  dispose(reason?: unknown): void
+}
 ```
 
 代数 + 每代一个 `AbortSignal`，新一代自动使旧一代失效：
 
 ```ts
-const generations = createGenerationController({ parentSignal: scope.closingSignal });
-const request = generations.begin({ timeoutMs: 5000 }); // 超过 5s 自动 abort 当前代
-const result = await fetchWithSignal(request.signal);
+const shutdown = new AbortController()
+const generations = createGenerationController({ parentSignal: shutdown.signal })
+const request = generations.begin({ timeoutMs: 5000 }) // 超过 5s 自动 abort 当前代
+const result = await fetchWithSignal(request.signal)
 if (generations.adopt(request.token, result, (v) => v.close())) {
-  use(result); // 仍是当前代，安全采用
+  use(result) // 仍是当前代，安全采用
 } // 否则内部已调用 release() 回收 result，返回 false
 ```
 
@@ -348,35 +448,35 @@ import {
   type IQuiescenceTracker,
   type ILeaseRegistry,
   type IPendingTracker
-} from '@migaia/lifecycle';
+} from '@migaia/lifecycle'
 ```
 
 ### `createQuiescenceTracker` / `createStringQuiescenceTracker`
 
 ```ts
-function createQuiescenceTracker<TKey extends object>(): IQuiescenceTracker<TKey>;
-function createStringQuiescenceTracker(): IQuiescenceTracker<string>;
+function createQuiescenceTracker<TKey extends object>(): IQuiescenceTracker<TKey>
+function createStringQuiescenceTracker(): IQuiescenceTracker<string>
 
 type IQuiescenceTracker<TKey> = {
-  retain(key: TKey): IDisposer; // IDisposer = () => void
-  count(key: TKey): number;
-  whenZero(key: TKey): Promise<void>; // 严格独占等待
-  whenZeroOnce(key: TKey): Promise<void>; // 非独占等待
-  seal(key: TKey): void;
-  isSealed(key: TKey): boolean;
-  forget(key: TKey): boolean;
-};
+  retain(key: TKey): IDisposer // IDisposer = () => void
+  count(key: TKey): number
+  whenZero(key: TKey): Promise<void> // 严格独占等待
+  whenZeroOnce(key: TKey): Promise<void> // 非独占等待
+  seal(key: TKey): void
+  isSealed(key: TKey): boolean
+  forget(key: TKey): boolean
+}
 ```
 
 按 key 计数的租约追踪：对象键用 `WeakMap`（自动 GC），字符串键用 `Map`（归零后自动清理未 seal 的条目）：
 
 ```ts
-const tracker = createQuiescenceTracker<object>(); // 或 createStringQuiescenceTracker()
-const release = tracker.retain(key);
-tracker.count(key); // 1
-tracker.seal(key); // 之后 retain(key) 抛 QUIESCENCE_SEALED
-release();
-await tracker.whenZero(key); // 必须先 seal，否则同步抛 QUIESCENCE_UNSEALED_WAIT
+const tracker = createQuiescenceTracker<object>() // 或 createStringQuiescenceTracker()
+const release = tracker.retain(key)
+tracker.count(key) // 1
+tracker.seal(key) // 之后 retain(key) 抛 QUIESCENCE_SEALED
+release()
+await tracker.whenZero(key) // 必须先 seal，否则同步抛 QUIESCENCE_UNSEALED_WAIT
 ```
 
 两者均无构造参数。边界行为：
@@ -391,8 +491,8 @@ await tracker.whenZero(key); // 必须先 seal，否则同步抛 QUIESCENCE_UNSE
 ### `createObjectLeaseRegistry` / `createStringLeaseRegistry`
 
 ```ts
-function createObjectLeaseRegistry<TKey extends object>(): ILeaseRegistry<TKey>;
-function createStringLeaseRegistry(): ILeaseRegistry<string>;
+function createObjectLeaseRegistry<TKey extends object>(): ILeaseRegistry<TKey>
+function createStringLeaseRegistry(): ILeaseRegistry<string>
 // type ILeaseRegistry<TKey> = IQuiescenceTracker<TKey>
 ```
 
@@ -401,22 +501,22 @@ function createStringLeaseRegistry(): ILeaseRegistry<string>;
 ### `createPendingTracker`
 
 ```ts
-function createPendingTracker(): IPendingTracker;
+function createPendingTracker(): IPendingTracker
 
 type IPendingTracker = {
-  track<T>(promise: Promise<T>): Promise<T>;
-  drain(): Promise<void>;
-  readonly size: number;
-};
+  track<T>(promise: Promise<T>): Promise<T>
+  drain(): Promise<void>
+  readonly size: number
+}
 ```
 
 只暴露 `track`/`drain`/`size` 的窄接口，用于追踪并排空在途 Promise（内部基于一个字符串键 `createStringQuiescenceTracker()`）：
 
 ```ts
-const pending = createPendingTracker();
-pending.track(doWork()); // 原样返回传入的 promise
-await pending.drain(); // 等到 size 归零；排空期间新增的 track() 不会被漏计（内部循环 whenZeroOnce）
-pending.size; // 当前在途数量
+const pending = createPendingTracker()
+pending.track(doWork()) // 原样返回传入的 promise
+await pending.drain() // 等到 size 归零；排空期间新增的 track() 不会被漏计（内部循环 whenZeroOnce）
+pending.size // 当前在途数量
 ```
 
 无构造参数。`track(promise)` 结算后（无论 resolve 还是 reject）自动释放内部租约；`drain()` 永不抛出（内部忽略释放函数自身的异常，`release` 本身也不会抛）；`drain()` 内部循环调用 `whenZeroOnce()`，因此排空期间新 `track()` 进来的 promise 也会被等到。
@@ -433,33 +533,34 @@ import {
   type IProvisionalScope,
   type IProvisionalScopeOptions,
   type ILifecycleOwner
-} from '@migaia/lifecycle';
+} from '@migaia/lifecycle'
 ```
 
 ### `createProvisionalScope`
 
 ```ts
-function createProvisionalScope(options?: IProvisionalScopeOptions): IProvisionalScope;
+function createProvisionalScope(options?: IProvisionalScopeOptions): IProvisionalScope
 
-type IProvisionalScopeOptions = { readonly parentSignal?: IAbortSignal };
+type IProvisionalScopeOptions = { readonly parentSignal?: IAbortSignal }
 
 type IProvisionalScope = {
-  readonly signal: IAbortSignal;
-  own<T>(resource: T, descriptor: IReleaseDescriptor): T;
-  commitTo(parent: ILifecycleOwner): Promise<void>;
-  rollback(): Promise<void>;
-};
+  readonly signal: IAbortSignal
+  own<T>(resource: T, descriptor: IReleaseDescriptor): T
+  commitTo(parent: ILifecycleOwner): Promise<void>
+  rollback(): Promise<void>
+}
 
-type ILifecycleOwner = { own<T>(resource: T, descriptor: IReleaseDescriptor): T };
+type ILifecycleOwner = { own<T>(resource: T, descriptor: IReleaseDescriptor): T }
 ```
 
 构造期两阶段所有权：资源先暂存这里，最终要么 `commitTo(parent)` 转移给真正的 owner，要么 `rollback()` 释放，二选一、只能选一次：
 
 ```ts
-const provisional = createProvisionalScope({ parentSignal: outerScope.closingSignal });
-const db = provisional.own(await connect(), { force: (ctx) => db.close() });
+const shutdown = new AbortController()
+const provisional = createProvisionalScope({ parentSignal: shutdown.signal })
+const db = provisional.own(await connect(), { force: (ctx) => db.close() })
 try {
-  await provisional.commitTo(outerScope); // 按注册顺序逐个 own() 到 parent
+  await provisional.commitTo(outerScope) // 按注册顺序逐个 own() 到 parent
 } catch (error) {
   // parent 中途拒绝（如已在 closing）：已转移部分留在 parent 名下，剩余部分已被自动释放并 await 完成
 }
@@ -485,38 +586,38 @@ import {
   type IMutationQueue,
   type IMutationQueueOptions,
   type IEnqueueOptions
-} from '@migaia/lifecycle';
+} from '@migaia/lifecycle'
 ```
 
 ### `createMutationQueue`
 
 ```ts
-function createMutationQueue(options?: IMutationQueueOptions): IMutationQueue;
+function createMutationQueue(options?: IMutationQueueOptions): IMutationQueue
 
 type IMutationQueueOptions = {
-  readonly queueAdmissionTimeoutMs?: number | false; // 默认 undefined（只诊断，从不因排队超时而拒绝）
-  readonly admissionDiagnosticMs?: number | false; // 默认 1000
-  readonly onAdmissionDiagnostic?: (info: { owner: string | undefined; waitedMs: number }) => void;
-  readonly scheduler?: ILifecycleScheduler; // 默认 systemScheduler
-};
+  readonly queueAdmissionTimeoutMs?: number | false // 默认 undefined（只诊断，从不因排队超时而拒绝）
+  readonly admissionDiagnosticMs?: number | false // 默认 1000
+  readonly onAdmissionDiagnostic?: (info: { owner: string | undefined; waitedMs: number }) => void
+  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler
+}
 
 type IEnqueueOptions = {
-  readonly owner?: string;
-  readonly queueAdmissionTimeoutMs?: number | false; // 覆盖本次任务的队列默认值
-};
+  readonly owner?: string
+  readonly queueAdmissionTimeoutMs?: number | false // 覆盖本次任务的队列默认值
+}
 
 type IMutationQueue = {
-  enqueue<T>(task: () => T | PromiseLike<T>, options?: IEnqueueOptions): Promise<T>;
-  readonly size: number;
-};
+  enqueue<T>(task: () => T | PromiseLike<T>, options?: IEnqueueOptions): Promise<T>
+  readonly size: number
+}
 ```
 
 严格 FIFO 串行队列，无并发池，带可选的入队 SLA 看门狗：
 
 ```ts
-const queue = createMutationQueue({ queueAdmissionTimeoutMs: 5000 });
-const result = await queue.enqueue(() => applyMutation(), { owner: 'sync-loop' });
-queue.size; // 排队中 + 正在执行的任务数（0 或 1）
+const queue = createMutationQueue({ queueAdmissionTimeoutMs: 5000 })
+const result = await queue.enqueue(() => applyMutation(), { owner: 'sync-loop' })
+queue.size // 排队中 + 正在执行的任务数（0 或 1）
 ```
 
 边界行为：
@@ -549,19 +650,26 @@ import {
   type IAbortSignal,
   type IAbortController,
   type ITerminalController
-} from '@migaia/lifecycle';
+} from '@migaia/lifecycle'
+
+// 仅 leaf entry 导出的 scheduler 组合工具：
+import {
+  addSchedulerTime,
+  resolveScheduler,
+  resolveSchedulerOption
+} from '@migaia/lifecycle/scheduler'
 ```
 
 ### `systemScheduler`
 
 ```ts
-const systemScheduler: ILifecycleScheduler; // { now(): number; schedule(cb, delayMs): IScheduledTask }
+const systemScheduler: ILifecycleScheduler // { now(): number; schedule(cb, delayMs): IScheduledTask }
 ```
 
 默认调度器，`now()` 用 `performance.now()`、`schedule()` 用 `setTimeout`/`clearTimeout`，一般不用手动传，除非要换成 `createManualScheduler()`：
 
 ```ts
-systemScheduler.now(); // 单调递增毫秒数
+systemScheduler.now() // 单调递增毫秒数
 ```
 
 无配置，纯常量对象；宿主缺 `performance.now`/`setTimeout`/`clearTimeout` 时，首次调用对应方法才 fail-fast 抛 `ENV_UNSUPPORTED`。
@@ -569,16 +677,16 @@ systemScheduler.now(); // 单调递增毫秒数
 ### `createManualScheduler`
 
 ```ts
-function createManualScheduler(): IManualScheduler;
+function createManualScheduler(): IManualScheduler
 // type IManualScheduler = ILifecycleScheduler & { advance(ms: number): void };
 ```
 
 单测里把时间变成确定性的虚拟时钟：
 
 ```ts
-const scheduler = createManualScheduler();
-const task = scheduler.schedule(() => console.log('fired'), 100);
-scheduler.advance(100); // 一次性 flush 所有到期回调（含到期回调内部再排的到期任务）
+const scheduler = createManualScheduler()
+const task = scheduler.schedule(() => console.log('fired'), 100)
+scheduler.advance(100) // 一次性 flush 所有到期回调（含到期回调内部再排的到期任务）
 ```
 
 无入参。`advance(ms)` 按到期时刻升序（同刻按登记顺序）依次执行所有到期回调，单次循环超过 10000 个 flush 任务会抛 `INVALID_OPTION`（runaway guard）；`ms`/`schedule()` 的 `delayMs` 必须是有限非负数，否则抛 `INVALID_OPTION`（`RangeError`/`TypeError` 原生类型，贴该码）。
@@ -586,13 +694,13 @@ scheduler.advance(100); // 一次性 flush 所有到期回调（含到期回调�
 ### `snapshotScheduler`
 
 ```ts
-function snapshotScheduler(value: unknown): ISchedulerSnapshot | undefined;
+function snapshotScheduler(value: unknown): ISchedulerSnapshot | undefined
 ```
 
 把任意 duck-typed 值快照成标准 `ILifecycleScheduler`（校验并锁定 accessor，防止 hostile getter 二次读取）：
 
 ```ts
-const snap = snapshotScheduler(candidate); // 不是合法 scheduler 时返回 undefined，而不是抛错
+const snap = snapshotScheduler(candidate) // 不是合法 scheduler 时返回 undefined，而不是抛错
 ```
 
 单参数 `value: unknown`，无选项；`now`/`schedule` 都不是函数时返回 `undefined`；读取 `now`/`schedule` 属性本身抛错时抛 `TypeError`（`INVALID_OPTION`）。
@@ -600,51 +708,63 @@ const snap = snapshotScheduler(candidate); // 不是合法 scheduler 时返回 u
 ### `resolveScheduler` / `resolveSchedulerOption`
 
 ```ts
-function resolveScheduler(value: unknown): ISchedulerSnapshot;
+function resolveScheduler(value: unknown): ISchedulerSnapshot
 function resolveSchedulerOption(
   options: { readonly scheduler?: unknown } | null | undefined,
   fallback: ISchedulerSnapshot
-): ISchedulerSnapshot;
+): ISchedulerSnapshot
 function resolveSchedulerOption(
   options: { readonly scheduler?: unknown } | null | undefined
-): ISchedulerSnapshot | undefined;
+): ISchedulerSnapshot | undefined
 ```
 
 内部/自定义 scheduler 实现复用的边界解析函数：`resolveScheduler(value)` 对非法值抛 `SCHEDULER_INVALID` 文案的 `INVALID_OPTION` 错误（而不是像 `snapshotScheduler` 那样返回 `undefined`）；`resolveSchedulerOption(options, fallback?)` 读取 `options.scheduler`，未提供时返回 `fallback`（若调用形态未传 `fallback` 则返回 `undefined`），读取该属性本身抛错时抛 `TypeError`（`INVALID_OPTION`）。
 
-### `validateSchedulerDelay` / `validateSchedulerTime`
+### `validateSchedulerDelay` / `validateSchedulerTime` / `addSchedulerTime`
 
 ```ts
-function validateSchedulerTime(value: unknown, label: string): number;
-function validateSchedulerDelay(value: unknown, label?: string): number; // label 默认 'delayMs'
+function validateSchedulerTime(value: unknown, label: string): number
+function validateSchedulerDelay(value: unknown, label?: string): number // label 默认 'delayMs'
+function addSchedulerTime(base: number, delta: number, label: string): number
 ```
 
 本包内部用来校验时间值的公开工具，自定义 scheduler 实现也可复用：
 
 ```ts
-validateSchedulerTime(value, 'deadlineAt'); // 非 number 抛 TypeError，非有限抛 RangeError
-validateSchedulerDelay(value); // 在上面基础上还要求 >= 0，否则抛 RangeError
+validateSchedulerTime(value, 'deadlineAt') // 非 number 抛 TypeError，非有限抛 RangeError
+validateSchedulerDelay(value) // 在上面基础上还要求 >= 0，否则抛 RangeError
+addSchedulerTime(now, delayMs, 'deadlineAt') // 结果溢出为 Infinity 时抛 RangeError
 ```
 
-`validateSchedulerTime`：`label` 必填，仅用于错误信息里标注字段名；非 `number` 抛贴 `INVALID_OPTION` 码的 `TypeError`，非有限（`NaN`/`Infinity`）抛贴同码的 `RangeError`。`validateSchedulerDelay`：`label` 可选；在上面基础上额外要求 `>= 0`，否则抛 `RangeError`。两者校验通过时返回值本身。
+`validateSchedulerTime`：`label` 必填，仅用于错误信息里标注字段名；非 `number` 抛贴 `INVALID_OPTION` 码的 `TypeError`，非有限（`NaN`/`Infinity`）抛贴同码的 `RangeError`。`validateSchedulerDelay`：`label` 可选；在上面基础上额外要求 `>= 0`，否则抛 `RangeError`。`addSchedulerTime` 校验 `base`、`delta` 和相加结果均为有限数；它只从 `/scheduler` leaf 导出。三者校验通过时返回数值。
 
 ### `createAbortController`
 
 ```ts
-function createAbortController(): IAbortController;
+function createAbortController(): IAbortController
 // type IAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(...); removeEventListener(...) };
 // type IAbortController = { readonly signal: IAbortSignal; abort(reason?: unknown): void };
 ```
 
-本包内部使用的极简 `AbortController`，不依赖全局 `AbortController`（结构上与 DOM/Node 的 `AbortSignal` 兼容，可互相传递）：
+本包委托当前宿主的原生 `AbortController`，返回真实 host instance（结构上与 DOM/Node 的 `AbortSignal` 兼容，可互相传递）：
 
 ```ts
-const controller = createAbortController();
-controller.signal.addEventListener('abort', () => console.log('aborted'));
-controller.abort('reason');
+const controller = createAbortController()
+controller.signal.addEventListener('abort', () => console.log('aborted'))
+controller.abort('reason')
 ```
 
-无构造参数。`abort(reason?)` 幂等；对已中止的信号再 `addEventListener` 不触发监听器（对齐 DOM 语义）；某个监听器抛错时，其余监听器仍会跑完，单个失败包成 `ABORT_LISTENER_FAILED` 抛出，多个失败聚合成同码的 `AggregateError`。
+无构造参数，也不接受 custom factory。实际对象由当前 realm 的 host-owned `globalThis.AbortController` 构造；lifecycle 不返回 facade、Proxy 或自建 EventTarget。宿主 constructor 缺失、getter throw、不可构造、构造失败或结果不满足最小 controller/signal shape时，抛保留原始 cause 的 `ENV_UNSUPPORTED`。
+
+V2 intentional breaking behavior：
+
+- `abort()` 与 `abort(undefined)` 使用宿主默认 reason，通常是原生 `DOMException`（name 为 `AbortError`），不再保留 V1 的 `undefined`。
+- non-`undefined` explicit reason保持 `===` identity；把 structural parent signal 的 `undefined` reason转发给native child时，同样规范化为宿主 `AbortError`。
+- 重复 `abort()` 幂等，不覆盖第一次固化的 reason。
+- 外部 listener throw走宿主 EventTarget error channel；`try/catch controller.abort()` 不能同步捕获它，lifecycle也不再提供 `ABORT_LISTENER_FAILED`。
+- Lifecycle 自己登记的 parent/cancellation callback 经过 package-private observed-subscription：处理 already-aborted、registration-time abort、post-registration recheck和幂等remove，并把自身 callback/read/cleanup failure交给对应 operation的collect/report边界。它不代理、枚举或捕获同一 signal 上的外部 listener。
+
+如果业务需要旧式“listener错误由调用 abort 的栈聚合抛出”，应使用业务自己拥有的回调编排器；不要包裹或 monkey-patch native `AbortSignal`。
 
 ### `boundedWait`
 
@@ -653,13 +773,13 @@ function boundedWait(
   task: PromiseLike<unknown>,
   deadlineAt: number,
   options?: { readonly scheduler?: ILifecycleScheduler } // 默认 systemScheduler
-): Promise<boolean>;
+): Promise<boolean>
 ```
 
 等到绝对截止时间为止，**从不取消**被等待的任务：
 
 ```ts
-const won = await boundedWait(task, deadlineAt); // true=task 先完成；false=截止时间先到（task 仍在跑）
+const won = await boundedWait(task, deadlineAt) // true=task 先完成；false=截止时间先到（task 仍在跑）
 ```
 
 `task`、`deadlineAt` 均必填（`deadlineAt` 是绝对时刻，经 `validateSchedulerTime` 校验）。无论超时与否都会挂一个 `.catch()` 观察 `task`，避免它日后 reject 变成未处理拒绝；`deadlineAt` 已经过去时立即返回 `false`（仍会先观察 `task`）。
@@ -667,26 +787,56 @@ const won = await boundedWait(task, deadlineAt); // true=task 先完成；false=
 ### `createTerminalController`
 
 ```ts
-function createTerminalController(): ITerminalController;
+function createTerminalController(): ITerminalController
 
 type ITerminalController = {
-  readonly lifecycle: 'open' | 'closing' | 'terminal';
-  close(): void;
-  forceTerminal(): void;
-  whenTerminal(): Promise<void>;
-};
+  readonly lifecycle: 'open' | 'closing' | 'terminal'
+  close(): void
+  forceTerminal(): void
+  whenTerminal(): Promise<void>
+}
 ```
 
 独立复用的容器存活轴状态机，`createLifecycleScope`/`createSyncLifecycleScope`/`createLifecycleUnit` 内部都基于它：
 
 ```ts
-const terminal = createTerminalController();
-terminal.close(); // open → closing，幂等
-terminal.forceTerminal(); // 直接进 terminal，resolve whenTerminal()
-await terminal.whenTerminal();
+const terminal = createTerminalController()
+terminal.close() // open → closing，幂等
+terminal.forceTerminal() // 直接进 terminal，resolve whenTerminal()
+await terminal.whenTerminal()
 ```
 
 无构造参数。`close()`：同步幂等，只在 `open` 时生效（`closing`/`terminal` 时空操作）。`forceTerminal()`：同步幂等，直接到 `terminal`（跳过 `closing`）。`whenTerminal()`：返回同一个 Promise，只在到达 `terminal` 时 resolve 一次；`terminal` 之前调用不会立即 resolve。
+
+---
+
+<a id="按需导入与-tree-shaking"></a>
+
+## 按需导入与 tree-shaking
+
+根入口 `@migaia/lifecycle` 保持完整兼容；对 bundle retained graph敏感的消费者可使用以下稳定 subpath：
+
+| Subpath                        | 主要导出                                                    |
+| ------------------------------ | ----------------------------------------------------------- |
+| `@migaia/lifecycle/abort`      | `createAbortController`、`IAbortSignal`、`IAbortController` |
+| `@migaia/lifecycle/scheduler`  | scheduler、snapshot与时间校验                               |
+| `@migaia/lifecycle/quiescence` | quiescence/lease/pending trackers                           |
+| `@migaia/lifecycle/scope`      | `createLifecycleScope`                                      |
+| `@migaia/lifecycle/generation` | `createGenerationController`                                |
+| `@migaia/lifecycle/disposal`   | release transaction与sync-start ledger                      |
+| `@migaia/lifecycle/errors`     | thenable/error helpers与error identity                      |
+
+```ts
+import { createAbortController } from '@migaia/lifecycle/abort'
+import { createPendingTracker } from '@migaia/lifecycle/quiescence'
+import { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'
+```
+
+Root 与 subpath 都re-export preserve-modules产物中的同一实现，同名runtime function/object保持 `===`；没有第二份module-scoped state。Package exports不开放 `dist/*` wildcard，内部文件不是公共API。
+
+`package.json` 声明 `sideEffects: false`，各模块import不会启动timer、登记listener或修改global。Tree-shaking是bundler行为：Node/Bun直接ESM import会解析依赖图，但不会替你删除未使用代码。验证按需效果时应检查Rollup/Vite retained modules或chunk内容；单独比较gzip总字节容易被压缩噪声误导。
+
+Leaf依赖仍会正常保留。例如 `/disposal` 必须保留thenable/error helper；“按需”只保证不把无关Scope、Generation或scheduler实现拉入，不保证单文件零依赖。
 
 ---
 
@@ -707,13 +857,13 @@ import {
   type ILifecycleError,
   type IThenableProbe,
   type IErrorCollector
-} from '@migaia/lifecycle';
+} from '@migaia/lifecycle'
 ```
 
 ### `LIFECYCLE_SOURCE`
 
 ```ts
-const LIFECYCLE_SOURCE: '@migaia/lifecycle';
+const LIFECYCLE_SOURCE: '@migaia/lifecycle'
 ```
 
 本包所有错误的 `source` 字段固定值，字符串常量，无调用。
@@ -725,18 +875,18 @@ function createLifecycleError(
   code: string,
   message: string,
   options?: {
-    readonly cause?: unknown;
-    readonly phase?: string;
-    readonly detail?: Readonly<Record<string, unknown>>;
-    readonly errors?: readonly unknown[];
+    readonly cause?: unknown
+    readonly phase?: string
+    readonly detail?: Readonly<Record<string, unknown>>
+    readonly errors?: readonly unknown[]
   }
-): ILifecycleError; // Error & { source, code, phase?, detail?, cause?, errors? }
+): ILifecycleError // Error & { source, code, phase?, detail?, cause?, errors? }
 ```
 
 构造一个携带 `(source, code)` 身份的原生 `Error`，从不改写 `stack`：
 
 ```ts
-throw createLifecycleError(LifecycleErrorCode.scopeClosed, '[lifecycle] scope is closing');
+throw createLifecycleError(LifecycleErrorCode.scopeClosed, '[lifecycle] scope is closing')
 ```
 
 `code`、`message` 均必填（建议 `code` 取自 `LifecycleErrorCode`）。`options.errors` 非空时会冻结后挂到 `.errors`。
@@ -748,27 +898,45 @@ function createLifecycleRangeError(
   code: string,
   message: string,
   options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>> }
-): RangeError;
+): RangeError
 ```
 
 同上但产出原生 `RangeError`（保留原生类型，用于入参越界场景）：
 
 ```ts
-throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0');
+throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')
 ```
 
 `code`、`message` 均必填。
 
+### `createLifecycleTypeError` / `createLifecycleFailure`
+
+二者只从 `@migaia/lifecycle/errors` leaf 导出：
+
+```ts
+import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'
+
+function createLifecycleTypeError(
+  code: string,
+  message: string,
+  options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>> }
+): TypeError
+
+function createLifecycleFailure(code: string, message: string, error: unknown): ILifecycleError
+```
+
+`createLifecycleTypeError` 创建保留原生 `TypeError` runtime type 的附码错误，并可携带 `cause`/`detail`。`createLifecycleFailure` 用在捕获边界：可扩展的原生 `Error` 会尽量原位附码并保持 `===` identity；primitive、冻结对象或不可重标记错误会被包装，原始抛出物仍可从 `cause` 到达。两者都不改写原始 `stack`。
+
 ### `tagLifecycleError`
 
 ```ts
-function tagLifecycleError<E extends Error>(error: E, code: string): E;
+function tagLifecycleError<E extends Error>(error: E, code: string): E
 ```
 
 给一个已存在（非本包构造）的错误对象就地贴上 `(source, code)`，常用于给原生 `AggregateError` 打标：
 
 ```ts
-tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed);
+tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)
 ```
 
 `error`、`code` 均必填。返回同一个对象（原地修改，保留原生类型如 `AggregateError`）。
@@ -776,13 +944,13 @@ tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDis
 ### `containAsyncRejection`
 
 ```ts
-function containAsyncRejection(value: unknown, onRejected: (error: unknown) => void): void;
+function containAsyncRejection(value: unknown, onRejected: (error: unknown) => void): void
 ```
 
 保护性地探测某个返回值是否是 thenable，是则观察其 rejection 而不让其变成未处理拒绝：
 
 ```ts
-containAsyncRejection(maybeAsyncCallbackResult, (error) => report(error));
+containAsyncRejection(maybeAsyncCallbackResult, (error) => report(error))
 ```
 
 `value`、`onRejected` 均必填。非 thenable 时直接返回，不调用 `onRejected`；`onRejected` 自身抛错被吞掉（最后一道错误边界）。
@@ -790,18 +958,18 @@ containAsyncRejection(maybeAsyncCallbackResult, (error) => report(error));
 ### `probeThenable`
 
 ```ts
-function probeThenable(value: unknown): IThenableProbe;
+function probeThenable(value: unknown): IThenableProbe
 
 type IThenableProbe =
   | { readonly kind: 'not-thenable' }
   | { readonly kind: 'thenable'; readonly thenFn: (resolve: unknown, reject: unknown) => void }
-  | { readonly kind: 'failed'; readonly error: unknown };
+  | { readonly kind: 'failed'; readonly error: unknown }
 ```
 
 只读一次 `value.then`，返回判别结果（不是布尔值，是否 thenable/是否 getter 抛错都会区分）：
 
 ```ts
-const probe = probeThenable(result);
+const probe = probeThenable(result)
 if (probe.kind === 'thenable') {
   /* probe.thenFn 已捕获，可安全 apply 一次 */
 }
@@ -815,13 +983,13 @@ if (probe.kind === 'thenable') {
 function assimilateCapturedThen<T>(
   thenFn: (resolve: unknown, reject: unknown) => void,
   thenable: unknown
-): Promise<T>;
+): Promise<T>
 ```
 
 把 `probeThenable` 捕获到的 `thenFn` 安全地 apply 成一个真正的 `Promise`，且只调用一次（内部用 `Reflect.apply` 保持 `this === thenable`）：
 
 ```ts
-const promise = assimilateCapturedThen<T>(probe.thenFn, thenableValue);
+const promise = assimilateCapturedThen<T>(probe.thenFn, thenableValue)
 ```
 
 `thenFn`（必填，须来自 `probeThenable` 的捕获结果）、`thenable`（必填，作为 `this` receiver 传给 `thenFn`）。无可选项。
@@ -832,21 +1000,21 @@ const promise = assimilateCapturedThen<T>(probe.thenFn, thenableValue);
 function createErrorCollector(
   policy: 'throw' | 'collect' | 'report' | 'firstError',
   report: ((error: unknown) => void) | undefined
-): IErrorCollector;
+): IErrorCollector
 
 type IErrorCollector = {
-  readonly policy: IErrorPolicy;
-  add(source: string, error: unknown): void;
-  finalize(message: string): readonly ICollectedError[];
-};
+  readonly policy: IErrorPolicy
+  add(source: string, error: unknown): void
+  finalize(message: string): readonly ICollectedError[]
+}
 ```
 
 按四种错误策略收集/上报错误，`createDisposeTransaction`/`createSyncLifecycleScope` 内部都用它：
 
 ```ts
-const collector = createErrorCollector('collect', undefined);
-collector.add('item-1', error);
-const collected = collector.finalize('teardown failed'); // 'collect' 策略下返回 ICollectedError[]
+const collector = createErrorCollector('collect', undefined)
+collector.add('item-1', error)
+const collected = collector.finalize('teardown failed') // 'collect' 策略下返回 ICollectedError[]
 ```
 
 `policy`、`report`（必填，显式传 `undefined` 表示无诊断通道）。`add(source, error)` 按策略即时处理（`'report'` 策略立即调用 `report`；`'firstError'` 只记住第一个错误，其余经 `report` 观测）。`finalize(message)`：`'collect'` 返回收集到的数组；`'report'` 返回空数组（已在 `add` 时上报）；`'throw'` 单错原样抛、多错聚合成携带 `SCOPE_DISPOSAL_FAILED` 码的 `AggregateError`；`'firstError'` 有错误时抛首个，否则返回空数组。
@@ -864,7 +1032,7 @@ import {
   LifecycleErrorPolicy,
   ThenableProbeKind,
   DisposeTransactionKind
-} from '@migaia/lifecycle';
+} from '@migaia/lifecycle'
 ```
 
 均为纯常量对象（`as const`），无调用参数，用于替代裸字符串字面量做比较/`switch`。
@@ -884,10 +1052,10 @@ import {
 ## 错误码
 
 ```ts
-import { LifecycleErrorCode, type ILifecycleErrorCode } from '@migaia/lifecycle';
+import { LifecycleErrorCode, type ILifecycleErrorCode } from '@migaia/lifecycle'
 ```
 
-稳定错误码表，**21 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/lifecycle'`：
+稳定错误码表，**20 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/lifecycle'`：
 
 ```ts
 if (error.code === LifecycleErrorCode.scopeClosed) {
@@ -903,7 +1071,6 @@ if (error.code === LifecycleErrorCode.scopeClosed) {
 | `scopeReentrantOwn`            | `SCOPE_REENTRANT_OWN`            | disposer 内部调用本 scope 的 `own()`                                                                                  |
 | `scopeSyncViolation`           | `SCOPE_SYNC_VIOLATION`           | `SyncLifecycleScope` 收到 `syncSafe !== true` 的 descriptor、收到一个异步 scope 实例作为资源、或某回调返回了 thenable |
 | `scopeDisposalFailed`          | `SCOPE_DISPOSAL_FAILED`          | `throw` 错误策略在多个资源释放失败时的 `AggregateError` 聚合出口                                                      |
-| `abortListenerFailed`          | `ABORT_LISTENER_FAILED`          | 一个或多个 abort listener 在同一取消派发中失败                                                                        |
 | `unitStartFailed`              | `UNIT_START_FAILED`              | `LifecycleUnit.start()` 返回的 thenable 被 reject（单元进入 `failed`）                                                |
 | `generationSuperseded`         | `GENERATION_SUPERSEDED`          | 一次异步操作的结果在 `adopt()` 提交点已被更晚的 generation 取代（非失败信号，仅诊断）                                 |
 | `generationCancellationFailed` | `GENERATION_CANCELLATION_FAILED` | generation 取消期间的 timer、parent listener 或 signal cleanup 失败                                                   |
@@ -928,16 +1095,16 @@ if (error.code === LifecycleErrorCode.scopeClosed) {
 ## 诊断消息
 
 ```ts
-import { LifecycleErrorText, type ILifecycleErrorText } from '@migaia/lifecycle';
+import { LifecycleErrorText, type ILifecycleErrorText } from '@migaia/lifecycle'
 ```
 
 稳定诊断消息表（本包内部错误信息的唯一声明处，公开是为了让调用方按文本断言/比对）：
 
 ```ts
-error.message === LifecycleErrorText.disposeTransactionFailed;
+error.message === LifecycleErrorText.disposeTransactionFailed
 ```
 
-全部键：`abortListenerDispatchFailed`、`provisionalCleanupFailed`、`disposeTransactionFailed`、`disposeDescriptorInvalid`、`mutationAdmissionTimedOut`、`generationCancellationFailed`、`schedulerTaskCancelGetterFailed`、`schedulerTaskInvalid`、`schedulerAccessorFailed`、`schedulerInvalid`、`schedulerNumberType`、`schedulerNumberRange`、`schedulerDelayRange`、`schedulerTimeOverflow`、`generationTimeoutAccessorFailed`。每个键对应的文本值与语义见源码 `src/error-text.ts`。
+全部键：`provisionalCleanupFailed`、`disposeTransactionFailed`、`disposeDescriptorInvalid`、`mutationAdmissionTimedOut`、`generationCancellationFailed`、`disposalLedgerClosed`、`disposalLedgerReentrant`、`envUnsupported`、`abortSignalInvalid`、`schedulerTaskCancelGetterFailed`、`schedulerTaskInvalid`、`schedulerAccessorFailed`、`schedulerInvalid`、`schedulerNumberType`、`schedulerNumberRange`、`schedulerDelayRange`、`schedulerTimeOverflow`、`generationTimeoutAccessorFailed`。每个键对应的文本值与语义见源码 `src/error-text.ts`。
 
 ---
 
@@ -948,35 +1115,35 @@ error.message === LifecycleErrorText.disposeTransactionFailed;
 ### 1. 作用域 + 代数：请求场景下取代过期结果
 
 ```ts
-import { createLifecycleScope, createGenerationController } from '@migaia/lifecycle';
+import { createLifecycleScope, createGenerationController } from '@migaia/lifecycle'
 
-const scope = createLifecycleScope({ errorPolicy: 'collect' });
-const generations = createGenerationController();
+const scope = createLifecycleScope({ errorPolicy: 'collect' })
+const generations = createGenerationController()
 
 async function loadUser(id: string) {
-  const request = generations.begin({ timeoutMs: 5000 });
-  const user = await fetchUser(id, { signal: request.signal });
-  if (!generations.adopt(request.token, user, (u) => u.dispose?.())) return; // 已过期，静默丢弃
-  scope.own(user, { force: () => user.dispose?.() });
+  const request = generations.begin({ timeoutMs: 5000 })
+  const user = await fetchUser(id, { signal: request.signal })
+  if (!generations.adopt(request.token, user, (u) => u.dispose?.())) return // 已过期，静默丢弃
+  scope.own(user, { force: () => user.dispose?.() })
 }
 ```
 
 ### 2. 事务性所有权：构造期失败自动回滚，成功后转移给长期 scope
 
 ```ts
-import { createLifecycleScope, createProvisionalScope } from '@migaia/lifecycle';
+import { createLifecycleScope, createProvisionalScope } from '@migaia/lifecycle'
 
-const rootScope = createLifecycleScope();
+const rootScope = createLifecycleScope()
 
 async function setupModule() {
-  const provisional = createProvisionalScope({ parentSignal: rootScope.closingSignal });
+  const provisional = createProvisionalScope()
   try {
-    const db = provisional.own(await connectDb(), { force: (ctx) => closeDb(db) });
-    const cache = provisional.own(await connectCache(), { force: (ctx) => closeCache(cache) });
-    await provisional.commitTo(rootScope); // 全部转移给 rootScope，之后随 rootScope.dispose() 释放
+    const db = provisional.own(await connectDb(), { force: (ctx) => closeDb(db) })
+    const cache = provisional.own(await connectCache(), { force: (ctx) => closeCache(cache) })
+    await provisional.commitTo(rootScope) // 全部转移给 rootScope，之后随 rootScope.dispose() 释放
   } catch (error) {
-    await provisional.rollback(); // 任一步失败：已注册的资源逆序释放，冒泡原错误
-    throw error;
+    await provisional.rollback() // 任一步失败：已注册的资源逆序释放，冒泡原错误
+    throw error
   }
 }
 ```
@@ -984,16 +1151,16 @@ async function setupModule() {
 ### 3. 静默追踪 + 变更队列：确保排空后才提交下一批变更
 
 ```ts
-import { createPendingTracker, createMutationQueue } from '@migaia/lifecycle';
+import { createPendingTracker, createMutationQueue } from '@migaia/lifecycle'
 
-const pending = createPendingTracker();
-const queue = createMutationQueue({ queueAdmissionTimeoutMs: 3000 });
+const pending = createPendingTracker()
+const queue = createMutationQueue({ queueAdmissionTimeoutMs: 3000 })
 
 async function applyBatch(mutations: Array<() => Promise<void>>) {
   for (const mutation of mutations) {
-    pending.track(queue.enqueue(mutation, { owner: 'batch' }));
+    pending.track(queue.enqueue(mutation, { owner: 'batch' }))
   }
-  await pending.drain(); // 等到本批（含批内动态追加的）全部落地
+  await pending.drain() // 等到本批（含批内动态追加的）全部落地
 }
 ```
 
@@ -1004,9 +1171,9 @@ import {
   createDisposeTransaction,
   createManualScheduler,
   type IDisposeItem
-} from '@migaia/lifecycle';
+} from '@migaia/lifecycle'
 
-const scheduler = createManualScheduler();
+const scheduler = createManualScheduler()
 const items: IDisposeItem[] = [
   {
     source: 'socket',
@@ -1018,29 +1185,85 @@ const items: IDisposeItem[] = [
     }
   },
   { source: 'db', descriptor: { order: 5, force: () => closeDb() } }
-];
+]
 const transaction = createDisposeTransaction(
   { kind: 'order' },
   { errorPolicy: 'collect', scheduler }
-);
-const runPromise = transaction.run(items);
-scheduler.advance(100); // 驱动 socket 的 graceful 超时降级到 force
-const failures = await runPromise;
+)
+const runPromise = transaction.run(items)
+scheduler.advance(100) // 驱动 socket 的 graceful 超时降级到 force
+const failures = await runPromise
 ```
 
 ### 5. 同步作用域：可暴露 `using` 语法的纯同步资源
 
 ```ts
-import { createSyncLifecycleScope } from '@migaia/lifecycle';
+import { createSyncLifecycleScope } from '@migaia/lifecycle'
 
 function withListeners() {
-  using scope = createSyncLifecycleScope(); // 环境支持 `[Symbol.dispose]` 时可用 `using`
-  const handler = () => console.log('tick');
-  window.addEventListener('tick', handler);
-  scope.own(handler, { syncSafe: true, force: () => window.removeEventListener('tick', handler) });
+  using scope = createSyncLifecycleScope() // 环境支持 `[Symbol.dispose]` 时可用 `using`
+  const handler = () => console.log('tick')
+  window.addEventListener('tick', handler)
+  scope.own(handler, { syncSafe: true, force: () => window.removeEventListener('tick', handler) })
   // 作用域结束时自动 dispose()，移除监听器
 }
 ```
+
+### 6. 同步入口 + 异步清理：Registry 的 residual disposer
+
+`dispose()` 必须同步返回、但内部 disposer 可能返回 Promise 时，用 ledger 启动并统一观测；不要让每个 Registry 自造 pending/error 状态机：
+
+```ts
+import { createSyncStartedDisposalLedger } from '@migaia/lifecycle'
+
+const ledger = createSyncStartedDisposalLedger()
+
+function disposeRegistry(): void {
+  ledger.start('cache', () => cache.dispose())
+  ledger.start('worker', () => worker.dispose())
+  ledger.seal()
+}
+
+disposeRegistry()
+const { synchronousErrors, completion } = ledger.seal()
+const allErrors = await completion
+```
+
+`synchronousErrors` 只含启动阶段立即失败；`completion` 归并同步与异步失败，并且永远 resolve raw errors，错误投影留给 Registry 的公开契约。
+
+### 7. 服务退出：停止接单，等待在途任务，再释放资源
+
+```ts
+import { createLifecycleScope, createPendingTracker } from '@migaia/lifecycle'
+
+const scope = createLifecycleScope({ errorPolicy: 'collect' })
+const pending = createPendingTracker()
+
+function handle(request: Request): Promise<Response> {
+  return pending.track(route(request))
+}
+
+async function shutdown() {
+  await pending.drain()
+  return scope.dispose()
+}
+```
+
+这里 `PendingTracker` 只负责“还有多少工作”，`LifecycleScope` 只负责“资源由谁释放”；职责不互相替代。
+
+---
+
+<a id="全部公开-api-索引"></a>
+
+## 全部公开 API 索引
+
+根入口 `@migaia/lifecycle` 可直接导入以下全部符号：
+
+- 构造/执行：`createAbortController`、`createSyncStartedDisposalLedger`、`systemScheduler`、`snapshotScheduler`、`createManualScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`probeThenable`、`assimilateCapturedThen`、`createErrorCollector`、`boundedWait`、`createTerminalController`、`createLifecycleScope`、`createSyncLifecycleScope`、`createLifecycleUnit`、`createGenerationController`、`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`、`createProvisionalScope`、`createMutationQueue`、`executeReleaseDescriptor`、`createDisposeTransaction`。
+- 常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`ThenableProbeKind`、`DisposeTransactionKind`、`LifecycleErrorCode`、`LifecycleErrorText`、`LIFECYCLE_SOURCE`。
+- 类型：`IDisposer`、`ILifecycleOwner`、`ILifecycleState`、`IUnitState`、`IReleaseContext`、`IReleaseDescriptor`、`ICollectedError`、`IErrorPolicy`、`ILifecycleStateValue`、`ILifecycleUnitStateValue`、`ILifecycleErrorPolicy`、`IThenableProbeKind`、`IDisposeTransactionKind`、`IAbortSignal`、`IAbortController`、`ISyncStartedDisposalLedger`、`ISyncStartedDisposalOutcome`、`ILifecycleErrorCode`、`ILifecycleErrorText`、`IScheduledTask`、`ILifecycleScheduler`、`ISchedulerSnapshot`、`IManualScheduler`、`ILifecycleError`、`IThenableProbe`、`IErrorCollector`、`ITerminalController`、`ILifecycleScope`、`ILifecycleScopeOptions`、`ISyncLifecycleScope`、`ISyncLifecycleScopeOptions`、`ISyncReleaseDescriptor`、`ILifecycleUnit`、`ILifecycleUnitOptions`、`IGenerationController`、`IGenerationControllerOptions`、`IGenerationRequest`、`IGenerationToken`、`IQuiescenceTracker`、`ILeaseRegistry`、`IPendingTracker`、`IProvisionalScope`、`IProvisionalScopeOptions`、`IMutationQueue`、`IMutationQueueOptions`、`IEnqueueOptions`、`IDisposeItem`、`IDisposeTransaction`、`IDisposeTransactionMode`、`IDisposeTransactionOptions`。
+
+Leaf entry 提供更小的按需边界；其中只有五项不在根入口：`@migaia/lifecycle/scheduler` 的 `addSchedulerTime`、`resolveScheduler`、`resolveSchedulerOption`，以及 `@migaia/lifecycle/errors` 的 `createLifecycleFailure`、`createLifecycleTypeError`。其余 leaf 符号都是根入口子集；完整入口映射见“按需导入与 tree-shaking”。
 
 ---
 

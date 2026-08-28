@@ -17,6 +17,34 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./abort": {
+      "types": "./dist/abort.d.ts",
+      "default": "./dist/abort.js"
+    },
+    "./scheduler": {
+      "types": "./dist/scheduler.d.ts",
+      "default": "./dist/scheduler.js"
+    },
+    "./quiescence": {
+      "types": "./dist/quiescence-tracker.d.ts",
+      "default": "./dist/quiescence-tracker.js"
+    },
+    "./scope": {
+      "types": "./dist/lifecycle-scope.d.ts",
+      "default": "./dist/lifecycle-scope.js"
+    },
+    "./generation": {
+      "types": "./dist/generation-controller.d.ts",
+      "default": "./dist/generation-controller.js"
+    },
+    "./disposal": {
+      "types": "./dist/disposal.d.ts",
+      "default": "./dist/disposal.js"
+    },
+    "./errors": {
+      "types": "./dist/errors.d.ts",
+      "default": "./dist/errors.js"
     }
   },
   "scripts": {

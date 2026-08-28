@@ -9,7 +9,7 @@ import { ASYNC_OWNER_BRAND } from './types.js'
 import { createLifecycleError, createErrorCollector, probeThenable } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { createTerminalController } from './terminal-controller.js'
-import { createAbortController } from './abort.js'
+import { captureAbortControllerFactory } from './abort-factory.js'
 import { LifecycleState, ThenableProbeKind } from './state-constants.js'
 
 const disposeKey = (Symbol as typeof Symbol & { dispose?: symbol }).dispose
@@ -89,6 +89,7 @@ function executeSyncDescriptor(
 export function createSyncLifecycleScope(
   options: ISyncLifecycleScopeOptions = {}
 ): ISyncLifecycleScope {
+  const createController = captureAbortControllerFactory()
   const errorPolicy = options.errorPolicy ?? 'throw'
   const terminal = createTerminalController()
   const entries: Array<{
@@ -159,10 +160,17 @@ export function createSyncLifecycleScope(
     }
     close()
     disposed = true
-    const snapshot = entries.splice(0).reverse()
+    const released = entries.splice(0).reverse()
+    // Explicit release orders are used by synchronous owners that need a source-before-query
+    // barrier. Legacy callers with omitted orders retain the documented LIFO behavior.
+    const snapshot = released.some((entry) => entry.descriptor.order !== undefined)
+      ? [...released].sort(
+          (left, right) => (right.descriptor.order ?? 0) - (left.descriptor.order ?? 0)
+        )
+      : released
     currentlyReleasing = true
     const collector = createErrorCollector(errorPolicy, options.report)
-    const controller = createAbortController()
+    const controller = createController()
     controller.abort('scope closed')
     try {
       for (const entry of snapshot) {

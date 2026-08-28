@@ -12,7 +12,7 @@ import { LifecycleErrorCode } from './error-code.js'
 import { createTerminalController } from './terminal-controller.js'
 import { DisposeTransactionKind, LifecycleState } from './state-constants.js'
 import { createDisposeTransaction } from './dispose-transaction.js'
-import { createAbortController } from './abort.js'
+import { captureAbortControllerFactory } from './abort-factory.js'
 import { resolveSchedulerOption, type ILifecycleScheduler } from './scheduler.js'
 
 const asyncDisposeKey = (Symbol as typeof Symbol & { asyncDispose?: symbol }).asyncDispose
@@ -66,7 +66,8 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
   const errorPolicy = options.errorPolicy ?? 'throw'
   const scheduler = resolveSchedulerOption(options)
   const terminal = createTerminalController()
-  const closingController = createAbortController()
+  const createController = captureAbortControllerFactory()
+  const closingController = createController()
   const entries: Array<{
     readonly resource: unknown
     readonly source: string
@@ -167,7 +168,7 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
       unregisterToken = {}
       const runForce = (): void => {
         const context: IReleaseContext = {
-          signal: createAbortController().signal,
+          signal: createController().signal,
           deadlineAt: undefined,
           report: (error) => {
             if (!options.report) return
