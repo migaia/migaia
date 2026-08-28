@@ -18,13 +18,10 @@ import {
   type ITextDecoder,
   type ITextEncoder
 } from './types.js'
-import {
-  createAbortController,
-  createLifecycleScope,
-  snapshotScheduler,
-  systemScheduler,
-  type ILifecycleScope
-} from '@migaia/lifecycle'
+import { createAbortController } from '@migaia/lifecycle/abort'
+import { createLifecycleScope, type ILifecycleScope } from '@migaia/lifecycle/scope'
+import { createPendingTracker, type IPendingTracker } from '@migaia/lifecycle/quiescence'
+import { snapshotScheduler, systemScheduler } from '@migaia/lifecycle/scheduler'
 import {
   createSerializeError,
   createSerializeRangeError,
@@ -39,7 +36,8 @@ import {
   SerializeCleanupPolicy,
   SerializePhase
 } from './format-constants.js'
-import { composeSerializeSignal, snapshotSerializeSignal } from './signal.js'
+import { composeSerializeSignal } from './signal.js'
+import { snapshotSerializeSignal } from './signal-snapshot.js'
 
 const NEVER_ABORTED: ISerializeAbortSignal = {
   aborted: false,
@@ -906,20 +904,11 @@ export function createSerializeRegistry(
   let closed = false
   let disposed = false
   let cleanedUp = false
-  let pendingCount = 0
-  const drainResolvers: Array<() => void> = []
+  const pending: IPendingTracker = createPendingTracker()
   let disposePromise: Promise<void> | undefined
   const track = <T>(task: Promise<T>): Promise<T> => {
-    pendingCount++
-    const settle = (): void => {
-      pendingCount--
-      if (pendingCount === 0) {
-        const resolvers = drainResolvers.splice(0)
-        for (const resolve of resolvers) resolve()
-      }
-    }
-    task.then(settle, (error) => {
-      settle()
+    pending.track(task)
+    task.then(undefined, (error) => {
       // Detached 迟到 rejection（cleanup 之后才 settle）走 report 通道观测；不重新接入 registry
       // 生命周期、不改变 terminal、不吞 rejection。report 自身抛错 containment（不影响 observation）。
       if (cleanedUp) {
@@ -933,10 +922,7 @@ export function createSerializeRegistry(
     return task
   }
 
-  const drain = (): Promise<void> => {
-    if (pendingCount === 0) return Promise.resolve()
-    return new Promise((resolve) => drainResolvers.push(resolve))
-  }
+  const drain = (): Promise<void> => pending.drain()
 
   const resolve = (type: string, phase: ISerializePhase): IParserSnapshot => {
     if (closed || disposed) {
@@ -1164,7 +1150,7 @@ export function createSerializeRegistry(
               kind: SerializeCleanupKind.drainTimeout,
               source: SERIALIZE_SOURCE,
               deadlineAt,
-              pendingCount
+              pendingCount: pending.size
             })
           } catch {
             // onDrainTimeout 抛错不阻断 cleanup（containment）
@@ -1192,7 +1178,7 @@ export function createSerializeRegistry(
               }
               if (!hasPrimaryError) {
                 await Promise.race([drain(), deadlineReached])
-                if (pendingCount > 0) reportTimeout()
+                if (pending.size > 0) reportTimeout()
               }
             }
           }
