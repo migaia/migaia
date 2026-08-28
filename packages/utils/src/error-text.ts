@@ -25,5 +25,11 @@ export const UtilsErrorText = {
   configPathInvalid: (path: string, reason: string) =>
     `[utils] invalid config path at ${path}: ${reason}`,
   objectPathInvalid: (path: string, reason: string) =>
-    `[utils] invalid object path at ${path}: ${reason}`
+    `[utils] invalid object path at ${path}: ${reason}`,
+  /** Stable text for malformed template configuration or unsafe value conversion. */
+  formatInvalid: (reason: string) => `[utils] invalid string format: ${reason}`,
+  /** Stable text for a strict template placeholder that has no own-property value. */
+  formatValueMissing: (path: string) => `[utils] missing string format value at ${path}`,
+  /** Stable text for locale or Intl number-format configuration rejected by the host. */
+  numberFormatInvalid: '[utils] invalid number format configuration'
 } as const

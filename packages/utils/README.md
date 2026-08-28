@@ -260,7 +260,7 @@ if (error.code === UtilsErrorCode.aborted) {
 }
 ```
 
-全部取值：`invalidArgument`(`INVALID_ARGUMENT`)、`nonErrorValue`(`NON_ERROR_VALUE`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`aborted`(`ABORTED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`schedulerRunaway`(`SCHEDULER_RUNAWAY`)、`errorIdentityConflict`(`ERROR_IDENTITY_CONFLICT`)、`cloneUnsupported`(`CLONE_UNSUPPORTED`)、`invalidEncoding`(`INVALID_ENCODING`)、`limiterClosed`(`LIMITER_CLOSED`)、`reentrantCall`(`REENTRANT_CALL`)、`configUnsupported`(`CONFIG_UNSUPPORTED`)、`configReadonly`(`CONFIG_READONLY`)、`configConflict`(`CONFIG_CONFLICT`)、`configLimitExceeded`(`CONFIG_LIMIT_EXCEEDED`)、`configPathInvalid`(`CONFIG_PATH_INVALID`)、`objectPathInvalid`(`OBJECT_PATH_INVALID`)。
+全部取值：`invalidArgument`(`INVALID_ARGUMENT`)、`nonErrorValue`(`NON_ERROR_VALUE`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`aborted`(`ABORTED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`schedulerRunaway`(`SCHEDULER_RUNAWAY`)、`errorIdentityConflict`(`ERROR_IDENTITY_CONFLICT`)、`cloneUnsupported`(`CLONE_UNSUPPORTED`)、`invalidEncoding`(`INVALID_ENCODING`)、`limiterClosed`(`LIMITER_CLOSED`)、`reentrantCall`(`REENTRANT_CALL`)、`configUnsupported`(`CONFIG_UNSUPPORTED`)、`configReadonly`(`CONFIG_READONLY`)、`configConflict`(`CONFIG_CONFLICT`)、`configLimitExceeded`(`CONFIG_LIMIT_EXCEEDED`)、`configPathInvalid`(`CONFIG_PATH_INVALID`)、`objectPathInvalid`(`OBJECT_PATH_INVALID`)、`formatInvalid`(`FORMAT_INVALID`)、`formatValueMissing`(`FORMAT_VALUE_MISSING`)、`numberFormatInvalid`(`NUMBER_FORMAT_INVALID`)。
 
 **`UtilsAbortError` / `UtilsTimeoutError`｜3 秒上手** —— 一般由包内抛出，也可直接构造：
 
@@ -696,6 +696,22 @@ const initOnce = once(() => {
 <a id="构建门禁"></a>
 
 ## 构建门禁
+
+### 高频值、模板与数字工具
+
+```ts
+import { format, formatCurrency, isEmptyValue, isPrimitive } from '@migaia/utils';
+
+isEmptyValue('  '); // true；0、false、0n 均为 false
+isPrimitive(Symbol('id')); // true
+format('库存 {stock}，金额 {money}', { stock: 0, money: '¥12.00' });
+formatCurrency(1234.5, 'CNY', {
+  locales: 'zh-CN',
+  format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+});
+```
+
+`format` 默认使用 `{`/`}`，可通过 `placeholder.open/close` 改成 `${`/`}` 或 `[[`/`]]`。数字工具复用有界 `Intl.NumberFormat` 缓存；热循环优先调用 `createNumberFormatter()` 一次并复用返回函数。金额、库存和量化精度均由业务显式配置，utils 不内置领域默认值。
 
 ```bash
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test

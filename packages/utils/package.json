@@ -49,6 +49,18 @@
     "./function": {
       "types": "./dist/function.d.ts",
       "default": "./dist/function.js"
+    },
+    "./value": {
+      "types": "./dist/value.d.ts",
+      "default": "./dist/value.js"
+    },
+    "./string": {
+      "types": "./dist/string.d.ts",
+      "default": "./dist/string.js"
+    },
+    "./number": {
+      "types": "./dist/number.d.ts",
+      "default": "./dist/number.js"
     }
   },
   "scripts": {
