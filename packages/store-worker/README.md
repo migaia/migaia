@@ -143,8 +143,7 @@ sum.dispose();
 import {
   workerParser,
   workerPlugin,
-  createSerializeWorkerHandler,
-  mergeWorkerChunks
+  createSerializeWorkerHandler
 } from '@migaia/store-worker/serialize/worker';
 // 也可以从包根导入（index.ts 里 `export * from './serialize/worker.js'`）：
 // import { workerPlugin } from '@migaia/store-worker';
@@ -206,14 +205,6 @@ const handler = createSerializeWorkerHandler(parser, (message, transfer) =>
 
 签名：`(parser: ISerializeParser, post: (message: unknown, transfer?: readonly Transferable[]) => void) => IManagedRpcHandler`。两个参数均必填，非对象/非函数同步抛 `INVALID_OPTION`。`parser`/`post` 的解码/编码结果、多段流式输出的本地拼装规则见 [USEGUIDE §6.5](./USEGUIDE.md#65-多段结果的本地拼装)。
 
-**`mergeWorkerChunks`｜5 秒上手** —— 把多个 `ISerializeChunk` 拼成一个，`createSerializeWorkerHandler` 内部用它拼装 `parser.encode()` 的多段流式输出：
-
-```ts
-const merged = mergeWorkerChunks([chunk1, chunk2]); // 全 text 则字符串拼接，否则统一转字节拼接
-```
-
-单参数 `chunks: readonly ISerializeChunk[]`（必填），无选项。空数组抛 `SerializeCodecError`(`CHUNK_MERGE_FAILED`)；混入 `value` 段(已物化的对象图，不能与 text/bytes 混拼)同样抛错；只有一段时直接返回该段。
-
 ---
 
 <a id="constants"></a>
@@ -263,7 +254,7 @@ if (error.code === StoreWorkerErrorCode.adapterDisposed) {
 }
 ```
 
-全部取值：`invalidOption`(`INVALID_OPTION`)、`adapterDisposed`(`ADAPTER_DISPOSED`)、`requestAborted`(`REQUEST_ABORTED`)、`invalidRequestChunk`(`INVALID_REQUEST_CHUNK`)、`invalidResponseChunk`(`INVALID_RESPONSE_CHUNK`)、`chunkMergeFailed`(`CHUNK_MERGE_FAILED`)、`cleanupFailed`(`CLEANUP_FAILED`)。
+全部取值：`invalidOption`(`INVALID_OPTION`)、`adapterDisposed`(`ADAPTER_DISPOSED`)、`requestAborted`(`REQUEST_ABORTED`)、`invalidRequestChunk`(`INVALID_REQUEST_CHUNK`)、`invalidResponseChunk`(`INVALID_RESPONSE_CHUNK`)、`cleanupFailed`(`CLEANUP_FAILED`)。
 
 **`createStoreWorkerError`｜5 秒上手**：
 

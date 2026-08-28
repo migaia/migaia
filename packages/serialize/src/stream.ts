@@ -17,7 +17,7 @@ import {
   SERIALIZE_SOURCE
 } from './errors.js'
 import { SerializeChunkKind, SerializePhase } from './format-constants.js'
-import { snapshotSerializeSignal } from './signal.js'
+import { snapshotSerializeSignal } from './signal-snapshot.js'
 
 type ISerializeScheduledTask = { cancel(): void }
 
@@ -48,6 +48,16 @@ type IDecodeStreamSnapshot = {
 
 /** Invoke one captured method with its original protocol receiver. */
 type ISerializeInvokable<TResult> = (...args: never[]) => TResult
+
+/**
+ * MRC-C-R02-only receiver boundary: invokes the once-captured encoder method with its original
+ * receiver.
+ */
+const invokeCollectEncoderWithReceiver = <TResult>(
+  method: ISerializeInvokable<TResult>,
+  receiver: object,
+  args: readonly unknown[]
+): TResult => Reflect.apply(method, receiver, args)
 
 /** Add a secondary cleanup failure without changing the earlier primary result. */
 const attachSerializeCleanupError = (primary: unknown, cleanupError: unknown): void => {
@@ -668,6 +678,13 @@ export type IEncodeStreamOptions = IFrameBudgetOptions & {
   readonly maxInFlight?: number
 }
 
+/** Captured policy for one collector operation; getters are read before iterator acquisition. */
+export type ICollectStreamOptions = {
+  readonly signal?: ISerializeAbortSignal
+  readonly empty?: 'text' | 'reject'
+  readonly context?: string
+}
+
 /**
  * 把一个大数组编码成分段流，**不做拼装**。
  *
@@ -795,34 +812,91 @@ export async function* decodeStream(
 /** 把分段流合并成一整块。只在消费者确实需要完整 blob 时才用——它会把整份数据 同时驻留在内存里，正是流式想避免的那笔峰值。 */
 export async function collectStream(
   chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>,
-  encoder?: ITextEncoder
+  encoder?: ITextEncoder,
+  options?: ICollectStreamOptions
 ): Promise<ISerializeChunk> {
+  const collectOptions = snapshotCollectOptions(options)
+  const capturedEncoder = snapshotCollectEncoder(encoder)
   const collected: ISerializeChunk[] = []
   let sawBytes = false
   let bytesConsumed = 0
   let index = 0
   const chunkProgress: number[] = []
-  let ownedError: unknown
+  let iterator: AsyncIterator<ISerializeChunk> | Iterator<ISerializeChunk> | undefined
+  let primaryError: unknown
+  let completed = false
   try {
-    for await (const chunk of chunks) {
+    checkCollectAbort(collectOptions.signal)
+    iterator = getCollectIterator(chunks)
+    while (true) {
+      checkCollectAbort(collectOptions.signal)
+      const step = await iterator.next()
+      if (step === null || (typeof step !== 'object' && typeof step !== 'function'))
+        throw new SerializeCodecError(SerializeErrorText.collectOptionInvalid, {
+          type: 'stream',
+          phase: SerializePhase.encode,
+          context: collectOptions.context,
+          chunkIndex: index,
+          bytesConsumed,
+          code: SerializeErrorCode.encodeFailed,
+          cause: step
+        })
+      let done: unknown
+      try {
+        done = step.done
+      } catch (error) {
+        throw new SerializeCodecError(
+          `collect stream failed at chunk ${index}: ${streamFailureReason(error)}`,
+          {
+            type: 'stream',
+            phase: SerializePhase.encode,
+            context: collectOptions.context,
+            chunkIndex: index,
+            bytesConsumed,
+            code: SerializeErrorCode.encodeFailed,
+            cause: error
+          }
+        )
+      }
+      if (done === true) {
+        completed = true
+        break
+      }
+      let chunk: unknown
+      try {
+        chunk = step.value
+      } catch (error) {
+        throw new SerializeCodecError(
+          `collect stream failed at chunk ${index}: ${streamFailureReason(error)}`,
+          {
+            type: 'stream',
+            phase: SerializePhase.encode,
+            context: collectOptions.context,
+            chunkIndex: index,
+            bytesConsumed,
+            code: SerializeErrorCode.encodeFailed,
+            cause: error
+          }
+        )
+      }
+      checkCollectAbort(collectOptions.signal)
       const validatedChunk = validateSerializeChunk(chunk, {
         type: 'stream',
         phase: SerializePhase.encode,
-        context: 'stream',
+        context: collectOptions.context,
         chunkIndex: index,
         bytesConsumed
       })
       chunkProgress.push(bytesConsumed)
       if (validatedChunk[0] === SerializeChunkKind.value) {
-        ownedError = new SerializeCodecError('cannot collect a value chunk into a stream', {
+        throw new SerializeCodecError(SerializeErrorText.collectValue, {
           type: 'stream',
           phase: SerializePhase.encode,
-          context: 'stream',
+          context: collectOptions.context,
           chunkIndex: index,
           bytesConsumed,
           code: SerializeErrorCode.invalidChunk
         })
-        throw ownedError
       }
       if (validatedChunk[0] === SerializeChunkKind.bytes) {
         sawBytes = true
@@ -832,30 +906,51 @@ export async function collectStream(
       index++
     }
   } catch (error) {
-    if (error === ownedError || isSerializeInvalidChunk(error)) throw error
+    primaryError = error
+  } finally {
+    const cleanupError = await closeCollectIterator(iterator, completed)
+    if (cleanupError !== undefined) {
+      if (primaryError === undefined) primaryError = cleanupError
+      else attachSerializeCleanupError(primaryError, cleanupError)
+    }
+  }
+  if (primaryError !== undefined) {
+    if (isSerializeInvalidChunk(primaryError) || isSerializeInvalidOption(primaryError))
+      throw primaryError
+    if (primaryError instanceof SerializeCodecError) throw primaryError
     throw new SerializeCodecError(
-      `collect stream failed at chunk ${index}: ${streamFailureReason(error)}`,
+      `collect stream failed at chunk ${index}: ${streamFailureReason(primaryError)}`,
       {
         type: 'stream',
         phase: SerializePhase.encode,
-        context: 'stream',
+        context: collectOptions.context,
         chunkIndex: index,
         bytesConsumed,
         code: SerializeErrorCode.encodeFailed,
-        cause: error
+        cause: primaryError
       }
     )
   }
-  if (collected.length === 0) return ['text', '']
+  if (collected.length === 0) {
+    if (collectOptions.empty === 'reject')
+      throw createSerializeError(SerializeErrorCode.encodeFailed, SerializeErrorText.collectEmpty, {
+        context: collectOptions.context
+      })
+    return ['text', '']
+  }
   if (!sawBytes) {
     // Joining once avoids repeatedly copying the accumulated string for a
     // long stream (which otherwise turns collection into quadratic work).
     return ['text', collected.map((chunk) => chunk[1] as string).join('')]
   }
   // core 无默认 Encoding adapter（R-4）：出现 bytes 需要合并时必须注入 encoder，不直接使用宿主 TextEncoder。
-  const enc = encoder
+  const enc = capturedEncoder
   if (enc === undefined) {
-    throw createSerializeError(SerializeErrorCode.envUnsupported, 'TextEncoder is unavailable')
+    throw createSerializeError(
+      SerializeErrorCode.envUnsupported,
+      SerializeErrorText.encoderInvalid,
+      { context: collectOptions.context }
+    )
   }
   const parts = collected.map((chunk, chunkIndex) =>
     chunk[0] === SerializeChunkKind.bytes
@@ -863,7 +958,7 @@ export async function collectStream(
       : encodeSerializeTextChunk(enc, chunk[1] as string, {
           type: 'stream',
           phase: SerializePhase.encode,
-          context: 'stream',
+          context: collectOptions.context,
           chunkIndex,
           bytesConsumed: chunkProgress[chunkIndex] ?? 0
         })
@@ -877,4 +972,139 @@ export async function collectStream(
     offset += part.byteLength
   }
   return ['bytes', merged]
+}
+
+/** Captures collector options and rejects malformed values before touching the source iterator. */
+function snapshotCollectOptions(options: unknown): {
+  readonly signal?: ISerializeAbortSignal
+  readonly empty: 'text' | 'reject'
+  readonly context: string
+} {
+  try {
+    if (options === undefined) return { empty: 'text', context: 'stream' }
+    if (options === null || typeof options !== 'object' || Array.isArray(options))
+      throw new TypeError(SerializeErrorText.collectOptionInvalid)
+    const candidate = options as Record<string, unknown>
+    const signal = candidate.signal
+    const empty = candidate.empty
+    const context = candidate.context
+    if (empty !== undefined && empty !== 'text' && empty !== 'reject')
+      throw new TypeError(SerializeErrorText.collectOptionInvalid)
+    if (context !== undefined && typeof context !== 'string')
+      throw new TypeError(SerializeErrorText.collectOptionInvalid)
+    return {
+      signal: signal === undefined ? undefined : snapshotSerializeSignal(signal),
+      empty: empty ?? 'text',
+      context: context ?? 'stream'
+    }
+  } catch (error) {
+    return streamOptionFailure(error)
+  }
+}
+
+/** Captures an encoder method once and preserves its receiver across mixed collection. */
+function snapshotCollectEncoder(encoder: ITextEncoder | undefined): ITextEncoder | undefined {
+  if (encoder === undefined) return undefined
+  try {
+    if (encoder === null || (typeof encoder !== 'object' && typeof encoder !== 'function'))
+      throw new TypeError(SerializeErrorText.encoderInvalid)
+    const target = encoder as { readonly encode?: unknown }
+    let method: unknown
+    try {
+      method = target.encode
+    } catch (error) {
+      return {
+        encode: (): Uint8Array => {
+          throw error
+        }
+      }
+    }
+    if (typeof method !== 'function') throw new TypeError(SerializeErrorText.encoderInvalid)
+    const receiver = encoder as object
+    return {
+      encode: (input: string): Uint8Array =>
+        invokeCollectEncoderWithReceiver(method as ISerializeInvokable<Uint8Array>, receiver, [
+          input
+        ])
+    }
+  } catch (error) {
+    return streamOptionFailure(error)
+  }
+}
+
+/** Resolves exactly one async or sync iterator after option and cancellation admission. */
+function getCollectIterator(
+  source: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>
+): AsyncIterator<ISerializeChunk> | Iterator<ISerializeChunk> {
+  try {
+    const candidate = source as {
+      readonly [Symbol.asyncIterator]?: () => AsyncIterator<ISerializeChunk>
+      readonly [Symbol.iterator]?: () => Iterator<ISerializeChunk>
+    }
+    const asyncFactory = candidate[Symbol.asyncIterator]
+    if (asyncFactory !== undefined) {
+      const sourceIterator = candidate[Symbol.asyncIterator]!()
+      return {
+        next: (): Promise<IteratorResult<ISerializeChunk>> => sourceIterator.next(),
+        return: sourceIterator.return
+          ? (): Promise<IteratorResult<ISerializeChunk>> => sourceIterator.return!()
+          : undefined
+      }
+    }
+    const syncFactory = candidate[Symbol.iterator]
+    if (syncFactory !== undefined) {
+      const sourceIterator = candidate[Symbol.iterator]!()
+      return {
+        next: (): IteratorResult<ISerializeChunk> => sourceIterator.next(),
+        return: sourceIterator.return
+          ? (): IteratorResult<ISerializeChunk> => sourceIterator.return!()
+          : undefined
+      }
+    }
+    throw new TypeError(SerializeErrorText.collectOptionInvalid)
+  } catch (error) {
+    if (isSerializeInvalidOption(error)) throw error
+    throw new SerializeCodecError(
+      `collect stream failed at chunk 0: ${streamFailureReason(error)}`,
+      {
+        type: 'stream',
+        phase: SerializePhase.encode,
+        context: 'stream',
+        chunkIndex: 0,
+        bytesConsumed: 0,
+        code: SerializeErrorCode.encodeFailed,
+        cause: error
+      }
+    )
+  }
+}
+
+/** Checks cooperative cancellation at each collector admission boundary. */
+function checkCollectAbort(signal: ISerializeAbortSignal | undefined): void {
+  if (signal !== undefined && readSerializeSignalAborted(signal))
+    throw createSerializeError(SerializeErrorCode.aborted, 'serialize aborted', {
+      cause: readSerializeSignalReason(signal)
+    })
+}
+
+/** Calls iterator return at most once and reports cleanup failure without replacing primary. */
+async function closeCollectIterator(
+  iterator: AsyncIterator<ISerializeChunk> | Iterator<ISerializeChunk> | undefined,
+  completed: boolean
+): Promise<unknown> {
+  if (iterator === undefined || completed) return undefined
+  try {
+    const close = iterator.return
+    if (typeof close !== 'function') return undefined
+    await close()
+    return undefined
+  } catch (error) {
+    return createSerializeError(
+      SerializeErrorCode.encodeFailed,
+      SerializeErrorText.collectCleanupFailed,
+      {
+        cause: error
+      }
+    )
+  }
 }

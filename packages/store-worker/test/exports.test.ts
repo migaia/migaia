@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { IWebRpcAbortSignal, IWebRpcEndpoint } from '@migaia/web-rpc'
 import { WorkerAdapter, createWorkerHandler, workerComputed, workerParser } from '../src/index'
 import { toManagedRpcHandler } from '../src/managed-rpc-handler'
-import { createSerializeWorkerHandler, mergeWorkerChunks } from '../src/serialize/worker'
+import { createSerializeWorkerHandler } from '../src/serialize/worker'
 
 function fakePort() {
   return {
@@ -469,14 +469,5 @@ describe('store-worker exports', () => {
       })
     )
     adapter.close()
-  })
-
-  it('rejects materialized value chunks instead of stringifying them', () => {
-    expect(() =>
-      mergeWorkerChunks([
-        ['text', 'a'],
-        ['value', { object: true }]
-      ])
-    ).toThrow('cannot merge value chunks into bytes')
   })
 })

@@ -1,22 +1,17 @@
 import {
   SerializeCodecError,
   SerializeChunkKind,
+  collectStream,
   isChunkShape,
   type ISerializeChunk,
   type ISerializeContext,
   type ISerializeParser,
   type ISerializePhase,
-  type ISerializePlugin
+  type ISerializePlugin,
+  type ITextEncoder
 } from '@migaia/serialize'
 import { isUint8Array } from '@migaia/utils/bytes'
-import {
-  abort,
-  connect,
-  createEndpoint,
-  protocol,
-  timeout,
-  type IWebRpcAbortSignal
-} from '@migaia/web-rpc'
+import { abort, connect, createEndpoint, protocol, timeout } from '@migaia/web-rpc'
 import { WebRpcPlatform } from '@migaia/web-rpc/protocol-constants'
 import {
   createWebWorkerTransport,
@@ -326,7 +321,11 @@ export function createSerializeWorkerHandler(
           const result = isChunkShape(output)
             ? output
             : ((Symbol.asyncIterator in Object(output) || Symbol.iterator in Object(output)
-                ? await collectInWorker(output as Iterable<ISerializeChunk>, context.signal)
+                ? await collectStream(output as Iterable<ISerializeChunk>, createWorkerEncoder(), {
+                    signal: context.signal,
+                    empty: 'reject',
+                    context: 'serialize-worker'
+                  })
                 : await output) as ISerializeChunk)
           return context.success(result, {
             transfer: transferablesOf(result, WorkerByteOwnership.transfer)
@@ -346,63 +345,12 @@ export function createSerializeWorkerHandler(
   return toManagedRpcHandler(endpoint, (message) => deliver(message))
 }
 
-/** Worker 侧不引 registry，就地把分段拼一次，避免把整个注册表打进 worker 包。 */
-async function collectInWorker(
-  output: Iterable<ISerializeChunk> | AsyncIterable<ISerializeChunk>,
-  signal?: IWebRpcAbortSignal
-): Promise<ISerializeChunk> {
-  const chunks: ISerializeChunk[] = []
-  if (Symbol.asyncIterator in Object(output)) {
-    for await (const chunk of output as AsyncIterable<ISerializeChunk>) {
-      signal?.throwIfAborted?.()
-      chunks.push(chunk)
-    }
-  } else {
-    for (const chunk of output as Iterable<ISerializeChunk>) {
-      signal?.throwIfAborted?.()
-      chunks.push(chunk)
-    }
+/** Creates an encoder only when this worker runtime exposes a valid host capability. */
+function createWorkerEncoder(): ITextEncoder | undefined {
+  try {
+    const Encoder = (globalThis as { readonly TextEncoder?: new () => ITextEncoder }).TextEncoder
+    return typeof Encoder === 'function' ? new Encoder() : undefined
+  } catch {
+    return undefined
   }
-  return mergeWorkerChunks(chunks)
-}
-
-/** Merges worker-produced wire chunks without coercing materialized values. */
-export function mergeWorkerChunks(chunks: readonly ISerializeChunk[]): ISerializeChunk {
-  if (chunks.length === 0)
-    throw new SerializeCodecError(StoreWorkerErrorText.emptyChunks, {
-      type: WorkerDiagnosticType.worker,
-      phase: WorkerSerializePhase.encode,
-      context: 'serialize-worker',
-      chunkIndex: 0,
-      bytesConsumed: 0,
-      code: StoreWorkerErrorCode.chunkMergeFailed,
-      source: STORE_WORKER_SOURCE
-    })
-  if (chunks.length === 1) return chunks[0]!
-  if (chunks.every((chunk) => chunk[0] === SerializeChunkKind.text)) {
-    return [SerializeChunkKind.text, chunks.map((chunk) => chunk[1] as string).join('')]
-  }
-  const encoder = new TextEncoder()
-  const parts = chunks.map((chunk) => {
-    if (chunk[0] === SerializeChunkKind.bytes) return chunk[1]
-    if (chunk[0] === SerializeChunkKind.text) return encoder.encode(chunk[1])
-    throw new SerializeCodecError(StoreWorkerErrorText.valueChunks, {
-      type: WorkerDiagnosticType.worker,
-      phase: WorkerSerializePhase.encode,
-      context: 'serialize-worker',
-      chunkIndex: 0,
-      bytesConsumed: 0,
-      code: StoreWorkerErrorCode.chunkMergeFailed,
-      source: STORE_WORKER_SOURCE
-    })
-  })
-  let total = 0
-  for (const part of parts) total += part.byteLength
-  const merged = new Uint8Array(total)
-  let offset = 0
-  for (const part of parts) {
-    merged.set(part, offset)
-    offset += part.byteLength
-  }
-  return [SerializeChunkKind.bytes, merged]
 }

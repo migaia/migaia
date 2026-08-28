@@ -253,37 +253,13 @@ Worker 侧的对端：把一个**普通的、跑在 Worker 里就地工作的** 
 
 ### 6.5 多段结果的本地拼装
 
-`parser.encode()` 允许返回可迭代对象（流式输出多个 `ISerializeChunk`）。Worker 侧不引入完整的 `@migaia/serialize` 注册表逻辑来做这件事（避免把不需要的代码打进 Worker 包体），而是就地实现了一个最小拼装：
-
-- 全部段都是 `'text'` 时，直接字符串拼接。
-- 否则统一转成 `Uint8Array`（`'bytes'` 段直接用，`'text'` 段用 `TextEncoder` 编码）；`'value'` 段不能参与混合拼装，会抛出 `SerializeError`。
-- 只有一段时直接返回该段，不做任何拼装。
-
-这个拼装逻辑只在 `encode` 输出多段时触发，`decode` 的输入固定是单段（`ISerializeChunk`），不涉及拼装。
+`parser.encode()` 允许返回可迭代对象（流式输出多个 `ISerializeChunk`）。Worker 侧将这类输出交给 `@migaia/serialize` 的 `collectStream` 统一收集，沿用序列化核心的分段校验、编码和清理语义；`decode` 的输入固定是单段（`ISerializeChunk`），不涉及收集。
 
 ---
 
 ## 7. 常量与错误码完整参考
 
-### 7.1 `mergeWorkerChunks(chunks)`
-
-```ts
-import { mergeWorkerChunks } from '@migaia/store-worker/serialize/worker';
-
-function mergeWorkerChunks(chunks: readonly ISerializeChunk[]): ISerializeChunk;
-```
-
-独立的公开导出（子路径 `@migaia/store-worker/serialize/worker`，也可从包根 `@migaia/store-worker` 导入），把多个 `ISerializeChunk` 拼成一个。`createSerializeWorkerHandler` 内部用它拼装 `parser.encode()` 返回的多段流式输出（见 [§6.5](#65-多段结果的本地拼装)），也可以在业务代码里单独调用。
-
-单参数 `chunks: readonly ISerializeChunk[]`（必填），无选项。边界行为：
-
-- **空数组**：抛出 `SerializeCodecError`（`code: 'CHUNK_MERGE_FAILED'`，来自 `@migaia/serialize`），`type` 字段默认 `WorkerDiagnosticType.worker`，`phase` 恒为 `'encode'`。
-- **单元素数组**：直接返回该元素本身，不做任何拷贝或包装。
-- **全部是 `'text'` 段**：按顺序 `join('')` 字符串拼接，返回 `['text', 拼接结果]`。
-- **混有 `'bytes'` 段**：统一转成 `Uint8Array`（`'bytes'` 段直接用，`'text'` 段用 `TextEncoder` 编码），逐段 `set()` 进一个新分配的定长缓冲区，返回 `['bytes', 合并后的 Uint8Array]`。
-- **混入 `'value'` 段**（已物化的对象图，语义上不能与 text/bytes 字节流混拼）：同样抛出 `SerializeCodecError`（`code: 'CHUNK_MERGE_FAILED'`），不会尝试做任何隐式转换（比如 `String(value)`）。
-
-### 7.2 `WorkerOwnership` / `WorkerDiagnosticType`
+### 7.1 `WorkerOwnership` / `WorkerDiagnosticType`
 
 ```ts
 import { WorkerOwnership, WorkerDiagnosticType } from '@migaia/store-worker';
@@ -305,9 +281,9 @@ const WorkerDiagnosticType = { worker: 'worker' } as const;
 type IWorkerDiagnosticType = 'worker';
 ```
 
-无调用参数，常量对象；`WorkerDiagnosticType.worker`（即字符串 `'worker'`）是 `workerParser`/`createSerializeWorkerHandler` 产出的 `SerializeError`/`SerializeCodecError` 的 `type` 字段默认值（未显式传 `type`/`options.type` 时使用），也是 `mergeWorkerChunks` 抛错时固定使用的 `type`。
+无调用参数，常量对象；`WorkerDiagnosticType.worker`（即字符串 `'worker'`）是 `workerParser`/`createSerializeWorkerHandler` 产出的 `SerializeError`/`SerializeCodecError` 的 `type` 字段默认值（未显式传 `type`/`options.type` 时使用）。
 
-### 7.3 `StoreWorkerErrorCode` 与错误工厂
+### 7.2 `StoreWorkerErrorCode` 与错误工厂
 
 ```ts
 import {
@@ -334,7 +310,6 @@ if ((error as { code?: string }).code === StoreWorkerErrorCode.adapterDisposed) 
 | `requestAborted`       | `REQUEST_ABORTED`        | Worker 侧的序列化请求被协作式取消（`AbortSignal`）；`ownership: 'transfer'` 时输入已 detach，不可重试 |
 | `invalidRequestChunk`  | `INVALID_REQUEST_CHUNK`  | 发给 Worker 的请求 chunk 形状非法（`isChunkShape` 校验未通过），协议错误                              |
 | `invalidResponseChunk` | `INVALID_RESPONSE_CHUNK` | Worker 返回的 chunk 形状非法，Worker 侧实现错误                                                       |
-| `chunkMergeFailed`     | `CHUNK_MERGE_FAILED`     | `mergeWorkerChunks` 合并失败（空列表，或把 `'value'` 段并入字节流），parser 实现错误                  |
 | `cleanupFailed`        | `CLEANUP_FAILED`         | 释放期间 endpoint 与（可选的）`worker.terminate()` 清理均失败                                         |
 
 **`createStoreWorkerError(code, message, options?)`**：
