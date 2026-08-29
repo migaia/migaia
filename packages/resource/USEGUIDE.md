@@ -257,10 +257,11 @@ type IResourceCacheSnapshot<T> = {
 ## 错误码
 
 ```ts
-import { ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource';
+import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource';
 ```
 
 稳定错误码表，**8 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/resource'`。
+`RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。
 
 | `ResourceErrorCode` 键      | 码值                          | 触发条件                                                                                                                                        |
 | --------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |

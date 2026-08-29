@@ -1,6 +1,6 @@
 # `@migaia/event-subscriber` 使用指南
 
-本指南逐个模块列出全部导出 API 的签名、边界行为与错误码。包的定位、适用/不适用场景与安装方式见 [README](./README.md)。
+本指南逐个模块覆盖公开运行时 API、直接配置所需的关键类型、边界行为与错误码。只服务于泛型推导的 type-only 投影类型以发布的 `.d.ts` 和编辑器提示为准；包的定位、适用/不适用场景与安装方式见 [README](./README.md)。
 
 ## 目录
 
@@ -118,6 +118,8 @@ type IEventChannel<T, R = void> = {
 ### API style
 
 style 是构造阶段的一次性命名投影。四个 preset 映射如下：
+
+`EventApiStyle` 导出这四个稳定 preset 值；配置、持久化或跨模块比较时优先引用 `EventApiStyle.onTrigger` 等常量成员，不要散写字符串。直接在对象字面量中传字符串仍受同一校验。
 
 | preset              | subscribe alias | publish alias | cancellation alias |
 | ------------------- | --------------- | ------------- | ------------------ |
@@ -281,6 +283,10 @@ type IListenerResult<R> =
 ### `withSnapshotEntries`
 
 高级集成入口：读取一次不可变 listener 快照并把 `IEventInvocation[]` 交给 visitor。每个 invocation 的 `invoke()` 最多调用一次；visitor 同步返回或返回的 Promise settle 后，所有 invocation 都会关闭，再次调用抛 `INVOCATION_CLOSED`。visitor 抛出或 reject 时原错误原样传播，同时仍会关闭全部 invocation。普通并行、串行或按 task 调用应优先使用下方 `invoke*` helper。
+
+### `invokeEachLive`
+
+更底层的同步遍历入口：在本次访问期间新追加的订阅者也可被当前访问看到，每个注册最多访问一次；visitor 必须同步完成。即使 visitor 抛错，内部遍历状态也会释放，原错误保持身份向上抛出。该 API 只适合需要 append-live 语义的框架集成；普通发布必须优先使用快照型 `invoke*` helper，避免一次发布的目标集合随回调副作用变化。
 
 ### `invokeParallelSettled` / `invokeParallel`
 

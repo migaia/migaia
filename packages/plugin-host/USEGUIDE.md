@@ -1,6 +1,6 @@
 # 使用手册
 
-本文是 `@migaia/plugin-host` 的完整参考手册。先看 [README.md](./README.md#核心心智模型五分钟上手) 的五分钟上手示例，跑起来之后再回来查这里的细节——README 讲"是什么、为什么用、5 分钟怎么跑起来"，本文讲"每一个导出的精确签名、每一种边界行为、每一个错误码"。
+本文是 `@migaia/plugin-host` 的应用与框架适配器参考手册。先看 [README.md](./README.md#核心心智模型五分钟上手) 的五分钟上手示例，跑起来之后再回来查这里的细节——README 讲“是什么、为什么用、5 分钟怎么跑起来”，本文覆盖公开运行时 API、关键配置类型、边界行为和错误码；只参与插件合并/提取的 type-only helper 以发布的 `.d.ts` 为准。
 
 ## 目录
 
@@ -329,6 +329,9 @@ import {
   GENERATOR_CONTINUE,
   GENERATOR_HALT,
   GENERATOR_UNDEFINED,
+  PluginHostDisposalNodeKind,
+  invokeCaptured,
+  readPluginHostDisposalProvenance,
   disposeKey,
   asyncDisposeKey
 } from '@migaia/plugin-host';
@@ -342,6 +345,8 @@ import {
 - **`adaptSyncStageToAsyncGenerator<TValue>(stage: ISyncPipelineStage<TValue>, onViolation: (kind) => void): IAsyncGeneratorPipelineStage<TValue>`**——组合前两个适配器：先用 `adaptSyncStageToGenerator` 的短路/duplicate/late 检测把 sync stage 变成 generator stage，再用 `adaptGeneratorStageToAsyncGenerator` 提升为 async-generator stage；`onViolation` **必填**。没有 `adaptAsyncStageToAsyncGenerator`——async 的递归 `next()` 洋葱模型（含双失败合并、active 控制路径）无法无损映射为 stage-local 的 yield 序列，这不是遗漏，是两种模型结构不兼容。
 - **`GENERATOR_CONTINUE` / `GENERATOR_HALT` / `GENERATOR_UNDEFINED`**——generator/async-generator pipeline 共用的哨兵值（`unique symbol`，从 `@migaia/middleware-pipeline` 转发，保持跨包同一身份）：stage 的 `return` 可以返回它们中的一个来表达"继续/终止/显式 undefined"，语义见 [§7](#7-pipeline-处理管线) 表格。
 - **`disposeKey: unique symbol` / `asyncDisposeKey: unique symbol`**——本包自声明的 symbol（不依赖 `ESNext.Disposable` lib，因此不强制要求该 lib 的类型声明）。插件/资源可以用这两个 key 之一声明清理方法，运行时会把自声明 symbol 与宿主原生 `Symbol.dispose`/`Symbol.asyncDispose`（若当前运行时提供）都识别为等价键；宿主不提供原生 symbol 时，只有自声明 symbol 生效。
+- **`invokeCaptured(callable, receiver, args)`**——框架适配器用于保留 JavaScript receiver、参数顺序和抛出值身份的低层调用边界。业务插件应直接调用自己的函数；只有已经独立完成 callable/receiver/args 准入的适配器才应使用它。
+- **`PluginHostDisposalNodeKind` / `readPluginHostDisposalProvenance(error)`**——清理诊断协议。前者区分 host error、aggregate 和 disposer wrapper；后者只读取本物理包实例登记的 provenance，未知错误或另一份重复安装的包实例会返回 `undefined`，不会按对象外形猜测。它用于日志与审计，不应代替 `source`/`code`/`cause` 错误处理。
 
 ```ts
 import { adaptSyncStageToAsync } from '@migaia/plugin-host';

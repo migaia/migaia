@@ -365,6 +365,8 @@ function createStoreRegistry(runtime?: IRuntime): StoreRegistry;
 
 所有本包错误都带 `source: '@migaia/store-react'` 与稳定 `code`：
 
+根入口同时导出 `STORE_REACT_SOURCE`、`createStoreReactError(code, message, options?)` 与 `createStoreReactAggregateError(code, errors, message)`，供与本包契约集成的 adapter 保留一致错误身份。普通组件只需捕获 hook/Registry 抛出的错误；不要为了改写 message 再包装一次。工厂保留传入的 native error/aggregate 语义和 cause 链，错误分支应比较 `STORE_REACT_SOURCE` 与 `StoreReactErrorCode`。
+
 | `StoreReactErrorCode` | 码值 | 触发条件 / 处理 |
 | --- | --- | --- |
 | `registryDisposed` | `REGISTRY_DISPOSED` | Registry 终结后继续读写；创建新 Registry |

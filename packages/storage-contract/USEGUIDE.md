@@ -1,6 +1,6 @@
 # `@migaia/storage-contract` 使用指南
 
-本指南逐个模块列出全部导出 API 的签名、语义与用法示例。包的定位与安装方式见 [README](./README.md)。
+本指南逐个模块覆盖公开运行时 API、实现契约所需的关键类型、语义与用法示例。二级索引等大型结构的完整字段签名以正文概念说明和发布的 `.d.ts` 共同为准，避免复制一份易漂移的声明文件；包的定位与安装方式见 [README](./README.md)。
 
 ## 目录
 
@@ -107,6 +107,16 @@ function asRecordStore<T = unknown>(store: IKeyValueStore): IRecordStore<T>;
 ```ts
 const record = await asRecordStore<{ name: string }>(store).getRecord('profile');
 ```
+
+### 一次性准入快照
+
+`snapshotKeyValueStoreDetailed(candidate)` 面向需要审计 hostile getter 的适配器：它按固定顺序读取一次基础 store 表面，成功返回 `{ valid: true, store, backend, capabilities, dispose, receiver }`；失败返回 `{ valid: false, cause }`，其中 `cause` 保留精确的属性读取异常。`snapshotKeyValueStore(candidate)` 与 `snapshotRecordStore(candidate)` 是更轻量的组合入口，合法时返回 `{ store, backend, capabilities }`，否则返回 `undefined`。它们只完成准入与快照，不调用后端操作；已经拿到快照的能力守卫应复用它，避免重复触发 getter。
+
+### Change feed 与二级索引能力
+
+`isChangeFeedStore(candidate)` / `asChangeFeedStore(store)` 只有在基础 L0 契约有效、`capabilities.changeFeed === true` 且 `subscribeChanges` 可调用时才通过。订阅回调收到 `IStorageChange`（递增 `sequence`、`origin`、channel/kind，以及可选 scope/keys），退订函数必须由调用方持有并执行；断言版能力不足时抛 `UNSUPPORTED_CAPABILITY`。
+
+`isSecondaryIndexRecordStore(candidate)` / `asSecondaryIndexRecordStore(store)` 要求完整 L1 契约、`capabilities.secondaryIndexes === true`，以及 ensure/readiness/indexed put/index iteration/indexed transaction 五个方法全部可调用。守卫不会调用任何后端方法；断言版失败同样抛 `UNSUPPORTED_CAPABILITY`。应用应先保存 `ensureRecordIndexes()` 返回的 generation-bound handle，再把它传给 readiness、写入、查询和事务，不能只按索引名绕过 handle。
 
 ---
 

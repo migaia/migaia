@@ -1,6 +1,6 @@
 # 使用手册
 
-本文是 `@migaia/logger` 的完整参考手册。先看 [README.md](./README.md#4-五分钟上手) 的五分钟上手示例，跑起来之后再回来查这里的细节——README 讲"是什么、为什么用、5 分钟怎么跑起来"，本文讲"每一个配置项、每一个 API、每一种边界行为"。
+本文是 `@migaia/logger` 的应用与适配器参考手册。先看 [README.md](./README.md#4-五分钟上手) 的五分钟上手示例，跑起来之后再回来查这里的细节——README 讲“是什么、为什么用、5 分钟怎么跑起来”，本文覆盖公开运行时 API、配置项和边界行为；仅供插件泛型推导的 type-only helper 由发布的 `.d.ts` 与编辑器提示承载。
 
 ## 目录
 
@@ -281,6 +281,9 @@ api.info('user created'); // 同时经过 api 自己的 pipeline/sink，也完�
 测试环境、非标准宿主，或者需要替换底层能力实现时，可以整体替换 runtime manager：
 
 ```ts
+import { getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger';
+
+const previous = getLoggerRuntimeManager();
 const restore = setLoggerRuntimeManager({
   randomUUID: () => crypto.randomUUID(),
   defer: (task) => queueMicrotask(task),
@@ -295,7 +298,7 @@ try {
 }
 ```
 
-`setLoggerRuntimeManager` 返回一个恢复函数，支持嵌套调用（后进先出恢复），适合在测试用例的 `beforeEach`/`afterEach` 里成对使用。
+`getLoggerRuntimeManager()` 返回当前活动 manager 的同一引用，适合在适配器安装前读取或做能力探测；不要修改返回对象。`setLoggerRuntimeManager` 返回一个幂等恢复函数，支持嵌套调用（后进先出恢复），适合在测试用例的 `beforeEach`/`afterEach` 里成对使用。`LoggerLevel`、`LoggerColorMode`、`LoggerReasoningPhase`、`LoggerStatus` 是稳定状态常量，`LOGGER_SOURCE` 是错误身份的稳定 source；比较时应引用这些导出，不要散写字符串。
 
 ---
 
