@@ -133,11 +133,10 @@ export type IEventInvocation<R> = {
   invoke(): R | PromiseLike<R>
 }
 
-/** Captured invocation batch; completion reports projection diagnostics and closes entries. */
-export type IEventInvocationBatch<R> = {
-  readonly entries: readonly IEventInvocation<R>[]
-  complete(): void
-}
+/** Callback supplied to the package-owned invocation scope. */
+export type IEventInvocationVisitor<R> = (
+  entries: readonly IEventInvocation<R>[]
+) => void | PromiseLike<void>
 
 export type IEventListener<T, R = void, V = undefined> = (
   event: IProjectedEventContext<T, V>
@@ -339,6 +338,8 @@ export type IEventChannelOptions<
   readonly dispatchPolicy?: IEventDispatchPolicy
   /** Controls whether one subscription handle removes only itself or all matching listeners. */
   readonly removalPolicy?: 'handle' | 'listener-all'
+  /** Maximum listener invocations in one top-level synchronous publish transaction. */
+  readonly publishBudget?: number
   readonly style?: IEventApiStyleOption<S>
   readonly valueConfig?: IValidatedEventValueConfig<T, V>
 }

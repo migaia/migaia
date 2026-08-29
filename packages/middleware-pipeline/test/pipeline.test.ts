@@ -155,6 +155,50 @@ describe('runSyncMiddleware', () => {
 })
 
 describe('runAsyncMiddleware', () => {
+  it('enters shallow downstream synchronously while preserving the returned Promise', () => {
+    const trace: string[] = []
+    const run = runAsyncMiddleware(
+      [
+        (value, next) => {
+          trace.push(`outer:${value}`)
+          const pending = next(value + 1)
+          trace.push('outer-after-next')
+          return pending
+        },
+        (value, next) => {
+          trace.push(`inner:${value}`)
+          return next(value + 1)
+        }
+      ],
+      1,
+      (value) => {
+        trace.push(`done:${value}`)
+      },
+      { onViolation: () => undefined }
+    )
+    expect(trace).toEqual(['outer:1', 'inner:2', 'done:3', 'outer-after-next'])
+    return run.then(() =>
+      expect(trace).toEqual(['outer:1', 'inner:2', 'done:3', 'outer-after-next'])
+    )
+  })
+
+  it('uses a synchronous package-owned spill to keep deep chains stack safe', async () => {
+    const stages: Array<IAsyncMiddlewareStage<number>> = Array.from(
+      { length: 2000 },
+      () => (value, next) => next(value + 1)
+    )
+    let result = 0
+    await runAsyncMiddleware(
+      stages,
+      0,
+      (value) => {
+        result = value
+      },
+      { onViolation: () => undefined }
+    )
+    expect(result).toBe(2000)
+  })
+
   it('observes downstream rejection while upstream stage remains pending', async () => {
     /** Releases upstream stage after rejection observation window. */
     let releaseUpstream!: () => void

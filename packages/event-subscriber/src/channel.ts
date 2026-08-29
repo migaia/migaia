@@ -13,7 +13,7 @@ import type {
   IEventContext,
   IEventDispatchSnapshot,
   IEventInvocation,
-  IEventInvocationBatch,
+  IEventInvocationVisitor,
   IEventListener,
   IEventAbortSignal,
   IFilteredEventChannel,
@@ -231,24 +231,25 @@ export const invokeDispatchSnapshot = <T, R, V = undefined>(
   projection?: { readonly plan: IEventProjectionPlan; readonly outcome: IEventProjectionOutcome }
 ): R | PromiseLike<R> => snapshot.listener(createEventContext(value, snapshot, projection) as never)
 
-/** Creates an opaque invocation batch over one immutable target snapshot. */
-export const invokeSnapshotEntries = <T, R, V = undefined>(
+/** Runs a callback over one immutable target snapshot and always closes its invocations. */
+export const withSnapshotEntries = <T, R, V = undefined>(
   channel: ICanonicalEventChannel<T, R, undefined, V> | IFilteredEventChannel<T, R, V>,
-  value: T
-): IEventInvocationBatch<R> => {
+  value: T,
+  visitor: IEventInvocationVisitor<R>
+): void | Promise<void> => {
   const { capability, taskId } = getCapability(channel)
   const snapshots = capability.snapshot(taskId)
   const projection =
     snapshots.length > 0 && capability.plan
       ? { plan: capability.plan, outcome: capability.project(value) }
       : undefined
-  let completeCalled = false
+  let closed = false
   const entries = snapshots.map((snapshot) => {
     let invoked = false
     return Object.freeze({
       taskId: snapshot.taskId,
       invoke: (): R | PromiseLike<R> => {
-        if (completeCalled || invoked)
+        if (closed || invoked)
           throw createEventTypeError(
             EventSubscriberErrorCode.invocationClosed,
             eventErrorText(EventSubscriberErrorCode.invocationClosed)
@@ -258,19 +259,35 @@ export const invokeSnapshotEntries = <T, R, V = undefined>(
       }
     }) as IEventInvocation<R>
   })
-  return Object.freeze({
-    entries: Object.freeze(entries),
-    complete(): void {
-      if (completeCalled) return
-      completeCalled = true
-      if (projection?.outcome.diagnostic)
-        reportEventProjectionFailure(
-          capability.options,
-          createEventContext(value, snapshots[0]!, projection),
-          projection.outcome.diagnostic
-        )
+  const close = (): void => {
+    if (closed) return
+    closed = true
+    if (projection?.outcome.diagnostic)
+      reportEventProjectionFailure(
+        capability.options,
+        createEventContext(value, snapshots[0]!, projection),
+        projection.outcome.diagnostic
+      )
+  }
+  try {
+    const result = visitor(Object.freeze(entries))
+    if (result === undefined) {
+      close()
+      return
     }
-  })
+    return Promise.resolve(result).then(
+      () => {
+        close()
+      },
+      (error: unknown) => {
+        close()
+        throw error
+      }
+    )
+  } catch (error) {
+    close()
+    throw error
+  }
 }
 
 /** Visits registrations with append-live visibility while always releasing dispatch bookkeeping. */
@@ -468,6 +485,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
   let terminalReport: IEventChannelOptions<T, undefined, V>['terminalReport']
   let dispatchPolicy: IEventChannelOptions<T, undefined, V>['dispatchPolicy']
   let removalPolicy: IEventChannelOptions<T, undefined, V>['removalPolicy']
+  let publishBudget: number | undefined
   let valueConfig: unknown
   let style: IEventApiStyle | undefined
   let stylePlan: IEventApiStylePlan
@@ -482,6 +500,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     terminalReport = options.terminalReport
     dispatchPolicy = options.dispatchPolicy ?? EventDispatchPolicy.recursive
     removalPolicy = options.removalPolicy ?? 'handle'
+    publishBudget = options.publishBudget ?? 100_000
     valueConfig = options.valueConfig as unknown
   } catch (error) {
     throw codeExistingError(error, EventSubscriberErrorCode.invalidOptions)
@@ -530,11 +549,18 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       EventSubscriberErrorCode.invalidOptions,
       eventErrorText(EventSubscriberErrorCode.invalidOptions)
     )
+  if (!Number.isSafeInteger(publishBudget) || publishBudget < 1)
+    throw createEventTypeError(
+      EventSubscriberErrorCode.invalidOptions,
+      eventErrorText(EventSubscriberErrorCode.invalidOptions)
+    )
   const normalizedOptions: IEventChannelOptions<T, undefined, V> = {
     report,
     terminalReport,
     valueConfig: valueConfig as IEventChannelOptions<T, undefined, V>['valueConfig'],
-    removalPolicy
+    removalPolicy,
+    dispatchPolicy,
+    publishBudget
   }
   const projectionPlan = suppliedProjectionPlan ?? createEventValueProjectionPlan(valueConfig)
   let first: IRegistrationOwner<T, R, V> | undefined
@@ -604,62 +630,101 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     return { release, commit }
   }
   /** Delivers one value while preserving listener snapshots and late-failure reporting. */
-  const dispatchValue = (value: T, failures: unknown[]): void => {
+  let remaining: number
+  let failures: unknown[] = []
+  let nativeDepth = 0
+  let spillCapture: T[] | undefined
+  /** Delivers one value while preserving listener snapshots and late-failure reporting. */
+  const dispatchValue = (value: T): void => {
+    ++nativeDepth
     const snapshots = capability.snapshot()
-    if (snapshots.length === 0) return
-    const projection = projectionPlan
-      ? { plan: projectionPlan, outcome: capability.project(value) }
-      : undefined
-    for (const snapshot of snapshots) {
-      let result: R | PromiseLike<R>
-      try {
-        result = invokeDispatchSnapshot(snapshot, value, projection)
-      } catch (error) {
-        failures.push(error)
-        continue
+    try {
+      if (!snapshots.length) return
+      const projection = projectionPlan
+        ? { plan: projectionPlan, outcome: capability.project(value) }
+        : undefined
+      for (const snapshot of snapshots) {
+        if (!remaining) return
+        --remaining
+        if (nativeDepth > 255) spillCapture = []
+        let result: R | PromiseLike<R>
+        try {
+          result = invokeDispatchSnapshot(snapshot, value, projection)
+        } catch (error) {
+          failures.push(error)
+          continue
+        } finally {
+          if (spillCapture) {
+            while (spillCapture.length) pendingValues.push(spillCapture.pop()!)
+            spillCapture = undefined
+            if (nativeDepth === 256)
+              while (pendingValues.length && remaining) dispatchValue(pendingValues.pop()!)
+          }
+        }
+        const context = createEventContext(value, snapshot, projection)
+        observePromiseLike(
+          result,
+          () => undefined,
+          (error) => reportLateFailure<T, undefined, V>(normalizedOptions, context, error)
+        )
       }
-      const context = createEventContext(value, snapshot, projection)
-      observePromiseLike(
-        result,
-        () => undefined,
-        (error) => reportLateFailure<T, undefined, V>(normalizedOptions, context, error)
-      )
+      if (projection?.outcome.diagnostic)
+        reportEventProjectionFailure<T, undefined, V>(
+          normalizedOptions,
+          createEventContext(value, snapshots[0]!, projection),
+          projection.outcome.diagnostic
+        )
+    } finally {
+      --nativeDepth
     }
-    if (projection?.outcome.diagnostic)
-      reportEventProjectionFailure<T, undefined, V>(
-        normalizedOptions,
-        createEventContext(value, snapshots[0]!, projection),
-        projection.outcome.diagnostic
-      )
   }
 
   /** Delivers a value recursively by default, or drains an explicit queued policy. */
   const publishValue = (initialValue: T): void => {
+    const rootTransaction = !nativeDepth && !publishing
+    if (rootTransaction) {
+      remaining = publishBudget!
+      failures = []
+      pendingValues.length = 0
+      pendingIndex = 0
+    }
     if (dispatchPolicy === EventDispatchPolicy.queued && publishing) {
       pendingValues.push(initialValue)
       return
     }
-    const failures: unknown[] = []
     if (dispatchPolicy === EventDispatchPolicy.recursive) {
-      dispatchValue(initialValue, failures)
+      if (!remaining || nativeDepth > 255) {
+        if (spillCapture) spillCapture.push(initialValue)
+        else pendingValues.push(initialValue)
+        return
+      }
+      dispatchValue(initialValue)
     } else {
       publishing = true
       pendingValues.push(initialValue)
       try {
-        while (pendingIndex < pendingValues.length)
-          dispatchValue(pendingValues[pendingIndex++]!, failures)
+        while (pendingIndex < pendingValues.length && remaining)
+          dispatchValue(pendingValues[pendingIndex++]!)
       } finally {
-        pendingValues.length = 0
-        pendingIndex = 0
         publishing = false
       }
     }
-    if (failures.length > 0)
-      throw createEventAggregateError(
+    if (rootTransaction && failures.length + pendingValues.length - pendingIndex) {
+      const error = createEventAggregateError(
         EventSubscriberErrorCode.publishFailed,
         failures,
         eventErrorText(EventSubscriberErrorCode.publishFailed)
       )
+      Object.defineProperty(error, 'detail', {
+        enumerable: true,
+        value: Object.freeze({
+          processed: publishBudget! - remaining,
+          remaining,
+          causalSummary: Object.freeze(failures)
+        })
+      })
+      throw error
+    }
   }
   const channel = {
     subscribe(listener, listenerOptions) {
