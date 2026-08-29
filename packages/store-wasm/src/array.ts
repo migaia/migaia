@@ -151,25 +151,39 @@ export function array(
               pendingValues.push(next)
             }
             const memoryView = raw()
-            const touched = new Map<IFieldSource, Array<[number, number]>>()
+            const touched = new Map<IFieldSource, Array<[number, number, number]>>()
             for (let i = lo; i < hi; i++) {
               const next = pendingValues[i - lo]
               if (Object.is(memoryView[i], next)) continue
               const bucket = bucketOf(i)
               const writes = touched.get(bucket) ?? []
-              writes.push([i, next])
+              writes.push([i, next, memoryView[i]])
               touched.set(bucket, writes)
             }
-            runtime.batch(() => {
-              for (const [bucket, writes] of touched) {
-                bucket.commit(() => {
-                  // A re-entrant commit may grow memory and replace the backing
-                  // ArrayBuffer. Resolve the view after entering each commit.
-                  const currentView = raw()
-                  for (const [index, next] of writes) currentView[index] = next
-                })
+            try {
+              runtime.batch(() => {
+                for (const [bucket, writes] of touched) {
+                  bucket.commit(() => {
+                    // A re-entrant commit may grow memory and replace the backing
+                    // ArrayBuffer. Resolve the view after entering each commit.
+                    const currentView = raw()
+                    for (const [index, next] of writes) currentView[index] = next
+                  })
+                }
+              })
+            } catch (primary) {
+              try {
+                const currentView = raw()
+                for (const writes of Array.from(touched.values()).reverse()) {
+                  for (const [index, , previous] of [...writes].reverse()) {
+                    currentView[index] = previous
+                  }
+                }
+              } catch (cleanup) {
+                throwWasmConstructionFailure(primary, cleanup)
               }
-            })
+              throw primary
+            }
           },
           view() {
             checkAlive()
@@ -183,6 +197,7 @@ export function array(
           dispose() {
             if (disposed || disposing) return
             disposing = true
+            disposed = true
             try {
               block.unregister(field)
               // 逆序释放（migration.sdd.md §5.7）：子资源依赖 block 的 WASM 内存，必须先摘子资源边再 dealloc。
@@ -192,7 +207,6 @@ export function array(
                   .map((bucket) => () => bucket.dispose()),
                 () => block.dispose()
               ])
-              disposed = true
             } finally {
               disposing = false
             }

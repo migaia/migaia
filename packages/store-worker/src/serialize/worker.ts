@@ -1,17 +1,16 @@
 import {
   SerializeCodecError,
   SerializeChunkKind,
-  collectStream,
   isChunkShape,
   type ISerializeChunk,
   type ISerializeContext,
   type ISerializeParser,
   type ISerializePhase,
-  type ISerializePlugin,
-  type ITextEncoder
+  type ISerializePlugin
 } from '@migaia/serialize'
 import { isUint8Array } from '@migaia/utils/bytes'
 import { abort, connect, createEndpoint, protocol, timeout } from '@migaia/web-rpc'
+import type { IWebRpcContext } from '@migaia/web-rpc'
 import { WebRpcPlatform } from '@migaia/web-rpc/protocol-constants'
 import {
   createWebWorkerTransport,
@@ -24,13 +23,16 @@ import {
   STORE_WORKER_SOURCE,
   StoreWorkerErrorCode
 } from '../errors.js'
+import type { IStoreWorkerErrorCode } from '../error-code.js'
 import { StoreWorkerErrorText } from '../error-text.js'
 import {
   WorkerByteOwnership,
   WorkerDiagnosticType,
   WorkerRpcIdentity,
+  WorkerSerializeFrameKind,
+  WorkerSerializeFrameMethod,
   WorkerSerializePhase,
-  type IWorkerByteOwnership
+  type IByteOwnership
 } from '../worker-constants.js'
 import { transferablesOf } from './transferables.js'
 
@@ -41,14 +43,187 @@ export type IWorkerLike = IWebWorkerLikePort & {
   terminate?(): void
 }
 
+type IWorkerSerializeFrame = {
+  readonly streamId: string
+  readonly kind: keyof typeof WorkerSerializeFrameKind
+  readonly sequence: number
+  readonly chunk?: ISerializeChunk
+  readonly error?: unknown
+}
+
+type IWorkerFrameQueue = {
+  readonly output: AsyncIterable<ISerializeChunk>
+  push(frame: IWorkerSerializeFrame): void
+  fail(error: unknown): void
+  finish(): void
+  cancel(): void
+}
+
+type IQueuedWorkerChunk = {
+  readonly chunk: ISerializeChunk
+  readonly sequence: number
+}
+
+type IWorkerAckState = {
+  credits: number
+  cancelled: boolean
+  nextAckSequence: number
+  readonly wake: Array<() => void>
+  cancelReject?: (reason: unknown) => void
+}
+
+/** Creates the stable cancellation failure used while a worker stream is unwinding. */
+function workerStreamCancelledError(): DOMException {
+  return new DOMException('serialize stream cancelled', 'AbortError')
+}
+
+/** Waits for consumer credit without allowing an unbounded worker-side chunk queue. */
+async function waitForWorkerCredit(state: IWorkerAckState): Promise<void> {
+  if (state.cancelled) throw workerStreamCancelledError()
+  if (state.credits > 0) {
+    state.credits--
+    return
+  }
+  await new Promise<void>((resolve) => state.wake.push(resolve))
+  if (state.cancelled) throw workerStreamCancelledError()
+  state.credits--
+}
+
+/** Preserves parser codec diagnostics when WebRPC reports an aborted request. */
+function createWorkerRequestAbortedError(
+  ownership: IByteOwnership,
+  optionType: string | undefined,
+  phase: ISerializePhase,
+  chunk: ISerializeChunk,
+  context: ISerializeContext,
+  abortCause: unknown
+): SerializeCodecError<IStoreWorkerErrorCode> {
+  return new SerializeCodecError(
+    StoreWorkerErrorText.aborted(ownership === WorkerByteOwnership.transfer),
+    {
+      type: optionType ?? WorkerDiagnosticType.worker,
+      phase,
+      context: context.context,
+      chunkIndex: 0,
+      bytesConsumed: chunk[0] === SerializeChunkKind.bytes ? chunk[1].byteLength : 0,
+      code: StoreWorkerErrorCode.requestAborted,
+      source: STORE_WORKER_SOURCE,
+      cause: abortCause
+    }
+  )
+}
+
+/** Creates a bounded-consumer queue for frames dispatched beside one RPC response. */
+function createWorkerFrameQueue(
+  streamId: string,
+  cancelRemote: () => void,
+  ackRemote: (sequence: number) => void
+): IWorkerFrameQueue {
+  const chunks: IQueuedWorkerChunk[] = []
+  const waiters: Array<{
+    readonly resolve: (result: IteratorResult<ISerializeChunk>) => void
+    readonly reject: (error: unknown) => void
+  }> = []
+  let failure: unknown
+  let finished = false
+  let expectedSequence = 0
+  const settle = (): void => {
+    if (!finished || waiters.length === 0) return
+    while (waiters.length > 0) {
+      const waiter = waiters.shift()!
+      if (failure !== undefined) waiter.reject(failure)
+      else waiter.resolve({ done: true, value: undefined })
+    }
+  }
+  const output: AsyncIterable<ISerializeChunk> = {
+    [Symbol.asyncIterator]() {
+      return {
+        next: async (): Promise<IteratorResult<ISerializeChunk>> => {
+          if (chunks.length > 0) {
+            const queued = chunks.shift()!
+            ackRemote(queued.sequence)
+            return { done: false, value: queued.chunk }
+          }
+          if (failure !== undefined) throw failure
+          if (finished) return { done: true, value: undefined }
+          return await new Promise<IteratorResult<ISerializeChunk>>((resolve, reject) => {
+            waiters.push({ resolve, reject })
+          })
+        },
+        return: async (): Promise<IteratorResult<ISerializeChunk>> => {
+          if (!finished) {
+            finished = true
+            cancelRemote()
+            settle()
+          }
+          return { done: true, value: undefined }
+        }
+      }
+    }
+  }
+  return {
+    output,
+    push(frame) {
+      if (finished || frame.streamId !== streamId) return
+      if (frame.sequence !== expectedSequence) {
+        failure = createStoreWorkerError(
+          StoreWorkerErrorCode.invalidResponseChunk,
+          StoreWorkerErrorText.invalidChunk
+        )
+        finished = true
+        settle()
+        return
+      }
+      expectedSequence++
+      if (frame.kind === WorkerSerializeFrameKind.open) return
+      if (frame.kind === WorkerSerializeFrameKind.chunk) {
+        if (!isChunkShape(frame.chunk)) {
+          failure = createStoreWorkerError(
+            StoreWorkerErrorCode.invalidResponseChunk,
+            StoreWorkerErrorText.invalidChunk
+          )
+          finished = true
+          settle()
+          return
+        }
+        const waiter = waiters.shift()
+        if (waiter) {
+          ackRemote(frame.sequence)
+          waiter.resolve({ done: false, value: frame.chunk })
+        } else chunks.push({ chunk: frame.chunk, sequence: frame.sequence })
+        return
+      }
+      if (frame.kind === WorkerSerializeFrameKind.error) {
+        failure = frame.error ?? new Error(StoreWorkerErrorText.invalidChunk)
+      }
+      finished = true
+      settle()
+    },
+    fail(error) {
+      if (finished) return
+      failure = error
+      finished = true
+      settle()
+    },
+    finish() {
+      finished = true
+      settle()
+    },
+    cancel() {
+      if (finished) return
+      finished = true
+      cancelRemote()
+      settle()
+    }
+  }
+}
+
 /**
  * 字节过界的所有权语义。
  *
  * Transfer 是**破坏性**的：底层 ArrayBuffer 连同指向它的所有别名视图一起被 detach。调用方交出去之后，一旦 worker 崩溃或请求被取消，就既没有结果、
  * 也失去了输入——原地数据丢失。所以默认是 copy，转移必须显式要求。
  */
-export type IByteOwnership = IWorkerByteOwnership
-
 /** Encodes one worker input using the canonical byte brand without copying its payload. */
 export function encodeWorkerValue(value: unknown): ISerializeChunk {
   return isUint8Array(value) ? [SerializeChunkKind.bytes, value] : [SerializeChunkKind.value, value]
@@ -161,6 +336,26 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
     middlewares: [connect({ transport }), protocol(), abort(), timeout()]
   })
 
+  const streams = new Map<string, IWorkerFrameQueue>()
+  let nextStreamId = 1
+  let frameSubscription: Promise<() => void> | undefined
+  const ensureFrameSubscription = (): Promise<() => void> => {
+    frameSubscription ??= client.then((endpoint) =>
+      endpoint.on(WorkerSerializeFrameMethod, (context: IWebRpcContext) => {
+        const frame = context.data as IWorkerSerializeFrame
+        const stream = streams.get(frame.streamId)
+        if (!stream) return
+        stream.push(frame)
+        if (
+          frame.kind === WorkerSerializeFrameKind.end ||
+          frame.kind === WorkerSerializeFrameKind.error
+        )
+          streams.delete(frame.streamId)
+      })
+    )
+    return frameSubscription
+  }
+
   const request = async (
     phase: ISerializePhase,
     chunk: ISerializeChunk,
@@ -191,22 +386,77 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
         // the caller's explicit reason is the authoritative original failure
         // and must remain reachable for identity/stack diagnostics.
         const abortCause = context.signal.reason ?? error
-        throw new SerializeCodecError(
-          StoreWorkerErrorText.aborted(resolvedOwnership === WorkerByteOwnership.transfer),
-          {
-            type: optionType ?? WorkerDiagnosticType.worker,
-            phase,
-            context: context.context,
-            chunkIndex: 0,
-            bytesConsumed: chunk[0] === SerializeChunkKind.bytes ? chunk[1].byteLength : 0,
-            code: StoreWorkerErrorCode.requestAborted,
-            source: STORE_WORKER_SOURCE,
-            cause: abortCause
-          }
+        throw createWorkerRequestAbortedError(
+          resolvedOwnership,
+          optionType,
+          phase,
+          chunk,
+          context,
+          abortCause
         )
       }
       throw error
     }
+  }
+
+  const streamEncode = (
+    chunk: ISerializeChunk,
+    context: ISerializeContext
+  ): AsyncIterable<ISerializeChunk> => {
+    if (context.signal.aborted) {
+      const abortCause = context.signal.reason ?? workerStreamCancelledError()
+      return Promise.reject(
+        createWorkerRequestAbortedError(
+          resolvedOwnership,
+          optionType,
+          WorkerSerializePhase.encode,
+          chunk,
+          context,
+          abortCause
+        )
+      ) as never
+    }
+    const streamId = `${clientId ?? WorkerRpcIdentity.main}:${nextStreamId++}`
+    const queue = createWorkerFrameQueue(
+      streamId,
+      () => {
+        void client.then((endpoint) =>
+          endpoint.dispatch(WorkerRpcIdentity.worker, WorkerSerializeFrameMethod, {
+            streamId,
+            kind: WorkerSerializeFrameKind.cancel,
+            sequence: -1
+          })
+        )
+      },
+      (sequence) => {
+        void client.then((endpoint) =>
+          endpoint.dispatch(WorkerRpcIdentity.worker, WorkerSerializeFrameMethod, {
+            streamId,
+            kind: WorkerSerializeFrameKind.ack,
+            sequence
+          })
+        )
+      }
+    )
+    streams.set(streamId, queue)
+    void ensureFrameSubscription()
+      .then(() => client)
+      .then((endpoint) =>
+        endpoint.send(
+          WorkerRpcIdentity.worker,
+          WorkerRpcIdentity.call,
+          { phase: WorkerSerializePhase.encode, chunk, streamId },
+          { signal: context.signal, transfer: transferablesOf(chunk, resolvedOwnership) }
+        )
+      )
+      .then(
+        () => undefined,
+        (error: unknown) => {
+          queue.fail(error)
+          streams.delete(streamId)
+        }
+      )
+    return queue.output
   }
 
   let disposePromise: Promise<void> | undefined
@@ -243,7 +493,7 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
       // 已经是字节就按 bytes 段送：只有这一种形态能进 transferList 走零拷贝。
       // 包成 value 段的话会退化成结构化克隆，把整份数据在主线程上复制一遍——
       // 实测里这正是「丢给 worker 反而更慢」的成因。
-      request(WorkerSerializePhase.encode, encodeWorkerValue(value), context),
+      streamEncode(encodeWorkerValue(value), context),
     decode: async (chunk, context) => {
       // 回包可能是 value 段（对象图，结构化克隆回来）也可能是 bytes 段
       // （parser 配了 decodeTo: 'jsonBytes'，走 transfer 回来）。两种情况
@@ -298,8 +548,10 @@ export function createSerializeWorkerHandler(
       }
     }
   }
+  const streamStates = new Map<string, IWorkerAckState>()
   const endpoint = createEndpoint({
     id: WorkerRpcIdentity.worker,
+    targetIds: [WorkerRpcIdentity.main],
     transport,
     provider: {
       call: async (context) => {
@@ -314,26 +566,118 @@ export function createSerializeWorkerHandler(
           context: 'serialize-worker'
         }
         if (phase === WorkerSerializePhase.encode) {
-          // 无论对面用 value 段还是 bytes 段送来，要编码的都是段里的负载，
-          // 不是段本身。之前把整个 bytes 段当值交给 parser，字节快路直接失效。
-          const output = await parser.encode(chunk[1], serializeContext)
-          // 单段本身也是数组，必须先消歧再决定要不要走拼装
-          const result = isChunkShape(output)
-            ? output
-            : ((Symbol.asyncIterator in Object(output) || Symbol.iterator in Object(output)
-                ? await collectStream(output as Iterable<ISerializeChunk>, createWorkerEncoder(), {
-                    signal: context.signal,
-                    empty: 'reject',
-                    context: 'serialize-worker'
-                  })
-                : await output) as ISerializeChunk)
-          return context.success(result, {
-            transfer: transferablesOf(result, WorkerByteOwnership.transfer)
-          })
+          const request = context.data as { readonly streamId?: unknown }
+          if (typeof request.streamId !== 'string' || request.streamId.length === 0)
+            throw createStoreWorkerError(
+              StoreWorkerErrorCode.invalidOption,
+              StoreWorkerErrorText.invalidPhase
+            )
+          const streamId = request.streamId
+          const ackState: IWorkerAckState = {
+            credits: 2,
+            cancelled: false,
+            nextAckSequence: 1,
+            wake: []
+          }
+          streamStates.set(streamId, ackState)
+          const abort = (): void => {
+            ackState.cancelled = true
+            for (const wake of ackState.wake.splice(0)) wake()
+            ackState.cancelReject?.(workerStreamCancelledError())
+            ackState.cancelReject = undefined
+          }
+          context.signal.addEventListener('abort', abort, { once: true })
+          let sequence = 0
+          let completed = false
+          let iterator: AsyncIterator<ISerializeChunk> | Iterator<ISerializeChunk> | undefined
+          const send = async (
+            kind: keyof typeof WorkerSerializeFrameKind,
+            next?: ISerializeChunk,
+            error?: unknown
+          ) => {
+            if (kind === WorkerSerializeFrameKind.chunk) await waitForWorkerCredit(ackState)
+            context.dispatchTo({
+              id: WorkerRpcIdentity.main,
+              method: WorkerSerializeFrameMethod,
+              data: {
+                streamId,
+                kind,
+                sequence: sequence++,
+                ...(next ? { chunk: next } : {}),
+                ...(error ? { error } : {})
+              }
+            })
+          }
+          try {
+            context.dispatchTo({
+              id: WorkerRpcIdentity.main,
+              method: WorkerSerializeFrameMethod,
+              data: { streamId, kind: WorkerSerializeFrameKind.open, sequence: sequence++ }
+            })
+            const output = await parser.encode(chunk[1], serializeContext)
+            if (isChunkShape(output)) {
+              await send(WorkerSerializeFrameKind.chunk, output)
+            } else {
+              const candidate = Object(output) as {
+                readonly [Symbol.asyncIterator]?: () => AsyncIterator<ISerializeChunk>
+                readonly [Symbol.iterator]?: () => Iterator<ISerializeChunk>
+              }
+              const asyncFactory = candidate[Symbol.asyncIterator]
+              const syncFactory = candidate[Symbol.iterator]
+              if (typeof asyncFactory === 'function')
+                iterator = (candidate as AsyncIterable<ISerializeChunk>)[Symbol.asyncIterator]()
+              else if (typeof syncFactory === 'function')
+                iterator = (candidate as Iterable<ISerializeChunk>)[Symbol.iterator]()
+              else throw new TypeError(StoreWorkerErrorText.invalidChunk)
+              while (true) {
+                let rejectCancellation!: (reason: unknown) => void
+                const cancellation = new Promise<never>((_resolve, reject) => {
+                  rejectCancellation = reject
+                  ackState.cancelReject = reject
+                  if (ackState.cancelled) reject(workerStreamCancelledError())
+                })
+                let step: IteratorResult<ISerializeChunk>
+                try {
+                  step = await Promise.race([Promise.resolve(iterator.next()), cancellation])
+                } finally {
+                  if (ackState.cancelReject === rejectCancellation)
+                    ackState.cancelReject = undefined
+                }
+                if (step.done) break
+                if (!isChunkShape(step.value))
+                  throw new TypeError(StoreWorkerErrorText.invalidChunk)
+                await send(WorkerSerializeFrameKind.chunk, step.value)
+              }
+            }
+            await send(WorkerSerializeFrameKind.end)
+            completed = true
+            return context.success({ streamId })
+          } catch (error) {
+            try {
+              await send(WorkerSerializeFrameKind.error, undefined, error)
+            } catch {
+              // Cancellation may close the operation before an error frame can be delivered.
+            }
+            throw error
+          } finally {
+            if (!completed && iterator?.return) {
+              try {
+                await iterator.return()
+              } catch {
+                // Preserve the primary stream failure; endpoint error serialization owns it.
+              }
+            }
+            context.signal.removeEventListener('abort', abort)
+            streamStates.delete(streamId)
+          }
+        }
+        if (phase !== WorkerSerializePhase.decode) {
+          throw createStoreWorkerError(
+            StoreWorkerErrorCode.invalidOption,
+            StoreWorkerErrorText.invalidPhase
+          )
         }
         const value = await parser.decode(chunk, serializeContext)
-        // 解出来还是字节时（parser 配了 decodeTo: 'jsonBytes'）按 bytes 段回，
-        // 才能走 transfer；包成 value 段就退化成结构化克隆，把整份复制回主线程。
         const result: ISerializeChunk = decodeWorkerValue(value)
         return context.success(result, {
           transfer: transferablesOf(result, WorkerByteOwnership.transfer)
@@ -342,15 +686,25 @@ export function createSerializeWorkerHandler(
     },
     middlewares: [connect({ transport }), protocol(), abort(), timeout()]
   })
+  void endpoint.then((resolved) =>
+    resolved.on(WorkerSerializeFrameMethod, (context) => {
+      const frame = context.data as Partial<IWorkerSerializeFrame>
+      if (typeof frame.streamId !== 'string') return
+      const state = streamStates.get(frame.streamId)
+      if (!state) return
+      if (frame.kind === WorkerSerializeFrameKind.cancel) {
+        state.cancelled = true
+        for (const wake of state.wake.splice(0)) wake()
+        state.cancelReject?.(workerStreamCancelledError())
+        state.cancelReject = undefined
+        return
+      }
+      if (frame.kind !== WorkerSerializeFrameKind.ack) return
+      if (frame.sequence !== state.nextAckSequence) return
+      state.nextAckSequence++
+      state.credits++
+      state.wake.shift()?.()
+    })
+  )
   return toManagedRpcHandler(endpoint, (message) => deliver(message))
-}
-
-/** Creates an encoder only when this worker runtime exposes a valid host capability. */
-function createWorkerEncoder(): ITextEncoder | undefined {
-  try {
-    const Encoder = (globalThis as { readonly TextEncoder?: new () => ITextEncoder }).TextEncoder
-    return typeof Encoder === 'function' ? new Encoder() : undefined
-  } catch {
-    return undefined
-  }
 }

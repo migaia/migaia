@@ -1,10 +1,10 @@
 export * from './worker.js'
 export type { IManagedRpcHandler } from './managed-rpc-handler.js'
-export * from './serialize/worker.js'
+export { createSerializeWorkerHandler, workerParser, workerPlugin } from './serialize/worker.js'
 export {
-  WorkerOwnership,
   WorkerDiagnosticType,
-  type IWorkerOwnership,
+  WorkerByteOwnership,
+  type IByteOwnership,
   type IWorkerDiagnosticType
 } from './worker-constants.js'
 

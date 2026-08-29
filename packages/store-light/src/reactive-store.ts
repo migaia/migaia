@@ -637,17 +637,23 @@ function createStoreCore<S extends Record<string, unknown>>(
       assertNotDisposed()
       assertStoreInput(fn, '$subscribe listener', 'function')
       let initialRun = true
-      // 粗粒度订阅只读取可变源字段。派生字段由这些源字段的变更
-      // 间接触发；不在这里主动读取全部 Computed，避免一次持久化
-      // 订阅把整个 Store 的昂贵 getter 变成常驻 keepAlive 节点。
+      // The public subscription observes every store-owned reactive field. Reading Computed
+      // nodes here is required for complete external-store semantics when a computed has no
+      // direct source signal in this store.
       const e = ownReactiveNode(
         new Effect(
           () => {
             for (const n of signals.values()) void n.value
+            for (const n of computeds.values()) void n.value
             for (const source of fieldSources) source.track()
             if (!initialRun || options?.fireImmediately === true) {
               try {
-                runtime.untracked(fn)
+                const result = runtime.untracked(() => (fn as () => unknown)())
+                if (result && typeof (result as { then?: unknown }).then === 'function') {
+                  void Promise.resolve(result).catch((error: unknown) =>
+                    reportStoreSubscriptionFailure(runtime, error)
+                  )
+                }
               } catch (error) {
                 reportStoreSubscriptionFailure(runtime, error)
               }

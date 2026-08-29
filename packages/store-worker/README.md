@@ -212,17 +212,17 @@ const handler = createSerializeWorkerHandler(parser, (message, transfer) =>
 ## 常量
 
 ```ts
-import { WorkerOwnership, WorkerDiagnosticType } from '@migaia/store-worker';
+import { WorkerByteOwnership, WorkerDiagnosticType } from '@migaia/store-worker';
 ```
 
-**`WorkerOwnership`｜3 秒上手** —— 值过 Worker 边界的所有权策略标签：
+**`WorkerByteOwnership`｜3 秒上手** —— 序列化字节跨 Worker 边界时的所有权策略：
 
 ```ts
-WorkerOwnership.transfer; // 'transfer'
-WorkerOwnership.clone; // 'clone'
+WorkerByteOwnership.copy; // 'copy'
+WorkerByteOwnership.transfer; // 'transfer'
 ```
 
-无调用参数，`as const` 常量对象；`IWorkerOwnership` 是其取值的联合类型。注意实际配置 `workerPlugin`/`workerParser` 的字节转移策略用的是各自 `ownership` 选项的字符串字面量 `'copy' | 'transfer'`(类型别名 `IByteOwnership`)，与这个常量是两套独立命名，不要混用。
+无调用参数，`as const` 常量对象；`IByteOwnership` 是其取值的联合类型，也是 `workerPlugin`/`workerParser` 的 `ownership` 选项类型。
 
 **`WorkerDiagnosticType`｜3 秒上手** —— 序列化 Worker 集成的诊断来源标签，出现在 `SerializeCodecError`/`SerializeError` 的 `type` 字段默认值里：
 

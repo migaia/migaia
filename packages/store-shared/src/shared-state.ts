@@ -12,6 +12,12 @@ import { registerSubs, registerVersion, readVersion } from '@migaia/reactive/nod
 import { createStoreSharedError, createStoreSharedRangeError } from './errors.js'
 import { StoreSharedErrorCode } from './error-code.js'
 import { StoreSharedErrorText } from './error-text.js'
+import {
+  SHARED_ABI_MAGIC,
+  SHARED_ABI_VERSION,
+  SharedAbiKind,
+  SharedAbiReady
+} from './shared-constants.js'
 
 /**
  * SharedArrayBuffer 支撑的跨线程状态。
@@ -53,15 +59,16 @@ function reportSharedWatchFailure(runtime: IRuntime, error: unknown): void {
  * 自旋有上限：写者若在持锁期间崩溃（线程被终止、页面被杀），seq 会永远停在奇数， 此时无限自旋会把这条线程也吊死。到限即抛，把「有人写坏了」暴露出来，而不是静默卡住。
  */
 function readConsistent(
-  view: Int32Array,
+  valueView: Int32Array,
+  versionView: BigInt64Array,
   valueSlot: number,
-  seqSlot: number
-): { readonly value: number; readonly version: number } {
+  versionSlot: number
+): { readonly value: number; readonly version: bigint } {
   for (let spins = 0; spins < SPIN_LIMIT; spins++) {
-    const before = Atomics.load(view, seqSlot)
-    if ((before & 1) !== 0) continue
-    const value = Atomics.load(view, valueSlot)
-    const after = Atomics.load(view, seqSlot)
+    const before = Atomics.load(versionView, versionSlot)
+    if ((before & 1n) !== 0n) continue
+    const value = Atomics.load(valueView, valueSlot)
+    const after = Atomics.load(versionView, versionSlot)
     if (before === after) return { value, version: before }
   }
   throw createStoreSharedError(
@@ -71,11 +78,11 @@ function readConsistent(
 }
 
 /** 获锁：把偶数 seq 推成奇数。返回获锁前的偶数 seq。 */
-function acquire(view: Int32Array, seqSlot: number): number {
+function acquire(versionView: BigInt64Array, versionSlot: number): bigint {
   for (let spins = 0; spins < SPIN_LIMIT; spins++) {
-    const seq = Atomics.load(view, seqSlot)
-    if ((seq & 1) !== 0) continue
-    if (Atomics.compareExchange(view, seqSlot, seq, seq + 1) === seq) {
+    const seq = Atomics.load(versionView, versionSlot)
+    if ((seq & 1n) !== 0n) continue
+    if (Atomics.compareExchange(versionView, versionSlot, seq, seq + 1n) === seq) {
       return seq
     }
   }
@@ -93,35 +100,67 @@ function acquire(view: Int32Array, seqSlot: number): number {
  * 返回新的 seq（即新版本），或 undefined 表示未写入。值未变化时也返回 undefined， 并把 seq 原样释放——不变的写入不该推进版本，否则每次 set 相同值都会通知一轮。
  */
 function writeLocked(
-  view: Int32Array,
+  valueView: Int32Array,
+  versionView: BigInt64Array,
   valueSlot: number,
-  seqSlot: number,
+  versionSlot: number,
   next: number,
   expected?: number
-): number | undefined {
-  const seq = acquire(view, seqSlot)
+): bigint | undefined {
+  const seq = acquire(versionView, versionSlot)
   try {
-    const current = Atomics.load(view, valueSlot)
+    const current = Atomics.load(valueView, valueSlot)
     if (expected !== undefined && current !== expected) return undefined
     if (current === next) return undefined
-    Atomics.store(view, valueSlot, next)
-    const committed = (seq + 2) | 0
-    Atomics.store(view, seqSlot, committed)
+    Atomics.store(valueView, valueSlot, next)
+    const committed = seq + 2n
+    Atomics.store(versionView, versionSlot, committed)
     return committed
   } finally {
     // 未写入时把锁原样放回；已写入时上面已经推进到 seq+2，这里不能再动
-    if (Atomics.load(view, seqSlot) === seq + 1) {
-      Atomics.store(view, seqSlot, seq)
+    if (Atomics.load(versionView, versionSlot) === seq + 1n) {
+      Atomics.store(versionView, versionSlot, seq)
     }
   }
 }
 
-const SIGNAL_VALUE_SLOT = 0
-const SIGNAL_SEQ_SLOT = 1
-const SIGNAL_SLOTS = 2
+const SIGNAL_MAGIC_SLOT = 0
+const SIGNAL_VERSION_SLOT = 1
+const SIGNAL_KIND_SLOT = 2
+const SIGNAL_READY_SLOT = 3
+const SIGNAL_VALUE_SLOT = 4
+const SIGNAL_VERSION_OFFSET = 24
+const SIGNAL_BYTES = SIGNAL_VERSION_OFFSET + BigInt64Array.BYTES_PER_ELEMENT
 
 /** The largest slot index supported by the ECMAScript typed-array index space. */
 const MAX_INT32_ARRAY_SLOTS = 0xffffffff
+
+/** Cross-realm brand check for the one supported shared-memory input type. */
+function isSharedBuffer(value: unknown): value is SharedArrayBuffer {
+  return Object.prototype.toString.call(value) === '[object SharedArrayBuffer]'
+}
+
+/** Reject a buffer whose header belongs to an obsolete or foreign layout. */
+function assertAbiHeader(view: Int32Array, kind: number, length?: number): void {
+  if (Atomics.load(view, 0) !== SHARED_ABI_MAGIC || Atomics.load(view, 1) !== SHARED_ABI_VERSION) {
+    throw createStoreSharedRangeError(
+      StoreSharedErrorCode.invalidOption,
+      StoreSharedErrorText.bufferType
+    )
+  }
+  if (Atomics.load(view, 2) !== kind || Atomics.load(view, 3) !== SharedAbiReady.ready) {
+    throw createStoreSharedRangeError(
+      StoreSharedErrorCode.invalidOption,
+      StoreSharedErrorText.bufferType
+    )
+  }
+  if (length !== undefined && Atomics.load(view, 4) !== length) {
+    throw createStoreSharedRangeError(
+      StoreSharedErrorCode.invalidOption,
+      StoreSharedErrorText.arrayBufferSmall
+    )
+  }
+}
 
 /**
  * Int32 值域校验。
@@ -160,7 +199,7 @@ type IWaitAsyncResult = {
  * `Atomics.wait` 不能用在主线程（会阻塞），所以走 `waitAsync`。环境不支持时抛错而 不是静默降级成拉取——静默降级会让调用方以为自己拿到了推送。
  */
 function watchSlot(
-  view: Int32Array,
+  view: BigInt64Array,
   slot: number,
   onWake: () => void,
   onError: (error: unknown) => void
@@ -173,16 +212,35 @@ function watchSlot(
   }
   const waitAsync = (
     Atomics as unknown as {
-      waitAsync: (typedArray: Int32Array, index: number, value: number) => IWaitAsyncResult
+      waitAsync: (
+        typedArray: Int32Array | BigInt64Array,
+        index: number,
+        value: number | bigint
+      ) => IWaitAsyncResult
     }
   ).waitAsync
   let stopped = false
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  /** Schedule another wait without retaining a live timer after disposal. */
+  const schedule = (): void => {
+    if (stopped) return
+    try {
+      timer = setTimeout(() => {
+        timer = undefined
+        loop()
+      }, 0)
+    } catch (error) {
+      stopped = true
+      onError(error)
+    }
+  }
 
   const loop = (): void => {
     if (stopped) return
     let result: IWaitAsyncResult
     try {
-      result = waitAsync(view, slot, Atomics.load(view, slot))
+      result = waitAsync(view as never, slot, Atomics.load(view, slot))
     } catch (error) {
       onError(error)
       return
@@ -196,7 +254,7 @@ function watchSlot(
           onError(error)
           return
         }
-        setTimeout(loop, 0)
+        schedule()
       }
       return
     }
@@ -209,7 +267,7 @@ function watchSlot(
           onError(error)
           return
         }
-        setTimeout(loop, 0)
+        schedule()
       },
       (error: unknown) => onError(error)
     )
@@ -219,11 +277,15 @@ function watchSlot(
   return () => {
     if (stopped) return
     stopped = true
+    if (timer !== undefined) {
+      clearTimeout(timer)
+      timer = undefined
+    }
     // Wake a pending waitAsync so its promise/callback can release the
     // captured SharedArrayBuffer view promptly instead of waiting for a
     // future remote write.
     try {
-      Atomics.notify(view, slot)
+      Atomics.notify(view as never, slot)
     } catch {
       // The loop is already logically stopped; a host teardown may make the
       // view unavailable, so disposal must remain best-effort and idempotent.
@@ -240,34 +302,49 @@ export class SharedInt32Signal implements IObservable, IDisposable {
   get version(): number {
     return readVersion(this, this.#initialVersion)
   }
-  #view: Int32Array
-  #observedSharedVersion: number
+  #valueView: Int32Array
+  #versionView: BigInt64Array
+  #observedSharedVersion: bigint
   #disposed = false
   #stopWatching?: IDisposer
 
   constructor(runtime: IRuntime, initialValue = 0, buffer?: SharedArrayBuffer) {
-    if (buffer !== undefined && !(buffer instanceof SharedArrayBuffer)) {
+    if (buffer !== undefined && !isSharedBuffer(buffer)) {
       throw createStoreSharedRangeError(
         StoreSharedErrorCode.invalidOption,
         StoreSharedErrorText.bufferType
       )
     }
     this.runtime = runtime
-    this.buffer = buffer ?? new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * SIGNAL_SLOTS)
-    if (this.buffer.byteLength < Int32Array.BYTES_PER_ELEMENT * SIGNAL_SLOTS) {
+    this.buffer = buffer ?? new SharedArrayBuffer(SIGNAL_BYTES)
+    if (this.buffer.byteLength < SIGNAL_BYTES) {
       throw createStoreSharedRangeError(
         StoreSharedErrorCode.bufferTooSmall,
         StoreSharedErrorText.signalBufferSmall
       )
     }
-    this.#view = new Int32Array(this.buffer, 0, SIGNAL_SLOTS)
+    this.#valueView = new Int32Array(this.buffer, 0, SIGNAL_VALUE_SLOT + 1)
+    this.#versionView = new BigInt64Array(this.buffer, SIGNAL_VERSION_OFFSET, 1)
     if (!buffer) {
-      Atomics.store(this.#view, SIGNAL_VALUE_SLOT, asInt32(initialValue, 'shared signal value'))
+      Atomics.store(this.#valueView, SIGNAL_MAGIC_SLOT, SHARED_ABI_MAGIC)
+      Atomics.store(this.#valueView, SIGNAL_VERSION_SLOT, SHARED_ABI_VERSION)
+      Atomics.store(this.#valueView, SIGNAL_KIND_SLOT, SharedAbiKind.signal)
+      Atomics.store(this.#valueView, SIGNAL_READY_SLOT, SharedAbiReady.initializing)
+      Atomics.store(
+        this.#valueView,
+        SIGNAL_VALUE_SLOT,
+        asInt32(initialValue, 'shared signal value')
+      )
+      Atomics.store(this.#versionView, 0, 0n)
+      Atomics.store(this.#valueView, SIGNAL_READY_SLOT, SharedAbiReady.ready)
+    } else {
+      assertAbiHeader(this.#valueView, SharedAbiKind.signal)
     }
     this.#observedSharedVersion = readConsistent(
-      this.#view,
+      this.#valueView,
+      this.#versionView,
       SIGNAL_VALUE_SLOT,
-      SIGNAL_SEQ_SLOT
+      0
     ).version
     this.#initialVersion = internalsOf(runtime).clock.next()
     this.subs = registerSubs(this, this.#subs)
@@ -289,11 +366,19 @@ export class SharedInt32Signal implements IObservable, IDisposable {
   set value(next: number) {
     this.#assertActive()
     const normalized = asInt32(next, 'shared signal value')
-    const version = writeLocked(this.#view, SIGNAL_VALUE_SLOT, SIGNAL_SEQ_SLOT, normalized)
+    const version = writeLocked(
+      this.#valueView,
+      this.#versionView,
+      SIGNAL_VALUE_SLOT,
+      0,
+      normalized
+    )
     if (version === undefined) return
     this.#observedSharedVersion = version
+    // Publish the committed version before local Reactive fanout: a hostile
+    // scheduler/observer must not leave remote readers asleep after a write.
+    Atomics.notify(this.#versionView as never, 0)
     internalsOf(this.runtime).notify(this)
-    Atomics.notify(this.#view, SIGNAL_SEQ_SLOT)
   }
 
   /**
@@ -318,15 +403,19 @@ export class SharedInt32Signal implements IObservable, IDisposable {
   watch(): IDisposer {
     this.#assertActive()
     if (this.#stopWatching) return this.#stopWatching
+    let disposer: IDisposer | undefined
     const stop = watchSlot(
-      this.#view,
-      SIGNAL_SEQ_SLOT,
+      this.#versionView,
+      0,
       () => {
         if (!this.#disposed) this.sync()
       },
-      (error) => reportSharedWatchFailure(this.runtime, error)
+      (error) => {
+        reportSharedWatchFailure(this.runtime, error)
+        if (this.#stopWatching === disposer) this.#stopWatching = undefined
+      }
     )
-    const disposer = () => {
+    disposer = () => {
       stop()
       if (this.#stopWatching === disposer) this.#stopWatching = undefined
     }
@@ -352,8 +441,8 @@ export class SharedInt32Signal implements IObservable, IDisposable {
     internalsOf(this.runtime).tracker.disconnectObservable(this, 'dispose')
   }
 
-  #read(): { readonly value: number; readonly version: number } {
-    return readConsistent(this.#view, SIGNAL_VALUE_SLOT, SIGNAL_SEQ_SLOT)
+  #read(): { readonly value: number; readonly version: bigint } {
+    return readConsistent(this.#valueView, this.#versionView, SIGNAL_VALUE_SLOT, 0)
   }
 
   #assertActive(): void {
@@ -372,32 +461,18 @@ export const sharedInt32 = (
 ): SharedInt32Signal => new SharedInt32Signal(runtime, initialValue, buffer)
 
 /**
- * 数组布局：头部一个 epoch slot，随后是脏页 bitmap（每 bit 一页，每页 `DIRTY_PAGE_SIZE` 格），最后是每格 `[value, seq]`。
- *
- * Epoch 是为了让**一条** waitAsync 回路覆盖整片：10k 格各起一个 waiter 显然不行。 但仅凭 epoch 决定"要不要扫"之后，扫描本身曾经是
- * O(length)——百万格的数组里 改一格也要整片过一遍。bitmap 把"要不要扫"细化到"扫哪几页"：每次落盘写入用 `Atomics.or` 把自己所在页的 bit 点亮（OR
- * 是无损的——多个写者并发点同一 bit 不会互相覆盖，也不会丢失彼此的标记）；`sync()` 用 `Atomics.exchange` 逐字读出并 清零每个 bitmap
- * word——exchange 是单次原子读改写，不存在"清零期间丢失一次并发 OR"的窗口：并发的 OR 要么完全发生在 exchange 之前（已经反映在读出的旧值里），
- * 要么完全发生在之后（作用在刚清零的 0 上，正确地留给下一次 sync() 发现）。
- *
- * Bitmap 和 epoch 一样只是"可能有写入"的提示，不是正确性来源——命中的每一页仍然 逐格用 seqlock 版本号判定是否真的变了、要不要通知。就算某次 bit 因为极端时序被
- * 提前清零、写入方的 OR 恰好在那之前完成，页内逐格版本比较依然会在下一轮 sync() 补上，不会漏掉一次真实变化。
+ * 数组布局：ABI header、一个 64 位 generation cursor、所有值以及每格 64 位 seqlock。 每个 Runtime 保留自己的 generation/cell
+ * cursors，因此任意数量的 readers 都能独立同步； 不再使用会被首个 reader 清掉的共享 dirty queue。
  */
-const ARRAY_EPOCH_SLOT = 0
-const ARRAY_HEADER_BASE_SLOTS = 1
-const DIRTY_PAGE_SIZE = 32
-const DIRTY_BITS_PER_WORD = 32
-const ARRAY_VALUE_OFFSET = 0
-const ARRAY_SEQ_OFFSET = 1
-const ARRAY_ENTRY_SLOTS = 2
-
-function dirtyPageCount(length: number): number {
-  return Math.ceil(length / DIRTY_PAGE_SIZE)
-}
-
-function dirtyBitmapWords(length: number): number {
-  return Math.ceil(dirtyPageCount(length) / DIRTY_BITS_PER_WORD)
-}
+const ARRAY_MAGIC_SLOT = 0
+const ARRAY_LAYOUT_SLOT = 1
+const ARRAY_KIND_SLOT = 2
+const ARRAY_READY_SLOT = 3
+const ARRAY_LENGTH_SLOT = 4
+const ARRAY_GENERATION_OFFSET = 24
+const ARRAY_VALUES_OFFSET = 32
+const ARRAY_VALUE_BYTES = Int32Array.BYTES_PER_ELEMENT
+const ARRAY_VERSION_BYTES = BigInt64Array.BYTES_PER_ELEMENT
 
 class SharedInt32ArrayCell implements IObservable {
   readonly runtime: IRuntime
@@ -409,7 +484,7 @@ class SharedInt32ArrayCell implements IObservable {
   }
   #owner: SharedInt32Array
   #index: number
-  #observedSharedVersion: number
+  #observedSharedVersion: bigint
 
   constructor(owner: SharedInt32Array, index: number) {
     this.#owner = owner
@@ -438,11 +513,13 @@ class SharedInt32ArrayCell implements IObservable {
   }
 
   /** 写入已落盘之后的收尾：记下新版本、通知本 Runtime、唤醒远端。 */
-  commitWrite(version: number): void {
+  commitWrite(version: bigint): void {
     this.#observedSharedVersion = version
     this.#owner.recordObservedVersion(this.#index, version)
-    internalsOf(this.runtime).notify(this)
+    // Publish the generation before local Reactive fanout: a hostile
+    // scheduler/observer must not leave remote readers asleep after a write.
     this.#owner.notifyWaiters()
+    internalsOf(this.runtime).notify(this)
   }
 
   sync(): boolean {
@@ -468,11 +545,12 @@ export class SharedInt32Array implements IDisposable {
   readonly runtime: IRuntime
   readonly buffer: SharedArrayBuffer
   readonly length: number
-  #view: Int32Array
+  #valueView: Int32Array
+  #versionView: BigInt64Array
+  #generationView: BigInt64Array
   #cells = new Map<number, SharedInt32ArrayCell>()
-  #observedVersions: Int32Array
-  #observedEpoch: number
-  #bitmapWords: number
+  #observedVersions: BigInt64Array
+  #observedGeneration: bigint
   #disposed = false
   #stopWatching?: IDisposer
 
@@ -502,7 +580,7 @@ export class SharedInt32Array implements IDisposable {
         { cause: error }
       )
     }
-    if (buffer !== undefined && !(buffer instanceof SharedArrayBuffer)) {
+    if (buffer !== undefined && !isSharedBuffer(buffer)) {
       throw createStoreSharedRangeError(
         StoreSharedErrorCode.invalidOption,
         StoreSharedErrorText.bufferType
@@ -532,16 +610,19 @@ export class SharedInt32Array implements IDisposable {
     }
     this.runtime = runtime
     this.length = length
-    this.#bitmapWords = dirtyBitmapWords(length)
-    const headerSlots = ARRAY_HEADER_BASE_SLOTS + this.#bitmapWords
-    const slots = headerSlots + length * ARRAY_ENTRY_SLOTS
-    if (!Number.isSafeInteger(slots) || slots > MAX_INT32_ARRAY_SLOTS) {
+    const valuesEnd = ARRAY_VALUES_OFFSET + length * ARRAY_VALUE_BYTES
+    const versionsOffset =
+      (valuesEnd + BigInt64Array.BYTES_PER_ELEMENT - 1) & ~(BigInt64Array.BYTES_PER_ELEMENT - 1)
+    const requiredBytes = versionsOffset + length * ARRAY_VERSION_BYTES
+    if (
+      !Number.isSafeInteger(requiredBytes) ||
+      requiredBytes / Int32Array.BYTES_PER_ELEMENT > MAX_INT32_ARRAY_SLOTS
+    ) {
       throw createStoreSharedRangeError(
         StoreSharedErrorCode.invalidOption,
         StoreSharedErrorText.arrayLengthTooLarge
       )
     }
-    const requiredBytes = slots * Int32Array.BYTES_PER_ELEMENT
     this.buffer = buffer ?? new SharedArrayBuffer(requiredBytes)
     if (this.buffer.byteLength < requiredBytes) {
       throw createStoreSharedRangeError(
@@ -549,14 +630,31 @@ export class SharedInt32Array implements IDisposable {
         StoreSharedErrorText.arrayBufferSmall
       )
     }
-    this.#view = new Int32Array(this.buffer, 0, slots)
-    this.#observedVersions = new Int32Array(length)
-    this.#observedEpoch = Atomics.load(this.#view, ARRAY_EPOCH_SLOT)
+    this.#valueView = new Int32Array(
+      this.buffer,
+      0,
+      Math.ceil(valuesEnd / Int32Array.BYTES_PER_ELEMENT)
+    )
+    this.#versionView = new BigInt64Array(this.buffer, versionsOffset, length)
+    this.#generationView = new BigInt64Array(this.buffer, ARRAY_GENERATION_OFFSET, 1)
+    this.#observedVersions = new BigInt64Array(length)
+    if (!buffer) {
+      Atomics.store(this.#valueView, ARRAY_MAGIC_SLOT, SHARED_ABI_MAGIC)
+      Atomics.store(this.#valueView, ARRAY_LAYOUT_SLOT, SHARED_ABI_VERSION)
+      Atomics.store(this.#valueView, ARRAY_KIND_SLOT, SharedAbiKind.array)
+      Atomics.store(this.#valueView, ARRAY_READY_SLOT, SharedAbiReady.initializing)
+      Atomics.store(this.#valueView, ARRAY_LENGTH_SLOT, length)
+      Atomics.store(this.#generationView, 0, 0n)
+    } else {
+      assertAbiHeader(this.#valueView, SharedAbiKind.array, length)
+    }
+    this.#observedGeneration = Atomics.load(this.#generationView, 0)
     if (preparedInitialValues) {
       for (let index = 0; index < preparedInitialValues.length; index++) {
-        Atomics.store(this.#view, this.#valueSlot(index), preparedInitialValues[index])
+        Atomics.store(this.#valueView, this.#valueSlot(index), preparedInitialValues[index])
       }
     }
+    if (!buffer) Atomics.store(this.#valueView, ARRAY_READY_SLOT, SharedAbiReady.ready)
     // Do not scan every seqlock during construction. Cells establish their
     // own baseline when first observed, while array-level sync uses epoch to
     // decide whether a full scan is needed at all.
@@ -642,31 +740,21 @@ export class SharedInt32Array implements IDisposable {
     // If it did not move, no cell can have changed and even a dirty-page scan
     // is unnecessary. A concurrent writer that increments after this load is
     // observed by the next sync call.
-    const epoch = Atomics.load(this.#view, ARRAY_EPOCH_SLOT)
-    if (epoch === this.#observedEpoch) return 0
+    const generation = Atomics.load(this.#generationView, 0)
+    if (generation === this.#observedGeneration) return 0
     let changed = 0
-    // 一次扫描算一次批处理：多格同时变化只惊动下游一轮。只走 bitmap 点亮的页，
-    // 而不是整个数组——百万格数组里改一格不再是 O(length)。
+    // A reader owns its local cursor. Every reader independently compares every
+    // cell version, so one reader can never consume another reader's wake-up.
     this.runtime.batch(() => {
-      for (let word = 0; word < this.#bitmapWords; word++) {
-        const bits = Atomics.exchange(this.#view, ARRAY_HEADER_BASE_SLOTS + word, 0)
-        if (bits === 0) continue
-        for (let bit = 0; bit < DIRTY_BITS_PER_WORD; bit++) {
-          if ((bits & (1 << bit)) === 0) continue
-          const page = word * DIRTY_BITS_PER_WORD + bit
-          const start = page * DIRTY_PAGE_SIZE
-          const end = Math.min(start + DIRTY_PAGE_SIZE, this.length)
-          for (let current = start; current < end; current++) {
-            const version = this.readCell(current).version
-            if (version === this.#observedVersions[current]) continue
-            this.#observedVersions[current] = version
-            this.#cells.get(current)?.sync()
-            changed++
-          }
-        }
+      for (let current = 0; current < this.length; current++) {
+        const version = this.readCell(current).version
+        if (version === this.#observedVersions[current]) continue
+        this.#observedVersions[current] = version
+        this.#cells.get(current)?.sync()
+        changed++
       }
     })
-    this.#observedEpoch = epoch
+    this.#observedGeneration = generation
     return changed
   }
 
@@ -678,15 +766,19 @@ export class SharedInt32Array implements IDisposable {
   watch(): IDisposer {
     this.assertActive()
     if (this.#stopWatching) return this.#stopWatching
+    let disposer: IDisposer | undefined
     const stop = watchSlot(
-      this.#view,
-      ARRAY_EPOCH_SLOT,
+      this.#generationView,
+      0,
       () => {
         if (!this.#disposed) this.sync()
       },
-      (error) => reportSharedWatchFailure(this.runtime, error)
+      (error) => {
+        reportSharedWatchFailure(this.runtime, error)
+        if (this.#stopWatching === disposer) this.#stopWatching = undefined
+      }
     )
-    const disposer = () => {
+    disposer = () => {
       stop()
       if (this.#stopWatching === disposer) this.#stopWatching = undefined
     }
@@ -737,32 +829,32 @@ export class SharedInt32Array implements IDisposable {
   /** 一致读某一格：value 与 version 同源。 */
   readCell(index: number): {
     readonly value: number
-    readonly version: number
+    readonly version: bigint
   } {
-    return readConsistent(this.#view, this.#valueSlot(index), this.#seqSlot(index))
+    return readConsistent(this.#valueView, this.#versionView, this.#valueSlot(index), index)
   }
 
   /** 写某一格；返回新版本，或 undefined 表示没写（值未变或期望值不符）。 */
-  writeCell(index: number, value: number, expected?: number): number | undefined {
+  writeCell(index: number, value: number, expected?: number): bigint | undefined {
     const version = writeLocked(
-      this.#view,
+      this.#valueView,
+      this.#versionView,
       this.#valueSlot(index),
-      this.#seqSlot(index),
+      index,
       value,
       expected
     )
-    if (version !== undefined) this.#markDirty(index)
     return version
   }
 
-  /** 推进 epoch 并唤醒远端 watcher。 */
+  /** Advance the shared 64-bit generation and wake every independent reader cursor. */
   notifyWaiters(): void {
-    this.#observedEpoch = Atomics.add(this.#view, ARRAY_EPOCH_SLOT, 1) + 1
-    Atomics.notify(this.#view, ARRAY_EPOCH_SLOT)
+    this.#observedGeneration = Atomics.add(this.#generationView, 0, 1n) + 1n
+    Atomics.notify(this.#generationView as never, 0)
   }
 
   /** Keep array-level pull bookkeeping aligned with local cell writes. */
-  recordObservedVersion(index: number, version: number): void {
+  recordObservedVersion(index: number, version: bigint): void {
     this.#observedVersions[index] = version
   }
 
@@ -794,24 +886,8 @@ export class SharedInt32Array implements IDisposable {
     }
   }
 
-  get #headerSlots(): number {
-    return ARRAY_HEADER_BASE_SLOTS + this.#bitmapWords
-  }
-
   #valueSlot(index: number): number {
-    return this.#headerSlots + index * ARRAY_ENTRY_SLOTS + ARRAY_VALUE_OFFSET
-  }
-
-  #seqSlot(index: number): number {
-    return this.#headerSlots + index * ARRAY_ENTRY_SLOTS + ARRAY_SEQ_OFFSET
-  }
-
-  /** Lossless: concurrent `Atomics.or` calls from other writers never clobber each other's bit. */
-  #markDirty(index: number): void {
-    const page = (index / DIRTY_PAGE_SIZE) | 0
-    const word = (page / DIRTY_BITS_PER_WORD) | 0
-    const bit = page % DIRTY_BITS_PER_WORD
-    Atomics.or(this.#view, ARRAY_HEADER_BASE_SLOTS + word, 1 << bit)
+    return ARRAY_VALUES_OFFSET / Int32Array.BYTES_PER_ELEMENT + index
   }
 }
 

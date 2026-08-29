@@ -247,9 +247,9 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
     /** Timestamp is evaluated before reserving an id so a failing clock leaves queues unchanged. */
     const timestamp = now()
     /** Snapshot is fully cloned before reserving an id or mutating any diagnostic queue. */
-    const state = clone(store.$plain())
+    const state = Object.freeze(clone(store.$plain()))
     /** Fully prepared history entry ready for atomic publication. */
-    const entry: IStoreHistoryEntry = { id: nextId, timestamp, label, state }
+    const entry: IStoreHistoryEntry = Object.freeze({ id: nextId, timestamp, label, state })
     nextId++
     return entry
   }
@@ -326,13 +326,13 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
 
   return {
     get history() {
-      return history
+      return Object.freeze([...history])
     },
     get actions() {
-      return actions
+      return Object.freeze([...actions])
     },
     get trace() {
-      return trace
+      return Object.freeze([...trace])
     },
     record,
     recordAction,

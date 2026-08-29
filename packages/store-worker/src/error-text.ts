@@ -18,6 +18,7 @@ export const StoreWorkerErrorText = {
     `[store] serialize worker request aborted${transferred ? '; transferred input is detached and cannot be retried' : ''}`,
   cleanupFailed: '[store] serialize worker cleanup failed',
   invalidRequestChunk: '[store] invalid serialize worker request chunk',
+  invalidPhase: '[store] invalid serialize worker phase',
   emptyChunks: '[store] cannot merge an empty chunk list',
   valueChunks: '[store] cannot merge value chunks into bytes'
 } as const

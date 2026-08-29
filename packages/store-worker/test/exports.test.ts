@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import type { ISerializeChunk, ISerializeParser } from '@migaia/serialize'
+import { SerializeChunkKind } from '@migaia/serialize'
 import type { IWebRpcAbortSignal, IWebRpcEndpoint } from '@migaia/web-rpc'
 import { WorkerAdapter, createWorkerHandler, workerComputed, workerParser } from '../src/index'
+import * as storeWorker from '../src/index'
 import { toManagedRpcHandler } from '../src/managed-rpc-handler'
 import { createSerializeWorkerHandler } from '../src/serialize/worker'
 
@@ -62,6 +65,18 @@ function installLinkedWorkerHandler(
   )
 }
 
+/** Installs the serializer-specific request/frame handler on the in-memory Worker port. */
+function installLinkedSerializeWorkerHandler(
+  port: ILinkedWorkerPort,
+  parser: ISerializeParser
+): ReturnType<typeof createSerializeWorkerHandler> {
+  const handler = createSerializeWorkerHandler(parser, (message) => {
+    port.deliver(message)
+  })
+  port.install(handler)
+  return handler
+}
+
 /** Minimal endpoint double — `toManagedRpcHandler` only ever calls `.dispose()`. */
 const mockEndpoint = (
   dispose: () => Promise<void>
@@ -69,6 +84,11 @@ const mockEndpoint = (
   ({ dispose }) as unknown as IWebRpcEndpoint<'worker', 'automatic', false>
 
 describe('store-worker exports', () => {
+  it('exports only the canonical byte ownership vocabulary', () => {
+    expect(storeWorker.WorkerByteOwnership).toEqual({ copy: 'copy', transfer: 'transfer' })
+    expect('Worker' + 'Ownership' in storeWorker).toBe(false)
+  })
+
   it('request timeout rejects a real WorkerAdapter/handler seam', async () => {
     const port = createLinkedWorkerPort()
     installLinkedWorkerHandler(port, async () => new Promise(() => undefined))
@@ -142,6 +162,81 @@ describe('store-worker exports', () => {
     expect(() => createSerializeWorkerHandler(null as never, (() => undefined) as never)).toThrow(
       '[store] serialize worker handler requires encode/decode parser functions'
     )
+  })
+
+  it('streams encode frames through the existing WebRPC endpoint with bounded consumer credit', async () => {
+    let produced = 0
+    let returned = false
+    const parser: ISerializeParser = {
+      name: 'stream-test',
+      async *encode() {
+        try {
+          for (let index = 0; index < 4; index++) {
+            produced++
+            yield [SerializeChunkKind.bytes, new Uint8Array([index])] as const
+          }
+        } finally {
+          returned = true
+        }
+      },
+      decode: (chunk) => chunk[1]
+    }
+    const port = createLinkedWorkerPort()
+    const handler = installLinkedSerializeWorkerHandler(port, parser)
+    const worker = workerParser({ worker: port })
+    const output = worker.encode('input', {
+      signal: new AbortController().signal,
+      context: 'stream-test'
+    })
+    const iterator = (output as AsyncIterable<ISerializeChunk>)[Symbol.asyncIterator]()
+    const first = await iterator.next()
+    expect(first.value).toEqual([SerializeChunkKind.bytes, new Uint8Array([0])])
+    expect(produced).toBeLessThanOrEqual(3)
+    const rest: unknown[] = []
+    for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) rest.push(chunk)
+    expect(rest).toHaveLength(3)
+    expect(returned).toBe(true)
+    await handler.dispose()
+    await worker.dispose?.()
+  })
+
+  it('cancels a pending encode iterator and invokes the parser iterator return hook', async () => {
+    let returned = false
+    let release!: () => void
+    const parser: ISerializeParser = {
+      name: 'cancel-test',
+      encode: async function* () {
+        try {
+          yield [SerializeChunkKind.bytes, new Uint8Array([1])] as const
+          await new Promise<void>((resolve) => {
+            release = resolve
+          })
+          yield [SerializeChunkKind.bytes, new Uint8Array([2])] as const
+        } finally {
+          returned = true
+        }
+      },
+      decode: (chunk) => chunk[1]
+    }
+    const port = createLinkedWorkerPort()
+    const handler = installLinkedSerializeWorkerHandler(port, parser)
+    const worker = workerParser({ worker: port })
+    const output = worker.encode('input', {
+      signal: new AbortController().signal,
+      context: 'cancel-test'
+    })
+    const iterator = (output as AsyncIterable<ISerializeChunk>)[Symbol.asyncIterator]()
+    await expect(iterator.next()).resolves.toMatchObject({ done: false })
+    for (let attempt = 0; attempt < 10 && release === undefined; attempt++)
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    expect(release).toEqual(expect.any(Function))
+    await iterator.return?.()
+    release()
+    for (let attempt = 0; attempt < 10 && !returned; attempt++)
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    expect(returned).toBe(true)
+    await handler.dispose()
+    await worker.dispose?.()
   })
   it('rejects null options at worker entry points with a tagged configuration error', () => {
     expect(() => new WorkerAdapter(fakePort(), null as never)).toThrow(

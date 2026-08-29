@@ -4,9 +4,11 @@ import type { IStoreResourceLoadContext } from './store-resource-request.js'
 import {
   assimilateCapturedThen,
   createGenerationController,
+  createSyncStartedDisposalLedger,
   probeThenable,
   ThenableProbeKind
 } from '@migaia/lifecycle'
+import type { ISyncStartedDisposalLedger } from '@migaia/lifecycle'
 import { ResourceStateController } from './store-resource-state.js'
 import { StoreResourceKind } from './resource-state-constants.js'
 import type { IResourceVersion } from './store-resource-state.js'
@@ -179,6 +181,8 @@ export function createStoreResource<T>(
   }
   const requests = createGenerationController()
   const state = new ResourceStateController<T>()
+  /** Physical cleanup completion is tracked separately from logical terminal state. */
+  let physicalTerminal = Promise.resolve()
   const ownership = new ResourceOwnershipRegistry<T>()
   const versions = new ResourceVersionRegistry<T>()
   const captures = new ResourceCaptureRegistry(() => {
@@ -272,16 +276,17 @@ export function createStoreResource<T>(
       state.current.kind === StoreResourceKind.closing) &&
       state.current.current !== undefined &&
       Object.is(state.current.current.value, value))
-  const cleanupOnce = (value: T) => {
+  const cleanupOnce = (value: T, ledger?: ISyncStartedDisposalLedger) => {
     if (ownership.isDisposed(value)) return
     const disposer = resolveDisposer(value)
     if (!disposer) return
     ownership.markDisposed(value)
+    if (ledger) {
+      ledger.start('store-resource', disposer)
+      return
+    }
     try {
-      // Callers of cleanupOnce run in fire-and-forget contexts (dispose
-      // paths declared sync, .then() settlement handlers); an async
-      // disposer's rejection has nobody positioned to await it, but must
-      // still be reported instead of becoming an unhandled rejection.
+      // Non-terminal eviction remains fire-and-forget, but every thenable rejection is observed.
       const result = disposer()
       const probe = probeThenable(result)
       if (probe.kind === ThenableProbeKind.failed) report(probe.error, 'dispose')
@@ -293,12 +298,12 @@ export function createStoreResource<T>(
       report(error, 'dispose')
     }
   }
-  const cleanupUnique = (values: T[]) => {
+  const cleanupUnique = (values: T[], ledger?: ISyncStartedDisposalLedger) => {
     const seen: T[] = []
     for (const value of values) {
       if (seen.some((item) => Object.is(item, value)) || heldElsewhere(value)) continue
       seen.push(value)
-      cleanupOnce(value)
+      cleanupOnce(value, ledger)
     }
   }
   const cancelEviction = () => cachePolicy.cancelEviction()
@@ -380,7 +385,16 @@ export function createStoreResource<T>(
     if (!wasDisposed) notify()
     listenerChannel.clear()
     listenerRegistrations.clear()
-    cleanupUnique(values)
+    const physicalLedger = createSyncStartedDisposalLedger()
+    cleanupUnique(values, physicalLedger)
+    const physicalOutcome = physicalLedger.seal()
+    physicalTerminal = physicalOutcome.completion.then((errors) => {
+      for (const item of errors) {
+        if (physicalOutcome.synchronousErrors.some((sync) => sync.error === item.error)) continue
+        report(item.error, 'dispose')
+      }
+    })
+    for (const item of physicalOutcome.synchronousErrors) report(item.error, 'dispose')
     versionTokens.clear()
     try {
       config.onTerminal?.()
@@ -739,7 +753,7 @@ export function createStoreResource<T>(
         return
       forceDisposeResource()
     },
-    whenTerminal: () => state.whenTerminal(),
+    whenTerminal: () => state.whenTerminal().then(() => physicalTerminal),
     getSnapshot: () => revision,
     subscribe(listener) {
       if (state.current.kind === StoreResourceKind.disposed) return () => {}
