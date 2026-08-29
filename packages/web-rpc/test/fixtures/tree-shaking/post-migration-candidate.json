@@ -3,18 +3,18 @@
   "status": "approved",
   "approval": {
     "status": "approved",
-    "decisionId": "WRC-C-B11-decision-20260829-S4R1",
-    "keyId": "coordinator-ed25519-aebc26a0c4859e17",
-    "digest": "a5251504c3171f9718d75ba599ebbb7e1b86536b6a635fc40aa47c554e4868a9",
+    "decisionId": "WRC-C-B11-decision-20260829-TSR-SDDV5",
+    "keyId": "coordinator-ed25519-48f6e693342b09c3",
+    "digest": "968132bedd9df573c06b9bb0baf1d8662a16c510aae89503f4258cb7006c60a7",
     "oldTuple": {
       "moduleCount": 53,
       "rawBytes": 250129,
       "gzipBytes": 61171
     },
     "newTuple": {
-      "moduleCount": 81,
-      "rawBytes": 478510,
-      "gzipBytes": 114531
+      "moduleCount": 106,
+      "rawBytes": 450673,
+      "gzipBytes": 107985
     }
   },
   "generatedFrom": {
@@ -25,7 +25,7 @@
       "tree-shaking-provenance.mjs",
       "tree-shaking/core-retained-causal.mjs"
     ],
-    "revision": "MA-ADC-S4-2026-08-29-r2",
+    "revision": "SDD-v5",
     "custody": "two identical final canonical builds plus Coordinator byte-exact install",
     "attributionKinds": [
       "import-edge",
@@ -33,7 +33,7 @@
       "generated-artifact"
     ]
   },
-  "provenanceDigest": "a5251504c3171f9718d75ba599ebbb7e1b86536b6a635fc40aa47c554e4868a9",
+  "provenanceDigest": "968132bedd9df573c06b9bb0baf1d8662a16c510aae89503f4258cb7006c60a7",
   "oldTuple": {
     "moduleCount": 53,
     "rawBytes": 250129,
@@ -41,9 +41,9 @@
     "endpointStaticImportCount": 28
   },
   "newTuple": {
-    "moduleCount": 81,
-    "rawBytes": 478510,
-    "gzipBytes": 114531,
+    "moduleCount": 106,
+    "rawBytes": 450673,
+    "gzipBytes": 107985,
     "endpointStaticImportCount": 12
   },
   "rootModules": [
@@ -108,6 +108,7 @@
     "workspace:packages/capability/dist/graph/topology.js",
     "workspace:packages/event-subscriber/dist/index.js",
     "workspace:packages/lifecycle/dist/abort-factory.js",
+    "workspace:packages/lifecycle/dist/abort.js",
     "workspace:packages/lifecycle/dist/bounded-wait.js",
     "workspace:packages/lifecycle/dist/dispose-transaction.js",
     "workspace:packages/lifecycle/dist/disposer-context.js",
@@ -116,15 +117,39 @@
     "workspace:packages/lifecycle/dist/errors.js",
     "workspace:packages/lifecycle/dist/generation-controller.js",
     "workspace:packages/lifecycle/dist/lifecycle-scope.js",
+    "workspace:packages/lifecycle/dist/mutation-queue.js",
     "workspace:packages/lifecycle/dist/observed-subscription.js",
+    "workspace:packages/lifecycle/dist/provisional-scope.js",
     "workspace:packages/lifecycle/dist/quiescence-tracker.js",
     "workspace:packages/lifecycle/dist/scheduler.js",
     "workspace:packages/lifecycle/dist/state-constants.js",
     "workspace:packages/lifecycle/dist/sync-lifecycle-scope.js",
     "workspace:packages/lifecycle/dist/terminal-controller.js",
     "workspace:packages/lifecycle/dist/types.js",
-    "workspace:packages/plugin-host/dist/index.js",
+    "workspace:packages/middleware-pipeline/dist/index.js",
+    "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/assertClassBrand.js",
+    "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/checkPrivateRedeclaration.js",
+    "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldGet2.js",
+    "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldInitSpec.js",
+    "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldSet2.js",
+    "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateMethodInitSpec.js",
+    "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/defineProperty.js",
+    "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPrimitive.js",
+    "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPropertyKey.js",
+    "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/typeof.js",
+    "workspace:packages/plugin-host/dist/config.js",
+    "workspace:packages/plugin-host/dist/core.js",
+    "workspace:packages/plugin-host/dist/disposal.js",
+    "workspace:packages/plugin-host/dist/error-code.js",
+    "workspace:packages/plugin-host/dist/error-text.js",
+    "workspace:packages/plugin-host/dist/extension.js",
+    "workspace:packages/plugin-host/dist/host-runtime.js",
+    "workspace:packages/plugin-host/dist/invocation.js",
+    "workspace:packages/plugin-host/dist/pipeline.js",
+    "workspace:packages/plugin-host/dist/state-constants.js",
+    "workspace:packages/plugin-host/dist/symbols.js",
     "workspace:packages/utils/dist/bytes.js",
+    "workspace:packages/utils/dist/config.js",
     "workspace:packages/utils/dist/error-text-Cw8rxmXe.js",
     "workspace:packages/utils/dist/error.js",
     "workspace:packages/utils/dist/object-path.js"
@@ -135,10 +160,10 @@
         "virtualId": "virtual:web-rpc-core",
         "sourceSha256": "0eaf086d1ec6901f63c8f254e4cd0e4e064b533aaedb4cb73bbb452c5ff9ca56"
       },
-      "moduleCount": 43,
-      "rawBytes": 253134,
-      "gzipBytes": 63873,
-      "bundleSha256": "ee2d12dc75b5d2276c5b6bd06da3f4feee125cb167a299e5755e6d3a6764191e",
+      "moduleCount": 71,
+      "rawBytes": 234634,
+      "gzipBytes": 59632,
+      "bundleSha256": "24da55e068070e9ff78ebb6952404ac7b401c9ab6836c4786d5f8937e8e6a554",
       "modules": [
         "\u0000rolldown/runtime.js",
         "src/core.ts",
@@ -167,22 +192,50 @@
         "virtual:web-rpc-core",
         "workspace:packages/capability/dist/graph/topology.js",
         "workspace:packages/lifecycle/dist/abort-factory.js",
+        "workspace:packages/lifecycle/dist/abort.js",
         "workspace:packages/lifecycle/dist/bounded-wait.js",
         "workspace:packages/lifecycle/dist/dispose-transaction.js",
         "workspace:packages/lifecycle/dist/disposer-context.js",
         "workspace:packages/lifecycle/dist/error-code.js",
         "workspace:packages/lifecycle/dist/error-text.js",
         "workspace:packages/lifecycle/dist/errors.js",
+        "workspace:packages/lifecycle/dist/generation-controller.js",
         "workspace:packages/lifecycle/dist/lifecycle-scope.js",
+        "workspace:packages/lifecycle/dist/mutation-queue.js",
         "workspace:packages/lifecycle/dist/observed-subscription.js",
+        "workspace:packages/lifecycle/dist/provisional-scope.js",
+        "workspace:packages/lifecycle/dist/quiescence-tracker.js",
         "workspace:packages/lifecycle/dist/scheduler.js",
         "workspace:packages/lifecycle/dist/state-constants.js",
         "workspace:packages/lifecycle/dist/sync-lifecycle-scope.js",
         "workspace:packages/lifecycle/dist/terminal-controller.js",
         "workspace:packages/lifecycle/dist/types.js",
-        "workspace:packages/plugin-host/dist/index.js",
+        "workspace:packages/middleware-pipeline/dist/index.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/assertClassBrand.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/checkPrivateRedeclaration.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldGet2.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldInitSpec.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldSet2.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateMethodInitSpec.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/defineProperty.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPrimitive.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPropertyKey.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/typeof.js",
+        "workspace:packages/plugin-host/dist/config.js",
+        "workspace:packages/plugin-host/dist/core.js",
+        "workspace:packages/plugin-host/dist/disposal.js",
+        "workspace:packages/plugin-host/dist/error-code.js",
+        "workspace:packages/plugin-host/dist/error-text.js",
+        "workspace:packages/plugin-host/dist/extension.js",
+        "workspace:packages/plugin-host/dist/host-runtime.js",
+        "workspace:packages/plugin-host/dist/invocation.js",
+        "workspace:packages/plugin-host/dist/pipeline.js",
+        "workspace:packages/plugin-host/dist/state-constants.js",
+        "workspace:packages/plugin-host/dist/symbols.js",
+        "workspace:packages/utils/dist/config.js",
         "workspace:packages/utils/dist/error-text-Cw8rxmXe.js",
-        "workspace:packages/utils/dist/error.js"
+        "workspace:packages/utils/dist/error.js",
+        "workspace:packages/utils/dist/object-path.js"
       ]
     },
     "client": {
@@ -190,10 +243,10 @@
         "virtualId": "virtual:web-rpc-client",
         "sourceSha256": "cc20f81229ddf28017cb28e07f8a6f1a1c3ca31b53495bf1cf94d7308ad0f8b9"
       },
-      "moduleCount": 68,
-      "rawBytes": 364341,
-      "gzipBytes": 90581,
-      "bundleSha256": "ccb7c021b32dc938e08cd854eda2a7f479c5bd9c124ca5b4f5662dfe01c03558",
+      "moduleCount": 93,
+      "rawBytes": 336456,
+      "gzipBytes": 84057,
+      "bundleSha256": "98e5c87798a539a1c81db967d005b8b2cae3622d887563a644d8116d8d6a71b8",
       "modules": [
         "\u0000rolldown/runtime.js",
         "src/client.ts",
@@ -243,6 +296,7 @@
         "workspace:packages/capability/dist/graph/topology.js",
         "workspace:packages/event-subscriber/dist/index.js",
         "workspace:packages/lifecycle/dist/abort-factory.js",
+        "workspace:packages/lifecycle/dist/abort.js",
         "workspace:packages/lifecycle/dist/bounded-wait.js",
         "workspace:packages/lifecycle/dist/dispose-transaction.js",
         "workspace:packages/lifecycle/dist/disposer-context.js",
@@ -251,15 +305,39 @@
         "workspace:packages/lifecycle/dist/errors.js",
         "workspace:packages/lifecycle/dist/generation-controller.js",
         "workspace:packages/lifecycle/dist/lifecycle-scope.js",
+        "workspace:packages/lifecycle/dist/mutation-queue.js",
         "workspace:packages/lifecycle/dist/observed-subscription.js",
+        "workspace:packages/lifecycle/dist/provisional-scope.js",
         "workspace:packages/lifecycle/dist/quiescence-tracker.js",
         "workspace:packages/lifecycle/dist/scheduler.js",
         "workspace:packages/lifecycle/dist/state-constants.js",
         "workspace:packages/lifecycle/dist/sync-lifecycle-scope.js",
         "workspace:packages/lifecycle/dist/terminal-controller.js",
         "workspace:packages/lifecycle/dist/types.js",
-        "workspace:packages/plugin-host/dist/index.js",
+        "workspace:packages/middleware-pipeline/dist/index.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/assertClassBrand.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/checkPrivateRedeclaration.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldGet2.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldInitSpec.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldSet2.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateMethodInitSpec.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/defineProperty.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPrimitive.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPropertyKey.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/typeof.js",
+        "workspace:packages/plugin-host/dist/config.js",
+        "workspace:packages/plugin-host/dist/core.js",
+        "workspace:packages/plugin-host/dist/disposal.js",
+        "workspace:packages/plugin-host/dist/error-code.js",
+        "workspace:packages/plugin-host/dist/error-text.js",
+        "workspace:packages/plugin-host/dist/extension.js",
+        "workspace:packages/plugin-host/dist/host-runtime.js",
+        "workspace:packages/plugin-host/dist/invocation.js",
+        "workspace:packages/plugin-host/dist/pipeline.js",
+        "workspace:packages/plugin-host/dist/state-constants.js",
+        "workspace:packages/plugin-host/dist/symbols.js",
         "workspace:packages/utils/dist/bytes.js",
+        "workspace:packages/utils/dist/config.js",
         "workspace:packages/utils/dist/error-text-Cw8rxmXe.js",
         "workspace:packages/utils/dist/error.js",
         "workspace:packages/utils/dist/object-path.js"
@@ -270,10 +348,10 @@
         "virtualId": "virtual:web-rpc-provider",
         "sourceSha256": "7cda8c39a9816f43a39ce148b91ee57bd760d020aaa918f19604482b7f4dbf28"
       },
-      "moduleCount": 74,
-      "rawBytes": 393254,
-      "gzipBytes": 97537,
-      "bundleSha256": "8a60e9bb58ce52759ef7317e04576986b51e5566b40bfd424c4d34c124ebedd1",
+      "moduleCount": 99,
+      "rawBytes": 365369,
+      "gzipBytes": 91003,
+      "bundleSha256": "d1caaeae79af97322e54ba191d119c335fc9c1c72a6ad6a17fe8c9a24d9c322a",
       "modules": [
         "\u0000rolldown/runtime.js",
         "src/core.ts",
@@ -329,6 +407,7 @@
         "workspace:packages/capability/dist/graph/topology.js",
         "workspace:packages/event-subscriber/dist/index.js",
         "workspace:packages/lifecycle/dist/abort-factory.js",
+        "workspace:packages/lifecycle/dist/abort.js",
         "workspace:packages/lifecycle/dist/bounded-wait.js",
         "workspace:packages/lifecycle/dist/dispose-transaction.js",
         "workspace:packages/lifecycle/dist/disposer-context.js",
@@ -337,15 +416,39 @@
         "workspace:packages/lifecycle/dist/errors.js",
         "workspace:packages/lifecycle/dist/generation-controller.js",
         "workspace:packages/lifecycle/dist/lifecycle-scope.js",
+        "workspace:packages/lifecycle/dist/mutation-queue.js",
         "workspace:packages/lifecycle/dist/observed-subscription.js",
+        "workspace:packages/lifecycle/dist/provisional-scope.js",
         "workspace:packages/lifecycle/dist/quiescence-tracker.js",
         "workspace:packages/lifecycle/dist/scheduler.js",
         "workspace:packages/lifecycle/dist/state-constants.js",
         "workspace:packages/lifecycle/dist/sync-lifecycle-scope.js",
         "workspace:packages/lifecycle/dist/terminal-controller.js",
         "workspace:packages/lifecycle/dist/types.js",
-        "workspace:packages/plugin-host/dist/index.js",
+        "workspace:packages/middleware-pipeline/dist/index.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/assertClassBrand.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/checkPrivateRedeclaration.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldGet2.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldInitSpec.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldSet2.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateMethodInitSpec.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/defineProperty.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPrimitive.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPropertyKey.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/typeof.js",
+        "workspace:packages/plugin-host/dist/config.js",
+        "workspace:packages/plugin-host/dist/core.js",
+        "workspace:packages/plugin-host/dist/disposal.js",
+        "workspace:packages/plugin-host/dist/error-code.js",
+        "workspace:packages/plugin-host/dist/error-text.js",
+        "workspace:packages/plugin-host/dist/extension.js",
+        "workspace:packages/plugin-host/dist/host-runtime.js",
+        "workspace:packages/plugin-host/dist/invocation.js",
+        "workspace:packages/plugin-host/dist/pipeline.js",
+        "workspace:packages/plugin-host/dist/state-constants.js",
+        "workspace:packages/plugin-host/dist/symbols.js",
         "workspace:packages/utils/dist/bytes.js",
+        "workspace:packages/utils/dist/config.js",
         "workspace:packages/utils/dist/error-text-Cw8rxmXe.js",
         "workspace:packages/utils/dist/error.js",
         "workspace:packages/utils/dist/object-path.js"
@@ -356,10 +459,10 @@
         "virtualId": "virtual:web-rpc-full",
         "sourceSha256": "a5bb6822af2057d6e400bd65307f4d5b8c46db77b0ccb6e6ea71155391431305"
       },
-      "moduleCount": 82,
-      "rawBytes": 478930,
-      "gzipBytes": 114678,
-      "bundleSha256": "c52bb3b01a10f3a661dd67dd3a197898f43f52be61b5e96fe980034b5843c52f",
+      "moduleCount": 107,
+      "rawBytes": 451045,
+      "gzipBytes": 108109,
+      "bundleSha256": "a912596d880533f1aa823edc0d816e7b651f497ae30ddad7ab9a209417c47f36",
       "modules": [
         "\u0000rolldown/runtime.js",
         "src/core.ts",
@@ -423,6 +526,7 @@
         "workspace:packages/capability/dist/graph/topology.js",
         "workspace:packages/event-subscriber/dist/index.js",
         "workspace:packages/lifecycle/dist/abort-factory.js",
+        "workspace:packages/lifecycle/dist/abort.js",
         "workspace:packages/lifecycle/dist/bounded-wait.js",
         "workspace:packages/lifecycle/dist/dispose-transaction.js",
         "workspace:packages/lifecycle/dist/disposer-context.js",
@@ -431,15 +535,39 @@
         "workspace:packages/lifecycle/dist/errors.js",
         "workspace:packages/lifecycle/dist/generation-controller.js",
         "workspace:packages/lifecycle/dist/lifecycle-scope.js",
+        "workspace:packages/lifecycle/dist/mutation-queue.js",
         "workspace:packages/lifecycle/dist/observed-subscription.js",
+        "workspace:packages/lifecycle/dist/provisional-scope.js",
         "workspace:packages/lifecycle/dist/quiescence-tracker.js",
         "workspace:packages/lifecycle/dist/scheduler.js",
         "workspace:packages/lifecycle/dist/state-constants.js",
         "workspace:packages/lifecycle/dist/sync-lifecycle-scope.js",
         "workspace:packages/lifecycle/dist/terminal-controller.js",
         "workspace:packages/lifecycle/dist/types.js",
-        "workspace:packages/plugin-host/dist/index.js",
+        "workspace:packages/middleware-pipeline/dist/index.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/assertClassBrand.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/checkPrivateRedeclaration.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldGet2.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldInitSpec.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldSet2.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateMethodInitSpec.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/defineProperty.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPrimitive.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPropertyKey.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/typeof.js",
+        "workspace:packages/plugin-host/dist/config.js",
+        "workspace:packages/plugin-host/dist/core.js",
+        "workspace:packages/plugin-host/dist/disposal.js",
+        "workspace:packages/plugin-host/dist/error-code.js",
+        "workspace:packages/plugin-host/dist/error-text.js",
+        "workspace:packages/plugin-host/dist/extension.js",
+        "workspace:packages/plugin-host/dist/host-runtime.js",
+        "workspace:packages/plugin-host/dist/invocation.js",
+        "workspace:packages/plugin-host/dist/pipeline.js",
+        "workspace:packages/plugin-host/dist/state-constants.js",
+        "workspace:packages/plugin-host/dist/symbols.js",
         "workspace:packages/utils/dist/bytes.js",
+        "workspace:packages/utils/dist/config.js",
         "workspace:packages/utils/dist/error-text-Cw8rxmXe.js",
         "workspace:packages/utils/dist/error.js",
         "workspace:packages/utils/dist/object-path.js"
@@ -450,10 +578,10 @@
         "virtualId": "virtual:web-rpc-custom",
         "sourceSha256": "706ac06f07ca2fd0d595fd5b0d5408726218f356be438a4d24325d7b42dfab09"
       },
-      "moduleCount": 81,
-      "rawBytes": 479318,
-      "gzipBytes": 114109,
-      "bundleSha256": "ab2a167b9b7594f243ea39035034e397eba94393a1d8bf31c90e026b1d9ff025",
+      "moduleCount": 106,
+      "rawBytes": 451433,
+      "gzipBytes": 107549,
+      "bundleSha256": "bd51e914d8dfdf399f8dd4f53385b39359902e04abd51d13ca7fb02d23adc714",
       "modules": [
         "\u0000rolldown/runtime.js",
         "src/core.ts",
@@ -516,6 +644,7 @@
         "workspace:packages/capability/dist/graph/topology.js",
         "workspace:packages/event-subscriber/dist/index.js",
         "workspace:packages/lifecycle/dist/abort-factory.js",
+        "workspace:packages/lifecycle/dist/abort.js",
         "workspace:packages/lifecycle/dist/bounded-wait.js",
         "workspace:packages/lifecycle/dist/dispose-transaction.js",
         "workspace:packages/lifecycle/dist/disposer-context.js",
@@ -524,15 +653,39 @@
         "workspace:packages/lifecycle/dist/errors.js",
         "workspace:packages/lifecycle/dist/generation-controller.js",
         "workspace:packages/lifecycle/dist/lifecycle-scope.js",
+        "workspace:packages/lifecycle/dist/mutation-queue.js",
         "workspace:packages/lifecycle/dist/observed-subscription.js",
+        "workspace:packages/lifecycle/dist/provisional-scope.js",
         "workspace:packages/lifecycle/dist/quiescence-tracker.js",
         "workspace:packages/lifecycle/dist/scheduler.js",
         "workspace:packages/lifecycle/dist/state-constants.js",
         "workspace:packages/lifecycle/dist/sync-lifecycle-scope.js",
         "workspace:packages/lifecycle/dist/terminal-controller.js",
         "workspace:packages/lifecycle/dist/types.js",
-        "workspace:packages/plugin-host/dist/index.js",
+        "workspace:packages/middleware-pipeline/dist/index.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/assertClassBrand.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/checkPrivateRedeclaration.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldGet2.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldInitSpec.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldSet2.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateMethodInitSpec.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/defineProperty.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPrimitive.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPropertyKey.js",
+        "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/typeof.js",
+        "workspace:packages/plugin-host/dist/config.js",
+        "workspace:packages/plugin-host/dist/core.js",
+        "workspace:packages/plugin-host/dist/disposal.js",
+        "workspace:packages/plugin-host/dist/error-code.js",
+        "workspace:packages/plugin-host/dist/error-text.js",
+        "workspace:packages/plugin-host/dist/extension.js",
+        "workspace:packages/plugin-host/dist/host-runtime.js",
+        "workspace:packages/plugin-host/dist/invocation.js",
+        "workspace:packages/plugin-host/dist/pipeline.js",
+        "workspace:packages/plugin-host/dist/state-constants.js",
+        "workspace:packages/plugin-host/dist/symbols.js",
         "workspace:packages/utils/dist/bytes.js",
+        "workspace:packages/utils/dist/config.js",
         "workspace:packages/utils/dist/error-text-Cw8rxmXe.js",
         "workspace:packages/utils/dist/error.js",
         "workspace:packages/utils/dist/object-path.js"
@@ -546,6 +699,11 @@
       "requirements": [
         "WRC-C-R07"
       ],
+      "rationale": "Endpoint projection retains the once-only disposal observer that reports Host-owned terminal effects without creating a second disposal owner.",
+      "byteAttribution": {
+        "originalBytes": 877,
+        "renderedBytes": 431
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -553,11 +711,6 @@
         "full",
         "custom"
       ],
-      "rationale": "Endpoint projection retains the once-only disposal observer that reports Host-owned terminal effects without creating a second disposal owner.",
-      "byteAttribution": {
-        "originalBytes": 877,
-        "renderedBytes": 431
-      },
       "incomingEdges": [
         {
           "consumer": "client",
@@ -595,6 +748,11 @@
       "requirements": [
         "WRC-C-R13"
       ],
+      "rationale": "Core construction and plugin translation retain the bounded install-settlement helper that coordinates abort, rollback, and late failure reporting.",
+      "byteAttribution": {
+        "originalBytes": 7051,
+        "renderedBytes": 4518
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -602,11 +760,6 @@
         "full",
         "custom"
       ],
-      "rationale": "Core construction and plugin translation retain the bounded install-settlement helper that coordinates abort, rollback, and late failure reporting.",
-      "byteAttribution": {
-        "originalBytes": 7051,
-        "renderedBytes": 4518
-      },
       "incomingEdges": [
         {
           "consumer": "client",
@@ -669,6 +822,11 @@
       "requirements": [
         "WRC-C-R36"
       ],
+      "rationale": "Core retains the WebRPC error translation boundary that preserves Host disposal ownership while exposing the package error contract.",
+      "byteAttribution": {
+        "originalBytes": 5766,
+        "renderedBytes": 4557
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -676,11 +834,6 @@
         "full",
         "custom"
       ],
-      "rationale": "Core retains the WebRPC error translation boundary that preserves Host disposal ownership while exposing the package error contract.",
-      "byteAttribution": {
-        "originalBytes": 5766,
-        "renderedBytes": 4552
-      },
       "incomingEdges": [
         {
           "consumer": "client",
@@ -718,6 +871,11 @@
       "requirements": [
         "WRC-C-R34"
       ],
+      "rationale": "Core retains the endpoint projection that exposes only admitted feature members and delegates disposal to the single Host promise.",
+      "byteAttribution": {
+        "originalBytes": 4831,
+        "renderedBytes": 3722
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -725,11 +883,6 @@
         "full",
         "custom"
       ],
-      "rationale": "Core retains the endpoint projection that exposes only admitted feature members and delegates disposal to the single Host promise.",
-      "byteAttribution": {
-        "originalBytes": 4831,
-        "renderedBytes": 3722
-      },
       "incomingEdges": [
         {
           "consumer": "client",
@@ -768,17 +921,17 @@
         "WRC-C-D63",
         "WRC-C-T46"
       ],
+      "rationale": "WebRPC owns the fixed encode, authentication, chunk, and transport-send sequence; only consumers selecting outbound retain this domain sender.",
+      "byteAttribution": {
+        "originalBytes": 16075,
+        "renderedBytes": 11943
+      },
       "retainedConsumers": [
         "client",
         "provider",
         "full",
         "custom"
       ],
-      "rationale": "WebRPC owns the fixed encode, authentication, chunk, and transport-send sequence; only consumers selecting outbound retain this domain sender.",
-      "byteAttribution": {
-        "originalBytes": 16075,
-        "renderedBytes": 11943
-      },
       "incomingEdges": [
         {
           "consumer": "client",
@@ -811,6 +964,11 @@
       "requirements": [
         "WRC-C-R29"
       ],
+      "rationale": "Plugin translation retains the package-internal feature contract that maps endpoint modules onto canonical PluginHost lifecycle semantics.",
+      "byteAttribution": {
+        "originalBytes": 9432,
+        "renderedBytes": 3104
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -818,11 +976,6 @@
         "full",
         "custom"
       ],
-      "rationale": "Plugin translation retains the package-internal feature contract that maps endpoint modules onto canonical PluginHost lifecycle semantics.",
-      "byteAttribution": {
-        "originalBytes": 9432,
-        "renderedBytes": 3104
-      },
       "incomingEdges": [
         {
           "consumer": "client",
@@ -860,6 +1013,11 @@
       "requirements": [
         "WRC-C-R18"
       ],
+      "rationale": "Plugin inventory retains normalized immutable descriptors so one construction transaction owns ordering, claims, and install inputs.",
+      "byteAttribution": {
+        "originalBytes": 1895,
+        "renderedBytes": 1218
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -867,11 +1025,6 @@
         "full",
         "custom"
       ],
-      "rationale": "Plugin inventory retains normalized immutable descriptors so one construction transaction owns ordering, claims, and install inputs.",
-      "byteAttribution": {
-        "originalBytes": 1895,
-        "renderedBytes": 1218
-      },
       "incomingEdges": [
         {
           "consumer": "client",
@@ -909,6 +1062,11 @@
       "requirements": [
         "WRC-C-R18"
       ],
+      "rationale": "Core retains the complete plugin inventory that validates and orders the one Host construction batch before side effects.",
+      "byteAttribution": {
+        "originalBytes": 19740,
+        "renderedBytes": 9909
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -916,11 +1074,6 @@
         "full",
         "custom"
       ],
-      "rationale": "Core retains the complete plugin inventory that validates and orders the one Host construction batch before side effects.",
-      "byteAttribution": {
-        "originalBytes": 19740,
-        "renderedBytes": 9909
-      },
       "incomingEdges": [
         {
           "consumer": "client",
@@ -958,6 +1111,11 @@
       "requirements": [
         "WRC-C-R15"
       ],
+      "rationale": "Selected features and bootstrap retain canonical internal shared keys for typed Host-owned ports without public surface leakage.",
+      "byteAttribution": {
+        "originalBytes": 8999,
+        "renderedBytes": 1292
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -965,11 +1123,6 @@
         "full",
         "custom"
       ],
-      "rationale": "Selected features and bootstrap retain canonical internal shared keys for typed Host-owned ports without public surface leakage.",
-      "byteAttribution": {
-        "originalBytes": 8999,
-        "renderedBytes": 1292
-      },
       "incomingEdges": [
         {
           "consumer": "client",
@@ -1147,6 +1300,11 @@
       "requirements": [
         "WRC-C-R29"
       ],
+      "rationale": "Core and WebRpcPluginHost retain the sole translator from WebRPC feature definitions to the canonical PluginHost install batch.",
+      "byteAttribution": {
+        "originalBytes": 26618,
+        "renderedBytes": 17180
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1154,11 +1312,6 @@
         "full",
         "custom"
       ],
-      "rationale": "Core and WebRpcPluginHost retain the sole translator from WebRPC feature definitions to the canonical PluginHost install batch.",
-      "byteAttribution": {
-        "originalBytes": 26618,
-        "renderedBytes": 17180
-      },
       "incomingEdges": [
         {
           "consumer": "client",
@@ -1221,6 +1374,11 @@
       "requirements": [
         "WRC-C-R50"
       ],
+      "rationale": "Provider inventory and admission retain the WeakSet-backed package-native identity authority that mints and checks first-party provider modules and claims without owning duplicate detection.",
+      "byteAttribution": {
+        "originalBytes": 1343,
+        "renderedBytes": 1251
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1228,11 +1386,6 @@
         "full",
         "custom"
       ],
-      "rationale": "Provider inventory and admission retain the WeakSet-backed package-native identity authority that mints and checks first-party provider modules and claims without owning duplicate detection.",
-      "byteAttribution": {
-        "originalBytes": 1343,
-        "renderedBytes": 1251
-      },
       "incomingEdges": [
         {
           "consumer": "client",
@@ -1310,17 +1463,17 @@
       "requirements": [
         "WRC-C-R38"
       ],
+      "rationale": "Outbound attachment retains the post-commit transport activation boundary only for consumers selecting outbound behavior.",
+      "byteAttribution": {
+        "originalBytes": 1516,
+        "renderedBytes": 1235
+      },
       "retainedConsumers": [
         "client",
         "provider",
         "full",
         "custom"
       ],
-      "rationale": "Outbound attachment retains the post-commit transport activation boundary only for consumers selecting outbound behavior.",
-      "byteAttribution": {
-        "originalBytes": 1516,
-        "renderedBytes": 1235
-      },
       "incomingEdges": [
         {
           "consumer": "client",
@@ -1353,6 +1506,11 @@
       "requirements": [
         "WRC-C-R28"
       ],
+      "rationale": "Core retains the sole WebRPC PluginHost specialization that applies package-specific disposal error translation without a second lifecycle owner.",
+      "byteAttribution": {
+        "originalBytes": 4625,
+        "renderedBytes": 2777
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1360,11 +1518,6 @@
         "full",
         "custom"
       ],
-      "rationale": "Core retains the sole WebRPC PluginHost specialization that applies package-specific disposal error translation without a second lifecycle owner.",
-      "byteAttribution": {
-        "originalBytes": 4625,
-        "renderedBytes": 2775
-      },
       "incomingEdges": [
         {
           "consumer": "client",
@@ -1402,6 +1555,11 @@
       "requirements": [
         "WRC-C-R30"
       ],
+      "rationale": "Canonical pure topology admission retained by selected endpoint consumers; no WebRPC-local DAG owner.",
+      "byteAttribution": {
+        "originalBytes": 9220,
+        "renderedBytes": 8103
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1409,11 +1567,6 @@
         "full",
         "custom"
       ],
-      "rationale": "Canonical pure topology admission retained by selected endpoint consumers; no WebRPC-local DAG owner.",
-      "byteAttribution": {
-        "originalBytes": 9220,
-        "renderedBytes": 8103
-      },
       "incomingEdges": [
         {
           "consumer": "client",
@@ -1446,12 +1599,16 @@
       }
     },
     {
+      "module": "workspace:packages/lifecycle/dist/abort-factory.js",
       "owner": "@migaia/lifecycle",
       "requirements": [
         "AUTH-WEBRPC-RETAINED"
       ],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
-      "module": "workspace:packages/lifecycle/dist/abort-factory.js",
+      "byteAttribution": {
+        "originalBytes": 1226,
+        "renderedBytes": 1306
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1459,10 +1616,6 @@
         "full",
         "custom"
       ],
-      "byteAttribution": {
-        "originalBytes": 1226,
-        "renderedBytes": 1273
-      },
       "incomingEdges": [],
       "provenance": {
         "kind": "generated-artifact",
@@ -1476,12 +1629,17 @@
       }
     },
     {
-      "owner": "@migaia/lifecycle",
+      "module": "workspace:packages/lifecycle/dist/abort.js",
+      "owner": "@migaia/web-rpc",
       "requirements": [
-        "AUTH-WEBRPC-RETAINED"
+        "TSR-R03",
+        "TSR-R07"
       ],
-      "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
-      "module": "workspace:packages/lifecycle/dist/bounded-wait.js",
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 264,
+        "renderedBytes": 84
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1489,10 +1647,36 @@
         "full",
         "custom"
       ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/lifecycle/dist/abort.js",
+          "artifactSha256": "e3f49f0c9000e95ab0b7daed5c7eeee548e397e00c095fc51bde912e6ba11472",
+          "generator": "canonical package build output",
+          "source": "packages/lifecycle/src/abort.ts",
+          "sourceSha256": "53e558f5a169b796973bc03a02b38d0829210793ef67b9456221f86ac76c0bd2"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/bounded-wait.js",
+      "owner": "@migaia/lifecycle",
+      "requirements": [
+        "AUTH-WEBRPC-RETAINED"
+      ],
+      "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 583,
-        "renderedBytes": 642
+        "renderedBytes": 643
       },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
       "incomingEdges": [],
       "provenance": {
         "kind": "generated-artifact",
@@ -1506,12 +1690,16 @@
       }
     },
     {
+      "module": "workspace:packages/lifecycle/dist/dispose-transaction.js",
       "owner": "@migaia/lifecycle",
       "requirements": [
         "AUTH-WEBRPC-RETAINED"
       ],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
-      "module": "workspace:packages/lifecycle/dist/dispose-transaction.js",
+      "byteAttribution": {
+        "originalBytes": 5256,
+        "renderedBytes": 6150
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1519,10 +1707,6 @@
         "full",
         "custom"
       ],
-      "byteAttribution": {
-        "originalBytes": 5256,
-        "renderedBytes": 6137
-      },
       "incomingEdges": [],
       "provenance": {
         "kind": "generated-artifact",
@@ -1536,12 +1720,16 @@
       }
     },
     {
+      "module": "workspace:packages/lifecycle/dist/disposer-context.js",
       "owner": "@migaia/lifecycle",
       "requirements": [
         "AUTH-WEBRPC-RETAINED"
       ],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
-      "module": "workspace:packages/lifecycle/dist/disposer-context.js",
+      "byteAttribution": {
+        "originalBytes": 342,
+        "renderedBytes": 193
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1549,10 +1737,6 @@
         "full",
         "custom"
       ],
-      "byteAttribution": {
-        "originalBytes": 342,
-        "renderedBytes": 192
-      },
       "incomingEdges": [],
       "provenance": {
         "kind": "generated-artifact",
@@ -1566,12 +1750,16 @@
       }
     },
     {
+      "module": "workspace:packages/lifecycle/dist/error-code.js",
       "owner": "@migaia/lifecycle",
       "requirements": [
         "AUTH-WEBRPC-RETAINED"
       ],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
-      "module": "workspace:packages/lifecycle/dist/error-code.js",
+      "byteAttribution": {
+        "originalBytes": 910,
+        "renderedBytes": 960
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1579,10 +1767,6 @@
         "full",
         "custom"
       ],
-      "byteAttribution": {
-        "originalBytes": 910,
-        "renderedBytes": 960
-      },
       "incomingEdges": [],
       "provenance": {
         "kind": "generated-artifact",
@@ -1596,12 +1780,16 @@
       }
     },
     {
+      "module": "workspace:packages/lifecycle/dist/error-text.js",
       "owner": "@migaia/lifecycle",
       "requirements": [
         "AUTH-WEBRPC-RETAINED"
       ],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
-      "module": "workspace:packages/lifecycle/dist/error-text.js",
+      "byteAttribution": {
+        "originalBytes": 1496,
+        "renderedBytes": 1543
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1609,10 +1797,6 @@
         "full",
         "custom"
       ],
-      "byteAttribution": {
-        "originalBytes": 1496,
-        "renderedBytes": 1543
-      },
       "incomingEdges": [],
       "provenance": {
         "kind": "generated-artifact",
@@ -1626,12 +1810,16 @@
       }
     },
     {
+      "module": "workspace:packages/lifecycle/dist/errors.js",
       "owner": "@migaia/lifecycle",
       "requirements": [
         "AUTH-WEBRPC-RETAINED"
       ],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
-      "module": "workspace:packages/lifecycle/dist/errors.js",
+      "byteAttribution": {
+        "originalBytes": 3119,
+        "renderedBytes": 3577
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1639,10 +1827,6 @@
         "full",
         "custom"
       ],
-      "byteAttribution": {
-        "originalBytes": 3119,
-        "renderedBytes": 3565
-      },
       "incomingEdges": [],
       "provenance": {
         "kind": "generated-artifact",
@@ -1656,22 +1840,23 @@
       }
     },
     {
+      "module": "workspace:packages/lifecycle/dist/generation-controller.js",
       "owner": "@migaia/lifecycle",
       "requirements": [
         "AUTH-WEBRPC-RETAINED"
       ],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
-      "module": "workspace:packages/lifecycle/dist/generation-controller.js",
+      "byteAttribution": {
+        "originalBytes": 3586,
+        "renderedBytes": 4274
+      },
       "retainedConsumers": [
+        "core",
         "client",
         "provider",
         "full",
         "custom"
       ],
-      "byteAttribution": {
-        "originalBytes": 3586,
-        "renderedBytes": 4269
-      },
       "incomingEdges": [],
       "provenance": {
         "kind": "generated-artifact",
@@ -1685,12 +1870,16 @@
       }
     },
     {
+      "module": "workspace:packages/lifecycle/dist/lifecycle-scope.js",
       "owner": "@migaia/lifecycle",
       "requirements": [
         "AUTH-WEBRPC-RETAINED"
       ],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
-      "module": "workspace:packages/lifecycle/dist/lifecycle-scope.js",
+      "byteAttribution": {
+        "originalBytes": 2796,
+        "renderedBytes": 2972
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1698,10 +1887,6 @@
         "full",
         "custom"
       ],
-      "byteAttribution": {
-        "originalBytes": 2796,
-        "renderedBytes": 2963
-      },
       "incomingEdges": [],
       "provenance": {
         "kind": "generated-artifact",
@@ -1715,12 +1900,17 @@
       }
     },
     {
-      "owner": "@migaia/lifecycle",
+      "module": "workspace:packages/lifecycle/dist/mutation-queue.js",
+      "owner": "@migaia/web-rpc",
       "requirements": [
-        "AUTH-WEBRPC-RETAINED"
+        "TSR-R03",
+        "TSR-R07"
       ],
-      "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
-      "module": "workspace:packages/lifecycle/dist/observed-subscription.js",
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 3406,
+        "renderedBytes": 4246
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1728,10 +1918,36 @@
         "full",
         "custom"
       ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/lifecycle/dist/mutation-queue.js",
+          "artifactSha256": "8cd76703230876a7983a4aefcc128e7e6b2e1c4c1abf103efc19ee7395d88c48",
+          "generator": "canonical package build output",
+          "source": "packages/lifecycle/src/mutation-queue.ts",
+          "sourceSha256": "77bb40802b82001654c92c566b2e01211fdd78ce26dc307b030ad7653eabe9ed"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/observed-subscription.js",
+      "owner": "@migaia/lifecycle",
+      "requirements": [
+        "AUTH-WEBRPC-RETAINED"
+      ],
+      "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 1179,
         "renderedBytes": 1485
       },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
       "incomingEdges": [],
       "provenance": {
         "kind": "generated-artifact",
@@ -1745,22 +1961,54 @@
       }
     },
     {
-      "owner": "@migaia/lifecycle",
+      "module": "workspace:packages/lifecycle/dist/provisional-scope.js",
+      "owner": "@migaia/web-rpc",
       "requirements": [
-        "AUTH-WEBRPC-RETAINED"
+        "TSR-R03",
+        "TSR-R07"
       ],
-      "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
-      "module": "workspace:packages/lifecycle/dist/quiescence-tracker.js",
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 2708,
+        "renderedBytes": 2956
+      },
       "retainedConsumers": [
+        "core",
         "client",
         "provider",
         "full",
         "custom"
       ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/lifecycle/dist/provisional-scope.js",
+          "artifactSha256": "46fba201b95c6c2d995acc7e53521f8169817c62f31cab9a3937946ebc4e7511",
+          "generator": "canonical package build output",
+          "source": "packages/lifecycle/src/provisional-scope.ts",
+          "sourceSha256": "f8d329e4ff45aa7e18e94a18253edd172c793ae98d10643ae9f7108bae6ed1e6"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/quiescence-tracker.js",
+      "owner": "@migaia/lifecycle",
+      "requirements": [
+        "AUTH-WEBRPC-RETAINED"
+      ],
+      "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
       "byteAttribution": {
         "originalBytes": 1696,
-        "renderedBytes": 1523
+        "renderedBytes": 1916
       },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
       "incomingEdges": [],
       "provenance": {
         "kind": "generated-artifact",
@@ -1774,12 +2022,16 @@
       }
     },
     {
+      "module": "workspace:packages/lifecycle/dist/scheduler.js",
       "owner": "@migaia/lifecycle",
       "requirements": [
         "AUTH-WEBRPC-RETAINED"
       ],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
-      "module": "workspace:packages/lifecycle/dist/scheduler.js",
+      "byteAttribution": {
+        "originalBytes": 3221,
+        "renderedBytes": 2506
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1787,10 +2039,6 @@
         "full",
         "custom"
       ],
-      "byteAttribution": {
-        "originalBytes": 3221,
-        "renderedBytes": 2498
-      },
       "incomingEdges": [],
       "provenance": {
         "kind": "generated-artifact",
@@ -1804,12 +2052,16 @@
       }
     },
     {
+      "module": "workspace:packages/lifecycle/dist/state-constants.js",
       "owner": "@migaia/lifecycle",
       "requirements": [
         "AUTH-WEBRPC-RETAINED"
       ],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
-      "module": "workspace:packages/lifecycle/dist/state-constants.js",
+      "byteAttribution": {
+        "originalBytes": 583,
+        "renderedBytes": 474
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1817,10 +2069,6 @@
         "full",
         "custom"
       ],
-      "byteAttribution": {
-        "originalBytes": 583,
-        "renderedBytes": 286
-      },
       "incomingEdges": [],
       "provenance": {
         "kind": "generated-artifact",
@@ -1834,12 +2082,16 @@
       }
     },
     {
+      "module": "workspace:packages/lifecycle/dist/sync-lifecycle-scope.js",
       "owner": "@migaia/lifecycle",
       "requirements": [
         "AUTH-WEBRPC-RETAINED"
       ],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
-      "module": "workspace:packages/lifecycle/dist/sync-lifecycle-scope.js",
+      "byteAttribution": {
+        "originalBytes": 2871,
+        "renderedBytes": 3172
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1847,10 +2099,6 @@
         "full",
         "custom"
       ],
-      "byteAttribution": {
-        "originalBytes": 2871,
-        "renderedBytes": 3158
-      },
       "incomingEdges": [],
       "provenance": {
         "kind": "generated-artifact",
@@ -1864,12 +2112,16 @@
       }
     },
     {
+      "module": "workspace:packages/lifecycle/dist/terminal-controller.js",
       "owner": "@migaia/lifecycle",
       "requirements": [
         "AUTH-WEBRPC-RETAINED"
       ],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
-      "module": "workspace:packages/lifecycle/dist/terminal-controller.js",
+      "byteAttribution": {
+        "originalBytes": 338,
+        "renderedBytes": 370
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1877,10 +2129,6 @@
         "full",
         "custom"
       ],
-      "byteAttribution": {
-        "originalBytes": 338,
-        "renderedBytes": 364
-      },
       "incomingEdges": [],
       "provenance": {
         "kind": "generated-artifact",
@@ -1894,12 +2142,16 @@
       }
     },
     {
+      "module": "workspace:packages/lifecycle/dist/types.js",
       "owner": "@migaia/lifecycle",
       "requirements": [
         "AUTH-WEBRPC-RETAINED"
       ],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
-      "module": "workspace:packages/lifecycle/dist/types.js",
+      "byteAttribution": {
+        "originalBytes": 111,
+        "renderedBytes": 101
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1907,10 +2159,6 @@
         "full",
         "custom"
       ],
-      "byteAttribution": {
-        "originalBytes": 111,
-        "renderedBytes": 101
-      },
       "incomingEdges": [],
       "provenance": {
         "kind": "generated-artifact",
@@ -1924,11 +2172,17 @@
       }
     },
     {
-      "module": "workspace:packages/plugin-host/dist/index.js",
-      "owner": "@migaia/plugin-host",
+      "module": "workspace:packages/middleware-pipeline/dist/index.js",
+      "owner": "@migaia/web-rpc",
       "requirements": [
-        "WRC-C-R28"
+        "TSR-R03",
+        "TSR-R07"
       ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 8495,
+        "renderedBytes": 8119
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -1936,74 +2190,691 @@
         "full",
         "custom"
       ],
-      "rationale": "Canonical generic plugin lifecycle, shared, extension, resource, rollback, and disposal owner.",
-      "byteAttribution": {
-        "originalBytes": 109857,
-        "renderedBytes": 109353
-      },
-      "incomingEdges": [
-        {
-          "consumer": "client",
-          "from": "src/internal/disposal-translation.ts",
-          "to": "workspace:packages/plugin-host/dist/index.js"
-        },
-        {
-          "consumer": "client",
-          "from": "src/internal/web-rpc-plugin-host.ts",
-          "to": "workspace:packages/plugin-host/dist/index.js"
-        },
-        {
-          "consumer": "core",
-          "from": "src/internal/disposal-translation.ts",
-          "to": "workspace:packages/plugin-host/dist/index.js"
-        },
-        {
-          "consumer": "core",
-          "from": "src/internal/web-rpc-plugin-host.ts",
-          "to": "workspace:packages/plugin-host/dist/index.js"
-        },
-        {
-          "consumer": "custom",
-          "from": "src/internal/disposal-translation.ts",
-          "to": "workspace:packages/plugin-host/dist/index.js"
-        },
-        {
-          "consumer": "custom",
-          "from": "src/internal/web-rpc-plugin-host.ts",
-          "to": "workspace:packages/plugin-host/dist/index.js"
-        },
-        {
-          "consumer": "full",
-          "from": "src/internal/disposal-translation.ts",
-          "to": "workspace:packages/plugin-host/dist/index.js"
-        },
-        {
-          "consumer": "full",
-          "from": "src/internal/web-rpc-plugin-host.ts",
-          "to": "workspace:packages/plugin-host/dist/index.js"
-        },
-        {
-          "consumer": "provider",
-          "from": "src/internal/disposal-translation.ts",
-          "to": "workspace:packages/plugin-host/dist/index.js"
-        },
-        {
-          "consumer": "provider",
-          "from": "src/internal/web-rpc-plugin-host.ts",
-          "to": "workspace:packages/plugin-host/dist/index.js"
-        }
-      ],
+      "incomingEdges": [],
       "provenance": {
-        "kind": "import-edge"
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/middleware-pipeline/dist/index.js",
+          "artifactSha256": "12df100794979f61cd59de9527d58ddc0bc697c7e1ae07e4698e7ef9e5ef60ac",
+          "generator": "canonical package build output",
+          "source": "packages/middleware-pipeline/src/index.ts",
+          "sourceSha256": "158fce88f937bd8d1c3206865b7588346a57724b8cab487e513f3e2177677df7"
+        }
       }
     },
     {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/assertClassBrand.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 289,
+        "renderedBytes": 292
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/assertClassBrand.js",
+          "artifactSha256": "c53364b723ccc4c111149fc7dee86cec002f79c580135fc72b5814e411b12162",
+          "generator": "canonical package build output"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/checkPrivateRedeclaration.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 239,
+        "renderedBytes": 244
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/checkPrivateRedeclaration.js",
+          "artifactSha256": "6cedc9c1140a34c9368835adc376c3ddf8d7a49dddc0058d9de968e527df227d",
+          "generator": "canonical package build output"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldGet2.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 200,
+        "renderedBytes": 166
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldGet2.js",
+          "artifactSha256": "9fcfb21245951e57fd821c8e8bdba00f1fd3bdb964d6e2e624b10e2044df9322",
+          "generator": "canonical package build output"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldInitSpec.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 215,
+        "renderedBytes": 174
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldInitSpec.js",
+          "artifactSha256": "845a3c5e820c0165e41d074083b5339b9d5c9414f3007df897381b0e8f932122",
+          "generator": "canonical package build output"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldSet2.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 209,
+        "renderedBytes": 173
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldSet2.js",
+          "artifactSha256": "a49497b9fa4c6ef560459f3bfcc4e643c60d4ba5e0ca5ee579335b516ee47eb7",
+          "generator": "canonical package build output"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateMethodInitSpec.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 210,
+        "renderedBytes": 169
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateMethodInitSpec.js",
+          "artifactSha256": "ad804b2e4fb8a30b977de586c65d3f8ed44963f5b1a58b047020d81594bfce8b",
+          "generator": "canonical package build output"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/defineProperty.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 309,
+        "renderedBytes": 280
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/defineProperty.js",
+          "artifactSha256": "f9cd48c10148fa6c0cdc351fd4f2cacb1ecb17b84d80f0144d1d7132c56f3be5",
+          "generator": "canonical package build output"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPrimitive.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 436,
+        "renderedBytes": 416
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPrimitive.js",
+          "artifactSha256": "80ed19b5e14696b42b6faffebe8370c3318fb14f1894139405efae6eb9d40967",
+          "generator": "canonical package build output"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPropertyKey.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 253,
+        "renderedBytes": 199
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPropertyKey.js",
+          "artifactSha256": "0e5f6aa31ce322cc19e88f5159ac23483c80d8dfb06449866298ca444c705482",
+          "generator": "canonical package build output"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/typeof.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 408,
+        "renderedBytes": 417
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/typeof.js",
+          "artifactSha256": "396209f0298d00a442c70d735b1111ee577698559056cbabdfd64e69d67fac74",
+          "generator": "canonical package build output"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/config.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 21362,
+        "renderedBytes": 21546
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/config.js",
+          "artifactSha256": "949c3aa654d7d8551f6fb4836a092e0bc1775bf7bfb0061926a892b740b6fbd7",
+          "generator": "canonical package build output",
+          "source": "packages/plugin-host/src/config.ts",
+          "sourceSha256": "817e69511e78c5f7f8197dee57af317c1f28ce08b5f3e0a1aef7685a788d6eb1"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/core.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 2213,
+        "renderedBytes": 1876
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/core.js",
+          "artifactSha256": "0546b6be0cf3240fc631efa0dd37da2c60c0fe8d8bfe6de40272fbc0b82ebd26",
+          "generator": "canonical package build output",
+          "source": "packages/plugin-host/src/core.ts",
+          "sourceSha256": "327741ad170a59f36aae38bc721e0a1c01eb4e2270c9c916086485b5ac84e821"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/disposal.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 982,
+        "renderedBytes": 724
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/disposal.js",
+          "artifactSha256": "a4083d203b98f775681e98ef0ae1eafc1ef8fcd303c38117b9a6adba1e78985d",
+          "generator": "canonical package build output",
+          "source": "packages/plugin-host/src/disposal.ts",
+          "sourceSha256": "9cd460db40505f03a4e858912ecf694e0a4ba8dfa92c513bbcee1118f57c142b"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/error-code.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 1447,
+        "renderedBytes": 1370
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/error-code.js",
+          "artifactSha256": "52d1bcdc471450bb136a0c90396e423fbc24a54327dae32513dcc7b9aef84073",
+          "generator": "canonical package build output",
+          "source": "packages/plugin-host/src/error-code.ts",
+          "sourceSha256": "015bca548a363b5befaf09e812302df86c1c914e73386ce50e0e2f831e04b2d5"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/error-text.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 5688,
+        "renderedBytes": 4864
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/error-text.js",
+          "artifactSha256": "ec770072b0b2a13700db1df9fd71a389c97b8992a076c6c3237898d4a9781e60",
+          "generator": "canonical package build output",
+          "source": "packages/plugin-host/src/error-text.ts",
+          "sourceSha256": "ee8e4f28f1418cfbaebcc91caf4cc52b703686bf9ef6c8a5c4fd15a070873b63"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/extension.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 720,
+        "renderedBytes": 516
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/extension.js",
+          "artifactSha256": "5fc39f47aa10757be4f92abc37f873906cef3dfa6454741cbe26942bc829eabf",
+          "generator": "canonical package build output",
+          "source": "packages/plugin-host/src/extension.ts",
+          "sourceSha256": "c0fb1dc34ef7adae880d3ef7ce5952603078cbe088686097686777bc11efcb54"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/host-runtime.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 28671,
+        "renderedBytes": 28519
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/host-runtime.js",
+          "artifactSha256": "0effa425f99cb12e1ee9671b0a33587d4106fba58fe542ffc0a8502c2a1f51ba",
+          "generator": "canonical package build output",
+          "source": "packages/plugin-host/src/host-runtime.ts",
+          "sourceSha256": "871a4464477c7d12c7a128dc49b941018368468030efe0ed5e06291c7cb16641"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/invocation.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 157,
+        "renderedBytes": 104
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/invocation.js",
+          "artifactSha256": "08fdfc5dfdb16e5bbe65f3bf12539d83f65ea55d359c369c87ed8a5488ac0c27",
+          "generator": "canonical package build output",
+          "source": "packages/plugin-host/src/invocation.ts",
+          "sourceSha256": "227f79102df4bd2671cfecf9c4b6129dbf2d52a00ea56cfc5ea54e04d7a58c10"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/pipeline.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 1919,
+        "renderedBytes": 1072
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/pipeline.js",
+          "artifactSha256": "fc4b6d361a84e5c3d61c5c1f5b9d89fbb67fdfd247c8e8c5df42439900a48340",
+          "generator": "canonical package build output",
+          "source": "packages/plugin-host/src/pipeline.ts",
+          "sourceSha256": "3dde0a5941777756c03d084c2c2e3d0e53c331cbc62084d8726a085e84b612f5"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/state-constants.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 514,
+        "renderedBytes": 294
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/state-constants.js",
+          "artifactSha256": "a443b37db74d9dd612cd342d654765a3f1abfc7a99d415e4d59a957a763c51db",
+          "generator": "canonical package build output",
+          "source": "packages/plugin-host/src/state-constants.ts",
+          "sourceSha256": "426a2a95a7a3104d361ccae13641f4f8536fbb27200b9db4081cb78f36b298b2"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/symbols.js",
+      "owner": "@migaia/plugin-host",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 369,
+        "renderedBytes": 298
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/plugin-host/dist/symbols.js",
+          "artifactSha256": "5b2b2da80cd7cd986c53f2488e03402b0186970470575e61c49bb816fc6b46c3",
+          "generator": "canonical package build output",
+          "source": "packages/plugin-host/src/symbols.ts",
+          "sourceSha256": "91c597f2e0a2da0a466ab3c8c55372ee578225be3af2f9e6f33b0f80df31e110"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/utils/dist/config.js",
+      "owner": "@migaia/web-rpc",
+      "requirements": [
+        "TSR-R03",
+        "TSR-R07"
+      ],
+      "rationale": "The admitted preserveModules publication retains this uniquely attributed PluginHost module in the selected WebRPC consumer closure.",
+      "byteAttribution": {
+        "originalBytes": 20769,
+        "renderedBytes": 1716
+      },
+      "retainedConsumers": [
+        "core",
+        "client",
+        "provider",
+        "full",
+        "custom"
+      ],
+      "incomingEdges": [],
+      "provenance": {
+        "kind": "generated-artifact",
+        "locator": {
+          "artifact": "workspace:packages/utils/dist/config.js",
+          "artifactSha256": "25937a905e880f6958611aca5ab5792f4fb9982b6b4d2a21b08be7b7ecf9863f",
+          "generator": "canonical package build output",
+          "source": "packages/utils/src/config.ts",
+          "sourceSha256": "98a34bbac8952095c02aa67aa51cefb037aeb16665ac9ab3f5ad7386e7e0d926"
+        }
+      }
+    },
+    {
+      "module": "workspace:packages/utils/dist/error-text-Cw8rxmXe.js",
       "owner": "@migaia/utils",
       "requirements": [
         "AUTH-WEBRPC-RETAINED"
       ],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
-      "module": "workspace:packages/utils/dist/error-text-Cw8rxmXe.js",
+      "byteAttribution": {
+        "originalBytes": 2380,
+        "renderedBytes": 2339
+      },
       "retainedConsumers": [
         "core",
         "client",
@@ -2011,10 +2882,6 @@
         "full",
         "custom"
       ],
-      "byteAttribution": {
-        "originalBytes": 2380,
-        "renderedBytes": 2337
-      },
       "incomingEdges": [],
       "provenance": {
         "kind": "generated-artifact",
@@ -2028,22 +2895,23 @@
       }
     },
     {
+      "module": "workspace:packages/utils/dist/object-path.js",
       "owner": "@migaia/utils",
       "requirements": [
         "AUTH-WEBRPC-RETAINED"
       ],
       "rationale": "Generated dependency artifact retained by the canonical WebRPC build; its source and generator are recorded without inventing an import edge.",
-      "module": "workspace:packages/utils/dist/object-path.js",
+      "byteAttribution": {
+        "originalBytes": 4552,
+        "renderedBytes": 1998
+      },
       "retainedConsumers": [
+        "core",
         "client",
         "provider",
         "full",
         "custom"
       ],
-      "byteAttribution": {
-        "originalBytes": 4552,
-        "renderedBytes": 1995
-      },
       "incomingEdges": [],
       "provenance": {
         "kind": "generated-artifact",
@@ -2184,17 +3052,17 @@
   "causality": {
     "cause": "PluginHost V2 migration",
     "owner": "@migaia/plugin-host",
-    "module": "workspace:packages/plugin-host/dist/index.js",
+    "module": "workspace:packages/plugin-host/dist/host-runtime.js",
     "evidenceSchema": "WRC-C-B11f-five-consumer-causal-v2",
     "measuredDelta": {
-      "moduleCount": 28,
-      "rawBytes": 228381,
-      "gzipBytes": 53360,
+      "moduleCount": 53,
+      "rawBytes": 200544,
+      "gzipBytes": 46814,
       "endpointStaticImportCount": -16
     },
     "byteAttribution": {
-      "originalBytes": 109857,
-      "renderedBytes": 109353
+      "originalBytes": 28671,
+      "renderedBytes": 28519
     },
     "retainedBy": [
       "core",
@@ -2203,58 +3071,7 @@
       "full",
       "custom"
     ],
-    "incomingEdges": [
-      {
-        "consumer": "client",
-        "from": "src/internal/disposal-translation.ts",
-        "to": "workspace:packages/plugin-host/dist/index.js"
-      },
-      {
-        "consumer": "client",
-        "from": "src/internal/web-rpc-plugin-host.ts",
-        "to": "workspace:packages/plugin-host/dist/index.js"
-      },
-      {
-        "consumer": "core",
-        "from": "src/internal/disposal-translation.ts",
-        "to": "workspace:packages/plugin-host/dist/index.js"
-      },
-      {
-        "consumer": "core",
-        "from": "src/internal/web-rpc-plugin-host.ts",
-        "to": "workspace:packages/plugin-host/dist/index.js"
-      },
-      {
-        "consumer": "custom",
-        "from": "src/internal/disposal-translation.ts",
-        "to": "workspace:packages/plugin-host/dist/index.js"
-      },
-      {
-        "consumer": "custom",
-        "from": "src/internal/web-rpc-plugin-host.ts",
-        "to": "workspace:packages/plugin-host/dist/index.js"
-      },
-      {
-        "consumer": "full",
-        "from": "src/internal/disposal-translation.ts",
-        "to": "workspace:packages/plugin-host/dist/index.js"
-      },
-      {
-        "consumer": "full",
-        "from": "src/internal/web-rpc-plugin-host.ts",
-        "to": "workspace:packages/plugin-host/dist/index.js"
-      },
-      {
-        "consumer": "provider",
-        "from": "src/internal/disposal-translation.ts",
-        "to": "workspace:packages/plugin-host/dist/index.js"
-      },
-      {
-        "consumer": "provider",
-        "from": "src/internal/web-rpc-plugin-host.ts",
-        "to": "workspace:packages/plugin-host/dist/index.js"
-      }
-    ]
+    "incomingEdges": []
   },
   "incrementalCausality": {
     "cause": "event-subscriber styled handle and invoke migration",

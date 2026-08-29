@@ -2,10 +2,10 @@
   "schema": "WRC-C-B11-approval-v2",
   "algorithm": "ed25519",
   "authorityId": "web-rpc-release-coordinator-v1",
-  "keyId": "coordinator-ed25519-aebc26a0c4859e17",
-  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAgs+bzUFTs5aLiVdpv2KtvLNZzIF0ZNQh7Ke42L5JIdQ=\n-----END PUBLIC KEY-----\n",
-  "decisionId": "WRC-C-B11-decision-20260829-S4R1",
-  "payloadDigest": "a5251504c3171f9718d75ba599ebbb7e1b86536b6a635fc40aa47c554e4868a9",
+  "keyId": "coordinator-ed25519-48f6e693342b09c3",
+  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEABC8pLNtvgHi9pCk4BYoL33HKxbaNirBRq74FL/gm71E=\n-----END PUBLIC KEY-----\n",
+  "decisionId": "WRC-C-B11-decision-20260829-TSR-SDDV5",
+  "payloadDigest": "968132bedd9df573c06b9bb0baf1d8662a16c510aae89503f4258cb7006c60a7",
   "status": "approved",
-  "reason": "Successor S4 exact protected-custody refresh after deterministic current root and retained-input drift, using two identical canonical builds."
+  "reason": "SDD-v5 non-store tree-shaking custody refresh after real emitted sourcemap provenance and PluginHost preserveModules topology changes, based on two identical canonical builds."
 }
