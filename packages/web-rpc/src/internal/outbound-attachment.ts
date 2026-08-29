@@ -5,7 +5,6 @@ import {
   WebRpcErrorCode,
   WebRpcLifecycleError,
   WebRpcRemoteError,
-  WebRpcSchemaValidationError,
   WebRpcTimeoutError
 } from '../errors.js'
 import { WebRpcMessageKind } from '../protocol-constants.js'
@@ -33,7 +32,6 @@ import { PendingRegistry } from './pending.js'
 import { WebRpcOutboundSender } from './outbound-sender.js'
 import { ReplayWindow } from './replay.js'
 import { splitUtf8, utf8ByteLength } from './utf8.js'
-import { executeWithRetry } from './retry.js'
 import { OperationScope } from './operation-scope.js'
 import { SourceIdentityRegistry } from './source-identity.js'
 import { InboundIdentityCoordinator } from './inbound-identity.js'
@@ -103,7 +101,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
   readonly #protocol: IWebRpcProtocolCapability
   /** Optional inbound/outbound protection capability. */
   readonly #authentication: IWebRpcAuthenticationCapability | undefined
-  /** Canonical dynamic timeout and retry policy installed by middleware. */
+  /** Canonical dynamic timeout capability installed by middleware. */
   readonly #timeout: IWebRpcTimeoutCapability
   /** Enables caller abort semantics only when the abort capability is selected. */
   readonly #abortEnabled: boolean
@@ -293,7 +291,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
     this.#activated = true
   }
 
-  /** Sends one request through the canonical total-deadline retry and cancellation closure. */
+  /** Sends one request through the canonical single-attempt deadline and cancellation closure. */
   async send<T>(
     targetId: string,
     method: string,
@@ -331,56 +329,16 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
     const timeoutMs = this.#timeout.resolveTimeout(options.timeoutMs)
     assertTimeout(timeoutMs)
     const operation = new OperationScope(generation, timeoutMs, this.kernel.closingSignal)
-    const remaining = (): number | false | undefined => operation.remaining(timeoutMs)
-    const retry = this.#timeout.retry
-    return executeWithRetry<T>({
-      maxAttempts: retry?.maxAttempts ?? 1,
-      signals: [operation.signal, ...(options.signal ? [options.signal] : [])],
-      createAbortError: (reason) => new WebRpcAbortError(undefined, undefined, reason),
-      createTimeoutError: () => new WebRpcTimeoutError(),
-      remainingTimeout: remaining,
-      onDiagnostic: (error) => this.emitFailure(error),
-      attempt: async () => {
-        operation.assertActive(this.kernel.generation)
-        const attemptTimeout = remaining()
-        if (attemptTimeout === 0) throw new WebRpcTimeoutError()
-        return this.#requestOnce<T>(
-          targetId,
-          method,
-          data,
-          {
-            ...options,
-            timeoutMs: attemptTimeout
-          },
-          [operation.signal, ...(options.signal ? [options.signal] : [])]
-        )
-      },
-      decide: async (error, attempt) => {
-        if (
-          !retry ||
-          error instanceof WebRpcAbortError ||
-          error instanceof WebRpcTimeoutError ||
-          error instanceof WebRpcLifecycleError ||
-          error instanceof WebRpcSchemaValidationError ||
-          error instanceof WebRpcContractError ||
-          (error instanceof WebRpcRemoteError && !retry.shouldRetry)
-        )
-          return { retry: false }
-        const budget = remaining()
-        if (budget === 0) throw new WebRpcTimeoutError()
-        const context = { attempt, error, targetId, method, data }
-        if (retry.shouldRetry && !(await retry.shouldRetry(context))) return { retry: false }
-        const delay = retry.delay ? await retry.delay(context) : 0
-        if (delay === false || delay === null) return { retry: false }
-        return {
-          retry: true,
-          delayMs: budget === false || budget === undefined ? delay : Math.min(delay, budget)
-        }
-      }
-    }).finally(() => operation.abort())
+    const remaining = operation.remaining(timeoutMs)
+    operation.assertActive(this.kernel.generation)
+    if (remaining === 0) throw new WebRpcTimeoutError()
+    return this.#requestOnce<T>(targetId, method, data, { ...options, timeoutMs: remaining }, [
+      operation.signal,
+      ...(options.signal ? [options.signal] : [])
+    ]).finally(() => operation.abort())
   }
 
-  /** Owns one retry attempt's task id, pending settlement, timeout, and abort listeners. */
+  /** Owns one request's task id, pending settlement, timeout, and abort listeners. */
   #requestOnce<T>(
     targetId: string,
     method: string,

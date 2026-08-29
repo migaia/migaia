@@ -47,6 +47,8 @@ export const WebRpcErrorText = {
   outboundReplayFull: 'Replay window is full',
   /** Stable validation failure for an uncallable event listener. */
   eventListenerInvalid: 'event listener must be a function',
+  /** Stable method/target validation text shared by outbound and provider registration. */
+  methodInvalid: 'method must be a non-empty string',
   /** Stable capability failure when caller cancellation was not selected. */
   abortMiddlewareMissing: 'abort middleware is not installed',
   /** Stable validation failure when a hostile cancellation signal cannot be observed. */

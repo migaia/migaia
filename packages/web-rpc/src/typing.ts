@@ -19,6 +19,11 @@ export type IWebRpcContext = {
 export type IWebRpcProvider = (
   context: IWebRpcContext
 ) => IWebRpcProviderResult | Promise<IWebRpcProviderResult>
+/** Bounded provider execution admission; excess requests fail immediately. */
+export type IWebRpcProviderLimits = {
+  readonly maxGlobal?: number
+  readonly maxPerPeer?: number
+}
 export type IWebRpcEventListener = (context: IWebRpcContext) => void | Promise<void>
 export type ISendOptions = {
   readonly signal?: IWebRpcAbortSignal
@@ -102,23 +107,8 @@ export type IWebRpcAuthenticationCapability = {
   readonly protect: IWebRpcAuthenticationTransform
   readonly unprotect: IWebRpcAuthenticationTransform
 }
-export type IWebRpcRetryContext = {
-  readonly attempt: number
-  readonly error: unknown
-  readonly targetId: string
-  readonly method: string
-  readonly data: unknown
-}
-export type IWebRpcRetryConfig = {
-  readonly maxAttempts?: number
-  readonly shouldRetry?: (context: IWebRpcRetryContext) => boolean | Promise<boolean>
-  readonly delay?: (
-    context: IWebRpcRetryContext
-  ) => number | false | null | Promise<number | false | null>
-}
 export type IWebRpcTimeoutConfig = {
   readonly timeoutMs?: number | false
-  readonly retry?: IWebRpcRetryConfig
 }
 /** Executable timeout capability installed by timeout middleware. */
 export type IWebRpcTimeoutCapability = IWebRpcTimeoutConfig & {
@@ -319,6 +309,7 @@ export type IWebRpcFactoryConfig<
   readonly targetIds?: readonly TTargetId[]
   readonly transport?: IWebRpcTransport
   readonly provider?: Readonly<Record<string, IWebRpcProvider>>
+  readonly providerLimits?: IWebRpcProviderLimits
   /** Bounds outbound identifier replay reservations for this endpoint. */
   readonly replay?: {
     readonly maxEntries?: number

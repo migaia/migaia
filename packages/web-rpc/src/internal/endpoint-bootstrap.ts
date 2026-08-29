@@ -17,7 +17,8 @@ import type {
   IWebRpcUuidConfig,
   IWebRpcProtocolCapability,
   IWebRpcPlugin,
-  IWebRpcProvider
+  IWebRpcProvider,
+  IWebRpcProviderLimits
 } from '../typing.js'
 import type { IWebRpcTransport } from '../transport.js'
 import type { IWebRpcEndpointOptions } from './endpoint-options.js'
@@ -28,6 +29,7 @@ export type IPreparedEndpoint<TTargetId extends string> = {
   readonly id: string
   readonly transport: IWebRpcTransport
   readonly providers: Readonly<Record<string, IWebRpcProvider>> | undefined
+  readonly providerLimits?: IWebRpcProviderLimits
   readonly options: IWebRpcEndpointOptions<TTargetId>
 }
 
@@ -43,6 +45,7 @@ export type IDeferredPreparedEndpoint<TTargetId extends string = string> = {
   readonly id: string
   readonly transport: IWebRpcTransport
   readonly providers: Readonly<Record<string, IWebRpcProvider>> | undefined
+  readonly providerLimits: IWebRpcProviderLimits | undefined
   /** Construction controls snapshotted with the other outer configuration fields. */
   readonly construction: IWebRpcFactoryConfig['construction']
   readonly middlewareSnapshots: readonly IEndpointMiddlewareSnapshot[]
@@ -58,6 +61,7 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
   factoryId: string,
   factoryTargetIds: readonly TTargetId[] | undefined,
   factoryProvider: Readonly<Record<string, IWebRpcProvider>> | undefined,
+  factoryProviderLimits: IWebRpcProviderLimits | undefined,
   factoryReplay: IWebRpcFactoryConfig['replay'],
   transport: IWebRpcTransport,
   platform: IWebRpcPlatform,
@@ -166,6 +170,7 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
     id: factoryId,
     transport,
     providers: factoryProvider,
+    providerLimits: factoryProviderLimits,
     options: {
       contract: getShared(WebRpcSharedKey.contract) as IWebRpcContractCapability | undefined,
       uuid: uuidCapability,
@@ -175,6 +180,7 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
       hooks: hooksCapability,
       chunk: chunkCapability,
       targetIds: normalizedTargetIds,
+      providerLimits: factoryProviderLimits,
       connect: connectCapability,
       features: {
         abort: abortCapability?.enabled,
@@ -206,6 +212,7 @@ export async function prepareEndpoint<
   let factoryTargetIds: unknown
   let factoryTransport: unknown
   let factoryProvider: unknown
+  let factoryProviderLimits: unknown
   let construction: IWebRpcFactoryConfig['construction']
   let factoryReplay: IWebRpcFactoryConfig['replay']
   try {
@@ -216,6 +223,7 @@ export async function prepareEndpoint<
     factoryTargetIds = config.targetIds
     factoryTransport = config.transport
     factoryProvider = config.provider
+    factoryProviderLimits = config.providerLimits
     construction = config.construction
     // Snapshotted here with everything else, not read again later at endpoint-construction
     // time: reading it late (past middleware install) means a hostile `replay` getter would
@@ -335,6 +343,7 @@ export async function prepareEndpoint<
     id: factoryId as string,
     transport,
     providers: factoryProvider as IWebRpcFactoryConfig<TTargetId>['provider'],
+    providerLimits: factoryProviderLimits as IWebRpcFactoryConfig<TTargetId>['providerLimits'],
     construction,
     middlewareSnapshots: Object.freeze(middlewareSnapshots.map((item) => Object.freeze(item))),
     finalize: async (installHookEvents, runConstruction, getShared) =>
@@ -342,6 +351,7 @@ export async function prepareEndpoint<
         factoryId as string,
         factoryTargetIds as readonly TTargetId[] | undefined,
         factoryProvider as IWebRpcFactoryConfig<TTargetId>['provider'],
+        factoryProviderLimits as IWebRpcFactoryConfig<TTargetId>['providerLimits'],
         factoryReplay,
         transport,
         platform as IWebRpcPlatform,

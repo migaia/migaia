@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -75,6 +76,34 @@ function uniqueSortedEdges(edges) {
   )
 }
 
+/** Records source/artifact custody for generated workspace modules without inventing edges. */
+function generatedArtifactProvenance(module) {
+  if (!module.startsWith('workspace:packages/')) return undefined
+  const relativeArtifact = module.slice('workspace:'.length)
+  const artifactPath = resolve(workspaceDirectory, relativeArtifact)
+  if (!existsSync(artifactPath)) return undefined
+  const sourceRelative = relativeArtifact.replace(
+    /^packages\/([^/]+)\/dist\/(.*)\.js$/,
+    (_match, packageName, name) => {
+      const sourceName = name.replace(/-[A-Za-z0-9]{8}$/, '')
+      return `packages/${packageName}/src/${sourceName}.ts`
+    }
+  )
+  const sourcePath = resolve(workspaceDirectory, sourceRelative)
+  return {
+    kind: 'generated-artifact',
+    locator: {
+      artifact: module,
+      artifactSha256: createHash('sha256').update(readFileSync(artifactPath)).digest('hex'),
+      generator: 'canonical package build output',
+      source: existsSync(sourcePath) ? sourceRelative : undefined,
+      sourceSha256: existsSync(sourcePath)
+        ? createHash('sha256').update(readFileSync(sourcePath)).digest('hex')
+        : undefined
+    }
+  }
+}
+
 /** Produces five-consumer retained attribution from canonical live and frozen module sets. */
 function main() {
   const retained = readScriptJson(retainedScript, ['--include-edges'])
@@ -101,15 +130,20 @@ function main() {
     })
   )
   const allEdges = consumerNames.flatMap((consumer) => consumers[consumer].edges)
-  const candidateAttribution = addedModules.map((module) => ({
-    module,
-    retainedBy: consumerNames.filter((consumer) =>
-      consumers[consumer].modules.includes(normalizeCandidateModule(module))
-    ),
-    incomingEdges: uniqueSortedEdges(
+  const candidateAttribution = addedModules.map((module) => {
+    const incomingEdges = uniqueSortedEdges(
       allEdges.filter((edge) => edge.to === normalizeCandidateModule(module))
     )
-  }))
+    return {
+      module,
+      retainedBy: consumerNames.filter((consumer) =>
+        consumers[consumer].modules.includes(normalizeCandidateModule(module))
+      ),
+      incomingEdges,
+      provenance:
+        incomingEdges.length > 0 ? { kind: 'import-edge' } : generatedArtifactProvenance(module)
+    }
+  })
 
   process.stdout.write(
     `${JSON.stringify(

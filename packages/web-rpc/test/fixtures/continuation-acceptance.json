@@ -6123,133 +6123,133 @@
       "id": "WRC-C-T90",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5224,
+      "line": 5161,
       "title": "T90 B12c01 RED: outbound inventory claims exact narrow shared ports"
     },
     {
       "id": "WRC-C-T91",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5261,
+      "line": 5198,
       "title": "T91 B12c01 RED: outbound result uses Host-owned disposal without legacy blanket escape"
     },
     {
       "id": "WRC-C-T92",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5276,
+      "line": 5213,
       "title": "T92 B12c01 RED: outbound publishes typed operations and identity ports in one Host batch"
     },
     {
       "id": "WRC-C-T93",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5295,
+      "line": 5232,
       "title": "T93 B12c01: outbound install does not subscribe or activate before final activation"
     },
     {
       "id": "WRC-C-T94",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5326,
+      "line": 5263,
       "title": "T94 B12c01 RED: outbound typed ports are endpoint-local and never shared by identity"
     },
     {
       "id": "WRC-C-T95",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5356,
+      "line": 5293,
       "title": "T95 B12c01 supporting baseline: endpoint construction owns target snapshot before outbound activation"
     },
     {
       "id": "WRC-C-T96",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5385,
+      "line": 5322,
       "title": "T96 B12c01: hostile outbound target getter fails before activation with original cause"
     },
     {
       "id": "WRC-C-T97",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5409,
+      "line": 5346,
       "title": "T97 B12c01: real outbound send and RPC fanout preserve canonical results"
     },
     {
       "id": "WRC-C-T98",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5433,
+      "line": 5370,
       "title": "T98 B12c01: outbound dispose is host-owned, idempotent, and rejects later sends canonically"
     },
     {
       "id": "WRC-C-T99",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5449,
+      "line": 5386,
       "title": "T99 B12c01: later activation failure rolls back outbound publication and leaves zero subscription residue"
     },
     {
       "id": "WRC-C-T100",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5476,
+      "line": 5413,
       "title": "T100 B12c01 RED: outbound cleanup proves exact order, failure identity, and terminal idempotence"
     },
     {
       "id": "WRC-C-T102",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5738,
+      "line": 5675,
       "title": "T102 B12c01: caller cancellation preserves native cause and clears outbound pending state"
     },
     {
       "id": "WRC-C-T103",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5779,
+      "line": 5716,
       "title": "T103 B12c01: real outbound order is encode then encrypt then sign then transport send"
     },
     {
       "id": "WRC-C-T104",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5823,
+      "line": 5760,
       "title": "T104 B12c01: hostile outbound authentication preserves native source/code/cause identity"
     },
     {
       "id": "WRC-C-T105",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5852,
+      "line": 5789,
       "title": "T105 B12c01: descriptor four-key claims remain distinct from seven-key final projection"
     },
     {
       "id": "WRC-C-T107",
       "kind": "assertion",
       "path": "packages/store-worker/test/exports.test.ts",
-      "line": 106,
+      "line": 126,
       "title": "caller abort reaches a real provider context signal and late settlement is ignored"
     },
     {
       "id": "WRC-C-T107",
       "kind": "assertion",
       "path": "packages/store-worker/test/exports.test.ts",
-      "line": 129,
+      "line": 149,
       "title": "caller abort preserves exact reason identity through the WorkerAdapter boundary"
     },
     {
       "id": "WRC-C-T108",
       "kind": "assertion",
       "path": "packages/store-worker/test/exports.test.ts",
-      "line": 266,
+      "line": 361,
       "title": "dispose() closes first, awaits endpoint.dispose(), and reuses the same Promise"
     },
     {
       "id": "WRC-C-T108",
       "kind": "assertion",
       "path": "packages/store-worker/test/exports.test.ts",
-      "line": 284,
+      "line": 379,
       "title": "dispose() propagates endpoint cleanup errors instead of swallowing them"
     },
     {
@@ -6557,49 +6557,49 @@
       "id": "WRC-C-T152",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5920,
+      "line": 5857,
       "title": "T152 primitive installation retains durable history and clears live markers"
     },
     {
       "id": "WRC-C-T153",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5924,
+      "line": 5861,
       "title": "T153 undefined installation is distinguished as installed history"
     },
     {
       "id": "WRC-C-T154",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5928,
+      "line": 5865,
       "title": "T154 no-disposer installation clears live markers exactly once"
     },
     {
       "id": "WRC-C-T155",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5956,
+      "line": 5893,
       "title": "T155 disposeResult false retains history without invoking a disposer"
     },
     {
       "id": "WRC-C-T156",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5982,
+      "line": 5919,
       "title": "T156 onInstalled throw still clears live markers after rollback"
     },
     {
       "id": "WRC-C-T157",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 6025,
+      "line": 5962,
       "title": "T157 result cleanup failure clears after cleanup and preserves Promise identity"
     },
     {
       "id": "WRC-C-T158",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 6228,
+      "line": 6165,
       "title": "T158 later rollback releases the earlier result once and clears live markers"
     },
     {
@@ -6655,7 +6655,7 @@
       "id": "WRC-C-T166",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 6064,
+      "line": 6001,
       "title": "T166 throwing cleanup observer is diagnostic-only and cannot alter disposal"
     },
     {
@@ -7124,7 +7124,7 @@
       "id": "WRC-C-T248",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 6304,
+      "line": 6241,
       "title": "T248 publishes and removes the real discovery resolver in one Host transaction"
     },
     {
@@ -7593,7 +7593,7 @@
       "id": "WRC-C-T29",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 3166,
+      "line": 3142,
       "title": "B12b03: construction control keeps one absolute fake-time deadline and idempotent close"
     },
     {
@@ -7614,7 +7614,7 @@
       "id": "WRC-C-T32",
       "kind": "assertion",
       "path": "packages/web-rpc/test/tree-shaking/b11f-candidate.test.ts",
-      "line": 514,
+      "line": 537,
       "title": "keeps legacy and unselected concrete owners outside every selected closure"
     },
     {
@@ -7656,7 +7656,7 @@
       "id": "WRC-C-T39",
       "kind": "assertion",
       "path": "packages/web-rpc/test/tree-shaking/b11f-candidate.test.ts",
-      "line": 247,
+      "line": 258,
       "title": "matches canonical root, five-consumer closure, provenance, and causal attribution"
     },
     {
@@ -7796,7 +7796,7 @@
       "id": "WRC-C-T74",
       "kind": "assertion",
       "path": "packages/web-rpc/test/tree-shaking/b11f-candidate.test.ts",
-      "line": 247,
+      "line": 258,
       "title": "matches canonical root, five-consumer closure, provenance, and causal attribution"
     },
     {
@@ -7817,28 +7817,28 @@
       "id": "WRC-C-T81",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 2984,
+      "line": 2960,
       "title": "B12b03: injected timeout async rejection preserves PH01 primary and full rollback residue"
     },
     {
       "id": "WRC-C-T82",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 3777,
+      "line": 3714,
       "title": "B12b03 RED: operation abort-first barrier chooses one terminal identity and clears late provider state"
     },
     {
       "id": "WRC-C-T83",
       "kind": "assertion",
       "path": "packages/store-worker/test/exports.test.ts",
-      "line": 266,
+      "line": 361,
       "title": "dispose() closes first, awaits endpoint.dispose(), and reuses the same Promise"
     },
     {
       "id": "WRC-C-T84",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 3777,
+      "line": 3714,
       "title": "B12b03 RED: operation abort-first barrier chooses one terminal identity and clears late provider state"
     },
     {
@@ -7859,28 +7859,28 @@
       "id": "WRC-C-T87",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 4488,
+      "line": 4425,
       "title": "B12b04 T87: independent %s trace proves failed retry, async barrier, and mutation isolation"
     },
     {
       "id": "WRC-C-T88",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 4598,
+      "line": 4535,
       "title": "B12b04 T87: hostile %s snapshot getter %s preserves exact cutoff and residue"
     },
     {
       "id": "WRC-C-T89",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 4981,
+      "line": 4918,
       "title": "B12b04 T89: native-shaped %s publication and endpoint disposal share one composed transaction"
     },
     {
       "id": "WRC-C-T101",
       "kind": "assertion",
       "path": "packages/store-worker/test/exports.test.ts",
-      "line": 80,
+      "line": 100,
       "title": "T101 B12c01 real WorkerAdapter RPC fanout preserves result order and remote error contract"
     },
     {
@@ -8069,28 +8069,28 @@
       "id": "WRC-C-T249",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 6327,
+      "line": 6264,
       "title": "T249 rolls back a published discovery resolver when a later real Host participant fails"
     },
     {
       "id": "WRC-C-T249",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 6370,
+      "line": 6307,
       "title": "T249 preserves the real discovery disposer failure identity and terminal residue"
     },
     {
       "id": "WRC-C-T249",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 6418,
+      "line": 6355,
       "title": "T249 preserves the shared canonical Host and endpoint disposal Promise on cleanup failure"
     },
     {
       "id": "WRC-C-T249",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 6482,
+      "line": 6419,
       "title": "T249 preserves ordered route, replay, and registry cleanup leaves from one composed endpoint"
     },
     {

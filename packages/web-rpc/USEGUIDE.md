@@ -232,6 +232,7 @@ type IWebRpcFactoryConfig<TTargetId extends string = string> = {
   readonly targetIds?: readonly TTargetId[] // 已知的对端 id 列表（自动发现模式下可省略，首次 send 会懒查询）
   readonly transport?: IWebRpcTransport // 实际收发消息用的传输适配器
   readonly provider?: Readonly<Record<string, IWebRpcProvider>> // 构造时就注册好的方法集合，等价于逐个调用 provide()
+  readonly providerLimits?: { readonly maxGlobal?: number; readonly maxPerPeer?: number } // provider 并发上限，默认 256/64，超限立即 OVERLOADED
   readonly middlewares: readonly IWebRpcPlugin[] // 必需：必须包含且只能包含一个 connect()；其他 middleware 按需
   readonly replay?: { readonly maxEntries?: number; readonly ttlMs?: number } // 出站请求 id 的重放保护窗口容量与 TTL
   readonly construction?: {
@@ -337,22 +338,17 @@ chunk({
 })
 ```
 
-超过 `chunkSize` 的字符串消息才会被切分；已经是 `Uint8Array` 的消息不支持分片（必须走能整体传输大二进制的传输通道）。**八个可配置项里只有 `chunkSize`/`maxMessageBytes` 是真正的"不设置就不限"**，其余六个容量维度（`maxConcurrentMessages`/`maxConcurrentMessagesPerPeer`/`maxBufferedBytes`/`maxChunksPerMessage`/`maxChunkBytes`/`assemblyTimeoutMs`，分别对应并发消息数、单 peer 消息数、总缓冲字节、分片数、分片字节、重组超时）即使完全不配置也带有上面标注的内置默认值，任意一项超限都会拒绝或丢弃对应的重组任务，防止异常/恶意大消息把内存占满。传入的值必须是正安全整数，否则构造期抛 `INVALID_CONFIG`。分片是尽力而为的传递——框架不提供分片级别的确认应答或重试状态机，需要"确认送达"语义时应在 RPC 层（业务方法本身的请求/响应）做超时重试，而不是依赖分片层。
+超过 `chunkSize` 的字符串消息才会被切分；已经是 `Uint8Array` 的消息不支持分片（必须走能整体传输大二进制的传输通道）。**八个可配置项里只有 `chunkSize`/`maxMessageBytes` 是真正的"不设置就不限"**，其余六个容量维度（`maxConcurrentMessages`/`maxConcurrentMessagesPerPeer`/`maxBufferedBytes`/`maxChunksPerMessage`/`maxChunkBytes`/`assemblyTimeoutMs`，分别对应并发消息数、单 peer 消息数、总缓冲字节、分片数、分片字节、重组超时）即使完全不配置也带有上面标注的内置默认值，任意一项超限都会拒绝或丢弃对应的重组任务，防止异常/恶意大消息把内存占满。传入的值必须是正安全整数，否则构造期抛 `INVALID_CONFIG`。分片传递不提供确认应答或重试状态机；需要可靠语义时由业务协议显式定义。
 
 ### 3.6 `timeout(config?)`
 
 ```ts
 timeout({
   timeoutMs?: number | false;    // 默认超时时长，false 表示不限时
-  retry?: {
-    maxAttempts?: number;
-    shouldRetry?: (context: IWebRpcRetryContext) => boolean | Promise<boolean>;
-    delay?: (context: IWebRpcRetryContext) => number | false | null | Promise<number | false | null>;
-  };
 })
 ```
 
-`send()` 调用时可以在 `options.timeoutMs` 里覆盖这个默认值。重试策略的 `shouldRetry`/`delay` 回调会在请求信号中止或 endpoint 释放时被自动取消——一个永不 settle 的异步 `delay` 回调不会让 `send()` 在信号已经触发之后还继续挂起。
+`send()` 调用时可以在 `options.timeoutMs` 里覆盖这个默认值。每次请求只发送一次；调用方负责业务层失败处理。
 
 ### 3.7 `ping()`
 
@@ -580,10 +576,10 @@ try {
   if (isWebRpcError(error)) {
     switch (error.code) {
       case WebRpcErrorCode.deadlineExceeded:
-        // 超时，可能需要重试或提示用户
+        // 超时，由调用方按业务策略处理
         break
       case WebRpcErrorCode.authenticationFailed:
-        // 鉴权失败，通常不应该重试
+        // 鉴权失败，通常应提示配置问题
         break
       default:
       // 兜底处理
@@ -617,7 +613,7 @@ try {
 | `TARGET_NOT_IDENTIFIABLE`                             | 目标存在但无法唯一定位到具体接收端                                | 检查是否需要 `uniqueTargetId`/`pinReceiver`                                              |
 | `ENDPOINT_DISPOSED`                                   | 在 `dispose()` 之后继续使用 endpoint                              | 检查生命周期管理，不要在释放后调用                                                       |
 | `CANCELLED`                                           | 请求被 `AbortSignal` 主动取消                                     | 业务预期内的取消，通常不需要当作异常处理                                                 |
-| `DEADLINE_EXCEEDED`                                   | 请求超时                                                          | 可考虑重试（配合 `timeout()` 的 `retry` 配置）或提示用户                                 |
+| `DEADLINE_EXCEEDED`                                   | 请求超时                                                          | 由调用方按业务策略处理                                                                   |
 | `PROVIDER_CONTEXT_EXPIRED`                            | provider 在其 `context` 已过期后才尝试结算                        | 检查 provider 是否有异步逻辑跑得太久                                                     |
 | `TRANSPORT`                                           | 底层传输发送/接收失败                                             | 传输层问题，检查连接状态                                                                 |
 | `AUTHENTICATION_FAILED`                               | `authentication()`/`connect()` 校验未通过                         | 安全相关，不建议自动重试                                                                 |
@@ -743,7 +739,7 @@ type IWebRpcHookEvent = {
 
 这些限制存在的目的是**防止单个异常/恶意对端把内存或 CPU 打满**，不是随意设定的性能上限——生产环境一般不需要调整，除非你的场景本身就有超出默认假设的高并发/大消息需求。
 
-分片传递是尽力而为（best-effort），不提供分片级确认应答和重试状态机；需要"确实送达"保证的场景，应该依赖 RPC 层本身的请求/响应加超时重试（`timeout()` 中间件），而不是指望分片层提供可靠传输语义。
+分片传递是尽力而为（best-effort），不提供分片级确认应答或自动重试；可靠送达语义必须由业务协议显式定义。
 
 ---
 

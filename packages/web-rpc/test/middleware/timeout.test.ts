@@ -11,11 +11,4 @@ describe('timeout middleware', () => {
     expect(capability.resolveTimeout()).toBe(10)
     expect(capability.resolveTimeout(25)).toBe(25)
   })
-  it('rejects a revoked retry descriptor during installation', () => {
-    const revoked = Proxy.revocable({}, {})
-    revoked.revoke()
-    expect(() => installPlugin(timeout({ retry: revoked.proxy as never }))).toThrow(
-      'timeout.retry descriptor is unreadable'
-    )
-  })
 })

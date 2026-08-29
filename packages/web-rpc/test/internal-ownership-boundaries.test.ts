@@ -4,7 +4,6 @@ import { ControlTaskRegistry } from '../src/internal/control-task-registry.js'
 import { raceWithAsyncControl, waitWithSignal } from '../src/internal/async-control.js'
 import { prepareEndpoint as prepareEndpointImpl } from '../src/internal/endpoint-bootstrap.js'
 import { allocateRpcId } from '../src/internal/id.js'
-import { executeWithRetry } from '../src/internal/retry.js'
 import { ResourceScope } from '../src/internal/resource-scope.js'
 import { createEndpointTimePort } from '../src/internal/time-port.js'
 import { createEndpointTransportActivation } from '../src/internal/transport-activation.js'
@@ -431,23 +430,5 @@ describe('internal ownership boundary semantics', () => {
     } finally {
       vi.useRealTimers()
     }
-  })
-
-  it('rejects invalid and already-aborted retry execution before user attempts', async () => {
-    const retryOptions = {
-      signals: [] as const,
-      attempt: async () => 'ok',
-      decide: async () => ({ retry: false }) as const,
-      createAbortError: () => new Error('aborted'),
-      createTimeoutError: () => new Error('timeout')
-    }
-    await expect(executeWithRetry({ ...retryOptions, maxAttempts: 0 })).rejects.toMatchObject({
-      code: 'INVALID_CONFIG'
-    })
-    const controller = new AbortController()
-    controller.abort('retry-aborted')
-    await expect(
-      executeWithRetry({ ...retryOptions, maxAttempts: 1, signals: [controller.signal] })
-    ).rejects.toThrow('aborted')
   })
 })

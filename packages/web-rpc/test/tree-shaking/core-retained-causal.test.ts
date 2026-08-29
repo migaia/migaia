@@ -19,6 +19,16 @@ type ICandidateAttribution = {
   readonly module: string
   readonly retainedBy: readonly IConsumer[]
   readonly incomingEdges: readonly ICausalEdge[]
+  readonly provenance?: {
+    readonly kind: 'import-edge' | 'entry-root' | 'generated-artifact'
+    readonly locator?: {
+      readonly artifact: string
+      readonly artifactSha256: string
+      readonly generator: string
+      readonly source?: string
+      readonly sourceSha256?: string
+    }
+  }
 }
 type ICausalReport = {
   readonly schema: string
@@ -96,7 +106,7 @@ describe('WRC-C-B11f five-consumer causal graph', () => {
     expect(Object.keys(report.consumers)).toEqual(consumers)
     expect(report.addedModules).toEqual(expected.added)
     expect(report.removedModules).toEqual(expected.removed)
-    expect(report.addedModules).toHaveLength(15)
+    expect(report.addedModules).toHaveLength(report.candidateAttribution.length)
     expect(report.candidateAttribution.map(({ module }) => module)).toEqual(expected.added)
 
     for (const consumer of consumers) {
@@ -122,7 +132,14 @@ describe('WRC-C-B11f five-consumer causal graph', () => {
         )
       )
       expect(candidate.retainedBy).toEqual(expectedRetainedBy)
-      expect(candidate.incomingEdges.length).toBeGreaterThan(0)
+      if (candidate.incomingEdges.length === 0) {
+        expect(candidate.provenance?.kind).toBe('generated-artifact')
+        expect(candidate.provenance?.locator?.artifact).toBe(candidate.module)
+        expect(candidate.provenance?.locator?.artifactSha256).toMatch(/^[0-9a-f]{64}$/)
+        expect(candidate.provenance?.locator?.generator.length).toBeGreaterThan(0)
+      } else {
+        expect(candidate.provenance?.kind).toBe('import-edge')
+      }
       expect(new Set(candidate.incomingEdges.map((edge) => JSON.stringify(edge))).size).toBe(
         candidate.incomingEdges.length
       )

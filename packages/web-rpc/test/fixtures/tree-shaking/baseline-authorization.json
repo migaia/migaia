@@ -1,44 +1,44 @@
 {
   "status": "approved",
-  "requirement": "ESV2H-R11 / ESV2H-T22",
-  "reason": "Independent Sol verification EVT-000088 approved the exact event-subscriber style-handle and invoke migration retained-size delta and causal evidence.",
+  "requirement": "MA-ADC-S4-2026-08-29-r2 / AUTH-WEBRPC-RETAINED",
+  "reason": "Successor S4 exact protected-custody refresh after deterministic current root and retained-input drift, using two identical canonical builds.",
   "approvalRecord": {
     "schema": "WRC-C-B11-approval-v2",
     "authorityId": "web-rpc-release-coordinator-v1",
-    "keyId": "coordinator-ed25519-35f1f9bd39e4a6b8",
-    "decisionId": "WRC-C-B11-decision-20260827-06",
-    "issuedAt": "2026-08-27T07:39:36.805Z",
-    "rationale": "Independent Sol verification EVT-000088 approved the exact event-subscriber style-handle and invoke migration retained-size delta and causal evidence.",
+    "keyId": "coordinator-ed25519-aebc26a0c4859e17",
+    "decisionId": "WRC-C-B11-decision-20260829-S4R1",
+    "issuedAt": "2026-08-29T13:22:45.394Z",
+    "rationale": "Successor S4 exact protected-custody refresh after deterministic current root and retained-input drift, using two identical canonical builds.",
     "oldTuple": {
       "moduleCount": 53,
       "rawBytes": 250129,
       "gzipBytes": 61171
     },
     "newTuple": {
-      "moduleCount": 66,
-      "rawBytes": 475863,
-      "gzipBytes": 113255
+      "moduleCount": 81,
+      "rawBytes": 478510,
+      "gzipBytes": 114531
     },
-    "digest": "ccc299b2a1b2905822bb0cb607ac24050e20aae4ff07d2bc524e1fdad8c4b1c1",
-    "signature": "pFXViG4XlamcsTUSSwUAr0wOQI3gHLq/uoqGsxWHC+OFRXQPg6a30EC3UnzW0m2Z7GI3hjxPZ2GTbQkyeVGgBw==",
+    "digest": "a5251504c3171f9718d75ba599ebbb7e1b86536b6a635fc40aa47c554e4868a9",
+    "signature": "24WSJ+xCCAy+QBd9hfzU+P/wdTGc5O0SRQWzXt5N2HVHKMeQ0B+e136P1Y3l6UKwzNHY2BJzBOxt8BOwfaVJCw==",
     "payload": {
       "schema": "WRC-C-B11-approval-v2",
       "authorityId": "web-rpc-release-coordinator-v1",
-      "keyId": "coordinator-ed25519-35f1f9bd39e4a6b8",
-      "decisionId": "WRC-C-B11-decision-20260827-06",
-      "issuedAt": "2026-08-27T07:39:36.805Z",
-      "rationale": "Independent Sol verification EVT-000088 approved the exact event-subscriber style-handle and invoke migration retained-size delta and causal evidence.",
+      "keyId": "coordinator-ed25519-aebc26a0c4859e17",
+      "decisionId": "WRC-C-B11-decision-20260829-S4R1",
+      "issuedAt": "2026-08-29T13:22:45.394Z",
+      "rationale": "Successor S4 exact protected-custody refresh after deterministic current root and retained-input drift, using two identical canonical builds.",
       "oldTuple": {
         "moduleCount": 53,
         "rawBytes": 250129,
         "gzipBytes": 61171
       },
       "newTuple": {
-        "moduleCount": 66,
-        "rawBytes": 475863,
-        "gzipBytes": 113255
+        "moduleCount": 81,
+        "rawBytes": 478510,
+        "gzipBytes": 114531
       },
-      "digest": "ccc299b2a1b2905822bb0cb607ac24050e20aae4ff07d2bc524e1fdad8c4b1c1"
+      "digest": "a5251504c3171f9718d75ba599ebbb7e1b86536b6a635fc40aa47c554e4868a9"
     }
   }
 }

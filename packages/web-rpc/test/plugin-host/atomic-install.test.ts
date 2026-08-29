@@ -2877,33 +2877,15 @@ describe('B12a atomic middleware and claim contracts', () => {
     transport.close?.()
   })
 
-  it('B12b03: timeout snapshots every retry field in receiver-free order', async () => {
+  it('B12b03: timeout snapshots its configuration in receiver-free order', async () => {
     const [transport] = createMemoryTransportPair()
     const reads: string[] = []
-    const retry = {
-      get maxAttempts(): number {
-        reads.push('retry.maxAttempts')
-        return 2
-      },
-      get shouldRetry(): () => boolean {
-        reads.push('retry.shouldRetry')
-        return () => false
-      },
-      get delay(): () => false {
-        reads.push('retry.delay')
-        return () => false
-      }
-    }
     let timeoutReceiver = false
     const config = {
       get timeoutMs(): number {
         timeoutReceiver = this === config
         reads.push('timeoutMs')
         return 25
-      },
-      get retry(): typeof retry {
-        reads.push('retry')
-        return retry
       }
     }
     const middleware = timeout(config)
@@ -2914,13 +2896,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       middlewares: [connect({ transport }), middleware]
     })
     expect(timeoutReceiver).toBe(true)
-    expect(reads).toEqual([
-      'timeoutMs',
-      'retry',
-      'retry.maxAttempts',
-      'retry.shouldRetry',
-      'retry.delay'
-    ])
+    expect(reads).toEqual(['timeoutMs'])
     await endpoint.dispose()
   })
 
@@ -3570,45 +3546,18 @@ describe('B12a atomic middleware and claim contracts', () => {
   it('B12b03: native timeout snapshot survives post-factory and post-install mutation', async () => {
     const reads: string[] = []
     let timeoutMs = 7
-    let maxAttempts = 2
-    let shouldRetry = false
-    let delay = 11
-    const retry = {
-      get maxAttempts() {
-        reads.push('retry.maxAttempts')
-        return maxAttempts
-      },
-      get shouldRetry() {
-        reads.push('retry.shouldRetry')
-        return shouldRetry
-      },
-      get delay() {
-        reads.push('retry.delay')
-        return delay
-      }
-    }
     const config = {
       get timeoutMs() {
         reads.push('timeoutMs')
         return timeoutMs
-      },
-      get retry() {
-        reads.push('retry')
-        return retry
       }
     }
     const batch = await createProductionBatch({
       injectDescriptor: (candidate, original) => {
         if (candidate.kind !== 'middleware' || candidate.name !== 'timeout') return original
         const snapshotTimeoutMs = config.timeoutMs
-        const retrySnapshot = config.retry
         const snapshot = {
-          timeoutMs: snapshotTimeoutMs,
-          retry: {
-            maxAttempts: retrySnapshot.maxAttempts,
-            shouldRetry: retrySnapshot.shouldRetry,
-            delay: retrySnapshot.delay
-          }
+          timeoutMs: snapshotTimeoutMs
         }
         return nativeCancellationDescriptor(original, 'timeout', WebRpcSharedKey.timeout, {
           sharedValue: {
@@ -3619,27 +3568,15 @@ describe('B12a atomic middleware and claim contracts', () => {
       }
     })
     timeoutMs = 99
-    maxAttempts = 99
-    shouldRetry = true
-    delay = 99
     await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
     timeoutMs = 101
-    maxAttempts = 101
-    shouldRetry = false
-    delay = 101
     const published = batch.host.getShared(WebRpcSharedKey.timeout) as {
       readonly resolve: (requested?: number | false) => number | false
       readonly snapshot: { readonly timeoutMs: number }
     }
     expect(published.resolve()).toBe(7)
     expect(published.snapshot.timeoutMs).toBe(7)
-    expect(reads).toEqual([
-      'timeoutMs',
-      'retry',
-      'retry.maxAttempts',
-      'retry.shouldRetry',
-      'retry.delay'
-    ])
+    expect(reads).toEqual(['timeoutMs'])
     await batch.host.dispose()
   })
 
