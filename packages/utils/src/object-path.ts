@@ -294,9 +294,8 @@ export function get<T, P extends IObjectPathInput<T>>(
 
 /** Clones a traversed container while preserving its prototype and own descriptors. */
 function cloneContainer(value: object, replacedKey: IObjectPathSegment): object {
-  if (Array.isArray(value)) return value.slice()
   const prototype = Object.getPrototypeOf(value)
-  if (prototype !== null && Object.getPrototypeOf(prototype) !== null)
+  if (!Array.isArray(value) && prototype !== null && Object.getPrototypeOf(prototype) !== null)
     throw invalidPath(String(replacedKey), 'path container is not a plain object or array')
   const descriptors = Object.getOwnPropertyDescriptors(value)
   Reflect.deleteProperty(descriptors, replacedKey)
@@ -319,11 +318,10 @@ export function set<T, P extends IObjectPathInput<T>>(
     )
       throw invalidPath(String(key), 'path is blocked by a non-object value')
     const source = current === undefined ? (typeof key === 'number' ? [] : {}) : current
-    const child = Reflect.has(source as object, key)
-      ? Reflect.get(source as object, key, source)
-      : undefined
+    const exists = Reflect.has(source as object, key)
+    const child = exists ? Reflect.get(source as object, key, source) : undefined
     const updated = update(child, index + 1)
-    if (Object.is(child, updated)) return source
+    if (exists && Object.is(child, updated)) return source
     const target = cloneContainer(source as object, key)
     const descriptor = Object.getOwnPropertyDescriptor(source as object, key)
     Object.defineProperty(

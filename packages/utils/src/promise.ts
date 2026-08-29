@@ -63,6 +63,9 @@ export type ITimeoutOperation<T> = (context: {
   readonly signal: IAbortSignal
 }) => T | PromiseLike<T>
 
+/** Internal controller hand-off used by retry so operation and policy share one attempt signal. */
+const retryAttemptController = Symbol('retry attempt controller')
+
 /** Stable reporter operation owned by the signal-only composition primitive. */
 const abortTimeoutSignalOperation = 'abort-timeout-signal' as const
 
@@ -106,6 +109,14 @@ function observeAbortReason(signal: IAbortSignal): unknown {
     return error
   }
 }
+
+/** Freezes the admission set so reentrant callers cannot change cleanup ownership. */
+function snapshotSignals(
+  signalsOption: readonly IAbortSignal[] | undefined,
+  signal: IAbortSignal | undefined
+): readonly IAbortSignal[] {
+  return Object.freeze([...(signalsOption ?? (signal === undefined ? [] : [signal]))])
+}
 export type IAbortTimeoutSignalOptions = {
   readonly signal?: IAbortSignal
   readonly timeoutMs?: number
@@ -133,7 +144,7 @@ export function createAbortTimeoutSignal(
   const controller = new AbortController()
   const scheduler = options.scheduler ?? systemScheduler
   const timeoutReason = options.timeoutReason
-  const signals = externalSignal === undefined ? [] : [externalSignal]
+  const signals = snapshotSignals(undefined, externalSignal)
   let timer: IScheduledTask | undefined
   let disposed = false
   const dispose = (): void => {
@@ -210,14 +221,34 @@ export type IConcurrencyLimiter = {
 export const systemScheduler: IUtilsScheduler = {
   now: () => Date.now(),
   schedule: (callback, delayMs) => {
-    const handle = setTimeout(callback, delayMs)
-    return {
-      cancel: () => clearTimeout(handle),
-      unref:
-        typeof (handle as unknown as { unref?: unknown }).unref === 'function'
-          ? () => (handle as unknown as { unref: () => void }).unref()
-          : undefined
+    const maximumTimerDelay = 2_147_483_647
+    let remaining = delayMs
+    let handle: ReturnType<typeof setTimeout> | undefined
+    let cancelled = false
+    let unrefRequested = false
+    const task: IScheduledTask = {
+      cancel: () => {
+        cancelled = true
+        if (handle !== undefined) clearTimeout(handle)
+      },
+      unref: () => {
+        unrefRequested = true
+        const unref = (handle as unknown as { unref?: unknown } | undefined)?.unref
+        if (typeof unref === 'function') unref()
+      }
     }
+    const scheduleNext = (): void => {
+      if (cancelled) return
+      const segment = Math.min(remaining, maximumTimerDelay)
+      remaining -= segment
+      handle = setTimeout(() => {
+        if (remaining > 0) scheduleNext()
+        else callback()
+      }, segment)
+      if (unrefRequested) task.unref?.()
+    }
+    scheduleNext()
+    return task
   }
 }
 
@@ -248,12 +279,77 @@ export function toPromise<T>(run: () => T): Promise<Awaited<T>> {
 export function createManualScheduler(): IManualScheduler {
   let current = 0
   let sequence = 0
-  const tasks: Array<{
+  type IManualTask = {
     readonly due: number
     readonly order: number
-    readonly callback: () => void
+    index: number
+    callback: (() => void) | undefined
     cancelled: boolean
-  }> = []
+  }
+  const tasks: IManualTask[] = []
+  const compareTasks = (left: IManualTask, right: IManualTask): number =>
+    left.due - right.due || left.order - right.order
+  /** Exchanges two heap entries and keeps cancellation handles synchronized with their indexes. */
+  const swapTasks = (left: number, right: number): void => {
+    ;[tasks[left], tasks[right]] = [tasks[right], tasks[left]]
+    tasks[left].index = left
+    tasks[right].index = right
+  }
+  /** Restores heap order toward the root after an indexed insertion or removal. */
+  const siftUp = (start: number): void => {
+    let index = start
+    while (index > 0) {
+      const parent = Math.floor((index - 1) / 2)
+      if (compareTasks(tasks[parent], tasks[index]) <= 0) break
+      swapTasks(parent, index)
+      index = parent
+    }
+  }
+  /** Restores heap order toward the leaves after a root or indexed removal. */
+  const siftDown = (start: number): void => {
+    let index = start
+    while (true) {
+      const left = index * 2 + 1
+      const right = left + 1
+      let smallest = index
+      if (left < tasks.length && compareTasks(tasks[left], tasks[smallest]) < 0) smallest = left
+      if (right < tasks.length && compareTasks(tasks[right], tasks[smallest]) < 0) smallest = right
+      if (smallest === index) break
+      swapTasks(index, smallest)
+      index = smallest
+    }
+  }
+  /** Inserts one task into the due/order min-heap. */
+  const pushTask = (task: IManualTask): void => {
+    task.index = tasks.length
+    tasks.push(task)
+    siftUp(task.index)
+  }
+  /** Removes and returns the earliest heap task in O(log n), including cancelled entries. */
+  const popTask = (): IManualTask | undefined => {
+    if (tasks.length === 0) return undefined
+    const first = tasks[0]
+    const last = tasks.pop()!
+    first.index = -1
+    if (tasks.length > 0) {
+      tasks[0] = last
+      last.index = 0
+      siftDown(0)
+    }
+    return first
+  }
+  /** Removes one live or cancelled task by its handle index without creating a second task ledger. */
+  const removeTask = (task: IManualTask): void => {
+    const index = task.index
+    if (index < 0 || tasks[index] !== task) return
+    const last = tasks.pop()!
+    task.index = -1
+    if (index === tasks.length) return
+    tasks[index] = last
+    last.index = index
+    if (index > 0 && compareTasks(tasks[Math.floor((index - 1) / 2)], last) > 0) siftUp(index)
+    else siftDown(index)
+  }
   const scheduler: IManualScheduler = {
     now: () => current,
     schedule: (callback, delayMs) => {
@@ -261,11 +357,19 @@ export function createManualScheduler(): IManualScheduler {
         throw new RangeError(
           UtilsErrorText.invalidArgument('delayMs', 'a finite non-negative number')
         )
-      const task = { due: current + delayMs, order: sequence++, callback, cancelled: false }
-      tasks.push(task)
+      const task: IManualTask = {
+        due: current + delayMs,
+        order: sequence++,
+        index: -1,
+        callback,
+        cancelled: false
+      }
+      pushTask(task)
       return {
         cancel: () => {
           task.cancelled = true
+          task.callback = undefined
+          removeTask(task)
         },
         unref: () => undefined
       }
@@ -274,20 +378,28 @@ export function createManualScheduler(): IManualScheduler {
       if (!Number.isFinite(ms) || ms < 0)
         throw new RangeError(UtilsErrorText.invalidArgument('ms', 'a finite non-negative number'))
       const target = current + ms
-      current = target
       let count = 0
       while (true) {
-        const next = tasks
-          .filter((task) => !task.cancelled && task.due <= target)
-          .sort((left, right) => left.due - right.due || left.order - right.order)[0]
+        const next = tasks[0]
         if (!next) break
+        if (next.cancelled || next.callback === undefined) {
+          popTask()
+          continue
+        }
+        if (next.due > target) break
         if (++count > 10000) throw runaway()
-        next.cancelled = true
-        next.callback()
+        const dueTask = popTask()
+        if (!dueTask) break
+        dueTask.cancelled = true
+        current = dueTask.due
+        const callback = dueTask.callback
+        dueTask.callback = undefined
+        callback?.()
       }
+      current = target
     },
     get pendingCount() {
-      return tasks.filter((task) => !task.cancelled).length
+      return tasks.length
     }
   }
   return scheduler
@@ -310,64 +422,86 @@ export function sleep(delayMs: number, options?: IAsyncControls): Promise<void> 
         UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
       )
     )
-  const signals = signalsOption ?? (signal ? [signal] : [])
+  const signals = snapshotSignals(signalsOption, signal)
   return new Promise<void>((resolve, reject) => {
     let settled = false
     let timer: IScheduledTask | undefined
-    const cleanup = (): void => {
+    const admitted: IAbortSignal[] = []
+    const cleanup = (primaryError?: unknown): boolean => {
+      const cleanupErrors: unknown[] = []
       try {
         timer?.cancel()
       } catch (error) {
-        reportDiagnostic(hostRethrowReporter, error, { operation: 'sleep', phase: 'cleanup' })
+        cleanupErrors.push(error)
       }
-      for (const signal of signals)
+      for (const signal of admitted.reverse())
         try {
           signal.removeEventListener('abort', onAbort)
         } catch (error) {
-          reportDiagnostic(hostRethrowReporter, error, { operation: 'sleep', phase: 'cleanup' })
+          cleanupErrors.push(error)
         }
+      if (cleanupErrors.length > 0) {
+        for (const error of cleanupErrors)
+          reportDiagnostic(hostRethrowReporter, error, { operation: 'sleep', phase: 'cleanup' })
+      }
+      if (primaryError !== undefined) reject(primaryError)
+      return primaryError === undefined
     }
     const onAbort = (): void => {
       if (settled) return
       const observation = observeAbort(signals)
       settled = true
-      cleanup()
-      if (observation.kind === 'failed') reject(observation.error)
-      else
-        reject(new UtilsAbortError(observation.kind === 'aborted' ? observation.reason : undefined))
+      cleanup(
+        observation.kind === 'failed'
+          ? observation.error
+          : new UtilsAbortError(observation.kind === 'aborted' ? observation.reason : undefined)
+      )
     }
-    for (const signal of signals) if (signal.aborted) return onAbort()
-    timer = scheduler.schedule(() => {
-      if (settled) return
-      settled = true
-      cleanup()
-      resolve()
-    }, delayMs)
-    if (unref) timer.unref?.()
     try {
-      for (const signal of signals) signal.addEventListener('abort', onAbort, { once: true })
+      const initial = observeAbort(signals)
+      if (initial.kind === 'failed') {
+        settled = true
+        cleanup(initial.error)
+        return
+      }
+      if (initial.kind === 'aborted') return onAbort()
+      timer = scheduler.schedule(() => {
+        if (settled) return
+        settled = true
+        if (cleanup()) resolve()
+      }, delayMs)
+      if (unref) timer.unref?.()
+      for (const candidate of signals) {
+        candidate.addEventListener('abort', onAbort, { once: true })
+        admitted.push(candidate)
+      }
+      const after = observeAbort(signals)
+      if (after.kind === 'failed') {
+        settled = true
+        cleanup(after.error)
+      } else if (after.kind === 'aborted') onAbort()
     } catch (error) {
       if (!settled) {
         settled = true
-        cleanup()
-        reject(error)
+        cleanup(error)
       }
-      return
     }
-    if (signals.some((signal) => signal.aborted)) onAbort()
   })
+}
+
+type IWithTimeoutOptions = IAsyncControls & {
+  readonly timeoutMs: number
+  readonly report?: IUtilsReporter
+  readonly zeroTimeoutBehavior?: 'skip' | 'start'
+  /** Disables internal cancellation allocation for deadline-only operations. */
+  readonly cooperativeCancellation?: boolean
+  readonly [retryAttemptController]?: AbortController
 }
 
 /** Races a lazy operation against an abort-aware deadline. */
 export function withTimeout<T>(
   operation: ITimeoutOperation<T>,
-  options: IAsyncControls & {
-    readonly timeoutMs: number
-    readonly report?: IUtilsReporter
-    readonly zeroTimeoutBehavior?: 'skip' | 'start'
-    /** Disables internal cancellation allocation for deadline-only operations. */
-    readonly cooperativeCancellation?: boolean
-  }
+  options: IWithTimeoutOptions
 ): Promise<T> {
   const timeoutMs = options.timeoutMs
   const signal = options.signal
@@ -387,14 +521,21 @@ export function withTimeout<T>(
         UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
       )
     )
-  const signals = signalsOption ?? (signal ? [signal] : [])
+  const signals = snapshotSignals(signalsOption, signal)
   const report = reportOption ?? hostRethrowReporter
-  const controller = cooperativeCancellation ? new AbortController() : undefined
+  const internalController = (
+    options as typeof options & {
+      [retryAttemptController]?: AbortController
+    }
+  )[retryAttemptController]
+  const controller =
+    internalController ?? (cooperativeCancellation ? new AbortController() : undefined)
   const operationSignal = controller?.signal as unknown as IAbortSignal | undefined
   return new Promise<T>((resolve, reject) => {
     let settled = false
     let timedOut = false
     let timer: IScheduledTask | undefined
+    const admitted: IAbortSignal[] = []
     const finish = (callback: () => void, primaryError?: unknown): void => {
       if (settled) return
       settled = true
@@ -404,7 +545,7 @@ export function withTimeout<T>(
       } catch (error) {
         cleanupErrors.push(error)
       }
-      for (const signal of signals)
+      for (const signal of admitted.reverse())
         try {
           signal.removeEventListener('abort', onAbort)
         } catch (error) {
@@ -432,7 +573,9 @@ export function withTimeout<T>(
         finish(() => reject(error), error)
       }
     }
-    for (const signal of signals) if (signal.aborted) return onAbort()
+    const initial = observeAbort(signals)
+    if (initial.kind === 'failed') return finish(() => reject(initial.error), initial.error)
+    if (initial.kind === 'aborted') return onAbort()
     if (timeoutMs === 0 && zeroTimeoutBehavior !== 'start') {
       const error = new UtilsTimeoutError('operation', 0)
       return finish(() => reject(error), error)
@@ -444,14 +587,24 @@ export function withTimeout<T>(
       finish(() => reject(timeoutError), timeoutError)
     }, timeoutMs)
     if (settled) timer.cancel()
-    if (unref) timer.unref?.()
     try {
-      for (const signal of signals) signal.addEventListener('abort', onAbort, { once: true })
+      if (unref) timer.unref?.()
     } catch (error) {
       finish(() => reject(error), error)
       return
     }
-    if (signals.some((signal) => signal.aborted)) return onAbort()
+    try {
+      for (const candidate of signals) {
+        candidate.addEventListener('abort', onAbort, { once: true })
+        admitted.push(candidate)
+      }
+    } catch (error) {
+      finish(() => reject(error), error)
+      return
+    }
+    const after = observeAbort(signals)
+    if (after.kind === 'failed') return finish(() => reject(after.error), after.error)
+    if (after.kind === 'aborted') return onAbort()
     if (settled) return
     try {
       Promise.resolve(operation({ signal: operationSignal ?? inertTimeoutSignal })).then(
@@ -491,17 +644,18 @@ export function raceWithAbort<T>(
         UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
       )
     )
-  const signals = signalsOption ?? (signal ? [signal] : [])
+  const signals = snapshotSignals(signalsOption, signal)
   const report = reportOption ?? hostRethrowReporter
   const controller = new AbortController()
   const operationSignal = controller.signal as unknown as IAbortSignal
   return new Promise<T>((resolve, reject) => {
     let settled = false
+    const admitted: IAbortSignal[] = []
     const finish = (callback: () => void, primaryError?: unknown): void => {
       if (settled) return
       settled = true
       const cleanupErrors: unknown[] = []
-      for (const candidate of signals)
+      for (const candidate of admitted.reverse())
         try {
           candidate.removeEventListener('abort', onAbort)
         } catch (error) {
@@ -533,9 +687,14 @@ export function raceWithAbort<T>(
       const error = new UtilsAbortError(reason)
       finish(() => reject(error), error)
     }
-    for (const candidate of signals) if (candidate.aborted) return onAbort()
+    const initial = observeAbort(signals)
+    if (initial.kind === 'failed') return finish(() => reject(initial.error), initial.error)
+    if (initial.kind === 'aborted') return onAbort()
     try {
-      for (const candidate of signals) candidate.addEventListener('abort', onAbort, { once: true })
+      for (const candidate of signals) {
+        candidate.addEventListener('abort', onAbort, { once: true })
+        admitted.push(candidate)
+      }
     } catch (error) {
       const admissionError = attachErrorIdentity(
         new TypeError(UtilsErrorText.invalidArgument('signal', 'abort listener admission failed'), {
@@ -546,7 +705,9 @@ export function raceWithAbort<T>(
       finish(() => reject(admissionError), admissionError)
       return
     }
-    if (signals.some((candidate) => candidate.aborted)) return onAbort()
+    const after = observeAbort(signals)
+    if (after.kind === 'failed') return finish(() => reject(after.error), after.error)
+    if (after.kind === 'aborted') return onAbort()
     try {
       Promise.resolve(operation({ signal: operationSignal })).then(
         (value) => {
@@ -626,7 +787,8 @@ async function retryCore<T>(
           signals: externalSignals,
           zeroTimeoutBehavior: options.zeroTimeoutBehavior,
           unref: options.unref,
-          report: options.report
+          report: options.report,
+          [retryAttemptController]: attemptController
         })
       }
       if (remainingMs !== undefined) {
@@ -637,7 +799,8 @@ async function retryCore<T>(
             signals: externalSignals,
             zeroTimeoutBehavior: options.zeroTimeoutBehavior,
             unref: options.unref,
-            report: options.report
+            report: options.report,
+            [retryAttemptController]: attemptController
           })
         } catch (error) {
           if (error instanceof UtilsTimeoutError)
@@ -655,12 +818,6 @@ async function retryCore<T>(
     } catch (error) {
       const externalAbort = observeAbort(externalSignals)
       if (externalAbort.kind === 'failed') throw externalAbort.error
-      if (
-        externalAbort.kind === 'aborted' &&
-        externalAbort.reason instanceof UtilsTimeoutError &&
-        externalAbort.reason.scope === 'operation'
-      )
-        return await new Promise<T>(() => undefined)
       if (externalAbort.kind === 'aborted' && error instanceof UtilsAbortError) throw error
       lastError = error
       if (
@@ -708,7 +865,7 @@ export function retry<T>(
 ): Promise<T> {
   const snapshot = { ...options }
   if (snapshot.totalTimeoutMs === undefined) return retryCore(operation, snapshot)
-  const externalSignals = snapshot.signals ?? (snapshot.signal ? [snapshot.signal] : [])
+  const externalSignals = snapshotSignals(snapshot.signals, snapshot.signal)
   return withTimeout(
     ({ signal }) =>
       retryCore(operation, {
@@ -722,7 +879,9 @@ export function retry<T>(
       scheduler: snapshot.scheduler,
       unref: snapshot.unref,
       zeroTimeoutBehavior: snapshot.zeroTimeoutBehavior,
-      report: snapshot.report
+      // The outer retry owner already settles the caller; late attempt cancellation is contained
+      // here rather than delegated to the host uncaught-exception reporter.
+      report: snapshot.report ?? (() => undefined)
     }
   ).catch((error: unknown) => {
     if (error instanceof UtilsTimeoutError && error.scope === 'operation')
@@ -741,10 +900,11 @@ function runWithAbort<T>(
   controller: AbortController,
   report: IUtilsReporter = hostRethrowReporter
 ): Promise<T> {
+  const admitted: IAbortSignal[] = []
   return new Promise<T>((resolve, reject) => {
     let settled = false
     const cleanup = (): void => {
-      for (const signal of signals)
+      for (const signal of admitted.reverse())
         try {
           signal.removeEventListener('abort', onAbort)
         } catch (error) {
@@ -765,8 +925,23 @@ function runWithAbort<T>(
       cleanup()
       reject(new UtilsAbortError(reason))
     }
-    for (const signal of signals) if (signal.aborted) return onAbort()
-    for (const signal of signals) signal.addEventListener('abort', onAbort, { once: true })
+    const initial = observeAbort(signals)
+    if (initial.kind === 'failed' || initial.kind === 'aborted') return onAbort()
+    try {
+      for (const signal of signals) {
+        admitted.push(signal)
+        signal.addEventListener('abort', onAbort, { once: true })
+        const after = observeAbort([signal])
+        if (after.kind !== 'none') return onAbort()
+      }
+    } catch (error) {
+      settled = true
+      cleanup()
+      reject(error)
+      return
+    }
+    const afterAdmission = observeAbort(signals)
+    if (afterAdmission.kind !== 'none') return onAbort()
     Promise.resolve()
       .then(operation)
       .then(
@@ -822,10 +997,17 @@ export function createConcurrencyLimiter(options: {
     idlePromise = undefined
     resolve?.()
   }
+  /** Drops consumed queue slots so completed task closures are no longer retained. */
+  const compact = (): void => {
+    if (queueHead < 64 || queueHead * 2 < queue.length) return
+    queue.splice(0, queueHead)
+    queueHead = 0
+  }
   const drain = (): void => {
     while (!closed && active < concurrency && queueHead < queue.length) {
       const entry = queue[queueHead++]
       if (!entry || entry.cancelled) continue
+      compact()
       try {
         entry.cleanup()
       } catch (error) {
@@ -864,6 +1046,7 @@ export function createConcurrencyLimiter(options: {
       entry.reject(closeReason)
     }
     queueHead = queue.length
+    compact()
     signalIdle()
   }
   const limiter: IConcurrencyLimiter = {
@@ -902,8 +1085,39 @@ export function createConcurrencyLimiter(options: {
           }
           signalIdle()
         }
-        runSignal?.addEventListener('abort', onAbort, { once: true })
         cleanup = () => runSignal?.removeEventListener('abort', onAbort)
+        try {
+          runSignal?.addEventListener('abort', onAbort, { once: true })
+          const afterAdmission = observeAbort(runSignal === undefined ? [] : [runSignal])
+          if (afterAdmission.kind !== 'none') {
+            entry.cancelled = true
+            cleanup()
+            reject(
+              afterAdmission.kind === 'failed'
+                ? afterAdmission.error
+                : (afterAdmission.reason ?? new UtilsAbortError())
+            )
+            signalIdle()
+            return
+          }
+          if (closed) {
+            entry.cancelled = true
+            cleanup()
+            reject(closeReason)
+            signalIdle()
+            return
+          }
+        } catch (error) {
+          entry.cancelled = true
+          try {
+            cleanup()
+          } catch (cleanupError) {
+            reportDiagnostic(report, cleanupError, { operation: 'limiter', phase: 'cleanup' })
+          }
+          reject(error)
+          signalIdle()
+          return
+        }
         queue.push(entry)
         drain()
       })
