@@ -416,5 +416,3 @@ host.runAction('increment', () => {
 ```bash
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
-
-</content>

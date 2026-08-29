@@ -310,6 +310,7 @@ if ((error as { code?: string }).code === StoreWorkerErrorCode.adapterDisposed) 
 | `requestAborted`       | `REQUEST_ABORTED`        | Worker 侧的序列化请求被协作式取消（`AbortSignal`）；`ownership: 'transfer'` 时输入已 detach，不可重试 |
 | `invalidRequestChunk`  | `INVALID_REQUEST_CHUNK`  | 发给 Worker 的请求 chunk 形状非法（`isChunkShape` 校验未通过），协议错误                              |
 | `invalidResponseChunk` | `INVALID_RESPONSE_CHUNK` | Worker 返回的 chunk 形状非法，Worker 侧实现错误                                                       |
+| `chunkMergeFailed`     | `CHUNK_MERGE_FAILED`     | Worker 输出为空，或把 value 段并入字节流；修正 parser 分段输出                                        |
 | `cleanupFailed`        | `CLEANUP_FAILED`         | 释放期间 endpoint 与（可选的）`worker.terminate()` 清理均失败                                         |
 
 **`createStoreWorkerError(code, message, options?)`**：
@@ -338,6 +339,8 @@ throw createStoreWorkerAggregateError(
 `STORE_WORKER_SOURCE`（`'@migaia/store-worker'`）是贴在每个本包错误上的固定 `source` 值，一般不需要手动引用，除非要用它去过滤/识别本包抛出的错误（例如把它和 `@migaia/web-rpc` 的 `WebRpcError`——`source: '@migaia/web-rpc'`——区分开）。
 
 ---
+
+<a id="8-字节转移语义ibyteownership"></a>
 
 ## 8. 字节转移语义（`IByteOwnership`）
 

@@ -47,6 +47,8 @@ store.sub(countDef, () => {}); // 订阅
 
 这个设计的意义是**作用域化**：同一份 `countDef` 在不同的 `AtomStore`（比如不同 `StoreProvider`、不同 SSR 请求）下各自独立实例化、互不污染。`useAtomDefinition`/`useSetAtomDefinition` 固定走 `StoreProvider` 自带的 `registry.atomStore`；`useAtomValue`/`useSetAtom`/`useAtom` 则是更通用的协议 hook，见 [3.6](#36-useatomvalueatom--usesetatomatom--useatomatom)。
 
+<a id="14-两种异步值resource-与-istoreresource"></a>
+
 ### 1.4 两种"异步值"：`Resource` 与 `IStoreResource`
 
 本包同时对接两种不同来源的异步容器，名字很像但不是一回事：
@@ -264,6 +266,8 @@ function useSetAtomDefinition<T, Args extends readonly unknown[], Result>(
 
 与 `useAtomValue`/`useSetAtom` 的区别：后者是"给任意 atom 协议对象接线，Provider 可选"；这一对是"专门读写 Provider 自己的 `atomStore`，Provider 必需"。业务里更常见的是用 `atomDef`/`derivedDef`/`writableDef`/`familyDef` 定义出 token，然后配这一对 hook。
 
+<a id="39-usenodevaluenode-runtime-enabled"></a>
+
 ### 3.9 `useNodeValue(node, runtime, enabled?)`
 
 ```ts
@@ -358,6 +362,20 @@ function createStoreRegistry(runtime?: IRuntime): StoreRegistry;
 - `whenTerminal()` / `lifecycle`：暴露统一的 `AsyncLifecycle` 形状（`open` → `closing` → `terminal`），`whenTerminal()` 在真正走到 `terminal`（含所有异步释放都 settle）才 resolve。
 
 ## 5. 错误处理完整参考
+
+所有本包错误都带 `source: '@migaia/store-react'` 与稳定 `code`：
+
+| `StoreReactErrorCode` | 码值 | 触发条件 / 处理 |
+| --- | --- | --- |
+| `registryDisposed` | `REGISTRY_DISPOSED` | Registry 终结后继续读写；创建新 Registry |
+| `registryDisposalFailed` | `REGISTRY_DISPOSAL_FAILED` | owned 实体释放失败；展开 `AggregateError.errors` |
+| `providerRequired` | `PROVIDER_REQUIRED` | Provider-only hook 缺少 `StoreProvider`；补 Provider |
+| `featureDisabled` | `FEATURE_DISABLED` | 所需 feature 未显式开启；修正 `config.features` |
+| `storeMissing` | `STORE_MISSING` | token 尚未注册；修正注册顺序或 token |
+| `storeDuplicate` | `STORE_DUPLICATE` | 同 token 重复注册；改用 `replace()` 或拆分 Registry |
+| `crossRuntime` | `CROSS_RUNTIME` | Store 与 Registry 不属于同一 Runtime；统一所有权 |
+| `invalidConfig` | `INVALID_CONFIG` | token/Provider/features 配置非法；按 message 修正 |
+| `readyRejected` | `READY_REJECTED` | readiness barrier reject；检查保留在 `cause` 的底层失败 |
 
 | 消息                                                                                                                          | 触发条件                                                                                                                                                    | 处理方式                                                                                             |
 | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |

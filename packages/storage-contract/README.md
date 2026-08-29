@@ -354,7 +354,7 @@ import {
 } from '@migaia/storage-contract';
 ```
 
-**`ICodec<T, TRaw>`｜5 秒上手** —— 编解码器接口类型，本包不内置任何实现（内置实现见 `@migaia/storage-web` 的 `jsonCodec`/structured/binary）：
+**`ICodec<T, TRaw>`｜5 秒上手** —— 编解码器接口类型。本包只内置一个运行时中立的 Map/Set JSON codec；浏览器通道相关的 structured/binary codec 仍由 `@migaia/storage-web` 提供：
 
 ```ts
 const myCodec: ICodec<MyValue> = {
@@ -366,6 +366,20 @@ const myCodec: ICodec<MyValue> = {
 ```
 
 全部字段：`name: string`（必填）、`output: ICodecOutput`（必填，`'text' | 'binary' | 'structured'`，用于与后端能力选路）、`encode(value: T, ctx?: IOperationContext): Promise<TRaw>`（必填）、`decode(raw: TRaw, ctx?: IOperationContext): Promise<T>`（必填）。
+
+**`collectionsJsonCodec`｜5 秒上手** —— 版本化保存 JSON 数据中的真实 `Map`/`Set`：
+
+```ts
+import {
+  COLLECTIONS_JSON_CODEC_NAME,
+  collectionsJsonCodec
+} from '@migaia/storage-contract';
+
+const raw = await collectionsJsonCodec.encode(new Map([['theme', 'dark']]));
+const restored = await collectionsJsonCodec.decode(raw); // Map 实例
+```
+
+固定 `name` 为 `COLLECTIONS_JSON_CODEC_NAME`（`'migaia-collections-json-v1'`），`output` 为 `'text'`。只识别自身精确的版本化 tuple，不会把普通相似数组猜成集合；根值无法被 JSON 表示、payload 非字符串或 JSON 解析失败时抛 `StorageContractError(INVALID_ARGUMENT)`，原始失败保留在 `cause`。
 
 **`snapshotCodec`｜5 秒上手** —— 读一次并校验未知值是否满足 `ICodec` 形状：
 
@@ -608,5 +622,3 @@ assertCodec(gzipJsonCodec); // 在注册前校验形状，坏实现尽早报错
 ```bash
 pnpm --filter @migaia/storage-contract run fmt && pnpm --filter @migaia/storage-contract run lint && pnpm --filter @migaia/storage-contract run typecheck && pnpm --filter @migaia/storage-contract run typecheck:test && pnpm --filter @migaia/storage-contract run test
 ```
-
-</content>

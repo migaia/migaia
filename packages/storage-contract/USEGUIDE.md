@@ -253,7 +253,16 @@ type ICodec<T = unknown, TRaw = string | Uint8Array | unknown> = {
 };
 ```
 
-序列化是面向开发者的开放契约，不绑定任何库。本包不内置任何编解码器实现；内置实现（`jsonCodec`、`structured.ts`、`binary.ts`）在 `@migaia/storage-web` 中提供。任何自定义编解码——压缩、加密、走 Worker 的重编码——都通过实现同一接口接入。`output` 声明产出形态，用于与后端能力选路（例如 `output: 'binary'` 的 codec 遇到只支持文本的后端应由调用方决定降级策略，本包不做隐式转换）。
+序列化是面向开发者的开放契约，不绑定任何宿主。本包内置运行时中立的 `collectionsJsonCodec`，用于以版本化 JSON tuple 往返真实 `Map`/`Set`；浏览器通道相关的 structured/binary codec 在 `@migaia/storage-web` 中提供。任何自定义编解码——压缩、加密、走 Worker 的重编码——都通过实现同一接口接入。`output` 声明产出形态，用于与后端能力选路（例如 `output: 'binary'` 的 codec 遇到只支持文本的后端应由调用方决定降级策略，本包不做隐式转换）。
+
+```ts
+import {
+  COLLECTIONS_JSON_CODEC_NAME,
+  collectionsJsonCodec
+} from '@migaia/storage-contract';
+```
+
+`collectionsJsonCodec.name === COLLECTIONS_JSON_CODEC_NAME`（固定值 `'migaia-collections-json-v1'`），`output === 'text'`。编码只为真实 `Map`/`Set` 生成精确 tuple；解码只还原完全匹配该版本、kind 与 payload 形状的 tuple，普通数组保持原样。根值不能被 JSON 表示、输入不是字符串或 JSON 解析失败时抛 `StorageContractError(code: 'INVALID_ARGUMENT')`，原始失败保留在 `cause`。
 
 ```ts
 function snapshotCodec(codec: unknown): ICodec;
@@ -428,5 +437,3 @@ pnpm --filter @migaia/storage-contract run typecheck
 pnpm --filter @migaia/storage-contract run typecheck:test
 pnpm --filter @migaia/storage-contract run test
 ```
-
-</content>

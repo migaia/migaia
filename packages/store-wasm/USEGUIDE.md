@@ -162,6 +162,8 @@ const field2 = string(64); // 自定义最大字节数
 
 ---
 
+<a id="7-arrayitem-length-granularity"></a>
+
 ## 7. `array(item, length, granularity?)`
 
 ```ts
