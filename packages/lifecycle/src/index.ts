@@ -8,6 +8,9 @@ export type {
   ICollectedError,
   IErrorPolicy
 } from './types.js'
+
+export type { IDisposerContext } from './disposer-context.js'
+
 export {
   LifecycleState,
   LifecycleUnitState,

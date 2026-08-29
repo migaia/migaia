@@ -65,6 +65,7 @@ import {
   createSyncLifecycleScope,
   executeReleaseDescriptor,
   createDisposeTransaction,
+  type IDisposerContext,
   type IReleaseDescriptor,
   type IReleaseContext
 } from '@migaia/lifecycle'
@@ -119,7 +120,7 @@ scope.own(handle, {
 })
 ```
 
-全部字段：`force: (context: IReleaseContext) => void | PromiseLike<void>`（**必填**）；`syncSafe?: boolean`；`order?: number`（缺省按 `0`）；`graceful?: (context) => void | PromiseLike<void>`；`gracefulTimeoutMs?: number`；`gcFallback?: boolean`；`custom?: (context) => void | PromiseLike<void>`（逃生舱，设置后完全接管释放，`graceful`/`force` 被忽略）。回调收到的 `IReleaseContext`：`signal`（容器进入 closing 时中止）、`deadlineAt`、`scheduler?`、`report(error)`。
+全部字段：`force: (context: IReleaseContext) => void | PromiseLike<void>`（**必填**）；`syncSafe?: boolean`；`order?: number`（缺省按 `0`）；`graceful?: (context) => void | PromiseLike<void>`；`gracefulTimeoutMs?: number`；`gcFallback?: boolean`；`custom?: (context) => void | PromiseLike<void>`（逃生舱，设置后完全接管释放，`graceful`/`force` 被忽略）。回调收到的 `IReleaseContext`：`signal`（容器进入 closing 时中止）、`deadlineAt`、`scheduler?`、`report(error)`，以及由 `LifecycleScope` 提供的 `disposer.join()`。`disposer.join()` 是当前 owner-disposal 的显式 self-join guard：无论同步调用或 await/microtask/timer/nested helper 后调用，都会立即抛 `SCOPE_REENTRANT_DISPOSE`；它不返回 Promise。通用 `createDisposeTransaction()` 没有 scope owner 时不提供 `disposer`。
 
 **`executeReleaseDescriptor`｜5 秒上手** —— 独立运行单个 descriptor 的完整降级链（`custom` → 否则 `graceful` 带超时 → `force`），不经过完整事务，常用于测试或自定义编排：
 
@@ -412,7 +413,12 @@ await terminal.whenTerminal()
 根入口保持兼容；需要控制 retained graph 时使用稳定 leaf：
 
 ```ts
-import { createAbortController } from '@migaia/lifecycle/abort'
+import {
+  createAbortController,
+  observeAbortSubscription,
+  type IObservedAbortFailureSink,
+  type IObservedAbortSubscription
+} from '@migaia/lifecycle/abort'
 import { snapshotScheduler } from '@migaia/lifecycle/scheduler'
 import { createPendingTracker } from '@migaia/lifecycle/quiescence'
 import { createLifecycleScope } from '@migaia/lifecycle/scope'
@@ -421,7 +427,7 @@ import { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'
 import { probeThenable } from '@migaia/lifecycle/errors'
 ```
 
-可用 subpath：`/abort`、`/scheduler`、`/quiescence`、`/scope`、`/generation`、`/disposal`、`/errors`。Root 和 subpath 都 re-export 同一 preserve-modules 实现，同名 runtime export 保持 `===`；包不开放 `dist/*` wildcard。`sideEffects: false` 表示未导入 leaf 可被 bundler 删除；Node/Bun 直接 ESM import 本身不执行 tree-shaking，体积验收应看 bundler retained modules，而不是只看 gzip 总字节。
+`/abort` 还公开 canonical hostile-signal-safe `observeAbortSubscription` 及其 `I`-prefixed handle/sink types；Resource 等消费者应静态从该 leaf 委托 signal registration，不复制 registration ledger。可用 subpath：`/abort`、`/scheduler`、`/quiescence`、`/scope`、`/generation`、`/disposal`、`/errors`。Root 和 subpath 都 re-export 同一 preserve-modules 实现，同名 runtime export 保持 `===`；包不开放 `dist/*` wildcard。`sideEffects: false` 表示未导入 leaf 可被 bundler 删除；Node/Bun 直接 ESM import 本身不执行 tree-shaking，体积验收应看 bundler retained modules，而不是只看 gzip 总字节。
 
 ---
 

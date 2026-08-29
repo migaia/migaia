@@ -5,8 +5,6 @@ import {
   validateSchedulerTime,
   type ILifecycleScheduler
 } from './scheduler.js'
-import { withTimeout } from '@migaia/utils/promise'
-import { UtilsTimeoutError } from '@migaia/utils/error'
 
 /**
  * Waits for one awaitable until an existing absolute deadline, without cancelling it.
@@ -34,15 +32,35 @@ export const boundedWait = async (
   const remainingMs = deadlineAt - scheduler.now()
   if (remainingMs < 0) return false
   const delayMs = validateSchedulerDelay(Math.max(0, remainingMs), 'deadline delay')
-  try {
-    return await withTimeout(() => observedTask.then(() => true), {
-      timeoutMs: delayMs,
-      scheduler,
-      zeroTimeoutBehavior: 'start',
-      cooperativeCancellation: false
-    })
-  } catch (error) {
-    if (error instanceof UtilsTimeoutError) return false
-    throw error
-  }
+  return new Promise<boolean>((resolve, reject) => {
+    let settled = false
+    let timer: { cancel(): void } | undefined
+    const settle = (outcome: () => void): void => {
+      if (settled) return
+      settled = true
+      try {
+        timer?.cancel()
+      } catch (error) {
+        reject(error)
+        return
+      }
+      outcome()
+    }
+    try {
+      timer = scheduler.schedule(() => settle(() => resolve(false)), delayMs)
+      if (settled) timer.cancel()
+    } catch (error) {
+      reject(error)
+      return
+    }
+    void observedTask.then(
+      () => settle(() => resolve(true)),
+      (error: unknown) => {
+        // A rejection after the timeout is deliberately consumed by this handler. Before the
+        // timeout it remains the caller's primary failure, without relying on an error class from
+        // another package or bundle to identify the timer winner.
+        settle(() => reject(error))
+      }
+    )
+  })
 }

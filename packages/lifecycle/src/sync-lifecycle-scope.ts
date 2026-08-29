@@ -8,6 +8,7 @@ import type {
 import { ASYNC_OWNER_BRAND } from './types.js'
 import { createLifecycleError, createErrorCollector, probeThenable } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
+import { LifecycleErrorText } from './error-text.js'
 import { createTerminalController } from './terminal-controller.js'
 import { captureAbortControllerFactory } from './abort-factory.js'
 import { LifecycleState, ThenableProbeKind } from './state-constants.js'
@@ -153,7 +154,7 @@ export function createSyncLifecycleScope(
       if (currentlyReleasing) {
         throw createLifecycleError(
           LifecycleErrorCode.scopeReentrantDispose,
-          '[lifecycle] cannot call dispose() re-entrantly on the same scope'
+          LifecycleErrorText.scopeReentrantDispose
         )
       }
       return []
@@ -161,18 +162,44 @@ export function createSyncLifecycleScope(
     close()
     disposed = true
     const released = entries.splice(0).reverse()
+    const collector = createErrorCollector(errorPolicy, options.report)
+    const admissionErrors: Array<{ readonly source: string; readonly error: unknown }> = []
+    const admitted = released.flatMap((entry) => {
+      try {
+        // Snapshot every descriptor field before any callback or ordering work begins. A hostile
+        // accessor therefore cannot discard the remaining release plan halfway through dispose().
+        const descriptor = entry.descriptor
+        return [
+          {
+            ...entry,
+            descriptor: {
+              syncSafe: descriptor.syncSafe,
+              order: descriptor.order,
+              custom: descriptor.custom,
+              graceful: descriptor.graceful,
+              gracefulTimeoutMs: descriptor.gracefulTimeoutMs,
+              force: descriptor.force
+            } as ISyncReleaseDescriptor
+          }
+        ]
+      } catch (error) {
+        admissionErrors.push({ source: entry.source, error })
+        return []
+      }
+    })
     // Explicit release orders are used by synchronous owners that need a source-before-query
     // barrier. Legacy callers with omitted orders retain the documented LIFO behavior.
-    const snapshot = released.some((entry) => entry.descriptor.order !== undefined)
-      ? [...released].sort(
+    const snapshot = admitted.some((entry) => entry.descriptor.order !== undefined)
+      ? [...admitted].sort(
           (left, right) => (right.descriptor.order ?? 0) - (left.descriptor.order ?? 0)
         )
-      : released
+      : admitted
     currentlyReleasing = true
-    const collector = createErrorCollector(errorPolicy, options.report)
     const controller = createController()
     controller.abort('scope closed')
     try {
+      for (const admissionError of admissionErrors)
+        collector.add(admissionError.source, admissionError.error)
       for (const entry of snapshot) {
         const context: IReleaseContext = {
           signal: controller.signal,

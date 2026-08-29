@@ -24,10 +24,21 @@ export function observeAbortSubscription(
   callback: (reason: unknown) => void,
   onFailure: IObservedAbortFailureSink
 ): IObservedAbortSubscription {
-  if (
-    typeof signal.addEventListener !== 'function' ||
-    typeof signal.removeEventListener !== 'function'
-  ) {
+  let addEventListener: unknown
+  let removeEventListener: unknown
+  try {
+    addEventListener = signal.addEventListener
+    removeEventListener = signal.removeEventListener
+  } catch (error) {
+    throw createLifecycleTypeError(
+      LifecycleErrorCode.invalidOption,
+      LifecycleErrorText.abortSignalInvalid,
+      {
+        cause: error
+      }
+    )
+  }
+  if (typeof addEventListener !== 'function' || typeof removeEventListener !== 'function') {
     throw createLifecycleTypeError(
       LifecycleErrorCode.invalidOption,
       LifecycleErrorText.abortSignalInvalid
@@ -35,13 +46,19 @@ export function observeAbortSubscription(
   }
   let removed = false
   let attempted = false
+  let delivered = false
   let registrationInProgress = false
   let callbackDuringRegistration = false
   const failures: unknown[] = []
-  const removeCaptured = (): void => {
-    if (!attempted) return
+  const removeCaptured = (force = false): void => {
+    if (!attempted || (removed && !force)) return
+    removed = true
     try {
-      signal.removeEventListener('abort', listener)
+      Reflect['apply'](
+        removeEventListener as (type: string, listener: () => void) => void,
+        signal,
+        ['abort', listener]
+      )
     } catch (error) {
       failures.push(error)
       try {
@@ -53,13 +70,25 @@ export function observeAbortSubscription(
   }
   const unsubscribe = (): void => {
     if (removed || !attempted) return
-    removed = true
-    removeCaptured()
+    removeCaptured(true)
   }
   const listener = (): void => {
+    if (delivered) return
+    delivered = true
     if (registrationInProgress) callbackDuringRegistration = true
     try {
-      callback(signal.reason)
+      let reason: unknown
+      try {
+        reason = signal.reason
+      } catch (error) {
+        try {
+          onFailure(error)
+        } catch {
+          // Native dispatch must not receive an operation callback failure.
+        }
+        reason = error
+      }
+      callback(reason)
     } catch (error) {
       try {
         onFailure(error)
@@ -73,7 +102,11 @@ export function observeAbortSubscription(
   attempted = true
   registrationInProgress = true
   try {
-    signal.addEventListener('abort', listener, { once: true })
+    Reflect['apply'](
+      addEventListener as (type: string, listener: () => void, options?: unknown) => void,
+      signal,
+      ['abort', listener, { once: true }]
+    )
   } catch (error) {
     unsubscribe()
     if (
@@ -96,7 +129,7 @@ export function observeAbortSubscription(
     registrationInProgress = false
   }
   const retryRegistrationCleanup = (): void => {
-    if (callbackDuringRegistration || failures.length > 0) removeCaptured()
+    if (callbackDuringRegistration || failures.length > 0) removeCaptured(true)
   }
   let aborted = false
   try {

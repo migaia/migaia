@@ -7,6 +7,9 @@ export default defineConfig({
   build: {
     target: 'es2022',
     rollupOptions: {
+      // Keep the workspace dependency as one canonical runtime copy. Inlining it here creates a
+      // second error class/symbol universe in packed lifecycle consumers.
+      external: (id) => id === '@migaia/utils' || id.startsWith('@migaia/utils/'),
       preserveEntrySignatures: 'strict',
       input: {
         index: 'src/index.ts',

@@ -4,6 +4,8 @@ export const LifecycleErrorText = {
   provisionalCleanupFailed: '[lifecycle] provisional cleanup failed',
   /** Stable finalization message for transaction-level failures. */
   disposeTransactionFailed: '[lifecycle] dispose transaction failed',
+  /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */
+  scopeReentrantDispose: '[lifecycle] cannot join the same scope disposal from its disposer',
   /** Stable message for a descriptor that cannot be admitted into a release transaction. */
   disposeDescriptorInvalid: '[lifecycle] release descriptor admission failed',
   /** Fallback message for a queue timeout wrapper around a non-Error primary. */

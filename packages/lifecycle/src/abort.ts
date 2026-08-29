@@ -1,5 +1,11 @@
 import { instantiateCurrentAbortController } from './abort-factory.js'
 
+export {
+  observeAbortSubscription,
+  type IObservedAbortFailureSink,
+  type IObservedAbortSubscription
+} from './observed-subscription.js'
+
 /** Structural abort signal consumed by lifecycle owners without importing DOM or Node types. */
 export type IAbortSignal = {
   readonly aborted: boolean

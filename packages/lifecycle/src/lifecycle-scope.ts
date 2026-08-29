@@ -7,8 +7,10 @@ import type {
   ILifecycleState
 } from './types.js'
 import { ASYNC_OWNER_BRAND } from './types.js'
+import { createDisposerContext } from './disposer-context.js'
 import { containAsyncRejection, createLifecycleError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
+import { LifecycleErrorText } from './error-text.js'
 import { createTerminalController } from './terminal-controller.js'
 import { DisposeTransactionKind, LifecycleState } from './state-constants.js'
 import { createDisposeTransaction } from './dispose-transaction.js'
@@ -68,6 +70,8 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
   const terminal = createTerminalController()
   const createController = captureAbortControllerFactory()
   const closingController = createController()
+  /** Immutable owner-bound capability shared by this scope's release callbacks. */
+  const disposerContext = createDisposerContext()
   const entries: Array<{
     readonly resource: unknown
     readonly source: string
@@ -83,19 +87,21 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
    * call-stack unwinding — not per-item bookkeeping here — attributes the error to the right item.
    */
   let currentlyReleasing = false
-  let activeDisposerCallback = false
+  let activeDisposerSynchronously = false
 
   /** Invokes one user callback while marking only its synchronous call frame as active. */
   const invokeDisposerCallback = (
     callback: (context: IReleaseContext) => void | PromiseLike<void>,
     context: IReleaseContext
   ): void | PromiseLike<void> => {
-    activeDisposerCallback = true
+    activeDisposerSynchronously = true
+    let result: void | PromiseLike<void> = undefined
     try {
-      return callback(context)
+      result = callback(context)
     } finally {
-      activeDisposerCallback = false
+      activeDisposerSynchronously = false
     }
+    return result
   }
 
   /**
@@ -231,7 +237,8 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
           report: options.report,
           deadlineAt: options.deadlineAt,
           scheduler,
-          signal: closingController.signal
+          signal: closingController.signal,
+          disposer: disposerContext
         }
       )
       return await transaction.run(
@@ -248,10 +255,10 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
 
   const dispose = (): Promise<readonly ICollectedError[]> => {
     if (disposePromise) {
-      if (activeDisposerCallback) {
+      if (activeDisposerSynchronously) {
         throw createLifecycleError(
           LifecycleErrorCode.scopeReentrantDispose,
-          '[lifecycle] cannot call dispose() re-entrantly on the same scope'
+          LifecycleErrorText.scopeReentrantDispose
         )
       }
       // Concurrent, non-reentrant call: reuse the one real disposal in flight (L-T29).

@@ -68,7 +68,12 @@ const instantiate = (constructor: IHostAbortControllerConstructor): IAbortContro
   try {
     return validateHostController(new constructor())
   } catch (error) {
-    if (error instanceof Error && 'code' in error) throw error
+    if (
+      error instanceof Error &&
+      (error as { readonly source?: unknown }).source === '@migaia/lifecycle' &&
+      typeof (error as { readonly code?: unknown }).code === 'string'
+    )
+      throw error
     throw createLifecycleError(
       LifecycleErrorCode.envUnsupported,
       LifecycleErrorText.envUnsupported,

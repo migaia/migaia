@@ -43,6 +43,7 @@ export type ILifecycleUnit<T> = {
 }
 
 export function createLifecycleUnit<T>(options: ILifecycleUnitOptions = {}): ILifecycleUnit<T> {
+  const report = options.report
   const terminal = createTerminalController()
   const generations = createGenerationController()
   let state: IUnitState = LifecycleUnitState.idle
@@ -50,7 +51,7 @@ export function createLifecycleUnit<T>(options: ILifecycleUnitOptions = {}): ILi
   let error: unknown
 
   const reportStartFailed = (rawError: unknown): void => {
-    if (!options.report) return
+    if (!report) return
     const tagged = createLifecycleError(
       LifecycleErrorCode.unitStartFailed,
       '[lifecycle] start() failed',
@@ -59,7 +60,7 @@ export function createLifecycleUnit<T>(options: ILifecycleUnitOptions = {}): ILi
       }
     )
     try {
-      const result: unknown = options.report(tagged)
+      const result: unknown = report(tagged)
       containAsyncRejection(result, () => {
         // No lower layer to escalate a reporter's own async failure to.
       })
@@ -84,8 +85,7 @@ export function createLifecycleUnit<T>(options: ILifecycleUnitOptions = {}): ILi
     try {
       result = factory()
     } catch (thrown) {
-      // Nothing could have superseded this generation yet — it just began, synchronously, on this
-      // same call stack — so committing unconditionally is correct.
+      if (!generations.isCurrent(request.token)) return
       state = LifecycleUnitState.failed
       error = thrown
       value = undefined
@@ -97,12 +97,14 @@ export function createLifecycleUnit<T>(options: ILifecycleUnitOptions = {}): ILi
     // read `.then` a second time.
     const probe = probeThenable(result)
     if (probe.kind === 'not-thenable') {
+      if (!generations.isCurrent(request.token)) return
       state = 'loaded'
       value = result as T
       error = undefined
       return
     }
     if (probe.kind === ThenableProbeKind.failed) {
+      if (!generations.isCurrent(request.token)) return
       state = LifecycleUnitState.failed
       error = probe.error
       value = undefined
