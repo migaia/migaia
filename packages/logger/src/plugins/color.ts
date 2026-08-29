@@ -131,14 +131,17 @@ class ColorPlugin implements ILoggerPlugin<
 
   #writeJson(entry: ILogEntry): void {
     const payload = {
+      id: entry.id,
       tag: entry.tag,
       time: entry.time.toISOString(),
       context: entry.context.length ? entry.context.join('.') : undefined,
       // uuid/topics 是否出现在渲染结果里，交给各自插件的 display 开关决定——
       // ansis 只负责按约定读取 entry.data 里这两个字段，不关心是谁写进去的
-      id: entry.data.uuidDisplay ? (entry.data.uuid as string | undefined) : undefined,
+      uuid: entry.data.uuidDisplay ? (entry.data.uuid as string | undefined) : undefined,
       topics: this.#formatTopicChain(entry),
       message: entry.message,
+      args: entry.args,
+      data: entry.data,
       meta: entry.meta,
       error: entry.error
     }
@@ -204,9 +207,9 @@ class ColorPlugin implements ILoggerPlugin<
     const runtime = getLoggerRuntimeManager()
     if (runtime.console) {
       if (tag === LoggerConsoleTag.error || tag === LoggerConsoleTag.fatal)
-        return runtime.console.error
-      if (tag === LoggerConsoleTag.warn) return runtime.console.warn
-      return runtime.console.log
+        return (...args) => runtime.console!.error(...args)
+      if (tag === LoggerConsoleTag.warn) return (...args) => runtime.console!.warn(...args)
+      return (...args) => runtime.console!.log(...args)
     }
     return (...args) =>
       runtime.write(args.map((arg) => (typeof arg === 'string' ? arg : String(arg))).join(' '))

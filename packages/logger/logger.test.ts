@@ -10,7 +10,7 @@ import { http } from './src/plugins/http'
 import { uuid } from './src/plugins/uuid'
 import { setLoggerRuntimeManager } from './src/runtime-manager'
 import { LoggerErrorCode } from './src/errors'
-import type { ILogEntry, ILoggerPlugin } from './src/typing'
+import type { ILogEntry, ILoggerPlugin, ILoggerPluginCore } from './src/typing'
 import { GENERATOR_CONTINUE, type IPipelineMode } from '@migaia/plugin-host'
 import { createManualScheduler } from '@migaia/lifecycle'
 
@@ -382,7 +382,7 @@ describe('logger plugin host integration', () => {
             return {}
           }
         }
-      ]
+      ] as const
     })
 
     expect(() => logger.log('info', 'message')).not.toThrow()
@@ -979,6 +979,52 @@ describe('logger plugin host integration', () => {
     info.mockRestore()
   })
 
+  it('preserves structured JSON fields and invokes a custom console with its owner', () => {
+    const calls: unknown[][] = []
+    const consoleOwner = {
+      log(...args: unknown[]) {
+        if (this !== consoleOwner) throw new Error('wrong console receiver')
+        calls.push(args)
+      },
+      warn(...args: unknown[]) {
+        if (this !== consoleOwner) throw new Error('wrong console receiver')
+        calls.push(args)
+      },
+      error(...args: unknown[]) {
+        if (this !== consoleOwner) throw new Error('wrong console receiver')
+        calls.push(args)
+      }
+    }
+    const restore = setLoggerRuntimeManager({
+      randomUUID: () => 'structured-id',
+      defer: (task) => task(),
+      write: () => undefined,
+      console: consoleOwner
+    })
+    try {
+      const logger = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [color({ format: 'json', color: 'never' })]
+      })
+      logger.dispatchRaw({
+        tag: 'info',
+        message: 'user=%s',
+        args: ['alice'],
+        data: { tenant: 'acme' }
+      })
+      const payload = JSON.parse(String(calls[0]?.[0])) as {
+        id: string
+        args: string[]
+        data: { tenant: string }
+      }
+      expect(payload.id).toMatch(/^log_/)
+      expect(payload.args).toEqual(['alice'])
+      expect(payload.data).toEqual({ tenant: 'acme' })
+    } finally {
+      restore()
+    }
+  })
+
   it('outputs level logs synchronously by default', () => {
     const info = vi.spyOn(console, 'log').mockImplementation(() => {})
     const logger = new Logger({
@@ -1097,6 +1143,66 @@ describe('logger plugin host integration', () => {
     logger.log('info', 'immediate')
 
     expect(batches).toEqual([['immediate']])
+  })
+
+  it('bounds batch concurrency and rejects a full lossless window synchronously', async () => {
+    let release!: () => void
+    let active = 0
+    const peak: number[] = []
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      plugins: [batch()]
+    })
+    const batcher = logger.getShared('createBatcher')!<string>(
+      { maxSize: 1, asyncOutput: false, maxConcurrentBatches: 1, maxPendingBatches: 1 },
+      async () => {
+        active += 1
+        peak.push(active)
+        await new Promise<void>((resolve) => (release = resolve))
+        active -= 1
+      }
+    )
+
+    batcher.push('first')
+    expect(() => batcher.push('second')).toThrowError(
+      expect.objectContaining({ code: 'BATCH_OVERFLOW' })
+    )
+    release()
+    await batcher.flush()
+    expect(Math.max(...peak)).toBe(1)
+  })
+
+  it('removes named extends edges idempotently and disconnects them on shutdown', async () => {
+    const entries: string[] = []
+    const target = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      plugins: [
+        {
+          name: 'unextend-target-sink',
+          install: (core: ILoggerPluginCore) => {
+            core.useSink((entry: ILogEntry) => {
+              entries.push(entry.message)
+            })
+            return {}
+          }
+        }
+      ] as const
+    })
+    const source = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    source.extends(target)
+    expect(source.unextend(target)).toBe(true)
+    expect(source.unextend(target)).toBe(false)
+    source.log('info', 'detached')
+    await source.flush()
+    expect(entries).toEqual([])
+    source.extends(target)
+    await source.shutdown('manual')
+    target.log('info', 'target-still-live')
+    await target.flush()
+    expect(entries).toEqual(['target-still-live'])
+    await target.shutdown('manual')
   })
 
   it.each(['sync', 'async', 'generator'] as const)('runs %s pipeline mode', async (mode) => {

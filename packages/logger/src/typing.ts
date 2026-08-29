@@ -254,6 +254,9 @@ export type ILoggerCore<
     ...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]
   ): ILoggerCore<TMode, TShared>
 
+  /** Removes named extension edges; returns true when at least one edge was removed. */
+  unextend(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): boolean
+
   /**
    * 给一个已经构造好的 logger 实例动态追加插件（不需要重新 new）。 和构造时传 `plugins` 数组走的是同一套冲突检测（重名插件、重名扩展方法
    * 都会抛异常），也是同一套安装逻辑——`new Logger({ plugins: [...] })` 内部实际上就是调用一次这个方法。

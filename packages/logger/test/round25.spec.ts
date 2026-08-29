@@ -31,7 +31,6 @@ function installAbortHarness(
   registrationError: Error,
   removalError?: Error
 ): IAbortHarness {
-  const originalAbortController = globalThis.AbortController
   const state = {
     adds: 0,
     aborts: 0,
@@ -104,11 +103,10 @@ function installAbortHarness(
     }
   }
 
-  vi.stubGlobal('AbortController', HostileAbortController)
   return {
     Controller: HostileAbortController,
     state,
-    restore: () => vi.stubGlobal('AbortController', originalAbortController)
+    restore: () => undefined
   }
 }
 
@@ -155,6 +153,10 @@ async function runScenario(
       task()
     },
     write: () => undefined,
+    // Keep PluginHost/lifecycle construction on the native host controller. The HTTP owner
+    // receives the hostile factory directly, so partial listener registration cannot be masked by
+    // an unrelated lifecycle admission path.
+    createAbortController: () => new harness.Controller(),
     fetch
   })
   process.on('unhandledRejection', onUnhandled)
@@ -255,6 +257,7 @@ describe('Round25 HTTP abort-listener partial registration', () => {
         task()
       },
       write: () => undefined,
+      createAbortController: () => new harness.Controller(),
       fetch
     })
     try {

@@ -70,6 +70,11 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
       )
     const runtimeProcess = getLoggerRuntimeManager().process
     if (!runtimeProcess) return {}
+    if (ProcessPlugin.#installed && ProcessPlugin.#runtimeProcess !== runtimeProcess)
+      throw createLoggerError(
+        LoggerErrorCode.pluginConfigConflict,
+        LoggerErrorText.processConfigConflict
+      )
     ProcessPlugin.#runtimeProcess ??= runtimeProcess
     // 不读 this.config——统一通过 core.config.get() 读取
     const config = core.config.get<IProcessPluginConfig>() ?? {}

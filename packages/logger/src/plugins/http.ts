@@ -1,5 +1,5 @@
 import type { IEmptyPluginExt, ILogEntry, ILoggerPluginCore, ILoggerPlugin } from '../typing.js'
-import type { IBatchShared } from './batch.js'
+import { createBatcherForCore, type IBatchController, type IBatchShared } from './batch.js'
 import type { IPipelineMode } from '@migaia/plugin-host'
 import { getLoggerRuntimeManager } from '../runtime-manager.js'
 import {
@@ -19,13 +19,158 @@ export type IHttpPluginConfig = {
   /** 单次 HTTP 请求最长等待时间；默认 10000ms。 */
   requestTimeoutMs?: number
   /** 是否复用 batch 插件的批量能力；未装 batch 插件时自动退化为每条日志单独发送 */
-  batch?: { maxSize?: number; maxWaitMs?: number; asyncOutput?: boolean }
+  batch?: {
+    maxSize?: number
+    maxWaitMs?: number
+    maxConcurrentBatches?: number
+    maxPendingBatches?: number
+    asyncOutput?: boolean
+  }
+  /** Maximum valid Retry-After delay; valid excess is clamped. Defaults to 30000ms. */
+  maxRetryAfterMs?: number
 }
 
 export const HTTP_PLUGIN_NAME = 'http' as const
 
 /** Marks scheduler/listener admission failures that must outrank an earlier transport failure. */
 const HTTP_WAIT_PRIMARY = Symbol('logger.http.wait.primary')
+
+/** Abbreviated weekdays accepted by IMF-fixdate and asctime-date. */
+const HTTP_DATE_SHORT_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+
+/** Full weekdays accepted only by the obsolete RFC 850 HTTP-date form. */
+const HTTP_DATE_LONG_WEEKDAYS = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday'
+] as const
+
+/** Three-letter months shared by every HTTP-date grammar variant. */
+const HTTP_DATE_MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec'
+] as const
+
+type IHttpDateParts = {
+  readonly day: number
+  readonly month: number
+  readonly year: number
+  readonly hour: number
+  readonly minute: number
+  readonly second: number
+  readonly weekday: number
+}
+
+/** Turns a strict four-digit or obsolete two-digit HTTP year into a calendar year. */
+function resolveHttpDateYear(value: string, nowYear: number): number {
+  if (value.length === 4) return Number(value)
+  const centuryYear = Math.floor(nowYear / 100) * 100 + Number(value)
+  return centuryYear > nowYear + 50 ? centuryYear - 100 : centuryYear
+}
+
+/** Validates a parsed HTTP-date calendar tuple without relying on permissive Date.parse rules. */
+function toHttpDateTimestamp(parts: IHttpDateParts): number | undefined {
+  if (parts.year < 1 || parts.day < 1 || parts.hour > 23 || parts.minute > 59 || parts.second > 59)
+    return undefined
+  /** Date instance whose UTC fields are checked after the calendar tuple is materialized. */
+  const date = new Date(0)
+  date.setUTCFullYear(parts.year, parts.month, parts.day)
+  date.setUTCHours(parts.hour, parts.minute, parts.second, 0)
+  if (
+    date.getUTCFullYear() !== parts.year ||
+    date.getUTCMonth() !== parts.month ||
+    date.getUTCDate() !== parts.day ||
+    date.getUTCHours() !== parts.hour ||
+    date.getUTCMinutes() !== parts.minute ||
+    date.getUTCSeconds() !== parts.second ||
+    date.getUTCDay() !== parts.weekday
+  )
+    return undefined
+  return date.getTime()
+}
+
+/** Parses one strict HTTP-date grammar variant without accepting Date.parse extensions. */
+function parseHttpDate(value: string): number | undefined {
+  /** Current UTC year used only for RFC 850 two-digit-year interpretation. */
+  const nowYear = new Date(Date.now()).getUTCFullYear()
+  const shortWeekday = HTTP_DATE_SHORT_WEEKDAYS.join('|')
+  const longWeekday = HTTP_DATE_LONG_WEEKDAYS.join('|')
+  const month = HTTP_DATE_MONTHS.join('|')
+  const imf = new RegExp(
+    `^(${shortWeekday}), ([0-3][0-9]) (${month}) ([0-9]{4}) ([0-2][0-9]):([0-5][0-9]):([0-5][0-9]) GMT$`
+  ).exec(value)
+  if (imf) {
+    return toHttpDateTimestamp({
+      weekday: HTTP_DATE_SHORT_WEEKDAYS.indexOf(
+        imf[1] as (typeof HTTP_DATE_SHORT_WEEKDAYS)[number]
+      ),
+      day: Number(imf[2]),
+      month: HTTP_DATE_MONTHS.indexOf(imf[3] as (typeof HTTP_DATE_MONTHS)[number]),
+      year: Number(imf[4]),
+      hour: Number(imf[5]),
+      minute: Number(imf[6]),
+      second: Number(imf[7])
+    })
+  }
+  const rfc850 = new RegExp(
+    `^(${longWeekday}), ([0-3][0-9])-(${month})-([0-9]{2}) ([0-2][0-9]):([0-5][0-9]):([0-5][0-9]) GMT$`
+  ).exec(value)
+  if (rfc850) {
+    return toHttpDateTimestamp({
+      weekday: HTTP_DATE_LONG_WEEKDAYS.indexOf(
+        rfc850[1] as (typeof HTTP_DATE_LONG_WEEKDAYS)[number]
+      ),
+      day: Number(rfc850[2]),
+      month: HTTP_DATE_MONTHS.indexOf(rfc850[3] as (typeof HTTP_DATE_MONTHS)[number]),
+      year: resolveHttpDateYear(rfc850[4], nowYear),
+      hour: Number(rfc850[5]),
+      minute: Number(rfc850[6]),
+      second: Number(rfc850[7])
+    })
+  }
+  const asctime = new RegExp(
+    `^(${shortWeekday}) (${month}) ((?: [1-9])|(?:[0-3][0-9])) ([0-2][0-9]):([0-5][0-9]):([0-5][0-9]) ([0-9]{4})$`
+  ).exec(value)
+  if (!asctime) return undefined
+  return toHttpDateTimestamp({
+    weekday: HTTP_DATE_SHORT_WEEKDAYS.indexOf(
+      asctime[1] as (typeof HTTP_DATE_SHORT_WEEKDAYS)[number]
+    ),
+    day: Number(asctime[3].trim()),
+    month: HTTP_DATE_MONTHS.indexOf(asctime[2] as (typeof HTTP_DATE_MONTHS)[number]),
+    year: Number(asctime[7]),
+    hour: Number(asctime[4]),
+    minute: Number(asctime[5]),
+    second: Number(asctime[6])
+  })
+}
+
+/** Parses one strict Retry-After value and clamps valid delays to the admitted bound. */
+function parseRetryAfter(value: string | null, maxDelayMs: number): number | undefined {
+  if (!value) return undefined
+  if (/^[0-9]+$/.test(value)) {
+    const seconds = Number(value)
+    if (Number.isFinite(seconds)) return Math.min(maxDelayMs, seconds * 1000)
+    return maxDelayMs
+  }
+  const timestamp = parseHttpDate(value)
+  if (timestamp !== undefined) return Math.min(maxDelayMs, Math.max(0, timestamp - Date.now()))
+  return undefined
+}
 
 /** Retains wait-admission classification without changing the public logger error contract. */
 function markHttpWaitPrimary(error: Error): Error {
@@ -91,14 +236,26 @@ class HttpPlugin implements ILoggerPlugin<
       (!Number.isFinite(config.requestTimeoutMs) || config.requestTimeoutMs < 0)
     )
       throw createLoggerError(LoggerErrorCode.invalidOption, LoggerErrorText.invalidRequestTimeout)
+    if (
+      config.maxRetryAfterMs !== undefined &&
+      (!Number.isFinite(config.maxRetryAfterMs) || config.maxRetryAfterMs < 0)
+    )
+      throw createLoggerError(LoggerErrorCode.invalidOption, LoggerErrorText.invalidOption)
     this.config = config
+  }
+
+  /** Creates a request/shutdown controller through the Logger runtime owner when available. */
+  #createAbortController(): AbortController | undefined {
+    const factory = getLoggerRuntimeManager().createAbortController
+    if (factory) return factory()
+    return typeof AbortController === 'function' ? new AbortController() : undefined
   }
 
   install(core: ILoggerPluginCore<IPipelineMode, Partial<IBatchShared>>): IEmptyPluginExt {
     // 不读 this.config——统一通过 core.config.get() 读取
     this.#resolvedConfig = core.config.get<IHttpPluginConfig>() ?? this.config
     this.#scheduler = core.scheduler
-    this.#controller = typeof AbortController === 'function' ? new AbortController() : undefined
+    this.#controller = this.#createAbortController()
     core.onDispose(core.onShutdown(() => this.#controller?.abort()))
 
     const send = (entries: ILogEntry[]): Promise<void> => this.#send(entries)
@@ -109,7 +266,24 @@ class HttpPlugin implements ILoggerPlugin<
       core.onDispose(core.useSink((entry) => batcher.push(entry)))
       // batch 插件自己已经通过 core.onFlush(flush) 注册了缓冲区的清空逻辑，
       // 这条路径的可靠退出保障由 batch 插件负责，这里不需要重复处理。
+    } else if (this.#resolvedConfig.batch) {
+      const batcher = createBatcherForCore(
+        core,
+        {},
+        { ...this.#resolvedConfig.batch, maxSize: 1, asyncOutput: false },
+        send
+      ) as IBatchController<ILogEntry>
+      core.onDispose(() => {
+        const cleanupErrors = batcher.dispose()
+        if (cleanupErrors instanceof Promise)
+          return cleanupErrors.then((errors) => {
+            if (errors.length > 0) throw errors[0]
+          })
+        if (cleanupErrors.length > 0) throw cleanupErrors[0]
+      })
+      core.onDispose(core.useSink((entry) => batcher.push(entry)))
     } else {
+      // Preserve the direct sink's native failure identity when no batch policy was requested.
       core.onDispose(core.useSink((entry) => send([entry])))
     }
 
@@ -146,14 +320,22 @@ class HttpPlugin implements ILoggerPlugin<
     let lastErr: unknown
     /** Retains each cleanup error once so a later status retry cannot make it unobservable. */
     const cleanupErrorsSeen: unknown[] = []
+    /** Remembers a terminal shutdown callback even when a hostile signal does not expose replay. */
+    let shutdownObserved = false
     for (let attempt = 0; attempt <= retries; attempt++) {
+      // A late shutdown signal may not replay abort to a newly-created listener. Once the
+      // first attempt observed that terminal signal, do not allocate another request controller
+      // or reopen transport work for a retry.
+      if (attempt > 0 && this.#controller?.signal.aborted) break
       let requestError: unknown
       let requestFailed = false
       const cleanupErrors: unknown[] = []
-      const requestController =
-        typeof AbortController === 'function' ? new AbortController() : undefined
+      const requestController = this.#createAbortController()
       const shutdownSignal = this.#controller?.signal
-      const onShutdown = () => requestController?.abort()
+      const onShutdown = (): void => {
+        shutdownObserved = true
+        requestController?.abort()
+      }
       /**
        * Conservatively owns cleanup once a signal exists, because hostile addEventListener
        * implementations can retain the listener before throwing.
@@ -273,6 +455,7 @@ class HttpPlugin implements ILoggerPlugin<
         if (
           registrationFailed ||
           requestAdmissionFailed ||
+          shutdownObserved ||
           this.#controller?.signal.aborted ||
           attempt >= retries
         )
@@ -315,10 +498,8 @@ class HttpPlugin implements ILoggerPlugin<
         break
       }
       const retryAfter = res.headers.get('Retry-After')
-      const parsedRetryAfterMs = retryAfter ? Number(retryAfter) * 1000 : NaN
-      const retryAfterMs = Number.isFinite(parsedRetryAfterMs)
-        ? Math.max(0, parsedRetryAfterMs)
-        : undefined
+      const maxRetryAfterMs = this.#resolvedConfig.maxRetryAfterMs ?? 30000
+      const retryAfterMs = parseRetryAfter(retryAfter, maxRetryAfterMs)
       if (attempt < retries && !this.#controller?.signal.aborted) {
         try {
           await this.#wait(retryAfterMs ?? this.#backoffDelay(attempt))

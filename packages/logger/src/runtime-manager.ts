@@ -11,6 +11,8 @@ export type ILoggerProcess = {
 
 export type ILoggerRuntimeManager = {
   readonly process?: ILoggerProcess
+  /** Optional Logger-owned AbortController factory for hostile-realm and cancellation tests. */
+  readonly createAbortController?: () => AbortController
   randomUUID(): string
   defer(task: () => void): void
   write(text: string): void
