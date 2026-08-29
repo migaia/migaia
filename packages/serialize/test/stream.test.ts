@@ -613,6 +613,83 @@ describe('sliceByFrameBudget：按实测耗时定片大小', () => {
 })
 
 describe('encodeStream：不拼装地吐流', () => {
+  it('surfaces an abort-listener failure from the public return path', async () => {
+    const listenerFailure = new Error('public abort listener failed')
+    const registry = {
+      primaryType: 'test',
+      types: ['test'] as const,
+      has: () => true,
+      encode: async (_value: unknown, options?: { signal?: ITestAbortSignal }) => {
+        options?.signal?.addEventListener('abort', () => {
+          throw listenerFailure
+        })
+        return ['text', 'chunk'] as const
+      },
+      decode: async () => undefined,
+      close: () => undefined,
+      dispose: async () => undefined
+    }
+    const stream = encodeStream(registry as never, rows(1), {
+      initialItems: 1,
+      minItems: 1,
+      maxItems: 1,
+      scheduler: scheduler()
+    })
+
+    await expect(stream.next()).resolves.toMatchObject({ done: false, value: ['text', 'chunk'] })
+    await expect(stream.return(undefined)).rejects.toBe(listenerFailure)
+  })
+
+  it('keeps a consumer throw primary while exposing public abort cleanup as secondary', async () => {
+    const listenerFailure = new Error('public abort listener failed')
+    const primary = new Error('consumer failed')
+    const registry = {
+      primaryType: 'test',
+      types: ['test'] as const,
+      has: () => true,
+      encode: async (_value: unknown, options?: { signal?: ITestAbortSignal }) => {
+        options?.signal?.addEventListener('abort', () => {
+          throw listenerFailure
+        })
+        return ['text', 'chunk'] as const
+      },
+      decode: async () => undefined,
+      close: () => undefined,
+      dispose: async () => undefined
+    }
+    const stream = encodeStream(registry as never, rows(1), {
+      initialItems: 1,
+      minItems: 1,
+      maxItems: 1,
+      scheduler: scheduler()
+    })
+
+    await expect(stream.next()).resolves.toMatchObject({ done: false, value: ['text', 'chunk'] })
+    await expect(stream.throw(primary)).rejects.toBe(primary)
+    expect((primary as { errors?: readonly unknown[] }).errors).toEqual([listenerFailure])
+  })
+
+  it('keeps a normal public return successful when abort cleanup reports no error', async () => {
+    const registry = {
+      primaryType: 'test',
+      types: ['test'] as const,
+      has: () => true,
+      encode: async () => ['text', 'chunk'] as const,
+      decode: async () => undefined,
+      close: () => undefined,
+      dispose: async () => undefined
+    }
+    const stream = encodeStream(registry as never, rows(1), {
+      initialItems: 1,
+      minItems: 1,
+      maxItems: 1,
+      scheduler: scheduler()
+    })
+
+    await expect(stream.next()).resolves.toMatchObject({ done: false, value: ['text', 'chunk'] })
+    await expect(stream.return(undefined)).resolves.toMatchObject({ done: true })
+  })
+
   it('emits one chunk per slice instead of one blob', async () => {
     const registry = createSerializeRegistry([jsonPlugin()])
     const chunks: ISerializeChunk[] = []

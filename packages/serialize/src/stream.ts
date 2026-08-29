@@ -17,6 +17,7 @@ import {
   SERIALIZE_SOURCE
 } from './errors.js'
 import { SerializeChunkKind, SerializePhase } from './format-constants.js'
+import { createSerializeOperationSignal } from './signal.js'
 import { snapshotSerializeSignal } from './signal-snapshot.js'
 
 type ISerializeScheduledTask = { cancel(): void }
@@ -66,11 +67,26 @@ const attachSerializeCleanupError = (primary: unknown, cleanupError: unknown): v
     const existing = (primary as { readonly errors?: readonly unknown[] }).errors
     Object.defineProperty(primary, 'errors', {
       value: Object.freeze([...(existing ?? []), cleanupError]),
+      configurable: true,
       enumerable: true
     })
   } catch {
     // A frozen or hostile primary still wins; cleanup failure remains contained.
   }
+}
+
+/** Finish public encode-stream cleanup while preserving any earlier primary throw identity. */
+const finalizeEncodeStreamCleanup = (
+  cleanupErrors: readonly unknown[],
+  hasPrimary: boolean,
+  primaryError: unknown
+): void => {
+  if (hasPrimary) {
+    for (const cleanupError of cleanupErrors)
+      attachSerializeCleanupError(primaryError, cleanupError)
+    throw primaryError
+  }
+  if (cleanupErrors.length > 0) throw cleanupErrors[0]
 }
 
 /** Keep an already-owned serialize INVALID_OPTION intact while wrapping a hostile failure. */
@@ -697,12 +713,30 @@ export async function* encodeStream<T>(
   options: IEncodeStreamOptions
 ): AsyncGenerator<ISerializeChunk, void, undefined> {
   const streamOptions = snapshotEncodeStreamOptions(options)
-  const { type, context, signal, maxInFlight } = streamOptions
-  const inFlight: Promise<ISerializeChunk>[] = []
+  const { type, context, maxInFlight } = streamOptions
+  const callerSignal = streamOptions.signal
+  /** Exact listener and operation cleanup failures retained until generator finalization. */
+  const cleanupErrors: unknown[] = []
+  /** Owner-local reporter keeps public cleanup failures observable without adding an API option. */
+  const reportCleanupFailure = (error: unknown): void => {
+    cleanupErrors.push(error)
+  }
+  const operation = createSerializeOperationSignal(callerSignal, reportCleanupFailure)
+  const operationSignal = operation.signal
+  const operationOptions = { ...streamOptions, signal: operationSignal }
+  const inFlight: Array<Promise<ISerializeChunk> | undefined> = []
+  let inFlightHead = 0
   let sliceIndex = 0
+  let completed = false
+  /** Whether the generator body recorded a primary throw before finalization. */
+  let hasPrimary = false
+  /** First generator-body failure; cleanup failures must remain secondary to it. */
+  let primaryError: unknown
 
   const drainOne = async (): Promise<ISerializeChunk> => {
-    const pending = inFlight.shift()!
+    const pending = inFlight[inFlightHead]!
+    inFlight[inFlightHead] = undefined
+    inFlightHead += 1
     try {
       return await pending
     } catch (error) {
@@ -713,17 +747,19 @@ export async function* encodeStream<T>(
   }
 
   try {
-    for await (const slice of sliceByFrameBudget(items, streamOptions)) {
-      if (signal !== undefined && readSerializeSignalAborted(signal)) {
+    for await (const slice of sliceByFrameBudget(items, operationOptions)) {
+      if (readSerializeSignalAborted(operationSignal)) {
         throw createSerializeError(SerializeErrorCode.aborted, 'serialize aborted', {
-          cause: readSerializeSignalReason(signal)
+          cause: readSerializeSignalReason(operationSignal)
         })
       }
       let pending: Promise<ISerializeChunk>
       try {
         // Promise.resolve preserves native Promise identity and assimilates thenables while the
         // catch below is installed in the same admission turn.
-        pending = Promise.resolve(registry.encode(slice, { type, signal, context }))
+        pending = Promise.resolve(
+          registry.encode(slice, { type, signal: operationSignal, context })
+        )
       } catch (error) {
         // A synchronous registry failure is still an ordered admission. Queue its rejection so
         // earlier work drains first and the same immediate observer prevents unhandled rejection.
@@ -734,20 +770,30 @@ export async function* encodeStream<T>(
       pending.catch(() => undefined)
       inFlight.push(pending)
       // 背压：在途数达到上限就先把最早那笔排空，避免无限堆积
-      while (inFlight.length >= maxInFlight) {
+      while (inFlight.length - inFlightHead >= maxInFlight) {
         yield await drainOne()
         sliceIndex++
       }
     }
-    while (inFlight.length > 0) {
+    while (inFlight.length - inFlightHead > 0) {
       yield await drainOne()
       sliceIndex++
     }
+    completed = true
+  } catch (error) {
+    hasPrimary = true
+    primaryError = error
   } finally {
-    // 消费者可能提前 break/throw，此时生成器会被 return()。留下的在途 Promise
-    // 若无人认领就会变成 unhandled rejection，所以在这里统一接住。
-    for (const pending of inFlight) pending.catch(() => undefined)
+    // Consumer early return/throw owns cancellation of queued work before observing settlement.
+    if (!completed && !operationSignal.aborted)
+      operation.abort(SerializeErrorText.streamConsumerClosed)
+    // Admission-time rejection observers retain ownership of residual noncooperative work.
+    // Do not await it here: a parser that ignores abort must not block generator finalization.
+    for (const pending of inFlight.slice(inFlightHead)) pending?.catch(() => undefined)
+    operation.dispose()
     inFlight.length = 0
+    inFlightHead = 0
+    finalizeEncodeStreamCleanup(cleanupErrors, hasPrimary, primaryError)
   }
 }
 
@@ -858,7 +904,7 @@ export async function collectStream(
           }
         )
       }
-      if (done === true) {
+      if (done) {
         completed = true
         break
       }
@@ -938,6 +984,7 @@ export async function collectStream(
       })
     return ['text', '']
   }
+  if (collected.length === 1) return collected[0]
   if (!sawBytes) {
     // Joining once avoids repeatedly copying the accumulated string for a
     // long stream (which otherwise turns collection into quadratic work).
@@ -1010,15 +1057,7 @@ function snapshotCollectEncoder(encoder: ITextEncoder | undefined): ITextEncoder
       throw new TypeError(SerializeErrorText.encoderInvalid)
     const target = encoder as { readonly encode?: unknown }
     let method: unknown
-    try {
-      method = target.encode
-    } catch (error) {
-      return {
-        encode: (): Uint8Array => {
-          throw error
-        }
-      }
-    }
+    method = target.encode
     if (typeof method !== 'function') throw new TypeError(SerializeErrorText.encoderInvalid)
     const receiver = encoder as object
     return {
@@ -1043,21 +1082,57 @@ function getCollectIterator(
     }
     const asyncFactory = candidate[Symbol.asyncIterator]
     if (asyncFactory !== undefined) {
-      const sourceIterator = candidate[Symbol.asyncIterator]!()
+      if (typeof asyncFactory !== 'function')
+        throw new TypeError(SerializeErrorText.collectOptionInvalid)
+      const sourceIterator = invokeCollectEncoderWithReceiver(
+        asyncFactory as ISerializeInvokable<AsyncIterator<ISerializeChunk>>,
+        candidate as object,
+        []
+      )
+      const next = sourceIterator.next
+      const close = sourceIterator.return
       return {
-        next: (): Promise<IteratorResult<ISerializeChunk>> => sourceIterator.next(),
-        return: sourceIterator.return
-          ? (): Promise<IteratorResult<ISerializeChunk>> => sourceIterator.return!()
+        next: (): Promise<IteratorResult<ISerializeChunk>> =>
+          invokeCollectEncoderWithReceiver(
+            next as ISerializeInvokable<Promise<IteratorResult<ISerializeChunk>>>,
+            sourceIterator as object,
+            []
+          ),
+        return: close
+          ? (): Promise<IteratorResult<ISerializeChunk>> =>
+              invokeCollectEncoderWithReceiver(
+                close as ISerializeInvokable<Promise<IteratorResult<ISerializeChunk>>>,
+                sourceIterator as object,
+                []
+              )
           : undefined
       }
     }
     const syncFactory = candidate[Symbol.iterator]
     if (syncFactory !== undefined) {
-      const sourceIterator = candidate[Symbol.iterator]!()
+      if (typeof syncFactory !== 'function')
+        throw new TypeError(SerializeErrorText.collectOptionInvalid)
+      const sourceIterator = invokeCollectEncoderWithReceiver(
+        syncFactory as ISerializeInvokable<Iterator<ISerializeChunk>>,
+        candidate as object,
+        []
+      )
+      const next = sourceIterator.next
+      const close = sourceIterator.return
       return {
-        next: (): IteratorResult<ISerializeChunk> => sourceIterator.next(),
-        return: sourceIterator.return
-          ? (): IteratorResult<ISerializeChunk> => sourceIterator.return!()
+        next: (): IteratorResult<ISerializeChunk> =>
+          invokeCollectEncoderWithReceiver(
+            next as ISerializeInvokable<IteratorResult<ISerializeChunk>>,
+            sourceIterator as object,
+            []
+          ),
+        return: close
+          ? (): IteratorResult<ISerializeChunk> =>
+              invokeCollectEncoderWithReceiver(
+                close as ISerializeInvokable<IteratorResult<ISerializeChunk>>,
+                sourceIterator as object,
+                []
+              )
           : undefined
       }
     }

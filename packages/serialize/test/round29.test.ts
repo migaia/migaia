@@ -231,6 +231,15 @@ describe('Round29 serialize boundaries', () => {
         scenario.makeEncoder(scenario.cause)
       ).catch((caught: unknown) => caught)
 
+      if (scenario.name === 'getter') {
+        expect(error, scenario.name).toBeInstanceOf(TypeError)
+        expect(error, scenario.name).toMatchObject({
+          source: '@migaia/serialize',
+          code: 'INVALID_OPTION',
+          cause: scenario.cause
+        })
+        continue
+      }
       expect(error, scenario.name).toBeInstanceOf(SerializeCodecError)
       expect(error, scenario.name).toMatchObject({
         source: '@migaia/serialize',
