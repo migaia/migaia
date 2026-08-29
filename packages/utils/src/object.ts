@@ -107,6 +107,33 @@ function projectSnapshotValue(
     return current
   if (traversal.seen.has(current as object)) return traversal.seen.get(current as object)
 
+  // structuredClone can isolate standard built-ins even when an unrelated sibling (such as a
+  // function) makes cloning the complete root impossible.  Clone this subtree independently so
+  // only the actually unsupported leaf is retained by reference.
+  let cloneableBuiltin = false
+  try {
+    cloneableBuiltin =
+      typeof globalThis.structuredClone === 'function' &&
+      (current instanceof Date ||
+        current instanceof RegExp ||
+        current instanceof Map ||
+        current instanceof Set ||
+        current instanceof ArrayBuffer ||
+        ArrayBuffer.isView(current))
+  } catch {
+    cloneableBuiltin = false
+  }
+  if (cloneableBuiltin) {
+    try {
+      const cloned = globalThis.structuredClone(current)
+      traversal.seen.set(current as object, cloned)
+      return cloned
+    } catch (error) {
+      traversal.diagnostics.push({ path, reason: 'unsupported', cause: error })
+      return current
+    }
+  }
+
   let isArray = false
   let prototype: object | null = null
   try {
@@ -139,7 +166,7 @@ function projectSnapshotValue(
     keys = Reflect.ownKeys(current as object)
   } catch (error) {
     traversal.diagnostics.push({ path, reason: 'read-failed', cause: error })
-    return target
+    return current
   }
   for (const key of keys) {
     if (isArray && key === 'length') continue

@@ -45,9 +45,9 @@ export function onceAsync<T>(functionValue: () => Promise<T>): () => Promise<T> 
     if (promise === undefined)
       promise = Promise.resolve().then(() => {
         const result: unknown = functionValue()
-        if (!(result instanceof Promise)) {
+        if (result === null || (typeof result !== 'object' && typeof result !== 'function')) {
           const error = new TypeError(
-            UtilsErrorText.invalidArgument('onceAsync result', 'a native Promise')
+            UtilsErrorText.invalidArgument('onceAsync result', 'a Promise or PromiseLike')
           )
           Object.defineProperty(error, 'source', { value: '@migaia/utils', enumerable: true })
           Object.defineProperty(error, 'code', {
@@ -56,7 +56,35 @@ export function onceAsync<T>(functionValue: () => Promise<T>): () => Promise<T> 
           })
           throw error
         }
-        return result
+        let then: unknown
+        // Read the then protocol exactly once so a hostile or stateful getter cannot alter
+        // admission between validation and assimilation.
+        then = Reflect.get(result, 'then')
+        if (typeof then !== 'function') {
+          const error = new TypeError(
+            UtilsErrorText.invalidArgument('onceAsync result', 'a Promise or PromiseLike')
+          )
+          Object.defineProperty(error, 'source', { value: '@migaia/utils', enumerable: true })
+          Object.defineProperty(error, 'code', {
+            value: UtilsErrorCode.invalidArgument,
+            enumerable: true
+          })
+          throw error
+        }
+        return new Promise<T>((resolve, reject) => {
+          try {
+            Reflect.apply(
+              then as (
+                resolve: (value: unknown) => void,
+                reject: (reason: unknown) => void
+              ) => void,
+              result,
+              [resolve, reject]
+            )
+          } catch (error) {
+            reject(error)
+          }
+        })
       })
     return promise
   }

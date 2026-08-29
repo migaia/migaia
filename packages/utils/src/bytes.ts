@@ -80,19 +80,23 @@ export function base64ToBytes(value: string): Uint8Array {
     throw encodingError(0)
   if (value.length % 4 !== 0) throw encodingError(value.length)
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-  const output: number[] = []
+  const padding = value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0
+  const output = new Uint8Array((value.length / 4) * 3 - padding)
+  let outputOffset = 0
   for (let index = 0; index < value.length; index += 4) {
     const first = alphabet.indexOf(value[index])
     const second = alphabet.indexOf(value[index + 1])
     const third = value[index + 2] === '=' ? 0 : alphabet.indexOf(value[index + 2])
     const fourth = value[index + 3] === '=' ? 0 : alphabet.indexOf(value[index + 3])
-    output.push((first << 2) | (second >> 4))
-    if (value[index + 2] !== '=') output.push(((second & 15) << 4) | (third >> 2))
-    if (value[index + 3] !== '=') output.push(((third & 3) << 6) | fourth)
+    const thirdPadding = value[index + 2] === '='
+    const fourthPadding = value[index + 3] === '='
+    if ((thirdPadding && (second & 15) !== 0) || (fourthPadding && (third & 3) !== 0))
+      throw encodingError(index)
+    output[outputOffset++] = (first << 2) | (second >> 4)
+    if (!thirdPadding) output[outputOffset++] = ((second & 15) << 4) | (third >> 2)
+    if (!fourthPadding) output[outputOffset++] = ((third & 3) << 6) | fourth
   }
-  const result = new Uint8Array(output)
-  if (bytesToBase64(result) !== value) throw encodingError(0)
-  return result
+  return output
 }
 
 /** Encodes a byte sequence as canonical chunks with a bounded chunk size. */

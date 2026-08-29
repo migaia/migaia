@@ -72,8 +72,11 @@ const dangerous = new Set<PropertyKey>(['__proto__', 'prototype', 'constructor']
 const hasBuiltinBrand = (value: object, kind: 'date' | 'regexp' | 'map' | 'set'): boolean => {
   try {
     if (kind === 'date') Reflect.apply(Date.prototype.getTime, value, [])
-    else if (kind === 'regexp') Reflect.get(value, 'source')
-    else if (kind === 'map') Reflect.apply(Map.prototype.has, value, [undefined])
+    else if (kind === 'regexp') {
+      const getter = Object.getOwnPropertyDescriptor(RegExp.prototype, 'source')?.get
+      if (!getter) return false
+      Reflect.apply(getter, value, [])
+    } else if (kind === 'map') Reflect.apply(Map.prototype.has, value, [undefined])
     else Reflect.apply(Set.prototype.has, value, [undefined])
     return true
   } catch {
@@ -173,7 +176,10 @@ export function patchConfig<T extends IConfigRecord>(
   const keys = Reflect.ownKeys(patch)
   if (keys.length === 0 && reuseUnchangedRoot) return base
   const next: Record<PropertyKey, unknown> = Object.create(Object.getPrototypeOf(base))
-  for (const key of Reflect.ownKeys(base)) next[key] = base[key]
+  for (const key of Reflect.ownKeys(base)) {
+    const baseDescriptor = Object.getOwnPropertyDescriptor(base, key)
+    if (baseDescriptor) Object.defineProperty(next, key, baseDescriptor)
+  }
   for (const key of keys) {
     if (dangerous.has(key))
       throw configError(UtilsErrorCode.configPathInvalid, String(key), 'dangerous key')
@@ -201,7 +207,9 @@ export function patchConfig<T extends IConfigRecord>(
         value: cloneGraph(
           descriptor.value,
           baseMeta.profile,
-          requestedLimits ? resolveLimits(requestedLimits) : baseMeta.limits,
+          requestedLimits
+            ? resolveLimits({ ...baseMeta.limits, ...requestedLimits })
+            : baseMeta.limits,
           seen
         )
       })
@@ -230,14 +238,18 @@ export function patchConfig<T extends IConfigRecord>(
       value: cloneGraph(
         patchDescriptor.value,
         baseMeta.profile,
-        requestedLimits ? resolveLimits(requestedLimits) : baseMeta.limits,
+        requestedLimits
+          ? resolveLimits({ ...baseMeta.limits, ...requestedLimits })
+          : baseMeta.limits,
         seen
       )
     })
   }
   metadata.set(next, {
     profile: baseMeta.profile,
-    limits: requestedLimits ? resolveLimits(requestedLimits) : baseMeta.limits
+    limits: requestedLimits
+      ? resolveLimits({ ...baseMeta.limits, ...requestedLimits })
+      : baseMeta.limits
   })
   return next as IOwnedConfig<T>
 }
@@ -401,17 +413,25 @@ export function combineConfig(
     onConflict === undefined
   )
     return sources[0]
+  const sourceLimits = metas.reduce<Record<keyof IConfigLimits, number>>(
+    (minimum, meta) => {
+      if (!meta) return minimum
+      for (const key of Object.keys(defaultLimits) as Array<keyof IConfigLimits>)
+        minimum[key] = Math.min(minimum[key], meta.limits[key])
+      return minimum
+    },
+    { ...defaultLimits }
+  )
   const limits: IConfigLimits = requestedLimits
-    ? resolveLimits(requestedLimits)
-    : metas.reduce<Record<keyof IConfigLimits, number>>(
-        (minimum, meta) => {
-          if (!meta) return minimum
-          for (const key of Object.keys(defaultLimits) as Array<keyof IConfigLimits>)
-            minimum[key] = Math.min(minimum[key], meta.limits[key])
-          return minimum
-        },
-        { ...defaultLimits }
+    ? resolveLimits(
+        Object.fromEntries(
+          (Object.keys(defaultLimits) as Array<keyof IConfigLimits>).map((key) => [
+            key,
+            Math.min(sourceLimits[key], requestedLimits[key] ?? sourceLimits[key])
+          ])
+        ) as Partial<IConfigLimits>
       )
+    : sourceLimits
   const result: Record<PropertyKey, unknown> = Object.create(null)
   for (const source of sources)
     mergeRecord(
@@ -439,6 +459,30 @@ function resolveLimits(overrides?: Partial<IConfigLimits>): IConfigLimits {
     )
       throw configError(UtilsErrorCode.configLimitExceeded, key, 'invalid limit')
   return result
+}
+
+/** Copies custom data properties from built-ins after their internal slots are recreated. */
+function copyOwnDataDescriptors(
+  source: object,
+  target: object,
+  limits: IConfigLimits,
+  profile: IConfigProfile,
+  seen: WeakMap<object, object>,
+  depth: number,
+  state: { nodes: number; keys: number }
+): void {
+  for (const key of Reflect.ownKeys(source)) {
+    state.keys++
+    if (state.keys > limits.maxKeys)
+      throw configError(UtilsErrorCode.configLimitExceeded, 'maxKeys', 'graph keys')
+    const descriptor = Object.getOwnPropertyDescriptor(source, key)
+    if (!descriptor || !('value' in descriptor))
+      throw configError(UtilsErrorCode.configUnsupported, String(key), 'accessor unsupported')
+    Object.defineProperty(target, key, {
+      ...descriptor,
+      value: cloneGraph(descriptor.value, profile, limits, seen, depth + 1, state)
+    })
+  }
 }
 
 function cloneGraph<T>(
@@ -519,25 +563,32 @@ function cloneGraph<T>(
   state.nodes++
   if (state.nodes > limits.maxNodes)
     throw configError(UtilsErrorCode.configLimitExceeded, 'maxNodes', 'graph nodes')
-  if (value instanceof Date && hasBuiltinBrand(value, 'date')) {
+  if (hasBuiltinBrand(value, 'date')) {
     const constructor = Object.getPrototypeOf(value)?.constructor
+    const time = Reflect.apply(Date.prototype.getTime, value, [])
     const copy =
       typeof constructor === 'function' && constructor !== Date
-        ? Reflect.construct(Date, [value.getTime()], constructor)
-        : new Date(value.getTime())
+        ? Reflect.construct(Date, [time], constructor)
+        : new Date(time)
     seen.set(value as object, copy)
+    copyOwnDataDescriptors(value, copy, limits, profile, seen, depth, state)
     return copy as T
   }
-  if (value instanceof RegExp && hasBuiltinBrand(value, 'regexp')) {
+  if (hasBuiltinBrand(value, 'regexp')) {
     const constructor = Object.getPrototypeOf(value)?.constructor
+    const sourceGetter = Object.getOwnPropertyDescriptor(RegExp.prototype, 'source')?.get
+    const flagsGetter = Object.getOwnPropertyDescriptor(RegExp.prototype, 'flags')?.get
+    const source = sourceGetter ? Reflect.apply(sourceGetter, value, []) : ''
+    const flags = flagsGetter ? Reflect.apply(flagsGetter, value, []) : ''
     const copy =
       typeof constructor === 'function' && constructor !== RegExp
-        ? Reflect.construct(RegExp, [value.source, value.flags], constructor)
-        : new RegExp(value.source, value.flags)
+        ? Reflect.construct(RegExp, [source, flags], constructor)
+        : new RegExp(source, flags)
     seen.set(value as object, copy)
+    copyOwnDataDescriptors(value, copy, limits, profile, seen, depth, state)
     return copy as T
   }
-  if (value instanceof Map && hasBuiltinBrand(value, 'map')) {
+  if (hasBuiltinBrand(value, 'map')) {
     const constructor = Object.getPrototypeOf(value)?.constructor
     const entries = Reflect.apply(Map.prototype.entries, value, []) as Iterable<
       readonly [unknown, unknown]
@@ -548,10 +599,14 @@ function cloneGraph<T>(
         : new Map()
     seen.set(value as object, copy)
     for (const [key, entry] of entries)
-      copy.set(
-        cloneGraph(key, profile, limits, seen, depth + 1, state),
-        cloneGraph(entry, profile, limits, seen, depth + 1, state)
-      )
+      if (++state.keys > limits.maxKeys)
+        throw configError(UtilsErrorCode.configLimitExceeded, 'maxKeys', 'graph entries')
+      else
+        copy.set(
+          cloneGraph(key, profile, limits, seen, depth + 1, state),
+          cloneGraph(entry, profile, limits, seen, depth + 1, state)
+        )
+    copyOwnDataDescriptors(value, copy, limits, profile, seen, depth, state)
     const sourcePrototype = Object.getPrototypeOf(value)
     if (sourcePrototype && !intrinsicPrototypes.has(sourcePrototype))
       Object.setPrototypeOf(
@@ -560,7 +615,7 @@ function cloneGraph<T>(
       )
     return copy as T
   }
-  if (value instanceof Set && hasBuiltinBrand(value, 'set')) {
+  if (hasBuiltinBrand(value, 'set')) {
     const constructor = Object.getPrototypeOf(value)?.constructor
     const copy =
       typeof constructor === 'function' && constructor !== Set
@@ -568,8 +623,12 @@ function cloneGraph<T>(
         : new Set()
     seen.set(value as object, copy)
     const entries = Reflect.apply(Set.prototype.values, value, []) as Iterable<unknown>
-    for (const entry of entries)
+    for (const entry of entries) {
+      if (++state.keys > limits.maxKeys)
+        throw configError(UtilsErrorCode.configLimitExceeded, 'maxKeys', 'graph entries')
       copy.add(cloneGraph(entry, profile, limits, seen, depth + 1, state))
+    }
+    copyOwnDataDescriptors(value, copy, limits, profile, seen, depth, state)
     const sourcePrototype = Object.getPrototypeOf(value)
     if (sourcePrototype && !intrinsicPrototypes.has(sourcePrototype))
       Object.setPrototypeOf(
@@ -677,6 +736,28 @@ function readonlyWrap(value: object): object {
         return target.size
       if (target instanceof Set && hasBuiltinBrand(target, 'set') && key === 'size')
         return target.size
+      const brandedDate = hasBuiltinBrand(target, 'date')
+      const brandedRegExp = hasBuiltinBrand(target, 'regexp')
+      if (brandedRegExp && (key === 'exec' || key === 'test')) {
+        const sourceGetter = Object.getOwnPropertyDescriptor(RegExp.prototype, 'source')?.get
+        const flagsGetter = Object.getOwnPropertyDescriptor(RegExp.prototype, 'flags')?.get
+        const rawSource = sourceGetter ? Reflect.apply(sourceGetter, target, []) : ''
+        const rawFlags = flagsGetter ? Reflect.apply(flagsGetter, target, []) : ''
+        return (input: string) => {
+          const isolated = new RegExp(rawSource, rawFlags)
+          return Reflect.apply(
+            Reflect.get(isolated, key, isolated) as (...args: unknown[]) => unknown,
+            isolated,
+            [input]
+          )
+        }
+      }
+      if (brandedDate || brandedRegExp) {
+        const intrinsicResult = Reflect.get(target, key, target)
+        if (typeof intrinsicResult === 'function')
+          return (...args: unknown[]) => Reflect.apply(intrinsicResult, target, args)
+        return intrinsicResult
+      }
       const result = Reflect.get(callable && key !== 'prototype' ? value : target, key, receiver)
       if (target instanceof Map && hasBuiltinBrand(target, 'map') && key === 'get')
         return (mapKey: unknown) => readonlyValue(target.get(unwrapReadonly(mapKey)))
@@ -794,7 +875,14 @@ function mergeRecord(
     const matched = pathRules
       ?.filter((rule) => rule.prefix.every((segment, index) => currentPath[index] === segment))
       .sort((a, b) => b.prefix.length - a.prefix.length)[0]
-    const effective = { ...strategies, ...matched?.strategies }
+    const effective: IConfigMergeStrategies = {
+      record: strategies?.record ?? 'merge',
+      array: strategies?.array ?? 'replace',
+      map: strategies?.map ?? 'replace',
+      set: strategies?.set ?? 'replace',
+      undefined: strategies?.undefined ?? 'ignore',
+      ...matched?.strategies
+    }
     if (right !== null && (typeof right === 'object' || typeof right === 'function')) {
       const seenTarget = sourceSeen.get(right as object)
       if (seenTarget) {
@@ -802,9 +890,15 @@ function mergeRecord(
         continue
       }
     }
-    if (left instanceof Map && right instanceof Map && effective.map === 'merge') {
-      for (const [mapKey, mapValue] of right) {
-        if (mapValue === CONFIG_DELETE) left.delete(mapKey)
+    if (
+      hasBuiltinBrand(left as object, 'map') &&
+      hasBuiltinBrand(right as object, 'map') &&
+      effective.map === 'merge'
+    ) {
+      const leftMap = left as Map<unknown, unknown>
+      const rightMap = right as Map<unknown, unknown>
+      for (const [mapKey, mapValue] of rightMap) {
+        if (mapValue === CONFIG_DELETE) leftMap.delete(mapKey)
         else {
           const mappedKey =
             mapKey !== null && (typeof mapKey === 'object' || typeof mapKey === 'function')
@@ -814,13 +908,19 @@ function mergeRecord(
             mapValue !== null && (typeof mapValue === 'object' || typeof mapValue === 'function')
               ? cloneGraph(mapValue, profile, limits, sourceSeen)
               : mapValue
-          left.set(mappedKey, mappedValue)
+          leftMap.set(mappedKey, mappedValue)
         }
       }
       continue
     }
-    if (left instanceof Set && right instanceof Set && effective.set === 'union') {
-      for (const entry of right) {
+    if (
+      hasBuiltinBrand(left as object, 'set') &&
+      hasBuiltinBrand(right as object, 'set') &&
+      effective.set === 'union'
+    ) {
+      const leftSet = left as Set<unknown>
+      const rightSet = right as Set<unknown>
+      for (const entry of rightSet) {
         if (entry === CONFIG_DELETE)
           throw configError(
             UtilsErrorCode.configConflict,
@@ -831,7 +931,7 @@ function mergeRecord(
           entry !== null && (typeof entry === 'object' || typeof entry === 'function')
             ? cloneGraph(entry, profile, limits, sourceSeen)
             : entry
-        left.add(mappedEntry)
+        leftSet.add(mappedEntry)
       }
       continue
     }
@@ -851,6 +951,14 @@ function mergeRecord(
       typeof right === 'object' &&
       !Array.isArray(left) &&
       !Array.isArray(right) &&
+      !hasBuiltinBrand(left, 'date') &&
+      !hasBuiltinBrand(right, 'date') &&
+      !hasBuiltinBrand(left, 'regexp') &&
+      !hasBuiltinBrand(right, 'regexp') &&
+      !hasBuiltinBrand(left, 'map') &&
+      !hasBuiltinBrand(right, 'map') &&
+      !hasBuiltinBrand(left, 'set') &&
+      !hasBuiltinBrand(right, 'set') &&
       effective.record !== 'replace'
     )
       mergeRecord(
@@ -889,10 +997,10 @@ function mergeRecord(
         continue
       }
       target[key] = decision.kind === 'value' ? decision.value : right
-    } else if (right !== undefined || strategies?.undefined !== 'ignore') {
-      if (right instanceof Map) {
+    } else if (right !== undefined || effective.undefined === 'assign') {
+      if (hasBuiltinBrand(right as object, 'map')) {
         const mapped = new Map<unknown, unknown>()
-        for (const [mapKey, mapValue] of right) {
+        for (const [mapKey, mapValue] of right as Map<unknown, unknown>) {
           mapped.set(
             mapKey !== null && (typeof mapKey === 'object' || typeof mapKey === 'function')
               ? cloneGraph(mapKey, profile, limits, sourceSeen)
@@ -903,15 +1011,17 @@ function mergeRecord(
           )
         }
         target[key] = mapped
-      } else if (right instanceof Set) {
+      } else if (hasBuiltinBrand(right as object, 'set')) {
         const mapped = new Set<unknown>()
-        for (const entry of right)
+        for (const entry of right as Set<unknown>)
           mapped.add(
             entry !== null && (typeof entry === 'object' || typeof entry === 'function')
               ? (sourceSeen.get(entry as object) ?? entry)
               : entry
           )
         target[key] = mapped
+      } else if (right !== null && (typeof right === 'object' || typeof right === 'function')) {
+        target[key] = cloneGraph(right, profile, limits, sourceSeen)
       } else target[key] = right
     }
   }

@@ -65,7 +65,7 @@ export function attachErrorIdentity<T extends Error>(
 
 /** Converts arbitrary thrown values while preserving the original as cause. */
 export function toError(value: unknown, options?: { readonly message?: string }): Error {
-  if (value instanceof Error) return value
+  if (isErrorLike(value)) return value
   let message = options?.message ?? UtilsErrorText.nonErrorValue
   try {
     if (options?.message === undefined && typeof value === 'string') message = value
@@ -73,6 +73,25 @@ export function toError(value: unknown, options?: { readonly message?: string })
     message = UtilsErrorText.nonErrorValue
   }
   return new UtilsErrorValue(message, value)
+}
+
+/** Recognizes native errors from other realms without relying on this realm's constructor. */
+function isErrorLike(value: unknown): value is Error {
+  if (value === null || (typeof value !== 'object' && typeof value !== 'function')) return false
+  try {
+    const candidate = value as {
+      readonly name?: unknown
+      readonly message?: unknown
+      readonly stack?: unknown
+    }
+    return (
+      typeof candidate.name === 'string' &&
+      typeof candidate.message === 'string' &&
+      typeof candidate.stack === 'string'
+    )
+  } catch {
+    return false
+  }
 }
 
 class UtilsErrorValue extends UtilsError {
@@ -94,7 +113,7 @@ export function walkErrorCauses(
     seen.add(value)
     result.push(value)
     try {
-      if (value instanceof AggregateError) for (const item of value.errors) visit(item, depth + 1)
+      if (isAggregateErrorLike(value)) for (const item of value.errors) visit(item, depth + 1)
     } catch (cause) {
       visit(cause, depth + 1)
     }
@@ -124,15 +143,27 @@ export function combineErrors(errors: Iterable<unknown>, message: string): Error
 }
 
 export function isUtilsError(value: unknown): value is UtilsError {
-  return value instanceof UtilsError
+  return isErrorLike(value) && (value as { source?: unknown }).source === '@migaia/utils'
 }
 
 export function isUtilsAbortError(value: unknown): value is UtilsAbortError {
-  return value instanceof UtilsAbortError
+  return isUtilsError(value) && (value as { code?: unknown }).code === UtilsErrorCode.aborted
 }
 
 export function isUtilsTimeoutError(value: unknown): value is UtilsTimeoutError {
-  return value instanceof UtilsTimeoutError
+  return (
+    isUtilsError(value) && (value as { code?: unknown }).code === UtilsErrorCode.deadlineExceeded
+  )
+}
+
+/** Reads AggregateError entries across realms while containing hostile errors accessors. */
+function isAggregateErrorLike(value: unknown): value is AggregateError {
+  if (!isErrorLike(value)) return false
+  try {
+    return Array.isArray((value as { readonly errors?: unknown }).errors)
+  } catch {
+    return false
+  }
 }
 
 export { UtilsErrorCode }
