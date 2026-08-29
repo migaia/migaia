@@ -1,6 +1,6 @@
 # `@migaia/storage-web` 使用指南
 
-本指南逐个模块列出全部导出 API 的完整签名、参数语义、默认值、边界行为与错误码。包的定位、适用场景与 5 分钟上手见 [README](./README.md)。
+本指南逐个模块覆盖面向应用与自定义适配器的公开运行时 API、关键契约类型、参数语义、默认值、边界行为与错误码。仅用于扩展点条件推导的 type-only helper 以发布的 `.d.ts` 和编辑器提示为准；包的定位、适用场景与 5 分钟上手见 [README](./README.md)。
 
 ## 目录
 
@@ -1188,7 +1188,12 @@ await host.dispose()
 ## 错误模块
 
 ```ts
-import { StorageError, StorageErrorCode } from '@migaia/storage-web'
+import {
+  STORAGE_WEB_SOURCE,
+  StorageError,
+  StorageErrorCode,
+  StorageErrorText
+} from '@migaia/storage-web'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -1225,6 +1230,8 @@ class StorageError extends Error {
 ```
 
 `source` 恒为 `'@migaia/storage-web'`；`cause` 恒保留原始异常，永不改写 `message`；实例在构造后立即 `Object.freeze`。
+
+`STORAGE_WEB_SOURCE` 是上述稳定 source 的唯一公开常量。`StorageErrorText` 是包维护的稳定错误文本/文本工厂集合，主要供实现自定义 backend、codec 或诊断适配器时复用；业务分支仍应比较 `(source, code)`，不要依赖 message 文本。
 
 **全部错误码**（`StorageErrorCode`）：
 

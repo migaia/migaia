@@ -570,7 +570,16 @@ endpoint.connect.ping(candidate, options?);            // 对某个候选做纯�
 所有跨包失败都携带稳定、不本地化的 `(source, code)`，但**不保证都是 `WebRpcError` 类实例**。参数和边界校验会保留原生 `TypeError` / `RangeError`，多项失败会保留 `AggregateError`，对端业务失败是 `WebRpcRemoteError`；这些对象仍会附加 WebRPC 的错误身份。业务逻辑应优先按 `source` / `code` 分支，不要匹配可能变化的 `message`，需要原生语义时再用 `instanceof TypeError` / `AggregateError`。
 
 ```ts
-import { isWebRpcError, WebRpcErrorCode } from '@migaia/web-rpc'
+import {
+  WEBRPC_SOURCE,
+  isWebRpcError,
+  WebRpcErrorCode,
+  WebRpcConfigurationError,
+  WebRpcProtocolError,
+  WebRpcContractError,
+  WebRpcTransportError,
+  WebRpcChunkError
+} from '@migaia/web-rpc'
 
 try {
   await endpoint.send('server', 'add', { a: 1, b: 2 })
@@ -589,6 +598,8 @@ try {
   }
 }
 ```
+
+`WEBRPC_SOURCE` 是稳定 source 常量。`WebRpcConfigurationError`、`WebRpcProtocolError`、`WebRpcContractError`、`WebRpcTransportError` 与 `WebRpcChunkError` 是按失败域细分的公开子类；它们便于日志/框架适配器做粗粒度归类，但业务恢复仍应以 `(source, code)` 为准，因为原生 `TypeError`、`RangeError`、`AggregateError` 也可能携带同一错误身份。
 
 ### 错误码完整参考
 
@@ -920,7 +931,9 @@ import {
   WebRpcTransportOwnership,
   WebRpcTransportEncoding,
   WebRpcMessageKind,
-  WebRpcVariation
+  WebRpcVariation,
+  WebRpcEndpointStatus,
+  WebRpcDebugPhase
 } from '@migaia/web-rpc'
 
 const transport = {
@@ -946,6 +959,8 @@ const transport = {
 | `WebRpcOperation`           | send/dispatch/ping 接收端选择操作                    |
 | `WebRpcControlKind`         | request/dispatch/ping/discovery 资源准入类别         |
 | `WebRpcCandidateStatus`     | active/stale/unregistered 发现候选状态               |
+| `WebRpcEndpointStatus`      | 发现元数据中的 endpoint 准入状态                     |
+| `WebRpcDebugPhase`          | 测试/诊断快照的 active/disposed 生命周期阶段         |
 | `WebRpcContractFailureKind` | schema 校验诊断分类                                  |
 | `WebRpcChunkEvent`          | chunk.rejected/chunk.expired hook 名                 |
 

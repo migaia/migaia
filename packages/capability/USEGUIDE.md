@@ -1,6 +1,6 @@
 # `@migaia/capability` 使用指南
 
-本指南给出全部导出 API 的完整签名、边界行为与错误码。包的定位与安装方式、每个导出的最小上手示例见 [README](./README.md)。
+本指南覆盖面向应用与适配器的公开运行时 API、关键契约类型、边界行为与错误码。仅参与条件推导的 type-only 辅助类型以发布的 `.d.ts` 和编辑器提示为准，不在正文逐项抄录；包的定位与安装方式、最小上手示例见 [README](./README.md)。
 
 ## 目录
 
@@ -74,6 +74,8 @@ type IGraphNodeDefinition<T> = {
 使用 `@migaia/capability/graph/topology` 时，公开节点的 `ordinal` 必须唯一并连续覆盖 `[0, nodeCount)`；拓扑构建只接受该注册域，非法或重复 ordinal 会按 `onInvalid` 的 `invalid-node` 或 `duplicate-ordinal` 语义报告。
 
 `IGraphNodeInstance` 必须提供 `{ value, release }`。Graph 只拥有一次 primary release；auxiliary release 由 lifecycle scope 管理，节点内 primary 先于 auxiliary，节点之间按逆拓扑释放。`ready()` 与 `dispose()` 在重复调用时保留 Promise identity；启动失败后 Graph 不隐式 retry，但仍可调用 `dispose()` 收尾。
+
+`snapshotGraphReadiness(source)` 是 Host 与 Graph 之间的低层准入快照：严格按 `state`、`error` 顺序各读取一次，只接受 `ready | blocked | failed`，并返回冻结的 `{ state, error }`。原生 `Error` getter failure 保持实例身份；非 `Error` 抛出值会以 `INVALID_OPTION` 包装且保留在 `cause`。普通业务代码应读取 Graph 自身状态；只有桥接外部 readiness source 时才直接调用它。
 
 Graph 状态为 `open → starting → ready | failed → quiescing → terminal`。`nodeState()` 与 `nodes` 在 terminal 后仍可读取；unknown node 抛 `GRAPH_UNKNOWN_NODE`。14 个 Graph error code 从 `CapabilityGraphErrorCode` 导出，错误保留 native Error/cause/stack，并由 `onError` 作为 diagnostics sink 接收 cleanup/late-result failure。
 

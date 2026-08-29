@@ -1,6 +1,6 @@
 # `@migaia/utils` 使用指南
 
-本指南逐个模块列出全部导出 API 的签名、语义与用法示例。包的定位与安装方式见 [README](./README.md)。
+本指南逐个模块覆盖公开运行时 API、直接配置所需的关键类型、语义与用法示例。仅用于泛型推导的 type-only helper 以发布的 `.d.ts` 和编辑器提示为准；包的定位与安装方式见 [README](./README.md)。
 
 ## 目录
 
@@ -528,9 +528,12 @@ type IDiagnosticSnapshot<T> = {
   readonly diagnostics: readonly ISnapshotDiagnostic[];
 };
 function diagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;
+function structuredDiagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;
 ```
 
 比 `immutableSnapshot` 更宽容的尽力而为深拷贝：只递归普通对象与数组；遇到函数、class 实例等不支持的类型时**保留原值原样放入快照**（不报错），同时在 `diagnostics` 里记一条 `reason: 'unsupported'`；访问器属性会记 `reason: 'accessor'` 并克隆其读取到的值；读取失败记 `reason: 'read-failed'` 并回退保留原始属性描述符。用循环引用检测（`WeakMap`）保证成环的输入也能安全返回。适合"尽量拷贝，同时如实报告哪些部分没能安全拷贝"的诊断场景。
+
+`structuredDiagnosticSnapshot` 优先尝试原生 `structuredClone`，成功时 diagnostics 为空；宿主不支持或克隆失败时自动退回上述尽力快照，并在根路径追加 `unsupported` 或携带原始 cause 的 `read-failed` 诊断。需要“能克隆就完整克隆、否则仍返回可观测降级结果”的遥测边界优先使用它。
 
 ```ts
 function identitySnapshot<T>(value: T): T;
@@ -595,11 +598,17 @@ type IPathProbe<T, P extends IObjectPathInput<T>> =
   | IPathFailedProbe<P>;
 
 function probeObjectPath<T, P extends IObjectPathInput<T>>(object: T, path: P): IPathProbe<T, P>;
+function probeObjectPathSegments<T, P extends IObjectPathInput<T>>(
+  object: T,
+  segments: P
+): IPathProbe<T, P>;
 ```
 
 沿路径逐段探测，每段只读取一次。四种结果分别对应：**成功取到值**（`value`，携带 `value`）、**某一段属性不存在**（`missing`）、**某一段的父值不是对象/函数因而无法继续深入**（`blocked`，例如路径指向 `a.b.c` 但 `a.b` 是 `null` 或字符串）、**某一段读取本身抛出异常**（`failed`，例如触发了会抛错的 getter，携带 `error`）。
 
 四种结果共有字段 `originKey`（原始传入的 `path`，未加工）与 `segments`（`parseObjectPath` 解析后的完整段元组）；`missing`/`blocked`/`failed` 额外共有 `failedAt`（第几段失败，0-based）、`failedKey`（失败的那一段键）、`resolvedPath`（成功解析到的前缀路径，即 `segments` 中 `failedAt` 之前的部分）、`parent`（失败发生时的父级值——`missing`/`failed` 时是该属性所属的对象，`blocked` 时是那个非对象的原始值本身）。`failed` 唯一多出 `error` 字段，携带原始抛出值。
+
+`probeObjectPathSegments` 接受已经由调用方校验/缓存的段元组，跳过再次解析；结果语义与 `probeObjectPath` 完全相同。只有能保证 segments 已通过同一安全约束的高频内部路径才应使用它，外部字符串输入继续交给 `probeObjectPath`。
 
 ```ts
 function get<T, P extends IObjectPathInput<T>>(
@@ -989,7 +998,7 @@ await request.catch(() => undefined);
 
 ## `/value`、`/string`、`/number` 高频工具
 
-`isEmptyValue` 只把 `null`、`undefined`、空白字符串和 `NaN` 判为空；`0`、`0n`、`false`、数组和对象保持有效。`isPrimitive` 覆盖 JavaScript 七类 primitive，不生成额外类型标签。
+`isNullish` 只识别 `null | undefined`；`isBlankString` 只识别 trim 后为空的字符串。`isEmptyValue` 组合两者并额外把 `NaN` 判为空；`0`、`0n`、`false`、数组和对象保持有效。`isPrimitive` 覆盖 JavaScript 七类 primitive，不生成额外类型标签。
 
 `format(source, values, options?)` 使用线性扫描替换 `{path}`，嵌套路径只读取 own property；缺失值默认保留占位符。`options.placeholder` 可配置 `{ open, close }`，`missing` 可选 `preserve | empty | throw`，`nullish` 可选 `empty | stringify`。双写边界字符用于输出字面量边界。
 
