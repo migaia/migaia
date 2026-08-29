@@ -104,7 +104,13 @@ export const LoggerErrorCode = {
    *
    * 调用方检查 extends 拓扑，拆除环路。
    */
-  extendsCycle: 'EXTENDS_CYCLE'
+  extendsCycle: 'EXTENDS_CYCLE',
+
+  /**
+   * A bounded batch/direct-HTTP owner has no admission slot for another full batch. The producer
+   * must stop or retry after quiescence; entries are never silently dropped or spilled.
+   */
+  batchOverflow: 'BATCH_OVERFLOW'
 } as const
 
 export type ILoggerErrorCode = (typeof LoggerErrorCode)[keyof typeof LoggerErrorCode]

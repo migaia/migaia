@@ -174,14 +174,14 @@ describe('Round24 HTTP shutdown admission', () => {
         // Replaced in the constructor so the signal closure owns the state.
       }
     }
-    /** Restores the global controller implementation after the race test. */
-    const originalAbortController = globalThis.AbortController
-    vi.stubGlobal('AbortController', NonReplayingAbortController)
     /** Restores the runtime transport capability after this isolated test. */
     const restore = setLoggerRuntimeManager({
       randomUUID: () => 'round24-http-shutdown',
       defer: (task) => task(),
       write: () => undefined,
+      // Inject hostility at the Logger-owned HTTP controller seam; PluginHost/lifecycle retains
+      // the native host controller and cannot mask the request-listener oracle.
+      createAbortController: () => new NonReplayingAbortController() as unknown as AbortController,
       fetch
     })
 
@@ -194,20 +194,22 @@ describe('Round24 HTTP shutdown admission', () => {
       logger.onShutdown(() => {
         logger.log('info', 'late-shutdown-entry')
       })
+      // PluginHost/lifecycle owns construction-time controllers. Snapshot that baseline so this
+      // oracle measures only the Logger HTTP request controller admitted by the late log.
+      const baselineControllerCount = controllers.length
 
       await expect(logger.shutdown('manual')).resolves.toMatchObject({
         logicalTerminal: true,
         cleanupComplete: true
       })
       expect(fetch).not.toHaveBeenCalled()
-      expect(controllers.length).toBe(2)
-      expect(controllers[1]?.signal.aborted).toBe(true)
+      expect(controllers.length).toBe(baselineControllerCount + 1)
+      expect(controllers.at(-1)?.signal.aborted).toBe(true)
       expect(listenerState).toEqual({ adds: 1, removes: 1 })
       expect(requestScheduleCalls).toBe(0)
       await expect(logger.flush()).resolves.toBeUndefined()
     } finally {
       restore()
-      vi.stubGlobal('AbortController', originalAbortController)
     }
   })
 })

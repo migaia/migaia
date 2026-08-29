@@ -2,7 +2,7 @@ import { PluginHost } from '@migaia/plugin-host'
 import {
   createEventChannel,
   invokeEachLive,
-  invokeSnapshotEntries,
+  withSnapshotEntries,
   type ICanonicalEventChannel
 } from '@migaia/event-subscriber'
 import type {
@@ -237,7 +237,8 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
       flush: () => this.flush(),
       onShutdown: (fn) => this.onShutdown(fn),
       shutdown: (reason) => this.shutdown(reason),
-      extends: (...others) => this.extends(...others) as unknown as ILoggerCore<IPipelineMode>
+      extends: (...others) => this.extends(...others) as unknown as ILoggerCore<IPipelineMode>,
+      unextend: (...others) => this.unextend(...others)
     }
     return domainCore
   }
@@ -279,9 +280,8 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
 
   #reportFailure(source: ILogFailure['source'], error: unknown): void {
     const failure: ILogFailure = { source, error }
-    const batch = invokeSnapshotEntries(this.#failureHooks, failure)
-    try {
-      for (const invocation of batch.entries) {
+    withSnapshotEntries(this.#failureHooks, failure, (entries) => {
+      for (const invocation of entries) {
         try {
           const pending = captureLoggerPromiseLike(invocation.invoke())
           if (pending) {
@@ -301,9 +301,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
           this.#reportFailureHookError(hookError)
         }
       }
-    } finally {
-      batch.complete()
-    }
+    })
     const labels: Record<ILogFailure['source'], string> = {
       defer: 'defer 任务异常',
       hook: 'hook 异常',
@@ -364,32 +362,30 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
   #runHookPhase(name: string, entry: ILogEntry): Promise<void> | undefined {
     const channel = this.#hooks.get(name)
     if (!channel) return undefined
-    const batch = invokeSnapshotEntries(channel, entry)
-    if (batch.entries.length === 0) return undefined
     let chain: Promise<void> | undefined
-    for (const invocation of batch.entries) {
-      const run = (): Promise<void> | undefined => {
-        try {
-          const pending = captureLoggerPromiseLike(invocation.invoke())
-          return pending?.catch((error) => {
+    const scoped = withSnapshotEntries(channel, entry, (entries) => {
+      if (entries.length === 0) return
+      for (const invocation of entries) {
+        const run = (): Promise<void> | undefined => {
+          try {
+            const pending = captureLoggerPromiseLike(invocation.invoke())
+            return pending?.catch((error) => {
+              this.#reportFailure('hook', error)
+            })
+          } catch (error) {
             this.#reportFailure('hook', error)
-          })
-        } catch (error) {
-          this.#reportFailure('hook', error)
-          return undefined
+            return undefined
+          }
+        }
+        if (chain) {
+          chain = chain.then(() => run())
+        } else {
+          chain = run()
         }
       }
-      if (chain) {
-        chain = chain.then(() => run())
-      } else {
-        chain = run()
-      }
-    }
-    if (!chain) {
-      batch.complete()
-      return undefined
-    }
-    return chain.finally(() => batch.complete())
+      return chain
+    })
+    return scoped === undefined ? undefined : scoped
   }
 
   defer(task: () => void | Promise<void>): void {
@@ -443,9 +439,8 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
 
   async #flush(deadlineAt: number): Promise<void> {
     await this.#drain(deadlineAt)
-    const flushBatch = invokeSnapshotEntries(this.#flushers, undefined)
-    try {
-      for (const invocation of flushBatch.entries) {
+    await withSnapshotEntries(this.#flushers, undefined, async (entries) => {
+      for (const invocation of entries) {
         try {
           if (
             !(await boundedWait(Promise.resolve(invocation.invoke()), deadlineAt, {
@@ -462,9 +457,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
           this.#reportFailure('flush', error)
         }
       }
-    } finally {
-      flushBatch.complete()
-    }
+    })
     await this.#drain(deadlineAt)
     for (const target of this.#extendTargets) {
       try {
@@ -528,9 +521,8 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     // docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
     const deadlineAt = this.#scheduler.now() + 3000
     ;(async () => {
-      const shutdownBatch = invokeSnapshotEntries(this.#shutdownHandlers, reason)
-      try {
-        for (const invocation of shutdownBatch.entries) {
+      await withSnapshotEntries(this.#shutdownHandlers, reason, async (entries) => {
+        for (const invocation of entries) {
           try {
             // Every handler is still invoked (unlike the flusher/extends-target loops, which `break`
             // on timeout) — onShutdown() never promised handlers would be skipped once a prior one is
@@ -553,14 +545,14 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
             this.#reportFailure('shutdown', error)
           }
         }
-      } finally {
-        shutdownBatch.complete()
-      }
+      })
       await this.flush(deadlineAt)
       // Shutdown handlers are allowed to enqueue final work; that work was drained above. Close
       // normal dispatch before PluginHost invokes plugin disposers so disposer-era logs cannot
       // enter a host whose lifecycle is already being torn down and create late #pending work.
       this.#dispatchAdmissionOpen = false
+      // Extension edges are owned by this core and must not retain live targets after shutdown.
+      this.#extendTargets = []
       const result = (await super.dispose()) as IPluginHostDisposalResult
       this.#status = LoggerStatus.closed
       return result
@@ -611,6 +603,14 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
       this.#extendTargets.push(other)
     }
     return this
+  }
+
+  /** Removes extension edges by stable logger context identity and remains idempotent. */
+  unextend(...others: readonly ILoggerExtendsTarget<IPipelineMode>[]): boolean {
+    const ids = new Set(others.map((other) => other.ctx.id))
+    const before = this.#extendTargets.length
+    this.#extendTargets = this.#extendTargets.filter((target) => !ids.has(target.ctx.id))
+    return this.#extendTargets.length !== before
   }
 
   /** 从 from 出发，沿着 extends 链路能不能走到 id 为 targetId 的 logger */
@@ -710,9 +710,8 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
     try {
       const pipeline = this.runPipeline(entry, (finalEntry) => {
         const committedEntry = finalEntry && finalEntry.time instanceof Date ? finalEntry : entry
-        const sinkBatch = invokeSnapshotEntries(this.#sinks, committedEntry)
-        try {
-          for (const invocation of sinkBatch.entries) {
+        withSnapshotEntries(this.#sinks, committedEntry, (entries) => {
+          for (const invocation of entries) {
             try {
               const result = invocation.invoke()
               const pending = captureLoggerPromiseLike(result)
@@ -728,9 +727,7 @@ class LoggerCore extends PluginHost<ILoggerDomainCore<IPipelineMode>, ILogEntry>
               this.#reportFailure('sink', err)
             }
           }
-        } finally {
-          sinkBatch.complete()
-        }
+        })
         const after = this.#runHookPhase('after', committedEntry)
         const forward = () => {
           const tagAfter = this.#runHookPhase(`after:${committedEntry.tag}`, committedEntry)

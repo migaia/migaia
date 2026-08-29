@@ -1422,7 +1422,7 @@ describe('Logger-owned scheduler option admission', () => {
 })
 
 describe('Round20 logger uninstall isolation', () => {
-  it('LG-T24 / LG-R23 drops buffered items, cancels every batcher, and isolates reinstall', async () => {
+  it('LG-T24 / LG-R23 drains buffered items, cancels every batcher, and isolates reinstall', async () => {
     const scheduled: Array<() => void> = []
     const cancelError = new Error('batch-cancel-failed')
     let cancelCalls = 0
@@ -1488,7 +1488,7 @@ describe('Round20 logger uninstall isolation', () => {
       for (const callback of scheduled) callback()
       oldBatcher.push('late-old')
       await oldBatcher.flush()
-      expect(oldBatches).toEqual([])
+      expect(oldBatches).toEqual([['drop-one'], ['drop-two']])
       expect(deferCalls).toBe(deferredBeforeLateCallbacks)
       expect(scheduled).toHaveLength(2)
 
@@ -1510,7 +1510,9 @@ describe('Round20 logger uninstall isolation', () => {
       scheduled[2]!()
       await newBatcher.flush()
       expect(newBatches).toEqual([['new-install']])
-      expect(oldBatches).toEqual([])
+      // Reinstall must not route the new logger's batch into the old owner; its prior
+      // losslessly drained batches remain the only entries observed by the old callback.
+      expect(oldBatches).toEqual([['drop-one'], ['drop-two']])
       await reinstalled.shutdown('manual')
       await logger.shutdown('manual')
     } finally {
