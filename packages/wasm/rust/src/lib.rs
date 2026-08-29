@@ -1,4 +1,9 @@
-use std::{cell::RefCell, collections::HashMap};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    io::{self, Cursor, Write},
+    ptr,
+};
 
 use wasm_bindgen::prelude::*;
 
@@ -25,7 +30,10 @@ struct Arena {
 
 impl Arena {
     fn new() -> Self {
-        Self { map: HashMap::new(), cursor: 1 }
+        Self {
+            map: HashMap::new(),
+            cursor: 1,
+        }
     }
 
     /// Pick an id that is not 0 and not currently live.
@@ -129,85 +137,204 @@ pub fn dealloc_bytes(id: u32) -> bool {
 // JSON. It is here for what V8 has no native parser for, and for producing a
 // more compact archive than JSON without touching the main thread's object graph.
 
-use std::cell::Cell;
-
-thread_local! {
-    /// Exact byte length of the buffer produced by the last conversion.
-    ///
-    /// The arena rounds capacity up to whole `u64` words, so `byte_len_of` reports
-    /// capacity rather than content length. Conversions need the exact figure, and
-    /// returning a pair from `#[wasm_bindgen]` would mean allocating a JS object
-    /// per call, so it is read back through this instead.
-    static LAST_LEN: Cell<u32> = const { Cell::new(0) };
-    static LAST_ERROR: RefCell<String> = const { RefCell::new(String::new()) };
-}
-
-/// Exact length in bytes of the last conversion's output. Only meaningful
-/// immediately after a conversion that returned a non-zero id.
+/// Metadata returned by one conversion operation.
+///
+/// Keeping the output id, exact byte length, and error on the same value makes
+/// each conversion self-contained. Re-entrant callers cannot observe a later
+/// operation's result through global side channels.
 #[wasm_bindgen]
-pub fn last_len() -> u32 {
-    LAST_LEN.with(|len| len.get())
+pub struct ConversionResult {
+    id: u32,
+    len: u32,
+    error: String,
 }
 
-/// Why the last conversion returned 0. Empty when the last call succeeded.
 #[wasm_bindgen]
-pub fn last_error() -> String {
-    LAST_ERROR.with(|error| error.borrow().clone())
-}
-
-fn fail(message: impl Into<String>) -> u32 {
-    LAST_ERROR.with(|error| *error.borrow_mut() = message.into());
-    LAST_LEN.with(|len| len.set(0));
-    NULL_ID
-}
-
-fn succeed(bytes: Vec<u8>) -> u32 {
-    LAST_ERROR.with(|error| error.borrow_mut().clear());
-    let id = alloc_bytes(bytes.len() as u32);
-    if id == NULL_ID {
-        return fail("arena exhausted");
+impl ConversionResult {
+    /// Allocation id containing the conversion output, or zero on failure.
+    #[wasm_bindgen(getter)]
+    pub fn id(&self) -> u32 {
+        self.id
     }
-    ARENA.with(|arena| {
-        // Must be a mutable borrow all the way down. Taking a shared `&Vec<u64>`
-        // and casting `as_ptr()` to `*mut u8` writes through a pointer derived
-        // from a shared reference, which is undefined behaviour under Rust's
-        // aliasing rules even though it happens to work today.
-        let mut arena = arena.borrow_mut();
-        if let Some(block) = arena.map.get_mut(&id) {
-            let destination = unsafe {
-                std::slice::from_raw_parts_mut(
-                    block.as_mut_ptr() as *mut u8,
-                    bytes.len(),
-                )
-            };
-            destination.copy_from_slice(&bytes);
-        }
-    });
-    LAST_LEN.with(|len| len.set(bytes.len() as u32));
-    id
+
+    /// Exact output byte length; zero on failure.
+    #[wasm_bindgen(getter)]
+    pub fn len(&self) -> u32 {
+        self.len
+    }
+
+    /// Empty on success, otherwise the operation-specific failure reason.
+    #[wasm_bindgen(getter)]
+    pub fn error(&self) -> String {
+        self.error.clone()
+    }
 }
 
-/// Read exactly `len` bytes out of the allocation, or `None` if the id is dead
-/// or `len` exceeds what was actually reserved.
-fn read_bytes(id: u32, len: u32) -> Option<Vec<u8>> {
-    ARENA.with(|arena| {
-        let arena = arena.borrow();
-        let block = arena.map.get(&id)?;
-        let capacity = block.len() * 8;
-        if len as usize > capacity {
-            return None;
+fn fail(message: impl Into<String>) -> ConversionResult {
+    ConversionResult {
+        id: NULL_ID,
+        len: 0,
+        error: message.into(),
+    }
+}
+
+/// Initial output capacity; subsequent growth is owned by the same arena block.
+const INITIAL_OUTPUT_BYTES: usize = 64;
+
+/// A geometric writer that emits conversion bytes directly into an arena block.
+/// The input and output remain borrowed only while the conversion transaction
+/// owns the arena borrow; neither borrow escapes into the returned metadata.
+struct ArenaWriter<'a> {
+    arena: &'a mut Arena,
+    id: u32,
+    position: usize,
+}
+
+impl Write for ArenaWriter<'_> {
+    /// Writes one serializer chunk, growing only the owned output block as needed.
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let required = self.position.checked_add(bytes.len()).ok_or_else(|| {
+            io::Error::new(io::ErrorKind::WriteZero, "conversion output is too large")
+        })?;
+        let block = self
+            .arena
+            .map
+            .get_mut(&self.id)
+            .expect("conversion output allocation");
+        let capacity = block.len().checked_mul(8).ok_or_else(|| {
+            io::Error::new(io::ErrorKind::WriteZero, "conversion output is too large")
+        })?;
+        if required > capacity {
+            let doubled = capacity.max(8).checked_mul(2).ok_or_else(|| {
+                io::Error::new(io::ErrorKind::WriteZero, "conversion output is too large")
+            })?;
+            block.resize(doubled.max(required).div_ceil(8), 0);
         }
-        // Read-only, so a shared borrow and `as_ptr()` are correct here; the
-        // mutable counterpart in `succeed` must not copy this pattern.
-        let source = unsafe {
-            std::slice::from_raw_parts(block.as_ptr() as *const u8, len as usize)
+        let destination = unsafe {
+            std::slice::from_raw_parts_mut(block.as_mut_ptr() as *mut u8, block.len() * 8)
         };
-        Some(source.to_vec())
-    })
+        // The serializer owns `bytes`, while this writer owns a disjoint arena
+        // range. The copy completes before either borrow can leave this call.
+        unsafe {
+            ptr::copy_nonoverlapping(
+                bytes.as_ptr(),
+                destination.as_mut_ptr().add(self.position),
+                bytes.len(),
+            );
+        }
+        self.position += bytes.len();
+        Ok(bytes.len())
+    }
+
+    /// The arena writer has no buffered state to flush.
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
-/// JSON bytes in, MessagePack bytes out. Returns the new allocation id, or 0 on
-/// failure with the reason available from [`last_error`].
+/// Allocates an output block while the caller already owns the arena borrow.
+fn allocate_output(arena: &mut Arena, byte_len: usize) -> Option<u32> {
+    let words = byte_len.div_ceil(8);
+    let id = arena.fresh_id();
+    if id == NULL_ID {
+        return None;
+    }
+    arena.map.insert(id, vec![0u64; words]);
+    Some(id)
+}
+
+/// Returns the input pointer and requested byte length without cloning input.
+fn input_range(arena: &Arena, id: u32, len: u32) -> Option<(*const u8, usize)> {
+    let block = arena.map.get(&id)?;
+    let input_len = len as usize;
+    if input_len > block.len() * 8 {
+        return None;
+    }
+    Some((block.as_ptr() as *const u8, input_len))
+}
+
+/// Converts JSON to MessagePack while borrowing input and writing output in one arena transaction.
+fn convert_json_to_msgpack(arena: &mut Arena, id: u32, len: u32) -> ConversionResult {
+    let Some((input_ptr, input_len)) = input_range(arena, id, len) else {
+        return fail("unknown allocation id or length past capacity");
+    };
+    let Some(output_id) = allocate_output(arena, INITIAL_OUTPUT_BYTES) else {
+        return fail("arena exhausted");
+    };
+    let outcome = {
+        // The source block remains heap-stable while the distinct output entry
+        // is inserted into the map, so this operation-bound pointer is valid.
+        let input = unsafe { std::slice::from_raw_parts(input_ptr, input_len) };
+        let mut writer = ArenaWriter {
+            arena,
+            id: output_id,
+            position: 0,
+        };
+        let mut deserializer = serde_json::Deserializer::from_slice(input);
+        let mut serializer = rmp_serde::Serializer::new(&mut writer).with_struct_map();
+        let result = serde_transcode::transcode(&mut deserializer, &mut serializer);
+        drop(serializer);
+        match result {
+            Ok(()) => match deserializer.end() {
+                Ok(()) => Ok(writer.position),
+                Err(error) => Err(format!("json to msgpack failed: {error}")),
+            },
+            Err(error) => Err(format!("json to msgpack failed: {error}")),
+        }
+    };
+    match outcome {
+        Ok(output_len) => ConversionResult {
+            id: output_id,
+            len: output_len as u32,
+            error: String::new(),
+        },
+        Err(error) => {
+            arena.map.remove(&output_id);
+            fail(error)
+        }
+    }
+}
+
+/// Converts MessagePack to JSON while borrowing input and writing output in one arena transaction.
+fn convert_msgpack_to_json(arena: &mut Arena, id: u32, len: u32) -> ConversionResult {
+    let Some((input_ptr, input_len)) = input_range(arena, id, len) else {
+        return fail("unknown allocation id or length past capacity");
+    };
+    let Some(output_id) = allocate_output(arena, INITIAL_OUTPUT_BYTES) else {
+        return fail("arena exhausted");
+    };
+    let outcome = {
+        let input = unsafe { std::slice::from_raw_parts(input_ptr, input_len) };
+        let mut writer = ArenaWriter {
+            arena,
+            id: output_id,
+            position: 0,
+        };
+        let mut cursor = Cursor::new(input);
+        let mut deserializer = rmp_serde::Deserializer::new(&mut cursor);
+        let mut serializer = serde_json::Serializer::new(&mut writer);
+        let result = serde_transcode::transcode(&mut deserializer, &mut serializer);
+        drop(serializer);
+        match result {
+            Ok(()) if cursor.position() == input_len as u64 => Ok(writer.position),
+            Ok(()) => Err("msgpack to json failed: trailing bytes".to_string()),
+            Err(error) => Err(format!("msgpack to json failed: {error}")),
+        }
+    };
+    match outcome {
+        Ok(output_len) => ConversionResult {
+            id: output_id,
+            len: output_len as u32,
+            error: String::new(),
+        },
+        Err(error) => {
+            arena.map.remove(&output_id);
+            fail(error)
+        }
+    }
+}
+
+/// JSON bytes in, MessagePack bytes out. Returns operation-bound output metadata.
 ///
 /// Transcodes straight from the JSON reader into the MessagePack writer. Going
 /// through `serde_json::Value` first was measurably worse: a million four-field
@@ -218,32 +345,12 @@ fn read_bytes(id: u32, len: u32) -> Option<Vec<u8>> {
 /// and reversible — a compact struct encoding would need both ends to agree on
 /// a schema, which a general-purpose store cannot assume.
 #[wasm_bindgen]
-pub fn json_to_msgpack(id: u32, len: u32) -> u32 {
-    let Some(input) = read_bytes(id, len) else {
-        return fail("unknown allocation id or length past capacity");
-    };
-    let mut deserializer = serde_json::Deserializer::from_slice(&input);
-    // 输出通常比 JSON 小，按输入大小预留即可，基本不会再扩容
-    let mut output = Vec::with_capacity(input.len());
-    let mut serializer = rmp_serde::Serializer::new(&mut output).with_struct_map();
-    match serde_transcode::transcode(&mut deserializer, &mut serializer) {
-        Ok(()) => succeed(output),
-        Err(error) => fail(format!("json to msgpack failed: {error}")),
-    }
+pub fn json_to_msgpack(id: u32, len: u32) -> ConversionResult {
+    ARENA.with(|arena| convert_json_to_msgpack(&mut arena.borrow_mut(), id, len))
 }
 
-/// MessagePack bytes in, JSON bytes out.
+/// MessagePack bytes in, JSON bytes out. Returns operation-bound output metadata.
 #[wasm_bindgen]
-pub fn msgpack_to_json(id: u32, len: u32) -> u32 {
-    let Some(input) = read_bytes(id, len) else {
-        return fail("unknown allocation id or length past capacity");
-    };
-    let mut deserializer = rmp_serde::Deserializer::new(input.as_slice());
-    // JSON 比 MessagePack 冗长，预留两倍减少扩容次数
-    let mut output = Vec::with_capacity(input.len() * 2);
-    let mut serializer = serde_json::Serializer::new(&mut output);
-    match serde_transcode::transcode(&mut deserializer, &mut serializer) {
-        Ok(()) => succeed(output),
-        Err(error) => fail(format!("msgpack to json failed: {error}")),
-    }
+pub fn msgpack_to_json(id: u32, len: u32) -> ConversionResult {
+    ARENA.with(|arena| convert_msgpack_to_json(&mut arena.borrow_mut(), id, len))
 }
