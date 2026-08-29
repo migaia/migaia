@@ -1,5 +1,16 @@
-import { defineConfig } from 'vite';
-import { fileURLToPath } from 'node:url';
+import { defineConfig } from 'vite'
+import { fileURLToPath } from 'node:url'
+
+/** Runtime dependencies that must stay external to preserve one owner per package boundary. */
+const runtimeExternals = [
+  '@migaia/lifecycle',
+  '@migaia/middleware-pipeline',
+  '@migaia/utils'
+] as const
+
+/** Keeps exact package imports and their subpaths external to the publication graph. */
+const isRuntimeExternal = (id: string): boolean =>
+  runtimeExternals.some((dependency) => id === dependency || id.startsWith(`${dependency}/`))
 
 /** Produces one runtime-neutral ESM entry; declarations are emitted by TypeScript. */
 export default defineConfig({
@@ -11,6 +22,15 @@ export default defineConfig({
       formats: ['es'],
       fileName: () => 'index.js'
     },
-    sourcemap: true
+    sourcemap: true,
+    rollupOptions: {
+      external: isRuntimeExternal,
+      preserveEntrySignatures: 'strict',
+      output: {
+        preserveModules: true,
+        preserveModulesRoot: 'src',
+        entryFileNames: '[name].js'
+      }
+    }
   }
-});
+})
