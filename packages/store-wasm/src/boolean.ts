@@ -61,11 +61,11 @@ export function boolean(): IFieldBuilder<IWasmBooleanField> {
           dispose() {
             if (disposed || disposing) return
             disposing = true
+            disposed = true
             try {
               block.unregister(field)
               // 逆序释放（migration.sdd.md §5.7）：先摘子资源边，再 dealloc block。
               disposeAllWasm([() => source!.dispose(), () => block.dispose()])
-              disposed = true
             } finally {
               disposing = false
             }

@@ -18,6 +18,15 @@ describeShared('Shared buffer runtime input boundary', () => {
     )
   })
 
+  it('rejects attaching a signal buffer as an array and vice versa', () => {
+    const signal = sharedInt32(syncRuntime(), 3)
+    expect(() => sharedInt32Array(syncRuntime(), 0, { buffer: signal.buffer })).toThrow()
+    const array = sharedInt32Array(syncRuntime(), 1)
+    expect(() => sharedInt32(syncRuntime(), 0, array.buffer)).toThrow()
+    signal.dispose()
+    array.dispose()
+  })
+
   it('rejects null array options', () => {
     expect(() => sharedInt32Array(createRuntime(), 1, null as never)).toThrow(
       '[store] shared array options must be an object'
@@ -380,7 +389,7 @@ describeShared('SharedInt32Array：逐下标失效', () => {
   })
 })
 
-describeShared('SharedInt32Array：脏页稀疏同步', () => {
+describeShared('SharedInt32Array：multi-reader generation/cursor同步', () => {
   it('a full-array sync() only wakes observers on the indices that actually changed, across page boundaries', () => {
     const writerRuntime = syncRuntime()
     const readerRuntime = syncRuntime()
@@ -413,7 +422,7 @@ describeShared('SharedInt32Array：脏页稀疏同步', () => {
     for (const index of touched) expect(reader.get(index)).toBe(index * 2)
 
     for (const index of touched) expect(runsByIndex.get(index)).toBe(2)
-    expect(untouchedRuns).toBe(1) // never notified — its page was never marked dirty
+    expect(untouchedRuns).toBe(1) // unchanged cell version is not notified
 
     expect(reader.sync()).toBe(0) // idempotent: nothing left dirty
 
@@ -423,31 +432,30 @@ describeShared('SharedInt32Array：脏页稀疏同步', () => {
     writer.dispose()
   })
 
-  it('scans only dirty pages, not the whole array, so sparse updates on a huge array stay fast', () => {
+  it("keeps independent reader cursors from consuming one another's updates", () => {
     const writerRuntime = syncRuntime()
-    const readerRuntime = syncRuntime()
-    const length = 1_000_000
+    const firstReaderRuntime = syncRuntime()
+    const secondReaderRuntime = syncRuntime()
+    const length = 8
     const writer = sharedInt32Array(writerRuntime, length)
-    const reader = sharedInt32Array(readerRuntime, length, {
+    const firstReader = sharedInt32Array(firstReaderRuntime, length, {
+      buffer: writer.buffer
+    })
+    const secondReader = sharedInt32Array(secondReaderRuntime, length, {
       buffer: writer.buffer
     })
 
-    for (const index of [0, 250_000, 500_000, 750_000, 999_999]) {
-      writer.set(index, 1)
-    }
+    writer.set(3, 1)
+    expect(firstReader.sync()).toBe(1)
+    expect(secondReader.sync()).toBe(1)
+    writer.set(6, 2)
+    expect(firstReader.sync()).toBe(1)
+    expect(secondReader.sync()).toBe(1)
+    expect(firstReader.get(6)).toBe(2)
+    expect(secondReader.get(6)).toBe(2)
 
-    const start = performance.now()
-    const changed = reader.sync()
-    const elapsedMs = performance.now() - start
-
-    expect(changed).toBe(5)
-    // A regression back to an O(length) full scan means one million
-    // readCell() calls; that takes far longer than this. Generous margin
-    // keeps this from flaking under CI load while still catching the
-    // regression this test exists to catch.
-    expect(elapsedMs).toBeLessThan(200)
-
-    reader.dispose()
+    firstReader.dispose()
+    secondReader.dispose()
     writer.dispose()
   })
 })
@@ -456,28 +464,28 @@ describeShared('seqlock：值与版本同源', () => {
   it('advances the version by two per committed write, and not at all when unchanged', () => {
     const runtime = syncRuntime()
     const signal = sharedInt32(runtime, 0)
-    const view = new Int32Array(signal.buffer, 0, 2)
+    const view = new BigInt64Array(signal.buffer, 24, 1)
 
-    expect(Atomics.load(view, 1)).toBe(0)
+    expect(Atomics.load(view, 0)).toBe(0n)
     signal.value = 5
     // 一次完成的写入把 seq 推进 2：偶数即「没人在写」，奇数是持锁中
-    expect(Atomics.load(view, 1)).toBe(2)
+    expect(Atomics.load(view, 0)).toBe(2n)
     signal.value = 5 // 相同值不该推进版本，否则每次 set 都通知一轮
-    expect(Atomics.load(view, 1)).toBe(2)
+    expect(Atomics.load(view, 0)).toBe(2n)
     signal.value = 6
-    expect(Atomics.load(view, 1)).toBe(4)
+    expect(Atomics.load(view, 0)).toBe(4n)
 
     signal.dispose()
   })
 
-  it('returns the int32-wrapped version after sequence overflow', () => {
+  it('keeps the 64-bit version beyond the old int32 range', () => {
     const runtime = syncRuntime()
     const signal = sharedInt32(runtime, 0)
-    const view = new Int32Array(signal.buffer, 0, 2)
-    Atomics.store(view, 1, 2_147_483_646)
+    const view = new BigInt64Array(signal.buffer, 24, 1)
+    Atomics.store(view, 0, 2_147_483_646n)
 
     signal.value = 1
-    expect(Atomics.load(view, 1)).toBe(-2_147_483_648)
+    expect(Atomics.load(view, 0)).toBe(2_147_483_648n)
     expect(signal.sync()).toBe(false)
     signal.dispose()
   })
@@ -504,13 +512,38 @@ describeShared('seqlock：值与版本同源', () => {
     reader.dispose()
   })
 
+  it('publishes the remote generation before a local scheduler failure', () => {
+    const writerRuntime = syncRuntime()
+    const readerRuntime = syncRuntime()
+    const writer = sharedInt32Array(writerRuntime, 1, { initialValues: [0] })
+    const reader = sharedInt32Array(readerRuntime, 1, { buffer: writer.buffer })
+    const observer = new Effect(() => {
+      void writer.get(0)
+    }, writerRuntime)
+    const failure = new Error('local scheduler failed')
+
+    writerRuntime.setSchedulerStrategy(() => {
+      throw failure
+    })
+
+    expect(() => writer.set(0, 7)).toThrow(failure)
+    // Remote readers must observe the committed generation even when local
+    // notification throws after the write has become visible.
+    expect(reader.sync()).toBe(1)
+    expect(reader.get(0)).toBe(7)
+
+    observer.dispose()
+    reader.dispose()
+    writer.dispose()
+  })
+
   it('refuses to read or write forever when a writer died holding the lock', () => {
     const runtime = syncRuntime()
     const signal = sharedInt32(runtime, 7)
-    const view = new Int32Array(signal.buffer, 0, 2)
+    const view = new BigInt64Array(signal.buffer, 24, 1)
 
     // 手工制造「有人持锁后消失」：seq 停在奇数
-    Atomics.store(view, 1, 1)
+    Atomics.store(view, 0, 1n)
 
     // 无限自旋会把这条线程也吊死，所以到限就抛，把「写坏了」暴露出来
     expect(() => signal.peek()).toThrow(/seqlock|never settled/)
@@ -518,7 +551,7 @@ describeShared('seqlock：值与版本同源', () => {
       signal.value = 9
     }).toThrow(/seqlock|contention limit/)
 
-    Atomics.store(view, 1, 2)
+    Atomics.store(view, 0, 2n)
     expect(signal.peek()).toBe(7)
     signal.dispose()
   })

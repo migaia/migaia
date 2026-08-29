@@ -7,11 +7,10 @@ import {
 } from '@migaia/reactive'
 import { claimOwnership, ownerOf } from '@migaia/reactive/ownership'
 import {
-  assimilateCapturedThen,
-  createTerminalController,
-  probeThenable,
-  ThenableProbeKind,
-  type ITerminalController,
+  containAsyncRejection,
+  createSyncStartedDisposalLedger,
+  type ISyncStartedDisposalLedger,
+  LifecycleState,
   type ILifecycleState
 } from '@migaia/lifecycle'
 import { createAtomStore, type IAtomStore } from '@migaia/store-keyed/atom/store'
@@ -115,21 +114,11 @@ export class StoreRegistry implements IDisposable {
   /** Provider-local atom state/override boundary. Same Runtime may host many registries. */
   readonly atomStore: IAtomStore
   #entries = new Map<symbol, IRegistryEntry>()
-  #disposed = false
   #retainCount = 0
   #lifecycleGeneration = 0
-  #terminal: ITerminalController = createTerminalController()
-  // Disposers invoked from the synchronous dispose() path whose return value
-  // turned out to be a thenable. dispose() can't await them (it's sync),
-  // but a later disposeAsync() call must — and a rejection must never
-  // become an unhandled rejection just because nothing was watching yet.
-  #pendingSyncDisposals = new Set<Promise<void>>()
+  /** Lifecycle-owned pending/error/completion truth for the whole registry disposal plan. */
+  #disposalLedger: ISyncStartedDisposalLedger = createSyncStartedDisposalLedger()
   #disposingAsync: Promise<void> | undefined
-  /** Stable completion ledger for every disposer started by the terminal dispose operation. */
-  #disposeCompletion: Promise<void> | undefined
-  #resolveDisposeCompletion: (() => void) | undefined
-  #rejectDisposeCompletion: ((error: unknown) => void) | undefined
-  #disposeErrors: unknown[] = []
 
   constructor(runtime: IRuntime = createRuntime()) {
     this.runtime = runtime
@@ -139,7 +128,7 @@ export class StoreRegistry implements IDisposable {
 
   /** Part of the project's unified lifecycle shape (see `@migaia/lifecycle`'s `ILifecycleState`). */
   get lifecycle(): ILifecycleState {
-    return this.#terminal.lifecycle
+    return this.#disposalLedger.lifecycle
   }
 
   /**
@@ -147,11 +136,11 @@ export class StoreRegistry implements IDisposable {
    * down.
    */
   whenTerminal(): Promise<void> {
-    return this.#terminal.whenTerminal()
+    return this.#disposalLedger.whenTerminal()
   }
 
   get disposed(): boolean {
-    return this.#disposed
+    return this.#disposalLedger.lifecycle !== LifecycleState.open
   }
 
   register<T>(token: IStoreToken<T>, value: T, options: IStoreRegistrationOptions = {}): IDisposer {
@@ -242,7 +231,7 @@ export class StoreRegistry implements IDisposable {
       // retain the registry before the zero-owner check runs.
       const dispose = () => {
         if (
-          !this.#disposed &&
+          this.#disposalLedger.lifecycle === LifecycleState.open &&
           this.#retainCount === 0 &&
           this.#lifecycleGeneration === generation
         ) {
@@ -277,114 +266,70 @@ export class StoreRegistry implements IDisposable {
    * `terminal` once every tracked thenable has actually settled.
    */
   dispose(): void {
-    if (this.#disposed) return
-    this.#createDisposeCompletion()
-    this.#disposed = true
-    this.#terminal.close()
+    if (this.#disposalLedger.lifecycle !== LifecycleState.open) return
     this.#lifecycleGeneration++
     const entries = [...this.#entries.values()].reverse()
     this.#entries.clear()
     for (const entry of entries) {
       if (!entry.owned) continue
-      try {
-        this.#disposeValueTracked(entry.value)
-      } catch (error) {
-        this.#disposeErrors.push(error)
-      }
+      this.#disposalLedger.start('registry', () => disposeValue(entry.value))
     }
-    try {
-      this.atomStore.dispose()
-    } catch (error) {
-      this.#disposeErrors.push(error)
-    }
-    this.#finishDisposeIfReady()
-    if (this.#disposeErrors.length === 1) throw this.#disposeErrors[0]
-    if (this.#disposeErrors.length > 1)
-      throw createStoreReactAggregateError(
-        StoreReactErrorCode.registryDisposalFailed,
-        this.#disposeErrors,
-        StoreReactErrorText.registryDisposalFailed
-      )
+    this.#disposalLedger.start('atom-store', () => this.atomStore.dispose())
+    const outcome = this.#disposalLedger.seal()
+    this.#observeAsyncDisposalErrors(outcome)
+    this.#throwSynchronousDisposalErrors(outcome.synchronousErrors)
   }
 
   /**
    * Awaitable counterpart. Single-flight: concurrent calls share one completion instead of each
    * racing their own pass over `#entries`. Calling this after a prior synchronous `dispose()` does
    * not resolve early — it waits for whatever thenable disposer results that `dispose()` started
-   * but could not block on (see `#pendingSyncDisposals`).
+   * but could not block on (tracked by the lifecycle disposal ledger).
    */
   disposeAsync(): Promise<void> {
     if (this.#disposingAsync) return this.#disposingAsync
-    if (!this.#disposed) {
+    if (this.#disposalLedger.lifecycle === LifecycleState.open) {
       try {
         this.dispose()
       } catch {
         // The stable completion below replays this failure to async callers.
       }
     }
-    this.#disposingAsync = this.#createDisposeCompletion()
-    return this.#disposingAsync
-  }
-
-  /** Creates the one completion promise shared by sync-started and async callers. */
-  #createDisposeCompletion(): Promise<void> {
-    if (this.#disposeCompletion) return this.#disposeCompletion
-    this.#disposeCompletion = new Promise<void>((resolve, reject) => {
-      this.#resolveDisposeCompletion = resolve
-      this.#rejectDisposeCompletion = reject
+    const outcome = this.#disposalLedger.seal()
+    const completion = outcome.completion.then((errors) => {
+      if (errors.length === 0) return
+      throw this.#mapDisposalErrors(errors)
     })
-    void this.#disposeCompletion.catch(() => undefined)
-    return this.#disposeCompletion
+    this.#disposingAsync = completion
+    return completion
   }
 
-  /** Settles the completion ledger once every tracked disposer has settled. */
-  #finishDisposeIfReady(): void {
-    if (this.#pendingSyncDisposals.size !== 0 || !this.#disposeCompletion) return
-    this.#terminal.forceTerminal()
-    if (this.#disposeErrors.length === 0) this.#resolveDisposeCompletion?.()
-    else if (this.#disposeErrors.length === 1)
-      this.#rejectDisposeCompletion?.(this.#disposeErrors[0])
-    else
-      this.#rejectDisposeCompletion?.(
-        createStoreReactAggregateError(
-          StoreReactErrorCode.registryDisposalFailed,
-          this.#disposeErrors,
-          StoreReactErrorText.registryDisposalFailed
-        )
-      )
-    this.#resolveDisposeCompletion = undefined
-    this.#rejectDisposeCompletion = undefined
-  }
-
-  /**
-   * Sync dispose() path: call a value's disposer, and track+observe a thenable result without
-   * blocking on it.
-   */
-  #disposeValueTracked(value: unknown): void {
-    const result = disposeValue(value)
-    const thenable = asPromiseLike(result)
-    if (!thenable) return
-    const tracked: Promise<void> = thenable.then(
-      () => undefined,
-      (error: unknown) => {
-        this.#disposeErrors.push(error)
-        reportRegistryFailure(this.runtime, error)
-        throw error
+  /** Reports asynchronous raw errors once, after ledger completion, without altering their identity. */
+  #observeAsyncDisposalErrors(outcome: {
+    readonly synchronousErrors: readonly unknown[]
+    readonly completion: Promise<readonly unknown[]>
+  }): void {
+    void outcome.completion.then((errors) => {
+      for (const entry of errors.slice(outcome.synchronousErrors.length)) {
+        reportRegistryFailure(this.runtime, (entry as { readonly error: unknown }).error)
       }
-    )
-    this.#pendingSyncDisposals.add(tracked)
-    void tracked.then(
-      () => this.#finishTrackedDisposal(tracked),
-      () => this.#finishTrackedDisposal(tracked)
+    })
+  }
+
+  /** Projects raw ledger errors into Store's synchronous AggregateError contract. */
+  #mapDisposalErrors(errors: readonly { readonly error: unknown }[]): unknown {
+    if (errors.length === 1) return errors[0]!.error
+    return createStoreReactAggregateError(
+      StoreReactErrorCode.registryDisposalFailed,
+      errors.map((entry) => entry.error),
+      StoreReactErrorText.registryDisposalFailed
     )
   }
 
-  /** Removes one settled sync disposer without creating an unhandled rejected finally-chain. */
-  #finishTrackedDisposal(tracked: Promise<void>): void {
-    this.#pendingSyncDisposals.delete(tracked)
-    if (this.#disposed && this.#pendingSyncDisposals.size === 0) {
-      this.#finishDisposeIfReady()
-    }
+  /** Throws only errors observed during synchronous callback start, preserving raw identity. */
+  #throwSynchronousDisposalErrors(errors: readonly { readonly error: unknown }[]): void {
+    if (errors.length === 0) return
+    throw this.#mapDisposalErrors(errors)
   }
 
   /**
@@ -394,11 +339,7 @@ export class StoreRegistry implements IDisposable {
    */
   #disposeValueObserved(value: unknown): void {
     const result = disposeValue(value)
-    const thenable = asPromiseLike(result)
-    if (!thenable) return
-    void thenable.catch((error: unknown) => {
-      reportRegistryFailure(this.runtime, error)
-    })
+    containAsyncRejection(result, (error) => reportRegistryFailure(this.runtime, error))
   }
 
   #assertRuntime<T>(token: IStoreToken<T>, value: T): void {
@@ -412,7 +353,7 @@ export class StoreRegistry implements IDisposable {
   }
 
   #assertActive(): void {
-    if (this.#disposed) {
+    if (this.#disposalLedger.lifecycle !== LifecycleState.open) {
       throw createStoreReactError(
         StoreReactErrorCode.registryDisposed,
         StoreReactErrorText.registryDisposed
@@ -439,11 +380,4 @@ function disposeValue(value: unknown): unknown {
   if (typeof candidate.$dispose === 'function') return candidate.$dispose()
   if (typeof candidate.dispose === 'function') return candidate.dispose()
   return undefined
-}
-
-function asPromiseLike(value: unknown): Promise<unknown> | undefined {
-  const probe = probeThenable(value)
-  if (probe.kind === ThenableProbeKind.failed) throw probe.error
-  if (probe.kind === ThenableProbeKind.notThenable) return undefined
-  return assimilateCapturedThen(probe.thenFn, value)
 }

@@ -205,8 +205,28 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
   }
 
   const disposeEntry = (entry: IFamilyEntry<V>): void => {
-    deleteEntry(entry)
     entry.value.dispose()
+    // Remove ownership only after cleanup succeeds. A failed disposer leaves
+    // the entry retryable and prevents clear/dispose from silently losing its
+    // timer or value ownership.
+    deleteEntry(entry)
+  }
+
+  /** Disposes reachable entries while retaining failed ownership for a caller retry. */
+  const disposeEntries = (entries: IFamilyEntry<V>[]): unknown[] => {
+    const errors: unknown[] = []
+    const seen = new Set<IDisposable>()
+    for (const entry of entries) {
+      if (seen.has(entry.value)) continue
+      seen.add(entry.value)
+      try {
+        entry.value.dispose()
+        deleteEntry(entry)
+      } catch (error) {
+        errors.push(error)
+      }
+    }
+    return errors
   }
 
   const armTtlTimer = (): void => {
@@ -304,8 +324,10 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
             disposeEntry(entry)
           } catch (error) {
             errors.push(error)
+            // Pruning is an eviction decision: do not retain an expired entry after cleanup
+            // fails. Explicit remove/clear/dispose retain ownership for retry instead.
+            deleteEntry(entry)
           } finally {
-            // disposeEntry removes ownership before calling hostile cleanup.
             removed++
           }
         }
@@ -343,38 +365,46 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
 
     const value = familyOptions.create(key)
     const weak = isObjectKey(key)
-    const entry: IFamilyEntry<V> = {
-      value,
-      expiresAt: ttl === Infinity ? Infinity : now() + ttl,
-      lastAccess: ++accessClock,
-      key: weak ? new WeakRef(key) : key,
-      weak
-    }
-    if (weak) {
-      objectEntries.set(key, entry)
-      const reference = new WeakRef(entry)
-      objectEntryRefs.add(reference)
-      objectRefsByEntry.set(entry, reference)
-      collectedEntries.register(entry, reference, entry)
-    } else {
-      primitiveEntries.set(key as Exclude<K, object>, entry)
-    }
-    liveEntryCount++
+    let entry: IFamilyEntry<V> | undefined
+    let reference: WeakRef<IFamilyEntry<V>> | undefined
     try {
+      const currentTime = ttl === Infinity ? 0 : now()
+      entry = {
+        value,
+        expiresAt: ttl === Infinity ? Infinity : currentTime + ttl,
+        lastAccess: ++accessClock,
+        key: weak ? new WeakRef(key) : key,
+        weak
+      }
+      if (weak) {
+        objectEntries.set(key, entry)
+        reference = new WeakRef(entry)
+        objectEntryRefs.add(reference)
+        objectRefsByEntry.set(entry, reference)
+        collectedEntries.register(entry, reference, entry)
+      } else {
+        primitiveEntries.set(key as Exclude<K, object>, entry)
+      }
+      liveEntryCount++
       enforceCapacity()
+      armTtlTimer()
     } catch (error) {
-      // Capacity errors belong to victims. The newly-created entry remains
-      // reachable so a caller can inspect or remove it after the failure.
-      if (entryFor(key) !== entry) {
-        try {
-          value.dispose()
-        } catch {
-          // Preserve the capacity error; this cleanup is only a fallback.
-        }
+      if (entry && entryFor(key) === entry) {
+        deleteEntry(entry)
+      } else if (reference) {
+        objectEntryRefs.delete(reference)
+      }
+      try {
+        value.dispose()
+      } catch (cleanupError) {
+        throw createStoreKeyedAggregateError(
+          StoreKeyedErrorCode.disposalFailed,
+          [error, cleanupError],
+          StoreKeyedErrorText.familyDisposalFailed
+        )
       }
       throw error
     }
-    armTtlTimer()
     return value
   }
 
@@ -403,26 +433,36 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
   family.clear = (): void => {
     assertUsable()
     const pending = liveEntries()
-    primitiveEntries.clear()
-    objectEntries = new WeakMap()
-    objectEntryRefs.clear()
-    liveEntryCount = 0
-    disposeAll(pending.map(({ value }) => value))
     if (ttlTimer !== undefined) clearTimeout(ttlTimer)
     ttlTimer = undefined
+    const errors = disposeEntries(pending)
+    if (errors.length > 0) {
+      armTtlTimer()
+      if (errors.length === 1) throw errors[0]
+      throw createStoreKeyedAggregateError(
+        StoreKeyedErrorCode.disposalFailed,
+        errors,
+        StoreKeyedErrorText.familyDisposalFailed
+      )
+    }
   }
   family.prune = prune
   family.dispose = (): void => {
     if (disposed) return
-    disposed = true
     const pending = liveEntries()
-    primitiveEntries.clear()
-    objectEntries = new WeakMap()
-    objectEntryRefs.clear()
-    liveEntryCount = 0
-    disposeAll(pending.map(({ value }) => value))
     if (ttlTimer !== undefined) clearTimeout(ttlTimer)
     ttlTimer = undefined
+    const errors = disposeEntries(pending)
+    if (errors.length > 0) {
+      armTtlTimer()
+      if (errors.length === 1) throw errors[0]
+      throw createStoreKeyedAggregateError(
+        StoreKeyedErrorCode.disposalFailed,
+        errors,
+        StoreKeyedErrorText.familyDisposalFailed
+      )
+    }
+    disposed = true
   }
   Object.defineProperties(family, {
     disposed: { get: () => disposed },
@@ -433,28 +473,6 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
 
 function isObjectKey(key: IFamilyKey): key is object {
   return (typeof key === 'object' && key !== null) || typeof key === 'function'
-}
-
-function disposeAll(values: IDisposable[]): void {
-  const errors: unknown[] = []
-  const seen = new Set<IDisposable>()
-  for (const value of values) {
-    if (seen.has(value)) continue
-    seen.add(value)
-    try {
-      value.dispose()
-    } catch (error) {
-      errors.push(error)
-    }
-  }
-  if (errors.length === 1) throw errors[0]
-  if (errors.length > 1) {
-    throw createStoreKeyedAggregateError(
-      StoreKeyedErrorCode.disposalFailed,
-      errors,
-      StoreKeyedErrorText.familyDisposalFailed
-    )
-  }
 }
 
 export type IComputedFamilyOptions<T> = IFamilyOptions & {

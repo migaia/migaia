@@ -107,6 +107,11 @@ export function record<Shape extends IRecordShape>(
                   StoreWasmErrorCode.fieldDisposed,
                   StoreWasmErrorText.fieldDisposed
                 )
+              if (typeof v !== 'number')
+                throw createStoreWasmTypeError(
+                  StoreWasmErrorCode.invalidOption,
+                  StoreWasmErrorText.valueType('record', 'number')
+                )
               const memoryView = view()
               if (Object.is(memoryView.getFloat64(offset, true), v)) return
               source.commit(() => memoryView.setFloat64(offset, v, true))
@@ -123,6 +128,7 @@ export function record<Shape extends IRecordShape>(
           value: () => {
             if (disposed || disposing) return
             disposing = true
+            disposed = true
             try {
               block.unregister(field)
               // 逆序释放（migration.sdd.md §5.7）：先摘子资源边，再 dealloc block。
@@ -130,7 +136,6 @@ export function record<Shape extends IRecordShape>(
                 ...sources.map((source) => () => source.dispose()),
                 () => block.dispose()
               ])
-              disposed = true
             } finally {
               disposing = false
             }

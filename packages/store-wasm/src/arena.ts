@@ -12,7 +12,10 @@ import { StoreWasmErrorText } from './error-text.js'
 let wasmReady: Promise<WebAssembly.Memory> | undefined
 let wasmMemory: WebAssembly.Memory | undefined
 export function ensureWasm(): Promise<WebAssembly.Memory> {
-  if (wasmMemory) return Promise.resolve(wasmMemory)
+  // Keep the settled promise identity as well as the memory value. A ready
+  // barrier is a generation token for React/SSR callers; wrapping the value
+  // in Promise.resolve() on each call would create a new generation forever.
+  if (wasmMemory && wasmReady) return wasmReady
   if (wasmReady) return wasmReady
   const pending = initWasm().then((o) => (wasmMemory = o.memory))
   wasmReady = pending
@@ -111,10 +114,44 @@ function allocation(memory: WebAssembly.Memory, id: number, ptr: number): IWasmA
     },
     dispose() {
       if (disposed) return
-      disposed = true
       deallocate(id)
+      disposed = true
     }
   }
+}
+
+/** Completes the allocator handshake and rolls back an id when its pointer is unusable. */
+function completeAllocation(
+  memory: WebAssembly.Memory,
+  id: number
+): {
+  memory: WebAssembly.Memory
+  id: number
+  ptr: number
+} {
+  let ptr: number
+  try {
+    ptr = ptr_of(id)
+  } catch (primary) {
+    try {
+      if (id !== 0) deallocate(id)
+    } catch (cleanup) {
+      throwWasmConstructionFailure(primary, cleanup)
+    }
+    throw primary
+  }
+  if (id !== 0 && ptr !== 0) return { memory, id, ptr }
+
+  const primary = createStoreWasmError(
+    StoreWasmErrorCode.allocationFailed,
+    StoreWasmErrorText.allocationFailed
+  )
+  try {
+    if (id !== 0) deallocate(id)
+  } catch (cleanup) {
+    throwWasmConstructionFailure(primary, cleanup)
+  }
+  throw primary
 }
 
 /** Allocate and own a field-sized block after explicit WASM initialization. */
@@ -132,7 +169,7 @@ export async function allocate(byteLen: number) {
   }
   const memory = await ensureWasm()
   const id = alloc_bytes(byteLen)
-  return { memory, id, ptr: ptr_of(id) }
+  return completeAllocation(memory, id)
 }
 
 /** Allocate after explicit WASM initialization; never starts async work. */
@@ -147,5 +184,5 @@ export function allocateSync(byteLen: number) {
   if (!memory)
     throw createStoreWasmError(StoreWasmErrorCode.notInitialized, StoreWasmErrorText.notInitialized)
   const id = alloc_bytes(byteLen)
-  return { memory, id, ptr: ptr_of(id) }
+  return completeAllocation(memory, id)
 }

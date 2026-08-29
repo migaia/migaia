@@ -210,6 +210,8 @@ export class ObservableObject<T extends Record<string, unknown>> extends Observa
   )
   #structure: Signal<number>
   #revision: Signal<number>
+  #snapshotCache: Readonly<T> | undefined
+  #snapshotRevision = -1
 
   constructor(
     initial: T,
@@ -296,7 +298,7 @@ export class ObservableObject<T extends Record<string, unknown>> extends Observa
     const cell = this.#cells.get(key)
     if (cell) cell.value = value
     if (!existed) this.#bumpStructure()
-    if (!Object.is(previous, value)) this.#revision.value = this.#revision.peek() + 1
+    if (!existed || !Object.is(previous, value)) this.#revision.value = this.#revision.peek() + 1
   }
 
   #deleteInternal(key: keyof T & string): void {
@@ -317,11 +319,17 @@ export class ObservableObject<T extends Record<string, unknown>> extends Observa
   snapshot(): Readonly<T> {
     this.assertActive()
     if (isTrackingIn(this.runtime)) void this.#revision.value
+    const revision = this.#revision.peek()
+    if (this.#snapshotCache !== undefined && this.#snapshotRevision === revision) {
+      return this.#snapshotCache
+    }
     // Keys may come from external payloads. A null-prototype snapshot keeps
     // `__proto__` a data key instead of invoking Object.prototype's setter.
     const snapshot = Object.create(null) as Record<string, unknown>
     for (const key of this.#values.keys()) snapshot[key] = this.peek(key)
-    return Object.freeze(snapshot) as Readonly<T>
+    this.#snapshotCache = Object.freeze(snapshot) as Readonly<T>
+    this.#snapshotRevision = revision
+    return this.#snapshotCache
   }
 
   replace(next: T): void {
@@ -380,6 +388,8 @@ export class ObservableArray<T> extends ObservableCollectionBase {
   )
   #structure: Signal<number>
   #revision: Signal<number>
+  #snapshotCache: readonly T[] | undefined
+  #snapshotRevision = -1
 
   constructor(
     initial: Iterable<T> = [],
@@ -426,7 +436,13 @@ export class ObservableArray<T> extends ObservableCollectionBase {
   snapshot(): readonly T[] {
     this.assertActive()
     if (isTrackingIn(this.runtime)) void this.#revision.value
-    return freezeArray(this.#values)
+    const revision = this.#revision.peek()
+    if (this.#snapshotCache !== undefined && this.#snapshotRevision === revision) {
+      return this.#snapshotCache
+    }
+    this.#snapshotCache = freezeArray(this.#values)
+    this.#snapshotRevision = revision
+    return this.#snapshotCache
   }
 
   peek(): readonly T[] {
@@ -484,8 +500,10 @@ export class ObservableArray<T> extends ObservableCollectionBase {
   splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[] {
     this.assertMutation('splice')
     const next = [...this.#values]
-    const removed =
-      deleteCount === undefined ? next.splice(start) : next.splice(start, deleteCount, ...items)
+    const hasDeleteCount = arguments.length >= 2
+    const removed = hasDeleteCount
+      ? next.splice(start, deleteCount ?? 0, ...items)
+      : next.splice(start)
     this.#replaceInternal(next)
     return Object.freeze(removed)
   }

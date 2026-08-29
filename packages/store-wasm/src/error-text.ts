@@ -19,6 +19,8 @@ export const StoreWasmErrorText = {
   valueTooLarge: (length: number, maxBytes: number): string =>
     `wasm.string: value exceeds maxBytes (${length} > ${maxBytes})`,
   corruptedLength: 'wasm.string: corrupted byte length',
+  /** Stable diagnostic for an allocator handshake that returned no usable pointer. */
+  allocationFailed: '[store] WASM allocation returned no usable pointer',
   allocationLimit: 'wasm.allocate: byteLen must fit an unsigned 32-bit integer',
   stringLimit: 'wasm.string: maxBytes exceeds the Wasm32 allocation limit',
   arrayLengthLimit: 'wasm.array: length exceeds the Wasm32 allocation limit',

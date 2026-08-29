@@ -259,20 +259,20 @@ Worker 侧的对端：把一个**普通的、跑在 Worker 里就地工作的** 
 
 ## 7. 常量与错误码完整参考
 
-### 7.1 `WorkerOwnership` / `WorkerDiagnosticType`
+### 7.1 `WorkerByteOwnership` / `WorkerDiagnosticType`
 
 ```ts
-import { WorkerOwnership, WorkerDiagnosticType } from '@migaia/store-worker';
+import { WorkerByteOwnership, WorkerDiagnosticType } from '@migaia/store-worker';
 ```
 
-**`WorkerOwnership`** —— 值过 Worker 边界的所有权策略标签：
+**`WorkerByteOwnership`** —— 序列化字节跨 Worker 边界时的所有权策略：
 
 ```ts
-const WorkerOwnership = { transfer: 'transfer', clone: 'clone' } as const;
-type IWorkerOwnership = 'transfer' | 'clone';
+const WorkerByteOwnership = { copy: 'copy', transfer: 'transfer' } as const;
+type IByteOwnership = 'copy' | 'transfer';
 ```
 
-无调用参数，`as const` 常量对象。**注意**：这是一个独立命名空间，与实际配置 `workerPlugin`/`workerParser`/`workerComputed` 的字节转移策略所用的字符串字面量 `'copy' | 'transfer'`（类型别名 `IByteOwnership`，见 [§8](#8-字节转移语义ibyteownership)）不是同一套值——`WorkerOwnership.clone` 不等于配置里的 `'copy'`，两者不能互换使用，只是恰好都表达"转移 vs 复制/克隆"这个概念。
+无调用参数，`as const` 常量对象；`IByteOwnership` 是其取值的联合类型，也是 `workerPlugin`/`workerParser` 的 `ownership` 选项类型，见 [§8](#8-字节转移语义ibyteownership)。
 
 **`WorkerDiagnosticType`** —— 序列化 Worker 集成的诊断来源标签：
 

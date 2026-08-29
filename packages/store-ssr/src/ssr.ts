@@ -323,8 +323,8 @@ export class SSRRequestScope {
     this.#assertActive()
     const registration = this.#resources.get(key)
     if (!registration) return false
-    this.#resources.delete(key)
     if (disposeOwned && registration.owned) registration.resource.dispose()
+    this.#resources.delete(key)
     return true
   }
 
@@ -502,7 +502,10 @@ export class SSRRequestScope {
       }))
     // 轮次上限：resource 的完成回调里无限注册新 resource 属于调用方的 bug，
     // 但不能让它把渲染线程永远吊在这里。
-    for (let round = 0; round < MAX_RESOURCE_ROUNDS; round++) {
+    // The counter is inclusive because round zero is the first settled
+    // generation: exactly 64 legitimate waterfall rounds must complete before
+    // the 65th round is rejected.
+    for (let round = 0; round <= MAX_RESOURCE_ROUNDS; round++) {
       if (this.#disposed) return failures
       const pending: Array<[string, Promise<unknown>]> = []
       for (const [key, registration] of this.#resources.entries()) {
@@ -569,8 +572,18 @@ export class SSRRequestScope {
     })
     for (const failure of failures) {
       try {
-        if (onResourceError) onResourceError(failure)
-        else this.runtime.reportError(failure.error, { phase: ReactiveErrorPhase.ssrResource })
+        if (onResourceError) {
+          const result = (onResourceError as (value: ISSRResourceFailure) => unknown)(failure)
+          if (result && typeof (result as { readonly then?: unknown }).then === 'function') {
+            void Promise.resolve(result).catch((error: unknown) => {
+              try {
+                this.runtime.reportError(error, { phase: ReactiveErrorPhase.ssrResource })
+              } catch {
+                // Diagnostic sinks are best effort; resource failure remains primary.
+              }
+            })
+          }
+        } else this.runtime.reportError(failure.error, { phase: ReactiveErrorPhase.ssrResource })
       } catch (reporterError) {
         // A user reporter is diagnostic-only; it cannot prevent remaining
         // failures from being reported or the payload from being dehydrated.

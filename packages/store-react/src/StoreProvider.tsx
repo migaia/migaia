@@ -11,8 +11,7 @@ import {
   encodeStoreExperimental,
   normalizeStoreConfig,
   StoreConfigContext,
-  type IStoreProviderConfig,
-  type IStoreReadyBarrier
+  type IStoreProviderConfig
 } from './store-config.js'
 
 const READY_KEYS = new WeakMap<Promise<void>, number>()
@@ -62,7 +61,7 @@ export function StoreProvider({
     )
   }
 
-  // ready 数组字面量每次 render 都是新引用；按元素浅比较稳住 Promise，避免 use() 反复 suspend
+  // Snapshot config once per render so a barrier generation is selected atomically.
   const configSnapshot = useMemo(() => {
     try {
       return {
@@ -85,24 +84,9 @@ export function StoreProvider({
   const readyInput = configSnapshot.ready
   const barrierScope = useRef<object>(undefined)
   if (!barrierScope.current) barrierScope.current = {}
-  const readyRef = useRef<{
-    value: readonly IStoreReadyBarrier[] | undefined
-    initialized: boolean
-  }>({
-    value: undefined,
-    initialized: false
-  })
-  if (!readyRef.current.initialized) {
-    readyRef.current = { value: readyInput, initialized: true }
-  } else if (!sameBarrierList(readyRef.current.value, readyInput)) {
-    const nodeProcess = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process
-    if (nodeProcess?.env?.NODE_ENV !== 'production') {
-      console.warn(StoreReactErrorText.readyIdentity)
-    } else {
-      console.error(StoreReactErrorText.readyRetained)
-    }
-  }
-  const stableReady = readyRef.current.value
+  // A changed barrier list is a new generation. The normalized promise cache is scoped
+  // to this Provider, so an old settlement cannot unlock the new generation.
+  const stableReady = readyInput
   const wasmEnabled = configSnapshot.wasm
   const warnAsyncActions = configSnapshot.warnAsyncActions
   const experimentalKey = useMemo(
@@ -247,15 +231,6 @@ type IOwnedRegistryBoundaryProps = {
   readonly runtime: IRuntime | undefined
   readonly disposeOnUnmount: boolean
   readonly armInitial: Promise<void> | undefined
-}
-
-function sameBarrierList(
-  left: readonly IStoreReadyBarrier[] | undefined,
-  right: readonly IStoreReadyBarrier[] | undefined
-): boolean {
-  if (left === right) return true
-  if (!left || !right || left.length !== right.length) return false
-  return left.every((item, index) => item === right[index])
 }
 
 function OwnedRegistryBoundary({
