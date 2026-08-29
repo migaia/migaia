@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { generateKeyPairSync, sign } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
@@ -83,6 +84,15 @@ describe('WRC-C-B11 retained provenance', () => {
     const report = readProvenance()
     const repeat = readProvenance()
     const packageInvocation = readProvenance(resolve(import.meta.dirname, '../..'))
+    const oldRoot = JSON.parse(
+      readFileSync(
+        resolve(
+          import.meta.dirname,
+          '../fixtures/tree-shaking/pre-migration-tree-shaking-baseline.json'
+        ),
+        'utf8'
+      )
+    ).root
     const { default: authority } = await import(
       '../fixtures/tree-shaking/baseline-authority.json',
       { with: { type: 'json' } }
@@ -95,7 +105,11 @@ describe('WRC-C-B11 retained provenance', () => {
     })
     expect(
       validateAuthorization(report.approval, report.subject, {
-        oldTuple: { moduleCount: 53, rawBytes: 250129, gzipBytes: 61171 },
+        oldTuple: {
+          moduleCount: oldRoot.moduleCount,
+          rawBytes: oldRoot.rawBytes,
+          gzipBytes: oldRoot.gzipBytes
+        },
         newTuple: report.tuple,
         authority
       })
@@ -318,8 +332,21 @@ describe('WRC-C-B11 retained provenance', () => {
 
   it('rejects bare, malformed, forged, stale, tuple-mismatched, and digest-mismatched approval', () => {
     const report = readProvenance()
+    const oldRoot = JSON.parse(
+      readFileSync(
+        resolve(
+          import.meta.dirname,
+          '../fixtures/tree-shaking/pre-migration-tree-shaking-baseline.json'
+        ),
+        'utf8'
+      )
+    ).root
     const options = {
-      oldTuple: { moduleCount: 53, rawBytes: 250129, gzipBytes: 61171 },
+      oldTuple: {
+        moduleCount: oldRoot.moduleCount,
+        rawBytes: oldRoot.rawBytes,
+        gzipBytes: oldRoot.gzipBytes
+      },
       newTuple: report.tuple
     }
     const { privateKey, publicKey } = generateKeyPairSync('ed25519')
