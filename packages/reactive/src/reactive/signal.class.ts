@@ -17,6 +17,7 @@ import {
   ReactiveTraceType
 } from '../runtime/trace-constants.js'
 import { ReactiveErrorText } from '../error-text.js'
+import { inspectThenable, observeThenableRejection } from '../runtime/receiver.js'
 
 // 可写原子——反应式图里唯一的"真值来源"，Computed/Effect 都是从它（或从彼此）派生。
 // 每个节点持有自己的 runtime：同一 runtime 内的节点才共享依赖图/版本时钟。
@@ -121,11 +122,25 @@ export class Signal<T> implements IObservable, IDisposable {
 
   /** Compose an owner lifecycle callback without silently replacing one. */
   addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void }): () => void {
-    if (hooks.onObserved) this.#observedHooks.add(hooks.onObserved)
-    if (hooks.onUnobserved) this.#unobservedHooks.add(hooks.onUnobserved)
+    const onObserved = hooks.onObserved
+    const onUnobserved = hooks.onUnobserved
+    if (onObserved !== undefined && typeof onObserved !== 'function') {
+      throw tagReactiveError(
+        new TypeError(ReactiveErrorText.runtimeOptionMustBeFunction('onObserved')),
+        ReactiveErrorCode.invalidOption
+      )
+    }
+    if (onUnobserved !== undefined && typeof onUnobserved !== 'function') {
+      throw tagReactiveError(
+        new TypeError(ReactiveErrorText.runtimeOptionMustBeFunction('onUnobserved')),
+        ReactiveErrorCode.invalidOption
+      )
+    }
+    if (onObserved) this.#observedHooks.add(onObserved)
+    if (onUnobserved) this.#unobservedHooks.add(onUnobserved)
     return () => {
-      if (hooks.onObserved) this.#observedHooks.delete(hooks.onObserved)
-      if (hooks.onUnobserved) this.#unobservedHooks.delete(hooks.onUnobserved)
+      if (onObserved) this.#observedHooks.delete(onObserved)
+      if (onUnobserved) this.#unobservedHooks.delete(onUnobserved)
     }
   }
   #composeHooks(hooks: Set<() => void>): (() => void) | undefined {
@@ -134,7 +149,26 @@ export class Signal<T> implements IObservable, IDisposable {
       const errors: unknown[] = []
       for (const hook of Array.from(hooks)) {
         try {
-          hook()
+          const result = hook()
+          const inspection = inspectThenable(result)
+          if ('error' in inspection) {
+            throw tagReactiveError(
+              new TypeError(
+                ReactiveErrorText.synchronousCallbackReturnedThenable('lifecycle hook'),
+                { cause: inspection.error }
+              ),
+              ReactiveErrorCode.invalidOption
+            )
+          }
+          if (inspection.then !== undefined) {
+            observeThenableRejection(result, inspection, (error) => {
+              this.runtime.reportError(error, { phase: ReactiveErrorPhase.lifecycleHook })
+            })
+            throw createReactiveError(
+              ReactiveErrorCode.invalidOption,
+              ReactiveErrorText.synchronousCallbackReturnedThenable('lifecycle hook')
+            )
+          }
         } catch (error) {
           errors.push(error)
         }

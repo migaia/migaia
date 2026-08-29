@@ -1,3 +1,5 @@
+/* oxlint-disable unicorn/no-thenable -- runtime must inspect hostile PromiseLike callback results. */
+
 /**
  * Reflective receiver-binding boundary for `@migaia/reactive`.
  *
@@ -30,6 +32,42 @@ export function assimilateThenable(
       reject(error)
     }
   })
+}
+
+export type IThenableInspection =
+  | { readonly then: undefined }
+  | { readonly then: (resolve: unknown, reject: unknown) => void }
+  | { readonly error: unknown }
+
+/**
+ * Reads a callback result's then property once so synchronous contracts can reject thenables
+ * safely.
+ */
+export function inspectThenable(value: unknown): IThenableInspection {
+  if (value === null || (typeof value !== 'object' && typeof value !== 'function')) {
+    return { then: undefined }
+  }
+  try {
+    const then = (value as { then?: unknown }).then
+    return typeof then === 'function'
+      ? { then: then as (resolve: unknown, reject: unknown) => void }
+      : { then: undefined }
+  } catch (error) {
+    return { error }
+  }
+}
+
+/** Observes a captured thenable rejection without introducing an unowned Promise rejection. */
+export function observeThenableRejection(
+  value: unknown,
+  inspection: IThenableInspection,
+  onRejected: (error: unknown) => void
+): void {
+  if ('then' in inspection && inspection.then !== undefined) {
+    void assimilateThenable(inspection.then, value).then(undefined, onRejected)
+  } else if ('error' in inspection) {
+    onRejected(inspection.error)
+  }
 }
 
 /**

@@ -74,6 +74,9 @@ export const ReactiveErrorText = {
   schedulerStrategyInvalid: 'scheduler strategy must be a function',
   /** Explains why a strategy return value cannot participate in synchronous scheduling. */
   schedulerStrategyReturnedThenable: 'scheduler strategy must return void',
+  /** Explains why synchronous callbacks cannot return PromiseLike values. */
+  synchronousCallbackReturnedThenable: (callback: string): string =>
+    `${callback} must return void; PromiseLike results are not supported`,
   /** Explains observer failures preceding the flush-loop guard. */
   observersBeforeFlushLoop: 'observers failed before the flush-loop guard fired',
   /** Explains multiple observer failures in one flush. */

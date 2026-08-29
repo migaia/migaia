@@ -265,6 +265,20 @@ export class DependencyTracker {
   }
 
   #commit(observer: IObserver, nextDeps: Set<IObservable>): void {
+    if (observer.deps.size === nextDeps.size) {
+      let sameTopology = true
+      for (const dep of nextDeps) {
+        if (!observer.deps.has(dep)) {
+          sameTopology = false
+          break
+        }
+      }
+      if (sameTopology) {
+        const versions = mutableNodeVersions(observer, observer.depVersions)
+        for (const dep of nextDeps) versions.set(dep, dep.version)
+        return
+      }
+    }
     /** Stable pre-commit dependency snapshot; lifecycle callbacks may mutate the live view. */
     const prevDeps = new Set(observer.deps)
     /** Reverse edges added by this commit; terminal rollback removes only these edges. */

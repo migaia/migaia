@@ -3,7 +3,11 @@ import { createReactiveError, tagReactiveError } from '../errors.js'
 import { ReactiveErrorCode } from '../error-code.js'
 import { ReactiveErrorText } from '../error-text.js'
 import { defaultRuntimeAdapter } from './default-runtime-adapter.js'
-import { assimilateThenable } from './receiver.js'
+import {
+  assimilateThenable,
+  inspectThenable as inspectCallbackThenable,
+  observeThenableRejection
+} from './receiver.js'
 import { ReactiveErrorPhase } from './trace-constants.js'
 
 type IThenableInspection =
@@ -55,7 +59,7 @@ export class Scheduler {
   /**
    * 自触发环保护：effect 写了自己也读的 signal 会导致无限重入。
    *
-   * 默认 100，但**可配置**——它是「一次冲刷里允许几轮」的策略参数，不是物理常数。 写死之后，合法的深链场景（一条长派生链每轮只推进一级）与真正的环无法区分， 而调用方连调都调不了。
+   * 默认 100，但**可配置**——它是「同一 observer 在一次冲刷里允许执行几次」的预算，不是队列批次数。合法的深链每个 observer 只执行一次，不会被误判为环。
    */
   #maxFlushPasses: number
 
@@ -229,32 +233,33 @@ export class Scheduler {
     if (this.#flushing) return 'deferred'
     this.#flushing = true
     try {
-      let passes = 0
+      const executions = new Map<IFlushable, number>()
       const errors: unknown[] = []
       while (this.#queued.size) {
-        if (++passes > this.#maxFlushPasses) {
-          // 这不是渲染次数触发的抖动，是反应式图本身有环——effect 的写操作又落回了它自己的依赖。
-          // 挡不住图内部的自触发发散，调度器必须单独兜底，避免整个 tab 卡死在同步死循环里。
-          //
-          // 队列必须清空，否则下一次冲刷会立刻再撞上同一个环、再抛一次，
-          // Runtime 从此不可用。但**清掉什么必须说出来**：丢弃待办而只报
-          // 「超限」，等于让调用方去猜哪些 effect 没跑。
-          const dropped = [...this.#queued]
-          this.#queued.clear()
-          const names = dropped.map((item) => item.debugName ?? '<anonymous>').slice(0, 8)
-          const loopError = createReactiveError(
-            ReactiveErrorCode.flushLoop,
-            ReactiveErrorText.flushLoopDetected(this.#maxFlushPasses, dropped.length, names)
-          )
-          if (errors.length === 0) throw loopError
-          throw tagReactiveError(
-            new AggregateError([...errors, loopError], ReactiveErrorText.observersBeforeFlushLoop),
-            ReactiveErrorCode.observerFailed
-          )
-        }
         const batch = [...this.#queued]
         this.#queued.clear()
-        for (const item of batch) {
+        for (let index = 0; index < batch.length; index++) {
+          const item = batch[index]
+          const executionCount = (executions.get(item) ?? 0) + 1
+          executions.set(item, executionCount)
+          if (executionCount > this.#maxFlushPasses) {
+            // Keep the unprocessed batch suffix alongside reentrant work in the diagnostic ledger.
+            const dropped = [...batch.slice(index), ...this.#queued]
+            this.#queued.clear()
+            const names = dropped.map((queued) => queued.debugName ?? '<anonymous>').slice(0, 8)
+            const loopError = createReactiveError(
+              ReactiveErrorCode.flushLoop,
+              ReactiveErrorText.flushLoopDetected(this.#maxFlushPasses, dropped.length, names)
+            )
+            if (errors.length === 0) throw loopError
+            throw tagReactiveError(
+              new AggregateError(
+                [...errors, loopError],
+                ReactiveErrorText.observersBeforeFlushLoop
+              ),
+              ReactiveErrorCode.observerFailed
+            )
+          }
           try {
             item.tick() // tick 内做版本脏校验，未变则跳过
           } catch (error) {
@@ -287,6 +292,28 @@ export class Scheduler {
     let result: T
     try {
       result = fn()
+      const inspection = inspectCallbackThenable(result)
+      if ('error' in inspection) {
+        throw tagReactiveError(
+          new TypeError(ReactiveErrorText.synchronousCallbackReturnedThenable('batch callback'), {
+            cause: inspection.error
+          }),
+          ReactiveErrorCode.invalidOption
+        )
+      }
+      if (inspection.then !== undefined) {
+        observeThenableRejection(result, inspection, (error) => {
+          try {
+            this.#onAsyncError(error)
+          } catch {
+            // The terminal diagnostic sink cannot create another failure.
+          }
+        })
+        throw tagReactiveError(
+          new TypeError(ReactiveErrorText.synchronousCallbackReturnedThenable('batch callback')),
+          ReactiveErrorCode.invalidOption
+        )
+      }
     } catch (error) {
       fnError = error
       hasFnError = true

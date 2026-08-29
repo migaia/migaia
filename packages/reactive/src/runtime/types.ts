@@ -166,7 +166,7 @@ export type IRuntimeOptions = {
   onError?: (error: unknown, context: IRuntimeErrorContext) => void
   onTrace?: (event: IRuntimeTraceEvent) => void
   /**
-   * 一次冲刷里允许的最大轮次，默认 100。超限视为自触发环：抛错并清空队列。
+   * 一次冲刷里单个 observer 允许的最大执行次数，默认 100。单个 observer 超限视为自触发环：抛错并清空队列。
    *
    * 可配置，因为它是策略参数而非物理常数——很长的派生链每轮只推进一级也会吃轮次。
    */
