@@ -112,6 +112,7 @@ pnpm add @migaia/logger
 5. **`pipeline.mode` 构造后不可切换**，四种模式（sync/async/generator/async-generator）执行顺序有本质区别，混用会立即报错，详见 USEGUIDE。
 6. **`http()` 批量发送要求插件顺序正确**：`plugins: [batch(), http(...)]`，顺序反了批处理不会生效。
 7. **`extends()` 只转发运行时输出路径**，不会把目标 logger 的 TypeScript 扩展方法合并进当前变量的类型。
+8. **批处理队列有界且不会静默丢日志**：`maxPendingBatches` 默认 `1024`，满载时抛出/上报 `BATCH_OVERFLOW`；生产环境应通过 `onFailure()` 监控并在下游恢复后再接纳新日志。
 
 ## 9. 深入参考
 

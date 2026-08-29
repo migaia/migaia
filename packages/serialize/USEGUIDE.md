@@ -155,6 +155,8 @@ type ISerializeContext = {
 
 > 注意字段名是 `context`，不是旧版本的 `source`——避免与错误对象的 `source`（固定为 `'@migaia/serialize'`）混淆。
 
+<a id="25-格式常量root-only"></a>
+
 ### 2.5 格式常量（root-only）
 
 ```ts

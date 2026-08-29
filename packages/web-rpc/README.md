@@ -677,6 +677,8 @@ const result = await resultPromise
 
 ---
 
+<a id="12-注意事项最容易踩的坑"></a>
+
 ## 12. 注意事项（最容易踩的坑）
 
 1. **`senderId` 是不可信字段**，任何拿到该消息的代码都能自己拼一个假的。跨源/共享传输场景必须配置 `connect()` 的 `identifier` 做真正的来源校验，不要只信任 `senderId`。

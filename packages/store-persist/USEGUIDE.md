@@ -60,6 +60,8 @@ function persistUnit<TState>(
 
 ---
 
+<a id="2-persist-完整参考store-light"></a>
+
 ## 2. `persist()` 完整参考（store-light）
 
 ```ts
@@ -97,7 +99,7 @@ type IPersistOptions = {
 ```ts
 import { createStore } from '@migaia/store-light';
 import { indexedDb } from '@migaia/storage-web/indexed-db';
-import { persist } from '@migaia/store-persist';
+import { persist } from '@migaia/store-persist/light';
 
 const store = createStore({ theme: 'light', fontSize: 14 });
 const handle = persist(store, {
@@ -109,6 +111,8 @@ const handle = persist(store, {
 ```
 
 ---
+
+<a id="3-persistcollection-完整参考store-indexed"></a>
 
 ## 3. `persistCollection()` 完整参考（store-indexed）
 
@@ -143,7 +147,7 @@ type IPersistCollectionOptions<TState> = {
 ```ts
 import { observableMap } from '@migaia/store-indexed';
 import { localStorage } from '@migaia/storage-web/local-storage';
-import { persistCollection } from '@migaia/store-persist';
+import { persistCollection } from '@migaia/store-persist/indexed';
 
 const cart = observableMap<string, number>(); // sku -> 数量
 const handle = persistCollection(cart, {
@@ -159,6 +163,8 @@ cart.set('sku-123', 2); // 防抖写回（默认 debounceMs: 0，下一次写队
 四种集合的 `replace()` 都是"一次性整体替换，只触发一次结构变化通知"——hydrate 失败（存档损坏、版本不匹配无 migrate）不会让 collection 停在"部分写入"的中间态：要么整份替换成功，要么 `restore()` 根本不被调用、collection 保持 hydrate 前的状态。
 
 ---
+
+<a id="4-persistkeyed--clearfamily-完整参考store-keyed"></a>
 
 ## 4. `persistKeyed()` + `clearFamily()` 完整参考（store-keyed）
 
@@ -191,7 +197,7 @@ type IPersistKeyedHandle<T> = { readonly value: T; dispose(): void };
 ```ts
 import { createAtomStore, familyDef } from '@migaia/store-keyed';
 import { indexedDb } from '@migaia/storage-web/indexed-db';
-import { persistKeyed, clearFamily } from '@migaia/store-persist';
+import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';
 
 type Session = { accessToken: string; refreshToken: string };
 const session = familyDef((): Session => ({ accessToken: '', refreshToken: '' }));
@@ -298,6 +304,17 @@ const handle = persistCollection(bigDataset, {
 `ABORTED_BY_DISPOSE`；后者保留原生 `AbortError`。hydrate 失败会保留原始错误并阻塞
 `flush()`/`clear()`，直到一次成功的 `retryHydrate()` 重新打开有序写入。
 
+| `StorePersistErrorCode` | 码值 | 触发条件 / 处理 |
+| --- | --- | --- |
+| `codecNotResolved` | `CODEC_NOT_RESOLVED` | 没有为 key 解析到 codec；显式提供 codec 或修复默认解析 |
+| `codecOutputMismatch` | `CODEC_OUTPUT_MISMATCH` | codec output 与实际 payload/后端能力不一致；修正 codec 实现或选路 |
+| `backendCapability` | `BACKEND_CAPABILITY` | binary codec 缺 `getBytes`/`setBytes`；换后端或 text codec |
+| `envelopeInvalid` | `ENVELOPE_INVALID` | 存档 envelope/版本非法；修复数据或提供 migrate |
+| `encodeFailed` | `ENCODE_FAILED` | 值无法编码；检查 `cause` 与待存值 |
+| `hydrateAndWriteFailed` | `HYDRATE_AND_WRITE_FAILED` | hydrate 与随后的写回都失败；展开 `AggregateError.errors` |
+| `abortedByDispose` | `ABORTED_BY_DISPOSE` | dispose 中止操作；按原生 `AbortError` 处理，不重用 handle |
+| `invalidOption` | `INVALID_OPTION` | version 等配置非法；修正后再构造 |
+
 | 触发条件                                                     | 错误类型                                   | 说明                                                      |
 | ------------------------------------------------------------ | ------------------------------------------ | --------------------------------------------------------- |
 | `version` 不是安全非负整数                                   | `TypeError`                                | 构造时同步抛出                                            |
@@ -319,7 +336,9 @@ import { createStore } from '@migaia/store-light';
 import { createAtomStore, familyDef } from '@migaia/store-keyed';
 import { observableSet } from '@migaia/store-indexed';
 import { indexedDb } from '@migaia/storage-web/indexed-db';
-import { persist, persistCollection, persistKeyed, clearFamily } from '@migaia/store-persist';
+import { persist } from '@migaia/store-persist/light';
+import { persistCollection } from '@migaia/store-persist/indexed';
+import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';
 import { createRuntime } from '@migaia/reactive';
 
 const runtime = createRuntime();

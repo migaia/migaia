@@ -96,6 +96,8 @@ const store = createStore(shape, {
 
 ---
 
+<a id="5-api-完整参考"></a>
+
 ## 5. `$`-API 完整参考
 
 `$`-前缀的方法/属性挂载为**不可枚举**属性，不会出现在 `for...in`、`Object.keys()` 或 `$snapshot()` 的用户字段遍历里。
@@ -363,6 +365,21 @@ function createStoreLightAggregateError(
 每个离开本包边界的错误都保留原生类型，并带 `source: '@migaia/store-light'` 与稳定
 `code`。例如已释放 Store 为 `STORE_DISPOSED`，未就绪异步字段为 `STORE_NOT_READY`；初始化与
 cleanup 同时失败时，主错误仍可经 `cause`/`errors` 访问。
+
+| `StoreLightErrorCode` | 码值 | 触发条件 / 处理 |
+| --- | --- | --- |
+| `storeDisposed` | `STORE_DISPOSED` | Store 终结后继续访问；创建新 Store，不复活旧实例 |
+| `resourceDisposed` | `RESOURCE_DISPOSED` | Resource closing/disposed 后读取或保留；停止使用并创建新资源 |
+| `captureInvalid` | `CAPTURE_INVALID` | capture token 无效或已消费；重新捕获，token 只能提交一次 |
+| `unknownVersion` | `UNKNOWN_VERSION` | 保留/捕获不可见版本；从当前 snapshot 重新取得版本 |
+| `identityRequired` | `IDENTITY_REQUIRED` | 带 dispose 的 factory 返回原始值；返回可追踪身份的对象或函数 |
+| `noAsyncInit` | `NO_ASYNC_INIT` | 对同步 Store 调 `storeReady()`；改用 `createAsyncStore()` 或移除等待 |
+| `storeNotReady` | `STORE_NOT_READY` | 异步字段 pending/failed 时访问；先等待 `storeReady()` |
+| `initAndCleanupFailed` | `INIT_AND_CLEANUP_FAILED` | 初始化与回滚同时失败；展开 `AggregateError.errors` |
+| `syncFieldRequired` | `SYNC_FIELD_REQUIRED` | `createStore()` 收到异步 FieldBuilder；改用 `createAsyncStore()` |
+| `actionBatchBoundary` | `ACTION_BATCH_BOUNDARY` | 异步 action 首次 await 后继续写的诊断；把后续写显式放入 `$batch()` |
+| `envUnsupported` | `ENV_UNSUPPORTED` | 缺少 `WeakRef`/`FinalizationRegistry`；修复部署环境 |
+| `invalidOption` | `INVALID_OPTION` | keepAlive、写目标或 hydrate 选项非法；按 message 修正输入 |
 
 | 错误信息                                                                                                                                                                                                                           | 触发条件                                                                                                                               |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |

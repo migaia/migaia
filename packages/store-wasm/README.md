@@ -259,6 +259,3 @@ try {
 ```bash
 pnpm --filter @migaia/store-wasm fmt && pnpm --filter @migaia/store-wasm lint && pnpm --filter @migaia/store-wasm typecheck && pnpm --filter @migaia/store-wasm typecheck:test && pnpm --filter @migaia/store-wasm test && pnpm --filter @migaia/store-wasm build
 ```
-
-</content>
-</invoke>

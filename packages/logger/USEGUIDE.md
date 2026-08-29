@@ -72,6 +72,7 @@ const log = new Logger({
 | `shutdown(reason)`                                          | `reason: 'signal' \| 'uncaughtException' \| 'unhandledRejection' \| 'manual'`                            | `reason` 必填                               | `Promise<void>`                    | 异步      | 运行 shutdown handler → flush → 卸载插件；重入调用会 alias 到同一个 in-flight promise，见 [§7](#7-flush-与-shutdown-精确语义)。 |
 | `dispose()`                                                 | 无                                                                                                       | —                                           | `Promise<void>`                    | 异步      | `shutdown('manual')` 的别名。                                                                                                   |
 | `extends(...others)`                                        | `others: ILoggerCore[]`                                                                                  | 至少 1 个目标                               | `this`                             | 同步      | 把当前 logger 接入目标的完整 pipeline/sink，见 [§10](#10-extends多-logger-转发)。                                               |
+| `unextend(...others)`                                       | `others: ILoggerCore[]`                                                                                  | 可为空                                      | `boolean`                          | 同步      | 按 logger context id 移除转发边；至少移除一条返回 `true`，重复移除返回 `false`。                                                 |
 | `use(...plugins)`                                           | `plugins: ILoggerPlugin[]`                                                                               | 至少 1 个                                   | `Promise<logger & Extensions>`     | 异步      | 运行期动态安装插件。                                                                                                            |
 | `unUse(name)`                                               | `name: string`                                                                                           | 必填                                        | `Promise<void>`                    | 异步      | 卸载指定插件。                                                                                                                  |
 | `config.get(path)`                                          | `plugin.key` 或 `plugin.[index].key`                                                                     | 必填                                        | `unknown \| undefined`             | 同步      | 读取指定插件的配置嵌套值；直接读插件根配置不合法，见 [§5](#5-配置边界)。                                                        |
@@ -145,6 +146,8 @@ pipeline 执行期间禁止新增 stage，避免修改一条正在执行中的�
 
 ---
 
+<a id="8-entry、hook-与-sink"></a>
+
 ## 8. Entry、hook 与 sink
 
 ```ts
@@ -194,11 +197,13 @@ Hook 名称约定：`before`、`after`、`before:<tag>`、`after:<tag>`，也可
 
 不添加任何 logger 方法，只提供 shared 能力 `createBatcher(config, onBatch)`，供其他插件（如 `http()`）复用。
 
-| 配置字段      | 类型      | 必填性 | 默认值 | 说明                               |
-| ------------- | --------- | ------ | ------ | ---------------------------------- |
-| `maxSize`     | `number`  | 可选   | `20`   | 攒够这个数量就触发一次发送。       |
-| `maxWaitMs`   | `number`  | 可选   | `2000` | 批次里第一项进入后的最长等待时间。 |
-| `asyncOutput` | `boolean` | 可选   | `true` | 满批次的回调是否走 `defer` 调度。  |
+| 配置字段               | 类型      | 必填性 | 默认值 | 说明                                                     |
+| ---------------------- | --------- | ------ | ------ | -------------------------------------------------------- |
+| `maxSize`              | `number`  | 可选   | `20`   | 攒够这个数量就触发一次发送。                             |
+| `maxWaitMs`            | `number`  | 可选   | `2000` | 批次里第一项进入后的最长等待时间。                       |
+| `maxConcurrentBatches` | `number`  | 可选   | `1`    | 同时执行的批次数；必须是正安全整数。                     |
+| `maxPendingBatches`    | `number`  | 可选   | `1024` | 排队中与执行中的批次总上限；满载时以 `BATCH_OVERFLOW` 失败，不静默丢弃。 |
+| `asyncOutput`          | `boolean` | 可选   | `true` | 满批次的回调是否走 `defer` 调度。                        |
 
 Batcher 的 `push(item)` 收集条目，`flush()` 发送剩余条目并等待正在进行的回调完成；这个 batcher 会自动登记进宿主 Logger 的 `flush()` 追踪范围，不需要手动接入。
 
@@ -265,6 +270,8 @@ api.info('user created'); // 同时经过 api 自己的 pipeline/sink，也完�
 
 `extends()` 转发的是**完整的处理路径**，不是简单抄送——目标 logger 自己的级别阈值、过滤器同样会对转发过来的日志生效。转发时会把当前 `topic` 追加进一份仅用于展示的 `topicChain`，同时把当前 logger 的 `id` 追加进一份仅用于循环检测的内部路径（两者故意分开维护：循环检测不能依赖可能为空、可能重名的 `topic` 字符串）。`extends()` 注册时会做一次静态循环检测（`a.extends(b); b.extends(a)` 这种直接循环会在调用 `extends()` 那一刻就抛错），转发时还有运行时兜底检测，防止通过外部自定义的 `ILoggerCore` 实现绕过静态检测形成循环转发。
 
+不再需要某条转发边时调用 `api.unextend(audit)`。它按目标 logger 的稳定 context id 移除关系；至少移除一条返回 `true`，目标不存在或重复移除返回 `false`，不会关闭目标 logger。
+
 **`extends()` 只组合运行时的日志输出路径，不会把目标 logger 通过插件获得的 TypeScript 扩展方法合并到当前变量的类型上**——如果 `audit` 装了 `level()` 有 `.info()` 方法，`api` 不会因为 `extends(audit)` 而在类型上获得任何新方法。extends 关系图不允许成环；`flush()` 会沿着这个图等待全部下游完成。
 
 ---
@@ -317,6 +324,28 @@ await log.flush();
 ```
 
 ---
+
+## 错误码速查
+
+所有 Logger 自有错误都带 `source: '@migaia/logger'` 与下列稳定 `code`；业务日志入口通常不直接抛出 sink/plugin 失败，应通过 `onFailure()` 观察。
+
+| `LoggerErrorCode` | 码值 | 触发条件 / 处理 |
+| --- | --- | --- |
+| `invalidOption` | `INVALID_OPTION` | 公开配置不可读或结构非法；修正配置，getter 原错误保留在 `cause` |
+| `runtimeShuttingDown` | `RUNTIME_SHUTTING_DOWN` | runtime 已进入 shutdown 后仍安装 process/logger；等待终结或不要安装 process plugin |
+| `pluginConfigConflict` | `PLUGIN_CONFIG_CONFLICT` | process plugin 以不同配置重复安装；统一配置或卸载后重装 |
+| `transportUnavailable` | `TRANSPORT_UNAVAILABLE` | http plugin 找不到 `fetch`；注入 runtime fetch 或换宿主 |
+| `serializeFailed` | `SERIALIZE_FAILED` | HTTP payload 序列化失败；检查 `cause` 与待记录数据 |
+| `deliveryFailed` | `DELIVERY_FAILED` | 非成功响应或可重试传输耗尽；检查 endpoint/网络并由业务决定补偿 |
+| `invalidRetryCount` | `INVALID_RETRY_COUNT` | retries 不是有限非负整数；构造前修正 |
+| `lifecycleDeadline` | `LIFECYCLE_DEADLINE` | flush/shutdown 到达绝对截止时间仍有工作；按降级交付处理，不要假设全部送达 |
+| `processInstallRollbackFailed` | `PROCESS_INSTALL_ROLLBACK_FAILED` | process 安装失败且 listener 回滚也失败；展开 `AggregateError.errors` |
+| `pluginUninstallCleanupFailed` | `PLUGIN_UNINSTALL_CLEANUP_FAILED` | plugin 最终卸载清理失败；检查 `cause`/`errors`，实例视为终结 |
+| `pluginShutdownCleanupFailed` | `PLUGIN_SHUTDOWN_CLEANUP_FAILED` | shutdown 的 deadline task 或退出清理失败；保留 primary 与 cleanup 错误 |
+| `hookFailed` | `HOOK_FAILED` | failure hook 自身失败的诊断码；只走 runtime reporter，不递归抛给业务入口 |
+| `extendsSelf` | `EXTENDS_SELF` | logger 转发给自身；移除自引用 |
+| `extendsCycle` | `EXTENDS_CYCLE` | 新 extends 边形成环；拆除环路 |
+| `batchOverflow` | `BATCH_OVERFLOW` | pending batch 达上限；停止接纳并等待下游恢复，不会静默丢弃 |
 
 ## 13. 构建、测试与常见问题排查
 

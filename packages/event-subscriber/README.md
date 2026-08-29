@@ -56,6 +56,7 @@ unsubscribe()
 - `report?: (failure: IEventReport<T>) => void | PromiseLike<void>` —— 处理 `publish()` 之后迟到的 Promise/thenable rejection（同步 listener 失败不走这里，见下）
 - `terminalReport?: (error: unknown) => void | PromiseLike<void>` —— `report` 缺失/失败时的兜底诊断出口
 - `dispatchPolicy?: EventDispatchPolicy` —— `recursive`（默认）保持 canonical nested publish 的同步递归顺序；只有需要“当前快照全部完成后再交付重入值”的消费者才显式使用 `queued`
+- `publishBudget?: number` —— 单次顶层同步发布事务最多调用的 listener 数，默认 `100_000`；必须是正安全整数。预算耗尽时停止继续展开并抛 `PUBLISH_FAILED`，防止递归或重入发布无限占用线程
 
 返回的 `channel` 上的方法与字段：
 
@@ -160,6 +161,7 @@ import {
   invokeSerialSettled,
   invokeTask,
   invokeTaskSettled,
+  withSnapshotEntries,
   type IListenerResult
 } from '@migaia/event-subscriber'
 ```
@@ -210,6 +212,8 @@ const value = await invokeTask(tasks, 'email', job) // Awaited<R>
 ```
 
 `IListenerResult<R>` 类型：`{ status: 'fulfilled', value: Awaited<R> } | { status: 'rejected', reason: unknown }`。
+
+**`withSnapshotEntries`｜高级集成** —— 把一次不可变 listener 快照交给 visitor，由 visitor 决定何时、按什么顺序调用每个 `entry.invoke()`。每个 entry 最多调用一次；visitor 同步返回或返回的 Promise settle 后，全部 entry 关闭，再调用会抛 `INVOCATION_CLOSED`。普通业务发布应优先使用上方 `invoke*` helper。
 
 ---
 
@@ -279,7 +283,7 @@ if (error.code === EventSubscriberErrorCode.publishFailed) {
 }
 ```
 
-全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`publishFailed`(`PUBLISH_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)。
+全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。
 
 **`EVENT_SUBSCRIBER_SOURCE`｜3 秒上手** —— 常量字符串 `'@migaia/event-subscriber'`，等同任意包边界错误的 `source` 字段。
 
@@ -385,5 +389,3 @@ channel.subscribe((event) => {
 ```bash
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
-
-</content>

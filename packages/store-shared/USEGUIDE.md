@@ -326,6 +326,8 @@ throw createStoreSharedRangeError(
 
 只要 `before === after` 且为偶数，就能保证这次读到的 `value` 和 `version` 出自同一次已完成的写入。自旋次数上限是 **65536（`1 << 16`）次**；超限说明可能有写者在持锁期间异常终止（线程被杀、页面崩溃），此时无限自旋会把当前线程也拖死，所以到限直接抛 `Error`（`contentionLimit`，消息含 `did not settle before the contention limit`），把"共享内存可能已经写坏"暴露出来，而不是静默卡死。
 
+<a id="62-写占锁--写值--放锁"></a>
+
 ### 6.2 写：占锁 → 写值 → 放锁
 
 ```

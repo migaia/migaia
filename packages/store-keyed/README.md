@@ -597,7 +597,8 @@ store.dispose(); // 释放这个作用域建出的全部实例
 ### 2. 按 key 产出的 family，跨会话共享定义但各自独立取值
 
 ```ts
-import { createAtomStore, familyDef, type IRuntime } from '@migaia/store-keyed';
+import { createAtomStore, familyDef } from '@migaia/store-keyed';
+import type { IRuntime } from '@migaia/reactive';
 
 const sessionByChatId = familyDef((chatId: string) => ({ messages: [] as string[] }));
 
@@ -612,7 +613,8 @@ function openChat(runtime: IRuntime, chatId: string) {
 ### 3. 测试期用 `override` 替身某个派生定义
 
 ```ts
-import { createAtomStore, derivedDef, createRuntime } from '@migaia/store-keyed';
+import { createAtomStore, derivedDef } from '@migaia/store-keyed';
+import { createRuntime } from '@migaia/reactive';
 
 const store = createAtomStore(createRuntime());
 const undo = store.override(
@@ -663,5 +665,3 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 ```bash
 pnpm run typecheck:e2e && pnpm run test:e2e
 ```
-
-</content>

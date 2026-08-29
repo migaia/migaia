@@ -129,6 +129,8 @@ const unsubscribe = store.sub(doubledDef, () => {
 
 `store.sub(def, onChange)` 内部用一个 `Effect` 订阅，而不是把底层节点直接交给调用方——实例化策略（何时建 Signal/Computed、是否惰性）因此可以自由演进而不破坏订阅者。首次运行只建立依赖、不触发 `onChange`；此后每次依赖变化都会在 `runtime.untracked()` 里调用 `onChange`，`onChange` 内抛出的异常会被捕获并交给 `runtime.reportError(error, { phase: 'subscription-listener' })`，不会中断其它订阅者或让 Effect 失效。返回的 `unsubscribe` 幂等，可以安全多次调用。
 
+<a id="34-override覆盖"></a>
+
 ### 3.4 Override（覆盖）
 
 ```ts
@@ -467,6 +469,8 @@ type IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyed
 
 ---
 
+<a id="8-子路径-reactiveatom"></a>
+
 ## 8. 子路径：reactive/atom
 
 ```ts
@@ -665,5 +669,3 @@ pnpm --filter @migaia/store-keyed build
 pnpm --filter @migaia/store-keyed typecheck:e2e
 pnpm --filter @migaia/store-keyed test:e2e
 ```
-
-</content>
