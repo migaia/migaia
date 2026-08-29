@@ -35,6 +35,12 @@ import {
   normalizeRetainedModule,
   normalizeRetainedModules
 } from '../../../scripts/storage-v2-retained-ledger.mjs'
+import {
+  assertSemanticModuleEvidence,
+  normalizeOwnedSemanticModules,
+  sourceMapSources,
+  resolveSourceMapSources
+} from '../../../scripts/package-tree-shaking-provenance.mjs'
 type IPackageDefinition = {
   readonly directory: string
   readonly name: string
@@ -121,6 +127,81 @@ const assertExactRetainedModules = (modules: Iterable<string>): void =>
 /** Reads one JSON file without allowing a module cache to hide a rewritten manifest. */
 const readJson = (fileName: string): Record<string, unknown> =>
   JSON.parse(readFileSync(fileName, 'utf8')) as Record<string, unknown>
+
+/** Converts a fresh packed graph into the shared source-owned semantic ledger. */
+function normalizeSemanticRetainedGraph(
+  outputs: readonly {
+    readonly fileName: string
+    readonly map: unknown
+    readonly modules: Readonly<Record<string, unknown>>
+  }[],
+  consumerDirectory: string,
+  installedPackages: ReadonlyMap<string, IInstalledPackageIdentity>
+) {
+  const entry = resolve(realpathSync(consumerDirectory), 'bundle-entry.js')
+  const owners = new Map<string, string>([['workspace-root', consumerDirectory]])
+  const records = []
+  for (const output of outputs) {
+    const sourceNames = sourceMapSources(output.map)
+    const resolvedSources = resolveSourceMapSources(
+      output.map,
+      resolve(consumerDirectory, 'bundle', output.fileName)
+    )
+    const moduleIds = Object.keys(output.modules)
+    expect(sourceNames).toHaveLength(moduleIds.length)
+    expect(resolvedSources).toHaveLength(sourceNames.length)
+    const emittedFile = resolve(consumerDirectory, 'bundle', output.fileName)
+    const packageRecords = new Map<
+      string,
+      {
+        readonly packageName: string
+        readonly packageRoot: string
+        readonly sourcePaths: string[]
+        originalBytes: number
+        renderedBytes: number
+      }
+    >()
+    for (const [index, moduleId] of moduleIds.entries()) {
+      const normalized =
+        moduleId === entry
+          ? 'workspace-root/bundle-entry.js'
+          : normalizeRetainedModule(moduleId, consumerDirectory, installedPackages)
+      const packageMatch = normalized.match(/^(@migaia\/[^/]+)\/(.+)$/)
+      const packageName = packageMatch?.[1] ?? 'workspace-root'
+      const packageRoot =
+        packageName === 'workspace-root'
+          ? consumerDirectory
+          : installedPackages.get(packageName)?.root
+      if (!packageRoot) throw new Error(`unknown packed sourcemap owner: ${moduleId}`)
+      owners.set(packageName, packageRoot)
+      const sourcePath = packageName === 'workspace-root' ? 'bundle-entry.js' : packageMatch![2]
+      const packageRecord = packageRecords.get(packageName) ?? {
+        packageName,
+        packageRoot,
+        sourcePaths: [],
+        originalBytes: 0,
+        renderedBytes: 0
+      }
+      packageRecord.sourcePaths.push(sourcePath)
+      packageRecord.originalBytes += Number(
+        (output.modules[moduleId] as { originalLength?: number }).originalLength ?? 0
+      )
+      packageRecord.renderedBytes += Number(
+        (output.modules[moduleId] as { renderedLength?: number }).renderedLength ?? 0
+      )
+      packageRecords.set(packageName, packageRecord)
+      expect(resolvedSources[index]).toBeTypeOf('string')
+    }
+    for (const packageRecord of packageRecords.values())
+      records.push({
+        ...packageRecord,
+        sourceMapBacked: true,
+        emittedPath: emittedFile,
+        emittedRole: packageRecord.packageName === 'workspace-root' ? 'entry' : 'runtime'
+      })
+  }
+  return normalizeOwnedSemanticModules(records, owners)
+}
 describe('SWV2-T58 C2-R4 host and release boundary', () => {
   it('pins D18 order, private manifests, exact exports, lock edges, and fail-closed capabilities', () => {
     const makefile = readFileSync(resolve(repositoryRoot, 'Makefile'), 'utf8')
@@ -207,6 +288,11 @@ describe('SWV2-T58 C2-R4 host and release boundary', () => {
         'utf8'
       )
       const retainedModuleIds = new Set<string>()
+      const retainedOutputs: {
+        readonly fileName: string
+        readonly map: unknown
+        readonly modules: Readonly<Record<string, unknown>>
+      }[] = []
       await build({
         configFile: false,
         logLevel: 'silent',
@@ -217,6 +303,12 @@ describe('SWV2-T58 C2-R4 host and release boundary', () => {
             generateBundle(_options, bundle) {
               for (const output of Object.values(bundle)) {
                 if (output.type !== 'chunk') continue
+                if (!output.map) throw new Error('packed retained chunk is missing its sourcemap')
+                retainedOutputs.push({
+                  fileName: output.fileName,
+                  map: output.map,
+                  modules: output.modules
+                })
                 for (const moduleId of Object.keys(output.modules)) retainedModuleIds.add(moduleId)
               }
             }
@@ -226,11 +318,47 @@ describe('SWV2-T58 C2-R4 host and release boundary', () => {
           outDir: bundleDirectory,
           emptyOutDir: true,
           minify: false,
+          sourcemap: true,
           lib: { entry: bundleEntry, formats: ['es'], fileName: () => 'consumer.js' }
         }
       })
       assertExactRetainedModules(
         normalizeRetainedModules(retainedModuleIds, consumerDirectory, installedPackages)
+      )
+      const semanticRetained = normalizeSemanticRetainedGraph(
+        retainedOutputs,
+        consumerDirectory,
+        installedPackages
+      )
+      const renamedOutput = await build({
+        configFile: false,
+        logLevel: 'silent',
+        root: consumerDirectory,
+        build: {
+          write: false,
+          minify: false,
+          sourcemap: true,
+          lib: { entry: bundleEntry, formats: ['es'], fileName: () => 'consumer-[hash].js' }
+        }
+      })
+      const renamedOutputs = (
+        Array.isArray(renamedOutput) ? renamedOutput : [renamedOutput]
+      ).flatMap((result) => {
+        if (!('output' in result)) return []
+        return result.output
+          .filter(
+            (output): output is typeof output & { type: 'chunk'; map: unknown } =>
+              output.type === 'chunk' && !!output.map
+          )
+          .map((output) => ({
+            fileName: output.fileName,
+            map: output.map,
+            modules: output.modules
+          }))
+      })
+      assertSemanticModuleEvidence(
+        semanticRetained,
+        normalizeSemanticRetainedGraph(renamedOutputs, consumerDirectory, installedPackages)
       )
       const bundle = readFileSync(join(bundleDirectory, 'consumer.js'), 'utf8')
       expect(bundle).not.toMatch(/(?:from\s*|import\()['"]@migaia\//)

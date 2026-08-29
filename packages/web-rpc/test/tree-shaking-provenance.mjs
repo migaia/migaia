@@ -14,6 +14,10 @@ import {
   sizeTuple,
   validateAuthorization
 } from './tree-shaking-authorization.mjs'
+import {
+  normalizeOwnedSemanticModules,
+  resolveSourceMapSources
+} from '../../../scripts/package-tree-shaking-provenance.mjs'
 
 const repositoryRoot = resolve(packageDirectory, '../..')
 process.chdir(repositoryRoot)
@@ -25,6 +29,18 @@ const authorityPath = resolve(
   packageDirectory,
   'test/fixtures/tree-shaking/baseline-authority.json'
 )
+
+/** Returns the owning workspace package for a physical retained module. */
+function ownerForModule(modulePath) {
+  const packageMatch = modulePath.match(`${repositoryRoot}/packages/([^/]+)/(.+)$`)
+  if (!packageMatch) return null
+  const packageRoot = resolve(repositoryRoot, 'packages', packageMatch[1])
+  const packageManifest = resolve(packageRoot, 'package.json')
+  if (!existsSync(packageManifest)) return null
+  const packageName = JSON.parse(readFileSync(packageManifest, 'utf8')).name
+  if (typeof packageName !== 'string' || !packageName) return null
+  return { packageName, packageRoot }
+}
 
 /** Hashes bytes with a stable algorithm for provenance comparison. */
 function sha256(bytes) {
@@ -110,6 +126,37 @@ for (const item of chunksWithCode) {
 const retainedModules = [...moduleEntries.values()].sort((left, right) =>
   left.module.localeCompare(right.module)
 )
+const knownOwners = new Map()
+const semanticRecords = []
+for (const item of chunksWithCode) {
+  if (!item.map) throw new TypeError('retained chunk is missing its emitted sourcemap')
+  const emittedFile = resolve(packageDirectory, 'dist', item.fileName)
+  const sourcesByOwner = new Map()
+  for (const sourcePath of resolveSourceMapSources(item.map, emittedFile)) {
+    const owner = ownerForModule(sourcePath)
+    if (!owner) throw new TypeError(`retained sourcemap source has no package owner: ${sourcePath}`)
+    knownOwners.set(owner.packageName, owner.packageRoot)
+    const previous = sourcesByOwner.get(owner.packageName) ?? {
+      packageName: owner.packageName,
+      packageRoot: owner.packageRoot,
+      sourcePaths: [],
+      originalBytes: 0,
+      renderedBytes: 0
+    }
+    previous.sourcePaths.push(sourcePath)
+    const metadata = moduleEntries.get(sourcePath)
+    previous.originalBytes += metadata?.originalBytes ?? 0
+    previous.renderedBytes += metadata?.renderedBytes ?? 0
+    sourcesByOwner.set(owner.packageName, previous)
+  }
+  for (const record of sourcesByOwner.values())
+    semanticRecords.push({
+      ...record,
+      emittedPath: emittedFile,
+      emittedRole: 'runtime'
+    })
+}
+const semanticModules = normalizeOwnedSemanticModules(semanticRecords, knownOwners)
 const retainedInputs = [...moduleEntries.keys()]
   .sort()
   .map((module) => hashInput(module, 'retained-module'))
@@ -142,7 +189,7 @@ const tools = {
 const resolvedBuildOptions = resolvedConfig
 const outputOptions = {
   formats: ['es'],
-  sourcemap: false,
+  sourcemap: true,
   minify: false,
   write: false
 }
@@ -151,7 +198,8 @@ const emitted = {
   rawBytes: Buffer.byteLength(code),
   gzipBytes: gzipSync(code).byteLength,
   bundleSha256: sha256(Buffer.from(code, 'utf8')),
-  modules: retainedModules
+  modules: retainedModules,
+  semanticModules
 }
 const subject = { boundary, tools, resolvedBuildOptions, outputOptions, emitted }
 const canonicalSubject = JSON.parse(JSON.stringify(subject))
@@ -163,7 +211,16 @@ const report = {
   subject: { ...canonicalSubject, digest: digestProvenanceSubject(canonicalSubject) },
   tuple: sizeTuple(emitted)
 }
-const oldTuple = { moduleCount: 53, rawBytes: 250129, gzipBytes: 61171 }
+const preMigrationPath = resolve(
+  packageDirectory,
+  'test/fixtures/tree-shaking/pre-migration-tree-shaking-baseline.json'
+)
+const preMigrationRoot = JSON.parse(readFileSync(preMigrationPath, 'utf8')).root
+const oldTuple = {
+  moduleCount: preMigrationRoot.moduleCount,
+  rawBytes: preMigrationRoot.rawBytes,
+  gzipBytes: preMigrationRoot.gzipBytes
+}
 const authorizationError = validateAuthorization(report.approval, report.subject, {
   oldTuple,
   newTuple: report.tuple,

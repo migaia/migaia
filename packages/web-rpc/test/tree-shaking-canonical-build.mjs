@@ -9,6 +9,7 @@ const canonicalBuildConfig = {
   logLevel: 'silent',
   build: {
     write: false,
+    sourcemap: true,
     minify: false,
     rollupOptions: { input }
   }
