@@ -88,7 +88,7 @@ fn double_free_reports_false() {
 // Format conversion
 // ---------------------------------------------------------------------------
 
-use wasm_provider::{json_to_msgpack, last_error, last_len, msgpack_to_json};
+use wasm_provider::{json_to_msgpack, msgpack_to_json};
 
 /// Copy bytes into a fresh arena allocation and hand back its id.
 fn put(bytes: &[u8]) -> u32 {
@@ -96,8 +96,7 @@ fn put(bytes: &[u8]) -> u32 {
     assert_ne!(id, 0, "arena refused an allocation of {}", bytes.len());
     let ptr = ptr_of(id) as *mut u8;
     // Safe: the block was just allocated with at least this many bytes.
-    unsafe { std::slice::from_raw_parts_mut(ptr, bytes.len()) }
-        .copy_from_slice(bytes);
+    unsafe { std::slice::from_raw_parts_mut(ptr, bytes.len()) }.copy_from_slice(bytes);
     id
 }
 
@@ -111,14 +110,25 @@ fn take(id: u32, len: u32) -> Vec<u8> {
 // written as MessagePack could not be read back as the state it came from.
 #[wasm_bindgen_test]
 fn json_msgpack_roundtrip_preserves_content() {
-    let json = br#"{"id":7,"name":"a\"b","ok":true,"nil":null,"nums":[1,-2,3.5],"nested":{"k":"v"}}"#;
-    let packed_id = json_to_msgpack(put(json), json.len() as u32);
-    assert_ne!(packed_id, 0, "encode failed: {}", last_error());
-    let packed = take(packed_id, last_len());
+    let json =
+        br#"{"id":7,"name":"a\"b","ok":true,"nil":null,"nums":[1,-2,3.5],"nested":{"k":"v"}}"#;
+    let packed_result = json_to_msgpack(put(json), json.len() as u32);
+    assert_ne!(
+        packed_result.id(),
+        0,
+        "encode failed: {}",
+        packed_result.error()
+    );
+    let packed = take(packed_result.id(), packed_result.len());
 
-    let back_id = msgpack_to_json(put(&packed), packed.len() as u32);
-    assert_ne!(back_id, 0, "decode failed: {}", last_error());
-    let back = take(back_id, last_len());
+    let back_result = msgpack_to_json(put(&packed), packed.len() as u32);
+    assert_ne!(
+        back_result.id(),
+        0,
+        "decode failed: {}",
+        back_result.error()
+    );
+    let back = take(back_result.id(), back_result.len());
 
     let original: serde_json::Value = serde_json::from_slice(json).unwrap();
     let restored: serde_json::Value = serde_json::from_slice(&back).unwrap();
@@ -130,12 +140,12 @@ fn json_msgpack_roundtrip_preserves_content() {
 #[wasm_bindgen_test]
 fn msgpack_is_more_compact_than_json() {
     let json = br#"[{"role":"user","tokens":12},{"role":"assistant","tokens":34}]"#;
-    let packed_id = json_to_msgpack(put(json), json.len() as u32);
-    assert_ne!(packed_id, 0);
+    let packed_result = json_to_msgpack(put(json), json.len() as u32);
+    assert_ne!(packed_result.id(), 0, "{}", packed_result.error());
     assert!(
-        last_len() < json.len() as u32,
+        packed_result.len() < json.len() as u32,
         "msgpack {} was not smaller than json {}",
-        last_len(),
+        packed_result.len(),
         json.len()
     );
 }
@@ -144,36 +154,104 @@ fn msgpack_is_more_compact_than_json() {
 #[wasm_bindgen_test]
 fn conversions_report_malformed_input() {
     let broken = b"{ not json";
-    assert_eq!(json_to_msgpack(put(broken), broken.len() as u32), 0);
-    assert!(last_error().contains("json to msgpack"), "{}", last_error());
+    let json_result = json_to_msgpack(put(broken), broken.len() as u32);
+    assert_eq!(json_result.id(), 0);
+    assert!(
+        json_result.error().contains("json to msgpack"),
+        "{}",
+        json_result.error()
+    );
 
     let garbage = &[0xc1u8, 0xc1, 0xc1];
-    assert_eq!(msgpack_to_json(put(garbage), garbage.len() as u32), 0);
-    assert!(last_error().contains("msgpack to json"), "{}", last_error());
+    let msgpack_result = msgpack_to_json(put(garbage), garbage.len() as u32);
+    assert_eq!(msgpack_result.id(), 0);
+    assert!(
+        msgpack_result.error().contains("msgpack to json"),
+        "{}",
+        msgpack_result.error()
+    );
 }
 
 // A stale or forged handle must be refused rather than read out of bounds.
 #[wasm_bindgen_test]
 fn conversions_refuse_a_bad_handle() {
-    assert_eq!(json_to_msgpack(0, 4), 0);
-    assert!(last_error().contains("unknown allocation id"));
+    let missing_result = json_to_msgpack(0, 4);
+    assert_eq!(missing_result.id(), 0);
+    assert!(missing_result.error().contains("unknown allocation id"));
 
     let id = alloc_bytes(8);
     // capacity is 8 bytes, so 64 is past the end
-    assert_eq!(json_to_msgpack(id, 64), 0);
-    assert!(last_error().contains("past capacity"));
+    let oversized_result = json_to_msgpack(id, 64);
+    assert_eq!(oversized_result.id(), 0);
+    assert!(oversized_result.error().contains("past capacity"));
     dealloc_bytes(id);
 }
 
-// last_error has to be cleared by a success, or a later caller would blame a
-// failure that already happened.
 #[wasm_bindgen_test]
-fn success_clears_the_previous_error() {
+fn result_metadata_is_operation_bound() {
     let broken = b"nope";
-    assert_eq!(json_to_msgpack(put(broken), broken.len() as u32), 0);
-    assert!(!last_error().is_empty());
+    let failure = json_to_msgpack(put(broken), broken.len() as u32);
+    assert_eq!(failure.id(), 0);
+    assert_eq!(failure.len(), 0);
+    assert!(!failure.error().is_empty());
 
     let good = br#"{"a":1}"#;
-    assert_ne!(json_to_msgpack(put(good), good.len() as u32), 0);
-    assert!(last_error().is_empty(), "stale error: {}", last_error());
+    let success = json_to_msgpack(put(good), good.len() as u32);
+    assert_ne!(success.id(), 0, "{}", success.error());
+    assert_eq!(success.error(), "");
+    assert!(success.len() > 0);
+}
+
+#[wasm_bindgen_test]
+fn conversion_results_survive_interleaving() {
+    let first = br#"{"first":true}"#;
+    let second = br#"{"second":true}"#;
+    let first_result = json_to_msgpack(put(first), first.len() as u32);
+    let second_result = json_to_msgpack(put(second), second.len() as u32);
+    assert_ne!(first_result.id(), 0, "{}", first_result.error());
+    assert_ne!(second_result.id(), 0, "{}", second_result.error());
+    assert_ne!(first_result.id(), second_result.id());
+    assert!(first_result.len() > 0);
+    assert!(second_result.len() > 0);
+    assert_eq!(first_result.error(), "");
+    assert_eq!(second_result.error(), "");
+}
+
+/// Large output must grow the one owned arena block geometrically rather than
+/// reserving a fixed multiple of the input size.
+#[wasm_bindgen_test]
+fn large_conversion_output_retains_below_two_x_capacity() {
+    let json = format!(r#"{{"data":"{}"}}"#, "a".repeat(1_048_500));
+    let result = json_to_msgpack(put(json.as_bytes()), json.len() as u32);
+    assert_ne!(
+        result.id(),
+        0,
+        "large conversion failed: {}",
+        result.error()
+    );
+    let capacity = byte_len_of(result.id());
+    assert!(
+        capacity < result.len() * 2 + 8,
+        "retained capacity {capacity} exceeded logical output {}",
+        result.len()
+    );
+    dealloc_bytes(result.id());
+}
+
+#[wasm_bindgen_test]
+fn conversions_reject_trailing_documents() {
+    let json = br#"{"a":1}{"b":2}"#;
+    let json_result = json_to_msgpack(put(json), json.len() as u32);
+    assert_eq!(json_result.id(), 0);
+    assert!(json_result.error().contains("json to msgpack"));
+
+    let valid_json = br#"{"a":1}"#;
+    let packed_result = json_to_msgpack(put(valid_json), valid_json.len() as u32);
+    assert_ne!(packed_result.id(), 0, "{}", packed_result.error());
+    let packed = take(packed_result.id(), packed_result.len());
+    let mut trailing = packed.clone();
+    trailing.push(0xc1);
+    let msgpack_result = msgpack_to_json(put(&trailing), trailing.len() as u32);
+    assert_eq!(msgpack_result.id(), 0);
+    assert!(msgpack_result.error().contains("msgpack to json"));
 }

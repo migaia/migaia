@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "files": [
-    "src",
+    "src/wasm_provider.js",
+    "src/wasm_provider.d.ts",
+    "src/wasm_provider_bg.wasm",
+    "src/wasm_provider_bg.wasm.d.ts",
     "rust",
     "README.md",
     "USEGUIDE.md"
@@ -18,7 +21,7 @@
   "scripts": {
     "build": "cd rust && wasm-pack build --target web --release --out-dir ../src",
     "test:rust": "cd rust && cargo test",
-    "test": "pnpm run test:rust",
+    "test": "wasm-pack test --node rust",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   }
 }
