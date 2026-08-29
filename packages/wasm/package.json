@@ -12,6 +12,7 @@
     "USEGUIDE.md"
   ],
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./src/wasm_provider.d.ts",
