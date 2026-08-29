@@ -217,10 +217,25 @@ export class Runtime implements IRuntime {
       return result
     }
     // 内部面只经 WeakMap 暴露；拿到 Runtime 的第三方无法沿引用链摸到图。
-    const deferIdle =
-      scheduleIdleOption === undefined
-        ? adapter.scheduleMicrotask
-        : createReceiverCallback(scheduleIdleOption, options)
+    /** Admits idle cleanup through the configured hook and recovers through the safe microtask port. */
+    const deferIdle = (task: () => void): void => {
+      const schedule =
+        scheduleIdleOption === undefined
+          ? adapter.scheduleMicrotask
+          : createReceiverCallback(scheduleIdleOption, options)
+      try {
+        schedule(task)
+      } catch (error) {
+        this.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })
+        if (schedule !== adapter.scheduleMicrotask) {
+          try {
+            adapter.scheduleMicrotask(task)
+          } catch (fallbackError) {
+            this.reportError(fallbackError, { phase: ReactiveErrorPhase.asyncFlush })
+          }
+        }
+      }
+    }
     registerInternals(this, {
       clock,
       tracker,

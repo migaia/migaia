@@ -417,12 +417,10 @@ describe('AF-T64 retry timer cleanup failure', () => {
     resource.dispose()
   })
 
-  it('AF-T64: cancel converges state while native host reports cleanup error', async () => {
-    const runtime = createRuntime()
+  it('AF-T64: cancel converges state while reporting cleanup error through the runtime sink', async () => {
+    const reported: unknown[] = []
+    const runtime = createRuntime({ onError: (error) => reported.push(error) })
     const cleanupError = new Error('retry timer cleanup failed')
-    const hostError = new Promise<unknown>((resolve) => {
-      process.once('uncaughtException', resolve)
-    })
     const resource = new Resource(
       async () => {
         throw new Error('initial failure')
@@ -463,7 +461,13 @@ describe('AF-T64 retry timer cleanup failure', () => {
     expect(resource.state.status).toBe('cancelled')
     expect(requestSettled).toBe(true)
     expect(thrown).toBeUndefined()
-    await expect(hostError).resolves.toBe(cleanupError)
+    expect(reported).toEqual([
+      expect.objectContaining({
+        source: '@migaia/resource',
+        code: ResourceErrorCode.cancellationCleanupFailed,
+        cause: cleanupError
+      })
+    ])
     expect(resource.state).toEqual({
       status: 'cancelled',
       error: expect.objectContaining({
@@ -701,7 +705,7 @@ describe('AF-T85 withAbort signal registration race', () => {
       code: ResourceErrorCode.requestAborted
     })
     expect(addCalls).toBe(1)
-    expect(removeCalls).toBe(1)
+    expect(removeCalls).toBe(2)
     expect(storedListeners.size).toBe(0)
     resource.dispose()
   })

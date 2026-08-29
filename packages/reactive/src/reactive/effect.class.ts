@@ -9,8 +9,12 @@ import type {
 import { internalsOf } from '../runtime/internals.js'
 import { claimOwnership } from '../runtime/ownership.js'
 import { createObserverRunTrace, describeObserver } from '../runtime/diagnostics.js'
+import { inspectThenable, observeThenableRejection } from '../runtime/receiver.js'
 import { registerDeps, registerDepVersions } from '../runtime/node-internals.js'
 import { ReactiveErrorPhase } from '../runtime/trace-constants.js'
+import { createReactiveError, tagReactiveError } from '../errors.js'
+import { ReactiveErrorCode } from '../error-code.js'
+import { ReactiveErrorText } from '../error-text.js'
 
 // 副作用：唯一真正"被执行"的观察者——Computed 只标脏不重跑，只有 Effect 会被调度器实际 tick
 export class Effect implements IObserver, IDisposable {
@@ -81,13 +85,21 @@ export class Effect implements IObserver, IDisposable {
     this.#cleanup = undefined
     try {
       if (typeof previousCleanup === 'function') {
-        this.runtime.untracked(previousCleanup) // cleanup 执行期间不建立依赖
+        const cleanupResult = this.runtime.untracked(previousCleanup) // cleanup 执行期间不建立依赖
+        this.#assertSynchronousResult(cleanupResult, 'effect cleanup')
       }
       if (this.#disposed) return
       /** Candidate cleanup returned by the current body; terminal effects must consume it locally. */
-      const nextCleanup = runtime.tracker.runTracked(this, this.#fn)
+      const nextCleanup = runtime.tracker.runTracked(this, () => {
+        const result = this.#fn()
+        this.#assertSynchronousResult(result, 'effect body')
+        return result
+      })
       if (this.#disposed) {
-        if (typeof nextCleanup === 'function') this.runtime.untracked(nextCleanup)
+        if (typeof nextCleanup === 'function') {
+          const cleanupResult = this.runtime.untracked(nextCleanup)
+          this.#assertSynchronousResult(cleanupResult, 'effect cleanup')
+        }
         return
       }
       this.#cleanup = nextCleanup
@@ -98,13 +110,40 @@ export class Effect implements IObserver, IDisposable {
       trace?.end()
     }
   }
+
+  /** Rejects PromiseLike callback results while observing their eventual rejection. */
+  #assertSynchronousResult(result: unknown, callback: string): void {
+    const inspection = inspectThenable(result)
+    if ('error' in inspection) {
+      throw tagReactiveError(
+        new TypeError(ReactiveErrorText.synchronousCallbackReturnedThenable(callback), {
+          cause: inspection.error
+        }),
+        ReactiveErrorCode.invalidOption
+      )
+    }
+    if (inspection.then === undefined) return
+    observeThenableRejection(result, inspection, (error) =>
+      this.runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush, observer: this })
+    )
+    throw createReactiveError(
+      ReactiveErrorCode.invalidOption,
+      ReactiveErrorText.synchronousCallbackReturnedThenable(callback)
+    )
+  }
   dispose(): void {
     if (this.#disposed) return
     this.#disposed = true
     internalsOf(this.runtime).tracker.clearDependencies(this)
     const previousCleanup = this.#cleanup
     this.#cleanup = undefined
-    if (typeof previousCleanup === 'function') this.runtime.untracked(previousCleanup)
-    internalsOf(this.runtime).scheduler.dequeue(this)
+    try {
+      if (typeof previousCleanup === 'function') {
+        const cleanupResult = this.runtime.untracked(previousCleanup)
+        this.#assertSynchronousResult(cleanupResult, 'effect cleanup')
+      }
+    } finally {
+      internalsOf(this.runtime).scheduler.dequeue(this)
+    }
   }
 }

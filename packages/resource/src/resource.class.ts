@@ -19,11 +19,11 @@ import {
   snapshotScheduler,
   LifecycleState,
   ThenableProbeKind,
-  type IAbortSignal,
   type IGenerationToken,
   type ILifecycleScheduler,
   type IScheduledTask
 } from '@migaia/lifecycle'
+import { observeAbortSubscription, type IAbortSignal } from '@migaia/lifecycle/abort'
 import {
   createResourceError,
   RESOURCE_SOURCE,
@@ -142,6 +142,22 @@ function validateRetry(retry: IResourceRetryPolicy): void {
       ResourceErrorCode.invalidOption
     )
   }
+}
+
+/** Creates an option failure and reports a hostile thenable returned by a sync retry policy. */
+function createInvalidRetryPolicyResult(
+  value: unknown,
+  message: string,
+  reportLateRejection: (error: unknown) => void
+): IResourceError {
+  const probe = probeThenable(value)
+  if (probe.kind === ThenableProbeKind.failed) {
+    return createResourceOptionTypeError(message, probe.error)
+  }
+  if (probe.kind === ThenableProbeKind.thenable) {
+    void assimilateCapturedThen<void>(probe.thenFn, value).catch(reportLateRejection)
+  }
+  return createResourceOptionTypeError(message)
 }
 
 /** Creates a native option type error while preserving a hostile getter as its cause. */
@@ -694,7 +710,10 @@ export class Resource<T> implements IObserver, IDisposable {
 
   #isFresh(): boolean {
     const state = this.#stateSignal.peek()
-    return state.status === ResourceStatus.success && this.#readSchedulerNow() < this.#expiresAt
+    return (
+      state.status === ResourceStatus.success &&
+      (this.#ttl === 0 || this.#readSchedulerNow() < this.#expiresAt)
+    )
   }
 
   #ensureFresh(): void {
@@ -711,6 +730,7 @@ export class Resource<T> implements IObserver, IDisposable {
         return
       }
     }
+    if (state.status === ResourceStatus.success && this.#ttl === 0) return
     if (
       state.status === ResourceStatus.idle ||
       (state.status === ResourceStatus.success && !fresh)
@@ -825,7 +845,20 @@ export class Resource<T> implements IObserver, IDisposable {
       shouldRetry =
         typeof this.#retry === 'number'
           ? nextFailureCount <= this.#retry
-          : this.#retry(nextFailureCount, error)
+          : (() => {
+              const result = this.#retry(nextFailureCount, error) as unknown
+              if (typeof result !== 'boolean') {
+                throw createInvalidRetryPolicyResult(
+                  result,
+                  ResourceErrorText.retryInvalid,
+                  (lateError) =>
+                    this.runtime.reportError(lateError, {
+                      phase: ReactiveErrorPhase.asyncFlush
+                    })
+                )
+              }
+              return result
+            })()
     } catch (policyError) {
       return Promise.reject(policyError)
     }
@@ -835,7 +868,20 @@ export class Resource<T> implements IObserver, IDisposable {
       delay =
         typeof this.#retryDelay === 'number'
           ? this.#retryDelay
-          : this.#retryDelay(nextFailureCount, error)
+          : (() => {
+              const result = this.#retryDelay(nextFailureCount, error) as unknown
+              if (typeof result !== 'number') {
+                throw createInvalidRetryPolicyResult(
+                  result,
+                  ResourceErrorText.retryDelayInvalid,
+                  (lateError) =>
+                    this.runtime.reportError(lateError, {
+                      phase: ReactiveErrorPhase.asyncFlush
+                    })
+                )
+              }
+              return result
+            })()
     } catch (policyError) {
       return Promise.reject(policyError)
     }
@@ -852,11 +898,7 @@ export class Resource<T> implements IObserver, IDisposable {
       let settled = false
       let aborted = false
       let callbackStarted = false
-      let listenerRegistered = false
-      let listenerRegistrationAttempted = false
-      let listenerRegistrationReturned = false
-      let abortDuringRegistration = false
-      let postRegistrationCleanupAttempted = false
+      let subscription: ReturnType<typeof observeAbortSubscription> | undefined
 
       /** Reports cleanup failure without replacing the retry wait's AbortError result. */
       const reportCleanupFailure = (cleanupError: unknown): void => {
@@ -872,22 +914,6 @@ export class Resource<T> implements IObserver, IDisposable {
         })
       }
 
-      /** Removes the retry abort listener, including a forced pass after hostile registration. */
-      const removeAbortListener = (force = false): void => {
-        if (force) {
-          if (!listenerRegistrationAttempted || postRegistrationCleanupAttempted) return
-          postRegistrationCleanupAttempted = true
-        } else if (!listenerRegistered) {
-          return
-        }
-        listenerRegistered = false
-        try {
-          controller.signal.removeEventListener('abort', onAbort)
-        } catch (cleanupError) {
-          reportCleanupFailure(cleanupError)
-        }
-      }
-
       /** Cancels a task returned after an abort/callback race and reports cancel failures. */
       const cancelTask = (task: IScheduledTask, cancellation: boolean): void => {
         try {
@@ -898,12 +924,10 @@ export class Resource<T> implements IObserver, IDisposable {
         }
       }
 
-      const onAbort = (): void => {
+      const onAbort = (_reason: unknown): void => {
         if (settled) return
-        if (!listenerRegistrationReturned) abortDuringRegistration = true
         aborted = true
         settled = true
-        removeAbortListener()
         let cleanupError: unknown
         let cleanupFailed = false
         if (!callbackStarted) {
@@ -915,19 +939,15 @@ export class Resource<T> implements IObserver, IDisposable {
           }
         }
         reject(abortError())
-        if (cleanupFailed) throw cleanupError
+        if (cleanupFailed) reportCleanupFailure(cleanupError)
       }
 
       const onTimer = (): void => {
         if (settled) return
         callbackStarted = true
-        removeAbortListener()
+        subscription?.unsubscribe()
         if (controller.signal.aborted) {
-          try {
-            onAbort()
-          } catch (cleanupError) {
-            reportCleanupFailure(cleanupError)
-          }
+          onAbort(undefined)
           return
         }
         settled = true
@@ -942,19 +962,8 @@ export class Resource<T> implements IObserver, IDisposable {
         }
         // Install first: schedule() may synchronously trigger the generation abort before it
         // returns its task. A listener installed afterward would miss that already-fired signal.
-        listenerRegistrationAttempted = true
-        listenerRegistered = true
-        controller.signal.addEventListener('abort', onAbort, { once: true })
-        listenerRegistrationReturned = true
-        if (abortDuringRegistration) removeAbortListener(true)
-        if (controller.signal.aborted) {
-          try {
-            onAbort()
-          } catch (cleanupError) {
-            reportCleanupFailure(cleanupError)
-          }
-          return
-        }
+        subscription = observeAbortSubscription(controller.signal, onAbort, reportCleanupFailure)
+        subscription.retryRegistrationCleanup()
         if (settled) return
 
         const scheduled = this.#scheduler.schedule(onTimer, delay)
@@ -971,25 +980,17 @@ export class Resource<T> implements IObserver, IDisposable {
           return
         }
         if (controller.signal.aborted) {
-          try {
-            onAbort()
-          } catch (cleanupError) {
-            reportCleanupFailure(cleanupError)
-          }
+          onAbort(undefined)
           if (aborted) cancelTask(scheduled, true)
         }
       } catch (error) {
-        if (listenerRegistrationAttempted && !listenerRegistrationReturned) {
-          listenerRegistrationReturned = true
-          removeAbortListener(true)
-        }
         if (settled) {
           if (aborted) reportCleanupFailure(error)
           else reportSchedulerFailure(error)
           return
         }
         settled = true
-        removeAbortListener()
+        subscription?.unsubscribe()
         reject(createSchedulerFailure(error))
       }
     }).then(() => this.#executeFetcher(controller, nextFailureCount))
@@ -998,14 +999,7 @@ export class Resource<T> implements IObserver, IDisposable {
   #withAbort(source: Promise<T>, signal: IAbortSignal): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       let settled = false
-
-      /** Tracks listener admission and ensures one post-admission cleanup attempt. */
-      const registration = {
-        attempted: false,
-        returned: false,
-        cleanupAttempted: false,
-        abortDuringRegistration: false
-      }
+      let subscription: ReturnType<typeof observeAbortSubscription> | undefined
 
       /** Reports listener cleanup without replacing the request's primary settlement. */
       const reportCleanupFailure = (cleanupError: unknown): void => {
@@ -1018,25 +1012,10 @@ export class Resource<T> implements IObserver, IDisposable {
         }
       }
 
-      /** Removes the listener once, including after an abort callback ran inside addEventListener. */
-      const removeAbortListener = (): void => {
-        if (!registration.attempted || !registration.returned || registration.cleanupAttempted) {
-          return
-        }
-        registration.cleanupAttempted = true
-        try {
-          signal.removeEventListener('abort', onAbort)
-        } catch (cleanupError) {
-          reportCleanupFailure(cleanupError)
-        }
-      }
-
       /** Settles cancellation and defers listener removal until hostile registration returns. */
-      const onAbort = (): void => {
+      const onAbort = (_reason: unknown): void => {
         if (settled) return
-        if (!registration.returned) registration.abortDuringRegistration = true
         settled = true
-        removeAbortListener()
         reject(abortError())
       }
 
@@ -1044,7 +1023,7 @@ export class Resource<T> implements IObserver, IDisposable {
       const onSourceValue = (value: T): void => {
         if (settled) return
         settled = true
-        removeAbortListener()
+        subscription?.unsubscribe()
         resolve(value)
       }
 
@@ -1052,7 +1031,7 @@ export class Resource<T> implements IObserver, IDisposable {
       const onSourceError = (error: unknown): void => {
         if (settled) return
         settled = true
-        removeAbortListener()
+        subscription?.unsubscribe()
         reject(error)
       }
 
@@ -1073,14 +1052,9 @@ export class Resource<T> implements IObserver, IDisposable {
       }
 
       try {
-        registration.attempted = true
-        signal.addEventListener('abort', onAbort, { once: true })
-        registration.returned = true
+        subscription = observeAbortSubscription(signal, onAbort, reportCleanupFailure)
+        subscription.retryRegistrationCleanup()
       } catch (error) {
-        // Treat a throwing add as returned for rollback: hostile implementations may have stored
-        // the listener before throwing, and must receive one removal attempt.
-        registration.returned = true
-        removeAbortListener()
         if (settled) {
           // An abort callback already won; preserve AbortError and expose registration failure via
           // the package diagnostic boundary instead of replacing the primary rejection.
@@ -1103,14 +1077,14 @@ export class Resource<T> implements IObserver, IDisposable {
         abortedAfterRegistration = signal.aborted
       } catch (error) {
         settled = true
-        removeAbortListener()
+        subscription?.unsubscribe()
         reject(createSignalRegistrationFailure(error))
         return
       }
-      if (registration.abortDuringRegistration || abortedAfterRegistration) {
-        onAbort()
+      if (abortedAfterRegistration) {
+        onAbort(undefined)
       }
-      if (settled) removeAbortListener()
+      if (settled) subscription?.unsubscribe()
     })
   }
 
@@ -1134,11 +1108,8 @@ export class Resource<T> implements IObserver, IDisposable {
             this.#expiresAt = 0
             this.#staleAfterSettlement = false
           }
-          try {
-            this.#stateSignal.value = { status: ResourceStatus.success, data }
-          } finally {
-            this.#requestPending = false
-          }
+          this.#requestPending = false
+          this.#stateSignal.value = { status: ResourceStatus.success, data }
           // autoStart 后从未被观察 → 主动休眠，防止上游边永驻
           if (this.#stateSignal.subs.size === 0) {
             this.#scheduleSuspension()
@@ -1149,11 +1120,8 @@ export class Resource<T> implements IObserver, IDisposable {
             return
           this.#settlementExpiry = undefined
           this.#staleAfterSettlement = false
-          try {
-            this.#stateSignal.value = { status: ResourceStatus.error, error }
-          } finally {
-            this.#requestPending = false
-          }
+          this.#requestPending = false
+          this.#stateSignal.value = { status: ResourceStatus.error, error }
           // autoStart 后从未被观察 → 主动休眠
           if (this.#stateSignal.subs.size === 0) {
             this.#scheduleSuspension()
