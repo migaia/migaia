@@ -321,6 +321,18 @@ export const runAsyncMiddleware = async <TValue>(
   const stageSnapshot = stages.slice()
   let index = -1
   let completed = false
+  /** Bounds native recursion while retaining synchronous shallow downstream entry. */
+  const maxNativeDepth = 256
+  /** Synchronous spill records used only after the native depth guard trips. */
+  const spill: Array<{
+    readonly value: TValue
+    readonly parentControlPath: IAsyncControlPath
+    readonly resolve: () => void
+    readonly reject: (error: unknown) => void
+  }> = []
+  let nativeDepth = 0
+  let drainingSpill = false
+  let invokeStep!: (current: TValue, parentControlPath?: IAsyncControlPath) => Promise<void>
   /** Executes one stage and reports runner-owned active control to its parent. */
   const step = async (current: TValue, parentControlPath?: IAsyncControlPath): Promise<void> => {
     /** Records an exact entry or post-stage active guard failure on this frame's parent slot. */
@@ -365,7 +377,7 @@ export const runAsyncMiddleware = async <TValue>(
       }
       called = true
       /** Internal downstream Promise retained for independent failure observation. */
-      const downstreamPromise = Promise.resolve().then(() => step(nextValue, downstreamControlPath))
+      const downstreamPromise = invokeStep(nextValue, downstreamControlPath)
       pending = downstreamPromise
       void downstreamPromise.then(undefined, (error) => {
         downstreamError = error
@@ -389,6 +401,20 @@ export const runAsyncMiddleware = async <TValue>(
       } catch (error) {
         downstreamError = error
         hasDownstreamError = true
+      }
+    }
+    // A signal can abort while a downstream stage is settling. Check the runner-owned control
+    // state before reducing ordinary stage/downstream failures so cancellation remains primary.
+    if (
+      !completed &&
+      context?.signal.aborted &&
+      (!hasStageError || stageError === downstreamError)
+    ) {
+      try {
+        check(context)
+      } catch (error) {
+        markParentActiveError(error)
+        throw error
       }
     }
     if (downstreamControlPath.hasActiveError) {
@@ -419,6 +445,40 @@ export const runAsyncMiddleware = async <TValue>(
         markParentActiveError(error)
         throw error
       }
+    }
+  }
+  /** Drains deep requests without adding a microtask boundary to their stage entry. */
+  const drainSpill = (): void => {
+    if (drainingSpill) return
+    drainingSpill = true
+    while (spill.length > 0) {
+      const request = spill.shift()!
+      try {
+        const result = step(request.value, request.parentControlPath)
+        void result.then(request.resolve, request.reject)
+      } catch (error) {
+        request.reject(error)
+      }
+    }
+    drainingSpill = false
+  }
+  invokeStep = (current, parentControlPath) => {
+    if (drainingSpill || nativeDepth >= maxNativeDepth) {
+      return new Promise<void>((resolve, reject) => {
+        spill.push({
+          value: current,
+          parentControlPath: parentControlPath as IAsyncControlPath,
+          resolve,
+          reject
+        })
+        drainSpill()
+      })
+    }
+    nativeDepth += 1
+    try {
+      return step(current, parentControlPath)
+    } finally {
+      nativeDepth -= 1
     }
   }
   await step(value)

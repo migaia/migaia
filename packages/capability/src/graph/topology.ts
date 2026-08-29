@@ -93,12 +93,8 @@ function snapshotTopologyNode(
     (ordinalValue as number) >= nodeCount
   )
     onInvalid(TopologyInvalidReason.invalidNode, nodeId)
-  let dependencyValues: unknown[]
-  try {
-    dependencyValues = Array.from(dependenciesValue as Iterable<unknown>)
-  } catch {
-    onInvalid(TopologyInvalidReason.invalidNode, nodeId)
-  }
+  if (!Array.isArray(dependenciesValue)) onInvalid(TopologyInvalidReason.invalidNode, nodeId)
+  const dependencyValues: unknown[] = dependenciesValue.slice()
   const edgeProviders = new Set<string>()
   const dependencies = dependencyValues.map((candidateDependency) => {
     if (
@@ -137,12 +133,8 @@ function snapshotTopologyNodes(
   nodes: readonly ITopologyNode[],
   onInvalid: (reason: ITopologyInvalidReason, nodeId?: string) => never
 ): readonly ITopologyNode[] {
-  let candidates: unknown[]
-  try {
-    candidates = Array.from(nodes as Iterable<unknown>)
-  } catch {
-    onInvalid(TopologyInvalidReason.invalidNode)
-  }
+  if (!Array.isArray(nodes)) onInvalid(TopologyInvalidReason.invalidNode)
+  const candidates: unknown[] = nodes.slice() as unknown[]
   const ids = new Set<string>()
   const ordinals = new Set<number>()
   const snapshots: ITopologyNode[] = []
