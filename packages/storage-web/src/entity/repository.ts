@@ -794,14 +794,15 @@ export const createRepository = <
 
   const sortRecords = (
     records: TDomain[],
-    comparator: (left: TDomain, right: TDomain) => number
+    comparator: (left: TDomain, right: TDomain) => number,
+    direction: 'next' | 'prev' | undefined
   ): void => {
     try {
       records.sort((left, right) => {
         const result = comparator(left, right)
         if (typeof result !== 'number' || Number.isNaN(result))
           throw new TypeError('entity orderBy comparator must return a number')
-        return result
+        return direction === 'prev' ? -result : result
       })
     } catch (cause) {
       throw new StorageError(StorageErrorCode.extensionFailed, {
@@ -820,12 +821,13 @@ export const createRepository = <
     runtime: IStorageOperationRuntime,
     applyOrdering = true
   ) {
+    if (options?.limit === 0) return
     const comparator = applyOrdering ? (options?.orderBy ?? defaultOrderBy) : undefined
     if (comparator) {
       const buffered: TDomain[] = []
       const scanOptions = { ...options, orderBy: undefined, limit: undefined }
       for await (const record of streamImpl(scanOptions, ctx, runtime, false)) buffered.push(record)
-      sortRecords(buffered, comparator)
+      sortRecords(buffered, comparator, options?.direction)
       const limited = options?.limit === undefined ? buffered : buffered.slice(0, options.limit)
       for (const record of limited) yield record
       return
@@ -940,6 +942,7 @@ export const createRepository = <
     snapshot: IIndexedListSnapshot,
     ctx: IOperationContext | undefined
   ): Promise<TDomain[]> => {
+    if (snapshot.options?.limit === 0) return []
     const index = config.indexes[snapshot.index]
     if (index === undefined)
       throw new StorageError(StorageErrorCode.invalidConfig, {
@@ -977,6 +980,19 @@ export const createRepository = <
         ? recordStore
         : undefined
     if (nativeIndexStore !== undefined && capability !== undefined) {
+      /**
+       * A native limit bounds physical index rows, not accepted entities. Push it down only when
+       * one non-multiEntry row is guaranteed per entity and invalid rows cannot be skipped; custom
+       * ordering, multiEntry dedupe, and skip handlers must retain the full candidate scan.
+       */
+      const nativeLimit =
+        normalized?.limit !== undefined &&
+        normalized.onInvalid === 'throw' &&
+        !index.definition.multiEntry &&
+        normalized.orderBy === undefined &&
+        defaultOrderBy === undefined
+          ? normalized.limit
+          : undefined
       const handle = await capability.ensureRecordIndexes(
         name,
         Object.values(config.indexes).map((entry) => entry.definition),
@@ -990,7 +1006,8 @@ export const createRepository = <
             handle,
             index: snapshot.index,
             range: indexRange,
-            direction: normalized?.direction
+            direction: normalized?.direction,
+            limit: nativeLimit
           },
           context
         )) {
@@ -1178,6 +1195,7 @@ export const createRepository = <
       const context = snapshotOperationContext(ctx)
       const runtime = createStorageOperationRuntime()
       const normalized = normalizeListOptions(options)
+      if (normalized?.limit === 0) return []
       const results: TDomain[] = []
       const comparator = normalized?.orderBy ?? defaultOrderBy
       const streamOptions = comparator ? { ...normalized, limit: undefined } : normalized
@@ -1221,6 +1239,7 @@ export const createRepository = <
           ? recordStore
           : undefined
       const normalized = snapshot.options
+      if (normalized?.limit === 0) return
       if (
         nativeCapability !== undefined &&
         nativeIndexStore !== undefined &&
@@ -1237,6 +1256,7 @@ export const createRepository = <
           if (readiness.status === 'complete') {
             const runtime = createStorageOperationRuntime()
             let yielded = 0
+            const seenIds = new Set<string>()
             for await (const [recordKey, raw] of nativeIndexStore.iterateRecordIndex(
               {
                 handle,
@@ -1246,10 +1266,20 @@ export const createRepository = <
               },
               ctx
             )) {
+              const recordId =
+                decodeRepositoryKey(name, recordKey) ??
+                (Array.isArray(recordKey) && recordKey.length === 2 && recordKey[0] === name
+                  ? (recordKey[1] as IStorageKey)
+                  : undefined)
+              if (recordId !== undefined) {
+                const identity = encodeFlatStorageKey(recordId)
+                if (seenIds.has(identity)) continue
+              }
               try {
                 const envelope = await decodeEnvelope(raw, ctx, runtime)
                 const value = await materialize(envelope, ctx, runtime)
                 if (value === undefined) continue
+                if (recordId !== undefined) seenIds.add(encodeFlatStorageKey(recordId))
                 yield value
                 yielded += 1
                 if (normalized?.limit !== undefined && yielded >= normalized.limit) return

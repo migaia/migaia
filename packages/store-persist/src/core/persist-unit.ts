@@ -24,6 +24,27 @@ import { assertPersistString } from './options.js'
 /** Maximum single delay accepted by Web/Node timers. */
 const MAX_TIMER_DELAY_MS = 2_147_483_647
 
+/** Rejects an accidental async callback before its Promise can enter state or storage. */
+function assertSynchronousCallbackResult<T>(key: string, name: string, value: T): T {
+  let then: unknown
+  try {
+    then = (value as { readonly then?: unknown } | null)?.then
+  } catch (error) {
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.invalidOption,
+      StorePersistErrorText.callbackAsync(key, name),
+      { cause: error }
+    )
+  }
+  if (typeof then === 'function') {
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.invalidOption,
+      StorePersistErrorText.callbackAsync(key, name)
+    )
+  }
+  return value
+}
+
 function disposedError(cause?: unknown): Error {
   return createStorePersistAbortError(
     StorePersistErrorCode.abortedByDispose,
@@ -243,8 +264,11 @@ export function persistUnit<TState>(
   let generationEpoch = 0
   const activeOperations = new Set<AbortController>()
   let hydrationSettled = false
+  let hydrationFailed = false
   let hydrating = false
   let dirtyDuringHydrate = false
+  /** Shares a recovery read so concurrent callers cannot restore two snapshots out of order. */
+  let retryPromise: Promise<void> | undefined
   const hydrationStartSnapshot = unit.snapshot()
   // 串行写队列：所有写入排成一条链，避免异步存储下"慢的旧写入后完成、覆盖新写入"的乱序问题。
   let writeChain: Promise<void> = Promise.resolve()
@@ -302,7 +326,7 @@ export function persistUnit<TState>(
           runAdapterOperation(async (signal) => {
             const envelope: IEnvelope<Partial<TState>> = {
               version,
-              state: partialize(unit.snapshot())
+              state: assertSynchronousCallbackResult(key, 'partialize', partialize(unit.snapshot()))
             }
             await writeEnvelope(storage, key, codec, envelope, { signal })
           })
@@ -325,7 +349,11 @@ export function persistUnit<TState>(
   }
 
   function scheduleWrite(): void {
-    if (disposed || hydrating) return
+    if (disposed) return
+    if (hydrating || hydrationFailed) {
+      dirtyDuringHydrate = true
+      return
+    }
     if (!hydrationSettled) {
       dirtyDuringHydrate = true
       return
@@ -343,9 +371,15 @@ export function persistUnit<TState>(
 
   stopSubscription = unit.subscribe(scheduleWrite)
 
-  const settled = Promise.resolve()
-    .then(() => runAdapterOperation((signal) => readEnvelope(storage, key, codec, { signal })))
-    .then(async (raw) => {
+  const hydrateAttempt = async (): Promise<void> => {
+    hydrationSettled = false
+    hydrationFailed = false
+    hydrationStatus.value = PersistState.loading
+    hydrationError.value = undefined
+    try {
+      const raw = await runAdapterOperation((signal) =>
+        readEnvelope(storage, key, codec, { signal })
+      )
       if (disposed) return
       if (raw !== undefined) {
         const envelope = assertEnvelope<Partial<TState>>(raw, key)
@@ -357,7 +391,11 @@ export function persistUnit<TState>(
               StorePersistErrorText.versionMismatch(key, envelope.version, version)
             )
           }
-          state = migrate(state as TState, envelope.version) as Partial<TState>
+          state = assertSynchronousCallbackResult(
+            key,
+            'migrate',
+            migrate(state as TState, envelope.version)
+          ) as Partial<TState>
         }
         // Always reconcile the persisted snapshot with the current snapshot. The
         // default object merge preserves fields initialized or mutated while the
@@ -368,7 +406,7 @@ export function persistUnit<TState>(
           const reconciled =
             options.merge === undefined
               ? mergePersistedPlainState(state, current, hydrationStartSnapshot)
-              : merge(state, current)
+              : assertSynchronousCallbackResult(key, 'merge', merge(state, current))
           unit.restore(reconciled)
         } finally {
           hydrating = false
@@ -377,15 +415,20 @@ export function persistUnit<TState>(
       hydrationStatus.value = PersistState.success
       hydrationError.value = undefined
       hydrationSettled = true
-      if (dirtyDuringHydrate) scheduleWrite()
-    })
-    .catch((caught) => {
+      const shouldWriteAfterHydrate = dirtyDuringHydrate
+      dirtyDuringHydrate = false
+      if (shouldWriteAfterHydrate) scheduleWrite()
+    } catch (caught) {
       if (disposed) return
       hydrationError.value = caught
       hydrationStatus.value = PersistState.error
       hydrationSettled = true
-      if (dirtyDuringHydrate) scheduleWrite()
-    })
+      hydrationFailed = true
+      throw caught
+    }
+  }
+
+  const settled = hydrateAttempt().catch(() => undefined)
 
   const ready = settled.then(() => {
     if (hydrationStatus.value === PersistState.error) throw hydrationError.value
@@ -402,6 +445,21 @@ export function persistUnit<TState>(
     writeError,
     ready,
     settled,
+    async retryHydrate() {
+      assertActive()
+      if (!hydrationFailed) {
+        await settled
+        if (hydrationFailed) throw hydrationError.value
+        return
+      }
+      if (retryPromise !== undefined) return retryPromise
+      retryPromise = hydrateAttempt()
+      try {
+        await retryPromise
+      } finally {
+        retryPromise = undefined
+      }
+    },
     async flush() {
       assertActive()
       const pendingWrite = writeDrain
@@ -410,6 +468,7 @@ export function persistUnit<TState>(
         timer = undefined
       }
       await settled
+      if (hydrationFailed) throw hydrationError.value
       // Capture the write already observed by this flush before checking the
       // lifecycle again. If dispose wins while the adapter ignores abort, its
       // late storage failure must remain reachable as the AbortError cause.
@@ -425,6 +484,7 @@ export function persistUnit<TState>(
         timer = undefined
       }
       await settled
+      if (hydrationFailed) throw hydrationError.value
       assertActive()
       const operation = writeChain.then(async () => {
         assertActive()

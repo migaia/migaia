@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url'
 const packageDirectory = resolve(fileURLToPath(new URL('..', import.meta.url)))
 /** Canonical runtime dependency needed by the packed codec and error constructors. */
 const utilsDirectory = resolve(packageDirectory, '../utils')
+/** Runtime-neutral collection codec dependency needed by the packed default codec. */
+const contractDirectory = resolve(packageDirectory, '../storage-contract')
 /** Isolated consumer proving package resolution from extracted tarballs. */
 const smokeDirectory = mkdtempSync(join(tmpdir(), 'migaia-store-persist-packed-'))
 
@@ -19,21 +21,30 @@ function main() {
     const consumerDirectory = join(smokeDirectory, 'consumer')
     mkdirSync(packDirectory, { recursive: true })
     mkdirSync(extractDirectory, { recursive: true })
-    for (const sourceDirectory of [utilsDirectory, packageDirectory])
+    for (const sourceDirectory of [utilsDirectory, contractDirectory, packageDirectory])
       execFileSync('pnpm', ['pack', '--pack-destination', packDirectory], {
         cwd: sourceDirectory,
         stdio: 'inherit'
       })
     const tarballs = readdirSync(packDirectory).filter((entry) => entry.endsWith('.tgz'))
     const utilsTarball = tarballs.find((entry) => entry.startsWith('migaia-utils-'))
+    const contractTarball = tarballs.find((entry) => entry.startsWith('migaia-storage-contract-'))
     const packageTarball = tarballs.find((entry) => entry.startsWith('migaia-store-persist-'))
-    if (utilsTarball === undefined || packageTarball === undefined)
+    if (utilsTarball === undefined || contractTarball === undefined || packageTarball === undefined)
       throw new Error('packed store-persist dependency set is incomplete')
     const utilsExtractDirectory = join(extractDirectory, 'utils')
+    const contractExtractDirectory = join(extractDirectory, 'storage-contract')
     const packageExtractDirectory = join(extractDirectory, 'package')
     mkdirSync(utilsExtractDirectory, { recursive: true })
+    mkdirSync(contractExtractDirectory, { recursive: true })
     mkdirSync(packageExtractDirectory, { recursive: true })
     execFileSync('tar', ['-xzf', join(packDirectory, utilsTarball), '-C', utilsExtractDirectory])
+    execFileSync('tar', [
+      '-xzf',
+      join(packDirectory, contractTarball),
+      '-C',
+      contractExtractDirectory
+    ])
     execFileSync('tar', [
       '-xzf',
       join(packDirectory, packageTarball),
@@ -46,6 +57,19 @@ function main() {
     symlinkSync(
       join(utilsExtractDirectory, 'package'),
       join(packageExtractDirectory, 'package', 'node_modules', '@migaia/utils'),
+      'dir'
+    )
+    symlinkSync(
+      join(contractExtractDirectory, 'package'),
+      join(packageExtractDirectory, 'package', 'node_modules', '@migaia/storage-contract'),
+      'dir'
+    )
+    mkdirSync(join(contractExtractDirectory, 'package', 'node_modules', '@migaia'), {
+      recursive: true
+    })
+    symlinkSync(
+      join(utilsExtractDirectory, 'package'),
+      join(contractExtractDirectory, 'package', 'node_modules', '@migaia/utils'),
       'dir'
     )
     mkdirSync(consumerDirectory, { recursive: true })

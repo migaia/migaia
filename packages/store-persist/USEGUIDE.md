@@ -252,6 +252,7 @@ async function logout(userId: string) {
 | `writeStatus` / `writeError`         | `IReadonlyPersistValue<...>`                                    | —         | 最近一次写操作的结果，会反复变化                                  |
 | `ready`                              | `Promise<void>`                                                 | 异步      | hydrate 成功 resolve，失败 reject                                 |
 | `settled`                            | `Promise<void>`                                                 | 异步      | 不管成功失败都 resolve                                            |
+| `retryHydrate()`                     | `() => Promise<void>`                                           | 异步      | 首次 hydrate 失败后重新读取；成功后恢复有序写入                    |
 | `flush()`                            | `() => Promise<void>`                                           | 异步      | 立即写并等待完成；这次写入失败会 reject 给调用方                  |
 | `clear()`                            | `() => Promise<void>`                                           | 异步      | 删除存档，不重置内存状态                                          |
 | `disposed`                           | `boolean`                                                       | 同步      | 是否已 `dispose()`                                                |
@@ -267,10 +268,10 @@ async function logout(userId: string) {
 `memoryStorage()`、`localStorage()` 或 `indexedDb()` 的返回值即可。binary codec 另需
 `getBytes`/`setBytes`。
 
-`codec` 默认是本包自带的 `defaultJsonCodec`（`output: 'text'`，遵循 `@migaia/storage-contract` 的 `ICodec` 契约；本包不运行时依赖 storage-web 的具体 codec 值）。这个默认 codec 额外处理了 `JSON.stringify` 原生不支持的两种形状：
+`codec` 默认是本包自带的 `defaultJsonCodec`（`name: 'migaia-collections-json-v1'`、`output: 'text'`，遵循 `@migaia/storage-contract` 的 `ICodec` 契约；本包不运行时依赖 storage-web 的具体 codec 值）。这个默认 codec 额外处理了 `JSON.stringify` 原生不支持的两种形状：
 
-- `Map` → 编码成 `{ "__migaia_persist_map__": [[key, value], ...] }`，解码时还原成真正的 `Map` 实例。
-- `Set` → 编码成 `{ "__migaia_persist_set__": [value, ...] }`，解码时还原成真正的 `Set` 实例。
+- `Map`/`Set` → 使用 storage-contract 所有的 `migaia-collections-json-v1` 版本化标记编码，解码时还原成真正的 `Map`/`Set` 实例。
+- 旧存档中的 `__migaia_persist_map__`/`__migaia_persist_set__` 仅按精确标签显式迁移；其他相似字段不会被猜测为集合。
 
 这不是可选的锦上添花——`JSON.stringify(new Map(...))` 产出 `"{}"`，**静默丢光内容而不报错**，`persistCollection()` 接的 `ObservableMap`/`ObservableSet` 的 `snapshot()` 就是真实的 `Map`/`Set` 实例，不处理这个坑会导致 keyed/indexed 场景下的 Map/Set 数据悄悄消失。
 
@@ -294,15 +295,16 @@ const handle = persistCollection(bigDataset, {
 
 所有包边界错误都带 `source: '@migaia/store-persist'` 与稳定 `code`。重点检查
 `ENVELOPE_INVALID`、`ENCODE_FAILED`、`BACKEND_CAPABILITY`、`CODEC_OUTPUT_MISMATCH` 和
-`ABORTED_BY_DISPOSE`；后者保留原生 `AbortError`。hydrate/write 同时失败时，`AggregateError.errors`
-保留两个原因。
+`ABORTED_BY_DISPOSE`；后者保留原生 `AbortError`。hydrate 失败会保留原始错误并阻塞
+`flush()`/`clear()`，直到一次成功的 `retryHydrate()` 重新打开有序写入。
 
 | 触发条件                                                     | 错误类型                                   | 说明                                                      |
 | ------------------------------------------------------------ | ------------------------------------------ | --------------------------------------------------------- |
 | `version` 不是安全非负整数                                   | `TypeError`                                | 构造时同步抛出                                            |
 | 存档不是合法信封（不是对象/缺 `version`/缺 `state`）         | `PersistEnvelopeError`（继承 `TypeError`） | hydrate 阶段，反映在 `hydrationError`/`ready` reject      |
+| hydrate 失败后调用 `flush()`/`clear()`                        | 原始 hydrate 错误                          | 写入保持阻塞并保留 dirty 状态；成功的 `retryHydrate()` 才恢复写入 |
 | `version` 与存档不一致且未提供 `migrate`                     | `Error`                                    | 消息含 `provide migrate()`                                |
-| codec 编码失败（比如值包含循环引用）                         | 取决于 codec 实现                          | `defaultJsonCodec` 透传 `JSON.stringify` 的原生错误       |
+| codec 编码失败（比如值包含循环引用）                         | `TypeError`                                | `defaultJsonCodec` 保留原始错误为 `cause` 并附加 `ENCODE_FAILED` |
 | `codec.output === 'structured'` 但存储不支持                 | `TypeError`                                | 见 [§7](#7-与-storage-web-的-codec-集成)                  |
 | `codec.output === 'binary'` 但存储没有 `getBytes`/`setBytes` | `TypeError`                                | 同上                                                      |
 | `persistKeyed()` 未传 `namespace`                            | TypeScript 编译期错误                      | `namespace` 是必填字段，不是运行时校验                    |

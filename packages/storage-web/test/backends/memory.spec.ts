@@ -4,6 +4,16 @@ import { memoryStorage } from '../../src/backends/memory'
 import { composeRepositoryKey } from '../../src/entity/key.js'
 
 describe('memoryStorage', () => {
+  it('absent record deletes are true no-ops for revisions and change feed', async () => {
+    const store = memoryStorage()
+    const changes: IStorageChange[] = []
+    const stop = store.subscribeChanges((change) => changes.push(change))
+    await store.deleteRecord('missing')
+    await store.transaction(async (tx) => tx.delete('also-missing'))
+    stop()
+    expect(changes).toEqual([])
+  })
+
   it('自动生成 key 即使随机源重复也不会覆盖已有 record', async () => {
     const originalCrypto = globalThis.crypto
     Object.defineProperty(globalThis, 'crypto', {
@@ -582,7 +592,9 @@ describe('memoryStorage change feed (SWV2-B05/R05/R16)', () => {
     })
     expect(changes).toHaveLength(1)
     expect(changes[0]).toMatchObject({ channel: 'record', kind: 'batch' })
-    expect(new Set(changes[0]!.keys)).toEqual(new Set(['a', 'b']))
+    // Net-change reporting omits the transient put/delete of `a`; only `b` exists
+    // in the committed transaction result.
+    expect(new Set(changes[0]!.keys)).toEqual(new Set(['b']))
 
     // A transaction whose callback throws must roll back with zero events (not one, not partial).
     await expect(

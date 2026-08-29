@@ -25,6 +25,8 @@ export const StorePersistErrorText = {
     `[store] persist "${key}" debounceMs must be a finite, non-negative number`,
   callback: (key: string, name: string): string =>
     `[store] persist "${key}" ${name} must be a function`,
+  callbackAsync: (key: string, name: string): string =>
+    `[store] persist "${key}" ${name} must return synchronously`,
   codecInvalid: (key: string): string => `[store] persist "${key}" codec is invalid`,
   storageInvalid: (key: string): string => `[store] persist "${key}" storage adapter is invalid`,
   hydrationWriteFailed: '[store] persist hydration and write both failed',

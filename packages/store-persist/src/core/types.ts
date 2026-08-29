@@ -48,6 +48,8 @@ export type IPersistHandle = {
   ready: Promise<void>
   /** Hydration 成功或失败都 resolve。 */
   settled: Promise<void>
+  /** 失败后重新读取一次存档；只有本次读取成功才解除写入闸门。 */
+  retryHydrate(): Promise<void>
   /** 立即写并等待全部在途写入完成；期间 dispose 会以 AbortError 结束。 */
   flush(): Promise<void>
   /** 排队删除存档；期间 dispose 会以 AbortError 结束。 */

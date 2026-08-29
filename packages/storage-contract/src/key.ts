@@ -62,27 +62,30 @@ export function assertStorageKey(
     if (nodes > KEY_DOMAIN_LIMITS.maxNodes || depth > KEY_DOMAIN_LIMITS.maxDepth) return false
     if (typeof candidate === 'string') return true
     if (typeof candidate === 'number') return Number.isFinite(candidate)
+    if (Array.isArray(candidate)) {
+      try {
+        const length = candidate.length
+        if (length === 0) return false
+        if (seen.has(candidate)) return false
+        seen.add(candidate)
+        for (let index = 0; index < length; index += 1) {
+          if (!Object.hasOwn(candidate, index) || !visit(candidate[index], depth + 1, seen)) {
+            seen.delete(candidate)
+            return false
+          }
+        }
+        seen.delete(candidate)
+        return true
+      } catch {
+        seen.delete(candidate)
+        return false
+      }
+    }
     const date = dateValue(candidate)
     if (date !== undefined) return !Number.isNaN(date)
     const buffer = bufferValue(candidate)
     if (buffer !== undefined) return buffer.byteLength <= KEY_DOMAIN_LIMITS.maxBinaryBytes
-    if (!Array.isArray(candidate) || seen.has(candidate)) return false
-    try {
-      const length = candidate.length
-      if (length === 0) return false
-      seen.add(candidate)
-      for (let index = 0; index < length; index += 1) {
-        if (!Object.hasOwn(candidate, index) || !visit(candidate[index], depth + 1, seen)) {
-          seen.delete(candidate)
-          return false
-        }
-      }
-      seen.delete(candidate)
-      return true
-    } catch {
-      seen.delete(candidate)
-      return false
-    }
+    return false
   }
   if (!visit(value, 0, new Set()))
     throw new StorageContractError(StorageContractErrorCode.invalidKey, {
@@ -101,14 +104,17 @@ export const snapshotStorageKey = (
   assertStorageKey(value, backend, label)
   const clone = (candidate: IStorageKey): IStorageKey => {
     if (typeof candidate === 'string' || typeof candidate === 'number') return candidate
+    if (Array.isArray(candidate)) {
+      const snapshot: IStorageKey[] = []
+      for (let index = 0; index < candidate.length; index += 1)
+        snapshot.push(clone(candidate[index]!))
+      return snapshot
+    }
     const date = dateValue(candidate)
     if (date !== undefined) return new Date(date)
     const buffer = bufferValue(candidate)
     if (buffer !== undefined) return buffer
-    const source = candidate as readonly IStorageKey[]
-    const snapshot: IStorageKey[] = []
-    for (let index = 0; index < source.length; index += 1) snapshot.push(clone(source[index]!))
-    return snapshot
+    return candidate
   }
   try {
     const snapshot = clone(value)
@@ -128,6 +134,7 @@ export const snapshotStorageKey = (
 export const compareStorageKeys = (a: IStorageKey, b: IStorageKey): number => {
   const rank = (value: IStorageKey): number => {
     if (typeof value === 'number') return 0
+    if (Array.isArray(value)) return 4
     if (dateValue(value) !== undefined) return 1
     if (typeof value === 'string') return 2
     if (bufferValue(value) !== undefined) return 3

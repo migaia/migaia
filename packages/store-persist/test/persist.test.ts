@@ -120,6 +120,36 @@ describe('persist（store-light）', () => {
     store.$dispose()
   })
 
+  it('hydration failure blocks writes until a fresh successful retryHydrate', async () => {
+    const storage = memoryStorage()
+    const failure = new Error('temporary read failure')
+    let reads = 0
+    let writes = 0
+    const originalGet = storage.get
+    const originalSet = storage.set
+    storage.get = async (key, ctx) => {
+      reads += 1
+      if (reads === 1) throw failure
+      return originalGet(key, ctx)
+    }
+    storage.set = async (key, value, ctx) => {
+      writes += 1
+      return originalSet(key, value, ctx)
+    }
+    const store = createStore({ count: 0 })
+    const handle = persist(store, { key: 'retry-hydrate', storage })
+    store.count = 1
+    await expect(handle.ready).rejects.toBe(failure)
+    await expect(handle.flush()).rejects.toBe(failure)
+    expect(writes).toBe(0)
+    await handle.retryHydrate()
+    await handle.flush()
+    expect(reads).toBe(2)
+    expect(writes).toBeGreaterThanOrEqual(1)
+    handle.dispose()
+    store.$dispose()
+  })
+
   it('hydrate 命中时把持久化值写回 store', async () => {
     const storage = memoryStorage()
     await storage.set('settings', JSON.stringify({ version: 0, state: { theme: 'dark' } }))
