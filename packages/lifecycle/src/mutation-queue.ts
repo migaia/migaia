@@ -49,6 +49,7 @@ type IMutationRecord = {
   admissionCancelAttempted: boolean
   timeoutError: unknown
   timeoutSettled: boolean
+  queueIndex: number
 }
 
 /** Keeps a timeout task's cancellation failure attached to the timeout primary. */
@@ -82,7 +83,9 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
   const defaultAdmissionTimeoutMs = options.queueAdmissionTimeoutMs
   const admissionDiagnosticMs = options.admissionDiagnosticMs ?? 1000
   const scheduler = resolveSchedulerOption(options, systemScheduler)
-  const queue: IMutationRecord[] = []
+  const queue: Array<IMutationRecord | undefined> = []
+  let queueHead = 0
+  let queuedCount = 0
   let running = false
   let runningOwner: string | undefined
 
@@ -159,6 +162,24 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
     }
   }
 
+  /** Removes a queued record in O(1), leaving a tombstone for the FIFO head scanner. */
+  const removeQueued = (record: IMutationRecord): boolean => {
+    const index = record.queueIndex
+    if (index < queueHead || queue[index] !== record) return false
+    queue[index] = undefined
+    record.queueIndex = -1
+    queuedCount--
+    if (queueHead > 1024 && queueHead * 2 > queue.length) {
+      queue.splice(0, queueHead)
+      for (let index = 0; index < queue.length; index++) {
+        const entry = queue[index]
+        if (entry !== undefined) entry.queueIndex = index
+      }
+      queueHead = 0
+    }
+    return true
+  }
+
   const armAdmission = (record: IMutationRecord, timeoutMs: number | false | undefined): void => {
     if (timeoutMs === false) return
     const startedAt = scheduler.now()
@@ -174,10 +195,22 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
       return
     }
     const timer = scheduler.schedule(() => {
-      const index = queue.indexOf(record)
-      if (index < 0) return // already dequeued to run, or already settled
-      queue.splice(index, 1)
-      const waitedMs = scheduler.now() - startedAt
+      if (!removeQueued(record)) return // already dequeued to run, or already settled
+      let waitedMs: number
+      try {
+        waitedMs = Math.max(0, scheduler.now() - startedAt)
+      } catch (error) {
+        record.timeoutSettled = true
+        record.admissionTimer = undefined
+        record.reject(
+          createLifecycleError(
+            LifecycleErrorCode.queueAdmissionTimeout,
+            LifecycleErrorText.mutationAdmissionTimedOut,
+            { cause: error, detail: { owner: record.owner, phase: 'timeout-clock' } }
+          )
+        )
+        return
+      }
       record.timeoutError = createLifecycleError(
         LifecycleErrorCode.queueAdmissionTimeout,
         `[lifecycle] mutation waited in the queue for more than ${timeoutMs}ms`,
@@ -186,6 +219,7 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
       if (record.admissionTimer !== undefined && !record.timeoutSettled) {
         record.timeoutSettled = true
         const cancelError = cancelAdmissionTask(record)
+        record.admissionTimer = undefined
         record.reject(
           cancelError === undefined
             ? record.timeoutError
@@ -208,7 +242,14 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
 
   const runNext = (): void => {
     if (running) return
-    const next = queue.shift()
+    while (queueHead < queue.length && queue[queueHead] === undefined) queueHead++
+    const next = queue[queueHead]
+    if (next !== undefined) {
+      queue[queueHead] = undefined
+      next.queueIndex = -1
+      queueHead++
+      queuedCount--
+    }
     if (!next) return
     disarmAdmission(next)
     running = true
@@ -261,17 +302,19 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
         admissionStartedAt: undefined,
         admissionCancelAttempted: false,
         timeoutError: undefined,
-        timeoutSettled: false
+        timeoutSettled: false,
+        queueIndex: -1
       }
-      const queuedBehindWork = running || queue.length > 0
+      const queuedBehindWork = running || queuedCount > 0
+      record.queueIndex = queue.length
       queue.push(record)
+      queuedCount++
       if (queuedBehindWork) {
         try {
           armAdmission(record, enqueueOptions.queueAdmissionTimeoutMs ?? defaultAdmissionTimeoutMs)
         } catch (error) {
           // 排程失败不得留下幽灵任务（AF-32）：移除记录并 reject，后续任务不被阻塞、size 正确、原始错误可达。
-          const index = queue.indexOf(record)
-          if (index >= 0) queue.splice(index, 1)
+          removeQueued(record)
           reject(error)
           return
         }
@@ -283,7 +326,7 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
   return {
     enqueue,
     get size() {
-      return queue.length + (running ? 1 : 0)
+      return queuedCount + (running ? 1 : 0)
     }
   }
 }

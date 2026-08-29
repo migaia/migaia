@@ -220,7 +220,7 @@ export const systemScheduler: ILifecycleScheduler = {
     return validateSchedulerTime(perf.now(), 'performance.now()')
   },
   schedule(callback, delayMs) {
-    validateSchedulerDelay(delayMs)
+    const validDelay = validateSchedulerDelay(delayMs)
     const set = host.setTimeout
     const clear = host.clearTimeout
     if (set === undefined || clear === undefined) {
@@ -229,8 +229,21 @@ export const systemScheduler: ILifecycleScheduler = {
         'setTimeout/clearTimeout is unavailable'
       )
     }
-    const handle = set(callback, delayMs)
     let cancelled = false
+    let remaining = validDelay
+    let handle: unknown
+    // Host timers commonly clamp values above the signed 32-bit range to ~1ms. Segment long
+    // delays so lifecycle deadlines retain the same semantics in Node and browsers.
+    const arm = (): void => {
+      if (cancelled) return
+      const segment = Math.min(remaining, 2_147_000_000)
+      remaining -= segment
+      handle = set(() => {
+        if (remaining > 0) arm()
+        else callback()
+      }, segment)
+    }
+    arm()
     return {
       cancel() {
         if (cancelled) return
@@ -254,48 +267,90 @@ export type IManualScheduler = ILifecycleScheduler & {
 export function createManualScheduler(): IManualScheduler {
   let nowMs = 0
   let nextId = 0
-  const tasks = new Map<number, { readonly callback: () => void; readonly at: number }>()
+  type IManualTask = {
+    readonly callback: () => void
+    readonly at: number
+    readonly id: number
+    index: number
+  }
+  const tasks: IManualTask[] = []
+  const swap = (left: number, right: number): void => {
+    const task = tasks[left]!
+    tasks[left] = tasks[right]!
+    tasks[right] = task
+    tasks[left]!.index = left
+    tasks[right]!.index = right
+  }
+  const before = (left: IManualTask, right: IManualTask): boolean =>
+    left.at < right.at || (left.at === right.at && left.id < right.id)
+  const siftUp = (index: number): void => {
+    let current = index
+    while (current > 0) {
+      const parent = Math.floor((current - 1) / 2)
+      if (!before(tasks[current]!, tasks[parent]!)) break
+      swap(current, parent)
+      current = parent
+    }
+  }
+  const siftDown = (index: number): void => {
+    let current = index
+    while (true) {
+      const left = current * 2 + 1
+      const right = left + 1
+      let smallest = current
+      if (left < tasks.length && before(tasks[left]!, tasks[smallest]!)) smallest = left
+      if (right < tasks.length && before(tasks[right]!, tasks[smallest]!)) smallest = right
+      if (smallest === current) return
+      swap(current, smallest)
+      current = smallest
+    }
+  }
+  const remove = (task: IManualTask): void => {
+    const index = task.index
+    if (index < 0 || index >= tasks.length || tasks[index] !== task) return
+    const last = tasks.pop()
+    if (last !== undefined && last !== task) {
+      tasks[index] = last
+      last.index = index
+      siftDown(index)
+      siftUp(index)
+    }
+    task.index = -1
+  }
   return {
     now: () => nowMs,
     schedule(callback, delayMs) {
       const validDelay = validateSchedulerDelay(delayMs)
       const dueAt = addSchedulerTime(nowMs, validDelay, 'schedule dueAt')
-      const id = nextId++
-      tasks.set(id, { callback, at: dueAt })
+      const task: IManualTask = { callback, at: dueAt, id: nextId++, index: tasks.length }
+      tasks.push(task)
+      siftUp(task.index)
       return {
         cancel() {
-          tasks.delete(id)
+          remove(task)
         }
       }
     },
     advance(ms) {
       const validAdvance = validateSchedulerDelay(ms, 'advance')
       const target = addSchedulerTime(nowMs, validAdvance, 'advance target')
-      nowMs = target
       // 循环取下一个到期任务（按到期时刻升序、同刻按登记顺序），直到当前时间点无 due：到期 callback
       // 新排的 delayMs=0 任务也在本次 advance 内 flush（AF-21）。runaway guard 防止自排程挂死测试。
       let runs = 0
       while (true) {
-        let nextId: number | undefined
-        let nextAt = Infinity
-        for (const [id, task] of tasks) {
-          if (task.at > nowMs) continue
-          if (task.at < nextAt || (task.at === nextAt && id < (nextId ?? Infinity))) {
-            nextId = id
-            nextAt = task.at
-          }
-        }
-        if (nextId === undefined) break
+        const task = tasks[0]
+        if (task === undefined || task.at > target) break
         if (++runs > MAX_ADVANCE_FLUSH) {
           throw createLifecycleError(
             LifecycleErrorCode.invalidOption,
             `[lifecycle] manual scheduler advance exceeded the ${MAX_ADVANCE_FLUSH}-task flush guard`
           )
         }
-        const task = tasks.get(nextId)
-        tasks.delete(nextId)
-        task?.callback()
+        remove(task)
+        nowMs = task.at
+        task.callback()
       }
+      nowMs = target
     }
   }
 }

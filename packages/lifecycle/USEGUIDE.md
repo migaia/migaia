@@ -66,6 +66,7 @@ import {
   createDisposeTransaction,
   createSyncStartedDisposalLedger,
   type IReleaseDescriptor,
+  type IDisposerContext,
   type IReleaseContext,
   type ILifecycleScope,
   type ILifecycleScopeOptions,
@@ -107,7 +108,7 @@ type IReleaseDescriptor = {
 - `gcFallback?: boolean` —— 置为 `true` 时向内部 `FinalizationRegistry` 注册一个不强引用 `resource`/闭包 target 的兜底；显式释放（`dispose()`/`release()`）会自动 unregister 它。
 - `custom?` —— 逃生舱：一旦提供，完全接管释放，`graceful`/`force` 被忽略。
 
-`IReleaseContext`（回调收到的第一参数）：`signal: IAbortSignal`（容器进入 closing 时中止）、`deadlineAt: number | undefined`、`scheduler?: ILifecycleScheduler`（产出 `deadlineAt` 的时间域，缺省 `systemScheduler`）、`report(error: unknown): void`（诊断通道，自身抛错被吞掉）。
+`IReleaseContext`（回调收到的第一参数）：`signal: IAbortSignal`（容器进入 closing 时中止）、`deadlineAt: number | undefined`、`scheduler?: ILifecycleScheduler`（产出 `deadlineAt` 的时间域，缺省 `systemScheduler`）、`report(error: unknown): void`（诊断通道，自身抛错被吞掉）、`disposer?: IDisposerContext`。由 `LifecycleScope` 驱动的 disposer 才有 `disposer.join()`；该显式 owner self-join operation 在同步调用及任意 await、microtask、Promise chain、nested helper 或 timer 后都立即抛 `SCOPE_REENTRANT_DISPOSE`，不返回 outer disposal Promise。没有 scope owner 的 generic `createDisposeTransaction()` 不伪造此 capability；不要捕获 scope 后在 disposer 中直接调用 `scope.dispose()` 绕过 context。
 
 ### `createLifecycleScope`
 
@@ -149,7 +150,7 @@ const failures = await scope.dispose() // 逆序释放，'throw' 策略下失败
 - `own(resource, descriptor)`：容器处于 `closing`/`terminal` 时抛 `SCOPE_CLOSED`/`SCOPE_TERMINAL`；在 disposer 内部重入调用抛 `SCOPE_REENTRANT_OWN`。
 - `release(resource)`：反注册但不释放（调用方已自行释放），返回是否找到并移除了该条目；若曾设置 `gcFallback`，同时 unregister 对应的 `FinalizationRegistry` 条目。
 - `close()`：同步、幂等；`open → closing`。
-- `dispose()`：逆序（LIFO）释放全部已注册资源；并发多次调用复用同一个 Promise；在 disposer 内部重入调用抛 `SCOPE_REENTRANT_DISPOSE`；容器已 `terminal` 时立即 resolve 空数组。`errorPolicy: 'collect'` 时返回值为收集到的 `ICollectedError[]`；其余三种策略要么抛出要么内部上报，返回空数组。
+- `dispose()`：逆序（LIFO）释放全部已注册资源；并发多次调用复用同一个 Promise；需要在 disposer 中表达 owner self-join 时使用 `context.disposer.join()`，该操作抛 `SCOPE_REENTRANT_DISPOSE` 且不改变 canonical Promise；容器已 `terminal` 时立即 resolve 空数组。`errorPolicy: 'collect'` 时返回值为收集到的 `ICollectedError[]`；其余三种策略要么抛出要么内部上报，返回空数组。
 - 环境支持时自动挂载 `[Symbol.asyncDispose]`。
 
 ### `createSyncLifecycleScope`
@@ -818,7 +819,7 @@ await terminal.whenTerminal()
 
 | Subpath                        | 主要导出                                                    |
 | ------------------------------ | ----------------------------------------------------------- |
-| `@migaia/lifecycle/abort`      | `createAbortController`、`IAbortSignal`、`IAbortController` |
+| `@migaia/lifecycle/abort`      | `createAbortController`、`observeAbortSubscription`、`IAbortSignal`、`IAbortController`、`IObservedAbortSubscription`、`IObservedAbortFailureSink` |
 | `@migaia/lifecycle/scheduler`  | scheduler、snapshot与时间校验                               |
 | `@migaia/lifecycle/quiescence` | quiescence/lease/pending trackers                           |
 | `@migaia/lifecycle/scope`      | `createLifecycleScope`                                      |
@@ -1261,7 +1262,7 @@ async function shutdown() {
 
 - 构造/执行：`createAbortController`、`createSyncStartedDisposalLedger`、`systemScheduler`、`snapshotScheduler`、`createManualScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`probeThenable`、`assimilateCapturedThen`、`createErrorCollector`、`boundedWait`、`createTerminalController`、`createLifecycleScope`、`createSyncLifecycleScope`、`createLifecycleUnit`、`createGenerationController`、`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`、`createProvisionalScope`、`createMutationQueue`、`executeReleaseDescriptor`、`createDisposeTransaction`。
 - 常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`ThenableProbeKind`、`DisposeTransactionKind`、`LifecycleErrorCode`、`LifecycleErrorText`、`LIFECYCLE_SOURCE`。
-- 类型：`IDisposer`、`ILifecycleOwner`、`ILifecycleState`、`IUnitState`、`IReleaseContext`、`IReleaseDescriptor`、`ICollectedError`、`IErrorPolicy`、`ILifecycleStateValue`、`ILifecycleUnitStateValue`、`ILifecycleErrorPolicy`、`IThenableProbeKind`、`IDisposeTransactionKind`、`IAbortSignal`、`IAbortController`、`ISyncStartedDisposalLedger`、`ISyncStartedDisposalOutcome`、`ILifecycleErrorCode`、`ILifecycleErrorText`、`IScheduledTask`、`ILifecycleScheduler`、`ISchedulerSnapshot`、`IManualScheduler`、`ILifecycleError`、`IThenableProbe`、`IErrorCollector`、`ITerminalController`、`ILifecycleScope`、`ILifecycleScopeOptions`、`ISyncLifecycleScope`、`ISyncLifecycleScopeOptions`、`ISyncReleaseDescriptor`、`ILifecycleUnit`、`ILifecycleUnitOptions`、`IGenerationController`、`IGenerationControllerOptions`、`IGenerationRequest`、`IGenerationToken`、`IQuiescenceTracker`、`ILeaseRegistry`、`IPendingTracker`、`IProvisionalScope`、`IProvisionalScopeOptions`、`IMutationQueue`、`IMutationQueueOptions`、`IEnqueueOptions`、`IDisposeItem`、`IDisposeTransaction`、`IDisposeTransactionMode`、`IDisposeTransactionOptions`。
+- 类型：`IDisposer`、`ILifecycleOwner`、`ILifecycleState`、`IUnitState`、`IDisposerContext`、`IReleaseContext`、`IReleaseDescriptor`、`ICollectedError`、`IErrorPolicy`、`ILifecycleStateValue`、`ILifecycleUnitStateValue`、`ILifecycleErrorPolicy`、`IThenableProbeKind`、`IDisposeTransactionKind`、`IAbortSignal`、`IAbortController`、`ISyncStartedDisposalLedger`、`ISyncStartedDisposalOutcome`、`ILifecycleErrorCode`、`ILifecycleErrorText`、`IScheduledTask`、`ILifecycleScheduler`、`ISchedulerSnapshot`、`IManualScheduler`、`ILifecycleError`、`IThenableProbe`、`IErrorCollector`、`ITerminalController`、`ILifecycleScope`、`ILifecycleScopeOptions`、`ISyncLifecycleScope`、`ISyncLifecycleScopeOptions`、`ISyncReleaseDescriptor`、`ILifecycleUnit`、`ILifecycleUnitOptions`、`IGenerationController`、`IGenerationControllerOptions`、`IGenerationRequest`、`IGenerationToken`、`IQuiescenceTracker`、`ILeaseRegistry`、`IPendingTracker`、`IProvisionalScope`、`IProvisionalScopeOptions`、`IMutationQueue`、`IMutationQueueOptions`、`IEnqueueOptions`、`IDisposeItem`、`IDisposeTransaction`、`IDisposeTransactionMode`、`IDisposeTransactionOptions`。
 
 Leaf entry 提供更小的按需边界；其中只有五项不在根入口：`@migaia/lifecycle/scheduler` 的 `addSchedulerTime`、`resolveScheduler`、`resolveSchedulerOption`，以及 `@migaia/lifecycle/errors` 的 `createLifecycleFailure`、`createLifecycleTypeError`。其余 leaf 符号都是根入口子集；完整入口映射见“按需导入与 tree-shaking”。
 

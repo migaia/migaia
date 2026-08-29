@@ -1,9 +1,11 @@
 import type { ICollectedError, IErrorPolicy, IReleaseContext, IReleaseDescriptor } from './types.js'
+import type { IDisposerContext } from './disposer-context.js'
 import {
   assimilateCapturedThen,
   containAsyncRejection,
   createErrorCollector,
   createLifecycleError,
+  createLifecycleTypeError,
   probeThenable,
   tagLifecycleError
 } from './errors.js'
@@ -102,6 +104,11 @@ async function raceGraceful(
   context: IReleaseContext,
   gracefulTimeoutMs: number | undefined
 ): Promise<IGracefulOutcome> {
+  // Start the graceful budget before user code runs so synchronous work cannot earn a fresh
+  // timeout after it has already consumed the caller's budget.
+  const scheduler = context.scheduler ?? systemScheduler
+  const start = scheduler.now()
+  const effectiveDeadline = computeEffectiveDeadline(gracefulTimeoutMs, context.deadlineAt, start)
   let result: void | PromiseLike<void>
   try {
     result = graceful(context)
@@ -110,12 +117,13 @@ async function raceGraceful(
   }
   const assimilated = assimilateThenable(result)
   if (assimilated.kind === ThenableProbeKind.failed) return { ok: false, error: assimilated.error }
-  if (assimilated.kind === 'not-thenable') return { ok: true }
+  if (assimilated.kind === 'not-thenable') {
+    if (effectiveDeadline !== undefined && scheduler.now() >= effectiveDeadline) {
+      return { ok: false, timedOut: true }
+    }
+    return { ok: true }
+  }
   const promise = assimilated.promise
-  // Single clock sample: the scheduler that produced `context.deadlineAt` (R-9 time-domain contract).
-  const scheduler = context.scheduler ?? systemScheduler
-  const now = scheduler.now()
-  const effectiveDeadline = computeEffectiveDeadline(gracefulTimeoutMs, context.deadlineAt, now)
   if (effectiveDeadline === undefined) {
     try {
       await promise
@@ -124,7 +132,7 @@ async function raceGraceful(
       return { ok: false, error }
     }
   }
-  if (effectiveDeadline <= now) {
+  if (effectiveDeadline <= start) {
     // The shared budget was already spent by an earlier item before this one even got a chance to
     // try — there is no point racing a wait against a deadline that has already passed. Surface it
     // as a diagnostic (not an item error — timing out is a normal degrade path) and go straight to
@@ -154,20 +162,41 @@ async function raceGraceful(
  * `graceful` throwing (not timing out) does not stop `force` from running (L-T24); a `graceful`
  * timeout abandons waiting without cancelling it and silently proceeds to `force` (L-T23).
  */
-export async function executeReleaseDescriptor(
+async function executeAdmittedReleaseDescriptor(
   descriptor: IReleaseDescriptor,
   context: IReleaseContext
 ): Promise<readonly unknown[]> {
-  if (context.deadlineAt !== undefined) validateSchedulerTime(context.deadlineAt, 'deadlineAt')
-  const scheduler = resolveSchedulerOption(context)
-  const normalizedContext =
-    scheduler === undefined
+  let signal: IReleaseContext['signal']
+  let deadlineAt: number | undefined
+  let schedulerOption: unknown
+  let report: IReleaseContext['report']
+  let disposer: IReleaseContext['disposer']
+  try {
+    signal = context.signal
+    deadlineAt = context.deadlineAt
+    schedulerOption = context.scheduler
+    report = context.report
+    disposer = context.disposer
+  } catch (error) {
+    throw createLifecycleTypeError(
+      LifecycleErrorCode.invalidOption,
+      LifecycleErrorText.schedulerAccessorFailed,
+      { cause: error, detail: { field: 'scheduler' } }
+    )
+  }
+  if (deadlineAt !== undefined) validateSchedulerTime(deadlineAt, 'deadlineAt')
+  const scheduler = resolveSchedulerOption({ scheduler: schedulerOption })
+  const hasSchedulerGetter =
+    Object.getOwnPropertyDescriptor(context, 'scheduler')?.get !== undefined
+  const normalizedContext: IReleaseContext =
+    scheduler === undefined && !hasSchedulerGetter
       ? context
       : {
-          signal: context.signal,
-          deadlineAt: context.deadlineAt,
+          signal,
+          deadlineAt,
           scheduler,
-          report: context.report
+          report,
+          disposer
         }
   if (descriptor.custom) {
     const outcome = await runCallback(descriptor.custom, normalizedContext)
@@ -197,6 +226,16 @@ export async function executeReleaseDescriptor(
     errors.push(forceOutcome.error)
   }
   return errors
+}
+
+/** Admits a public release descriptor once before executing its degrade chain. */
+export async function executeReleaseDescriptor(
+  descriptor: IReleaseDescriptor,
+  context: IReleaseContext
+): Promise<readonly unknown[]> {
+  const admission = admitDescriptor(descriptor, false)
+  if (!admission.ok) return [admission.error]
+  return executeAdmittedReleaseDescriptor(admission.descriptor, context)
 }
 
 export type IDisposeItem = {
@@ -243,6 +282,8 @@ export type IDisposeTransactionOptions = {
   readonly scheduler?: ILifecycleScheduler
   /** Forwarded into `context.signal` for every item; aborted automatically once `run()` starts. */
   readonly signal?: IAbortSignal
+  /** Owner-bound self-join capability, supplied only by a LifecycleScope owner. */
+  readonly disposer?: IDisposerContext
   /** Awaited after every item settles, so in-flight work started by a release can still be drained. */
   readonly pending?: { drain(): Promise<void> }
 }
@@ -342,7 +383,13 @@ const admitItems = (
   const admitted: IAdmittedDisposeItem[] = []
   const rejected: ICollectedError[] = []
   const includeOrder = mode.kind === 'order'
-  for (const item of items) {
+  const itemCount = items.length
+  for (let index = 0; index < itemCount; index++) {
+    const item = items[index]
+    if (item === undefined) {
+      rejected.push({ source: 'transaction', error: invalidDescriptor('item') })
+      continue
+    }
     let source = 'transaction'
     try {
       source = item.source
@@ -394,11 +441,15 @@ export function createDisposeTransaction(
 ): IDisposeTransaction {
   const errorPolicy = options.errorPolicy ?? 'throw'
   const scheduler = resolveSchedulerOption(options)
+  const report = options.report
+  const deadlineAt = options.deadlineAt
+  const signalOption = options.signal
+  const pending = options.pending
   const createController = captureAbortControllerFactory()
   return {
     mode,
     async run(items) {
-      const collector = createErrorCollector(errorPolicy, options.report)
+      const collector = createErrorCollector(errorPolicy, report)
       const cleanupErrors: unknown[] = []
       let primaryRecorded = false
       const record = (source: string, error: unknown): void => {
@@ -408,15 +459,15 @@ export function createDisposeTransaction(
       // Mirrors `options.signal` into a signal every item's context can observe (L-T26). With no
       // `options.signal` given, `controller.signal` simply never aborts — a scope that wants items
       // to see "we're closing" passes its own close()-tied signal in.
-      const controller = options.signal === undefined ? undefined : createController()
+      const controller = signalOption === undefined ? undefined : createController()
       const signalCleanupErrors: unknown[] = []
       let signalSubscription: IObservedAbortSubscription | undefined
       const forwardAbort = (reason: unknown): void => controller?.abort(reason)
       try {
-        if (options.signal?.aborted) {
-          controller?.abort(options.signal.reason)
-        } else if (options.signal) {
-          signalSubscription = observeAbortSubscription(options.signal, forwardAbort, (error) =>
+        if (signalOption?.aborted) {
+          controller?.abort(signalOption.reason)
+        } else if (signalOption) {
+          signalSubscription = observeAbortSubscription(signalOption, forwardAbort, (error) =>
             signalCleanupErrors.push(error)
           )
           signalSubscription.retryRegistrationCleanup()
@@ -430,12 +481,13 @@ export function createDisposeTransaction(
         for (const item of admission.admitted) {
           const context: IReleaseContext = {
             signal: controller?.signal ?? inertReleaseSignal,
-            deadlineAt: options.deadlineAt,
+            deadlineAt,
             scheduler,
-            report: (error) => safeReport(options.report, error)
+            report: (error) => safeReport(report, error),
+            disposer: options.disposer
           }
           try {
-            const errors = await executeReleaseDescriptor(item.descriptor, context)
+            const errors = await executeAdmittedReleaseDescriptor(item.descriptor, context)
             for (const error of errors) record(item.source, error)
           } catch (error) {
             // Keep one unexpected item failure from preventing later admitted resources from release.
@@ -449,9 +501,9 @@ export function createDisposeTransaction(
         signalSubscription?.unsubscribe()
         cleanupErrors.push(...signalCleanupErrors)
       }
-      if (options.pending) {
+      if (pending) {
         try {
-          await options.pending.drain()
+          await pending.drain()
         } catch (error) {
           record('transaction-pending', error)
         }

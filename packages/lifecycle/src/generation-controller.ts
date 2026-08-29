@@ -329,9 +329,13 @@ export function createGenerationController(
               try {
                 abortCurrent('generation timed out')
               } catch (error) {
-                if (!scheduling) throw error
                 callbackFailed = true
                 callbackFailure = error
+                if (!scheduling) {
+                  // A host timer has no caller stack to receive cleanup failures. Observe the
+                  // rejection on a detached diagnostic chain rather than throwing through setTimeout.
+                  containAsyncRejection(Promise.reject(error), () => undefined)
+                }
               }
             }, timeoutMs)
           } catch (error) {

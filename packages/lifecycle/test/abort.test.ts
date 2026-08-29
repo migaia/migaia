@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createAbortController, type IAbortSignal } from '../src/abort'
+import { createAbortController, observeAbortSubscription, type IAbortSignal } from '../src/abort.js'
 
 describe('T-15 reason 行为', () => {
   it('abort(reason) 后 reason 经 signal.reason 保持 === 身份可达', () => {
@@ -58,6 +58,24 @@ describe('T-15 reason 行为', () => {
     const controller = createAbortController()
     const hostConstructor = (globalThis as { AbortController: Function }).AbortController
     expect(controller).toBeInstanceOf(hostConstructor)
+  })
+
+  it('exports the canonical hostile-signal subscription through the abort leaf', () => {
+    const controller = createAbortController()
+    const reason = { code: 'ABORTED' }
+    let observedReason: unknown
+    const subscription = observeAbortSubscription(
+      controller.signal,
+      (value) => {
+        observedReason = value
+      },
+      () => undefined
+    )
+
+    controller.abort(reason)
+
+    expect(observedReason).toBe(reason)
+    subscription.unsubscribe()
   })
 })
 

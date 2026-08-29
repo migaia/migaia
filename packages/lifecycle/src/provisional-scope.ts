@@ -157,6 +157,12 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
       return Promise.reject(error)
     }
     state = ProvisionalScopeState.rolledBack
+    let resolveRollback!: () => void
+    let rejectRollback!: (error: unknown) => void
+    rollbackPromise = new Promise<void>((resolve, reject) => {
+      resolveRollback = resolve
+      rejectRollback = reject
+    })
     let abortFailed = false
     let abortError: unknown
     try {
@@ -177,13 +183,14 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
       }
     }
     const releasePromise = releaseEntries(remaining)
-    rollbackPromise = releasePromise.then(
+    releasePromise.then(
       () => {
-        if (abortFailed) throw abortError
+        if (abortFailed) rejectRollback(abortError)
+        else resolveRollback()
       },
       (cleanupError: unknown) => {
-        if (abortFailed) throw attachCleanupErrors(abortError, [cleanupError])
-        throw cleanupError
+        if (abortFailed) rejectRollback(attachCleanupErrors(abortError, [cleanupError]))
+        else rejectRollback(cleanupError)
       }
     )
     return rollbackPromise

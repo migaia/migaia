@@ -178,9 +178,14 @@ export function createLifecycleFailure(
   message: string,
   error: unknown
 ): ILifecycleError {
-  if (error instanceof Error) {
+  const errorLike =
+    error !== null &&
+    (typeof error === 'object' || typeof error === 'function') &&
+    typeof (error as { readonly message?: unknown }).message === 'string' &&
+    typeof (error as { readonly stack?: unknown }).stack === 'string'
+  if (errorLike) {
     try {
-      return tagLifecycleError(error, code) as ILifecycleError
+      return tagLifecycleError(error as Error, code) as ILifecycleError
     } catch {
       // Frozen or already non-configurable errors cannot be retagged without replacing identity.
     }
