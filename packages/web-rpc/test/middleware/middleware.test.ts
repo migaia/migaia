@@ -112,9 +112,6 @@ describe('middleware capabilities', () => {
     expect(() => installPlugin(timeout(unreadable as never))).toThrow(
       expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
     )
-    expect(() => installPlugin(timeout({ retry: 1 } as never))).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
-    )
   })
   it('rejects unreadable chunk descriptors with INVALID_CONFIG', () => {
     const unreadable = new Proxy(

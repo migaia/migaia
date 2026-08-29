@@ -2,7 +2,6 @@ import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { DiscoveryRegistry } from '../src/internal/discovery-registry'
 import { ChunkAssembler, splitUtf8, utf8ByteLength } from '../src/internal/chunk'
-import { executeWithRetry } from '../src/internal/retry'
 import { ResourceScope } from '../src/internal/resource-scope'
 import { RequestReplayLedger } from '../src/internal/request-replay-ledger'
 import { createSettlement } from '../src/internal/settlement'
@@ -111,119 +110,6 @@ describe('property invariants', () => {
           expect(registry.remoteSnapshot().map(([key]) => key)).toEqual(accepted)
         }
       ),
-      propertyParameters
-    )
-  })
-
-  it('runs retry attempts serially and never exceeds the configured budget', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        fc.array(fc.boolean(), { minLength: 1, maxLength: 12 }),
-        fc.integer({ min: 1, max: 12 }),
-        async (outcomes, requestedAttempts) => {
-          const maxAttempts = Math.min(requestedAttempts, outcomes.length)
-          let attempts = 0
-          const firstSuccess = outcomes.slice(0, maxAttempts).findIndex(Boolean)
-          const operation = executeWithRetry({
-            maxAttempts,
-            signals: [],
-            createAbortError: () => new Error('aborted'),
-            createTimeoutError: () => new Error('timeout'),
-            attempt: async () => {
-              const succeeds = outcomes[attempts] ?? false
-              attempts += 1
-              if (!succeeds) throw new Error('retryable')
-              return attempts
-            },
-            decide: async () => ({ retry: true, delayMs: 0 })
-          })
-          if (firstSuccess >= 0) {
-            await expect(operation).resolves.toBe(firstSuccess + 1)
-            expect(attempts).toBe(firstSuccess + 1)
-          } else {
-            await expect(operation).rejects.toThrow('retryable')
-            expect(attempts).toBe(maxAttempts)
-          }
-        }
-      ),
-      propertyParameters
-    )
-  })
-
-  it('keeps asynchronous retry decisions single-path and serial', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        fc.array(fc.boolean(), { minLength: 1, maxLength: 12 }),
-        fc.array(fc.boolean(), { minLength: 1, maxLength: 12 }),
-        fc.integer({ min: 1, max: 12 }),
-        async (outcomes, decisions, requestedAttempts) => {
-          const maxAttempts = Math.min(requestedAttempts, outcomes.length)
-          const expectedAttempts = (() => {
-            for (let index = 0; index < maxAttempts; index += 1) {
-              if (outcomes[index]) return index + 1
-              if (index === maxAttempts - 1 || !decisions[index]) return index + 1
-            }
-            return maxAttempts
-          })()
-          let attempts = 0
-          const operation = executeWithRetry({
-            maxAttempts,
-            signals: [],
-            createAbortError: () => new Error('aborted'),
-            createTimeoutError: () => new Error('timeout'),
-            attempt: async (attempt) => {
-              await Promise.resolve()
-              attempts += 1
-              if (!outcomes[attempt - 1]) throw new Error('retryable')
-              return attempt
-            },
-            decide: async (_error, attempt) => {
-              await Promise.resolve()
-              return decisions[attempt - 1] ? { retry: true, delayMs: 0 } : { retry: false }
-            }
-          })
-          if (
-            outcomes
-              .slice(0, expectedAttempts)
-              .some((value, index) => value && index + 1 === expectedAttempts)
-          )
-            await expect(operation).resolves.toBe(expectedAttempts)
-          else await expect(operation).rejects.toThrow()
-          expect(attempts).toBe(expectedAttempts)
-        }
-      ),
-      propertyParameters
-    )
-  })
-
-  it('does not start a late retry after a policy-side abort race', async () => {
-    await fc.assert(
-      fc.asyncProperty(fc.boolean(), async (abortDuringPolicy) => {
-        const controller = new AbortController()
-        let attempts = 0
-        const operation = executeWithRetry({
-          maxAttempts: 3,
-          signals: [controller.signal],
-          createAbortError: () => new Error('aborted'),
-          createTimeoutError: () => new Error('timeout'),
-          attempt: async () => {
-            attempts += 1
-            throw new Error('retryable')
-          },
-          decide: async () => {
-            await Promise.resolve()
-            if (abortDuringPolicy) controller.abort()
-            return { retry: true, delayMs: 0 }
-          }
-        })
-        if (abortDuringPolicy) {
-          await expect(operation).rejects.toThrow('aborted')
-          expect(attempts).toBe(1)
-        } else {
-          await expect(operation).rejects.toThrow('retryable')
-          expect(attempts).toBe(3)
-        }
-      }),
       propertyParameters
     )
   })

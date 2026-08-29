@@ -6,7 +6,7 @@
 
 如果你需要在两段**互相隔离、不能直接调用对方函数**的 JavaScript 代码之间通信——比如主页面和 iframe、主线程和 Worker、多个浏览器标签页之间——通常只能用 `postMessage`/`onmessage` 这种"发消息、猜是谁发的、手动对应请求和响应"的原始方式。写多了你会发现自己在反复造轮子：怎么把"调用一个方法并拿到返回值"这件事伪装成同步函数调用的样子？怎么知道这条消息是回复哪个请求的？对方老半天不回怎么办？消息太大发不过去怎么拆？谁能证明这条消息真的是我认识的那个 iframe 发的，而不是页面里被注入的恶意脚本冒充的？
 
-`@migaia/web-rpc` 就是把这些问题一次性解决掉的库。它在任意一种"能发消息、能收消息"的传输通道上，包出一层**类型安全的双向 RPC**：一端用 `provide(method, handler)` 注册方法，另一端用 `await endpoint.send(targetId, method, data)` 调用，写法和调本地异步函数几乎一样，超时、重试、鉴权、分片、断线检测、多接收端负载均衡这些细节全部由框架处理。
+`@migaia/web-rpc` 就是把这些问题一次性解决掉的库。它在任意一种"能发消息、能收消息"的传输通道上，包出一层**类型安全的双向 RPC**：一端用 `provide(method, handler)` 注册方法，另一端用 `await endpoint.send(targetId, method, data)` 调用，写法和调本地异步函数几乎一样，超时、鉴权、分片、断线检测、多接收端负载均衡这些细节全部由框架处理。
 
 这个包的 endpoint 核心**不关心你在什么环境运行**——核心入口不绑定 DOM、React、Store、Node 或某个具体宿主 API。真正“怎么发消息、怎么收消息”被抽成 `Transport`（传输适配器）；浏览器、Worker 和 Node MessagePort 代码只存在于按需导入的 adapter 子路径。官方提供 9 组适配器，也可以为 WebSocket、Electron IPC 或业务总线实现自己的 `IWebRpcTransport`。
 
@@ -20,7 +20,7 @@
 | 点对点实时通信                                     | 基于 WebRTC DataChannel，比如协作编辑、P2P 游戏状态同步     |
 | 大文件 / 大对象跨端传输                            | 超过单次消息大小限制自动分片，接收端自动重组                |
 | 微前端子应用间通信                                 | 各子应用独立部署、独立运行时，仍需要互相调用能力            |
-| 需要断线容错的长连接场景                           | WebTransport datagram、连接可能中断，需要超时/重试/存活探测 |
+| 需要断线探测的长连接场景                             | WebTransport datagram、连接可能中断，需要超时/存活探测 |
 
 不适合的场景：如果两端本来就在同一个 JS 线程里、能直接互相 import 调用，用这个库反而是多此一举——它解决的是"物理隔离、只能靠消息通信"这个约束下的问题。
 
@@ -28,7 +28,7 @@
 
 - **类型安全的端到端调用**：`send<T>(targetId, method, data)` 的返回值类型、`provide()` 里 `ctx.data` 的类型都可以通过 `IWebRpcMethodSchema`（配合 zod / valibot 等任意实现了 `parse()` 的校验库）在运行时强校验，而不只是编译期的自我欺骗。
 - **双向调用**：不是"客户端发请求、服务端只能回响应"的单向模型——每一端既可以是调用方也可以是被调用方，`provide()` 和 `send()` 在同一个 `endpoint` 上共存。
-- **超时与重试**：`timeout()` 中间件统一管理请求超时和可配置的重试策略，不用每个业务调用点自己写 `Promise.race` 加计时器。
+- **请求超时**：`timeout()` 中间件统一管理请求 deadline；每个请求只发送一次，避免隐含的 at-least-once 语义。
 - **鉴权与加密**：`authentication()` 中间件对每一帧（包括分片帧、控制帧）做签名/验签、加解密，`connect()` 中间件对"这条消息真的来自我认识的那个 peer 吗"做验证，不是只信任 `senderId` 这个可以被伪造的字符串字段。
 - **大消息自动分片**：`chunk()` 中间件在发送侧按字节预算自动切分、接收侧自动重组，并从并发消息数、单 peer 消息数、分片数、分片大小、缓冲区总量、重组超时六个维度限制资源占用，防止恶意/异常大消息把内存打爆。
 - **多接收端的服务发现与负载均衡**：同一个 `targetId` 背后可以有多个存活的接收端（比如多个 SharedWorker tab），框架自动维护"谁还活着"的路由表，未指定接收端时对活跃接收端做首次成功即返回的竞速调用；也支持手动模式精确控制发现/注册/固定路由。
@@ -158,6 +158,7 @@ endpoint.provide('add', (ctx) => {
 - `transport?: IWebRpcTransport` —— 也可以只在 `connect({ transport })` 里提供，二选一即可
 - `targetIds?: readonly string[]` —— 已知对端 id 的预声明，非必需；自动发现模式下首次 `send`/`dispatch`/`ping` 未知 `targetId` 会懒查询
 - `provider?: Readonly<Record<string, IWebRpcProvider>>` —— 构造时批量注册的方法集合，等价于逐个调用 `provide()`
+- `providerLimits?: { maxGlobal?: number; maxPerPeer?: number }` —— provider 并发上限，默认 `256/64`；超限立即返回 `OVERLOADED`，不排队
 - `replay?: { maxEntries?: number; ttlMs?: number }` —— 出站请求 id 重放保护窗口，默认容量 4096、TTL 310 秒
 - `construction?: { signal?: IWebRpcAbortSignal; timeoutMs?: number | false }` —— 构造期本身的取消/超时；取消/超时后仍会正确回滚已安装成功的中间件
 
@@ -326,13 +327,13 @@ chunk({ chunkSize: 16_384, maxMessageBytes: 50 * 1024 * 1024, assemblyTimeoutMs:
 
 全部选项（六个容量维度即使不配置也带内置默认值，不是"不设置就不限"）：`chunkSize?: number`（单帧字节数，超过触发分片，未设不主动分片）、`maxMessageBytes?: number`（单条消息总字节数上限，未设不检查）、`maxConcurrentMessages?: number`（端点级并发重组数，默认 128）、`maxConcurrentMessagesPerPeer?: number`（单 peer 并发重组数，默认 32）、`maxBufferedBytes?: number`（重组缓冲区总字节，默认 16MiB）、`maxChunksPerMessage?: number`（单消息最大分片数，默认 4096）、`maxChunkBytes?: number`（单分片最大字节，默认 4MiB）、`assemblyTimeoutMs?: number`（重组超时，默认 30 秒）、`byteLength?: (value) => number`（自定义字节测量，默认按 UTF-8）、`split?: (value, maxBytes) => readonly string[]`（自定义切分算法）。已是 `Uint8Array` 的消息不支持自动分片。
 
-**`timeout(config?)`｜5 秒上手** —— 统一请求超时与重试策略：
+**`timeout(config?)`｜5 秒上手** —— 统一请求超时：
 
 ```ts
-timeout({ timeoutMs: 5000, retry: { maxAttempts: 3, shouldRetry: () => true } })
+timeout({ timeoutMs: 5000 })
 ```
 
-全部选项：`timeoutMs?: number | false`（默认超时，`false` 表示不限时；`send()` 的 `options.timeoutMs` 可逐次覆盖）、`retry?: { maxAttempts?: number; shouldRetry?: (context) => boolean | Promise<boolean>; delay?: (context) => number | false | null | Promise<number | false | null> }`（`context` 含 `attempt`/`error`/`targetId`/`method`/`data`）。重试回调在请求信号中止或 endpoint 释放时会被自动取消。
+全部选项：`timeoutMs?: number | false`（默认超时，`false` 表示不限时；`send()` 的 `options.timeoutMs` 可逐次覆盖）。每次请求只发送一次，失败由调用方按业务需要处理。
 
 **`ping()`｜3 秒上手** —— 在 full preset，或选择了 `control()` Feature 的组合里，安装后 endpoint 获得 `ping`/`pingAll` 方法：
 
@@ -646,7 +647,7 @@ const endpoint = await createComposedEndpoint(
 await endpoint.send('receiver', 'uploadFile', { name: 'video.mp4', bytes: largeUint8Array })
 ```
 
-### 5. 超时 + 重试 + 可取消调用
+### 5. 超时 + 可取消调用
 
 ```ts
 import { contract, protocol, connect, timeout, abort } from '@migaia/web-rpc'
@@ -662,7 +663,7 @@ const endpoint = await createClientEndpoint({
     connect({ transport }),
     timeout({
       timeoutMs: 5000,
-      retry: { maxAttempts: 3, shouldRetry: () => true, delay: (ctx) => ctx.attempt * 200 }
+      timeoutMs: 5000
     }),
     abort()
   ]

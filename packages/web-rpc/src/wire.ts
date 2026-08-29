@@ -1,5 +1,7 @@
 import { WebRpcMessageKind, WebRpcVariation } from './protocol-constants.js'
 import type { ISerializedError } from './error-serialization.js'
+import { WebRpcError, WebRpcErrorCode } from './errors.js'
+import { WebRpcErrorText } from './error-text.js'
 
 export type IWebRpcVariation = (typeof WebRpcVariation)[keyof typeof WebRpcVariation]
 export type IWebRpcDiscoveryQuery = {
@@ -85,7 +87,6 @@ export type IWebRpcEnvelope =
     }
   | IWebRpcChunkFrame
 import { safeRead } from './internal/safe-value.js'
-import { WebRpcError, WebRpcErrorCode } from './errors.js'
 
 /** Reads and freezes one canonical wire snapshot before protocol routing. */
 export function normalizeWebRpcEnvelope(value: unknown): IWebRpcEnvelope | undefined {
@@ -371,8 +372,10 @@ export const isWebRpcEnvelope = (value: unknown): value is IWebRpcEnvelope => {
     return false
   }
 }
+
+/** Validates one method or target identifier before it enters an endpoint-owned registry. */
 export const assertMethod = (method: string): string => {
   if (typeof method !== 'string' || method.length === 0)
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'method must be a non-empty string')
+    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.methodInvalid)
   return method
 }

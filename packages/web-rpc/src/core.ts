@@ -271,7 +271,7 @@ export async function createComposedEndpoint<
   const hookOwner = installed.find(
     (value) => typeof (value as { hooks?: unknown }).hooks === 'object'
   ) as { hooks?: IWebRpcKernelSurface['hooks'] } | undefined
-  const onOwner = installed.find(
+  const onOwner = installed.findLast(
     (value) => typeof (value as { on?: unknown }).on === 'function'
   ) as { on: IWebRpcEndpoint['on'] } | undefined
   let publicSurface: object

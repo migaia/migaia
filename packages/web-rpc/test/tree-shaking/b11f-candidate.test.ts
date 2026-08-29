@@ -66,6 +66,16 @@ type ICandidateModule = {
     readonly renderedBytes: number
   } | null
   readonly incomingEdges: readonly IIncomingEdge[]
+  readonly provenance?: {
+    readonly kind: 'import-edge' | 'entry-root' | 'generated-artifact'
+    readonly locator?: {
+      readonly artifact: string
+      readonly artifactSha256: string
+      readonly generator: string
+      readonly source?: string
+      readonly sourceSha256?: string
+    }
+  }
 }
 
 type ICandidateCausality = {
@@ -128,6 +138,7 @@ type ICausalReport = {
     readonly module: string
     readonly retainedBy: readonly IConsumer[]
     readonly incomingEdges: readonly IIncomingEdge[]
+    readonly provenance?: ICandidateModule['provenance']
   }[]
 }
 
@@ -258,10 +269,14 @@ describe('WRC-C-B11f approved post-migration candidate', () => {
     expect(candidate.schema).toBe('WRC-C-B11f-post-migration-candidate-v2')
     expect(candidate.causalSchema).toBe('WRC-C-B11f-five-consumer-causal-v2')
     expect(candidate.status).toBe('approved')
+    const { default: authority } = await import(
+      '../fixtures/tree-shaking/baseline-authority.json',
+      { with: { type: 'json' } }
+    )
     expect(candidate.approval).toEqual({
       status: 'approved',
-      decisionId: 'WRC-C-B11-decision-20260827-06',
-      keyId: 'coordinator-ed25519-35f1f9bd39e4a6b8',
+      decisionId: authority.decisionId,
+      keyId: authority.keyId,
       digest: candidate.provenanceDigest,
       oldTuple: {
         moduleCount: candidate.oldTuple.moduleCount,
@@ -406,7 +421,12 @@ describe('WRC-C-B11f approved post-migration candidate', () => {
       const causalEntry = causalAttribution.get(entry.module)
       expect(causalEntry).toBeDefined()
       expect(entry.retainedConsumers).toEqual(causalEntry?.retainedBy)
-      expect(causalEntry?.incomingEdges.length).toBeGreaterThan(0)
+      if (causalEntry?.incomingEdges.length === 0) {
+        expect(causalEntry.provenance?.kind).toBe('generated-artifact')
+        expect(causalEntry.provenance?.locator?.artifact).toBe(entry.module)
+      } else {
+        expect(causalEntry?.provenance?.kind).toBe('import-edge')
+      }
       expect(entry.incomingEdges).toEqual(causalEntry?.incomingEdges)
     }
   })
@@ -424,15 +444,15 @@ describe('WRC-C-B11f approved post-migration candidate', () => {
       ],
       [
         'tree-shaking-baseline.json',
-        '6868ac292dcebc2c59222c4ae38ccf708bb0b1037a26ebd8850aae5be6a573af'
+        'e5bb66498867e3a827befe097995e7a0640513ab12a0d2fc2b16bdbcd75474d9'
       ],
       [
         'baseline-authority.json',
-        'a317b7a2bcb554bbe095be9e3e38509dc468d51554ae4413db3e71aa05ed50dc'
+        '5df57233003b9dc72e9391a50ea2c665f3b88af9188d69d6316c57a06673fac9'
       ],
       [
         'baseline-authorization.json',
-        '408f40440b5c476262bd91d5ac696332991603486c0c4a197ca3dc2aac690a8e'
+        'd9b595d080dbe822a492ffa31689ffa29ec1ff3ca04255a91239a1a4a54df9d6'
       ]
     ] as const
 
@@ -507,7 +527,10 @@ describe('WRC-C-B11f approved post-migration candidate', () => {
     expect(authorization.approvalRecord.signature).toMatch(/^[A-Za-z0-9+/]+=*$/)
     expect(candidate.removedModules.map(({ module }) => module)).toEqual([
       'packages/web-rpc/src/internal/capability-registry.ts',
-      'packages/web-rpc/src/internal/pipeline.ts'
+      'packages/web-rpc/src/internal/pipeline.ts',
+      'packages/web-rpc/src/internal/retry.ts',
+      'workspace:packages/lifecycle/dist/index.js',
+      'workspace:packages/utils/dist/error-text-AvoAS3qw.js'
     ])
   })
 

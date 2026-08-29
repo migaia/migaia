@@ -173,7 +173,7 @@ export const WebRpcErrorCode = {
   /**
    * 本地 deadline 到期（`WebRpcTimeoutError`）。
    *
-   * 调用方检查目标是否可达、超时是否过短；是否重试由 `timeout.retry` 的本地策略决定。
+   * 调用方检查目标是否可达或超时是否过短；请求失败按单次传输结果处理。
    */
   deadlineExceeded: 'DEADLINE_EXCEEDED',
 

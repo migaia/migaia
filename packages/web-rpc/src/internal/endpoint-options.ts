@@ -11,6 +11,7 @@ import type {
   IWebRpcHooksConfig,
   IWebRpcProtocolCapability,
   IWebRpcProtocolConfig,
+  IWebRpcProviderLimits,
   IWebRpcTimeoutCapability,
   IWebRpcTimeoutConfig,
   IWebRpcUuidConfig
@@ -26,6 +27,7 @@ export type IWebRpcEndpointOptions<TTargetId extends string> = {
   hooks?: IWebRpcHooksConfig
   chunk?: IWebRpcChunkConfig | IWebRpcChunkCapability
   targetIds?: readonly TTargetId[]
+  providerLimits?: IWebRpcProviderLimits
   connect?: IWebRpcConnectConfig | IWebRpcConnectCapability
   features?: IWebRpcFeatureConfig
   initialHookEvents?: readonly IWebRpcHookEvent[]

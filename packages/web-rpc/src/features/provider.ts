@@ -19,17 +19,19 @@ import {
 import { registerNativeProviderModule } from '../internal/provider-claim-authority.js'
 import { outbound } from './outbound.js'
 import type { IOutboundSurface } from './outbound.js'
-import type { IWebRpcProvider } from '../typing.js'
+import type { IWebRpcEventListener, IWebRpcProvider } from '../typing.js'
 import type { IWebRpcCoreConfig, IWebRpcEndpointModule } from '../core.js'
 
 /** Provider preset surface includes selected outbound projection plus provider registration. */
 export type IProviderSurface = IOutboundSurface & {
+  on(event: string, listener: IWebRpcEventListener): () => void
   dispose(): Promise<void>
   provide(method: string, provider: IWebRpcProvider): IProviderSurface
 }
 
 /** Narrow installation result; the composed root supplies the selected outbound projection. */
 type IProviderInstallationSurface = {
+  readonly on: (event: string, listener: IWebRpcEventListener) => () => void
   readonly dispose: () => Promise<void>
   readonly provide: (method: string, provider: IWebRpcProvider) => IProviderInstallationSurface
 }
@@ -63,6 +65,7 @@ const providerModule = defineEndpointModule<
     )
     let surface: IProviderInstallationSurface
     surface = {
+      on: (event, listener) => providerAttachment.on(event, listener),
       dispose: async () => {
         providerAttachment.dispose()
         recordProviderResultDisposal(kernel, surface)

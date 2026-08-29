@@ -1,7 +1,7 @@
 import { WebRpcConfigurationError, WebRpcError, WebRpcErrorCode } from '../errors.js'
 import { WebRpcMessageKind, WebRpcVariation } from '../protocol-constants.js'
 import { WebRpcErrorText } from '../error-text.js'
-import type { IWebRpcProvider } from '../typing.js'
+import type { IWebRpcEventListener, IWebRpcProvider } from '../typing.js'
 import type { IWebRpcRequest } from '../wire.js'
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
@@ -40,7 +40,7 @@ export class WebRpcProviderAttachment {
   /** Completed request replay ownership. */
   readonly #replay: RequestReplayLedger
   /** Per-task provider execution quotas. */
-  readonly #admission = new ProviderAdmissionRegistry()
+  readonly #admission: ProviderAdmissionRegistry
   /** Active provider abort controllers. */
   readonly #controllers = new Map<string, AbortController>()
   /** Provider execution owner. */
@@ -84,6 +84,10 @@ export class WebRpcProviderAttachment {
         ? `${prepared.id}:${uniqueTargetId}`
         : prepared.id
     this.#abortEnabled = prepared.options.features?.abort === true
+    this.#admission = new ProviderAdmissionRegistry(
+      prepared.options.providerLimits?.maxGlobal ?? 256,
+      prepared.options.providerLimits?.maxPerPeer ?? 64
+    )
     this.#transaction = kernel
     this.#replay = new RequestReplayLedger(4096, 1024, 310_000)
     this.#executor = new ProviderExecutor({
@@ -140,6 +144,15 @@ export class WebRpcProviderAttachment {
       )
     recordProviderRegistration(this.#transaction, method, provider)
     return this
+  }
+
+  /** Registers an inbound dispatch listener in the same provider registry as request handlers. */
+  on(event: string, listener: IWebRpcEventListener): () => void {
+    this.#kernel.assertActive()
+    assertProviderEvent(event)
+    if (typeof listener !== 'function')
+      throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.eventListenerInvalid)
+    return this.#registry.listen(event, listener)
   }
 
   /** Aborts the active provider task identified by its canonical task key or task id. */
@@ -271,4 +284,10 @@ function snapshotProviderEntries(
   } catch (error) {
     throw new WebRpcConfigurationError(WebRpcErrorText.providerDescriptorInvalid, error)
   }
+}
+/** Validates provider-owned event names without retaining the broad wire module. */
+function assertProviderEvent(event: string): string {
+  if (typeof event !== 'string' || event.length === 0)
+    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.methodInvalid)
+  return event
 }
