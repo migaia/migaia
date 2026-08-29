@@ -19,7 +19,7 @@ pnpm add @migaia/serialize
 ## 目录
 
 - [`.`：主入口（chunk 协议、registry、stream、Base64、错误、格式常量）](#主入口)
-- [`/core`：无 lifecycle 依赖的纯协议子集](#core-模块)
+- [`/core`：静态复用 lifecycle abort leaf 的纯协议子集](#core-模块)
 - [`/plugins`：内置 JSON 插件](#plugins-模块)
 - [`/registry`：仅 registry 实现面](#registry-模块)
 - [高阶组合示例](#高阶组合示例)
@@ -198,9 +198,9 @@ import {
 } from '@migaia/serialize/core';
 ```
 
-零包依赖、零 lifecycle、零宿主全局假设——timer 一律经 `scheduler` 注入、Encoding 一律经 `ITextEncoder`/`ITextDecoder` 注入。**不包含** `createSerializeRegistry`（依赖 `@migaia/lifecycle`，只在主入口/`/registry` 提供）、内置 JSON 插件、以及格式常量（`SerializeChunkKind` 等，只在主入口提供）。
+Core 静态复用 `@migaia/lifecycle/abort` 作为唯一取消 owner；packed consumer 可保留 abort leaf 的必要闭包，但必须 tree-shake lifecycle root、scope、scheduler、generation、quiescence 与 disposal。timer 一律经 `scheduler` 注入、Encoding 一律经 `ITextEncoder`/`ITextDecoder` 注入。**不包含** `createSerializeRegistry`（依赖 `@migaia/lifecycle` 其他 leaf，只在主入口/`/registry` 提供）、内置 JSON 插件、以及格式常量（`SerializeChunkKind` 等，只在主入口提供）。
 
-其余每个导出的完整选项与 `/registry`、`/plugins` 相同（同一份实现），见上文与 [USEGUIDE.md](./USEGUIDE.md)。适合只需要 chunk 协议 + Base64 + 流式切片、不想引入 lifecycle 依赖的场景（例如纯算法层的 CBOR/MessagePack parser 包）。
+其余每个导出的完整选项与 `/registry`、`/plugins` 相同（同一份实现），见上文与 [USEGUIDE.md](./USEGUIDE.md)。适合只需要 chunk 协议 + Base64 + 流式切片、只引入 lifecycle abort leaf 的场景（例如纯算法层的 CBOR/MessagePack parser 包）。
 
 ---
 

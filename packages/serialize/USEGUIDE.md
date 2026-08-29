@@ -83,7 +83,7 @@ import {
 } from '@migaia/serialize';
 ```
 
-包有四个导出入口：主入口 `.`（上面这份完整列表）、`./core`（零 lifecycle 依赖的纯协议子集）、`./plugins`（内置 JSON 插件）、`./registry`（仅 registry 实现面）。四者的精确导出面见 [§11](#11-子路径导出面corepluginsregistry)。
+包有四个导出入口：主入口 `.`（上面这份完整列表）、`./core`（静态复用 lifecycle abort leaf 的纯协议子集）、`./plugins`（内置 JSON 插件）、`./registry`（仅 registry 实现面）。四者的精确导出面见 [§11](#11-子路径导出面corepluginsregistry)。
 
 运行时依赖 `@migaia/lifecycle` 的按需子路径（`/scheduler`、`/abort`、`/scope`、`/quiescence`）与 `@migaia/utils`（Base64/UTF-8 底层算法、`attachErrorIdentity` 错误身份标注）。registry 的 pending/drain、closing controller 与 parser scope 直接复用 lifecycle leaf；Serialize 仍只拥有 codec registry、stream、context 与自身错误投影。协作式取消信号类型 `ISerializeAbortSignal` 是包内独立定义的结构化类型（`{ aborted, reason?, addEventListener, removeEventListener }`），不依赖 DOM `AbortSignal`，但原生 `AbortSignal` 满足这个结构，可以直接传入。
 
@@ -747,14 +747,14 @@ import {
 } from '@migaia/serialize/core';
 ```
 
-零包依赖、零 lifecycle、零宿主全局假设——timer 一律经 `scheduler` 注入、Encoding 一律经 `ITextEncoder`/`ITextDecoder` 注入（这也是为什么 `sliceByFrameBudget`/`encodeStream` 的 `options.scheduler`、`collectStream` 需要 `bytes` 段合并时的 `encoder` 都是必填/条件必填的）。**不包含**：
+Core 静态复用 `@migaia/lifecycle/abort` 作为唯一取消 owner；packed consumer 可保留 abort leaf 的必要闭包，但必须排除 lifecycle root、scope、scheduler、generation、quiescence 与 disposal。Core 不假定宿主全局 timer，timer 一律经 `scheduler` 注入、Encoding 一律经 `ITextEncoder`/`ITextDecoder` 注入（这也是为什么 `sliceByFrameBudget`/`encodeStream` 的 `options.scheduler`、`collectStream` 需要 `bytes` 段合并时的 `encoder` 都是必填/条件必填的）。**不包含**：
 
 - `createSerializeRegistry`（依赖 `@migaia/lifecycle`，只在主入口/`/registry` 提供）
 - `chunkToText`/`chunkToBytes`（同样定义在 `registry.ts`，只在主入口/`/registry` 提供）
 - 内置 JSON 插件（只在主入口/`/plugins` 提供）
 - 格式常量 `SerializeChunkKind` 等（只在主入口提供，见 [§2.5](#25-格式常量root-only)）
 
-其余每个导出的完整选项、行为、错误码与主入口同一份实现完全一致，见上文各节。适合只需要 chunk 协议 + Base64 + 流式切片、不想引入 lifecycle 依赖的场景（例如纯算法层的 CBOR/MessagePack parser 包，或者要在 Worker/Deno 等没有 `@migaia/lifecycle` 场景运行的代码）。
+其余每个导出的完整选项、行为、错误码与主入口同一份实现完全一致，见上文各节。适合只需要 chunk 协议 + Base64 + 流式切片、只依赖 lifecycle abort leaf 的场景（例如纯算法层的 CBOR/MessagePack parser 包）。
 
 ### 11.2 `/plugins`
 

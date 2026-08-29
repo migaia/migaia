@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createSerializeRegistry } from '../src/index.js'
 import { composeSerializeSignal } from '../src/signal.js'
 import type { ISerializeAbortSignal } from '../src/types.js'
@@ -177,6 +177,62 @@ describe('composeSerializeSignal registration races', () => {
     expect(() => composed.dispose()).not.toThrow()
     expect(removalOrder).toEqual(['closing', 'caller'])
     expect(reported).toEqual([closingRemovalFailure, callerRemovalFailure])
+  })
+
+  it('reports abort listener failures without replacing the primary cancellation', () => {
+    const listenerFailure = new Error('abort listener failed')
+    const abortReason = new Error('caller stopped')
+    const reported: unknown[] = []
+    const listeners = new Set<() => void>()
+    class FakeAbortController {
+      readonly signal = {
+        aborted: false,
+        reason: undefined as unknown,
+        addEventListener: (_type: 'abort', listener: () => void): void => {
+          listeners.add(listener)
+        },
+        removeEventListener: (_type: 'abort', listener: () => void): void => {
+          listeners.delete(listener)
+        }
+      }
+
+      abort(reason?: unknown): void {
+        if (this.signal.aborted) return
+        this.signal.aborted = true
+        this.signal.reason = reason
+        for (const listener of listeners) listener()
+      }
+    }
+    vi.stubGlobal('AbortController', FakeAbortController)
+    try {
+      let callerListener: (() => void) | undefined
+      const caller: ISerializeAbortSignal = {
+        aborted: false,
+        reason: abortReason,
+        addEventListener(_type, listener) {
+          callerListener = listener
+        },
+        removeEventListener() {}
+      }
+      const closing: ISerializeAbortSignal = {
+        aborted: false,
+        reason: undefined,
+        addEventListener() {},
+        removeEventListener() {}
+      }
+
+      const composed = composeSerializeSignal(caller, closing, (error) => reported.push(error))
+      composed.signal.addEventListener('abort', () => {
+        throw listenerFailure
+      })
+      callerListener?.()
+
+      expect(composed.signal.aborted).toBe(true)
+      expect(composed.signal.reason).toBe(abortReason)
+      expect(reported).toEqual([listenerFailure])
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('invokes caller listener methods with the original receiver', () => {

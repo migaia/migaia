@@ -60,12 +60,18 @@ const collectCoreImports = (): {
 }
 
 describe('Round27 serialize boundaries', () => {
-  it('SER-T27-01 keeps core source graph and bundled output free of workspace packages', async () => {
+  it('SER-T27-01 keeps core source graph limited to utils and the public abort leaf', async () => {
     const dependencies = readPackageDependencies()
     const graph = collectCoreImports()
 
-    expect([...graph.external].sort()).toEqual(['@migaia/utils/bytes', '@migaia/utils/error'])
-    for (const dependency of dependencies.filter((dependency) => dependency !== '@migaia/utils')) {
+    expect([...graph.external].sort()).toEqual([
+      '@migaia/lifecycle/abort',
+      '@migaia/utils/bytes',
+      '@migaia/utils/error'
+    ])
+    for (const dependency of dependencies.filter(
+      (dependency) => dependency !== '@migaia/utils' && dependency !== '@migaia/lifecycle'
+    )) {
       expect(graph.external).not.toContain(dependency)
     }
     expect(graph.files).not.toContain(resolve(packageRoot, 'src/registry.ts'))
@@ -90,8 +96,10 @@ describe('Round27 serialize boundaries', () => {
       .map((chunk) => chunk.code ?? '')
       .join('\n')
 
-    expect(bundle).not.toContain('@migaia/lifecycle')
-    for (const dependency of dependencies.filter((dependency) => dependency !== '@migaia/utils')) {
+    expect(bundle).toContain('@migaia/lifecycle')
+    for (const dependency of dependencies.filter(
+      (dependency) => dependency !== '@migaia/utils' && dependency !== '@migaia/lifecycle'
+    )) {
       expect(bundle).not.toContain(dependency)
     }
   })

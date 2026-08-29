@@ -36,9 +36,8 @@ export function composeSerializeSignal(
 ): { readonly signal: ISerializeAbortSignal; readonly dispose: () => void } {
   const closingSnapshot = snapshotSerializeSignal(closing)
   if (readAborted(closingSnapshot)) return { signal: closingSnapshot, dispose: () => {} }
-  if (caller === undefined) return { signal: closingSnapshot, dispose: () => {} }
-  const callerSnapshot = snapshotSerializeSignal(caller)
-  if (readAborted(callerSnapshot)) {
+  const callerSnapshot = caller === undefined ? undefined : snapshotSerializeSignal(caller)
+  if (callerSnapshot !== undefined && readAborted(callerSnapshot)) {
     readReason(callerSnapshot)
     return { signal: callerSnapshot, dispose: () => {} }
   }
@@ -47,8 +46,8 @@ export function composeSerializeSignal(
   const composed = createAbortController()
   /** Caller listener registration state. */
   const callerRegistration: IListenerRegistration = {
-    signal: callerSnapshot,
-    listener: () => observeAbort(callerSnapshot),
+    signal: callerSnapshot!,
+    listener: () => observeAbort(callerSnapshot!),
     attempted: false,
     removed: false
   }
@@ -77,6 +76,42 @@ export function composeSerializeSignal(
     }
   }
 
+  /** Captured parser listeners whose failures must remain observable as secondary errors. */
+  const exposedListeners = new Map<() => void, () => void>()
+
+  /** Expose the composed signal while retaining primary abort state and reporting listener errors. */
+  const exposedSignal: ISerializeAbortSignal = {
+    get aborted() {
+      return composed.signal.aborted
+    },
+    get reason() {
+      return composed.signal.reason
+    },
+    addEventListener(type, listener, options) {
+      if (exposedListeners.has(listener)) return
+      const wrapped = (): void => {
+        try {
+          listener()
+        } catch (error) {
+          reportCleanupFailure(error)
+        }
+      }
+      exposedListeners.set(listener, wrapped)
+      try {
+        composed.signal.addEventListener(type, wrapped, options)
+      } catch (error) {
+        exposedListeners.delete(listener)
+        throw error
+      }
+    },
+    removeEventListener(type, listener) {
+      const wrapped = exposedListeners.get(listener)
+      if (wrapped === undefined) return
+      exposedListeners.delete(listener)
+      composed.signal.removeEventListener(type, wrapped)
+    }
+  }
+
   /** Remove each attempted listener once, continuing after individual removal failures. */
   const cleanupListeners = (): void => {
     if (registrationDepth > 0) return
@@ -96,6 +131,7 @@ export function composeSerializeSignal(
     if (disposed) return
     disposed = true
     cleanupRequested = true
+    exposedListeners.clear()
     cleanupListeners()
   }
 
@@ -161,17 +197,45 @@ export function composeSerializeSignal(
   }
 
   try {
-    register(callerRegistration)
-    if (recheck(callerSnapshot) || recheck(closingSnapshot)) {
-      return { signal: composed.signal, dispose }
+    if (callerSnapshot !== undefined) register(callerRegistration)
+    if ((callerSnapshot !== undefined && recheck(callerSnapshot)) || recheck(closingSnapshot)) {
+      return { signal: exposedSignal, dispose }
     }
 
     register(closingRegistration)
-    recheck(callerSnapshot)
+    if (callerSnapshot !== undefined) recheck(callerSnapshot)
     recheck(closingSnapshot)
-    return { signal: composed.signal, dispose }
+    return { signal: exposedSignal, dispose }
   } catch (error) {
     dispose()
     throw error
+  }
+}
+
+/** Create one operation owner through the existing lifecycle controller and signal composition path. */
+export function createSerializeOperationSignal(
+  caller: ISerializeAbortSignal | undefined,
+  report: (error: unknown) => void
+): {
+  readonly signal: ISerializeAbortSignal
+  readonly abort: (reason?: unknown) => void
+  readonly dispose: () => void
+} {
+  const owner = createAbortController()
+  const composed = composeSerializeSignal(caller, owner.signal, report)
+  return {
+    signal: composed.signal,
+    abort(reason?: unknown) {
+      try {
+        owner.abort(reason)
+      } catch (error) {
+        try {
+          report(error)
+        } catch {
+          // Secondary reporting failure cannot replace the operation's primary cancellation.
+        }
+      }
+    },
+    dispose: composed.dispose
   }
 }

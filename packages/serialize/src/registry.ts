@@ -336,6 +336,7 @@ async function collectChunks(
       code: SerializeErrorCode.encodeFailed
     })
   }
+  if (collected.length === 1) return collected[0]
   if (sawValue) return collected[0]
   if (!sawBytes) {
     let text = ''

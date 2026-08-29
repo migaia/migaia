@@ -64,7 +64,9 @@ export const SerializeErrorText = {
   /** Stable text for a value chunk rejected from wire collection. */
   collectValue: 'cannot collect a value chunk into a stream',
   /** Stable text for iterator cleanup failures at the collector boundary. */
-  collectCleanupFailed: 'serialize stream iterator cleanup failed'
+  collectCleanupFailed: 'serialize stream iterator cleanup failed',
+  /** Reason carried by the operation-owned signal when a consumer closes a stream early. */
+  streamConsumerClosed: 'serialize stream consumer closed'
 } as const
 
 /** 结构化 tagged 错误：原生错误类型 `TError` 交叉附加 `source`/`code`/`context?`。运行时仍为 `TError`（`instanceof` 保持真）。 */
