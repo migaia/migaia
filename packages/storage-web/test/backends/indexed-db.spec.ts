@@ -3263,7 +3263,13 @@ describe('indexedDb backend', () => {
     } as unknown as IDBFactory
 
     const store = indexedDb({ factory: failingFactory, dbName: 'x' })
-    await expect(store.get('k')).rejects.toBeDefined()
+    await expect(store.get('k')).rejects.toMatchObject({
+      source: '@migaia/storage-web',
+      code: 'BACKEND_UNAVAILABLE',
+      backend: 'indexeddb',
+      operation: 'indexeddb.open',
+      cause: expect.objectContaining({ name: 'UnknownError', message: 'open failed' })
+    })
   })
 
   it('open success result getter 异常会 settle 为 BACKEND_UNAVAILABLE', async () => {

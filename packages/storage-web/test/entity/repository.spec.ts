@@ -11,6 +11,35 @@ type IUser = { id: string; name: string; email: string }
 
 const users = defineEntity<IUser>({ name: 'users', key: 'id' })
 
+it('stream limit zero performs no backend read or yield', async () => {
+  const store = memoryStorage()
+  const repo = users.connect(store)
+  await repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })
+  let reads = 0
+  const originalIterate = store.iterateRecords
+  store.iterateRecords = (range, ctx) => {
+    reads += 1
+    return originalIterate(range, ctx)
+  }
+  const values: IUser[] = []
+  for await (const value of repo.stream({ limit: 0 })) values.push(value)
+  expect(values).toEqual([])
+  expect(reads).toBe(0)
+})
+
+it('stream direction reverses the explicit comparator order', async () => {
+  const repo = users.connect(memoryStorage())
+  await repo.put({ id: 'a', name: 'A', email: 'a@b.c' })
+  await repo.put({ id: 'b', name: 'B', email: 'b@c.d' })
+  const values: IUser[] = []
+  for await (const value of repo.stream({
+    orderBy: (left, right) => left.id.localeCompare(right.id),
+    direction: 'prev'
+  }))
+    values.push(value)
+  expect(values.map((value) => value.id)).toEqual(['b', 'a'])
+})
+
 it('SWV4-R05 projects explicit selectors and indexed list through the shared query route', async () => {
   type IIndexedUser = { id: string; email: string; tags: string[] }
   let selectorCalls = 0

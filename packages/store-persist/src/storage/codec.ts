@@ -1,4 +1,8 @@
-import type { ICodec } from '@migaia/storage-contract'
+import {
+  collectionsJsonCodec,
+  COLLECTIONS_JSON_CODEC_NAME,
+  type ICodec
+} from '@migaia/storage-contract'
 import { isUint8Array } from '@migaia/utils/bytes'
 import type { IPersistStorage, IPersistByteStorage } from '../core/types.js'
 import { createStorePersistTypeError } from '../errors.js'
@@ -9,43 +13,14 @@ import { StorePersistErrorText } from '../error-text.js'
 const MAP_TAG = '__migaia_persist_map__'
 const SET_TAG = '__migaia_persist_set__'
 
-/** Detects collections by structured-cloning into this realm; never reads a candidate constructor. */
-const intrinsicCollection = (value: unknown): Map<unknown, unknown> | Set<unknown> | undefined => {
-  if (value === null || typeof value !== 'object') return undefined
-  try {
-    const clone = globalThis.structuredClone?.(value)
-    if (clone instanceof Map) return clone
-    if (clone instanceof Set) return clone
-    if (value instanceof Map) return value
-    if (value instanceof Set) return value
-  } catch {
-    return undefined
-  }
-  return undefined
-}
-
-/**
- * `JSON.stringify(new Map(...))` 产出 `"{}"`——Map/Set 不是 JSON 原生可表达的形状，裸调用会
- * 悄悄丢光内容而不是报错。`persistCollection()` 的 `ObservableMap`/`ObservableSet` 快照就是真的 `Map`/`Set` 实例（源码确认
- * `snapshot()` 内部 `return new Map(this.#values)`），所以默认 codec
- * 必须自己认得这两种形状，用一个打了标签的普通对象过一趟，而不是要求每个使用方自己转数组。
- */
-function jsonReplacer(_key: string, value: unknown): unknown {
-  const collection = intrinsicCollection(value)
-  if (collection instanceof Map) return { [MAP_TAG]: [...collection.entries()] }
-  if (collection instanceof Set) return { [SET_TAG]: [...collection.values()] }
-  return value
-}
-
-function jsonReviver(_key: string, value: unknown): unknown {
+/** Explicitly recognizes only the two legacy tags; ordinary JSON never enters this migration path. */
+function legacyReviver(_key: string, value: unknown): unknown {
   if (value !== null && typeof value === 'object') {
     const record = value as Record<string, unknown>
-    if (MAP_TAG in record && Array.isArray(record[MAP_TAG])) {
+    if (Object.hasOwn(record, MAP_TAG) && Array.isArray(record[MAP_TAG]))
       return new Map(record[MAP_TAG] as [unknown, unknown][])
-    }
-    if (SET_TAG in record && Array.isArray(record[SET_TAG])) {
+    if (Object.hasOwn(record, SET_TAG) && Array.isArray(record[SET_TAG]))
       return new Set(record[SET_TAG] as unknown[])
-    }
   }
   return value
 }
@@ -55,26 +30,42 @@ function jsonReviver(_key: string, value: unknown): unknown {
  * 的具体值，只按结构复刻这一份零依赖实现，避免让"默认 codec 是什么"这件事 额外背上一条运行时依赖。
  */
 export const defaultJsonCodec: ICodec = Object.freeze({
-  name: 'json',
+  name: COLLECTIONS_JSON_CODEC_NAME,
   output: PersistCodecOutput.text,
   async encode(value: unknown): Promise<string> {
-    const encoded = JSON.stringify(value, jsonReplacer)
-    if (encoded === undefined) {
+    try {
+      return await collectionsJsonCodec.encode(value)
+    } catch (cause) {
       throw createStorePersistTypeError(
         StorePersistErrorCode.encodeFailed,
-        StorePersistErrorText.jsonSerialize
+        StorePersistErrorText.jsonSerialize,
+        { cause }
       )
     }
-    return encoded
   },
   async decode(raw: unknown): Promise<unknown> {
-    if (typeof raw !== 'string') {
+    if (typeof raw !== 'string')
       throw createStorePersistTypeError(
         StorePersistErrorCode.envelopeInvalid,
         StorePersistErrorText.jsonPayload
       )
+    try {
+      /** Legacy detection is explicit and exact; unrecognized lookalikes remain ordinary JSON. */
+      let legacyFound = false
+      const parsed = JSON.parse(raw, (key, value: unknown) => {
+        const migrated = legacyReviver(key, value)
+        if (migrated !== value) legacyFound = true
+        return migrated
+      })
+      if (legacyFound) return parsed
+      return await collectionsJsonCodec.decode(raw)
+    } catch (cause) {
+      throw createStorePersistTypeError(
+        StorePersistErrorCode.envelopeInvalid,
+        StorePersistErrorText.jsonPayload,
+        { cause }
+      )
     }
-    return JSON.parse(raw, jsonReviver)
   }
 })
 

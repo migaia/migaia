@@ -326,14 +326,16 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
     const committedKeys: IStorageKey[] = []
     for (const [encoded, entry] of draft) {
       if (entry === TOMBSTONE) {
-        documents.delete(encoded)
-        recordRevisions.set(encoded, revisionOf(encoded) + 1)
+        if (documents.delete(encoded)) {
+          recordRevisions.set(encoded, revisionOf(encoded) + 1)
+          committedKeys.push(draftKeys.get(encoded)!)
+        }
       } else {
         checkCrossChannel(entry[0], 'record', entry[2], true, undefined, false)
         documents.set(encoded, [entry[0], entry[1]])
         recordRevisions.set(encoded, revisionOf(encoded) + 1)
+        committedKeys.push(draftKeys.get(encoded)!)
       }
-      committedKeys.push(draftKeys.get(encoded)!)
     }
     // SWV2-B05 "batch one-event": the whole transaction's writes/deletes fanout as a single
     // `kind:'batch'` event after every entry above committed, not one event per key — and only
@@ -454,8 +456,10 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
         const keySnapshot = snapshotStorageKey(key, StorageBackend.memory)
         const encoded = encodeFlatStorageKey(keySnapshot)
         const existed = documents.delete(encoded)
-        recordRevisions.set(encoded, (recordRevisions.get(encoded) ?? 0) + 1)
-        if (existed) publishChange({ channel: 'record', kind: 'remove', keys: [keySnapshot] })
+        if (existed) {
+          recordRevisions.set(encoded, (recordRevisions.get(encoded) ?? 0) + 1)
+          publishChange({ channel: 'record', kind: 'remove', keys: [keySnapshot] })
+        }
       }),
     clearRecords: (ctx) =>
       withAbort(ctx, async () => {

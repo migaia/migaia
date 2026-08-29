@@ -1,7 +1,7 @@
 import type { IAtomStore, IWritableAtomDefinition } from '@migaia/store-keyed'
 import { persistUnit } from '../core/persist-unit.js'
 import type { ICodec } from '@migaia/storage-contract'
-import type { IPersistStorage, IPersistUnit } from '../core/types.js'
+import type { IPersistHandle, IPersistStorage, IPersistUnit } from '../core/types.js'
 import { snapshotPersistOptions, assertPersistString } from '../core/options.js'
 import { createStorePersistTypeError } from '../errors.js'
 import { StorePersistErrorCode } from '../error-code.js'
@@ -18,9 +18,8 @@ export type IPersistKeyedOptions<T> = {
   merge?: (persisted: Partial<T>, current: T) => T
 }
 
-export type IPersistKeyedHandle<T> = {
+export type IPersistKeyedHandle<T> = IPersistHandle & {
   readonly value: T
-  dispose(): void
 }
 
 function storageKey(namespace: string, id: string): string {
@@ -63,8 +62,8 @@ export function persistKeyed<T>(
     debounceMs: snapshot.debounceMs
   })
   return {
-    value,
-    dispose: () => handle.dispose()
+    ...handle,
+    value
   }
 }
 

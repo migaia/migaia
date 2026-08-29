@@ -23,6 +23,7 @@ export type { IBackendKind, IStorageCapabilities } from './capabilities.js'
 export { snapshotStorageCapabilities, isStorageCapabilities } from './capabilities.js'
 
 export type { ICodec, ICodecOutput } from './codec.js'
+export { COLLECTIONS_JSON_CODEC_NAME, collectionsJsonCodec } from './collections-codec.js'
 
 export type {
   IKeyValueStoreAdmission,

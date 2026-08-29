@@ -55,4 +55,14 @@ describe('defaultJsonCodec Map/Set 往返', () => {
     await expect(defaultJsonCodec.encode({ fakeMap, fakeSet })).resolves.toBeTypeOf('string')
     expect(executed).toBe(false)
   })
+
+  it('uses the versioned contract format and explicitly migrates legacy tags', async () => {
+    const encoded = await defaultJsonCodec.encode({ map: new Map([['a', 1]]) })
+    expect(encoded).toContain('migaia-collections-json-v1')
+    const migrated = (await defaultJsonCodec.decode(
+      '{"version":0,"state":{"map":{"__migaia_persist_map__":[["a",1]]}}}'
+    )) as { state: { map: Map<string, number> } }
+    expect(migrated.state.map).toBeInstanceOf(Map)
+    expect([...migrated.state.map.entries()]).toEqual([['a', 1]])
+  })
 })
