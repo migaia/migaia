@@ -1,0 +1,383 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "locale": "zh",
+      "library": "P3",
+      "source": "src/content/zh/packages/P3/README.md",
+      "slug": "",
+      "format": "md"
+    },
+    {
+      "locale": "zh",
+      "library": "P4",
+      "source": "src/content/zh/packages/P4/README.md",
+      "slug": "",
+      "format": "md"
+    },
+    {
+      "locale": "zh",
+      "library": "P5",
+      "source": "src/content/zh/packages/P5/README.md",
+      "slug": "",
+      "format": "md"
+    },
+    {
+      "locale": "zh",
+      "library": "P6",
+      "source": "src/content/zh/packages/P6/README.md",
+      "slug": "",
+      "format": "md"
+    },
+    {
+      "locale": "zh",
+      "library": "P7",
+      "source": "src/content/zh/packages/P7/README.md",
+      "slug": "",
+      "format": "md"
+    },
+    {
+      "locale": "zh",
+      "library": "P8",
+      "source": "src/content/zh/packages/P8/README.md",
+      "slug": "",
+      "format": "md"
+    },
+    {
+      "locale": "zh",
+      "library": "event-subscriber",
+      "source": "src/content/zh/packages/event-subscriber/advanced.mdx",
+      "slug": "advanced",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "event-subscriber",
+      "source": "src/content/zh/packages/event-subscriber/api.mdx",
+      "slug": "api",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "event-subscriber",
+      "source": "src/content/zh/packages/event-subscriber/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "event-subscriber",
+      "source": "src/content/zh/packages/event-subscriber/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "lifecycle",
+      "source": "src/content/zh/packages/lifecycle/advanced.mdx",
+      "slug": "advanced",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "lifecycle",
+      "source": "src/content/zh/packages/lifecycle/api.mdx",
+      "slug": "api",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "lifecycle",
+      "source": "src/content/zh/packages/lifecycle/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "lifecycle",
+      "source": "src/content/zh/packages/lifecycle/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "logger",
+      "source": "src/content/zh/packages/logger/advanced.mdx",
+      "slug": "advanced",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "logger",
+      "source": "src/content/zh/packages/logger/api.mdx",
+      "slug": "api",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "logger",
+      "source": "src/content/zh/packages/logger/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "logger",
+      "source": "src/content/zh/packages/logger/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "middleware-pipeline",
+      "source": "src/content/zh/packages/middleware-pipeline/advanced.mdx",
+      "slug": "advanced",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "middleware-pipeline",
+      "source": "src/content/zh/packages/middleware-pipeline/api.mdx",
+      "slug": "api",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "middleware-pipeline",
+      "source": "src/content/zh/packages/middleware-pipeline/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "middleware-pipeline",
+      "source": "src/content/zh/packages/middleware-pipeline/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "plugin-host",
+      "source": "src/content/zh/packages/plugin-host/advanced.mdx",
+      "slug": "advanced",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "plugin-host",
+      "source": "src/content/zh/packages/plugin-host/api.mdx",
+      "slug": "api",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "plugin-host",
+      "source": "src/content/zh/packages/plugin-host/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "plugin-host",
+      "source": "src/content/zh/packages/plugin-host/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "reactive",
+      "source": "src/content/zh/packages/reactive/advanced.mdx",
+      "slug": "advanced",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "reactive",
+      "source": "src/content/zh/packages/reactive/api.mdx",
+      "slug": "api",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "reactive",
+      "source": "src/content/zh/packages/reactive/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "reactive",
+      "source": "src/content/zh/packages/reactive/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "resource",
+      "source": "src/content/zh/packages/resource/advanced.mdx",
+      "slug": "advanced",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "resource",
+      "source": "src/content/zh/packages/resource/api.mdx",
+      "slug": "api",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "resource",
+      "source": "src/content/zh/packages/resource/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "resource",
+      "source": "src/content/zh/packages/resource/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "serialize",
+      "source": "src/content/zh/packages/serialize/advanced.mdx",
+      "slug": "advanced",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "serialize",
+      "source": "src/content/zh/packages/serialize/api.mdx",
+      "slug": "api",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "serialize",
+      "source": "src/content/zh/packages/serialize/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "serialize",
+      "source": "src/content/zh/packages/serialize/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "storage-contract",
+      "source": "src/content/zh/packages/storage-contract/advanced.mdx",
+      "slug": "advanced",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "storage-contract",
+      "source": "src/content/zh/packages/storage-contract/api.mdx",
+      "slug": "api",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "storage-contract",
+      "source": "src/content/zh/packages/storage-contract/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "storage-contract",
+      "source": "src/content/zh/packages/storage-contract/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "storage-web",
+      "source": "src/content/zh/packages/storage-web/advanced.mdx",
+      "slug": "advanced",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "storage-web",
+      "source": "src/content/zh/packages/storage-web/api.mdx",
+      "slug": "api",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "storage-web",
+      "source": "src/content/zh/packages/storage-web/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "storage-web",
+      "source": "src/content/zh/packages/storage-web/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "utils",
+      "source": "src/content/zh/packages/utils/advanced.mdx",
+      "slug": "advanced",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "utils",
+      "source": "src/content/zh/packages/utils/api.mdx",
+      "slug": "api",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "utils",
+      "source": "src/content/zh/packages/utils/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "utils",
+      "source": "src/content/zh/packages/utils/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "web-rpc",
+      "source": "src/content/zh/packages/web-rpc/advanced.mdx",
+      "slug": "advanced",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "web-rpc",
+      "source": "src/content/zh/packages/web-rpc/api.mdx",
+      "slug": "api",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "web-rpc",
+      "source": "src/content/zh/packages/web-rpc/overview.mdx",
+      "slug": "overview",
+      "format": "mdx"
+    },
+    {
+      "locale": "zh",
+      "library": "web-rpc",
+      "source": "src/content/zh/packages/web-rpc/quickstart.mdx",
+      "slug": "quickstart",
+      "format": "mdx"
+    }
+  ]
+}

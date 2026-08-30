@@ -4,7 +4,7 @@ import typography from '@tailwindcss/typography'
 import animate from 'tailwindcss-animate'
 
 export default {
-  content: ['./src/**/*.{astro,html,js,jsx,md,mdx,ts,tsx}'],
+  content: ['./app/**/*.{html,js,jsx,md,mdx,ts,tsx}', './src/**/*.{html,js,jsx,md,mdx,ts,tsx}'],
   theme: {
     extend: {
       fontFamily: {

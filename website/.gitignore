@@ -1,9 +1,10 @@
 node_modules/
 dist/
+build/
+.react-router/
+.bun-tmp/
 .env
 .env.local
 .env.*.local
 *.log
 .DS_Store
-bun.lock
-.astro/
