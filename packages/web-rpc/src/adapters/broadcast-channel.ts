@@ -10,12 +10,15 @@ import {
   releaseListenerRegistration,
   reportListenerFailure
 } from '../internal/listener-safety.js'
+import { createMessageListenerHub } from '../internal/message-listener-hub.js'
 
 /** Adapts BroadcastChannel for tab-to-tab and storage-backed coordination. */
 export function createBroadcastChannelTransport(channel: BroadcastChannel): IWebRpcTransport {
-  const listeners = new Set<
-    (message: { data: unknown; origin?: string; source?: unknown }) => void
-  >()
+  const listeners = createMessageListenerHub<{
+    data: unknown
+    origin?: string
+    source?: unknown
+  }>()
   const listenerErrors = new Set<(error: unknown) => void>()
   const transportErrorWrappers = new Set<EventListener>()
   const secondaryFailures = createListenerFailureState()
@@ -31,13 +34,13 @@ export function createBroadcastChannelTransport(channel: BroadcastChannel): IWeb
       reportListenerFailure(error, listenerErrors, secondaryFailures)
       return
     }
-    for (const listener of Array.from(listeners)) {
+    listeners.dispatch({ data, origin, source }, (listener, message) => {
       observeListener(
-        () => listener({ data, origin, source }),
+        () => listener(message),
         (error) => reportListenerFailure(error, listenerErrors, secondaryFailures),
         secondaryFailures
       )
-    }
+    })
   }
   return {
     platform: WebRpcPlatform.broadcastChannel,
@@ -47,7 +50,7 @@ export function createBroadcastChannelTransport(channel: BroadcastChannel): IWeb
       channel.postMessage(message)
     },
     subscribe(listener) {
-      if (listeners.size === 0)
+      listeners.add(listener, () =>
         registerListeners(
           [
             {
@@ -57,14 +60,12 @@ export function createBroadcastChannelTransport(channel: BroadcastChannel): IWeb
           ],
           { code: WebRpcErrorCode.transport, secondaryFailures }
         )
-      listeners.add(listener)
+      )
       return () => {
         if (!listeners.has(listener)) return
         releaseListenerRegistration(
           listeners.size === 1 ? [() => channel.removeEventListener('message', onMessage)] : [],
-          () => {
-            listeners.delete(listener)
-          },
+          () => listeners.remove(listener, () => undefined),
           { code: WebRpcErrorCode.transport, secondaryFailures }
         )
       }

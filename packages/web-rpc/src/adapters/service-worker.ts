@@ -10,6 +10,7 @@ import {
   releaseListenerRegistration,
   reportListenerFailure
 } from '../internal/listener-safety.js'
+import { createMessageListenerHub } from '../internal/message-listener-hub.js'
 
 /** Outbound ServiceWorker or Client target. */
 export type IServiceWorkerMessageTarget = {
@@ -35,9 +36,11 @@ export function createServiceWorkerTransport(
 ): IWebRpcTransport<unknown, Transferable> {
   const { target, receiver } = options
   const peerId = options.peerId ?? target.id
-  const listeners = new Set<
-    (message: { data: unknown; origin?: string; source?: unknown }) => void
-  >()
+  const listeners = createMessageListenerHub<{
+    data: unknown
+    origin?: string
+    source?: unknown
+  }>()
   const listenerErrors = new Set<(error: unknown) => void>()
   const transportErrors = new Set<(error: unknown) => void>()
   const secondaryFailures = createListenerFailureState()
@@ -53,13 +56,13 @@ export function createServiceWorkerTransport(
       reportListenerFailure(error, transportErrors, secondaryFailures)
       return
     }
-    for (const listener of Array.from(listeners)) {
+    listeners.dispatch({ data, origin, source }, (listener, message) => {
       observeListener(
-        () => listener({ data, origin, source }),
+        () => listener(message),
         (error) => reportListenerFailure(error, listenerErrors, secondaryFailures),
         secondaryFailures
       )
-    }
+    })
   }
   return {
     platform: WebRpcPlatform.worker,
@@ -72,7 +75,7 @@ export function createServiceWorkerTransport(
       target.postMessage(message, options?.transfer)
     },
     subscribe(listener) {
-      if (listeners.size === 0)
+      listeners.add(listener, () =>
         registerListeners(
           [
             {
@@ -82,14 +85,12 @@ export function createServiceWorkerTransport(
           ],
           { code: WebRpcErrorCode.transport, secondaryFailures }
         )
-      listeners.add(listener)
+      )
       return () => {
         if (!listeners.has(listener)) return
         releaseListenerRegistration(
           listeners.size === 1 ? [() => receiver.removeEventListener('message', onMessage)] : [],
-          () => {
-            listeners.delete(listener)
-          },
+          () => listeners.remove(listener, () => undefined),
           { code: WebRpcErrorCode.transport, secondaryFailures }
         )
       }

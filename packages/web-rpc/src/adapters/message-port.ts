@@ -13,6 +13,7 @@ import {
   releaseListenerRegistration,
   reportListenerFailure
 } from '../internal/listener-safety.js'
+import { createMessageListenerHub } from '../internal/message-listener-hub.js'
 import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js'
 
 /**
@@ -47,7 +48,7 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
   port: IBrowserMessagePortLike<TTransfer, TEvent>,
   options: IBrowserMessagePortTransportOptions = {}
 ): IWebRpcTransport<unknown, TTransfer> {
-  const messageListeners = new Set<(message: { data: unknown }) => void>()
+  const messageListeners = createMessageListenerHub<{ data: unknown }>()
   const errorListeners = new Set<(error: unknown) => void>()
   const listenerErrors = new Set<(error: unknown) => void>()
   const secondaryFailures = createListenerFailureState()
@@ -56,13 +57,13 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
   const ownership = options.ownership ?? 'owned'
   const onMessage = (event: TEvent): void => {
     const data = safeRead<unknown>(event, 'data')
-    for (const listener of Array.from(messageListeners)) {
+    messageListeners.dispatch({ data }, (listener, message) => {
       observeListener(
-        () => listener({ data }),
+        () => listener(message),
         (error) => reportListenerFailure(error, listenerErrors, secondaryFailures),
         secondaryFailures
       )
-    }
+    })
   }
   const onMessageError = (): void => {
     const error = new Error('[rpc] browser message port could not deserialize a message')
@@ -81,7 +82,7 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
     },
     subscribe(listener) {
       if (closed) throw new WebRpcTransportError('[rpc] browser message port is closed')
-      if (messageListeners.size === 0) {
+      messageListeners.add(listener, () =>
         registerListeners(
           [
             {
@@ -96,8 +97,7 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
           ],
           { code: WebRpcErrorCode.transport, secondaryFailures }
         )
-      }
-      messageListeners.add(listener)
+      )
       return () => {
         if (!messageListeners.has(listener)) return
         releaseListenerRegistration(
@@ -108,7 +108,7 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
               ]
             : [],
           () => {
-            messageListeners.delete(listener)
+            messageListeners.remove(listener, () => undefined)
           },
           { code: WebRpcErrorCode.transport, secondaryFailures }
         )
@@ -117,7 +117,7 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
     close() {
       if (closed) return closeResult
       closed = true
-      messageListeners.clear()
+      messageListeners.clear(() => undefined)
       const cleanupErrors = collectListenerCleanupFailures([
         () => port.removeEventListener('message', onMessage),
         () => port.removeEventListener('messageerror', onMessageError)
@@ -161,7 +161,7 @@ export function createBrowserMessagePortTransport<TTransfer = unknown, TEvent = 
  * transport.
  */
 export function createNodeMessagePortTransport(port: INodeMessagePortLike): IWebRpcTransport {
-  const messageListeners = new Set<(message: { data: unknown }) => void>()
+  const messageListeners = createMessageListenerHub<{ data: unknown }>()
   const errorListeners = new Set<(error: unknown) => void>()
   const listenerErrors = new Set<(error: unknown) => void>()
   const secondaryFailures = createListenerFailureState()
@@ -174,13 +174,13 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IWeb
   }
 
   const onMessage = (message: unknown): void => {
-    for (const listener of Array.from(messageListeners)) {
+    messageListeners.dispatch({ data: message }, (listener, messageValue) => {
       observeListener(
-        () => listener({ data: message }),
+        () => listener(messageValue),
         (error) => reportListenerFailure(error, listenerErrors, secondaryFailures),
         secondaryFailures
       )
-    }
+    })
   }
   // `error` here is an external boundary the same way a DOM event is —
   // stringifying it must not itself throw and escape as an uncaught
@@ -213,7 +213,7 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IWeb
     // referencing listeners it can no longer reach.
     subscribe(listener) {
       if (closed) throw new WebRpcTransportError('[rpc] message port is closed')
-      if (messageListeners.size === 0)
+      messageListeners.add(listener, () =>
         registerListeners(
           [
             {
@@ -223,13 +223,13 @@ export function createNodeMessagePortTransport(port: INodeMessagePortLike): IWeb
           ],
           { code: WebRpcErrorCode.transport, secondaryFailures }
         )
-      messageListeners.add(listener)
+      )
       return () => {
         if (!messageListeners.has(listener)) return
         releaseListenerRegistration(
           messageListeners.size === 1 ? [() => port.off('message', onMessage)] : [],
           () => {
-            messageListeners.delete(listener)
+            messageListeners.remove(listener, () => undefined)
           },
           { code: WebRpcErrorCode.transport, secondaryFailures }
         )

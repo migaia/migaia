@@ -79,6 +79,8 @@ export const WebRpcErrorText = {
   transferUnsupportedWithAuthentication: 'Transfer lists are unsupported with authentication',
   /** Describes a splitter result that violates the bounded framing contract. */
   invalidChunkFrames: 'Chunk splitter returned invalid frames',
+  /** Stable range text for the minimum UTF-8 chunk budget accepted by WebRPC. */
+  utf8ChunkBudgetInvalid: 'maxBytes must be at least 4 bytes',
   /** Describes a protocol codec result whose runtime type disagrees with its declaration. */
   protocolEncodedType: (encodedType: string): string =>
     `Protocol encoded output must be ${encodedType}`,

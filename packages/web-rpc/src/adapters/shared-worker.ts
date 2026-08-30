@@ -7,6 +7,7 @@ import {
   releaseListenerRegistration,
   reportListenerFailure
 } from '../internal/listener-safety.js'
+import { createMessageListenerHub } from '../internal/message-listener-hub.js'
 import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js'
 import { WebRpcErrorCode } from '../errors.js'
 
@@ -28,9 +29,11 @@ export type ISharedWorkerPort = {
 export function createSharedWorkerTransport(
   port: ISharedWorkerPort
 ): IWebRpcTransport<unknown, Transferable> {
-  const listeners = new Set<
-    (message: { data: unknown; origin?: string; source?: unknown }) => void
-  >()
+  const listeners = createMessageListenerHub<{
+    data: unknown
+    origin?: string
+    source?: unknown
+  }>()
   const listenerErrors = new Set<(error: unknown) => void>()
   const transportErrors = new Set<(error: unknown) => void>()
   const secondaryFailures = createListenerFailureState()
@@ -47,18 +50,13 @@ export function createSharedWorkerTransport(
       reportListenerFailure(error, transportErrors, secondaryFailures)
       return
     }
-    for (const listener of Array.from(listeners)) {
+    listeners.dispatch({ data, origin, source }, (listener, message) => {
       observeListener(
-        () =>
-          listener({
-            data,
-            origin: typeof origin === 'string' ? origin : undefined,
-            source
-          }),
+        () => listener(message),
         (error) => reportListenerFailure(error, listenerErrors, secondaryFailures),
         secondaryFailures
       )
-    }
+    })
   }
   const onError = (): void => {
     reportListenerFailure(
@@ -75,7 +73,7 @@ export function createSharedWorkerTransport(
       port.postMessage(message, options?.transfer)
     },
     subscribe(listener) {
-      if (listeners.size === 0) {
+      listeners.add(listener, () =>
         registerListeners(
           [
             { add: () => port.start?.(), remove: () => undefined },
@@ -90,8 +88,7 @@ export function createSharedWorkerTransport(
           ],
           { code: WebRpcErrorCode.transport, secondaryFailures }
         )
-      }
-      listeners.add(listener)
+      )
       return () => {
         if (!listeners.has(listener)) return
         releaseListenerRegistration(
@@ -101,9 +98,7 @@ export function createSharedWorkerTransport(
                 () => port.removeEventListener('messageerror', onError)
               ]
             : [],
-          () => {
-            listeners.delete(listener)
-          },
+          () => listeners.remove(listener, () => undefined),
           { code: WebRpcErrorCode.transport, secondaryFailures }
         )
       }

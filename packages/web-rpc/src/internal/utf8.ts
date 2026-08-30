@@ -1,31 +1,21 @@
-import { utf8ByteLength as canonicalUtf8ByteLength } from '@migaia/utils/bytes'
-import { tagWebRpcError, WebRpcErrorCode } from '../errors.js'
+/** UTF-8 primitives are owned by Utils; this module keeps WebRPC imports package-private. */
+import { splitUtf8 as splitCanonical, utf8ByteLength } from '@migaia/utils/bytes'
+import { WebRpcErrorCode, tagWebRpcError } from '../errors.js'
+import { WebRpcErrorText } from '../error-text.js'
 
-/** Measures encoded text without retaining the concrete inbound chunk assembler. */
-export function utf8ByteLength(value: string): number {
-  return canonicalUtf8ByteLength(value)
-}
+export { utf8ByteLength }
 
-/** Splits text without cutting a Unicode code point or exceeding a byte budget. */
+/** Adapts the canonical splitter while retaining WebRPC's error identity and empty-frame shape. */
 export function splitUtf8(value: string, maxBytes: number): readonly string[] {
-  if (!Number.isSafeInteger(maxBytes) || maxBytes < 4)
-    throw tagWebRpcError(
-      new RangeError('maxBytes must be at least 4 bytes'),
-      WebRpcErrorCode.invalidConfig
-    )
-  const parts: string[] = []
-  let part = ''
-  let bytes = 0
-  for (const character of value) {
-    const characterBytes = utf8ByteLength(character)
-    if (part && bytes + characterBytes > maxBytes) {
-      parts.push(part)
-      part = ''
-      bytes = 0
-    }
-    part += character
-    bytes += characterBytes
+  try {
+    const chunks = splitCanonical(value, maxBytes)
+    return value.length === 0 ? [] : chunks
+  } catch (error) {
+    if (error instanceof RangeError)
+      throw tagWebRpcError(
+        new RangeError(WebRpcErrorText.utf8ChunkBudgetInvalid),
+        WebRpcErrorCode.invalidConfig
+      )
+    throw error
   }
-  if (part) parts.push(part)
-  return parts
 }
