@@ -16,6 +16,7 @@ import {
 } from './errors.js'
 import { StoreIndexedErrorCode } from './error-code.js'
 import { StoreIndexedErrorText } from './error-text.js'
+import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 const ABSENT = Symbol('observable-collection-absent')
 
@@ -131,13 +132,12 @@ abstract class ObservableCollectionBase implements IDisposable {
         StoreIndexedErrorText.optionsObject
       )
     }
-    try {
-      Object.getOwnPropertyDescriptors(options)
-    } catch (error) {
+    const descriptorSnapshot = snapshotOwnDescriptors(options)
+    if (!descriptorSnapshot.ok) {
       throw createStoreIndexedTypeError(
         StoreIndexedErrorCode.invalidOption,
         StoreIndexedErrorText.optionsObject,
-        { cause: error }
+        { cause: descriptorSnapshot.error }
       )
     }
     let mutationGuard: IMutationGuard | undefined
@@ -338,8 +338,16 @@ export class ObservableObject<T extends Record<string, unknown>> extends Observa
     // Read every hostile getter before touching the current collection. A
     // failed snapshot must leave the replacement atomic.
     let nextEntries: readonly (readonly [string, unknown])[]
+    let nextKeys: ReadonlySet<string>
     try {
-      nextEntries = Object.keys(next).map((key) => [key, next[key as keyof T]] as const)
+      const preparedEntries: Array<readonly [string, unknown]> = []
+      const preparedKeys = new Set<string>()
+      for (const key of Object.keys(next)) {
+        preparedEntries.push([key, next[key as keyof T]] as const)
+        preparedKeys.add(key)
+      }
+      nextEntries = preparedEntries
+      nextKeys = preparedKeys
     } catch (error) {
       throw createStoreIndexedTypeError(
         StoreIndexedErrorCode.invalidOption,
@@ -347,9 +355,8 @@ export class ObservableObject<T extends Record<string, unknown>> extends Observa
         { cause: error }
       )
     }
-    const nextKeys = new Set(nextEntries.map(([key]) => key))
     this.runtime.batch(() => {
-      for (const key of Array.from(this.#values.keys())) {
+      for (const key of this.#values.keys()) {
         if (!nextKeys.has(key)) this.#deleteInternal(key)
       }
       for (const [key, value] of nextEntries) {
@@ -499,8 +506,15 @@ export class ObservableArray<T> extends ObservableCollectionBase {
 
   splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[] {
     this.assertMutation('splice')
-    const next = [...this.#values]
+    // Preserve native `splice()` semantics at the JavaScript boundary. Forwarding an omitted
+    // `start` as an explicit `undefined` would otherwise delete the whole array.
+    if (arguments.length === 0) return Object.freeze([])
     const hasDeleteCount = arguments.length >= 2
+    // A common insertion cursor probe must not clone and compare the entire collection.
+    if (hasDeleteCount && items.length === 0 && (deleteCount === undefined || deleteCount === 0)) {
+      return Object.freeze([])
+    }
+    const next = [...this.#values]
     const removed = hasDeleteCount
       ? next.splice(start, deleteCount ?? 0, ...items)
       : next.splice(start)
@@ -834,7 +848,14 @@ export class ObservableSet<T> extends ObservableCollectionBase {
     this.assertMutation('clear')
     if (this.#values.size === 0) return
     this.runtime.batch(() => {
-      for (const value of Array.from(this.#values)) this.#deleteInternal(value)
+      this.#values.clear()
+      // Only materialized membership cells can have observers. Clear them individually, then
+      // publish one structural revision for the whole operation.
+      for (const [value, cell] of this.#cells) {
+        cell.value = false
+        this.#cells.tombstone(value)
+      }
+      this.#bumpStructure()
     })
   }
 

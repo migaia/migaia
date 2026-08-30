@@ -21,6 +21,7 @@ import {
 import type { IPluginHostDisposalResult } from '@migaia/plugin-host'
 import { ClonePolicy } from './tolerant-clone.js'
 import { MiddlewareEventPhase, MiddlewareEventType } from './event-constants.js'
+import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 /** Reports middleware diagnostics without letting a hostile reporter escape the event boundary. */
 function reportMiddlewareFailure(
@@ -75,13 +76,12 @@ function assertHostOptions(options: unknown): asserts options is object {
       StoreMiddlewareErrorCode.invalidOption,
       StoreMiddlewareErrorText.optionsObject
     )
-  try {
-    Object.getOwnPropertyDescriptors(options)
-  } catch (error) {
+  const descriptorSnapshot = snapshotOwnDescriptors(options)
+  if (!descriptorSnapshot.ok) {
     throw createStoreMiddlewareError(
       StoreMiddlewareErrorCode.invalidOption,
       StoreMiddlewareErrorText.optionsObject,
-      { cause: error }
+      { cause: descriptorSnapshot.error }
     )
   }
 }

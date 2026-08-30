@@ -1,6 +1,11 @@
 import type { IDisposable } from '@migaia/reactive'
 import type { IFieldSource } from '@migaia/store-light'
-import { allocateOwnedSync, disposeAllWasm, throwWasmConstructionFailure } from './arena.js'
+import {
+  allocateOwnedSync,
+  disposeAllWasm,
+  disposeWasmField,
+  throwWasmConstructionFailure
+} from './arena.js'
 import {
   createStoreWasmError,
   createStoreWasmRangeError,
@@ -199,14 +204,12 @@ export function array(
             disposing = true
             disposed = true
             try {
-              block.unregister(field)
               // 逆序释放（migration.sdd.md §5.7）：子资源依赖 block 的 WASM 内存，必须先摘子资源边再 dealloc。
-              disposeAllWasm([
-                ...buckets
-                  .filter((bucket): bucket is IFieldSource => bucket !== undefined)
-                  .map((bucket) => () => bucket.dispose()),
-                () => block.dispose()
-              ])
+              disposeWasmField(
+                block,
+                field,
+                buckets.filter((bucket): bucket is IFieldSource => bucket !== undefined)
+              )
             } finally {
               disposing = false
             }

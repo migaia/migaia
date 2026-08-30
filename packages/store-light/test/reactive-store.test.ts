@@ -726,7 +726,7 @@ describe('$subscribe', () => {
       }).not.toThrow()
       await Promise.resolve()
       expect(calls).toBe(2)
-      expect(hostReportError).toHaveBeenCalledWith(reporterFailure)
+      expect(hostReportError).not.toHaveBeenCalled()
       store.$dispose()
     } finally {
       vi.unstubAllGlobals()

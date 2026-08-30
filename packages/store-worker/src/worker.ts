@@ -19,6 +19,7 @@ import {
 import { toManagedRpcHandler, type IManagedRpcHandler } from './managed-rpc-handler.js'
 import { createStoreWorkerError, STORE_WORKER_SOURCE, StoreWorkerErrorCode } from './errors.js'
 import { StoreWorkerErrorText } from './error-text.js'
+import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 export type { IManagedRpcHandler } from './managed-rpc-handler.js'
 export type IWorkerPort = IWebWorkerLikePort
@@ -31,13 +32,12 @@ function assertWorkerOptions(options: unknown): asserts options is object {
       StoreWorkerErrorText.optionsObject
     )
   }
-  try {
-    Object.getOwnPropertyDescriptors(options)
-  } catch (error) {
+  const descriptorSnapshot = snapshotOwnDescriptors(options)
+  if (!descriptorSnapshot.ok) {
     throw createStoreWorkerError(
       StoreWorkerErrorCode.invalidOption,
       StoreWorkerErrorText.optionsObject,
-      { cause: error }
+      { cause: descriptorSnapshot.error }
     )
   }
 }

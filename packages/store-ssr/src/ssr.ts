@@ -17,16 +17,17 @@ import {
 } from './errors.js'
 import { SsrWireType, SsrWorkOutcome } from './ssr-constants.js'
 import { StoreSsrErrorText } from './error-text.js'
+import { snapshotOwnDescriptors } from '@migaia/utils/object'
+import { isPlainObject } from '@migaia/utils/object'
 
 /** Rejects null/non-object public options before SSR entry points read their fields. */
 function assertOptionObject(options: unknown): asserts options is object {
   if (options === null || typeof options !== 'object')
     throw createStoreSsrError(StoreSsrErrorCode.invalidOption, StoreSsrErrorText.optionsObject)
-  try {
-    Object.getOwnPropertyDescriptors(options)
-  } catch (error) {
+  const descriptorSnapshot = snapshotOwnDescriptors(options)
+  if (!descriptorSnapshot.ok) {
     throw createStoreSsrError(StoreSsrErrorCode.invalidOption, StoreSsrErrorText.optionsObject, {
-      cause: error
+      cause: descriptorSnapshot.error
     })
   }
 }
@@ -1089,12 +1090,6 @@ function toJSONValue(
     depth,
     state
   )
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== 'object') return false
-  const prototype = Object.getPrototypeOf(value)
-  return prototype === Object.prototype || prototype === null
 }
 
 function jsonObjectToUnknownRecord(

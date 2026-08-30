@@ -17,6 +17,7 @@ import { createAtomStore, type IAtomStore } from '@migaia/store-keyed/atom/store
 import { createStoreReactAggregateError, createStoreReactError } from './errors.js'
 import { StoreReactErrorCode } from './error-code.js'
 import { StoreReactErrorText } from './error-text.js'
+import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 const STORE_TOKEN_VALUE = Symbol('store-token-value')
 
@@ -62,13 +63,12 @@ function readRegistrationOwned(options: unknown, fallback: boolean): boolean {
       StoreReactErrorCode.invalidConfig,
       StoreReactErrorText.optionsObject
     )
-  try {
-    Object.getOwnPropertyDescriptors(options)
-  } catch (error) {
+  const descriptorSnapshot = snapshotOwnDescriptors(options)
+  if (!descriptorSnapshot.ok) {
     throw createStoreReactError(
       StoreReactErrorCode.invalidConfig,
       StoreReactErrorText.optionsObject,
-      { cause: error }
+      { cause: descriptorSnapshot.error }
     )
   }
   try {

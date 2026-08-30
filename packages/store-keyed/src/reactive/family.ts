@@ -178,6 +178,8 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
   let disposed = false
   let accessClock = 0
   let ttlTimer: ReturnType<typeof setTimeout> | undefined
+  /** Absolute expiry currently represented by `ttlTimer`; later inserts reuse that timer. */
+  let ttlDeadline: number | undefined
 
   const assertUsable = (): void => {
     if (disposed)
@@ -229,9 +231,18 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
     return errors
   }
 
-  const armTtlTimer = (): void => {
+  const armTtlTimer = (candidate?: IFamilyEntry<V>): void => {
+    if (
+      candidate !== undefined &&
+      ttlTimer !== undefined &&
+      ttlDeadline !== undefined &&
+      candidate.expiresAt >= ttlDeadline
+    ) {
+      return
+    }
     if (ttlTimer !== undefined) clearTimeout(ttlTimer)
     ttlTimer = undefined
+    ttlDeadline = undefined
     if (!wallClock || ttl === Infinity || disposed) return
     const currentTime = now()
     const nextExpiry = liveEntries().reduce(
@@ -249,8 +260,10 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
     // bounded cadence so it can be reclaimed after becoming unobserved, but
     // never turn an already-expired observed entry into a 0ms busy loop.
     const delay = Math.min(MAX_TIMER_DELAY_MS, Math.max(16, nextExpiry - currentTime))
+    ttlDeadline = nextExpiry
     ttlTimer = setTimeout(() => {
       ttlTimer = undefined
+      ttlDeadline = undefined
       if (disposed) return
       try {
         prune()
@@ -387,7 +400,7 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
       }
       liveEntryCount++
       enforceCapacity()
-      armTtlTimer()
+      armTtlTimer(entryFor(key) === entry ? entry : undefined)
     } catch (error) {
       if (entry && entryFor(key) === entry) {
         deleteEntry(entry)
@@ -435,6 +448,7 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
     const pending = liveEntries()
     if (ttlTimer !== undefined) clearTimeout(ttlTimer)
     ttlTimer = undefined
+    ttlDeadline = undefined
     const errors = disposeEntries(pending)
     if (errors.length > 0) {
       armTtlTimer()
@@ -452,6 +466,7 @@ export function createFamily<K extends IFamilyKey, V extends IDisposable>(
     const pending = liveEntries()
     if (ttlTimer !== undefined) clearTimeout(ttlTimer)
     ttlTimer = undefined
+    ttlDeadline = undefined
     const errors = disposeEntries(pending)
     if (errors.length > 0) {
       armTtlTimer()

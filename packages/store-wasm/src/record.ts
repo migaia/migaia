@@ -1,6 +1,11 @@
 import type { IDisposable } from '@migaia/reactive'
 import type { IFieldSource } from '@migaia/store-light'
-import { allocateOwnedSync, disposeAllWasm, throwWasmConstructionFailure } from './arena.js'
+import {
+  allocateOwnedSync,
+  disposeAllWasm,
+  disposeWasmField,
+  throwWasmConstructionFailure
+} from './arena.js'
 import { createStoreWasmError, createStoreWasmTypeError, StoreWasmErrorCode } from './errors.js'
 import type { number as numberBuilder } from './number.js'
 import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.js'
@@ -130,12 +135,8 @@ export function record<Shape extends IRecordShape>(
             disposing = true
             disposed = true
             try {
-              block.unregister(field)
               // 逆序释放（migration.sdd.md §5.7）：先摘子资源边，再 dealloc block。
-              disposeAllWasm([
-                ...sources.map((source) => () => source.dispose()),
-                () => block.dispose()
-              ])
+              disposeWasmField(block, field, sources)
             } finally {
               disposing = false
             }

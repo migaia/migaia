@@ -22,22 +22,13 @@ import {
   StoreLightErrorCode
 } from './errors.js'
 import { StoreLightErrorText } from './error-text.js'
+import { attachSecondaryErrors } from '@migaia/utils/error'
+import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 /** Re-throws construction primary while retaining cleanup failure for non-Error primaries. */
 function throwConstructionFailure(primary: unknown, cleanup: unknown): never {
-  if (primary instanceof Error) {
-    try {
-      Object.defineProperty(primary, 'cause', { value: cleanup, configurable: true })
-      throw primary
-    } catch (attachmentFailure) {
-      if (attachmentFailure === primary) throw attachmentFailure
-      throw createStoreLightAggregateError(
-        StoreLightErrorCode.initAndCleanupFailed,
-        [primary, cleanup],
-        StoreLightErrorText.cleanupFailed
-      )
-    }
-  }
+  const attached = attachSecondaryErrors(primary, [cleanup])
+  if (attached === primary) throw primary
   throw createStoreLightAggregateError(
     StoreLightErrorCode.initAndCleanupFailed,
     [primary, cleanup],
@@ -58,22 +49,6 @@ function reportSynchronousCleanupFailure(runtime: IRuntime, error: unknown): voi
     } catch {
       // A failing host sink cannot be allowed to turn cleanup observation into
       // an unhandled rejection; the original cleanup error remains the input.
-    }
-  }
-}
-
-/** Contains subscription diagnostics when the Runtime reporter itself fails. */
-function reportStoreSubscriptionFailure(runtime: IRuntime, error: unknown): void {
-  try {
-    runtime.reportError(error, { phase: ReactiveErrorPhase.subscriptionListener })
-    return
-  } catch (reporterError) {
-    const host = (globalThis as { reportError?: (value: unknown) => void }).reportError
-    try {
-      if (host) host(reporterError)
-      else console.error(reporterError)
-    } catch {
-      // Subscriber and diagnostic failures must not escape the reactive Effect boundary.
     }
   }
 }
@@ -352,7 +327,12 @@ function createStoreCore<S extends Record<string, unknown>>(
 
   let descriptors: Record<string, PropertyDescriptor>
   try {
-    descriptors = _descriptors ?? Object.getOwnPropertyDescriptors(shape)
+    if (_descriptors !== undefined) descriptors = _descriptors
+    else {
+      const descriptorSnapshot = snapshotOwnDescriptors(shape)
+      if (!descriptorSnapshot.ok) throw descriptorSnapshot.error
+      descriptors = descriptorSnapshot.descriptors as Record<string, PropertyDescriptor>
+    }
   } catch (error) {
     disposed = true
     initAbort.abort()
@@ -651,11 +631,11 @@ function createStoreCore<S extends Record<string, unknown>>(
                 const result = runtime.untracked(() => (fn as () => unknown)())
                 if (result && typeof (result as { then?: unknown }).then === 'function') {
                   void Promise.resolve(result).catch((error: unknown) =>
-                    reportStoreSubscriptionFailure(runtime, error)
+                    runtime.reportError(error, { phase: ReactiveErrorPhase.subscriptionListener })
                   )
                 }
               } catch (error) {
-                reportStoreSubscriptionFailure(runtime, error)
+                runtime.reportError(error, { phase: ReactiveErrorPhase.subscriptionListener })
               }
             }
             initialRun = false
@@ -718,13 +698,12 @@ function createStoreCore<S extends Record<string, unknown>>(
           StoreLightErrorCode.invalidOption,
           StoreLightErrorText.optionsObject
         )
-      try {
-        Object.getOwnPropertyDescriptors(options)
-      } catch (error) {
+      const descriptorSnapshot = snapshotOwnDescriptors(options)
+      if (!descriptorSnapshot.ok) {
         throw createStoreLightError(
           StoreLightErrorCode.invalidOption,
           StoreLightErrorText.optionsObject,
-          { cause: error }
+          { cause: descriptorSnapshot.error }
         )
       }
       let entries: Array<[string, unknown]>
@@ -737,15 +716,22 @@ function createStoreCore<S extends Record<string, unknown>>(
           { cause: error }
         )
       }
-      const unknown = entries.filter(([key]) => !signals.has(key)).map(([key]) => key)
-      if (options.unknown === 'strict' && unknown.length > 0) {
+      let firstUnknown: string | undefined
+      if (options.unknown === 'strict' || options.unknown === 'report') {
+        for (const [key] of entries) {
+          if (signals.has(key)) continue
+          if (options.unknown === 'strict') {
+            firstUnknown = key
+            break
+          }
+          options.onUnknown?.(key)
+        }
+      }
+      if (firstUnknown !== undefined) {
         throw createStoreLightError(
           StoreLightErrorCode.invalidOption,
-          StoreLightErrorText.unknownHydrationField(unknown[0])
+          StoreLightErrorText.unknownHydrationField(firstUnknown)
         )
-      }
-      if (options.unknown === 'report') {
-        for (const key of unknown) options.onUnknown?.(key)
       }
       runMutation(() => {
         for (const [k, v] of entries) {
@@ -851,7 +837,9 @@ export function createStore<S extends Record<string, unknown>>(
 ): IReactiveStore<S> {
   let descriptors: Record<string, PropertyDescriptor>
   try {
-    descriptors = Object.getOwnPropertyDescriptors(shape)
+    const descriptorSnapshot = snapshotOwnDescriptors(shape)
+    if (!descriptorSnapshot.ok) throw descriptorSnapshot.error
+    descriptors = descriptorSnapshot.descriptors as Record<string, PropertyDescriptor>
   } catch (error) {
     throw createStoreLightError(
       StoreLightErrorCode.invalidOption,
