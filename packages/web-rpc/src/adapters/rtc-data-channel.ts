@@ -14,6 +14,7 @@ import {
   reportListenerFailure
 } from '../internal/listener-safety.js'
 import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js'
+import { createMessageListenerHub } from '../internal/message-listener-hub.js'
 
 /** Minimal RTCDataChannel surface accepted by the adapter. */
 export type IRTCDataChannel = {
@@ -48,7 +49,7 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IWebRpc
       new TypeError('RTCDataChannel must be open before transport construction'),
       WebRpcErrorCode.invalidConfig
     )
-  const listeners = new Set<(message: { data: unknown }) => void>()
+  const listeners = createMessageListenerHub<{ data: unknown }>()
   const listenerErrors = new Set<(error: unknown) => void>()
   const transportErrors = new Set<(error: unknown) => void>()
   const secondaryFailures = createListenerFailureState()
@@ -79,19 +80,19 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IWebRpc
   }
   const onMessage = (event: unknown): void => {
     const data = safeRead<unknown>(event, 'data')
-    for (const listener of Array.from(listeners)) {
+    listeners.dispatch({ data }, (listener, message) => {
       observeListener(
-        () => listener({ data }),
+        () => listener(message),
         (error) => reportListenerFailure(error, listenerErrors, secondaryFailures),
         secondaryFailures
       )
-    }
+    })
   }
   const onTerminal = (event: unknown): void => {
     if (terminalReported) return
     terminalReported = true
     closed = true
-    listeners.clear()
+    listeners.clear(() => undefined)
     const cleanupErrors = collectListenerCleanupFailures([
       () => channel.removeEventListener('closing', onTerminal),
       () => channel.removeEventListener('close', onTerminal),
@@ -121,7 +122,7 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IWebRpc
     },
     subscribe(listener) {
       if (closed) throw new WebRpcTransportError('RTCDataChannel is closed')
-      if (listeners.size === 0) {
+      listeners.add(listener, () => {
         installTerminalListeners()
         try {
           channel.addEventListener('message', onMessage)
@@ -138,8 +139,7 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IWebRpc
             secondaryFailures
           })
         }
-      }
-      listeners.add(listener)
+      })
       return () => {
         if (!listeners.has(listener)) return
         const isFinal = listeners.size === 1
@@ -157,7 +157,7 @@ export function createRtcDataChannelTransport(channel: IRTCDataChannel): IWebRpc
               ]
             : [],
           () => {
-            listeners.delete(listener)
+            listeners.remove(listener, () => undefined)
             if (isFinal && transportErrors.size === 0) terminalListenersInstalled = false
           },
           { code: WebRpcErrorCode.transport, secondaryFailures }

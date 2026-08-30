@@ -2,10 +2,10 @@
   "schema": "WRC-C-B11-approval-v2",
   "algorithm": "ed25519",
   "authorityId": "web-rpc-release-coordinator-v1",
-  "keyId": "coordinator-ed25519-48f6e693342b09c3",
-  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEABC8pLNtvgHi9pCk4BYoL33HKxbaNirBRq74FL/gm71E=\n-----END PUBLIC KEY-----\n",
-  "decisionId": "WRC-C-B11-decision-20260829-TSR-SDDV5",
-  "payloadDigest": "968132bedd9df573c06b9bb0baf1d8662a16c510aae89503f4258cb7006c60a7",
+  "keyId": "coordinator-ed25519-bc42d020131451c6",
+  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAtxggfK8ltxQoBMlZXtyQr2E3xtRk4UHR+bbgcNjcoeM=\n-----END PUBLIC KEY-----\n",
+  "decisionId": "WRC-C-B11-decision-20260830-PDLC-R5",
+  "payloadDigest": "32c50cab53845d11301a21b82cdc22a726f93873300087d14d0f8b55d8c76980",
   "status": "approved",
-  "reason": "SDD-v5 non-store tree-shaking custody refresh after real emitted sourcemap provenance and PluginHost preserveModules topology changes, based on two identical canonical builds."
+  "reason": "PDLC r5 custody refresh after two byte-identical canonical builds attributed the current 108-module WebRPC closure to the admitted Utils publication split."
 }

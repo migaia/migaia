@@ -19,7 +19,14 @@ const repositoryRoot = resolve(packageDirectory, '../..')
 const smokeDirectory = mkdtempSync(join(tmpdir(), 'migaia-web-rpc-packed-'))
 const extractDirectory = join(smokeDirectory, 'extract')
 const consumerDirectory = join(smokeDirectory, 'consumer')
-const packageDependencies = ['capability', 'event-subscriber', 'lifecycle', 'plugin-host', 'utils']
+const packageDependencies = [
+  'capability',
+  'event-subscriber',
+  'lifecycle',
+  'middleware-pipeline',
+  'plugin-host',
+  'utils'
+]
 const publicSubpaths = [
   './core',
   './client',

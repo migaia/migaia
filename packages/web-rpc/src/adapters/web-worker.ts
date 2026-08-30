@@ -8,6 +8,7 @@ import {
   releaseListenerRegistration,
   reportListenerFailure
 } from '../internal/listener-safety.js'
+import { createMessageListenerHub } from '../internal/message-listener-hub.js'
 import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js'
 import { WebRpcErrorCode } from '../errors.js'
 
@@ -46,9 +47,11 @@ export function createWebWorkerTransport(
   port: IWebWorkerLikePort,
   options: IWebWorkerTransportOptions = {}
 ): IWebRpcTransport<unknown, Transferable> {
-  const messageListeners = new Set<
-    (message: { data: unknown; origin?: string; source?: unknown }) => void
-  >()
+  const messageListeners = createMessageListenerHub<{
+    data: unknown
+    origin?: string
+    source?: unknown
+  }>()
   const errorListeners = new Set<(error: unknown) => void>()
   const listenerErrors = new Set<(error: unknown) => void>()
   const secondaryFailures = createListenerFailureState()
@@ -77,13 +80,13 @@ export function createWebWorkerTransport(
       emitTransportError(new Error(`[rpc] worker message could not be read: ${safeString(error)}`))
       return
     }
-    for (const listener of Array.from(messageListeners)) {
+    messageListeners.dispatch({ data, origin, source }, (listener, message) => {
       observeListener(
-        () => listener({ data, origin, source }),
+        () => listener(message),
         (error) => reportListenerFailure(error, listenerErrors, secondaryFailures),
         secondaryFailures
       )
-    }
+    })
   }
   const onFailure =
     (reason: string) =>
@@ -115,7 +118,7 @@ export function createWebWorkerTransport(
     // leaves — a client that closes must not leave the underlying port
     // still holding real listeners it can no longer reach.
     subscribe(listener) {
-      if (messageListeners.size === 0)
+      messageListeners.add(listener, () =>
         registerListeners(
           [
             {
@@ -125,14 +128,12 @@ export function createWebWorkerTransport(
           ],
           { code: WebRpcErrorCode.transport, secondaryFailures }
         )
-      messageListeners.add(listener)
+      )
       return () => {
         if (!messageListeners.has(listener)) return
         releaseListenerRegistration(
           messageListeners.size === 1 ? [() => port.removeEventListener('message', onMessage)] : [],
-          () => {
-            messageListeners.delete(listener)
-          },
+          () => messageListeners.remove(listener, () => undefined),
           { code: WebRpcErrorCode.transport, secondaryFailures }
         )
       }

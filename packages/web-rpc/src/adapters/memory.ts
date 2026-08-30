@@ -8,6 +8,10 @@ import {
   observeListener,
   reportListenerFailure
 } from '../internal/listener-safety.js'
+import {
+  createMessageListenerHub,
+  type IMessageListenerHub
+} from '../internal/message-listener-hub.js'
 
 export type IMemoryTransport = IWebRpcTransport & {
   /**
@@ -25,8 +29,8 @@ export type IMemoryTransport = IWebRpcTransport & {
  * `send()` returns stays correct.
  */
 export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemoryTransport] {
-  const listenersA = new Set<(message: { data: unknown }) => void>()
-  const listenersB = new Set<(message: { data: unknown }) => void>()
+  const listenersA = createMessageListenerHub<{ data: unknown }>()
+  const listenersB = createMessageListenerHub<{ data: unknown }>()
   let closed = false
   const errorsA = new Set<(error: unknown) => void>(),
     errorsB = new Set<(error: unknown) => void>()
@@ -38,8 +42,8 @@ export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemory
   let closeResult: void | Promise<void>
 
   const makeSide = (
-    outgoing: Set<(message: { data: unknown }) => void>,
-    incoming: Set<(message: { data: unknown }) => void>,
+    outgoing: IMessageListenerHub<{ data: unknown }>,
+    incoming: IMessageListenerHub<{ data: unknown }>,
     errors: Set<(error: unknown) => void>,
     listenerErrors: Set<(error: unknown) => void>,
     remoteListenerErrors: Set<(error: unknown) => void>,
@@ -55,19 +59,19 @@ export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemory
         // Closed between send() and delivery — the other side is gone,
         // there is nobody left to deliver to.
         if (closed) return
-        for (const listener of Array.from(outgoing)) {
+        outgoing.dispatch({ data: message }, (listener, messageValue) => {
           observeListener(
-            () => listener({ data: message }),
+            () => listener(messageValue),
             (error) => reportListenerFailure(error, remoteListenerErrors, remoteSecondaryFailures),
             remoteSecondaryFailures
           )
-        }
+        })
       })
     },
     subscribe(listener) {
-      incoming.add(listener)
+      incoming.add(listener, () => undefined)
       return () => {
-        const deleted = incoming.delete(listener)
+        const deleted = incoming.remove(listener, () => undefined)
         drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
         return deleted
       }
@@ -86,8 +90,8 @@ export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemory
         errorsB,
         secondaryFailuresB
       )
-      listenersA.clear()
-      listenersB.clear()
+      listenersA.clear(() => undefined)
+      listenersB.clear(() => undefined)
       closeResult = drainTerminalListenerFailures([], {
         code: WebRpcErrorCode.transport,
         secondaryFailures: [secondaryFailuresA, secondaryFailuresB]

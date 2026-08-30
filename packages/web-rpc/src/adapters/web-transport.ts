@@ -11,6 +11,7 @@ import {
   observeListener,
   reportListenerFailure
 } from '../internal/listener-safety.js'
+import { createMessageListenerHub } from '../internal/message-listener-hub.js'
 
 /** Minimal datagram surface accepted by the WebTransport adapter. */
 export type IWebTransportDatagrams = {
@@ -23,7 +24,7 @@ export function createWebTransportDatagramTransport(
   datagrams: IWebTransportDatagrams
 ): IWebRpcTransport<Uint8Array> {
   const writer = datagrams.writable.getWriter()
-  const listeners = new Set<(message: { data: Uint8Array }) => void>()
+  const listeners = createMessageListenerHub<{ data: Uint8Array }>()
   const listenerErrors = new Set<(error: unknown) => void>()
   const transportErrors = new Set<(error: unknown) => void>()
   const secondaryFailures = createListenerFailureState()
@@ -42,7 +43,7 @@ export function createWebTransportDatagramTransport(
     terminalOccurred = true
     terminalError = error
     closed = true
-    listeners.clear()
+    listeners.clear(() => undefined)
     reportListenerFailure(error, transportErrors, secondaryFailures)
   }
   const read = async (): Promise<void> => {
@@ -62,13 +63,13 @@ export function createWebTransportDatagramTransport(
           transitionTerminal(new Error('WebTransport datagram stream ended'))
           break
         }
-        for (const listener of Array.from(listeners)) {
+        listeners.dispatch({ data: result.value }, (listener, message) =>
           observeListener(
-            () => listener({ data: result.value }),
+            () => listener(message),
             (error) => reportListenerFailure(error, listenerErrors, secondaryFailures),
             secondaryFailures
           )
-        }
+        )
       }
     } catch (error) {
       transitionTerminal(error)
@@ -102,7 +103,7 @@ export function createWebTransportDatagramTransport(
     },
     subscribe(listener) {
       if (closed) throw new WebRpcTransportError('WebTransport is closed')
-      listeners.add(listener)
+      listeners.add(listener, () => undefined)
       if (!readPromise) {
         readPromise = read().finally(() => {
           readPromise = undefined
@@ -112,7 +113,7 @@ export function createWebTransportDatagramTransport(
         })
       }
       return () => {
-        const deleted = listeners.delete(listener)
+        const deleted = listeners.remove(listener, () => undefined)
         drainListenerFailures([], { code: WebRpcErrorCode.transport, secondaryFailures })
         return deleted
       }
@@ -121,7 +122,7 @@ export function createWebTransportDatagramTransport(
       if (closePromise) return closePromise
       closed = true
       terminalReported = true
-      listeners.clear()
+      listeners.clear(() => undefined)
       const readOwner = readPromise
       closePromise = (async () => {
         const errors: unknown[] = []
