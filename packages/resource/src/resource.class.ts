@@ -10,6 +10,7 @@ import { internalsOf } from '@migaia/reactive/internals'
 import { internalRuntimeOf } from '@migaia/reactive/node-factories'
 import { claimOwnership } from '@migaia/reactive/ownership'
 import { registerDeps, registerDepVersions } from '@migaia/reactive/node-internals'
+import { attachSecondaryErrors } from '@migaia/utils/error'
 import {
   assimilateCapturedThen,
   createGenerationController,
@@ -368,37 +369,20 @@ function createCancellationFailure(error: unknown): IResourceError {
   )
 }
 
-/** Keeps later Resource teardown failures reachable without replacing the first cleanup failure. */
-function appendDisposeCleanupErrors(primary: unknown, cleanupErrors: readonly unknown[]): unknown {
+/** Keeps later Resource teardown failures reachable while preserving its package fallback. */
+const appendDisposeCleanupErrors = (
+  primary: unknown,
+  cleanupErrors: readonly unknown[]
+): unknown => {
   if (cleanupErrors.length === 0) return primary
-  if (primary !== null && (typeof primary === 'object' || typeof primary === 'function')) {
-    try {
-      /** Existing aggregate members, if the primary already exposes an `errors` collection. */
-      const existing = (primary as { readonly errors?: unknown }).errors
-      /** Frozen identity-preserving list of cleanup failures attached to the primary. */
-      const errors = Array.isArray(existing) ? [...existing, ...cleanupErrors] : [...cleanupErrors]
-      Object.defineProperty(primary, 'errors', {
-        value: Object.freeze(errors),
-        enumerable: true,
-        configurable: true
-      })
-      return primary
-    } catch {
-      // Frozen/non-extensible primary: use the package's existing cleanup code as a last resort.
-    }
-  }
-  /** Tagged fallback that keeps the primary in `cause` and every failure in `errors`. */
-  const aggregate = createResourceError(
+  const attached = attachSecondaryErrors(primary, cleanupErrors)
+  if (attached === primary) return primary
+  const fallback = createResourceError(
     ResourceErrorCode.cancellationCleanupFailed,
     ResourceErrorText.cancellationCleanupFailed,
     { cause: primary }
   )
-  Object.defineProperty(aggregate, 'errors', {
-    value: Object.freeze([primary, ...cleanupErrors]),
-    enumerable: true,
-    configurable: true
-  })
-  return aggregate
+  return attachSecondaryErrors(fallback, [primary, ...cleanupErrors])
 }
 
 /**

@@ -18,6 +18,15 @@ export type IDiagnosticSnapshot<T> = {
   readonly diagnostics: readonly ISnapshotDiagnostic[]
 }
 
+/** Result of one non-throwing own-descriptor capture at an object boundary. */
+export type IOwnDescriptorsSnapshot =
+  | {
+      readonly kind: 'captured'
+      readonly ok: true
+      readonly descriptors: Readonly<Record<PropertyKey, PropertyDescriptor>>
+    }
+  | { readonly kind: 'failed'; readonly ok: false; readonly error: unknown }
+
 type ISnapshotTraversal = {
   readonly diagnostics: ISnapshotDiagnostic[]
   readonly seen: WeakMap<object, unknown>
@@ -41,6 +50,28 @@ export function probeProperty<T>(value: object, key: PropertyKey): IProbePropert
     return { kind: 'value', value: Reflect.get(value, key, value) as T }
   } catch (error) {
     return { kind: 'failed', error }
+  }
+}
+
+/**
+ * Captures own descriptors at most once and contains revoked-proxy or descriptor-trap failures.
+ * Primitive inputs are valid empty snapshots; callers decide their package-specific value policy.
+ */
+export function snapshotOwnDescriptors(value: unknown): IOwnDescriptorsSnapshot {
+  if (
+    value === null ||
+    value === undefined ||
+    (typeof value !== 'object' && typeof value !== 'function')
+  )
+    return { kind: 'captured', ok: true, descriptors: {} }
+  try {
+    return {
+      kind: 'captured',
+      ok: true,
+      descriptors: Object.getOwnPropertyDescriptors(value)
+    }
+  } catch (error) {
+    return { kind: 'failed', ok: false, error }
   }
 }
 

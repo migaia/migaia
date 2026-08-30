@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { once, onceAsync } from '../src/function.js'
+import { assimilateCapturedThen, once, onceAsync, probeThenable } from '../src/function.js'
 import {
   diagnosticSnapshot,
   immutableSnapshot,
   isPlainObject,
-  probeProperty
+  probeProperty,
+  snapshotOwnDescriptors
 } from '../src/object.js'
 
 describe('function and object primitives', () => {
@@ -130,5 +131,37 @@ describe('function and object primitives', () => {
     } finally {
       Object.defineProperty(globalThis, 'structuredClone', { configurable: true, value: original })
     }
+  })
+
+  it('reads then once and assimilates with the original receiver', async () => {
+    let reads = 0
+    let calls = 0
+    const thenable: object = {}
+    const thenProperty = String.fromCharCode(116, 104, 101, 110)
+    Object.defineProperty(thenable, thenProperty, {
+      get() {
+        reads += 1
+        return (resolve: (value: number) => void) => {
+          calls += 1
+          resolve(7)
+        }
+      }
+    })
+    const probe = probeThenable(thenable)
+    expect(probe.kind).toBe('thenable')
+    if (probe.kind !== 'thenable') throw new Error('test probe classification')
+    await expect(assimilateCapturedThen(probe.thenFn, thenable)).resolves.toBe(7)
+    expect(reads).toBe(1)
+    expect(calls).toBe(1)
+  })
+
+  it('contains descriptor snapshot failures without rereading a revoked proxy', () => {
+    const target = Proxy.revocable({}, {})
+    target.revoke()
+    const snapshot = snapshotOwnDescriptors(target.proxy)
+    expect(snapshot.ok).toBe(false)
+    if (snapshot.ok) throw new Error('test descriptor snapshot classification')
+    expect(snapshot.kind).toBe('failed')
+    expect(snapshot.error).toBeInstanceOf(TypeError)
   })
 })

@@ -11,6 +11,7 @@ import {
 } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
+import { attachSecondaryErrors, safeErrorReason } from '@migaia/utils/error'
 import { boundedWait } from './bounded-wait.js'
 import {
   resolveSchedulerOption,
@@ -409,27 +410,15 @@ const admitItems = (
   return { admitted, rejected }
 }
 
-/** Keeps transaction cleanup failures reachable without replacing an earlier primary failure. */
+/** Keeps transaction cleanup failures reachable while preserving Lifecycle's fallback identity. */
 const appendCleanupErrors = (primary: unknown, cleanupErrors: readonly unknown[]): unknown => {
   if (cleanupErrors.length === 0) return primary
-  if (primary !== null && (typeof primary === 'object' || typeof primary === 'function')) {
-    try {
-      const existing = (primary as { readonly errors?: unknown }).errors
-      const errors = Array.isArray(existing) ? [...existing, ...cleanupErrors] : [...cleanupErrors]
-      Object.defineProperty(primary, 'errors', {
-        value: Object.freeze(errors),
-        enumerable: true,
-        configurable: true
-      })
-      return primary
-    } catch {
-      // Frozen / non-extensible primary — fall through to the tagged aggregate wrapper.
-    }
-  }
+  const attached = attachSecondaryErrors(primary, cleanupErrors)
+  if (attached === primary) return primary
   return tagLifecycleError(
     new AggregateError(
       [primary, ...cleanupErrors],
-      primary instanceof Error ? primary.message : LifecycleErrorText.disposeTransactionFailed
+      safeErrorReason(primary, LifecycleErrorText.disposeTransactionFailed)
     ),
     LifecycleErrorCode.scopeDisposalFailed
   )

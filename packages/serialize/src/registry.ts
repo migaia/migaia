@@ -38,6 +38,7 @@ import {
 } from './format-constants.js'
 import { composeSerializeSignal } from './signal.js'
 import { snapshotSerializeSignal } from './signal-snapshot.js'
+import { attachSecondaryErrors, safeErrorReason } from '@migaia/utils/error'
 
 const NEVER_ABORTED: ISerializeAbortSignal = {
   aborted: false,
@@ -101,25 +102,8 @@ const probeIterable = (value: unknown): IIterableProbe | undefined => {
  * primary failure. Normal Error messages and primitive coercions retain their existing text;
  * failures during either read use one deterministic package-owned fallback.
  */
-const reasonOf = (error: unknown): string => {
-  try {
-    if (error instanceof Error) {
-      try {
-        const message = error.message
-        return typeof message === 'string' ? message : String(message)
-      } catch {
-        return SerializeErrorText.reasonUnavailable
-      }
-    }
-    try {
-      return String(error)
-    } catch {
-      return SerializeErrorText.reasonUnavailable
-    }
-  } catch {
-    return SerializeErrorText.reasonUnavailable
-  }
-}
+const reasonOf = (error: unknown): string =>
+  safeErrorReason(error, SerializeErrorText.reasonUnavailable)
 
 /** 结构化探测宿主 `TextEncoder`（Encoding API），不 import DOM/Node。 */
 const hostTextEncoder = (): ITextEncoder | undefined => {
@@ -519,27 +503,11 @@ const defaultReport = (_error: unknown): void => {}
 /** A no-op timeout observer used when callers do not request deadline diagnostics. */
 const defaultOnDrainTimeout = (_diagnostic: ISerializeTimeoutDiagnostic): void => {}
 
-/**
- * Keeps cleanup failures reachable while retaining the first deadline failure as the rejected
- * value. Extensible errors receive an `errors` snapshot; frozen values use an AggregateError whose
- * first entry is the unchanged primary.
- */
+/** Keeps cleanup failures reachable while retaining Serialize's fallback message and primary. */
 const appendCleanupErrors = (primary: unknown, cleanupErrors: readonly unknown[]): unknown => {
   if (cleanupErrors.length === 0) return primary
-  if (primary !== null && (typeof primary === 'object' || typeof primary === 'function')) {
-    try {
-      const existing = (primary as { readonly errors?: unknown }).errors
-      const errors = Array.isArray(existing) ? [...existing, ...cleanupErrors] : [...cleanupErrors]
-      Object.defineProperty(primary, 'errors', {
-        value: Object.freeze(errors),
-        enumerable: true,
-        configurable: true
-      })
-      return primary
-    } catch {
-      // Frozen or hostile primary: preserve both values in a standard aggregate.
-    }
-  }
+  const attached = attachSecondaryErrors(primary, cleanupErrors)
+  if (attached === primary) return primary
   return new AggregateError([primary, ...cleanupErrors], reasonOf(primary))
 }
 
