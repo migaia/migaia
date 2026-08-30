@@ -1,9 +1,4 @@
-import {
-  StorageContractError,
-  StorageContractErrorCode,
-  type IChangeFeedStore,
-  type IStorageChange
-} from '@migaia/storage-contract'
+import { type IChangeFeedStore, type IStorageChange } from '@migaia/storage-contract'
 import { isStorageErrorFamily } from '../core/error-family.js'
 import { createStorageOperationRuntime } from '../core/operation-reporter.js'
 import {
@@ -22,6 +17,7 @@ import {
 import { isStorageKeyInRange } from '../core/query.js'
 import { StorageBackend, StorageChannel, StorageOperation } from '../constants.js'
 import { isUint8Array } from '../core/bytes.js'
+import { createStorageToken } from '../utils/storage-token.js'
 import { planChannelWrite } from '../core/channel-write.js'
 import {
   createBackendReactiveController,
@@ -58,18 +54,6 @@ const CAPABILITIES: IStorageCapabilities = Object.freeze({
   opaqueEntries: false
 })
 
-/** Realm-wide monotonic suffix prevents silent overwrite when entropy sources repeat. */
-let memoryAutoKeySequence = 0
-
-const autoKey = (): string => {
-  const entropy =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-  memoryAutoKeySequence += 1
-  return `${entropy}-${memoryAutoKeySequence.toString(36)}`
-}
-
 /**
  * 纯内存实现。用于测试、SSR 服务端、以及其他后端不可用时的显式降级目标。 每个实例持有独立存储，天然隔离，不需要命名空间参数。 实现全部 L0 + L1 接口（record 使用
  * structured clone），v1 不提供原生二级索引。
@@ -81,14 +65,16 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
   const documents = new Map<string, [IStorageKey, TValue]>()
   const recordRevisions = new Map<string, number>()
   let recordEpoch = 0
-  let disposed = false
-  /** Seals new operations synchronously when disposal begins, before controller draining completes. */
-  let disposalRequested = false
-  /** Store-level disposal Promise cached to preserve identity across repeated calls. */
-  let disposePromise: Promise<void> | undefined
 
   /** Private commit-after controller shared with direct consumers and Host materialization. */
-  const controller = createBackendReactiveController({ backend: StorageBackend.memory })
+  const controller = createBackendReactiveController({
+    backend: StorageBackend.memory,
+    finalize: () => {
+      kv.clear()
+      bytes.clear()
+      documents.clear()
+    }
+  })
 
   /**
    * SWV2-R16/I05/I06/E08: fires only after a mutation has fully and durably committed (never from
@@ -101,10 +87,7 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
   }
 
   const assertLive = (): void => {
-    if (disposed || disposalRequested)
-      throw new StorageContractError(StorageContractErrorCode.disposed, {
-        backend: StorageBackend.memory
-      })
+    controller.assertLive()
   }
 
   const cloneValue = <T>(value: T, key?: IStorageKey): T => {
@@ -269,7 +252,7 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
       put: async (value, key, options) => {
         assertTransactionScopeActive(scopeActive, StorageBackend.memory)
         const conflictPolicy = readTransactionConflictPolicy(options, StorageBackend.memory)
-        const resolvedKey = key ?? autoKey()
+        const resolvedKey = key ?? createStorageToken()
         const keySnapshot = snapshotStorageKey(resolvedKey, StorageBackend.memory)
         const encoded = encodeFlatStorageKey(keySnapshot)
         trackRevision(encoded)
@@ -379,16 +362,7 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
         if (hadEntries) publishChange({ channel: 'all', kind: 'clear' })
       }),
     dispose: () => {
-      if (disposePromise !== undefined) return disposePromise
-      disposalRequested = true
-      const controllerDispose = controller.dispose()
-      disposePromise = controllerDispose.then(() => {
-        disposed = true
-        kv.clear()
-        bytes.clear()
-        documents.clear()
-      })
-      return disposePromise
+      return controller.dispose()
     },
 
     getBytes: (key, ctx) =>
@@ -440,7 +414,7 @@ export const memoryStorage = <TValue = unknown>(): ISyncCapableStore<IRecordStor
     putRecord: (value, key, ctx) =>
       withAbort(ctx, async (_signal, context) => {
         assertLive()
-        const resolvedKey = key ?? autoKey()
+        const resolvedKey = key ?? createStorageToken()
         const keySnapshot = snapshotStorageKey(resolvedKey, StorageBackend.memory)
         const encoded = encodeFlatStorageKey(keySnapshot)
         const prepared = cloneValue(value, keySnapshot)

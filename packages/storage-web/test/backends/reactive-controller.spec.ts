@@ -108,6 +108,29 @@ describe('B04 R08 private backend reactive controller', () => {
     expect(events).toHaveLength(1)
   })
 
+  it('seals admission synchronously and runs backend finalization inside the cached promise', async () => {
+    let finalized = false
+    const controller = createBackendReactiveController({
+      backend: 'memory',
+      finalize: () => {
+        finalized = true
+      }
+    })
+    const release = controller.beginMutation()
+    const firstDispose = controller.dispose()
+    expect(() => controller.assertLive()).toThrowError(
+      expect.objectContaining({ code: 'STORE_DISPOSED' })
+    )
+    expect(finalized).toBe(false)
+    expect(controller.dispose()).toBe(firstDispose)
+    release()
+    await firstDispose
+    expect(finalized).toBe(true)
+    expect(() => controller.beginMutation()).toThrowError(
+      expect.objectContaining({ code: 'STORE_DISPOSED' })
+    )
+  })
+
   it('admits memory transactions before sealing and drains them before disposal', async () => {
     const store = memoryStorage()
     const controller = getBackendReactiveController(store)!

@@ -1,8 +1,4 @@
-import {
-  StorageContractError,
-  StorageContractErrorCode,
-  type IStorageChange
-} from '@migaia/storage-contract'
+import { type IStorageChange } from '@migaia/storage-contract'
 import {
   snapshotOperationContext,
   snapshotSyncWriteOptions,
@@ -274,16 +270,8 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
     }
   }
 
-  let disposed = false
-  /** Seals new operations synchronously when disposal begins, before controller draining completes. */
-  let disposalRequested = false
-  /** Store-level disposal Promise cached to preserve identity across repeated calls. */
-  let disposePromise: Promise<void> | undefined
   const assertLive = (): void => {
-    if (disposed || disposalRequested)
-      throw new StorageContractError(StorageContractErrorCode.disposed, {
-        backend: StorageBackend.cookie
-      })
+    controller.assertLive()
   }
 
   const namespacedEntries = (
@@ -504,13 +492,7 @@ export const cookies = (options: ICookiesOptions = {}): ISyncCapableStore<ICooki
         clearNamespacedEntries('cookie.clearAll', signal)
       }),
     dispose: () => {
-      if (disposePromise !== undefined) return disposePromise
-      disposalRequested = true
-      const controllerDispose = controller.dispose()
-      disposePromise = controllerDispose.then(() => {
-        disposed = true
-      })
-      return disposePromise
+      return controller.dispose()
     }
   }
   registerBackendReactiveController(store, controller)
