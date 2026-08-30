@@ -22,6 +22,7 @@ export type IBackendReactiveSnapshot = {
 export type IBackendReactiveController = {
   readonly snapshot: IBackendReactiveSnapshot
   readonly origin: string
+  assertLive(): void
   beginMutation(): () => void
   publish(change: Omit<IStorageChange, 'sequence' | 'origin' | 'scope'>): IStorageChange | undefined
   publishExternal(change: IStorageChange): void
@@ -38,6 +39,8 @@ type IBackendReactiveControllerOptions = {
    * counter.
    */
   readonly origin?: string
+  /** Concrete backend cleanup run after admitted mutations drain and before terminal state. */
+  readonly finalize?: () => void | Promise<void>
 }
 
 /** One private exact-store registration per factory-created store. */
@@ -107,11 +110,14 @@ export const createBackendReactiveController = (
   const controller: IBackendReactiveController = {
     snapshot,
     origin,
-    beginMutation: () => {
+    assertLive: () => {
       if (disposeRequested || disposed)
         throw new StorageContractError(StorageContractErrorCode.disposed, {
           backend: input.backend
         })
+    },
+    beginMutation: () => {
+      controller.assertLive()
       return mutationLeases.retain(mutationLeaseKey)
     },
     publish: (change) => {
@@ -144,7 +150,13 @@ export const createBackendReactiveController = (
       if (disposePromise !== undefined) return disposePromise
       disposeRequested = true
       mutationLeases.seal(mutationLeaseKey)
-      disposePromise = mutationLeases.whenZero(mutationLeaseKey).then(finishDispose)
+      disposePromise = mutationLeases.whenZero(mutationLeaseKey).then(async () => {
+        try {
+          await input.finalize?.()
+        } finally {
+          finishDispose()
+        }
+      })
       return disposePromise
     }
   }

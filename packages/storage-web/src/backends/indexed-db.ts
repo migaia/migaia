@@ -94,6 +94,7 @@ import {
 } from './indexed-db-backfill.js'
 import { acquireIndexedDbCoordination } from './indexed-db-coordination.js'
 import { safeJsonPayloadByteLength } from '../utils/json.js'
+import { createStorageToken } from '../utils/storage-token.js'
 import {
   createBackendReactiveController,
   registerBackendReactiveController
@@ -246,18 +247,6 @@ const INTERNAL_STORE_NAMES = new Set([
 const isValidStoreName = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0
 
-/** Realm-wide monotonic suffix prevents silent overwrite when entropy sources repeat. */
-let indexedDbAutoKeySequence = 0
-
-const autoKey = (): string => {
-  const entropy =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-  indexedDbAutoKeySequence += 1
-  return `${entropy}-${indexedDbAutoKeySequence.toString(36)}`
-}
-
 /** Bounds private generation tokens so the native prefix-successor proof cannot depend on user data. */
 const INDEX_GENERATION_MAX_LENGTH = 128
 
@@ -270,7 +259,7 @@ const isValidIndexGeneration = (value: unknown): value is string =>
 
 /** Create one independent backend-owned generation token for a new or rotated index. */
 const createIndexGeneration = (): string => {
-  const generation = autoKey()
+  const generation = createStorageToken()
   if (!isValidIndexGeneration(generation))
     throw new StorageError(StorageErrorCode.invalidConfig, { backend: StorageBackend.indexedDb })
   return generation
@@ -925,7 +914,7 @@ export const indexedDb = <TValue = unknown>(
         })
       const runtime = createStorageOperationRuntime()
       const database = await open(runtime, mutationLease)
-      const ownerToken = autoKey()
+      const ownerToken = createStorageToken()
       const acquire = createTransaction(
         database,
         [META_STORE_NAME, REVISIONS_STORE_NAME],
@@ -1636,12 +1625,8 @@ export const indexedDb = <TValue = unknown>(
     })
   }
 
-  let disposed = false
   const assertLive = (): void => {
-    if (disposed)
-      throw new StorageContractError(StorageContractErrorCode.disposed, {
-        backend: StorageBackend.indexedDb
-      })
+    controller.assertLive()
   }
 
   /** Private commit-after controller shared by direct and Host-created exact stores. */
@@ -1649,7 +1634,25 @@ export const indexedDb = <TValue = unknown>(
     backend: StorageBackend.indexedDb,
     platform: factory,
     options: Object.freeze({ dbName, kvStoreName, bytesStoreName, recordsStoreName }),
-    origin: `indexeddb:${autoKey()}`
+    origin: `indexeddb:${createStorageToken()}`,
+    finalize: async () => {
+      coordination.dispose()
+      const pending = connection
+      const recoveryDatabase = activeDatabase
+      connection = undefined
+      activeDatabase = undefined
+      let pendingDatabase: IDBDatabase | undefined
+      if (pending) {
+        try {
+          pendingDatabase = await pending
+          tryCloseDatabase(pendingDatabase)
+        } catch {
+          // 失败/正在打开的连接已不可用，dispose 是尽力而为。
+        }
+      }
+      if (recoveryDatabase && recoveryDatabase !== pendingDatabase)
+        tryCloseDatabase(recoveryDatabase)
+    }
   })
 
   /** Report-only owner for malformed or unavailable coordination transport behavior. */
@@ -1673,10 +1676,7 @@ export const indexedDb = <TValue = unknown>(
 
   /** Reject work after disposal begins without invalidating already admitted transactions. */
   const assertMutationAdmission = (): void => {
-    if (disposed)
-      throw new StorageContractError(StorageContractErrorCode.disposed, {
-        backend: StorageBackend.indexedDb
-      })
+    controller.assertLive()
   }
 
   /** Brands the private context that an already-admitted logical operation may reuse. */
@@ -2253,7 +2253,7 @@ export const indexedDb = <TValue = unknown>(
     runtime: IStorageOperationRuntime,
     inheritedLease?: IMutationLeaseContext
   ): Promise<IDBDatabase> => {
-    if (disposed || prepareState === 'disposed') {
+    if (prepareState === 'disposed') {
       return Promise.reject(
         new StorageContractError(StorageContractErrorCode.disposed, {
           backend: StorageBackend.indexedDb
@@ -2692,7 +2692,7 @@ export const indexedDb = <TValue = unknown>(
       put: async (value, key, options) => {
         assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb)
         const conflictPolicy = readTransactionConflictPolicy(options, StorageBackend.indexedDb)
-        const resolvedKey = key ?? autoKey()
+        const resolvedKey = key ?? createStorageToken()
         const keySnapshot = snapshotStorageKey(resolvedKey, StorageBackend.indexedDb)
         const valueSnapshot = snapshotWriteValue(value, keySnapshot)
         await readRevision(keySnapshot)
@@ -3112,11 +3112,6 @@ export const indexedDb = <TValue = unknown>(
     }
   }
 
-  /**
-   * Cached completion shared by every caller so disposal has one cleanup owner and Promise
-   * identity.
-   */
-  let disposePromise: Promise<void> | undefined
   const store: IRecordStore<TValue> &
     ISecondaryIndexRecordStore<TValue> &
     IChangeFeedStore &
@@ -3395,29 +3390,8 @@ export const indexedDb = <TValue = unknown>(
     // sync 未定义：IndexedDB 无同步 API。
 
     dispose: () => {
-      if (disposePromise !== undefined) return disposePromise
-      disposePromise = (async () => {
-        prepareState = 'disposed'
-        await controller.dispose()
-        disposed = true
-        coordination.dispose()
-        const pending = connection
-        const recoveryDatabase = activeDatabase
-        connection = undefined
-        activeDatabase = undefined
-        let pendingDatabase: IDBDatabase | undefined
-        if (pending) {
-          try {
-            pendingDatabase = await pending
-            tryCloseDatabase(pendingDatabase)
-          } catch {
-            // 失败/正在打开的连接已不可用，dispose 是尽力而为。
-          }
-        }
-        if (recoveryDatabase && recoveryDatabase !== pendingDatabase)
-          tryCloseDatabase(recoveryDatabase)
-      })()
-      return disposePromise
+      prepareState = 'disposed'
+      return controller.dispose()
     },
 
     get: (key, ctx) =>
@@ -3715,7 +3689,7 @@ export const indexedDb = <TValue = unknown>(
       withMutationLease((lease) =>
         withAbort(ctx, async (signal, context, runtime) => {
           assertLive()
-          const resolvedKey = key ?? autoKey()
+          const resolvedKey = key ?? createStorageToken()
           const keySnapshot = snapshotStorageKey(resolvedKey, StorageBackend.indexedDb)
           await writeWithConflict(
             'record',

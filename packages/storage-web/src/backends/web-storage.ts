@@ -1,8 +1,4 @@
-import {
-  StorageContractError,
-  StorageContractErrorCode,
-  type IStorageChange
-} from '@migaia/storage-contract'
+import { type IStorageChange } from '@migaia/storage-contract'
 import { snapshotSyncWriteOptions, throwIfAborted, withAbort } from '../core/operation.js'
 import {
   lengthPrefixedNamespaceCodec,
@@ -128,11 +124,6 @@ export const createWebStorageBackend = (
   }
 
   const live = storage as IWebStorageLike
-  let disposed = false
-  /** Seals new operations synchronously when disposal begins, before controller draining completes. */
-  let disposalRequested = false
-  /** Store-level disposal Promise cached to preserve identity across repeated calls. */
-  let disposePromise: Promise<void> | undefined
 
   /** Private commit-after controller shared by direct and Host-created exact stores. */
   const controller = createBackendReactiveController({
@@ -147,8 +138,7 @@ export const createWebStorageBackend = (
   }
 
   const assertLive = (): void => {
-    if (disposed || disposalRequested)
-      throw new StorageContractError(StorageContractErrorCode.disposed, { backend })
+    controller.assertLive()
   }
 
   const namespacedEntries = (): Array<{
@@ -276,13 +266,7 @@ export const createWebStorageBackend = (
         clearNamespacedEntries(`${backend}.clearAll`, signal)
       }),
     dispose: () => {
-      if (disposePromise !== undefined) return disposePromise
-      disposalRequested = true
-      const controllerDispose = controller.dispose()
-      disposePromise = controllerDispose.then(() => {
-        disposed = true
-      })
-      return disposePromise
+      return controller.dispose()
     }
   }
   registerBackendReactiveController(store, controller)
