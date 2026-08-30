@@ -1,5 +1,10 @@
 import type { IDisposable } from '@migaia/reactive'
-import { allocateOwnedSync, disposeAllWasm, throwWasmConstructionFailure } from './arena.js'
+import {
+  allocateOwnedSync,
+  disposeAllWasm,
+  disposeWasmField,
+  throwWasmConstructionFailure
+} from './arena.js'
 import {
   createStoreWasmError,
   createStoreWasmRangeError,
@@ -97,9 +102,8 @@ export function string(maxBytes: number = DEFAULT_MAX_BYTES): IFieldBuilder<IWas
             disposing = true
             disposed = true
             try {
-              block.unregister(field)
               // 逆序释放（migration.sdd.md §5.7）：先摘子资源边，再 dealloc block。
-              disposeAllWasm([() => source!.dispose(), () => block.dispose()])
+              disposeWasmField(block, field, source === undefined ? [] : [source])
             } finally {
               disposing = false
             }

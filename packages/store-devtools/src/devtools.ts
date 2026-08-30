@@ -169,6 +169,58 @@ export function getObserverTree(observable: IObservable, maxDepth = 20): IDepend
 /** MaxDepth 为 0 时连根的直接边都不展开——把这条边界判断和递归里的写法对齐。 */
 const depth0Exceeds = (depth: number, maxDepth: number): boolean => depth >= maxDepth
 
+/** Fixed-capacity chronological queue with O(1) publication after reaching its limit. */
+class BoundedQueue<T> {
+  /** Maximum number of live values retained by this queue. */
+  readonly #capacity: number
+  /** Lazily-grown ring storage; avoids allocating an attacker-sized configured capacity upfront. */
+  readonly #values: Array<T | undefined> = []
+  /** Index containing the oldest retained value. */
+  #start = 0
+  /** Number of currently retained values. */
+  #size = 0
+
+  constructor(capacity: number) {
+    this.#capacity = capacity
+  }
+
+  /** Publishes one value, evicting the oldest value when full. */
+  push(value: T): void {
+    if (this.#size < this.#capacity) {
+      this.#values[(this.#start + this.#size) % this.#capacity] = value
+      this.#size++
+      return
+    }
+    this.#values[this.#start] = value
+    this.#start = (this.#start + 1) % this.#capacity
+  }
+
+  /** Returns a chronological snapshot without exposing mutable ring storage. */
+  values(): T[] {
+    const result: T[] = []
+    for (let offset = 0; offset < this.#size; offset++) {
+      result.push(this.#values[(this.#start + offset) % this.#capacity]!)
+    }
+    return result
+  }
+
+  /** Finds the first chronological value matching `predicate`. */
+  find(predicate: (value: T) => boolean): T | undefined {
+    for (let offset = 0; offset < this.#size; offset++) {
+      const value = this.#values[(this.#start + offset) % this.#capacity]!
+      if (predicate(value)) return value
+    }
+    return undefined
+  }
+
+  /** Releases all retained values while keeping reusable fixed storage. */
+  clear(): void {
+    this.#values.length = 0
+    this.#start = 0
+    this.#size = 0
+  }
+}
+
 export function createStoreDevTools<S extends Record<string, unknown>>(
   store: IReactiveStore<S>,
   options: IStoreDevToolsOptions = {}
@@ -227,9 +279,9 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
   }
   const now = optionValues.now ?? Date.now
   const clone = optionValues.clone ?? ClonePolicy.diagnostic
-  const history: IStoreHistoryEntry[] = []
-  const actions: IActionTrace[] = []
-  const trace: IRuntimeTraceEvent[] = []
+  const history = new BoundedQueue<IStoreHistoryEntry>(maxHistory)
+  const actions = new BoundedQueue<IActionTrace>(maxTrace)
+  const trace = new BoundedQueue<IRuntimeTraceEvent>(maxTrace)
   let nextId = 1
   // 计数而非布尔：回放期间监听器再次 jumpTo 时，内层的 finally 不能提前解除外层的回放屏蔽，
   // 否则外层剩余的通知会被当成用户操作记进历史。
@@ -257,15 +309,11 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
     assertActive()
     const entry = createEntry(label)
     history.push(entry)
-    if (history.length > maxHistory) history.splice(0, history.length - maxHistory)
     return entry
   }
   const recordAction = (action: Omit<IActionTrace, 'timestamp'>): void => {
     assertActive()
     actions.push({ ...action, timestamp: now() })
-    if (actions.length > maxTrace) {
-      actions.splice(0, actions.length - maxTrace)
-    }
   }
   record(StoreDevtoolsLabel.initial)
   let unsubscribe: (() => void) | undefined
@@ -288,9 +336,6 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
             if (disposed) return
             try {
               trace.push(event)
-              if (trace.length > maxTrace) {
-                trace.splice(0, trace.length - maxTrace)
-              }
               if (
                 event.type === ReactiveTraceType.action &&
                 event.phase !== ReactiveTracePhase.start
@@ -326,13 +371,13 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
 
   return {
     get history() {
-      return Object.freeze([...history])
+      return Object.freeze(history.values())
     },
     get actions() {
-      return Object.freeze([...actions])
+      return Object.freeze(actions.values())
     },
     get trace() {
-      return Object.freeze([...trace])
+      return Object.freeze(trace.values())
     },
     record,
     recordAction,
@@ -355,9 +400,9 @@ export function createStoreDevTools<S extends Record<string, unknown>>(
       assertActive()
       /** Replacement snapshot prepared before any existing queue is truncated. */
       const initial = createEntry(StoreDevtoolsLabel.initial)
-      history.length = 0
-      actions.length = 0
-      trace.length = 0
+      history.clear()
+      actions.clear()
+      trace.clear()
       history.push(initial)
     },
     dispose() {

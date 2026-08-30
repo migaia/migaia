@@ -311,6 +311,21 @@ describe('createFamily: ttl with an injected clock', () => {
   })
 })
 
+it('reuses the earliest wall-clock TTL timer for later entries', () => {
+  const timer = vi.spyOn(globalThis, 'setTimeout')
+  const { create } = makeItemFactory()
+  const family = createFamily<string, IItem>({ create, isObserved: () => false, ttl: 60_000 })
+  try {
+    family.get('a')
+    family.get('b')
+    family.get('c')
+    expect(timer).toHaveBeenCalledTimes(1)
+  } finally {
+    family.dispose()
+    timer.mockRestore()
+  }
+})
+
 describe('createFamily: ttl reporter containment', () => {
   it('does not escape when the default runtime reporter throws', () => {
     vi.useFakeTimers()

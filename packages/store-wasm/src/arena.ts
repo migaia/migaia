@@ -6,6 +6,7 @@ import {
   StoreWasmErrorCode
 } from './errors.js'
 import { StoreWasmErrorText } from './error-text.js'
+import { attachSecondaryErrors } from '@migaia/utils/error'
 
 // 模块作用域缓存，只发起一次加载；重复调用（StrictMode 双渲染、父组件无关重渲染）拿到同一个 promise 引用，
 // 不会重复 fetch/instantiate，也不会导致 use() 每次渲染都重新挂起
@@ -68,21 +69,20 @@ export function disposeAllWasm(cleanups: ReadonlyArray<() => void>): void {
   }
 }
 
+/** Disposes one registered field in ownership order: unregister, source, then native block. */
+export function disposeWasmField(
+  block: IWasmAllocation,
+  field: object,
+  sources: readonly { dispose(): void }[]
+): void {
+  block.unregister(field)
+  disposeAllWasm([...sources.map((source) => () => source.dispose()), () => block.dispose()])
+}
+
 /** Re-throws construction primary while retaining rollback failure for non-Error primaries too. */
 export function throwWasmConstructionFailure(primary: unknown, cleanup: unknown): never {
-  if (primary instanceof Error) {
-    try {
-      Object.defineProperty(primary, 'cause', { value: cleanup, configurable: true })
-      throw primary
-    } catch (attachmentFailure) {
-      if (attachmentFailure === primary) throw attachmentFailure
-      throw createStoreWasmAggregateError(
-        StoreWasmErrorCode.cleanupFailed,
-        [primary, cleanup],
-        StoreWasmErrorText.cleanupFailed
-      )
-    }
-  }
+  const attached = attachSecondaryErrors(primary, [cleanup])
+  if (attached === primary) throw primary
   throw createStoreWasmAggregateError(
     StoreWasmErrorCode.cleanupFailed,
     [primary, cleanup],

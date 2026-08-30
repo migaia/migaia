@@ -1,5 +1,10 @@
 import type { IDisposable } from '@migaia/reactive'
-import { allocateOwnedSync, disposeAllWasm, throwWasmConstructionFailure } from './arena.js'
+import {
+  allocateOwnedSync,
+  disposeAllWasm,
+  disposeWasmField,
+  throwWasmConstructionFailure
+} from './arena.js'
 import { createStoreWasmError, createStoreWasmTypeError, StoreWasmErrorCode } from './errors.js'
 import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.js'
 import { WasmFieldMode } from './field-constants.js'
@@ -63,9 +68,8 @@ export function boolean(): IFieldBuilder<IWasmBooleanField> {
             disposing = true
             disposed = true
             try {
-              block.unregister(field)
               // 逆序释放（migration.sdd.md §5.7）：先摘子资源边，再 dealloc block。
-              disposeAllWasm([() => source!.dispose(), () => block.dispose()])
+              disposeWasmField(block, field, source === undefined ? [] : [source])
             } finally {
               disposing = false
             }

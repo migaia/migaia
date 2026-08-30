@@ -71,12 +71,17 @@ export class ResourceVersionRegistry<T> {
   }
 
   holds(value: T): boolean {
-    return (
-      [...this.#closing.values()].some((item) => Object.is(item.value, value)) ||
-      this.#superseded.some((item) => Object.is(item, value)) ||
-      (this.#stale !== undefined && Object.is(this.#stale.value, value)) ||
-      [...this.#retired.values()].some((version) => Object.is(version.value, value))
-    )
+    for (const item of this.#closing.values()) {
+      if (Object.is(item.value, value)) return true
+    }
+    for (const item of this.#superseded) {
+      if (Object.is(item, value)) return true
+    }
+    if (this.#stale !== undefined && Object.is(this.#stale.value, value)) return true
+    for (const version of this.#retired.values()) {
+      if (Object.is(version.value, value)) return true
+    }
+    return false
   }
 
   clear(): T[] {

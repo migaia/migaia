@@ -11,6 +11,7 @@ import {
   StoreKeyedErrorCode
 } from '../errors.js'
 import { StoreKeyedErrorText } from '../error-text.js'
+import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 /**
  * 按键产出**定义**的 family。
@@ -149,13 +150,12 @@ export function familyDef<K extends IFamilyKey, T>(
       StoreKeyedErrorText.familyCapacity
     )
   }
-  try {
-    Object.getOwnPropertyDescriptors(options)
-  } catch (error) {
+  const descriptorSnapshot = snapshotOwnDescriptors(options)
+  if (!descriptorSnapshot.ok) {
     throw createStoreKeyedRangeError(
       StoreKeyedErrorCode.invalidOption,
       StoreKeyedErrorText.familyCapacity,
-      { cause: error }
+      { cause: descriptorSnapshot.error }
     )
   }
   let maxSize: number | undefined
@@ -205,13 +205,12 @@ export function derivedFamilyDef<K extends IFamilyKey, T>(
       StoreKeyedErrorText.familyCapacity
     )
   }
-  try {
-    Object.getOwnPropertyDescriptors(options)
-  } catch (error) {
+  const descriptorSnapshot = snapshotOwnDescriptors(options)
+  if (!descriptorSnapshot.ok) {
     throw createStoreKeyedRangeError(
       StoreKeyedErrorCode.invalidOption,
       StoreKeyedErrorText.familyCapacity,
-      { cause: error }
+      { cause: descriptorSnapshot.error }
     )
   }
   let maxSize: number | undefined

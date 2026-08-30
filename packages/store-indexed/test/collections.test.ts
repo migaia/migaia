@@ -158,6 +158,23 @@ describe('store-indexed', () => {
     collection.dispose()
   })
 
+  it('preserves native no-argument splice semantics and skips no-op notifications', () => {
+    const collection = new ObservableArray([1, 2, 3])
+    let runs = 0
+    const dispose = defaultRuntime.effect(() => {
+      collection.snapshot()
+      runs++
+    })
+
+    expect((collection.splice as (...args: never[]) => readonly number[])()).toEqual([])
+    expect(collection.splice(1, 0)).toEqual([])
+    expect(collection.snapshot()).toEqual([1, 2, 3])
+    expect(runs).toBe(1)
+
+    dispose()
+    collection.dispose()
+  })
+
   it('ObservableMap.replace() atomically swaps content with a single structural notification', () => {
     const map = new ObservableMap<string, number>([
       ['a', 1],
@@ -242,6 +259,30 @@ describe('store-indexed', () => {
     expect(runs).toBe(1)
 
     dispose()
+    set.dispose()
+  })
+
+  it('ObservableSet.clear() publishes one structural change and updates materialized cells', () => {
+    const set = new ObservableSet<number>([1, 2, 3])
+    let structuralRuns = 0
+    let membershipRuns = 0
+    const disposeStructure = defaultRuntime.effect(() => {
+      set.snapshot()
+      structuralRuns++
+    })
+    const disposeMembership = defaultRuntime.effect(() => {
+      set.has(1)
+      membershipRuns++
+    })
+
+    set.clear()
+
+    expect(set.snapshot()).toEqual(new Set())
+    expect(structuralRuns).toBe(2)
+    expect(membershipRuns).toBe(2)
+
+    disposeMembership()
+    disposeStructure()
     set.dispose()
   })
 

@@ -3,6 +3,7 @@ import { createStoreReactError } from './errors.js'
 import { StoreReactErrorCode } from './error-code.js'
 import { StoreReactErrorText } from './error-text.js'
 import { EMPTY_EXPERIMENTAL_ENCODING, StoreProviderState } from './provider-state-constants.js'
+import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 /**
  * 应用级 Store 配置（挂在 StoreProvider 上）。
@@ -197,7 +198,9 @@ export function encodeStoreExperimental(input: IStoreFeatureExperimental | undef
     const cached = cacheable ? EXPERIMENTAL_ENCODING_CACHE.get(input) : undefined
     if (cached !== undefined) return cached
     const entries: Array<readonly [string, boolean]> = []
-    for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(input))) {
+    const descriptorSnapshot = snapshotOwnDescriptors(input)
+    if (!descriptorSnapshot.ok) throw descriptorSnapshot.error
+    for (const [key, descriptor] of Object.entries(descriptorSnapshot.descriptors)) {
       if (!descriptor.enumerable || !('value' in descriptor)) continue
       entries.push([key, descriptor.value === true])
     }

@@ -25,6 +25,7 @@ import {
 } from '../errors.js'
 import type { IStoreWorkerErrorCode } from '../error-code.js'
 import { StoreWorkerErrorText } from '../error-text.js'
+import { snapshotOwnDescriptors } from '@migaia/utils/object'
 import {
   WorkerByteOwnership,
   WorkerDiagnosticType,
@@ -35,6 +36,7 @@ import {
   type IByteOwnership
 } from '../worker-constants.js'
 import { transferablesOf } from './transferables.js'
+import { CursorQueue } from '../cursor-queue.js'
 
 /** Worker 出事的三种途径，全都得监听，否则请求会永久悬挂。 */
 export type IWorkerFailureEvent = 'error' | 'messageerror'
@@ -68,7 +70,7 @@ type IWorkerAckState = {
   credits: number
   cancelled: boolean
   nextAckSequence: number
-  readonly wake: Array<() => void>
+  readonly wake: CursorQueue<() => void>
   cancelReject?: (reason: unknown) => void
 }
 
@@ -87,6 +89,17 @@ async function waitForWorkerCredit(state: IWorkerAckState): Promise<void> {
   await new Promise<void>((resolve) => state.wake.push(resolve))
   if (state.cancelled) throw workerStreamCancelledError()
   state.credits--
+}
+
+/** Takes one producer wake callback with amortized O(1) queue maintenance. */
+function takeWorkerWake(state: IWorkerAckState): (() => void) | undefined {
+  return state.wake.take()
+}
+
+/** Releases every producer waiting for credit during cancellation. */
+function wakeAllWorkers(state: IWorkerAckState): void {
+  let wake: (() => void) | undefined
+  while ((wake = takeWorkerWake(state)) !== undefined) wake()
 }
 
 /** Preserves parser codec diagnostics when WebRPC reports an aborted request. */
@@ -119,18 +132,18 @@ function createWorkerFrameQueue(
   cancelRemote: () => void,
   ackRemote: (sequence: number) => void
 ): IWorkerFrameQueue {
-  const chunks: IQueuedWorkerChunk[] = []
-  const waiters: Array<{
+  const chunks = new CursorQueue<IQueuedWorkerChunk>()
+  const waiters = new CursorQueue<{
     readonly resolve: (result: IteratorResult<ISerializeChunk>) => void
     readonly reject: (error: unknown) => void
-  }> = []
+  }>()
   let failure: unknown
   let finished = false
   let expectedSequence = 0
   const settle = (): void => {
-    if (!finished || waiters.length === 0) return
-    while (waiters.length > 0) {
-      const waiter = waiters.shift()!
+    if (!finished || waiters.size === 0) return
+    let waiter: ReturnType<typeof waiters.take>
+    while ((waiter = waiters.take()) !== undefined) {
       if (failure !== undefined) waiter.reject(failure)
       else waiter.resolve({ done: true, value: undefined })
     }
@@ -139,8 +152,8 @@ function createWorkerFrameQueue(
     [Symbol.asyncIterator]() {
       return {
         next: async (): Promise<IteratorResult<ISerializeChunk>> => {
-          if (chunks.length > 0) {
-            const queued = chunks.shift()!
+          const queued = chunks.take()
+          if (queued) {
             ackRemote(queued.sequence)
             return { done: false, value: queued.chunk }
           }
@@ -186,7 +199,7 @@ function createWorkerFrameQueue(
           settle()
           return
         }
-        const waiter = waiters.shift()
+        const waiter = waiters.take()
         if (waiter) {
           ackRemote(frame.sequence)
           waiter.resolve({ done: false, value: frame.chunk })
@@ -254,13 +267,12 @@ function assertWorkerParserOptions(options: unknown): asserts options is IWorker
       StoreWorkerErrorText.optionsObject
     )
   }
-  try {
-    Object.getOwnPropertyDescriptors(options)
-  } catch (error) {
+  const descriptorSnapshot = snapshotOwnDescriptors(options)
+  if (!descriptorSnapshot.ok) {
     throw createStoreWorkerError(
       StoreWorkerErrorCode.invalidOption,
       StoreWorkerErrorText.optionsObject,
-      { cause: error }
+      { cause: descriptorSnapshot.error }
     )
   }
 }
@@ -577,12 +589,12 @@ export function createSerializeWorkerHandler(
             credits: 2,
             cancelled: false,
             nextAckSequence: 1,
-            wake: []
+            wake: new CursorQueue()
           }
           streamStates.set(streamId, ackState)
           const abort = (): void => {
             ackState.cancelled = true
-            for (const wake of ackState.wake.splice(0)) wake()
+            wakeAllWorkers(ackState)
             ackState.cancelReject?.(workerStreamCancelledError())
             ackState.cancelReject = undefined
           }
@@ -694,7 +706,7 @@ export function createSerializeWorkerHandler(
       if (!state) return
       if (frame.kind === WorkerSerializeFrameKind.cancel) {
         state.cancelled = true
-        for (const wake of state.wake.splice(0)) wake()
+        wakeAllWorkers(state)
         state.cancelReject?.(workerStreamCancelledError())
         state.cancelReject = undefined
         return
@@ -703,7 +715,7 @@ export function createSerializeWorkerHandler(
       if (frame.sequence !== state.nextAckSequence) return
       state.nextAckSequence++
       state.credits++
-      state.wake.shift()?.()
+      takeWorkerWake(state)?.()
     })
   )
   return toManagedRpcHandler(endpoint, (message) => deliver(message))
