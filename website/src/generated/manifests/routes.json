@@ -1,0 +1,6668 @@
+{
+  "version": 1,
+  "locales": ["en", "zh"],
+  "families": [
+    {
+      "domain": "docs",
+      "path": "/:lang/docs/*"
+    },
+    {
+      "domain": "guides",
+      "path": "/:lang/guides/*"
+    },
+    {
+      "domain": "architecture",
+      "path": "/:lang/architecture/*"
+    }
+  ],
+  "entries": [
+    {
+      "path": "/en/architecture",
+      "locale": "en",
+      "domain": "architecture",
+      "library": null
+    },
+    {
+      "path": "/en/architecture/capability",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "capability"
+    },
+    {
+      "path": "/en/architecture/capability/graph",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "capability"
+    },
+    {
+      "path": "/en/architecture/capability/graph-topology",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "capability"
+    },
+    {
+      "path": "/en/architecture/capability/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "capability"
+    },
+    {
+      "path": "/en/architecture/capability/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "capability"
+    },
+    {
+      "path": "/en/architecture/capability/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "capability"
+    },
+    {
+      "path": "/en/architecture/docs",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "docs"
+    },
+    {
+      "path": "/en/architecture/docs/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "docs"
+    },
+    {
+      "path": "/en/architecture/docs/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "docs"
+    },
+    {
+      "path": "/en/architecture/event-subscriber",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/architecture/event-subscriber/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/architecture/event-subscriber/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/architecture/event-subscriber/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/architecture/lifecycle",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/architecture/lifecycle/abort",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/architecture/lifecycle/disposal",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/architecture/lifecycle/errors",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/architecture/lifecycle/generation",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/architecture/lifecycle/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/architecture/lifecycle/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/architecture/lifecycle/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/architecture/lifecycle/quiescence",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/architecture/lifecycle/scheduler",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/architecture/lifecycle/scope",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/architecture/logger",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "logger"
+    },
+    {
+      "path": "/en/architecture/logger/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "logger"
+    },
+    {
+      "path": "/en/architecture/logger/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "logger"
+    },
+    {
+      "path": "/en/architecture/logger/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "logger"
+    },
+    {
+      "path": "/en/architecture/logger/plugins",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "logger"
+    },
+    {
+      "path": "/en/architecture/middleware-pipeline",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/architecture/middleware-pipeline/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/architecture/middleware-pipeline/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/architecture/middleware-pipeline/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/architecture/plugin-host",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/architecture/plugin-host/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/architecture/plugin-host/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/architecture/plugin-host/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/architecture/reactive",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/architecture/reactive/copy-check",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/architecture/reactive/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/architecture/reactive/internals",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/architecture/reactive/node-factories",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/architecture/reactive/node-internals",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/architecture/reactive/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/architecture/reactive/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/architecture/reactive/reactive",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/architecture/reactive/runtime",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/architecture/reactive/source",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/architecture/resource",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "resource"
+    },
+    {
+      "path": "/en/architecture/resource/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "resource"
+    },
+    {
+      "path": "/en/architecture/resource/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "resource"
+    },
+    {
+      "path": "/en/architecture/resource/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "resource"
+    },
+    {
+      "path": "/en/architecture/serialize",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/architecture/serialize/core",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/architecture/serialize/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/architecture/serialize/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/architecture/serialize/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/architecture/serialize/plugins",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/architecture/serialize/registry",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/architecture/storage-contract",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/architecture/storage-contract/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/architecture/storage-contract/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/architecture/storage-contract/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/architecture/storage-web",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/cookies",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/entity",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/host",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/indexed-db",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/local-storage",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/memory",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/plugins-cookies",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/plugins-indexed-db",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/plugins-local-storage",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/plugins-memory",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/plugins-reactive",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/plugins-reactive-cookies",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/plugins-reactive-indexed-db",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/plugins-reactive-local-storage",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/plugins-reactive-memory",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/plugins-reactive-session-storage",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/plugins-session-storage",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/reactive-adapter",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/schema",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/serialize",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/storage-web/session-storage",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/architecture/store-devtools",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/en/architecture/store-devtools/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/en/architecture/store-devtools/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/en/architecture/store-devtools/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/en/architecture/store-indexed",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/en/architecture/store-indexed/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/en/architecture/store-indexed/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/en/architecture/store-indexed/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/en/architecture/store-keyed",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/architecture/store-keyed/atom-definition",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/architecture/store-keyed/atom-store",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/architecture/store-keyed/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/architecture/store-keyed/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/architecture/store-keyed/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/architecture/store-keyed/reactive-atom",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/architecture/store-light",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-light"
+    },
+    {
+      "path": "/en/architecture/store-light/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-light"
+    },
+    {
+      "path": "/en/architecture/store-light/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-light"
+    },
+    {
+      "path": "/en/architecture/store-light/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-light"
+    },
+    {
+      "path": "/en/architecture/store-middleware",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/en/architecture/store-middleware/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/en/architecture/store-middleware/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/en/architecture/store-middleware/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/en/architecture/store-middleware/tolerant-clone",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/en/architecture/store-persist",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/architecture/store-persist/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/architecture/store-persist/indexed",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/architecture/store-persist/keyed",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/architecture/store-persist/light",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/architecture/store-persist/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/architecture/store-persist/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/architecture/store-react",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-react"
+    },
+    {
+      "path": "/en/architecture/store-react/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-react"
+    },
+    {
+      "path": "/en/architecture/store-react/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-react"
+    },
+    {
+      "path": "/en/architecture/store-react/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-react"
+    },
+    {
+      "path": "/en/architecture/store-shared",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-shared"
+    },
+    {
+      "path": "/en/architecture/store-shared/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-shared"
+    },
+    {
+      "path": "/en/architecture/store-shared/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-shared"
+    },
+    {
+      "path": "/en/architecture/store-shared/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-shared"
+    },
+    {
+      "path": "/en/architecture/store-ssr",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/en/architecture/store-ssr/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/en/architecture/store-ssr/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/en/architecture/store-ssr/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/en/architecture/store-wasm",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/en/architecture/store-wasm/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/en/architecture/store-wasm/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/en/architecture/store-wasm/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/en/architecture/store-worker",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-worker"
+    },
+    {
+      "path": "/en/architecture/store-worker/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-worker"
+    },
+    {
+      "path": "/en/architecture/store-worker/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-worker"
+    },
+    {
+      "path": "/en/architecture/store-worker/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-worker"
+    },
+    {
+      "path": "/en/architecture/store-worker/serialize",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "store-worker"
+    },
+    {
+      "path": "/en/architecture/tray",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "tray"
+    },
+    {
+      "path": "/en/architecture/tray/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "tray"
+    },
+    {
+      "path": "/en/architecture/tray/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "tray"
+    },
+    {
+      "path": "/en/architecture/tray/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "tray"
+    },
+    {
+      "path": "/en/architecture/utils",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/en/architecture/utils/bytes",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/en/architecture/utils/config",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/en/architecture/utils/error",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/en/architecture/utils/function",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/en/architecture/utils/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/en/architecture/utils/number",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/en/architecture/utils/object",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/en/architecture/utils/object-path",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/en/architecture/utils/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/en/architecture/utils/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/en/architecture/utils/promise",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/en/architecture/utils/string",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/en/architecture/utils/typing",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/en/architecture/utils/value",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/en/architecture/wasm",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "wasm"
+    },
+    {
+      "path": "/en/architecture/wasm/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "wasm"
+    },
+    {
+      "path": "/en/architecture/wasm/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "wasm"
+    },
+    {
+      "path": "/en/architecture/wasm/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "wasm"
+    },
+    {
+      "path": "/en/architecture/web-rpc",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/adapters-broadcast-channel",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/adapters-memory",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/adapters-message-port",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/adapters-rtc-data-channel",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/adapters-service-worker",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/adapters-shared-worker",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/adapters-web-transport",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/adapters-web-worker",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/adapters-window",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/client",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/core",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/features-chunk",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/features-control",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/features-discovery",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/features-outbound",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/features-provider",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/full",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/index",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/overview",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/ownership",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/protocol-constants",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/architecture/web-rpc/provider",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs",
+      "locale": "en",
+      "domain": "docs",
+      "library": null
+    },
+    {
+      "path": "/en/docs/capability",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph-topology",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/docs",
+      "locale": "en",
+      "domain": "docs",
+      "library": "docs"
+    },
+    {
+      "path": "/en/docs/docs/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "docs"
+    },
+    {
+      "path": "/en/docs/event-subscriber",
+      "locale": "en",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/docs/event-subscriber/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/docs/event-subscriber/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/docs/lifecycle",
+      "locale": "en",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/docs/lifecycle/abort",
+      "locale": "en",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/docs/lifecycle/disposal",
+      "locale": "en",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/docs/lifecycle/errors",
+      "locale": "en",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/docs/lifecycle/generation",
+      "locale": "en",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/docs/lifecycle/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/docs/lifecycle/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/docs/lifecycle/quiescence",
+      "locale": "en",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/docs/lifecycle/scheduler",
+      "locale": "en",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/docs/lifecycle/scope",
+      "locale": "en",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/docs/logger",
+      "locale": "en",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
+      "path": "/en/docs/logger/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
+      "path": "/en/docs/logger/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
+      "path": "/en/docs/logger/plugins",
+      "locale": "en",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
+      "path": "/en/docs/middleware-pipeline",
+      "locale": "en",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/docs/middleware-pipeline/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/docs/middleware-pipeline/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/docs/plugin-host",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/reactive",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/copy-check",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/internals",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/node-factories",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/node-internals",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/ownership",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/reactive",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/runtime",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/source",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/resource",
+      "locale": "en",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/en/docs/resource/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/en/docs/resource/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/en/docs/serialize",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/core",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/plugins",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/registry",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/storage-contract",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-web",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/cookies",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/entity",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/host",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/indexed-db",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/local-storage",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/memory",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/plugins-cookies",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/plugins-indexed-db",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/plugins-local-storage",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/plugins-memory",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/plugins-reactive",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/plugins-reactive-cookies",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/plugins-reactive-indexed-db",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/plugins-reactive-local-storage",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/plugins-reactive-memory",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/plugins-reactive-session-storage",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/plugins-session-storage",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/reactive-adapter",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/schema",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/serialize",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/session-storage",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/store-devtools",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/en/docs/store-devtools/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/en/docs/store-devtools/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/en/docs/store-indexed",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/en/docs/store-indexed/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/en/docs/store-indexed/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/en/docs/store-keyed",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/docs/store-keyed/atom-definition",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/docs/store-keyed/atom-store",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/docs/store-keyed/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/docs/store-keyed/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/docs/store-keyed/reactive-atom",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/docs/store-light",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-light"
+    },
+    {
+      "path": "/en/docs/store-light/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-light"
+    },
+    {
+      "path": "/en/docs/store-light/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-light"
+    },
+    {
+      "path": "/en/docs/store-middleware",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/en/docs/store-middleware/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/en/docs/store-middleware/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/en/docs/store-middleware/tolerant-clone",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/en/docs/store-persist",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/docs/store-persist/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/docs/store-persist/indexed",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/docs/store-persist/keyed",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/docs/store-persist/light",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/docs/store-persist/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/docs/store-react",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-react"
+    },
+    {
+      "path": "/en/docs/store-react/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-react"
+    },
+    {
+      "path": "/en/docs/store-react/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-react"
+    },
+    {
+      "path": "/en/docs/store-shared",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-shared"
+    },
+    {
+      "path": "/en/docs/store-shared/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-shared"
+    },
+    {
+      "path": "/en/docs/store-shared/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-shared"
+    },
+    {
+      "path": "/en/docs/store-ssr",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/en/docs/store-ssr/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/en/docs/store-ssr/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/en/docs/store-wasm",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/en/docs/store-wasm/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/en/docs/store-wasm/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/en/docs/store-worker",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-worker"
+    },
+    {
+      "path": "/en/docs/store-worker/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-worker"
+    },
+    {
+      "path": "/en/docs/store-worker/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-worker"
+    },
+    {
+      "path": "/en/docs/store-worker/serialize",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-worker"
+    },
+    {
+      "path": "/en/docs/tray",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/utils",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/bytes",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/config",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/error",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/function",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/number",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/object-path",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/promise",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/string",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/typing",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/value",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/wasm",
+      "locale": "en",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/en/docs/wasm/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/en/docs/wasm/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/en/docs/web-rpc",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/adapters-broadcast-channel",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/adapters-memory",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/adapters-message-port",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/adapters-rtc-data-channel",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/adapters-service-worker",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/adapters-shared-worker",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/adapters-web-transport",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/adapters-web-worker",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/adapters-window",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/client",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/core",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/features-chunk",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/features-control",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/features-discovery",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/features-outbound",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/features-provider",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/full",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/index",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/protocol-constants",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/provider",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides",
+      "locale": "en",
+      "domain": "guides",
+      "library": null
+    },
+    {
+      "path": "/en/guides/capability",
+      "locale": "en",
+      "domain": "guides",
+      "library": "capability"
+    },
+    {
+      "path": "/en/guides/capability/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "capability"
+    },
+    {
+      "path": "/en/guides/capability/graph",
+      "locale": "en",
+      "domain": "guides",
+      "library": "capability"
+    },
+    {
+      "path": "/en/guides/capability/graph-topology",
+      "locale": "en",
+      "domain": "guides",
+      "library": "capability"
+    },
+    {
+      "path": "/en/guides/capability/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "capability"
+    },
+    {
+      "path": "/en/guides/capability/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "capability"
+    },
+    {
+      "path": "/en/guides/docs",
+      "locale": "en",
+      "domain": "guides",
+      "library": "docs"
+    },
+    {
+      "path": "/en/guides/docs/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "docs"
+    },
+    {
+      "path": "/en/guides/docs/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "docs"
+    },
+    {
+      "path": "/en/guides/event-subscriber",
+      "locale": "en",
+      "domain": "guides",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/guides/event-subscriber/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/guides/event-subscriber/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/guides/event-subscriber/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/guides/lifecycle",
+      "locale": "en",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/guides/lifecycle/abort",
+      "locale": "en",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/guides/lifecycle/disposal",
+      "locale": "en",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/guides/lifecycle/errors",
+      "locale": "en",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/guides/lifecycle/generation",
+      "locale": "en",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/guides/lifecycle/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/guides/lifecycle/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/guides/lifecycle/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/guides/lifecycle/quiescence",
+      "locale": "en",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/guides/lifecycle/scheduler",
+      "locale": "en",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/guides/lifecycle/scope",
+      "locale": "en",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/guides/logger",
+      "locale": "en",
+      "domain": "guides",
+      "library": "logger"
+    },
+    {
+      "path": "/en/guides/logger/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "logger"
+    },
+    {
+      "path": "/en/guides/logger/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "logger"
+    },
+    {
+      "path": "/en/guides/logger/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "logger"
+    },
+    {
+      "path": "/en/guides/logger/plugins",
+      "locale": "en",
+      "domain": "guides",
+      "library": "logger"
+    },
+    {
+      "path": "/en/guides/middleware-pipeline",
+      "locale": "en",
+      "domain": "guides",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/guides/middleware-pipeline/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/guides/middleware-pipeline/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/guides/middleware-pipeline/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/guides/plugin-host",
+      "locale": "en",
+      "domain": "guides",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/guides/plugin-host/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/guides/plugin-host/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/guides/plugin-host/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/guides/reactive",
+      "locale": "en",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/guides/reactive/copy-check",
+      "locale": "en",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/guides/reactive/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/guides/reactive/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/guides/reactive/internals",
+      "locale": "en",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/guides/reactive/node-factories",
+      "locale": "en",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/guides/reactive/node-internals",
+      "locale": "en",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/guides/reactive/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/guides/reactive/ownership",
+      "locale": "en",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/guides/reactive/reactive",
+      "locale": "en",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/guides/reactive/runtime",
+      "locale": "en",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/guides/reactive/source",
+      "locale": "en",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/guides/resource",
+      "locale": "en",
+      "domain": "guides",
+      "library": "resource"
+    },
+    {
+      "path": "/en/guides/resource/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "resource"
+    },
+    {
+      "path": "/en/guides/resource/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "resource"
+    },
+    {
+      "path": "/en/guides/resource/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "resource"
+    },
+    {
+      "path": "/en/guides/serialize",
+      "locale": "en",
+      "domain": "guides",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/guides/serialize/core",
+      "locale": "en",
+      "domain": "guides",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/guides/serialize/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/guides/serialize/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/guides/serialize/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/guides/serialize/plugins",
+      "locale": "en",
+      "domain": "guides",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/guides/serialize/registry",
+      "locale": "en",
+      "domain": "guides",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/guides/storage-contract",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/guides/storage-contract/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/guides/storage-contract/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/guides/storage-contract/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/guides/storage-web",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/cookies",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/entity",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/host",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/indexed-db",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/local-storage",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/memory",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/plugins-cookies",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/plugins-indexed-db",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/plugins-local-storage",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/plugins-memory",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/plugins-reactive",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/plugins-reactive-cookies",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/plugins-reactive-indexed-db",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/plugins-reactive-local-storage",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/plugins-reactive-memory",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/plugins-reactive-session-storage",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/plugins-session-storage",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/reactive-adapter",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/schema",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/serialize",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/storage-web/session-storage",
+      "locale": "en",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/guides/store-devtools",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/en/guides/store-devtools/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/en/guides/store-devtools/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/en/guides/store-devtools/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/en/guides/store-indexed",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/en/guides/store-indexed/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/en/guides/store-indexed/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/en/guides/store-indexed/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/en/guides/store-keyed",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/guides/store-keyed/atom-definition",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/guides/store-keyed/atom-store",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/guides/store-keyed/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/guides/store-keyed/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/guides/store-keyed/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/guides/store-keyed/reactive-atom",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/guides/store-light",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-light"
+    },
+    {
+      "path": "/en/guides/store-light/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-light"
+    },
+    {
+      "path": "/en/guides/store-light/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-light"
+    },
+    {
+      "path": "/en/guides/store-light/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-light"
+    },
+    {
+      "path": "/en/guides/store-middleware",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/en/guides/store-middleware/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/en/guides/store-middleware/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/en/guides/store-middleware/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/en/guides/store-middleware/tolerant-clone",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/en/guides/store-persist",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/guides/store-persist/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/guides/store-persist/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/guides/store-persist/indexed",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/guides/store-persist/keyed",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/guides/store-persist/light",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/guides/store-persist/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/guides/store-react",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-react"
+    },
+    {
+      "path": "/en/guides/store-react/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-react"
+    },
+    {
+      "path": "/en/guides/store-react/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-react"
+    },
+    {
+      "path": "/en/guides/store-react/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-react"
+    },
+    {
+      "path": "/en/guides/store-shared",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-shared"
+    },
+    {
+      "path": "/en/guides/store-shared/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-shared"
+    },
+    {
+      "path": "/en/guides/store-shared/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-shared"
+    },
+    {
+      "path": "/en/guides/store-shared/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-shared"
+    },
+    {
+      "path": "/en/guides/store-ssr",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/en/guides/store-ssr/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/en/guides/store-ssr/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/en/guides/store-ssr/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/en/guides/store-wasm",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/en/guides/store-wasm/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/en/guides/store-wasm/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/en/guides/store-wasm/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/en/guides/store-worker",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-worker"
+    },
+    {
+      "path": "/en/guides/store-worker/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-worker"
+    },
+    {
+      "path": "/en/guides/store-worker/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-worker"
+    },
+    {
+      "path": "/en/guides/store-worker/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-worker"
+    },
+    {
+      "path": "/en/guides/store-worker/serialize",
+      "locale": "en",
+      "domain": "guides",
+      "library": "store-worker"
+    },
+    {
+      "path": "/en/guides/tray",
+      "locale": "en",
+      "domain": "guides",
+      "library": "tray"
+    },
+    {
+      "path": "/en/guides/tray/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "tray"
+    },
+    {
+      "path": "/en/guides/tray/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "tray"
+    },
+    {
+      "path": "/en/guides/tray/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "tray"
+    },
+    {
+      "path": "/en/guides/utils",
+      "locale": "en",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/en/guides/utils/bytes",
+      "locale": "en",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/en/guides/utils/config",
+      "locale": "en",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/en/guides/utils/error",
+      "locale": "en",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/en/guides/utils/function",
+      "locale": "en",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/en/guides/utils/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/en/guides/utils/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/en/guides/utils/number",
+      "locale": "en",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/en/guides/utils/object",
+      "locale": "en",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/en/guides/utils/object-path",
+      "locale": "en",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/en/guides/utils/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/en/guides/utils/promise",
+      "locale": "en",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/en/guides/utils/string",
+      "locale": "en",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/en/guides/utils/typing",
+      "locale": "en",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/en/guides/utils/value",
+      "locale": "en",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/en/guides/wasm",
+      "locale": "en",
+      "domain": "guides",
+      "library": "wasm"
+    },
+    {
+      "path": "/en/guides/wasm/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "wasm"
+    },
+    {
+      "path": "/en/guides/wasm/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "wasm"
+    },
+    {
+      "path": "/en/guides/wasm/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "wasm"
+    },
+    {
+      "path": "/en/guides/web-rpc",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/adapters-broadcast-channel",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/adapters-memory",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/adapters-message-port",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/adapters-rtc-data-channel",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/adapters-service-worker",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/adapters-shared-worker",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/adapters-web-transport",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/adapters-web-worker",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/adapters-window",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/client",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/core",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/features-chunk",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/features-control",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/features-discovery",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/features-outbound",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/features-provider",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/full",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/index",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/overview",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/protocol-constants",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/guides/web-rpc/provider",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": null
+    },
+    {
+      "path": "/zh/architecture/capability",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/architecture/capability/graph",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/architecture/capability/graph-topology",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/architecture/capability/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/architecture/capability/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/architecture/capability/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/architecture/docs",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "docs"
+    },
+    {
+      "path": "/zh/architecture/docs/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "docs"
+    },
+    {
+      "path": "/zh/architecture/docs/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "docs"
+    },
+    {
+      "path": "/zh/architecture/event-subscriber",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/architecture/event-subscriber/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/architecture/event-subscriber/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/architecture/event-subscriber/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/architecture/lifecycle",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/architecture/lifecycle/abort",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/architecture/lifecycle/disposal",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/architecture/lifecycle/errors",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/architecture/lifecycle/generation",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/architecture/lifecycle/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/architecture/lifecycle/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/architecture/lifecycle/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/architecture/lifecycle/quiescence",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/architecture/lifecycle/scheduler",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/architecture/lifecycle/scope",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/architecture/logger",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/architecture/logger/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/architecture/logger/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/architecture/logger/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/architecture/logger/plugins",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/architecture/middleware-pipeline",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/architecture/middleware-pipeline/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/architecture/middleware-pipeline/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/architecture/middleware-pipeline/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/architecture/plugin-host",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/architecture/plugin-host/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/architecture/plugin-host/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/architecture/plugin-host/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/architecture/reactive",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/architecture/reactive/copy-check",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/architecture/reactive/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/architecture/reactive/internals",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/architecture/reactive/node-factories",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/architecture/reactive/node-internals",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/architecture/reactive/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/architecture/reactive/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/architecture/reactive/reactive",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/architecture/reactive/runtime",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/architecture/reactive/source",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/architecture/resource",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/architecture/resource/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/architecture/resource/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/architecture/resource/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/architecture/serialize",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/architecture/serialize/core",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/architecture/serialize/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/architecture/serialize/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/architecture/serialize/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/architecture/serialize/plugins",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/architecture/serialize/registry",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/architecture/storage-contract",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/architecture/storage-contract/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/architecture/storage-contract/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/architecture/storage-contract/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/architecture/storage-web",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/cookies",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/entity",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/host",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/indexed-db",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/local-storage",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/memory",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/plugins-cookies",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/plugins-indexed-db",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/plugins-local-storage",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/plugins-memory",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/plugins-reactive",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/plugins-reactive-cookies",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/plugins-reactive-indexed-db",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/plugins-reactive-local-storage",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/plugins-reactive-memory",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/plugins-reactive-session-storage",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/plugins-session-storage",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/reactive-adapter",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/schema",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/serialize",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/storage-web/session-storage",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/architecture/store-devtools",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/zh/architecture/store-devtools/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/zh/architecture/store-devtools/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/zh/architecture/store-devtools/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/zh/architecture/store-indexed",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/zh/architecture/store-indexed/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/zh/architecture/store-indexed/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/zh/architecture/store-indexed/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/zh/architecture/store-keyed",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/architecture/store-keyed/atom-definition",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/architecture/store-keyed/atom-store",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/architecture/store-keyed/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/architecture/store-keyed/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/architecture/store-keyed/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/architecture/store-keyed/reactive-atom",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/architecture/store-light",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-light"
+    },
+    {
+      "path": "/zh/architecture/store-light/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-light"
+    },
+    {
+      "path": "/zh/architecture/store-light/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-light"
+    },
+    {
+      "path": "/zh/architecture/store-light/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-light"
+    },
+    {
+      "path": "/zh/architecture/store-middleware",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/zh/architecture/store-middleware/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/zh/architecture/store-middleware/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/zh/architecture/store-middleware/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/zh/architecture/store-middleware/tolerant-clone",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/zh/architecture/store-persist",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/architecture/store-persist/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/architecture/store-persist/indexed",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/architecture/store-persist/keyed",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/architecture/store-persist/light",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/architecture/store-persist/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/architecture/store-persist/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/architecture/store-react",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-react"
+    },
+    {
+      "path": "/zh/architecture/store-react/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-react"
+    },
+    {
+      "path": "/zh/architecture/store-react/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-react"
+    },
+    {
+      "path": "/zh/architecture/store-react/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-react"
+    },
+    {
+      "path": "/zh/architecture/store-shared",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-shared"
+    },
+    {
+      "path": "/zh/architecture/store-shared/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-shared"
+    },
+    {
+      "path": "/zh/architecture/store-shared/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-shared"
+    },
+    {
+      "path": "/zh/architecture/store-shared/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-shared"
+    },
+    {
+      "path": "/zh/architecture/store-ssr",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/zh/architecture/store-ssr/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/zh/architecture/store-ssr/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/zh/architecture/store-ssr/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/zh/architecture/store-wasm",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/zh/architecture/store-wasm/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/zh/architecture/store-wasm/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/zh/architecture/store-wasm/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/zh/architecture/store-worker",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-worker"
+    },
+    {
+      "path": "/zh/architecture/store-worker/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-worker"
+    },
+    {
+      "path": "/zh/architecture/store-worker/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-worker"
+    },
+    {
+      "path": "/zh/architecture/store-worker/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-worker"
+    },
+    {
+      "path": "/zh/architecture/store-worker/serialize",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "store-worker"
+    },
+    {
+      "path": "/zh/architecture/tray",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/architecture/tray/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/architecture/tray/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/architecture/tray/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/architecture/utils",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/architecture/utils/bytes",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/architecture/utils/config",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/architecture/utils/error",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/architecture/utils/function",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/architecture/utils/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/architecture/utils/number",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/architecture/utils/object",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/architecture/utils/object-path",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/architecture/utils/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/architecture/utils/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/architecture/utils/promise",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/architecture/utils/string",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/architecture/utils/typing",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/architecture/utils/value",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/architecture/wasm",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/architecture/wasm/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/architecture/wasm/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/architecture/wasm/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/architecture/web-rpc",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/adapters-broadcast-channel",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/adapters-memory",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/adapters-message-port",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/adapters-rtc-data-channel",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/adapters-service-worker",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/adapters-shared-worker",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/adapters-web-transport",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/adapters-web-worker",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/adapters-window",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/client",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/core",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/features-chunk",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/features-control",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/features-discovery",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/features-outbound",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/features-provider",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/full",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/index",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/overview",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/ownership",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/protocol-constants",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/architecture/web-rpc/provider",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs",
+      "locale": "zh",
+      "domain": "docs",
+      "library": null
+    },
+    {
+      "path": "/zh/docs/capability",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph-topology",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/docs",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "docs"
+    },
+    {
+      "path": "/zh/docs/docs/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "docs"
+    },
+    {
+      "path": "/zh/docs/event-subscriber",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/docs/event-subscriber/advanced",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/docs/event-subscriber/api",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/docs/event-subscriber/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/docs/event-subscriber/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/docs/event-subscriber/quickstart",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/docs/lifecycle",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/docs/lifecycle/abort",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/docs/lifecycle/advanced",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/docs/lifecycle/api",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/docs/lifecycle/disposal",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/docs/lifecycle/errors",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/docs/lifecycle/generation",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/docs/lifecycle/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/docs/lifecycle/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/docs/lifecycle/quickstart",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/docs/lifecycle/quiescence",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/docs/lifecycle/scheduler",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/docs/lifecycle/scope",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/docs/logger",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/docs/logger/advanced",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/docs/logger/api",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/docs/logger/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/docs/logger/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/docs/logger/plugins",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/docs/logger/quickstart",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/docs/middleware-pipeline",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/docs/middleware-pipeline/advanced",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/docs/middleware-pipeline/api",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/docs/middleware-pipeline/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/docs/middleware-pipeline/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/docs/middleware-pipeline/quickstart",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/docs/plugin-host",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/advanced",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/quickstart",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/reactive",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/advanced",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/copy-check",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/internals",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/node-factories",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/node-internals",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/ownership",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/quickstart",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/reactive",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/runtime",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/source",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/resource",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/advanced",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/api",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/quickstart",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/serialize",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/advanced",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/api",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/core",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/plugins",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/quickstart",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/registry",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/storage-contract",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/advanced",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/quickstart",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-web",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/advanced",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/api",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/cookies",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/entity",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/host",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/indexed-db",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/local-storage",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/memory",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/plugins-cookies",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/plugins-indexed-db",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/plugins-local-storage",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/plugins-memory",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/plugins-reactive",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/plugins-reactive-cookies",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/plugins-reactive-indexed-db",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/plugins-reactive-local-storage",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/plugins-reactive-memory",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/plugins-reactive-session-storage",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/plugins-session-storage",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/quickstart",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/reactive-adapter",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/schema",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/serialize",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/session-storage",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/store-devtools",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/zh/docs/store-devtools/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/zh/docs/store-devtools/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/zh/docs/store-indexed",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/zh/docs/store-indexed/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/zh/docs/store-indexed/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/zh/docs/store-keyed",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/docs/store-keyed/atom-definition",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/docs/store-keyed/atom-store",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/docs/store-keyed/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/docs/store-keyed/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/docs/store-keyed/reactive-atom",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/docs/store-light",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-light"
+    },
+    {
+      "path": "/zh/docs/store-light/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-light"
+    },
+    {
+      "path": "/zh/docs/store-light/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-light"
+    },
+    {
+      "path": "/zh/docs/store-middleware",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/zh/docs/store-middleware/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/zh/docs/store-middleware/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/zh/docs/store-middleware/tolerant-clone",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/zh/docs/store-persist",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/docs/store-persist/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/docs/store-persist/indexed",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/docs/store-persist/keyed",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/docs/store-persist/light",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/docs/store-persist/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/docs/store-react",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-react"
+    },
+    {
+      "path": "/zh/docs/store-react/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-react"
+    },
+    {
+      "path": "/zh/docs/store-react/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-react"
+    },
+    {
+      "path": "/zh/docs/store-shared",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-shared"
+    },
+    {
+      "path": "/zh/docs/store-shared/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-shared"
+    },
+    {
+      "path": "/zh/docs/store-shared/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-shared"
+    },
+    {
+      "path": "/zh/docs/store-ssr",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/zh/docs/store-ssr/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/zh/docs/store-ssr/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/zh/docs/store-wasm",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/zh/docs/store-wasm/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/zh/docs/store-wasm/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/zh/docs/store-worker",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-worker"
+    },
+    {
+      "path": "/zh/docs/store-worker/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-worker"
+    },
+    {
+      "path": "/zh/docs/store-worker/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-worker"
+    },
+    {
+      "path": "/zh/docs/store-worker/serialize",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-worker"
+    },
+    {
+      "path": "/zh/docs/tray",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/utils",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/advanced",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/api",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/bytes",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/config",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/error",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/function",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/number",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/object-path",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/promise",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/quickstart",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/string",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/typing",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/value",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/wasm",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/web-rpc",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/adapters-broadcast-channel",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/adapters-memory",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/adapters-message-port",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/adapters-rtc-data-channel",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/adapters-service-worker",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/adapters-shared-worker",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/adapters-web-transport",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/adapters-web-worker",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/adapters-window",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/advanced",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/api",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/client",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/core",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/features-chunk",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/features-control",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/features-discovery",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/features-outbound",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/features-provider",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/full",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/index",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/protocol-constants",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/provider",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/quickstart",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides",
+      "locale": "zh",
+      "domain": "guides",
+      "library": null
+    },
+    {
+      "path": "/zh/guides/capability",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/guides/capability/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/guides/capability/graph",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/guides/capability/graph-topology",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/guides/capability/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/guides/capability/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/guides/docs",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "docs"
+    },
+    {
+      "path": "/zh/guides/docs/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "docs"
+    },
+    {
+      "path": "/zh/guides/docs/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "docs"
+    },
+    {
+      "path": "/zh/guides/event-subscriber",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/guides/event-subscriber/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/guides/event-subscriber/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/guides/event-subscriber/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/guides/lifecycle",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/guides/lifecycle/abort",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/guides/lifecycle/disposal",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/guides/lifecycle/errors",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/guides/lifecycle/generation",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/guides/lifecycle/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/guides/lifecycle/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/guides/lifecycle/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/guides/lifecycle/quiescence",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/guides/lifecycle/scheduler",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/guides/lifecycle/scope",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/guides/logger",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/guides/logger/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/guides/logger/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/guides/logger/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/guides/logger/plugins",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/guides/middleware-pipeline",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/guides/middleware-pipeline/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/guides/middleware-pipeline/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/guides/middleware-pipeline/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/guides/plugin-host",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/guides/plugin-host/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/guides/plugin-host/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/guides/plugin-host/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/guides/reactive",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/guides/reactive/copy-check",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/guides/reactive/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/guides/reactive/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/guides/reactive/internals",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/guides/reactive/node-factories",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/guides/reactive/node-internals",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/guides/reactive/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/guides/reactive/ownership",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/guides/reactive/reactive",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/guides/reactive/runtime",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/guides/reactive/source",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/guides/resource",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/guides/resource/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/guides/resource/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/guides/resource/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/guides/serialize",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/guides/serialize/core",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/guides/serialize/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/guides/serialize/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/guides/serialize/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/guides/serialize/plugins",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/guides/serialize/registry",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/guides/storage-contract",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/guides/storage-contract/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/guides/storage-contract/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/guides/storage-contract/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/guides/storage-web",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/cookies",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/entity",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/host",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/indexed-db",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/local-storage",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/memory",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/plugins-cookies",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/plugins-indexed-db",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/plugins-local-storage",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/plugins-memory",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/plugins-reactive",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/plugins-reactive-cookies",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/plugins-reactive-indexed-db",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/plugins-reactive-local-storage",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/plugins-reactive-memory",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/plugins-reactive-session-storage",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/plugins-session-storage",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/reactive-adapter",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/schema",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/serialize",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/storage-web/session-storage",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/guides/store-devtools",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/zh/guides/store-devtools/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/zh/guides/store-devtools/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/zh/guides/store-devtools/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/zh/guides/store-indexed",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/zh/guides/store-indexed/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/zh/guides/store-indexed/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/zh/guides/store-indexed/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/zh/guides/store-keyed",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/guides/store-keyed/atom-definition",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/guides/store-keyed/atom-store",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/guides/store-keyed/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/guides/store-keyed/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/guides/store-keyed/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/guides/store-keyed/reactive-atom",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/guides/store-light",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-light"
+    },
+    {
+      "path": "/zh/guides/store-light/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-light"
+    },
+    {
+      "path": "/zh/guides/store-light/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-light"
+    },
+    {
+      "path": "/zh/guides/store-light/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-light"
+    },
+    {
+      "path": "/zh/guides/store-middleware",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/zh/guides/store-middleware/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/zh/guides/store-middleware/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/zh/guides/store-middleware/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/zh/guides/store-middleware/tolerant-clone",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/zh/guides/store-persist",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/guides/store-persist/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/guides/store-persist/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/guides/store-persist/indexed",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/guides/store-persist/keyed",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/guides/store-persist/light",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/guides/store-persist/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/guides/store-react",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-react"
+    },
+    {
+      "path": "/zh/guides/store-react/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-react"
+    },
+    {
+      "path": "/zh/guides/store-react/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-react"
+    },
+    {
+      "path": "/zh/guides/store-react/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-react"
+    },
+    {
+      "path": "/zh/guides/store-shared",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-shared"
+    },
+    {
+      "path": "/zh/guides/store-shared/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-shared"
+    },
+    {
+      "path": "/zh/guides/store-shared/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-shared"
+    },
+    {
+      "path": "/zh/guides/store-shared/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-shared"
+    },
+    {
+      "path": "/zh/guides/store-ssr",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/zh/guides/store-ssr/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/zh/guides/store-ssr/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/zh/guides/store-ssr/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/zh/guides/store-wasm",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/zh/guides/store-wasm/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/zh/guides/store-wasm/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/zh/guides/store-wasm/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/zh/guides/store-worker",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-worker"
+    },
+    {
+      "path": "/zh/guides/store-worker/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-worker"
+    },
+    {
+      "path": "/zh/guides/store-worker/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-worker"
+    },
+    {
+      "path": "/zh/guides/store-worker/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-worker"
+    },
+    {
+      "path": "/zh/guides/store-worker/serialize",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "store-worker"
+    },
+    {
+      "path": "/zh/guides/tray",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/guides/tray/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/guides/tray/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/guides/tray/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/guides/utils",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/guides/utils/bytes",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/guides/utils/config",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/guides/utils/error",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/guides/utils/function",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/guides/utils/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/guides/utils/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/guides/utils/number",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/guides/utils/object",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/guides/utils/object-path",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/guides/utils/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/guides/utils/promise",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/guides/utils/string",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/guides/utils/typing",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/guides/utils/value",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/guides/wasm",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/guides/wasm/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/guides/wasm/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/guides/wasm/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/guides/web-rpc",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/adapters-broadcast-channel",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/adapters-memory",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/adapters-message-port",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/adapters-rtc-data-channel",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/adapters-service-worker",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/adapters-shared-worker",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/adapters-web-transport",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/adapters-web-worker",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/adapters-window",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/client",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/core",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/features-chunk",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/features-control",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/features-discovery",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/features-outbound",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/features-provider",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/full",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/index",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/overview",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/protocol-constants",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/provider",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    }
+  ]
+}

@@ -3,6 +3,7 @@
 
 import { resolve } from 'node:path'
 import { writeFileSync, mkdirSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 
 const PACKAGES = ['middleware-pipeline', 'plugin-host', 'logger']
 
@@ -11,9 +12,18 @@ async function generateErrorCodes() {
   mkdirSync(dir, { recursive: true })
 
   for (const pkg of PACKAGES) {
-    const output = { package: pkg, codes: {}, generated: new Date().toISOString() }
-    writeFileSync(resolve(dir, `${pkg}.json`), JSON.stringify(output, null, 2))
+    const output = { package: pkg, codes: {} }
+    writeFileSync(resolve(dir, `${pkg}.json`), `${JSON.stringify(output, null, 2)}\n`)
     console.log(`✓ ${pkg}`)
+  }
+  const result = spawnSync(
+    'oxfmt',
+    PACKAGES.map((pkg) => resolve('src/generated/error-codes', `${pkg}.json`)),
+    { stdio: 'inherit' }
+  )
+  if (result.status !== 0) {
+    console.error('generated error-code formatting failed')
+    process.exit(result.status || 1)
   }
 }
 
