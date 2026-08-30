@@ -4,10 +4,10 @@ import { ReactiveErrorCode } from '../error-code.js'
 import { ReactiveErrorText } from '../error-text.js'
 import { defaultRuntimeAdapter } from './default-runtime-adapter.js'
 import {
-  assimilateThenable,
+  assimilateCapturedThen,
   inspectThenable as inspectCallbackThenable,
   observeThenableRejection
-} from './receiver.js'
+} from '@migaia/utils/function'
 import { ReactiveErrorPhase } from './trace-constants.js'
 
 type IThenableInspection =
@@ -170,7 +170,7 @@ export class Scheduler {
         )
         return
       }
-      const settled = assimilateThenable(inspected.handler, result)
+      const settled = assimilateCapturedThen(inspected.handler, result)
       void settled.then(
         () => {
           this.#reportStrategyFailure(

@@ -1,62 +1,9 @@
 import type { ICollectedError, IErrorPolicy } from './types.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
+import { assimilateCapturedThen, probeThenable, type IThenableProbe } from '@migaia/utils/function'
 import { LifecycleErrorCode } from './error-code.js'
-import { ThenableProbeKind } from './state-constants.js'
-
-/**
- * 一次读取的 thenable 探测结果（`lifecycle-extraction.sdd.md` §3「then 只读一次」）。
- *
- * 区分「非 thenable」「thenable（已捕获 then）」「getter 失败」三种，保证 hostile/stateful getter 只被读取一次、且 getter
- * 异常不被静默吞掉。
- */
-export type IThenableProbe =
-  | { readonly kind: typeof ThenableProbeKind.notThenable }
-  | {
-      readonly kind: typeof ThenableProbeKind.thenable
-      readonly thenFn: (resolve: unknown, reject: unknown) => void
-    }
-  | { readonly kind: typeof ThenableProbeKind.failed; readonly error: unknown }
-
-/** 一次读取 `value.then`，返回判别结果；getter 抛错归入 `failed`，绝不把探测异常静默改写。 */
-export function probeThenable(value: unknown): IThenableProbe {
-  if (value === null || (typeof value !== 'object' && typeof value !== 'function')) {
-    return { kind: ThenableProbeKind.notThenable }
-  }
-  let thenFn: unknown
-  try {
-    thenFn = (value as { then?: unknown }).then
-  } catch (error) {
-    return { kind: ThenableProbeKind.failed, error }
-  }
-  if (typeof thenFn !== 'function') return { kind: ThenableProbeKind.notThenable }
-  return {
-    kind: ThenableProbeKind.thenable,
-    thenFn: thenFn as (resolve: unknown, reject: unknown) => void
-  }
-}
-
-/**
- * Assimilates a thenable whose `.then` was already captured by `probeThenable`, invoking it exactly
- * once with the thenable as receiver (Promise/A+) and no second `.then` read.
- *
- * This is the package's single reflective receiver-binding boundary. Preserving `this === thenable`
- * together with the single-read guarantee requires `Reflect.apply` — an arrow function captures
- * lexical context, it cannot supply an arbitrary receiver — while the repository rule forbids
- * `Function.prototype.call`/`apply`/`bind`. `Reflect.apply` (the `Reflect` static, distinct from
- * `Function.prototype.apply`) appears nowhere else in this package.
- */
-export function assimilateCapturedThen<T>(
-  thenFn: (resolve: unknown, reject: unknown) => void,
-  thenable: unknown
-): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    try {
-      Reflect.apply(thenFn, thenable, [resolve, reject])
-    } catch (error) {
-      reject(error)
-    }
-  })
-}
+export { assimilateCapturedThen, probeThenable }
+export type { IThenableProbe }
 
 /** `source` value stamped onto every error this package throws. */
 export const LIFECYCLE_SOURCE = '@migaia/lifecycle'

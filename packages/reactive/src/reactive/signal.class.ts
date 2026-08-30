@@ -17,7 +17,7 @@ import {
   ReactiveTraceType
 } from '../runtime/trace-constants.js'
 import { ReactiveErrorText } from '../error-text.js'
-import { inspectThenable, observeThenableRejection } from '../runtime/receiver.js'
+import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 
 // 可写原子——反应式图里唯一的"真值来源"，Computed/Effect 都是从它（或从彼此）派生。
 // 每个节点持有自己的 runtime：同一 runtime 内的节点才共享依赖图/版本时钟。

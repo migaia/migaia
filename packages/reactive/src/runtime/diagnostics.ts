@@ -8,7 +8,7 @@ import type {
   IRuntimeTraceEvent
 } from './types.js'
 import { ReactiveTracePhase, ReactiveTraceType } from './trace-constants.js'
-import { assimilateThenable } from './receiver.js'
+import { assimilateCapturedThen } from '@migaia/utils/function'
 
 type INodeRole = 'observable' | 'observer'
 
@@ -64,7 +64,7 @@ export function containDiagnosticRejection(
   // Reuse the `then` we already read — `assimilateThenable` invokes it exactly once with the
   // thenable as receiver, so we never hand the value back to `Promise.resolve()` to read `.then`
   // twice (a stateful getter could return a different function or throw on the second read).
-  const settled = assimilateThenable(then as (resolve: unknown, reject: unknown) => void, value)
+  const settled = assimilateCapturedThen(then as (resolve: unknown, reject: unknown) => void, value)
   void settled.catch((error: unknown) => {
     try {
       onRejected(error)

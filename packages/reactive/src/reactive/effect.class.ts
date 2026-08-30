@@ -9,7 +9,7 @@ import type {
 import { internalsOf } from '../runtime/internals.js'
 import { claimOwnership } from '../runtime/ownership.js'
 import { createObserverRunTrace, describeObserver } from '../runtime/diagnostics.js'
-import { inspectThenable, observeThenableRejection } from '../runtime/receiver.js'
+import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { registerDeps, registerDepVersions } from '../runtime/node-internals.js'
 import { ReactiveErrorPhase } from '../runtime/trace-constants.js'
 import { createReactiveError, tagReactiveError } from '../errors.js'

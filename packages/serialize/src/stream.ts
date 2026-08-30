@@ -19,6 +19,7 @@ import {
 import { SerializeChunkKind, SerializePhase } from './format-constants.js'
 import { createSerializeOperationSignal } from './signal.js'
 import { snapshotSerializeSignal } from './signal-snapshot.js'
+import { attachSecondaryErrors, safeErrorReason } from '@migaia/utils/error'
 
 type ISerializeScheduledTask = { cancel(): void }
 
@@ -61,20 +62,6 @@ const invokeCollectEncoderWithReceiver = <TResult>(
 ): TResult => Reflect.apply(method, receiver, args)
 
 /** Add a secondary cleanup failure without changing the earlier primary result. */
-const attachSerializeCleanupError = (primary: unknown, cleanupError: unknown): void => {
-  if (primary === null || (typeof primary !== 'object' && typeof primary !== 'function')) return
-  try {
-    const existing = (primary as { readonly errors?: readonly unknown[] }).errors
-    Object.defineProperty(primary, 'errors', {
-      value: Object.freeze([...(existing ?? []), cleanupError]),
-      configurable: true,
-      enumerable: true
-    })
-  } catch {
-    // A frozen or hostile primary still wins; cleanup failure remains contained.
-  }
-}
-
 /** Finish public encode-stream cleanup while preserving any earlier primary throw identity. */
 const finalizeEncodeStreamCleanup = (
   cleanupErrors: readonly unknown[],
@@ -82,12 +69,14 @@ const finalizeEncodeStreamCleanup = (
   primaryError: unknown
 ): void => {
   if (hasPrimary) {
-    for (const cleanupError of cleanupErrors)
-      attachSerializeCleanupError(primaryError, cleanupError)
-    throw primaryError
+    throw attachSecondaryErrors(primaryError, cleanupErrors)
   }
   if (cleanupErrors.length > 0) throw cleanupErrors[0]
 }
+
+/** Attaches one cleanup failure while preserving Serialize's primary error projection. */
+const attachSerializeCleanupError = (primaryError: unknown, cleanupError: unknown): unknown =>
+  attachSecondaryErrors(primaryError, [cleanupError])
 
 /** Keep an already-owned serialize INVALID_OPTION intact while wrapping a hostile failure. */
 const isSerializeInvalidOption = (error: unknown): boolean => {
@@ -103,25 +92,8 @@ const isSerializeInvalidOption = (error: unknown): boolean => {
 }
 
 /** Extract hostile protocol-failure text without allowing diagnostics to replace the primary. */
-const streamFailureReason = (error: unknown): string => {
-  try {
-    if (error instanceof Error) {
-      try {
-        const message = error.message
-        return typeof message === 'string' ? message : String(message)
-      } catch {
-        return SerializeErrorText.reasonUnavailable
-      }
-    }
-    try {
-      return String(error)
-    } catch {
-      return SerializeErrorText.reasonUnavailable
-    }
-  } catch {
-    return SerializeErrorText.reasonUnavailable
-  }
-}
+const streamFailureReason = (error: unknown): string =>
+  safeErrorReason(error, SerializeErrorText.reasonUnavailable)
 
 /** Keep pre-existing serialize-owned invalid-chunk errors unchanged during stream cleanup. */
 const isSerializeInvalidChunk = (error: unknown): boolean => {
@@ -254,7 +226,7 @@ const scheduleOwnedYield = (
           primaryError = cleanupError
           hasPrimary = true
         } else {
-          attachSerializeCleanupError(primaryError, cleanupError)
+          primaryError = attachSerializeCleanupError(primaryError, cleanupError)
         }
       }
     }
@@ -280,7 +252,7 @@ const scheduleOwnedYield = (
           primaryError = cleanupError
           hasPrimary = true
         } else {
-          attachSerializeCleanupError(primaryError, cleanupError)
+          primaryError = attachSerializeCleanupError(primaryError, cleanupError)
         }
       }
     }
@@ -351,7 +323,7 @@ const scheduleOwnedYield = (
         }
         primaryError = registrationError
         hasPrimary = true
-        if (recheckFailed) attachSerializeCleanupError(primaryError, recheckError)
+        if (recheckFailed) primaryError = attachSerializeCleanupError(primaryError, recheckError)
         scheduleSettled = true
         finish()
         return promise
@@ -379,7 +351,7 @@ const scheduleOwnedYield = (
           )
       hasPrimary = true
     } else {
-      attachSerializeCleanupError(primaryError, error)
+      primaryError = attachSerializeCleanupError(primaryError, error)
     }
     scheduleSettled = true
   }
@@ -957,7 +929,7 @@ export async function collectStream(
     const cleanupError = await closeCollectIterator(iterator, completed)
     if (cleanupError !== undefined) {
       if (primaryError === undefined) primaryError = cleanupError
-      else attachSerializeCleanupError(primaryError, cleanupError)
+      else primaryError = attachSerializeCleanupError(primaryError, cleanupError)
     }
   }
   if (primaryError !== undefined) {

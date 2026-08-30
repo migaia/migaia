@@ -63,6 +63,64 @@ export function attachErrorIdentity<T extends Error>(
   return error
 }
 
+/**
+ * Appends secondary failures to a primary without changing primary identity. A hostile or
+ * non-extensible primary receives an `AggregateError` fallback whose first entry is the primary.
+ */
+export function attachSecondaryErrors(
+  primary: unknown,
+  secondaryErrors: readonly unknown[]
+): unknown {
+  if (secondaryErrors.length === 0) return primary
+  if (primary !== null && (typeof primary === 'object' || typeof primary === 'function')) {
+    try {
+      const existingDescriptor = Object.getOwnPropertyDescriptor(primary, 'errors')
+      const existing = existingDescriptor
+        ? 'value' in existingDescriptor
+          ? existingDescriptor.value
+          : Reflect.get(primary, 'errors', primary)
+        : undefined
+      if (existingDescriptor !== undefined && !Array.isArray(existing))
+        return new AggregateError([primary, ...secondaryErrors])
+      const errors = Object.freeze([
+        ...(Array.isArray(existing) ? existing : []),
+        ...secondaryErrors
+      ])
+      Object.defineProperty(primary, 'errors', {
+        configurable: true,
+        enumerable: false,
+        value: errors,
+        writable: false
+      })
+      return primary
+    } catch {
+      // Frozen primaries and hostile accessors use the identity-preserving aggregate fallback.
+    }
+  }
+  return new AggregateError([primary, ...secondaryErrors])
+}
+
+/** Reads an arbitrary failure's diagnostic reason once, returning a caller-owned safe fallback. */
+export function safeErrorReason(error: unknown, fallback: string): string {
+  try {
+    if (error instanceof Error) {
+      try {
+        const message = error.message
+        return typeof message === 'string' ? message : String(message)
+      } catch {
+        return fallback
+      }
+    }
+    try {
+      return String(error)
+    } catch {
+      return fallback
+    }
+  } catch {
+    return fallback
+  }
+}
+
 /** Converts arbitrary thrown values while preserving the original as cause. */
 export function toError(value: unknown, options?: { readonly message?: string }): Error {
   if (isErrorLike(value)) return value
