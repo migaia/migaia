@@ -2,10 +2,10 @@
   "schema": "WRC-C-B11-approval-v2",
   "algorithm": "ed25519",
   "authorityId": "web-rpc-release-coordinator-v1",
-  "keyId": "coordinator-ed25519-bc42d020131451c6",
-  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAtxggfK8ltxQoBMlZXtyQr2E3xtRk4UHR+bbgcNjcoeM=\n-----END PUBLIC KEY-----\n",
-  "decisionId": "WRC-C-B11-decision-20260830-PDLC-R5",
-  "payloadDigest": "32c50cab53845d11301a21b82cdc22a726f93873300087d14d0f8b55d8c76980",
+  "keyId": "coordinator-ed25519-a5907cf9ee31549e",
+  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAxzKgGKiY+A4CwDpuTrhAnLdYQTwgwgQl/wHsXhaj8JQ=\n-----END PUBLIC KEY-----\n",
+  "decisionId": "WRC-C-B11-decision-20260831-SHIP-DRY-RUN-R1",
+  "payloadDigest": "a5907cf9ee31549e6c0c9ec3e7cbecb389dd17ee23dda56480970051e5955995",
   "status": "approved",
-  "reason": "PDLC r5 custody refresh after two byte-identical canonical builds attributed the current 108-module WebRPC closure to the admitted Utils publication split."
+  "reason": "Ship dry-run custody refresh after two byte-identical canonical builds attributed the current 121-module closure to the admitted managed PluginHost composition; raw and gzip bytes decreased."
 }
