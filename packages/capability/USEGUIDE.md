@@ -37,7 +37,7 @@ import {
   CapabilityErrorCode,
   type ICapabilityErrorCode,
   CAPABILITY_SOURCE
-} from '@migaia/capability';
+} from '@migaia/capability'
 ```
 
 `exports` 提供包根（`.`）、静态 Graph 子路径（`./graph`）与无状态拓扑子路径（`./graph/topology`）。Host 符号从包根导入，Graph 符号从 `@migaia/capability/graph` 导入；只需纯 required-edge 准入时从 `@migaia/capability/graph/topology` 导入。本包复用 `@migaia/lifecycle` 的竞态/所有权原语与 `@migaia/utils/error` 的 `attachErrorIdentity`；不依赖 Store、React 或任何运行时全局对象，可在任意支持 ESM 的 JS 环境中使用。
@@ -54,20 +54,20 @@ import {
   type IGraphNodeDefinition,
   type IGraphStartContext,
   type IGraphNodeInstance
-} from '@migaia/capability/graph';
+} from '@migaia/capability/graph'
 ```
 
 `createCapabilityGraph(options?)` 在创建 lifecycle 根 scope 前读取 `options.onError`；getter failure 或非 callable 值抛 `GRAPH_INVALID_OPTION`。首次 `ready()` 只接受当前注册表，冻结后 `register()` 抛 `GRAPH_FROZEN`；terminal 后变更抛 `GRAPH_DISPOSED`。
 
 ```ts
 type IGraphNodeDefinition<T> = {
-  readonly id: IGraphNodeId;
-  readonly kind: string;
-  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[];
+  readonly id: IGraphNodeId
+  readonly kind: string
+  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[]
   readonly start: (
     context: IGraphStartContext
-  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>;
-};
+  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>
+}
 ```
 
 `ready()` 会先校验 unknown provider、duplicate edge、self-loop/cycle，再按注册 ordinal 做稳定拓扑启动。`context.get(provider)` 只能读取当前 node 已声明且已 ready 的 direct provider；它不创建 lease。`context.own()` 进入 node provisional scope，启动失败、abort、stale 或 dispose 时回滚。
@@ -107,8 +107,8 @@ const CapabilityState = {
   activating: 'activating',
   on: 'on',
   failed: 'failed'
-} as const;
-type ICapabilityStateValue = (typeof CapabilityState)[keyof typeof CapabilityState];
+} as const
+type ICapabilityStateValue = (typeof CapabilityState)[keyof typeof CapabilityState]
 ```
 
 `state-constants.ts` 经主入口 `export *` 一并导出 `ICapabilityStateValue`（与 `ICapabilityState` 同一个联合类型，命名历史遗留、两者等价）。
@@ -119,9 +119,9 @@ const CapabilityEnableStatus = {
   gated: 'gated',
   cancelled: 'cancelled',
   failed: 'failed'
-} as const;
+} as const
 type ICapabilityEnableStatusValue =
-  (typeof CapabilityEnableStatus)[keyof typeof CapabilityEnableStatus];
+  (typeof CapabilityEnableStatus)[keyof typeof CapabilityEnableStatus]
 ```
 
 同样经 `export *` 导出的 `ICapabilityEnableStatusValue` 是 `ICapabilityEnableResult['status']` 取值的联合类型，与 `CapabilityEnableStatus` 常量表的取值一一对应。
@@ -133,7 +133,7 @@ type ICapabilityEnableResult =
   | { readonly status: 'enabled' }
   | { readonly status: 'gated' }
   | { readonly status: 'cancelled' }
-  | { readonly status: 'failed'; readonly error: unknown };
+  | { readonly status: 'failed'; readonly error: unknown }
 ```
 
 - `enabled` —— 激活成功并被采纳，`state` 变为 `on`。
@@ -151,12 +151,12 @@ type ICapabilityEnableResult =
 function createCapabilityHost<Context>(
   context: Context,
   options?: ICapabilityHostOptions
-): ICapabilityHost<Context>;
+): ICapabilityHost<Context>
 
 type ICapabilityHostOptions = {
-  readonly flags?: Readonly<Record<string, boolean>>;
-  readonly onError?: (name: string, error: unknown) => void;
-};
+  readonly flags?: Readonly<Record<string, boolean>>
+  readonly onError?: (name: string, error: unknown) => void
+}
 ```
 
 `context` 是所有 `activate()` 共享的应用上下文对象，按引用传入且不会被冻结——只放调用能力确实需要的东西（Store、配置、telemetry），host 本身不会读取或修改它。
@@ -199,21 +199,21 @@ type ICapabilityHostOptions = {
 type ICapabilityHost<Context> = {
   register<Handle extends ICapabilityHandle>(
     definition: ICapabilityDefinition<Context, Handle>
-  ): void;
-  readonly names: readonly string[];
-  state(name: string): ICapabilityState;
-  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined;
-  error(name: string): unknown;
-  setFlag(name: string, enabled: boolean): void;
-  setFlags(flags: Readonly<Record<string, boolean>>): void;
-  enable(name: string): Promise<ICapabilityEnableResult>;
-  enableResult(name: string): Promise<ICapabilityEnableResult>;
-  disable(name: string): Promise<boolean>;
-  dispose(): Promise<void>;
-  enableLegacyBoolean(name: string): Promise<boolean>;
-  disableNow(name: string): boolean;
-  readonly disposed: boolean;
-};
+  ): void
+  readonly names: readonly string[]
+  state(name: string): ICapabilityState
+  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined
+  error(name: string): unknown
+  setFlag(name: string, enabled: boolean): void
+  setFlags(flags: Readonly<Record<string, boolean>>): void
+  enable(name: string): Promise<ICapabilityEnableResult>
+  enableResult(name: string): Promise<ICapabilityEnableResult>
+  disable(name: string): Promise<boolean>
+  dispose(): Promise<void>
+  enableLegacyBoolean(name: string): Promise<boolean>
+  disableNow(name: string): boolean
+  readonly disposed: boolean
+}
 ```
 
 #### `register(definition)`
@@ -306,14 +306,14 @@ host 是否已经整体关闭；`true` 之后所有变更类方法（`register`/
 ## 错误码与错误结构
 
 ```ts
-type ICapabilityError = Error & { readonly source: string; readonly code: string };
+type ICapabilityError = Error & { readonly source: string; readonly code: string }
 function createCapabilityError(
   code: string,
   message: string,
   options?: { readonly cause?: unknown }
-): ICapabilityError;
-function tagCapabilityError<E extends Error>(error: E, code: string): E;
-const CAPABILITY_SOURCE = '@migaia/capability';
+): ICapabilityError
+function tagCapabilityError<E extends Error>(error: E, code: string): E
+const CAPABILITY_SOURCE = '@migaia/capability'
 ```
 
 本包统一使用结构化错误契约：错误以属性形式携带 `source`（恒为 `CAPABILITY_SOURCE`）与 `code`，从不替换错误本身——依赖 `instanceof TypeError`/`RangeError` 等类型判断的调用方不受影响。`createCapabilityError` 构造一个携带 `(source, code)` 的普通 `Error`；`tagCapabilityError` 给已构造好的错误（如 `TypeError`）就地补上 `(source, code)`，不改变其类型——这是 `INVALID_NAME`/`INVALID_ACTIVATE`/`INVALID_HANDLE` 必须保持抛出值仍是 `TypeError` 的原因。两者内部都基于 `@migaia/utils/error` 的 `attachErrorIdentity` 实现，同名身份字段已存在且值不同会抛 `TypeError`；值相同视为幂等。
@@ -329,8 +329,8 @@ const CapabilityErrorCode = {
   invalidHandle: 'INVALID_HANDLE',
   gated: 'GATED',
   invalidOption: 'INVALID_OPTION'
-} as const;
-type ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode];
+} as const
+type ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode]
 ```
 
 码值是公开 API 的一部分，改名等同破坏性变更。逐条含义与触发点：
@@ -376,7 +376,7 @@ type ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof Capability
 ## 组合工作流示例：懒加载 + 错误上报 + 优雅收尾
 
 ```ts
-import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability';
+import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'
 
 const capabilities = createCapabilityHost(
   { store },
@@ -384,22 +384,22 @@ const capabilities = createCapabilityHost(
     flags: { persistence: true },
     onError: (name, error) => reportError(name, error)
   }
-);
+)
 
 capabilities.register({
   name: 'persistence',
   async activate({ store }) {
-    const { persist, memoryStorage } = await import('@migaia/store-persist');
-    const handle = persist(store, { key: 'settings', storage: memoryStorage() });
-    return { dispose: () => handle.dispose() };
+    const { persist, memoryStorage } = await import('@migaia/store-persist')
+    const handle = persist(store, { key: 'settings', storage: memoryStorage() })
+    return { dispose: () => handle.dispose() }
   }
-});
+})
 
-const result = await capabilities.enable('persistence');
-if (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用');
+const result = await capabilities.enable('persistence')
+if (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')
 
-await capabilities.disable('persistence');
-await capabilities.dispose(); // LIFO 释放全部已启用能力，之后 host 不可再用
+await capabilities.disable('persistence')
+await capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用
 ```
 
 `createCapabilityHost()` 建立开关表快照与状态机；`activate()` 内部的 `await import()` 保证关着的能力不进初始包；`onError` 只做诊断上报，从不反向影响生命周期；`dispose()` 是唯一的整体收尾入口，按真实激活顺序反向释放并等待全部清理完成。
@@ -431,19 +431,20 @@ await capabilities.dispose(); // LIFO 释放全部已启用能力，之后 host 
 ```bash
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
+
 ## Dynamic Capability Graph
 
 ```ts
-import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic';
+import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'
 
 const graph = createDynamicCapabilityGraph<{ readonly version: number }>({
   startBatch: (entries) =>
     entries.map((entry) => ({ value: entry.binding, release: async () => undefined })),
   releaseBatch: async (entries, fence) => {
-    await fence;
+    await fence
     // 这里只释放 entries 对应的 exact old generation。
   }
-});
+})
 ```
 
 `getBinding()` 是非 owning 诊断读取；需要把 binding 保留到异步工作结束时必须使用

@@ -11,9 +11,6 @@
   ],
   "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
-  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -33,6 +30,9 @@
       "types": "./dist/graph/dynamic.d.ts",
       "default": "./dist/graph/dynamic.js"
     }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
     "fmt": "oxfmt src test",
