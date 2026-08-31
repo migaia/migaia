@@ -16,6 +16,29 @@ import { asIndexedDbBackfillStore } from '../src/backends/indexed-db-backfill'
 import { composeRepositoryKey, repositoryEntityRange } from '../src/entity/key'
 import { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
 
+/**
+ * Preserves unexpected browser diagnostics while containing failures deliberately induced by E2E
+ * cases.
+ */
+const installExpectedDiagnosticContainment = (): void => {
+  const originalError = console.error
+  const originalWarn = console.warn
+  console.error = ((...args: unknown[]) => {
+    if (String(args[0]).startsWith('[storage-web] operation cleanup failed')) return
+    originalError(...args)
+  }) as typeof console.error
+  console.warn = ((...args: unknown[]) => {
+    if (
+      String(args[0]).startsWith('[storage-web] entity ') &&
+      String(args[0]).includes(' skipped invalid record ')
+    )
+      return
+    originalWarn(...args)
+  }) as typeof console.warn
+}
+
+installExpectedDiagnosticContainment()
+
 /** Keeps a browser-page-owned backfill lease alive while a second page exercises takeover. */
 const browserBackfillLeaseOwners = new Map<
   string,
