@@ -13,7 +13,7 @@
     "typecheck": "react-router typegen && tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
     "test": "bun run test:parity && bun run test:examples && bun run test:static",
-    "test:static": "bun run build && bun test test/static-route.test.ts test/toolchain-contract.test.ts test/content-quality.test.ts",
+    "test:static": "bun run build && bun test test/static-route.test.ts test/toolchain-contract.test.ts test/content-quality.test.ts test/example-import-boundary.test.ts",
     "test:parity": "bun scripts/parity/exports.ts && bun scripts/parity/error-codes.ts && bun scripts/parity/layering.ts && bun scripts/parity/versions.ts",
     "test:examples": "bun scripts/parity/examples.ts",
     "test:browser": "node test/browser-contract.test.mjs"

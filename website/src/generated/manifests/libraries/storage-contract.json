@@ -3,7 +3,7 @@
   "library": {
     "slug": "storage-contract",
     "description": "Runtime-neutral storage contract: key-value store, codec, capability, context, key-domain and contract-level error types.",
-    "version": "0.0.2",
+    "version": "0.0.4",
     "exports": ["."],
     "documentation": {
       "readme": {
@@ -691,8 +691,8 @@
             ]
           },
           {
-            "id": "1-只依赖-l0-需要-l1-时才在功能边界收窄",
-            "heading": "1. 只依赖 L0，需要 L1 时才在功能边界收窄",
+            "id": "高阶组合示例-1-只依赖-l0-需要-l1-时才在功能边界收窄",
+            "heading": "高阶组合示例 · 1. 只依赖 L0，需要 L1 时才在功能边界收窄",
             "blocks": [
               {
                 "type": "code",
@@ -702,8 +702,8 @@
             ]
           },
           {
-            "id": "2-按能力分支而不是按后端名字分支",
-            "heading": "2. 按能力分支而不是按后端名字分支",
+            "id": "高阶组合示例-2-按能力分支而不是按后端名字分支",
+            "heading": "高阶组合示例 · 2. 按能力分支而不是按后端名字分支",
             "blocks": [
               {
                 "type": "code",
@@ -713,8 +713,8 @@
             ]
           },
           {
-            "id": "3-事务内读改写-冲突策略",
-            "heading": "3. 事务内读改写 + 冲突策略",
+            "id": "高阶组合示例-3-事务内读改写-冲突策略",
+            "heading": "高阶组合示例 · 3. 事务内读改写 + 冲突策略",
             "blocks": [
               {
                 "type": "code",
@@ -724,8 +724,8 @@
             ]
           },
           {
-            "id": "4-校验-超时组合的存储读",
-            "heading": "4. 校验 + 超时组合的存储读",
+            "id": "高阶组合示例-4-校验-超时组合的存储读",
+            "heading": "高阶组合示例 · 4. 校验 + 超时组合的存储读",
             "blocks": [
               {
                 "type": "code",
@@ -735,8 +735,8 @@
             ]
           },
           {
-            "id": "5-自定义-codec-接入契约边界",
-            "heading": "5. 自定义 codec 接入契约边界",
+            "id": "高阶组合示例-5-自定义-codec-接入契约边界",
+            "heading": "高阶组合示例 · 5. 自定义 codec 接入契约边界",
             "blocks": [
               {
                 "type": "code",

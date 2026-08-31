@@ -357,8 +357,8 @@
             ]
           },
           {
-            "id": "1-接入已有-store-actions-only-策略-日志中间件-devtools",
-            "heading": "1. 接入已有 Store：actions-only 策略 + 日志中间件 + DevTools",
+            "id": "高阶组合示例-1-接入已有-store-actions-only-策略-日志中间件-devtools",
+            "heading": "高阶组合示例 · 1. 接入已有 Store：actions-only 策略 + 日志中间件 + DevTools",
             "blocks": [
               {
                 "type": "code",
@@ -368,8 +368,8 @@
             ]
           },
           {
-            "id": "2-自定义领域插件-只在-action-结束时上报审计事件",
-            "heading": "2. 自定义领域插件：只在 action 结束时上报审计事件",
+            "id": "高阶组合示例-2-自定义领域插件-只在-action-结束时上报审计事件",
+            "heading": "高阶组合示例 · 2. 自定义领域插件：只在 action 结束时上报审计事件",
             "blocks": [
               {
                 "type": "code",
@@ -379,8 +379,8 @@
             ]
           },
           {
-            "id": "3-独立使用-mutationpolicy-不接-store-错误身份识别",
-            "heading": "3. 独立使用 MutationPolicy（不接 Store）+ 错误身份识别",
+            "id": "高阶组合示例-3-独立使用-mutationpolicy-不接-store-错误身份识别",
+            "heading": "高阶组合示例 · 3. 独立使用 MutationPolicy（不接 Store）+ 错误身份识别",
             "blocks": [
               {
                 "type": "code",
@@ -390,8 +390,8 @@
             ]
           },
           {
-            "id": "4-大状态树下换用零拷贝-clonepolicy-opaque-降低-getstate-开销",
-            "heading": "4. 大状态树下换用零拷贝 ClonePolicy.opaque 降低 getState() 开销",
+            "id": "高阶组合示例-4-大状态树下换用零拷贝-clonepolicy-opaque-降低-getstate-开销",
+            "heading": "高阶组合示例 · 4. 大状态树下换用零拷贝 ClonePolicy.opaque 降低 getState() 开销",
             "blocks": [
               {
                 "type": "code",
@@ -401,8 +401,8 @@
             ]
           },
           {
-            "id": "5-手动构造-host-不经-bindstoremiddleware-支持-devtools-时间旅行",
-            "heading": "5. 手动构造 Host（不经 bindStoreMiddleware），支持 DevTools 时间旅行",
+            "id": "高阶组合示例-5-手动构造-host-不经-bindstoremiddleware-支持-devtools-时间旅行",
+            "heading": "高阶组合示例 · 5. 手动构造 Host（不经 bindStoreMiddleware），支持 DevTools 时间旅行",
             "blocks": [
               {
                 "type": "code",
@@ -1195,8 +1195,8 @@
           "identity": "packages/store-middleware/dist/middleware.d.ts:createMutationPolicy:export declare function createMutationPolicy(mode?: IMutationPolicyMode): MutationPolicy;",
           "guidance": [
             {
-              "id": "3-独立使用-mutationpolicy-不接-store-错误身份识别",
-              "heading": "3. 独立使用 MutationPolicy（不接 Store）+ 错误身份识别",
+              "id": "高阶组合示例-3-独立使用-mutationpolicy-不接-store-错误身份识别",
+              "heading": "高阶组合示例 · 3. 独立使用 MutationPolicy（不接 Store）+ 错误身份识别",
               "blocks": [
                 {
                   "type": "code",
@@ -3287,8 +3287,8 @@
           "identity": "packages/store-middleware/dist/middleware.d.ts:MutationPolicy:export declare class MutationPolicy implements IMutationGuard { #private; constructor(mode?: IMutationPolicyMode); get insideAction(): boolean; assertMutationAllowed(operation?: string): void; runInAction<T>(fn: () => T): T; }",
           "guidance": [
             {
-              "id": "3-独立使用-mutationpolicy-不接-store-错误身份识别",
-              "heading": "3. 独立使用 MutationPolicy（不接 Store）+ 错误身份识别",
+              "id": "高阶组合示例-3-独立使用-mutationpolicy-不接-store-错误身份识别",
+              "heading": "高阶组合示例 · 3. 独立使用 MutationPolicy（不接 Store）+ 错误身份识别",
               "blocks": [
                 {
                   "type": "code",

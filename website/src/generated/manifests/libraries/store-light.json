@@ -392,8 +392,8 @@
             ]
           },
           {
-            "id": "1-严格写入守卫-异步资源-用户设置面板",
-            "heading": "1. 严格写入守卫 + 异步资源：用户设置面板",
+            "id": "高阶组合示例-1-严格写入守卫-异步资源-用户设置面板",
+            "heading": "高阶组合示例 · 1. 严格写入守卫 + 异步资源：用户设置面板",
             "blocks": [
               {
                 "type": "paragraph",
@@ -407,8 +407,8 @@
             ]
           },
           {
-            "id": "2-hydrate-plain-往返持久化快照",
-            "heading": "2. $hydrate + $plain：往返持久化快照",
+            "id": "高阶组合示例-2-hydrate-plain-往返持久化快照",
+            "heading": "高阶组合示例 · 2. $hydrate + $plain：往返持久化快照",
             "blocks": [
               {
                 "type": "code",
@@ -418,8 +418,8 @@
             ]
           },
           {
-            "id": "3-own-把外部资源纳入-store-生命周期",
-            "heading": "3. $own 把外部资源纳入 Store 生命周期",
+            "id": "高阶组合示例-3-own-把外部资源纳入-store-生命周期",
+            "heading": "高阶组合示例 · 3. $own 把外部资源纳入 Store 生命周期",
             "blocks": [
               {
                 "type": "code",
@@ -429,8 +429,8 @@
             ]
           },
           {
-            "id": "4-自定义-fieldbuilder-接入-store",
-            "heading": "4. 自定义 FieldBuilder 接入 Store",
+            "id": "高阶组合示例-4-自定义-fieldbuilder-接入-store",
+            "heading": "高阶组合示例 · 4. 自定义 FieldBuilder 接入 Store",
             "blocks": [
               {
                 "type": "code",
@@ -2083,8 +2083,8 @@
               ]
             },
             {
-              "id": "3-own-把外部资源纳入-store-生命周期",
-              "heading": "3. $own 把外部资源纳入 Store 生命周期",
+              "id": "高阶组合示例-3-own-把外部资源纳入-store-生命周期",
+              "heading": "高阶组合示例 · 3. $own 把外部资源纳入 Store 生命周期",
               "blocks": [
                 {
                   "type": "code",

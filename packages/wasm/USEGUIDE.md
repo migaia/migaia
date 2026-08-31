@@ -5,9 +5,9 @@
 ## 1. 初始化
 
 ```ts
-import init, { initSync } from '@migaia/wasm';
+import init, { initSync } from '@migaia/wasm'
 
-const wasm = await init();
+const wasm = await init()
 // 或：const wasm = initSync(moduleOrBytes);
 ```
 
@@ -15,12 +15,12 @@ const wasm = await init();
 
 ## 2. Arena 契约
 
-| API | 返回值 | 语义 |
-| --- | --- | --- |
-| `alloc_bytes(byteLen)` | `number` | 8 字节对齐、清零的稳定分配 id，失败为 `0` |
-| `ptr_of(id)` | `number` | 当前线性内存中的字节偏移，未知 id 为 `0` |
-| `byte_len_of(id)` | `number` | 实际容量（按 8 字节取整），未知 id 为 `0` |
-| `dealloc_bytes(id)` | `boolean` | 是否确实释放了一个 live id |
+| API                    | 返回值    | 语义                                      |
+| ---------------------- | --------- | ----------------------------------------- |
+| `alloc_bytes(byteLen)` | `number`  | 8 字节对齐、清零的稳定分配 id，失败为 `0` |
+| `ptr_of(id)`           | `number`  | 当前线性内存中的字节偏移，未知 id 为 `0`  |
+| `byte_len_of(id)`      | `number`  | 实际容量（按 8 字节取整），未知 id 为 `0` |
+| `dealloc_bytes(id)`    | `boolean` | 是否确实释放了一个 live id                |
 
 `0` 是保留哨兵。分配使用稳定 id 并避免覆盖仍存活的块；指针只保证到释放前稳定。WASM memory 增长会替换 `memory.buffer`，所以 typed array 不能跨越后续分配调用复用。
 
@@ -42,22 +42,18 @@ msgpack_to_json(id: number, len: number): ConversionResult;
 转码只读取指定分配的前 `len` 个字节，并拒绝未知 id、超过容量的长度、空文档、格式错误和尾随第二个文档。JSON 允许文档后的空白；MessagePack 必须精确消费输入。map key 以字符串保存，避免 schema 依赖。
 
 ```ts
-const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }));
-const inputId = wasm.alloc_bytes(json.length);
-new Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json);
+const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }))
+const inputId = wasm.alloc_bytes(json.length)
+new Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json)
 
-const encoded = wasm.json_to_msgpack(inputId, json.length);
+const encoded = wasm.json_to_msgpack(inputId, json.length)
 if (encoded.id === 0) {
-  wasm.dealloc_bytes(inputId);
-  throw new Error(encoded.error);
+  wasm.dealloc_bytes(inputId)
+  throw new Error(encoded.error)
 }
-const packed = new Uint8Array(
-  wasm.memory.buffer,
-  wasm.ptr_of(encoded.id),
-  encoded.len
-).slice();
-wasm.dealloc_bytes(inputId);
-wasm.dealloc_bytes(encoded.id);
+const packed = new Uint8Array(wasm.memory.buffer, wasm.ptr_of(encoded.id), encoded.len).slice()
+wasm.dealloc_bytes(inputId)
+wasm.dealloc_bytes(encoded.id)
 ```
 
 ## 4. 错误与边界

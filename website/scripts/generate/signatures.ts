@@ -37,6 +37,7 @@ const DOMAINS = ['docs', 'guides', 'architecture'] as const
 /** Maintained task topics owned by the Guide information architecture. */
 const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
   utils: [
+    'collector',
     'deadlines-and-abort',
     'retry-and-concurrency',
     'error-identity-and-causes',
@@ -281,6 +282,8 @@ function maintainedDocument(filePath: string) {
   let table: string[][] = []
   let code: string[] | null = null
   let language = 'text'
+  /** Active Markdown heading ancestry used to retain semantic parent sections. */
+  const headingAncestors: string[] = []
   /** Commits buffered prose while preserving its original block order. */
   const flush = () => {
     if (paragraph.length > 0) {
@@ -329,12 +332,19 @@ function maintainedDocument(filePath: string) {
     if (heading) {
       commitSection()
       const title = markdownText(heading[2].replace(/`/g, ''))
+      const level = heading[1].length
+      headingAncestors.length = level - 1
+      const advancedParent = headingAncestors.find((ancestor) =>
+        /高阶组合示例|高阶用法|进阶用法|性能特征|advanced usage|performance/i.test(ancestor)
+      )
+      headingAncestors[level - 1] = title
+      const readerHeading = advancedParent ? `${advancedParent} · ${title}` : title
       section = {
-        id: title
+        id: readerHeading
           .toLowerCase()
           .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-')
           .replace(/^-|-$/g, ''),
-        heading: title,
+        heading: readerHeading,
         blocks: []
       }
       continue
@@ -1671,6 +1681,45 @@ async function generateManifests() {
     )
   }
   const apiManifest = { version: 1, apis }
+  /** Narrow public import owners used to keep reader examples tree-shaking friendly. */
+  const exampleImports = {
+    version: 1,
+    packages: Object.fromEntries(
+      libraries.map((library) => {
+        const packageName = `@migaia/${library.slug}`
+        const candidates = new Map<string, string[]>()
+        for (const api of apiManifest.apis.filter(
+          (candidate) => candidate.library === library.slug && candidate.exportPath !== '.'
+        )) {
+          for (const symbol of api.symbols) {
+            const symbolRecord = symbol as Record<string, unknown>
+            const symbolName = String(symbolRecord.name)
+            const source = String(symbolRecord.source)
+            const wildcardPath = api.exportPath.includes('*')
+              ? `./${source.replace(`packages/${library.slug}/dist/`, '').replace(/\.d\.ts$/u, '')}`
+              : api.exportPath
+            const importPath = `${packageName}/${wildcardPath.replace(/^\.\//u, '')}`
+            const paths = candidates.get(symbolName) ?? []
+            paths.push(importPath)
+            candidates.set(symbolName, paths)
+          }
+        }
+        return [
+          packageName,
+          Object.fromEntries(
+            [...candidates.entries()]
+              .map(([symbol, paths]) => [
+                symbol,
+                [...new Set(paths)].sort(
+                  (left, right) => left.length - right.length || left.localeCompare(right)
+                )[0]
+              ])
+              .sort(([left], [right]) => left.localeCompare(right))
+          )
+        ]
+      })
+    )
+  }
   /** Lightweight navigation facts that never carry maintained documents or API bodies. */
   const libraryIndexManifest = {
     version: 1,
@@ -1730,6 +1779,7 @@ async function generateManifests() {
     content,
     libraries: libraryManifest,
     'library-index': libraryIndexManifest,
+    'example-imports': exampleImports,
     apis: apiManifest,
     routes,
     relationships
@@ -1746,9 +1796,15 @@ function formatGeneratedJson() {
   )
   const files = [
     ...PACKAGES.map((pkg) => resolve('src/generated/signatures', `${pkg}.json`)),
-    ...['content', 'libraries', 'library-index', 'apis', 'routes', 'relationships'].map((name) =>
-      resolve('src/generated/manifests', `${name}.json`)
-    ),
+    ...[
+      'content',
+      'libraries',
+      'library-index',
+      'example-imports',
+      'apis',
+      'routes',
+      'relationships'
+    ].map((name) => resolve('src/generated/manifests', `${name}.json`)),
     ...libraryShards
   ]
   const result = spawnSync('oxfmt', files, { stdio: 'inherit' })

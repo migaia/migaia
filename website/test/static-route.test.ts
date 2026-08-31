@@ -101,6 +101,38 @@ test('SITE-T-NO-INDEX keeps repository entry names out of public docs routes', (
   assert.doesNotMatch(html, /href=\x22\/zh\/docs\/event-subscriber\/index(?:\/|\x22)/)
 })
 
+test('SITE-T-TOC renders only right-rail anchors backed by real page sections', () => {
+  const docsArtifacts = emittedFiles(buildRoot).filter(
+    (path) => path.endsWith('index.html') && path.includes('/docs/')
+  )
+  for (const path of docsArtifacts) {
+    const html = readFileSync(path, 'utf8')
+    const rail = html.match(/<aside class="right-rail"[^>]*>([\s\S]*?)<\/aside>/)?.[1]
+    if (!rail) continue
+    for (const match of rail.matchAll(/href="#([^"]+)"/g))
+      assert.match(html, new RegExp(`id="${match[1]}"`), `${path}: missing #${match[1]}`)
+  }
+
+  const libraryRoot = join(buildRoot, 'zh/docs')
+  for (const entry of readdirSync(libraryRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const path = join(libraryRoot, entry.name, 'index.html')
+    if (!existsSync(path)) continue
+    const html = readFileSync(path, 'utf8')
+    if (!html.includes('id="module-guidance"')) continue
+    const rail = html.match(/<aside class="right-rail"[^>]*>([\s\S]*?)<\/aside>/)?.[1]
+    assert.ok(rail, `${entry.name}: missing right rail`)
+    assert.match(rail, /href="#learning-advanced"[^>]*>高级用法</, `${entry.name}: advanced link`)
+    assert.match(html, /id="learning-advanced"/, `${entry.name}: advanced section`)
+    assert.match(html, /高阶用法教程/, `${entry.name}: advanced tutorial heading`)
+    assert.match(
+      html,
+      /id="learning-advanced"[\s\S]*?<figure class="code-frame"/,
+      `${entry.name}: advanced tutorial code`
+    )
+  }
+})
+
 test('SITE-T-SEMANTIC-ROUTES keeps API links stable, readable, and collision-safe', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   assert.ok(routes.has('/zh/docs/event-subscriber/createEventChannel'))
@@ -2192,6 +2224,68 @@ test('SITE-T-WEBRPC-LINKS keeps every maintained WebRPC continuation resolvable'
         assert.ok(routes.has(link), `broken maintained WebRPC link: ${path} -> ${link}`)
       }
     }
+  }
+})
+
+test('SITE-T-WEBRPC-TRANSPORTS renders every adapter tutorial in both locales', () => {
+  const factories = [
+    'createMemoryTransportPair',
+    'createWindowMessageTransport',
+    'createBrowserMessagePortTransport',
+    'createNodeMessagePortTransport',
+    'createWebWorkerTransport',
+    'createSharedWorkerTransport',
+    'createServiceWorkerTransport',
+    'createBroadcastChannelTransport',
+    'createRtcDataChannelTransport',
+    'createWebTransportDatagramTransport'
+  ]
+  for (const locale of ['en', 'zh']) {
+    const path = `/${locale}/guides/web-rpc/transports-and-security`
+    const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
+    for (const factory of factories) assert.ok(page.includes(factory), `${path} misses ${factory}`)
+    assert.ok(!page.includes('createMessagePortTransport'))
+  }
+})
+
+test('SITE-T-WEBRPC-NAV exposes primary endpoints and every guide from the left rail', () => {
+  for (const locale of ['en', 'zh']) {
+    const docsPath = `/${locale}/docs/web-rpc`
+    const docsPage = readFileSync(join(buildRoot, artifactPath(docsPath)), 'utf8')
+    for (const endpoint of [
+      'createEndpoint',
+      'createClientEndpoint',
+      'createProviderEndpoint',
+      'createFullEndpoint',
+      'createComposedEndpoint'
+    ])
+      assert.ok(docsPage.includes(`>${endpoint}</a>`), `${docsPath} hides ${endpoint}`)
+    assert.ok(docsPage.includes(`/${locale}/guides/web-rpc/transports-and-security`))
+
+    const guidePath = `/${locale}/guides/web-rpc/transports-and-security`
+    const guidePage = readFileSync(join(buildRoot, artifactPath(guidePath)), 'utf8')
+    for (const anchor of [
+      'window-transport',
+      'web-worker-transport',
+      'shared-worker-transport',
+      'broadcast-channel-transport'
+    ]) {
+      assert.ok(guidePage.includes(`id="${anchor}"`), `${guidePath} misses #${anchor}`)
+      assert.ok(guidePage.includes(`href="#${anchor}"`), `${guidePath} does not link #${anchor}`)
+    }
+    for (const topic of [
+      'getting-started',
+      'endpoint-composition',
+      'calls-and-cancellation',
+      'providers-and-contracts',
+      'transports-and-security',
+      'discovery-and-control',
+      'chunking-and-backpressure',
+      'replay-retry-and-lifecycle'
+    ])
+      assert.ok(guidePage.includes(`/${locale}/guides/web-rpc/${topic}`))
+    assert.ok(guidePage.includes('href="#memory-transport"'))
+    assert.ok(guidePage.includes('href="#web-transport-datagram-transport"'))
   }
 })
 

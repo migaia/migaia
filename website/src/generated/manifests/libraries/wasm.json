@@ -40,7 +40,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import init, {\n  alloc_bytes,\n  ptr_of,\n  byte_len_of,\n  dealloc_bytes,\n  json_to_msgpack,\n  msgpack_to_json\n} from '@migaia/wasm';"
+                "code": "import init, {\n  alloc_bytes,\n  ptr_of,\n  byte_len_of,\n  dealloc_bytes,\n  json_to_msgpack,\n  msgpack_to_json\n} from '@migaia/wasm'"
               },
               {
                 "type": "paragraph",
@@ -53,12 +53,12 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type ConversionResult = {\n  readonly id: number;    // 成功时的新输出分配，失败时为 0\n  readonly len: number;   // 精确输出长度，失败时为 0\n  readonly error: string; // 成功为空串，失败为原因\n};"
+                "code": "type ConversionResult = {\n  readonly id: number // 成功时的新输出分配，失败时为 0\n  readonly len: number // 精确输出长度，失败时为 0\n  readonly error: string // 成功为空串，失败为原因\n}"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const wasm = await init();\nconst input = alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json);\n\nconst result = json_to_msgpack(input, json.length);\nif (result.id === 0) throw new Error(result.error);\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice();\n\ndealloc_bytes(input);\ndealloc_bytes(result.id);"
+                "code": "const wasm = await init()\nconst input = alloc_bytes(json.length)\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json)\n\nconst result = json_to_msgpack(input, json.length)\nif (result.id === 0) throw new Error(result.error)\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n\ndealloc_bytes(input)\ndealloc_bytes(result.id)"
               },
               {
                 "type": "paragraph",
@@ -77,6 +77,25 @@
               {
                 "type": "paragraph",
                 "text": "arena 使用 `Vec<u64>`，保证指针适合 `Float64Array`/`BigInt64Array`。WASM memory 增长会使旧 `ArrayBuffer` 视图失效；每次分配或读取前都从当前 `memory.buffer` 创建视图。所有分配都必须显式释放；`@migaia/store-wasm` 另外提供 FinalizationRegistry 兜底，但不替代确定性 dispose。"
+              }
+            ]
+          },
+          {
+            "id": "高阶组合示例-交错转码并在一个所有权边界内释放全部分配",
+            "heading": "高阶组合示例 · 交错转码并在一个所有权边界内释放全部分配",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "每次转码返回独立的 `ConversionResult`，因此可以先保留多个结果，再按业务顺序读取。输入 id 和成功结果 id 都归调用者所有；用 `try/finally` 把释放收拢到同一个边界，避免异常路径泄漏 arena 分配："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import init, { alloc_bytes, dealloc_bytes, json_to_msgpack, ptr_of } from '@migaia/wasm'\n\nconst wasm = await init()\n\nfunction writeJson(value: unknown): { id: number; length: number } {\n  const bytes = new TextEncoder().encode(JSON.stringify(value))\n  const id = alloc_bytes(bytes.length)\n  if (id === 0) throw new Error('WASM arena allocation failed')\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  return { id, length: bytes.length }\n}\n\nconst firstInput = writeJson({ id: 1, status: 'ready' })\nconst secondInput = writeJson({ id: 2, status: 'queued' })\nconst outputIds: number[] = []\n\ntry {\n  const first = json_to_msgpack(firstInput.id, firstInput.length)\n  const second = json_to_msgpack(secondInput.id, secondInput.length)\n  for (const result of [first, second]) {\n    if (result.id === 0) throw new Error(result.error)\n    outputIds.push(result.id)\n    const ownedCopy = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log(ownedCopy.byteLength)\n  }\n} finally {\n  dealloc_bytes(firstInput.id)\n  dealloc_bytes(secondInput.id)\n  for (const id of outputIds) dealloc_bytes(id)\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "每次读取前都重新访问 `wasm.memory.buffer`，因为后续分配可能触发 memory growth 并使旧视图失效。`.slice()` 得到 JavaScript 自有副本后即可释放 WASM 输出；如果要保留零拷贝视图，就必须把对应 id 的释放延后到最后一次读取之后。"
               }
             ]
           },
@@ -116,7 +135,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import init, { initSync } from '@migaia/wasm';\n\nconst wasm = await init();\n// 或：const wasm = initSync(moduleOrBytes);"
+                "code": "import init, { initSync } from '@migaia/wasm'\n\nconst wasm = await init()\n// 或：const wasm = initSync(moduleOrBytes);"
               },
               {
                 "type": "paragraph",
@@ -168,7 +187,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }));\nconst inputId = wasm.alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json);\n\nconst encoded = wasm.json_to_msgpack(inputId, json.length);\nif (encoded.id === 0) {\n  wasm.dealloc_bytes(inputId);\n  throw new Error(encoded.error);\n}\nconst packed = new Uint8Array(\n  wasm.memory.buffer,\n  wasm.ptr_of(encoded.id),\n  encoded.len\n).slice();\nwasm.dealloc_bytes(inputId);\nwasm.dealloc_bytes(encoded.id);"
+                "code": "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }))\nconst inputId = wasm.alloc_bytes(json.length)\nnew Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json)\n\nconst encoded = wasm.json_to_msgpack(inputId, json.length)\nif (encoded.id === 0) {\n  wasm.dealloc_bytes(inputId)\n  throw new Error(encoded.error)\n}\nconst packed = new Uint8Array(wasm.memory.buffer, wasm.ptr_of(encoded.id), encoded.len).slice()\nwasm.dealloc_bytes(inputId)\nwasm.dealloc_bytes(encoded.id)"
               }
             ]
           },
@@ -253,8 +272,9 @@
           "errors": ["No documented errors are declared for alloc_bytes."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for alloc_bytes.",
           "examples": [
-            "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }));\nconst inputId = wasm.alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json);\n\nconst encoded = wasm.json_to_msgpack(inputId, json.length);\nif (encoded.id === 0) {\n  wasm.dealloc_bytes(inputId);\n  throw new Error(encoded.error);\n}\nconst packed = new Uint8Array(\n  wasm.memory.buffer,\n  wasm.ptr_of(encoded.id),\n  encoded.len\n).slice();\nwasm.dealloc_bytes(inputId);\nwasm.dealloc_bytes(encoded.id);",
-            "const wasm = await init();\nconst input = alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json);\n\nconst result = json_to_msgpack(input, json.length);\nif (result.id === 0) throw new Error(result.error);\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice();\n\ndealloc_bytes(input);\ndealloc_bytes(result.id);"
+            "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }))\nconst inputId = wasm.alloc_bytes(json.length)\nnew Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json)\n\nconst encoded = wasm.json_to_msgpack(inputId, json.length)\nif (encoded.id === 0) {\n  wasm.dealloc_bytes(inputId)\n  throw new Error(encoded.error)\n}\nconst packed = new Uint8Array(wasm.memory.buffer, wasm.ptr_of(encoded.id), encoded.len).slice()\nwasm.dealloc_bytes(inputId)\nwasm.dealloc_bytes(encoded.id)",
+            "const wasm = await init()\nconst input = alloc_bytes(json.length)\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json)\n\nconst result = json_to_msgpack(input, json.length)\nif (result.id === 0) throw new Error(result.error)\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n\ndealloc_bytes(input)\ndealloc_bytes(result.id)",
+            "import init, { alloc_bytes, dealloc_bytes, json_to_msgpack, ptr_of } from '@migaia/wasm'\n\nconst wasm = await init()\n\nfunction writeJson(value: unknown): { id: number; length: number } {\n  const bytes = new TextEncoder().encode(JSON.stringify(value))\n  const id = alloc_bytes(bytes.length)\n  if (id === 0) throw new Error('WASM arena allocation failed')\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  return { id, length: bytes.length }\n}\n\nconst firstInput = writeJson({ id: 1, status: 'ready' })\nconst secondInput = writeJson({ id: 2, status: 'queued' })\nconst outputIds: number[] = []\n\ntry {\n  const first = json_to_msgpack(firstInput.id, firstInput.length)\n  const second = json_to_msgpack(secondInput.id, secondInput.length)\n  for (const result of [first, second]) {\n    if (result.id === 0) throw new Error(result.error)\n    outputIds.push(result.id)\n    const ownedCopy = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log(ownedCopy.byteLength)\n  }\n} finally {\n  dealloc_bytes(firstInput.id)\n  dealloc_bytes(secondInput.id)\n  for (const id of outputIds) dealloc_bytes(id)\n}"
           ],
           "exportPath": ".",
           "overloadSignatures": ["export function alloc_bytes(byte_len: number): number;"],
@@ -305,7 +325,7 @@
           "declaredConfiguration": [],
           "identity": "packages/wasm/src/wasm_provider.d.ts:alloc_bytes:export function alloc_bytes(byte_len: number): number;",
           "guidance": [],
-          "usageScore": 26,
+          "usageScore": 36,
           "configuration": [],
           "fragment": "wasm-index--alloc_bytes"
         },
@@ -441,7 +461,7 @@
           "declaredConfiguration": [],
           "identity": "packages/wasm/src/wasm_provider.d.ts:ConversionResult:export class ConversionResult { private constructor(); free(): void; [Symbol.dispose](): void; /** * Empty on success, otherwise the operation-specific failure reason. */ readonly error: string; /** * Allocation id containing the conversion output, or zero on failure. */ readonly id: number; /** * Exact output byte length; zero on failure. */ readonly len: number; }",
           "guidance": [],
-          "usageScore": 32,
+          "usageScore": 34,
           "configuration": [],
           "fragment": "wasm-index--ConversionResult"
         },
@@ -466,8 +486,9 @@
           "errors": ["No documented errors are declared for dealloc_bytes."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for dealloc_bytes.",
           "examples": [
-            "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }));\nconst inputId = wasm.alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json);\n\nconst encoded = wasm.json_to_msgpack(inputId, json.length);\nif (encoded.id === 0) {\n  wasm.dealloc_bytes(inputId);\n  throw new Error(encoded.error);\n}\nconst packed = new Uint8Array(\n  wasm.memory.buffer,\n  wasm.ptr_of(encoded.id),\n  encoded.len\n).slice();\nwasm.dealloc_bytes(inputId);\nwasm.dealloc_bytes(encoded.id);",
-            "const wasm = await init();\nconst input = alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json);\n\nconst result = json_to_msgpack(input, json.length);\nif (result.id === 0) throw new Error(result.error);\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice();\n\ndealloc_bytes(input);\ndealloc_bytes(result.id);"
+            "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }))\nconst inputId = wasm.alloc_bytes(json.length)\nnew Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json)\n\nconst encoded = wasm.json_to_msgpack(inputId, json.length)\nif (encoded.id === 0) {\n  wasm.dealloc_bytes(inputId)\n  throw new Error(encoded.error)\n}\nconst packed = new Uint8Array(wasm.memory.buffer, wasm.ptr_of(encoded.id), encoded.len).slice()\nwasm.dealloc_bytes(inputId)\nwasm.dealloc_bytes(encoded.id)",
+            "const wasm = await init()\nconst input = alloc_bytes(json.length)\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json)\n\nconst result = json_to_msgpack(input, json.length)\nif (result.id === 0) throw new Error(result.error)\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n\ndealloc_bytes(input)\ndealloc_bytes(result.id)",
+            "import init, { alloc_bytes, dealloc_bytes, json_to_msgpack, ptr_of } from '@migaia/wasm'\n\nconst wasm = await init()\n\nfunction writeJson(value: unknown): { id: number; length: number } {\n  const bytes = new TextEncoder().encode(JSON.stringify(value))\n  const id = alloc_bytes(bytes.length)\n  if (id === 0) throw new Error('WASM arena allocation failed')\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  return { id, length: bytes.length }\n}\n\nconst firstInput = writeJson({ id: 1, status: 'ready' })\nconst secondInput = writeJson({ id: 2, status: 'queued' })\nconst outputIds: number[] = []\n\ntry {\n  const first = json_to_msgpack(firstInput.id, firstInput.length)\n  const second = json_to_msgpack(secondInput.id, secondInput.length)\n  for (const result of [first, second]) {\n    if (result.id === 0) throw new Error(result.error)\n    outputIds.push(result.id)\n    const ownedCopy = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log(ownedCopy.byteLength)\n  }\n} finally {\n  dealloc_bytes(firstInput.id)\n  dealloc_bytes(secondInput.id)\n  for (const id of outputIds) dealloc_bytes(id)\n}"
           ],
           "exportPath": ".",
           "overloadSignatures": ["export function dealloc_bytes(id: number): boolean;"],
@@ -518,7 +539,7 @@
           "declaredConfiguration": [],
           "identity": "packages/wasm/src/wasm_provider.d.ts:dealloc_bytes:export function dealloc_bytes(id: number): boolean;",
           "guidance": [],
-          "usageScore": 36,
+          "usageScore": 50,
           "configuration": [],
           "fragment": "wasm-index--dealloc_bytes"
         },
@@ -667,7 +688,7 @@
           "errors": ["No documented errors are declared for initSync."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for initSync.",
           "examples": [
-            "import init, { initSync } from '@migaia/wasm';\n\nconst wasm = await init();\n// 或：const wasm = initSync(moduleOrBytes);"
+            "import init, { initSync } from '@migaia/wasm'\n\nconst wasm = await init()\n// 或：const wasm = initSync(moduleOrBytes);"
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -751,8 +772,9 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for json_to_msgpack.",
           "examples": [
             "type ConversionResult = {\n  readonly id: number;\n  readonly len: number;\n  readonly error: string;\n};\n\njson_to_msgpack(id: number, len: number): ConversionResult;\nmsgpack_to_json(id: number, len: number): ConversionResult;",
-            "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }));\nconst inputId = wasm.alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json);\n\nconst encoded = wasm.json_to_msgpack(inputId, json.length);\nif (encoded.id === 0) {\n  wasm.dealloc_bytes(inputId);\n  throw new Error(encoded.error);\n}\nconst packed = new Uint8Array(\n  wasm.memory.buffer,\n  wasm.ptr_of(encoded.id),\n  encoded.len\n).slice();\nwasm.dealloc_bytes(inputId);\nwasm.dealloc_bytes(encoded.id);",
-            "const wasm = await init();\nconst input = alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json);\n\nconst result = json_to_msgpack(input, json.length);\nif (result.id === 0) throw new Error(result.error);\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice();\n\ndealloc_bytes(input);\ndealloc_bytes(result.id);"
+            "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }))\nconst inputId = wasm.alloc_bytes(json.length)\nnew Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json)\n\nconst encoded = wasm.json_to_msgpack(inputId, json.length)\nif (encoded.id === 0) {\n  wasm.dealloc_bytes(inputId)\n  throw new Error(encoded.error)\n}\nconst packed = new Uint8Array(wasm.memory.buffer, wasm.ptr_of(encoded.id), encoded.len).slice()\nwasm.dealloc_bytes(inputId)\nwasm.dealloc_bytes(encoded.id)",
+            "const wasm = await init()\nconst input = alloc_bytes(json.length)\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json)\n\nconst result = json_to_msgpack(input, json.length)\nif (result.id === 0) throw new Error(result.error)\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n\ndealloc_bytes(input)\ndealloc_bytes(result.id)",
+            "import init, { alloc_bytes, dealloc_bytes, json_to_msgpack, ptr_of } from '@migaia/wasm'\n\nconst wasm = await init()\n\nfunction writeJson(value: unknown): { id: number; length: number } {\n  const bytes = new TextEncoder().encode(JSON.stringify(value))\n  const id = alloc_bytes(bytes.length)\n  if (id === 0) throw new Error('WASM arena allocation failed')\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  return { id, length: bytes.length }\n}\n\nconst firstInput = writeJson({ id: 1, status: 'ready' })\nconst secondInput = writeJson({ id: 2, status: 'queued' })\nconst outputIds: number[] = []\n\ntry {\n  const first = json_to_msgpack(firstInput.id, firstInput.length)\n  const second = json_to_msgpack(secondInput.id, secondInput.length)\n  for (const result of [first, second]) {\n    if (result.id === 0) throw new Error(result.error)\n    outputIds.push(result.id)\n    const ownedCopy = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log(ownedCopy.byteLength)\n  }\n} finally {\n  dealloc_bytes(firstInput.id)\n  dealloc_bytes(secondInput.id)\n  for (const id of outputIds) dealloc_bytes(id)\n}"
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -810,7 +832,7 @@
           "declaredConfiguration": [],
           "identity": "packages/wasm/src/wasm_provider.d.ts:json_to_msgpack:export function json_to_msgpack(id: number, len: number): ConversionResult;",
           "guidance": [],
-          "usageScore": 26,
+          "usageScore": 38,
           "configuration": [],
           "fragment": "wasm-index--json_to_msgpack"
         },
@@ -923,8 +945,9 @@
           "errors": ["No documented errors are declared for ptr_of."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ptr_of.",
           "examples": [
-            "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }));\nconst inputId = wasm.alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json);\n\nconst encoded = wasm.json_to_msgpack(inputId, json.length);\nif (encoded.id === 0) {\n  wasm.dealloc_bytes(inputId);\n  throw new Error(encoded.error);\n}\nconst packed = new Uint8Array(\n  wasm.memory.buffer,\n  wasm.ptr_of(encoded.id),\n  encoded.len\n).slice();\nwasm.dealloc_bytes(inputId);\nwasm.dealloc_bytes(encoded.id);",
-            "const wasm = await init();\nconst input = alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json);\n\nconst result = json_to_msgpack(input, json.length);\nif (result.id === 0) throw new Error(result.error);\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice();\n\ndealloc_bytes(input);\ndealloc_bytes(result.id);"
+            "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }))\nconst inputId = wasm.alloc_bytes(json.length)\nnew Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json)\n\nconst encoded = wasm.json_to_msgpack(inputId, json.length)\nif (encoded.id === 0) {\n  wasm.dealloc_bytes(inputId)\n  throw new Error(encoded.error)\n}\nconst packed = new Uint8Array(wasm.memory.buffer, wasm.ptr_of(encoded.id), encoded.len).slice()\nwasm.dealloc_bytes(inputId)\nwasm.dealloc_bytes(encoded.id)",
+            "const wasm = await init()\nconst input = alloc_bytes(json.length)\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json)\n\nconst result = json_to_msgpack(input, json.length)\nif (result.id === 0) throw new Error(result.error)\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n\ndealloc_bytes(input)\ndealloc_bytes(result.id)",
+            "import init, { alloc_bytes, dealloc_bytes, json_to_msgpack, ptr_of } from '@migaia/wasm'\n\nconst wasm = await init()\n\nfunction writeJson(value: unknown): { id: number; length: number } {\n  const bytes = new TextEncoder().encode(JSON.stringify(value))\n  const id = alloc_bytes(bytes.length)\n  if (id === 0) throw new Error('WASM arena allocation failed')\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  return { id, length: bytes.length }\n}\n\nconst firstInput = writeJson({ id: 1, status: 'ready' })\nconst secondInput = writeJson({ id: 2, status: 'queued' })\nconst outputIds: number[] = []\n\ntry {\n  const first = json_to_msgpack(firstInput.id, firstInput.length)\n  const second = json_to_msgpack(secondInput.id, secondInput.length)\n  for (const result of [first, second]) {\n    if (result.id === 0) throw new Error(result.error)\n    outputIds.push(result.id)\n    const ownedCopy = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log(ownedCopy.byteLength)\n  }\n} finally {\n  dealloc_bytes(firstInput.id)\n  dealloc_bytes(secondInput.id)\n  for (const id of outputIds) dealloc_bytes(id)\n}"
           ],
           "exportPath": ".",
           "overloadSignatures": ["export function ptr_of(id: number): number;"],
@@ -975,7 +998,7 @@
           "declaredConfiguration": [],
           "identity": "packages/wasm/src/wasm_provider.d.ts:ptr_of:export function ptr_of(id: number): number;",
           "guidance": [],
-          "usageScore": 32,
+          "usageScore": 44,
           "configuration": [],
           "fragment": "wasm-index--ptr_of"
         },

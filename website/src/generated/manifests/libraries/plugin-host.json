@@ -3,8 +3,8 @@
   "library": {
     "slug": "plugin-host",
     "description": "Runtime-neutral plugin lifecycle, extension and pipeline host for Node.js, Bun, browsers and workers.",
-    "version": "0.0.5",
-    "exports": [".", "./defined", "./structural"],
+    "version": "0.0.6",
+    "exports": [".", "./composition", "./defined", "./structural"],
     "documentation": {
       "readme": {
         "sections": [
@@ -43,7 +43,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "包只公开根入口 `@migaia/plugin-host`：`PluginHost`、插件/配置/pipeline 类型、状态常量、错误码与错误类、pipeline 适配器、`GENERATOR_*` 信号量、dispose symbol 均从这里导入。没有稳定的深层子路径；不要依赖 `src`/`dist` 内部文件。"
+                "text": "包公开根入口 `@migaia/plugin-host`，另有稳定的 `@migaia/plugin-host/composition` 子路径。根入口 提供 `PluginHost`、插件/配置/pipeline 类型、状态常量、错误码与错误类、pipeline 适配器、 `GENERATOR_*` 信号量与 dispose symbol；composition 子路径仅提供 opaque `IRegistrationToken`、`IRegistrationView<TPlugin>` 与 `createView(token)`。不要依赖 `src`/`dist` 内部文件，也不要把 composition view 当成 Host mutation/config/shared 能力。"
               }
             ]
           },
@@ -439,8 +439,8 @@
             ]
           },
           {
-            "id": "1-带配置-shared-能力-失败回滚的完整插件组合",
-            "heading": "1. 带配置、shared 能力、失败回滚的完整插件组合",
+            "id": "高阶组合示例-1-带配置-shared-能力-失败回滚的完整插件组合",
+            "heading": "高阶组合示例 · 1. 带配置、shared 能力、失败回滚的完整插件组合",
             "blocks": [
               {
                 "type": "code",
@@ -450,8 +450,8 @@
             ]
           },
           {
-            "id": "2-async-pipeline-做请求耗时统计-洋葱模型的-前置-后置",
-            "heading": "2. async pipeline 做请求耗时统计（洋葱模型的\"前置 + 后置\"）",
+            "id": "高阶组合示例-2-async-pipeline-做请求耗时统计-洋葱模型的-前置-后置",
+            "heading": "高阶组合示例 · 2. async pipeline 做请求耗时统计（洋葱模型的\"前置 + 后置\"）",
             "blocks": [
               {
                 "type": "code",
@@ -461,8 +461,8 @@
             ]
           },
           {
-            "id": "3-用-diagnostic-自定义队列-清理超时观测宿主内部行为",
-            "heading": "3. 用 diagnostic + 自定义队列/清理超时观测宿主内部行为",
+            "id": "高阶组合示例-3-用-diagnostic-自定义队列-清理超时观测宿主内部行为",
+            "heading": "高阶组合示例 · 3. 用 diagnostic + 自定义队列/清理超时观测宿主内部行为",
             "blocks": [
               {
                 "type": "code",
@@ -472,8 +472,8 @@
             ]
           },
           {
-            "id": "4-优雅降级-安装失败时读出真实原因与回滚详情",
-            "heading": "4. 优雅降级：安装失败时读出真实原因与回滚详情",
+            "id": "高阶组合示例-4-优雅降级-安装失败时读出真实原因与回滚详情",
+            "heading": "高阶组合示例 · 4. 优雅降级：安装失败时读出真实原因与回滚详情",
             "blocks": [
               {
                 "type": "code",
@@ -483,8 +483,8 @@
             ]
           },
           {
-            "id": "5-generator-pipeline-用-generator-halt-提前截断处理链",
-            "heading": "5. generator pipeline：用 GENERATOR_HALT 提前截断处理链",
+            "id": "高阶组合示例-5-generator-pipeline-用-generator-halt-提前截断处理链",
+            "heading": "高阶组合示例 · 5. generator pipeline：用 GENERATOR_HALT 提前截断处理链",
             "blocks": [
               {
                 "type": "code",
@@ -494,8 +494,8 @@
             ]
           },
           {
-            "id": "6-async-generator-串行异步处理-host-中途-dispose-自动止损",
-            "heading": "6. Async-generator：串行异步处理 + host 中途 dispose 自动止损",
+            "id": "高阶组合示例-6-async-generator-串行异步处理-host-中途-dispose-自动止损",
+            "heading": "高阶组合示例 · 6. Async-generator：串行异步处理 + host 中途 dispose 自动止损",
             "blocks": [
               {
                 "type": "code",
@@ -509,8 +509,8 @@
             ]
           },
           {
-            "id": "7-async-generator-多-stage-链式处理-复用已有的同步-generator-stage",
-            "heading": "7. Async-generator 多 stage 链式处理，复用已有的同步 generator stage",
+            "id": "高阶组合示例-7-async-generator-多-stage-链式处理-复用已有的同步-generator-stage",
+            "heading": "高阶组合示例 · 7. Async-generator 多 stage 链式处理，复用已有的同步 generator stage",
             "blocks": [
               {
                 "type": "code",
@@ -1442,6 +1442,25 @@
                 "text": "Q：`host.dispose()` 卡住不 resolve。 先检查是否存在某个 disposer 反过来 `await` 了触发它的这次 `dispose()` 调用——这是循环等待，见 §8。默认情况下 `disposeStepTimeoutMs` 是 5000ms，超时后这一步会被计为 `DISPOSE_STEP_TIMEOUT` 失败并继续推进，最终仍会收敛到 `disposed`；如果 `dispose()` 迟迟不 resolve，检查是否传了 `disposeStepTimeoutMs: false`（永久等待，不会强制推进）。"
               }
             ]
+          },
+          {
+            "id": "composition-registration-view",
+            "heading": "Composition registration view",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`@migaia/plugin-host/composition` 是独立的 composition 子路径："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import {\n  createView,\n  type IRegistrationToken,\n  type IRegistrationView\n} from '@migaia/plugin-host/composition'"
+              },
+              {
+                "type": "paragraph",
+                "text": "`createView(token)` 只发布该 exact registration 的 extensions。token 是 opaque identity，foreign 或已撤销 token 会 fail closed；view 不包含 Host、config、shared 或 mutation 能力。历史 `IPluginRegistrationReceipt` 仍是 deprecated 的 `IRegistrationToken` 类型别名，保持编译兼容。"
+              }
+            ]
           }
         ]
       }
@@ -1729,6 +1748,69 @@
           "usageScore": 30,
           "configuration": [],
           "fragment": "plugin-host-index--adaptSyncStageToGenerator"
+        },
+        {
+          "name": "createRegistrationView",
+          "kind": "const",
+          "signature": "export declare const createRegistrationView: (receipt: IPluginRegistrationReceipt) => Readonly<{ readonly extensions: Readonly<Record<PropertyKey, unknown>>; }>;",
+          "declarationLine": 57,
+          "source": "packages/plugin-host/dist/composition.d.ts",
+          "purpose": "Creates a narrow extension-only view for one live registration token.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRegistrationView.",
+          "advanced": "No additional advanced behavior is declared for createRegistrationView.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for createRegistrationView."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRegistrationView.",
+          "examples": [],
+          "aliasOf": "createRegistrationView",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const createRegistrationView: (receipt: IPluginRegistrationReceipt) => Readonly<{ readonly extensions: Readonly<Record<PropertyKey, unknown>>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use createRegistrationView when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createRegistrationView does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Creates a narrow extension-only view for one live registration token."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createRegistrationView from @migaia/plugin-host, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createRegistrationView when its const contract and declared inputs match the result you need. Choose a different public symbol when createRegistrationView does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRegistrationView."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createRegistrationView."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/plugin-host/dist/composition.d.ts:createRegistrationView:export declare const createRegistrationView: (receipt: IPluginRegistrationReceipt) => Readonly<{ readonly extensions: Readonly<Record<PropertyKey, unknown>>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "plugin-host-index--createRegistrationView"
         },
         {
           "name": "IAsyncGeneratorPipelineStage",
@@ -2854,8 +2936,8 @@
               ]
             },
             {
-              "id": "1-带配置-shared-能力-失败回滚的完整插件组合",
-              "heading": "1. 带配置、shared 能力、失败回滚的完整插件组合",
+              "id": "高阶组合示例-1-带配置-shared-能力-失败回滚的完整插件组合",
+              "heading": "高阶组合示例 · 1. 带配置、shared 能力、失败回滚的完整插件组合",
               "blocks": [
                 {
                   "type": "code",
@@ -3060,7 +3142,7 @@
           "name": "IPluginBatchRemovalLeaf",
           "kind": "type",
           "signature": "export type IPluginBatchRemovalLeaf = Readonly<{ readonly receipt: IPluginRegistrationReceipt; readonly name: string; readonly cleanupComplete: boolean; readonly cleanupErrors: readonly unknown[]; readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>; }>;",
-          "declarationLine": 291,
+          "declarationLine": 299,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Result of one prepared batch removal, preserving the Host dynamic-view contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginBatchRemovalLeaf.",
@@ -3123,7 +3205,7 @@
           "name": "IPluginBatchRemovalOptions",
           "kind": "type",
           "signature": "export type IPluginBatchRemovalOptions = Readonly<{ readonly beforeCleanup?: PromiseLike<void>; }>;",
-          "declarationLine": 287,
+          "declarationLine": 295,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Canonical fence supplied by Graph before Host physical cleanup begins.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginBatchRemovalOptions.",
@@ -3186,7 +3268,7 @@
           "name": "IPluginBatchRemovalResult",
           "kind": "type",
           "signature": "export type IPluginBatchRemovalResult<TView> = Readonly<{ readonly ok: boolean; readonly committed: true; readonly view: TView; readonly leaves: readonly IPluginBatchRemovalLeaf[]; readonly cleanupComplete: boolean; readonly cleanupErrors: readonly unknown[]; readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>; }>;",
-          "declarationLine": 299,
+          "declarationLine": 307,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Aggregate result for one all-or-nothing prepared removal commit.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginBatchRemovalResult.",
@@ -3502,7 +3584,7 @@
           "name": "IPluginHostCompositionIntegration",
           "kind": "type",
           "signature": "export type IPluginHostCompositionIntegration<THost> = Readonly<{ readonly revision: number; getCurrentView(): IPluginHostDynamicView<THost>; createPluginAdmission<TPlugin extends IPluginConstraint<any>>(plugin: TPlugin): IPluginAdmission<TPlugin>; createDataOrderSlot(name: string): IPluginDataOrderSlot; prepareAdmissions(requestsInPublicationOrder: readonly IPluginAdmissionRequest[]): Promise<IPluginPreparedAdmissions>; commitPreparedAdmissions(prepared: IPluginPreparedAdmissions): readonly IPluginRegistrationReceipt[]; discardPreparedAdmissions(prepared: IPluginPreparedAdmissions): Promise<IPluginHostPhysicalCleanupResult>; retireDataOrderSlot(slot: IPluginDataOrderSlot): void; prepareUnUseBatch(receiptsInCleanupOrder: readonly IPluginRegistrationReceipt[]): IPluginPreparedRemovalBatch; commitPreparedUnUseBatch<TView>(prepared: IPluginPreparedRemovalBatch, options: IPluginBatchRemovalOptions): Promise<IPluginBatchRemovalResult<TView>>; }>;",
-          "declarationLine": 309,
+          "declarationLine": 317,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Host-owned integration used by a composition owner to perform total batch publication.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostCompositionIntegration.",
@@ -4963,7 +5045,7 @@
           "name": "IPluginPreparedRemovalBatch",
           "kind": "type",
           "signature": "export type IPluginPreparedRemovalBatch = object;",
-          "declarationLine": 285,
+          "declarationLine": 293,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Opaque exact registration batch prepared for logical removal.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginPreparedRemovalBatch.",
@@ -5086,10 +5168,10 @@
         {
           "name": "IPluginRegistrationReceipt",
           "kind": "type",
-          "signature": "export type IPluginRegistrationReceipt = object;",
-          "declarationLine": 283,
+          "signature": "export type IPluginRegistrationReceipt<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = IRegistrationToken<TPlugin>;",
+          "declarationLine": 287,
           "source": "packages/plugin-host/dist/typing.d.ts",
-          "purpose": "Opaque exact registration receipt returned at prepared admission commit.",
+          "purpose": "@deprecated Use IRegistrationToken from `@migaia/plugin-host/composition`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginRegistrationReceipt.",
           "advanced": "No additional advanced behavior is declared for IPluginRegistrationReceipt.",
           "parameters": ["This type declaration has no parameters."],
@@ -5100,7 +5182,9 @@
           "examples": [],
           "aliasOf": "IPluginRegistrationReceipt",
           "exportPath": ".",
-          "overloadSignatures": ["export type IPluginRegistrationReceipt = object;"],
+          "overloadSignatures": [
+            "export type IPluginRegistrationReceipt<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = IRegistrationToken<TPlugin>;"
+          ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "Use IPluginRegistrationReceipt when its type contract and declared inputs match the result you need.",
@@ -5109,7 +5193,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Opaque exact registration receipt returned at prepared admission commit."
+              "content": "@deprecated Use IRegistrationToken from `@migaia/plugin-host/composition`."
             },
             {
               "id": "getting-started",
@@ -5138,9 +5222,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginRegistrationReceipt:export type IPluginRegistrationReceipt = object;",
+          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginRegistrationReceipt:export type IPluginRegistrationReceipt<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = IRegistrationToken<TPlugin>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [],
           "fragment": "plugin-host-index--IPluginRegistrationReceipt"
         },
@@ -5758,8 +5842,8 @@
               ]
             },
             {
-              "id": "1-带配置-shared-能力-失败回滚的完整插件组合",
-              "heading": "1. 带配置、shared 能力、失败回滚的完整插件组合",
+              "id": "高阶组合示例-1-带配置-shared-能力-失败回滚的完整插件组合",
+              "heading": "高阶组合示例 · 1. 带配置、shared 能力、失败回滚的完整插件组合",
               "blocks": [
                 {
                   "type": "code",
@@ -6321,6 +6405,26 @@
           "ownerFragment": "plugin-host-structural--IPluginHostOptions"
         },
         {
+          "identity": "packages/plugin-host/dist/typing.d.ts:IRegistrationToken:export type IRegistrationToken<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = object & Readonly<{ readonly __plugin?: TPlugin; }>;",
+          "name": "IRegistrationToken",
+          "signature": "export type IRegistrationToken<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = object & Readonly<{ readonly __plugin?: TPlugin; }>;",
+          "source": "packages/plugin-host/dist/typing.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./composition",
+          "ownerModule": "composition",
+          "ownerFragment": "plugin-host-composition--IRegistrationToken"
+        },
+        {
+          "identity": "packages/plugin-host/dist/typing.d.ts:IRegistrationView:export type IRegistrationView<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = Readonly<{ readonly extensions: Readonly<IExtractPluginExt<TPlugin>>; }>;",
+          "name": "IRegistrationView",
+          "signature": "export type IRegistrationView<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = Readonly<{ readonly extensions: Readonly<IExtractPluginExt<TPlugin>>; }>;",
+          "source": "packages/plugin-host/dist/typing.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./composition",
+          "ownerModule": "composition",
+          "ownerFragment": "plugin-host-composition--IRegistrationView"
+        },
+        {
           "identity": "packages/plugin-host/dist/typing.d.ts:ISetupHostOptions:export type ISetupHostOptions<TCore extends object, TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[], TValue = never> = Readonly<{ readonly host: IPluginHostOptions; readonly setupTimeoutMs: number | false; readonly signal?: IAbortSignal; readonly core: (context: IHostSetupContext) => IPluginAwaitable<TCore>; readonly plugins?: TPlugins; }>;",
           "name": "ISetupHostOptions",
           "signature": "export type ISetupHostOptions<TCore extends object, TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[], TValue = never> = Readonly<{ readonly host: IPluginHostOptions; readonly setupTimeoutMs: number | false; readonly signal?: IAbortSignal; readonly core: (context: IHostSetupContext) => IPluginAwaitable<TCore>; readonly plugins?: TPlugins; }>;",
@@ -6401,6 +6505,219 @@
           "ownerFragment": "plugin-host-defined--setupHost"
         }
       ]
+    },
+    {
+      "id": "plugin-host:composition",
+      "library": "plugin-host",
+      "module": "composition",
+      "exportPath": "./composition",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/plugin-host/getting-started",
+      "architecturePath": "/en/architecture/plugin-host",
+      "symbols": [
+        {
+          "name": "createView",
+          "kind": "const",
+          "signature": "export declare const createView: <TPlugin extends IPluginConstraint<any>>(token: IRegistrationToken<TPlugin>) => IRegistrationView<TPlugin>;",
+          "declarationLine": 3,
+          "source": "packages/plugin-host/dist/composition-entry.d.ts",
+          "purpose": "Publishes only the exact live registration extensions carried by `token`.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createView.",
+          "advanced": "No additional advanced behavior is declared for createView.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for createView."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createView.",
+          "examples": [
+            "import {\n  createView,\n  type IRegistrationToken,\n  type IRegistrationView\n} from '@migaia/plugin-host/composition'"
+          ],
+          "exportPath": "./composition",
+          "overloadSignatures": [
+            "export declare const createView: <TPlugin extends IPluginConstraint<any>>(token: IRegistrationToken<TPlugin>) => IRegistrationView<TPlugin>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use createView when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createView does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Publishes only the exact live registration extensions carried by `token`."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createView from @migaia/plugin-host/composition, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createView when its const contract and declared inputs match the result you need. Choose a different public symbol when createView does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createView."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createView."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/plugin-host/dist/composition-entry.d.ts:createView:export declare const createView: <TPlugin extends IPluginConstraint<any>>(token: IRegistrationToken<TPlugin>) => IRegistrationView<TPlugin>;",
+          "guidance": [],
+          "usageScore": 16,
+          "configuration": [],
+          "fragment": "plugin-host-composition--createView"
+        },
+        {
+          "name": "IRegistrationToken",
+          "kind": "type",
+          "signature": "export type IRegistrationToken<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = object & Readonly<{ readonly __plugin?: TPlugin; }>;",
+          "declarationLine": 283,
+          "source": "packages/plugin-host/dist/typing.d.ts",
+          "purpose": "Canonical name for the opaque token accepted by composition publication.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRegistrationToken.",
+          "advanced": "No additional advanced behavior is declared for IRegistrationToken.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRegistrationToken."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRegistrationToken.",
+          "examples": [
+            "import {\n  createView,\n  type IRegistrationToken,\n  type IRegistrationView\n} from '@migaia/plugin-host/composition'"
+          ],
+          "aliasOf": "IRegistrationToken",
+          "exportPath": "./composition",
+          "overloadSignatures": [
+            "export type IRegistrationToken<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = object & Readonly<{ readonly __plugin?: TPlugin; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRegistrationToken when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRegistrationToken does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Canonical name for the opaque token accepted by composition publication."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRegistrationToken from @migaia/plugin-host/composition, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRegistrationToken when its type contract and declared inputs match the result you need. Choose a different public symbol when IRegistrationToken does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRegistrationToken."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRegistrationToken."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/plugin-host/dist/typing.d.ts:IRegistrationToken:export type IRegistrationToken<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = object & Readonly<{ readonly __plugin?: TPlugin; }>;",
+          "guidance": [],
+          "usageScore": 16,
+          "configuration": [],
+          "fragment": "plugin-host-composition--IRegistrationToken"
+        },
+        {
+          "name": "IRegistrationView",
+          "kind": "type",
+          "signature": "export type IRegistrationView<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = Readonly<{ readonly extensions: Readonly<IExtractPluginExt<TPlugin>>; }>;",
+          "declarationLine": 289,
+          "source": "packages/plugin-host/dist/typing.d.ts",
+          "purpose": "Narrow extension-only view for one live registration token.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRegistrationView.",
+          "advanced": "No additional advanced behavior is declared for IRegistrationView.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRegistrationView."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRegistrationView.",
+          "examples": [
+            "import {\n  createView,\n  type IRegistrationToken,\n  type IRegistrationView\n} from '@migaia/plugin-host/composition'"
+          ],
+          "aliasOf": "IRegistrationView",
+          "exportPath": "./composition",
+          "overloadSignatures": [
+            "export type IRegistrationView<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = Readonly<{ readonly extensions: Readonly<IExtractPluginExt<TPlugin>>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRegistrationView when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRegistrationView does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Narrow extension-only view for one live registration token."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRegistrationView from @migaia/plugin-host/composition, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRegistrationView when its type contract and declared inputs match the result you need. Choose a different public symbol when IRegistrationView does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRegistrationView."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRegistrationView."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/plugin-host/dist/typing.d.ts:IRegistrationView:export type IRegistrationView<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = Readonly<{ readonly extensions: Readonly<IExtractPluginExt<TPlugin>>; }>;",
+          "guidance": [],
+          "usageScore": 12,
+          "configuration": [],
+          "fragment": "plugin-host-composition--IRegistrationView"
+        }
+      ],
+      "aliases": []
     },
     {
       "id": "plugin-host:defined",
@@ -9102,8 +9419,8 @@
               ]
             },
             {
-              "id": "1-带配置-shared-能力-失败回滚的完整插件组合",
-              "heading": "1. 带配置、shared 能力、失败回滚的完整插件组合",
+              "id": "高阶组合示例-1-带配置-shared-能力-失败回滚的完整插件组合",
+              "heading": "高阶组合示例 · 1. 带配置、shared 能力、失败回滚的完整插件组合",
               "blocks": [
                 {
                   "type": "code",

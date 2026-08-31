@@ -3,7 +3,7 @@
   "library": {
     "slug": "serialize",
     "description": "Store-neutral chunked serialization and codec registry.",
-    "version": "0.0.2",
+    "version": "0.0.4",
     "exports": [".", "./core", "./plugins", "./registry"],
     "documentation": {
       "readme": {
@@ -288,8 +288,8 @@
             ]
           },
           {
-            "id": "1-大数据导出-分片编码-协作式取消-错误定位",
-            "heading": "1. 大数据导出：分片编码 + 协作式取消 + 错误定位",
+            "id": "高阶组合示例-1-大数据导出-分片编码-协作式取消-错误定位",
+            "heading": "高阶组合示例 · 1. 大数据导出：分片编码 + 协作式取消 + 错误定位",
             "blocks": [
               {
                 "type": "code",
@@ -299,8 +299,8 @@
             ]
           },
           {
-            "id": "2-多格式共存-新旧存档平滑迁移",
-            "heading": "2. 多格式共存：新旧存档平滑迁移",
+            "id": "高阶组合示例-2-多格式共存-新旧存档平滑迁移",
+            "heading": "高阶组合示例 · 2. 多格式共存：新旧存档平滑迁移",
             "blocks": [
               {
                 "type": "code",
@@ -310,8 +310,8 @@
             ]
           },
           {
-            "id": "3-二进制走文本通道-编码-base64-带截止时间释放",
-            "heading": "3. 二进制走文本通道：编码 + Base64 + 带截止时间释放",
+            "id": "高阶组合示例-3-二进制走文本通道-编码-base64-带截止时间释放",
+            "heading": "高阶组合示例 · 3. 二进制走文本通道：编码 + Base64 + 带截止时间释放",
             "blocks": [
               {
                 "type": "code",
@@ -321,8 +321,8 @@
             ]
           },
           {
-            "id": "4-自定义-parser-接入-安全的-type-校验",
-            "heading": "4. 自定义 parser 接入 + 安全的 type 校验",
+            "id": "高阶组合示例-4-自定义-parser-接入-安全的-type-校验",
+            "heading": "高阶组合示例 · 4. 自定义 parser 接入 + 安全的 type 校验",
             "blocks": [
               {
                 "type": "code",
@@ -1893,7 +1893,7 @@
         {
           "name": "SerializeChunkKind",
           "kind": "const",
-          "signature": "export declare const SerializeChunkKind: { readonly value: 'value'; readonly text: 'text'; readonly bytes: 'bytes'; };",
+          "signature": "export declare const SerializeChunkKind: { readonly value: \"value\"; readonly text: \"text\"; readonly bytes: \"bytes\"; };",
           "declarationLine": 2,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Canonical serialized chunk kinds.",
@@ -1913,7 +1913,7 @@
           "aliasOf": "SerializeChunkKind",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SerializeChunkKind: { readonly value: 'value'; readonly text: 'text'; readonly bytes: 'bytes'; };"
+            "export declare const SerializeChunkKind: { readonly value: \"value\"; readonly text: \"text\"; readonly bytes: \"bytes\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1952,7 +1952,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/format-constants.d.ts:SerializeChunkKind:export declare const SerializeChunkKind: { readonly value: 'value'; readonly text: 'text'; readonly bytes: 'bytes'; };",
+          "identity": "packages/serialize/dist/format-constants.d.ts:SerializeChunkKind:export declare const SerializeChunkKind: { readonly value: \"value\"; readonly text: \"text\"; readonly bytes: \"bytes\"; };",
           "guidance": [],
           "usageScore": 62,
           "configuration": [],
@@ -1961,7 +1961,7 @@
         {
           "name": "SerializeCleanupKind",
           "kind": "const",
-          "signature": "export declare const SerializeCleanupKind: { readonly cleanupError: 'cleanup-error'; readonly drainTimeout: 'drain-timeout'; };",
+          "signature": "export declare const SerializeCleanupKind: { readonly cleanupError: \"cleanup-error\"; readonly drainTimeout: \"drain-timeout\"; };",
           "declarationLine": 23,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "SerializeCleanupKind is part of this module's public const contract.",
@@ -1979,7 +1979,7 @@
           "aliasOf": "SerializeCleanupKind",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SerializeCleanupKind: { readonly cleanupError: 'cleanup-error'; readonly drainTimeout: 'drain-timeout'; };"
+            "export declare const SerializeCleanupKind: { readonly cleanupError: \"cleanup-error\"; readonly drainTimeout: \"drain-timeout\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2018,7 +2018,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/format-constants.d.ts:SerializeCleanupKind:export declare const SerializeCleanupKind: { readonly cleanupError: 'cleanup-error'; readonly drainTimeout: 'drain-timeout'; };",
+          "identity": "packages/serialize/dist/format-constants.d.ts:SerializeCleanupKind:export declare const SerializeCleanupKind: { readonly cleanupError: \"cleanup-error\"; readonly drainTimeout: \"drain-timeout\"; };",
           "guidance": [],
           "usageScore": 24,
           "configuration": [],
@@ -2027,7 +2027,7 @@
         {
           "name": "SerializeCleanupPolicy",
           "kind": "const",
-          "signature": "export declare const SerializeCleanupPolicy: { readonly throw: 'throw'; readonly report: 'report'; };",
+          "signature": "export declare const SerializeCleanupPolicy: { readonly throw: \"throw\"; readonly report: \"report\"; };",
           "declarationLine": 19,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Cleanup policies and diagnostic kinds used by the serializer registry.",
@@ -2045,7 +2045,7 @@
           "aliasOf": "SerializeCleanupPolicy",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SerializeCleanupPolicy: { readonly throw: 'throw'; readonly report: 'report'; };"
+            "export declare const SerializeCleanupPolicy: { readonly throw: \"throw\"; readonly report: \"report\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2084,7 +2084,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/format-constants.d.ts:SerializeCleanupPolicy:export declare const SerializeCleanupPolicy: { readonly throw: 'throw'; readonly report: 'report'; };",
+          "identity": "packages/serialize/dist/format-constants.d.ts:SerializeCleanupPolicy:export declare const SerializeCleanupPolicy: { readonly throw: \"throw\"; readonly report: \"report\"; };",
           "guidance": [],
           "usageScore": 24,
           "configuration": [],
@@ -2093,7 +2093,7 @@
         {
           "name": "SerializeOutput",
           "kind": "const",
-          "signature": "export declare const SerializeOutput: { readonly text: 'text'; readonly structured: 'structured'; readonly binary: 'binary'; };",
+          "signature": "export declare const SerializeOutput: { readonly text: \"text\"; readonly structured: \"structured\"; readonly binary: \"binary\"; };",
           "declarationLine": 8,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Codec output representations used by serializers and persistence adapters.",
@@ -2111,7 +2111,7 @@
           "aliasOf": "SerializeOutput",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SerializeOutput: { readonly text: 'text'; readonly structured: 'structured'; readonly binary: 'binary'; };"
+            "export declare const SerializeOutput: { readonly text: \"text\"; readonly structured: \"structured\"; readonly binary: \"binary\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2150,7 +2150,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/format-constants.d.ts:SerializeOutput:export declare const SerializeOutput: { readonly text: 'text'; readonly structured: 'structured'; readonly binary: 'binary'; };",
+          "identity": "packages/serialize/dist/format-constants.d.ts:SerializeOutput:export declare const SerializeOutput: { readonly text: \"text\"; readonly structured: \"structured\"; readonly binary: \"binary\"; };",
           "guidance": [],
           "usageScore": 24,
           "configuration": [],
@@ -2159,7 +2159,7 @@
         {
           "name": "SerializePhase",
           "kind": "const",
-          "signature": "export declare const SerializePhase: { readonly encode: 'encode'; readonly decode: 'decode'; };",
+          "signature": "export declare const SerializePhase: { readonly encode: \"encode\"; readonly decode: \"decode\"; };",
           "declarationLine": 14,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Instrumentation phases emitted while encoding or decoding.",
@@ -2177,7 +2177,7 @@
           "aliasOf": "SerializePhase",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SerializePhase: { readonly encode: 'encode'; readonly decode: 'decode'; };"
+            "export declare const SerializePhase: { readonly encode: \"encode\"; readonly decode: \"decode\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2216,7 +2216,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/format-constants.d.ts:SerializePhase:export declare const SerializePhase: { readonly encode: 'encode'; readonly decode: 'decode'; };",
+          "identity": "packages/serialize/dist/format-constants.d.ts:SerializePhase:export declare const SerializePhase: { readonly encode: \"encode\"; readonly decode: \"decode\"; };",
           "guidance": [],
           "usageScore": 24,
           "configuration": [],
@@ -2225,7 +2225,7 @@
         {
           "name": "SerializePluginType",
           "kind": "const",
-          "signature": "export declare const SerializePluginType: { readonly json: 'json'; };",
+          "signature": "export declare const SerializePluginType: { readonly json: \"json\"; };",
           "declarationLine": 28,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Built-in serializer plugin identifiers used in registry metadata.",
@@ -2243,7 +2243,7 @@
           "aliasOf": "SerializePluginType",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const SerializePluginType: { readonly json: 'json'; };"
+            "export declare const SerializePluginType: { readonly json: \"json\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2282,7 +2282,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/format-constants.d.ts:SerializePluginType:export declare const SerializePluginType: { readonly json: 'json'; };",
+          "identity": "packages/serialize/dist/format-constants.d.ts:SerializePluginType:export declare const SerializePluginType: { readonly json: \"json\"; };",
           "guidance": [],
           "usageScore": 28,
           "configuration": [],
@@ -2671,9 +2671,9 @@
           "ownerFragment": "serialize-plugins--jsonPlugin"
         },
         {
-          "identity": "packages/serialize/dist/errors.d.ts:SERIALIZE_SOURCE:export declare const SERIALIZE_SOURCE: '@migaia/serialize';",
+          "identity": "packages/serialize/dist/errors.d.ts:SERIALIZE_SOURCE:export declare const SERIALIZE_SOURCE: \"@migaia/serialize\";",
           "name": "SERIALIZE_SOURCE",
-          "signature": "export declare const SERIALIZE_SOURCE: '@migaia/serialize';",
+          "signature": "export declare const SERIALIZE_SOURCE: \"@migaia/serialize\";",
           "source": "packages/serialize/dist/errors.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./core",
@@ -4237,8 +4237,8 @@
               ]
             },
             {
-              "id": "1-大数据导出-分片编码-协作式取消-错误定位",
-              "heading": "1. 大数据导出：分片编码 + 协作式取消 + 错误定位",
+              "id": "高阶组合示例-1-大数据导出-分片编码-协作式取消-错误定位",
+              "heading": "高阶组合示例 · 1. 大数据导出：分片编码 + 协作式取消 + 错误定位",
               "blocks": [
                 {
                   "type": "code",
@@ -4535,8 +4535,8 @@
               ]
             },
             {
-              "id": "1-大数据导出-分片编码-协作式取消-错误定位",
-              "heading": "1. 大数据导出：分片编码 + 协作式取消 + 错误定位",
+              "id": "高阶组合示例-1-大数据导出-分片编码-协作式取消-错误定位",
+              "heading": "高阶组合示例 · 1. 大数据导出：分片编码 + 协作式取消 + 错误定位",
               "blocks": [
                 {
                   "type": "code",
@@ -6651,7 +6651,7 @@
         {
           "name": "SERIALIZE_SOURCE",
           "kind": "const",
-          "signature": "export declare const SERIALIZE_SOURCE: '@migaia/serialize';",
+          "signature": "export declare const SERIALIZE_SOURCE: \"@migaia/serialize\";",
           "declarationLine": 4,
           "source": "packages/serialize/dist/errors.d.ts",
           "purpose": "错误 `source` 的唯一字面量来源；禁止各处手写 `'@migaia/serialize'` 字符串。",
@@ -6670,7 +6670,7 @@
           ],
           "aliasOf": "SERIALIZE_SOURCE",
           "exportPath": "./core",
-          "overloadSignatures": ["export declare const SERIALIZE_SOURCE: '@migaia/serialize';"],
+          "overloadSignatures": ["export declare const SERIALIZE_SOURCE: \"@migaia/serialize\";"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "Use SERIALIZE_SOURCE when its const contract and declared inputs match the result you need.",
@@ -6708,7 +6708,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/errors.d.ts:SERIALIZE_SOURCE:export declare const SERIALIZE_SOURCE: '@migaia/serialize';",
+          "identity": "packages/serialize/dist/errors.d.ts:SERIALIZE_SOURCE:export declare const SERIALIZE_SOURCE: \"@migaia/serialize\";",
           "guidance": [
             {
               "id": "4-3-tagserializeerror-createserializeerror-createserializetypeerror-createserializerangeerror-构造期失败",
@@ -7257,8 +7257,8 @@
               ]
             },
             {
-              "id": "1-大数据导出-分片编码-协作式取消-错误定位",
-              "heading": "1. 大数据导出：分片编码 + 协作式取消 + 错误定位",
+              "id": "高阶组合示例-1-大数据导出-分片编码-协作式取消-错误定位",
+              "heading": "高阶组合示例 · 1. 大数据导出：分片编码 + 协作式取消 + 错误定位",
               "blocks": [
                 {
                   "type": "code",
@@ -8132,8 +8132,8 @@
           "identity": "packages/serialize/dist/plugins/json.d.ts:jsonPlugin:export declare const jsonPlugin: (options?: IJsonPluginOptions) => ISerializePlugin;",
           "guidance": [
             {
-              "id": "1-大数据导出-分片编码-协作式取消-错误定位",
-              "heading": "1. 大数据导出：分片编码 + 协作式取消 + 错误定位",
+              "id": "高阶组合示例-1-大数据导出-分片编码-协作式取消-错误定位",
+              "heading": "高阶组合示例 · 1. 大数据导出：分片编码 + 协作式取消 + 错误定位",
               "blocks": [
                 {
                   "type": "code",
@@ -9074,8 +9074,8 @@
               ]
             },
             {
-              "id": "1-大数据导出-分片编码-协作式取消-错误定位",
-              "heading": "1. 大数据导出：分片编码 + 协作式取消 + 错误定位",
+              "id": "高阶组合示例-1-大数据导出-分片编码-协作式取消-错误定位",
+              "heading": "高阶组合示例 · 1. 大数据导出：分片编码 + 协作式取消 + 错误定位",
               "blocks": [
                 {
                   "type": "code",

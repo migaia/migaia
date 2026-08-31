@@ -3,7 +3,7 @@
   "library": {
     "slug": "storage-web",
     "description": "Independent web storage library: localStorage, sessionStorage, cookies, IndexedDB CRUD with entity, schema and serialize extension points.",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "exports": [
       ".",
       "./cookies",
@@ -558,8 +558,8 @@
             ]
           },
           {
-            "id": "1-indexeddb-standard-schema-版本迁移",
-            "heading": "1. IndexedDB + Standard Schema + 版本迁移",
+            "id": "高阶组合示例-1-indexeddb-standard-schema-版本迁移",
+            "heading": "高阶组合示例 · 1. IndexedDB + Standard Schema + 版本迁移",
             "blocks": [
               {
                 "type": "code",
@@ -569,8 +569,8 @@
             ]
           },
           {
-            "id": "2-kv-only-后端上做能力检查后再决定用记录还是值",
-            "heading": "2. KV-only 后端上做能力检查后再决定用记录还是值",
+            "id": "高阶组合示例-2-kv-only-后端上做能力检查后再决定用记录还是值",
+            "heading": "高阶组合示例 · 2. KV-only 后端上做能力检查后再决定用记录还是值",
             "blocks": [
               {
                 "type": "code",
@@ -580,8 +580,8 @@
             ]
           },
           {
-            "id": "3-批量事务写入-冲突重试-结构化后端",
-            "heading": "3. 批量事务写入 + 冲突重试（结构化后端）",
+            "id": "高阶组合示例-3-批量事务写入-冲突重试-结构化后端",
+            "heading": "高阶组合示例 · 3. 批量事务写入 + 冲突重试（结构化后端）",
             "blocks": [
               {
                 "type": "code",
@@ -591,8 +591,8 @@
             ]
           },
           {
-            "id": "4-自定义-codec-二进制降级诊断",
-            "heading": "4. 自定义 codec + 二进制降级诊断",
+            "id": "高阶组合示例-4-自定义-codec-二进制降级诊断",
+            "heading": "高阶组合示例 · 4. 自定义 codec + 二进制降级诊断",
             "blocks": [
               {
                 "type": "code",
@@ -602,8 +602,8 @@
             ]
           },
           {
-            "id": "5-命名空间隔离-显式-replace-冲突策略",
-            "heading": "5. 命名空间隔离 + 显式 replace 冲突策略",
+            "id": "高阶组合示例-5-命名空间隔离-显式-replace-冲突策略",
+            "heading": "高阶组合示例 · 5. 命名空间隔离 + 显式 replace 冲突策略",
             "blocks": [
               {
                 "type": "code",
@@ -5292,7 +5292,7 @@
               "name": "report",
               "type": "(error: unknown) => void | PromiseLike<void>",
               "optional": true,
-              "description": ""
+              "description": "Receives contained late rejection and cleanup diagnostics without replacing the primary * failure."
             }
           ],
           "identity": "packages/storage-web/dist/host/storage-host.d.ts:createStorageHost:export declare const createStorageHost: <const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly []>(options?: IStorageHostCreateOptions<TPlugins>) => Promise<IStorageHost<IPluginStoreMap<TPlugins>, Extract<IStoragePluginReactiveId<TPlugins[number]>, keyof IPluginStoreMap<TPlugins> & string>>>;",
@@ -5328,7 +5328,7 @@
               "type": "(error: unknown) => void | PromiseLike<void>",
               "optional": true,
               "description": "`installTimeoutMs` 默认 30 秒，作用于整个安装 batch；`scheduler` 可注入确定性时间；`report` 只接收 late rejection/cleanup 等诊断，reporter 自己失败不会覆盖主错误。安装中再次 `use()` 会抛 `STORAGE_HOST_BUSY`。",
-              "descriptionEn": "",
+              "descriptionEn": "Receives contained late rejection and cleanup diagnostics without replacing the primary * failure.",
               "descriptionZh": "`installTimeoutMs` 默认 30 秒，作用于整个安装 batch；`scheduler` 可注入确定性时间；`report` 只接收 late rejection/cleanup 等诊断，reporter 自己失败不会覆盖主错误。安装中再次 `use()` 会抛 `STORAGE_HOST_BUSY`。"
             }
           ],
@@ -5651,7 +5651,7 @@
           "name": "ILiveQuery",
           "kind": "type",
           "signature": "export type ILiveQuery<T> = { readonly state: ILiveQueryStateView<T>; readonly consistency: IReactiveConsistency; readonly ready: Promise<void>; refresh(): Promise<void>; dispose(): Promise<void>; };",
-          "declarationLine": 170,
+          "declarationLine": 177,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Minimal live-query handle shell reserved for the reactive vertical slice.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILiveQuery.",
@@ -5713,7 +5713,7 @@
           "name": "ILiveQueryOptions",
           "kind": "type",
           "signature": "export type ILiveQueryOptions<TStores extends Record<string, IKeyValueStore>, TBackendId extends keyof TStores & string, T> = { readonly backendId: TBackendId; readonly runtime: IRuntime; readonly query: (context: { readonly store: TStores[TBackendId]; readonly signal: IAbortSignal; readonly scope?: string; }) => T | PromiseLike<T>; /** Optional entity scope used only to prove that an invalidation cannot be unrelated. */ readonly scope?: string; /** Optional change predicate; failures are reported and conservatively refresh the query. */ readonly matches?: (change: IStorageChange) => boolean; /** Preserve the last visible value while Resource refreshes in the background. */ readonly keepPreviousData?: boolean; /** Compare settled values before replacing the visible value projection. */ readonly equals?: (previous: T, next: T) => boolean; /** Per-generation deadline, driven by the Host scheduler. */ readonly timeoutMs?: number; /** External cancellation for the whole query instance. */ readonly signal?: IAbortSignal; /** Report-only sink for stale settlement and cleanup failures. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };",
-          "declarationLine": 178,
+          "declarationLine": 185,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Query input shell retaining the exact backend ID and store type.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILiveQueryOptions.",
@@ -5775,7 +5775,7 @@
           "name": "ILiveQueryState",
           "kind": "type",
           "signature": "export type ILiveQueryState<T> = { readonly status: 'loading'; readonly value?: T; } | { readonly status: 'ready'; readonly value: T; } | { readonly status: 'refreshing'; readonly value: T; } | { readonly status: 'error'; readonly value?: T; readonly error: unknown; } | { readonly status: 'disposed'; readonly value?: T; readonly error?: unknown; };",
-          "declarationLine": 132,
+          "declarationLine": 139,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Public live-query state; Resource settlement remains the sole state authority.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILiveQueryState.",
@@ -5837,7 +5837,7 @@
           "name": "ILiveQueryStateView",
           "kind": "type",
           "signature": "export type ILiveQueryStateView<T> = Pick<IComputedValue<ILiveQueryState<T>>, 'runtime' | 'debugName' | 'observed' | 'value' | 'peek'>;",
-          "declarationLine": 151,
+          "declarationLine": 158,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Non-disposable read-only projection of the same-runtime computed state node.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILiveQueryStateView.",
@@ -5961,7 +5961,7 @@
           "name": "IReactiveBackendHandle",
           "kind": "type",
           "signature": "export type IReactiveBackendHandle<TStore extends IKeyValueStore, TId extends string> = { readonly id: TId; readonly store: TStore; liveQuery<T>(options: Omit<ILiveQueryOptions<{ readonly [TKey in TId]: TStore; }, TId, T>, 'backendId'>): ILiveQuery<T>; };",
-          "declarationLine": 124,
+          "declarationLine": 131,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Stable handle shape reserved for the reactive vertical slice.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IReactiveBackendHandle.",
@@ -6023,7 +6023,7 @@
           "name": "IReactiveConsistency",
           "kind": "type",
           "signature": "export type IReactiveConsistency = Readonly<{ readonly mode: 'push' | 'hybrid' | 'polling'; readonly pollIntervalMs?: number; readonly visibility: IStorageReactiveVisibility; }>;",
-          "declarationLine": 153,
+          "declarationLine": 160,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Frozen consistency admitted by the installed reactive adapter.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IReactiveConsistency.",
@@ -6643,7 +6643,7 @@
           "name": "IStorageFeatureCompilation",
           "kind": "type",
           "signature": "export type IStorageFeatureCompilation = { readonly ordered: readonly IStorageFeatureNode[]; readonly materialized: readonly IStorageFeatureNode[]; };",
-          "declarationLine": 225,
+          "declarationLine": 232,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Pure compiler result; synthetic providers never appear in materialized output.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageFeatureCompilation.",
@@ -6705,7 +6705,7 @@
           "name": "IStorageFeatureMetadata",
           "kind": "type",
           "signature": "export type IStorageFeatureMetadata = { readonly backendKind: IStorageBackendKind<string, IKeyValueStore>; readonly capability: string; readonly reactive?: IStorageReactiveFeatureMetadata; };",
-          "declarationLine": 208,
+          "declarationLine": 215,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Internal metadata retained by the feature compiler without exposing brands to callers.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageFeatureMetadata.",
@@ -6767,7 +6767,7 @@
           "name": "IStorageFeatureNode",
           "kind": "type",
           "signature": "export type IStorageFeatureNode = { readonly id: string; readonly dependencies: readonly { readonly provider: string; readonly required: true; }[]; readonly ordinal: number; readonly materialize: boolean; readonly feature?: IStorageFeatureMetadata; };",
-          "declarationLine": 214,
+          "declarationLine": 221,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Runtime descriptor envelope consumed by the pure topology adapter.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageFeatureNode.",
@@ -6829,7 +6829,7 @@
           "name": "IStorageHost",
           "kind": "type",
           "signature": "export type IStorageHost<TStores extends Record<string, IKeyValueStore>, TReactiveIds extends keyof TStores & string = never> = IStorageHostBase<TStores, TReactiveIds> & ([TReactiveIds] extends [never] ? Record<never, never> : IStorageHostReactiveApi<TStores, TReactiveIds>);",
-          "declarationLine": 206,
+          "declarationLine": 213,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Conditional Host type shell preserving exact backend IDs and reactive capability honesty.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageHost.",
@@ -6891,7 +6891,7 @@
           "name": "IStorageHostBase",
           "kind": "type",
           "signature": "export type IStorageHostBase<TStores extends Record<string, IKeyValueStore>, TReactiveIds extends keyof TStores & string = never> = { use<const TPlugins extends readonly IStorageBackendPluginHandle[]>(...plugins: IRejectInstalledOrDuplicateIds<TStores, TPlugins>): Promise<IStorageHost<TStores & IPluginStoreMap<TPlugins>, TReactiveIds | IStoragePluginReactiveId<TPlugins[number]>>>; backend<TId extends keyof TStores & string>(id: TId): TStores[TId]; hasBackend(id: string): id is keyof TStores & string; backends(): ReadonlyMap<keyof TStores & string, TStores[keyof TStores]>; hasReactiveBackend(id: string): id is TReactiveIds; reactiveBackend<TId extends keyof TStores & string>(id: TId): IReactiveBackendHandle<TStores[TId], TId> | undefined; reactiveBackend(id: string): IReactiveBackendHandle<IKeyValueStore, string> | undefined; dispose(): Promise<void>; };",
-          "declarationLine": 159,
+          "declarationLine": 166,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Non-reactive Host operations shared by every conditional Host view.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageHostBase.",
@@ -6952,8 +6952,8 @@
         {
           "name": "IStorageHostCreateOptions",
           "kind": "type",
-          "signature": "export type IStorageHostCreateOptions<TPlugins extends readonly IStorageBackendPluginHandle[]> = IStorageHostOptions & { readonly plugins?: IRejectInstalledOrDuplicateIds<Record<never, never>, TPlugins>; };",
-          "declarationLine": 120,
+          "signature": "export type IStorageHostCreateOptions<TPlugins extends readonly IStorageBackendPluginHandle[]> = IStorageHostOptions & { /** Initial plugin tuple installed atomically before the host is returned. */ readonly plugins?: IRejectInstalledOrDuplicateIds<Record<never, never>, TPlugins>; };",
+          "declarationLine": 126,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Constructor options preserving literal plugin tuples for exact Host capabilities.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageHostCreateOptions.",
@@ -6966,7 +6966,7 @@
           "examples": [],
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type IStorageHostCreateOptions<TPlugins extends readonly IStorageBackendPluginHandle[]> = IStorageHostOptions & { readonly plugins?: IRejectInstalledOrDuplicateIds<Record<never, never>, TPlugins>; };"
+            "export type IStorageHostCreateOptions<TPlugins extends readonly IStorageBackendPluginHandle[]> = IStorageHostOptions & { /** Initial plugin tuple installed atomically before the host is returned. */ readonly plugins?: IRejectInstalledOrDuplicateIds<Record<never, never>, TPlugins>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7005,7 +7005,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/host/types.d.ts:IStorageHostCreateOptions:export type IStorageHostCreateOptions<TPlugins extends readonly IStorageBackendPluginHandle[]> = IStorageHostOptions & { readonly plugins?: IRejectInstalledOrDuplicateIds<Record<never, never>, TPlugins>; };",
+          "identity": "packages/storage-web/dist/host/types.d.ts:IStorageHostCreateOptions:export type IStorageHostCreateOptions<TPlugins extends readonly IStorageBackendPluginHandle[]> = IStorageHostOptions & { /** Initial plugin tuple installed atomically before the host is returned. */ readonly plugins?: IRejectInstalledOrDuplicateIds<Record<never, never>, TPlugins>; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -7014,7 +7014,7 @@
         {
           "name": "IStorageHostOptions",
           "kind": "type",
-          "signature": "export type IStorageHostOptions = { readonly installTimeoutMs?: number; readonly scheduler?: ILifecycleScheduler; readonly report?: (error: unknown) => void | PromiseLike<void>; };",
+          "signature": "export type IStorageHostOptions = { /** Bounds one complete plugin installation batch; defaults to 30 seconds. */ readonly installTimeoutMs?: number; /** Supplies deterministic lifecycle time for installation, rollback, and cleanup. */ readonly scheduler?: ILifecycleScheduler; /** * Receives contained late rejection and cleanup diagnostics without replacing the primary * failure. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };",
           "declarationLine": 114,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Host options captured at construction; scheduler ownership remains lifecycle-owned.",
@@ -7028,7 +7028,7 @@
           "examples": [],
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type IStorageHostOptions = { readonly installTimeoutMs?: number; readonly scheduler?: ILifecycleScheduler; readonly report?: (error: unknown) => void | PromiseLike<void>; };"
+            "export type IStorageHostOptions = { /** Bounds one complete plugin installation batch; defaults to 30 seconds. */ readonly installTimeoutMs?: number; /** Supplies deterministic lifecycle time for installation, rollback, and cleanup. */ readonly scheduler?: ILifecycleScheduler; /** * Receives contained late rejection and cleanup diagnostics without replacing the primary * failure. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7067,7 +7067,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/host/types.d.ts:IStorageHostOptions:export type IStorageHostOptions = { readonly installTimeoutMs?: number; readonly scheduler?: ILifecycleScheduler; readonly report?: (error: unknown) => void | PromiseLike<void>; };",
+          "identity": "packages/storage-web/dist/host/types.d.ts:IStorageHostOptions:export type IStorageHostOptions = { /** Bounds one complete plugin installation batch; defaults to 30 seconds. */ readonly installTimeoutMs?: number; /** Supplies deterministic lifecycle time for installation, rollback, and cleanup. */ readonly scheduler?: ILifecycleScheduler; /** * Receives contained late rejection and cleanup diagnostics without replacing the primary * failure. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -7077,7 +7077,7 @@
           "name": "IStorageHostReactiveApi",
           "kind": "type",
           "signature": "export type IStorageHostReactiveApi<TStores extends Record<string, IKeyValueStore>, TReactiveIds extends keyof TStores & string> = { liveQuery<TBackendId extends TReactiveIds, _T>(options: ILiveQueryOptions<TStores, TBackendId, _T>): ILiveQuery<_T>; };",
-          "declarationLine": 202,
+          "declarationLine": 209,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Reactive API is conditionally intersected only when a reactive ID is known.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageHostReactiveApi.",
@@ -7973,7 +7973,7 @@
               "name": "report",
               "type": "(error: unknown) => void | PromiseLike<void>",
               "optional": true,
-              "description": ""
+              "description": "Receives contained late rejection and cleanup diagnostics without replacing the primary * failure."
             }
           ],
           "identity": "packages/storage-web/dist/host/storage-host.d.ts:StorageHostFacade:export declare class StorageHostFacade<TStores extends Record<string, IKeyValueStore> = Record<never, never>, TReactiveIds extends keyof TStores & string = never> { #private; /** Creates the shell and snapshots lifecycle/deadline inputs before any plugin runs. */ constructor(options?: IStorageHostOptions); /** Materializes one immutable plugin tuple through the canonical PluginHost batch. */ use<const TPlugins extends readonly IStorageBackendPluginHandle[]>(...plugins: IRejectInstalledOrDuplicateIds<TStores, TPlugins>): Promise<IStorageHost<TStores & IPluginStoreMap<TPlugins>, TReactiveIds | IStoragePluginReactiveId<TPlugins[number]>>>; /** Looks up an exact store from the last atomically published registry snapshot. */ backend<TId extends keyof TStores & string>(id: TId): TStores[TId]; /** Narrows a lookup to IDs in the current immutable registry snapshot. */ hasBackend(id: string): id is keyof TStores & string; /** Returns a mutation-incapable copy of the current store registry. */ backends(): ReadonlyMap<keyof TStores & string, TStores[keyof TStores]>; /** Reports whether the committed Host registry contains an exact reactive adapter. */ hasReactiveBackend(id: string): id is TReactiveIds; /** Returns exact adapter-bound store shell and delegates query state to Resource. */ reactiveBackend<TId extends keyof TStores & string>(id: TId): IReactiveBackendHandle<TStores[TId], TId> | undefined; /** Seals the facade once and delegates lifecycle cleanup to PluginHost. */ dispose(): Promise<void>; }",
@@ -8021,7 +8021,7 @@
               "type": "(error: unknown) => void | PromiseLike<void>",
               "optional": true,
               "description": "构造参数与 factory 共用同一契约：`installTimeoutMs` 限制完整安装 batch，`scheduler` 注入生命周期时间，`report` 只接收 late rejection 和 cleanup 诊断且不会替换主错误。`backend()`、`hasBackend()`、`backends()`、`use()` 和 `dispose()` 的行为与 factory 返回对象完全一致。",
-              "descriptionEn": "",
+              "descriptionEn": "Receives contained late rejection and cleanup diagnostics without replacing the primary * failure.",
               "descriptionZh": "构造参数与 factory 共用同一契约：`installTimeoutMs` 限制完整安装 batch，`scheduler` 注入生命周期时间，`report` 只接收 late rejection 和 cleanup 诊断且不会替换主错误。`backend()`、`hasBackend()`、`backends()`、`use()` 和 `dispose()` 的行为与 factory 返回对象完全一致。"
             }
           ],

@@ -3,7 +3,7 @@
   "library": {
     "slug": "utils",
     "description": "Runtime-neutral reusable utility primitives.",
-    "version": "0.0.2",
+    "version": "0.0.4",
     "exports": [
       ".",
       "./bytes",
@@ -70,6 +70,7 @@
                   "`/typing`：跨项目复用类型",
                   "`/config`：带所有权语义的配置对象",
                   "`/function`：一次性调用",
+                  "Collector：惰性字段筛选流水线",
                   "高阶组合示例",
                   "构建门禁"
                 ]
@@ -789,8 +790,31 @@
             ]
           },
           {
-            "id": "1-截止时间-重试-只读配置",
-            "heading": "1. 截止时间 + 重试 + 只读配置",
+            "id": "collector-惰性字段筛选流水线",
+            "heading": "Collector：惰性字段筛选流水线",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`collect` 只从包根入口导出。它借用一个 `readonly` 数组，链式动作立即改变查询语义，首次读取 `result` 时才按调用顺序扫描一次并缓存："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { collect } from '@migaia/utils';\n\nconst collector = collect(users)\n  .fieldBy('profile.name-zh', 'profile.name-en')\n  .like(' world ')\n  .where((user) => user.active)\n  .take(20);\n\nconst result = collector.result;"
+              },
+              {
+                "type": "paragraph",
+                "text": "`fieldBy` 本身会过滤掉所有候选字段都为 `undefined` 的 source，并启用 `like`、`equals`、`oneOf` 的 typestate；未调用它时，TypeScript 不暴露这些方法。`like` 只匹配字符串，trim 后为空时为 no-op。另有 `distinctBy`、`skip`、`take`，所有动作保留原 source 项的身份与顺序。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Collector 不复制或追踪外部修改：调用方必须在 collector 生命周期内遵守传入数组及对象的只读约定。相同查询 revision 重复读取 `result` 返回同一缓存引用；新增动作后会从原 source 重新求值，但不会修改旧结果快照。"
+              }
+            ]
+          },
+          {
+            "id": "高阶组合示例-1-截止时间-重试-只读配置",
+            "heading": "高阶组合示例 · 1. 截止时间 + 重试 + 只读配置",
             "blocks": [
               {
                 "type": "code",
@@ -800,8 +824,8 @@
             ]
           },
           {
-            "id": "2-并发限流-重试-错误合并-批量拉取-容忍部分失败",
-            "heading": "2. 并发限流 + 重试 + 错误合并：批量拉取，容忍部分失败",
+            "id": "高阶组合示例-2-并发限流-重试-错误合并-批量拉取-容忍部分失败",
+            "heading": "高阶组合示例 · 2. 并发限流 + 重试 + 错误合并：批量拉取，容忍部分失败",
             "blocks": [
               {
                 "type": "code",
@@ -811,8 +835,8 @@
             ]
           },
           {
-            "id": "3-对象路径-配置-把校验后的嵌套结构整体写回配置根",
-            "heading": "3. 对象路径 + 配置：把校验后的嵌套结构整体写回配置根",
+            "id": "高阶组合示例-3-对象路径-配置-把校验后的嵌套结构整体写回配置根",
+            "heading": "高阶组合示例 · 3. 对象路径 + 配置：把校验后的嵌套结构整体写回配置根",
             "blocks": [
               {
                 "type": "code",
@@ -822,8 +846,8 @@
             ]
           },
           {
-            "id": "4-一次性初始化-错误身份-确保初始化异常带上可识别的-code",
-            "heading": "4. 一次性初始化 + 错误身份：确保初始化异常带上可识别的 code",
+            "id": "高阶组合示例-4-一次性初始化-错误身份-确保初始化异常带上可识别的-code",
+            "heading": "高阶组合示例 · 4. 一次性初始化 + 错误身份：确保初始化异常带上可识别的 code",
             "blocks": [
               {
                 "type": "code",
@@ -880,6 +904,7 @@
                   "`/typing` 模块",
                   "`/config` 模块",
                   "`/function` 模块",
+                  "Collector",
                   "组合工作流示例",
                   "排查与构建门禁"
                 ]
@@ -1741,6 +1766,57 @@
             ]
           },
           {
+            "id": "collector",
+            "heading": "Collector",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Collector 是包根入口提供的、数组专用的惰性查询流水线："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "type ICollectorActions<T, Self> = {\n  readonly result: readonly T[];\n  fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(\n    ...paths: P\n  ): IFieldCollector<T, P[number]>;\n  where(predicate: (source: T) => boolean): Self;\n  distinctBy<P extends IObjectPathInput<T>>(path: P): Self;\n  skip(count: number): Self;\n  take(count: number): Self;\n};\n\ninterface ICollector<T> extends ICollectorActions<T, ICollector<T>> {}\n\ninterface IFieldCollector<T, P extends IObjectPathInput<T>>\n  extends ICollectorActions<T, IFieldCollector<T, P>> {\n  like(query: string): IFieldCollector<T, P>;\n  equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>;\n  oneOf(\n    value: IObjectPathValue<T, P>,\n    ...values: IObjectPathValue<T, P>[]\n  ): IFieldCollector<T, P>;\n}\n\nfunction collect<T>(dataSource: readonly T[]): ICollector<T>;"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "const collector = collect(users)\n  .fieldBy('profile.name-zh', 'profile.name-en')\n  .like(' World ')\n  .distinctBy('id')\n  .skip(10)\n  .take(20);\n\nconst result = collector.result;"
+              },
+              {
+                "type": "paragraph",
+                "text": "执行与缓存："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "`collect` 借用原 `readonly` 数组且不复制；无动作或全部 source 通过时，`result` 直接复用原数组。",
+                  "每个动作立即写入有序语义流水线，但不会扫描 source；首次读取 `result` 时单次遍历并缓存。同 revision 重复读取返回同一引用，新增有效动作后缓存失效。",
+                  "动作顺序可观察：`take(2).where(predicate)` 与 `where(predicate).take(2)` 不等价。连续链式调用不会生成每步中间数组。",
+                  "求值失败不缓存；getter、Proxy 与 `where` 抛出的错误保持原始身份。求值回调中重读或修改同一 collector 会抛 `REENTRANT_CALL`。"
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "字段动作："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "`fieldBy` 立即解析路径，并加入“任一字段值非 `undefined`”过滤；missing、blocked 和显式 `undefined` 统一视为无有效值。重复调用会保留前一个过滤动作，同时替换后续字段谓词的活动字段域。",
+                  "`like` 对 query 执行 `trim().toLowerCase()`；trim 后为空是 no-op。只对字符串字段进行忽略大小写的连续子串匹配，多个字段使用 OR。",
+                  "`equals` 与 `oneOf` 使用 `Object.is`；多个字段使用 OR，多个动作按顺序组成 AND。`oneOf` 固定线性扫描候选值，不按数据量升级为索引。",
+                  "`distinctBy` 只去重已定义 key，保留第一次出现；missing、blocked、显式 `undefined` 均不参与去重。",
+                  "`where` 只接收 source，不注入 index。`skip`/`take` 只接受非负安全整数，否则抛出带 `INVALID_ARGUMENT` 的原生 `RangeError`。"
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "输入数组和嵌套 source 由调用方维持只读。Collector 不监听外部 mutation；外部绕过类型修改数据后，已缓存 revision 不会自动失效。"
+              }
+            ]
+          },
+          {
             "id": "组合工作流示例-截止时间-配置",
             "heading": "组合工作流示例：截止时间 + 配置",
             "blocks": [
@@ -1815,7 +1891,279 @@
       ],
       "guidePath": "/en/guides/utils/getting-started",
       "architecturePath": "/en/architecture/utils",
-      "symbols": [],
+      "symbols": [
+        {
+          "name": "collect",
+          "kind": "function",
+          "signature": "export declare function collect<T>(dataSource: readonly T[]): ICollector<T>;",
+          "declarationLine": 27,
+          "source": "packages/utils/dist/collector.d.ts",
+          "purpose": "Creates a lazy collector over a borrowed readonly array.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for collect.",
+          "advanced": "No additional advanced behavior is declared for collect.",
+          "parameters": ["dataSource: readonly T[]"],
+          "parameterDetails": [
+            {
+              "name": "dataSource",
+              "type": "readonly T[]",
+              "optional": false
+            }
+          ],
+          "returns": "ICollector<T>",
+          "errors": ["No documented errors are declared for collect."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for collect.",
+          "examples": [
+            "const collector = collect(users)\n  .fieldBy('profile.name-zh', 'profile.name-en')\n  .like(' World ')\n  .distinctBy('id')\n  .skip(10)\n  .take(20);\n\nconst result = collector.result;",
+            "import { collect } from '@migaia/utils';\n\nconst collector = collect(users)\n  .fieldBy('profile.name-zh', 'profile.name-en')\n  .like(' world ')\n  .where((user) => user.active)\n  .take(20);\n\nconst result = collector.result;"
+          ],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function collect<T>(dataSource: readonly T[]): ICollector<T>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "dataSource",
+                "type": "readonly T[]",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["ICollector<T>"],
+          "whenToUse": "Use collect when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when collect does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Creates a lazy collector over a borrowed readonly array."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import collect from @migaia/utils, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use collect when its function contract and declared inputs match the result you need. Choose a different public symbol when collect does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for collect."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for collect."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/collector.d.ts:collect:export declare function collect<T>(dataSource: readonly T[]): ICollector<T>;",
+          "guidance": [],
+          "usageScore": 30,
+          "configuration": [],
+          "fragment": "utils-index--collect"
+        },
+        {
+          "name": "ICollector",
+          "kind": "interface",
+          "signature": "export interface ICollector<T> extends ICollectorActions<T, ICollector<T>> { }",
+          "declarationLine": 15,
+          "source": "packages/utils/dist/collector.d.ts",
+          "purpose": "Collector state before a field scope enables field-dependent predicates. An interface is required because TypeScript rejects the equivalent directly recursive alias.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICollector.",
+          "advanced": "No additional advanced behavior is declared for ICollector.",
+          "parameters": ["This interface declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this interface.",
+          "errors": ["No documented errors are declared for ICollector."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICollector.",
+          "examples": [
+            "type ICollectorActions<T, Self> = {\n  readonly result: readonly T[];\n  fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(\n    ...paths: P\n  ): IFieldCollector<T, P[number]>;\n  where(predicate: (source: T) => boolean): Self;\n  distinctBy<P extends IObjectPathInput<T>>(path: P): Self;\n  skip(count: number): Self;\n  take(count: number): Self;\n};\n\ninterface ICollector<T> extends ICollectorActions<T, ICollector<T>> {}\n\ninterface IFieldCollector<T, P extends IObjectPathInput<T>>\n  extends ICollectorActions<T, IFieldCollector<T, P>> {\n  like(query: string): IFieldCollector<T, P>;\n  equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>;\n  oneOf(\n    value: IObjectPathValue<T, P>,\n    ...values: IObjectPathValue<T, P>[]\n  ): IFieldCollector<T, P>;\n}\n\nfunction collect<T>(dataSource: readonly T[]): ICollector<T>;"
+          ],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export interface ICollector<T> extends ICollectorActions<T, ICollector<T>> { }"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ICollector when its interface contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ICollector does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Collector state before a field scope enables field-dependent predicates. An interface is required because TypeScript rejects the equivalent directly recursive alias."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICollector from @migaia/utils, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICollector when its interface contract and declared inputs match the result you need. Choose a different public symbol when ICollector does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained interface example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICollector."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ICollector."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/collector.d.ts:ICollector:export interface ICollector<T> extends ICollectorActions<T, ICollector<T>> { }",
+          "guidance": [],
+          "usageScore": 18,
+          "configuration": [],
+          "fragment": "utils-index--ICollector"
+        },
+        {
+          "name": "ICollectorActions",
+          "kind": "type",
+          "signature": "export type ICollectorActions<T, Self> = { readonly result: readonly T[]; fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(...paths: P): IFieldCollector<T, P[number]>; where(predicate: (source: T) => boolean): Self; distinctBy<P extends IObjectPathInput<T>>(path: P): Self; skip(count: number): Self; take(count: number): Self; };",
+          "declarationLine": 3,
+          "source": "packages/utils/dist/collector.d.ts",
+          "purpose": "Actions available before and after a field scope is selected.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICollectorActions.",
+          "advanced": "No additional advanced behavior is declared for ICollectorActions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ICollectorActions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICollectorActions.",
+          "examples": [
+            "type ICollectorActions<T, Self> = {\n  readonly result: readonly T[];\n  fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(\n    ...paths: P\n  ): IFieldCollector<T, P[number]>;\n  where(predicate: (source: T) => boolean): Self;\n  distinctBy<P extends IObjectPathInput<T>>(path: P): Self;\n  skip(count: number): Self;\n  take(count: number): Self;\n};\n\ninterface ICollector<T> extends ICollectorActions<T, ICollector<T>> {}\n\ninterface IFieldCollector<T, P extends IObjectPathInput<T>>\n  extends ICollectorActions<T, IFieldCollector<T, P>> {\n  like(query: string): IFieldCollector<T, P>;\n  equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>;\n  oneOf(\n    value: IObjectPathValue<T, P>,\n    ...values: IObjectPathValue<T, P>[]\n  ): IFieldCollector<T, P>;\n}\n\nfunction collect<T>(dataSource: readonly T[]): ICollector<T>;"
+          ],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ICollectorActions<T, Self> = { readonly result: readonly T[]; fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(...paths: P): IFieldCollector<T, P[number]>; where(predicate: (source: T) => boolean): Self; distinctBy<P extends IObjectPathInput<T>>(path: P): Self; skip(count: number): Self; take(count: number): Self; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ICollectorActions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ICollectorActions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Actions available before and after a field scope is selected."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICollectorActions from @migaia/utils, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICollectorActions when its type contract and declared inputs match the result you need. Choose a different public symbol when ICollectorActions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICollectorActions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ICollectorActions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/collector.d.ts:ICollectorActions:export type ICollectorActions<T, Self> = { readonly result: readonly T[]; fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(...paths: P): IFieldCollector<T, P[number]>; where(predicate: (source: T) => boolean): Self; distinctBy<P extends IObjectPathInput<T>>(path: P): Self; skip(count: number): Self; take(count: number): Self; };",
+          "guidance": [],
+          "usageScore": 18,
+          "configuration": [],
+          "fragment": "utils-index--ICollectorActions"
+        },
+        {
+          "name": "IFieldCollector",
+          "kind": "interface",
+          "signature": "export interface IFieldCollector<T, P extends IObjectPathInput<T>> extends ICollectorActions<T, IFieldCollector<T, P>> { like(query: string): IFieldCollector<T, P>; equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>; oneOf(value: IObjectPathValue<T, P>, ...values: IObjectPathValue<T, P>[]): IFieldCollector<T, P>; }",
+          "declarationLine": 21,
+          "source": "packages/utils/dist/collector.d.ts",
+          "purpose": "Collector state whose values are inferred from the latest `fieldBy`. An interface is required to preserve its recursive fluent return type.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFieldCollector.",
+          "advanced": "No additional advanced behavior is declared for IFieldCollector.",
+          "parameters": ["This interface declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this interface.",
+          "errors": ["No documented errors are declared for IFieldCollector."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFieldCollector.",
+          "examples": [
+            "type ICollectorActions<T, Self> = {\n  readonly result: readonly T[];\n  fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(\n    ...paths: P\n  ): IFieldCollector<T, P[number]>;\n  where(predicate: (source: T) => boolean): Self;\n  distinctBy<P extends IObjectPathInput<T>>(path: P): Self;\n  skip(count: number): Self;\n  take(count: number): Self;\n};\n\ninterface ICollector<T> extends ICollectorActions<T, ICollector<T>> {}\n\ninterface IFieldCollector<T, P extends IObjectPathInput<T>>\n  extends ICollectorActions<T, IFieldCollector<T, P>> {\n  like(query: string): IFieldCollector<T, P>;\n  equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>;\n  oneOf(\n    value: IObjectPathValue<T, P>,\n    ...values: IObjectPathValue<T, P>[]\n  ): IFieldCollector<T, P>;\n}\n\nfunction collect<T>(dataSource: readonly T[]): ICollector<T>;"
+          ],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export interface IFieldCollector<T, P extends IObjectPathInput<T>> extends ICollectorActions<T, IFieldCollector<T, P>> { like(query: string): IFieldCollector<T, P>; equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>; oneOf(value: IObjectPathValue<T, P>, ...values: IObjectPathValue<T, P>[]): IFieldCollector<T, P>; }"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IFieldCollector when its interface contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IFieldCollector does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Collector state whose values are inferred from the latest `fieldBy`. An interface is required to preserve its recursive fluent return type."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IFieldCollector from @migaia/utils, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IFieldCollector when its interface contract and declared inputs match the result you need. Choose a different public symbol when IFieldCollector does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained interface example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFieldCollector."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IFieldCollector."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/collector.d.ts:IFieldCollector:export interface IFieldCollector<T, P extends IObjectPathInput<T>> extends ICollectorActions<T, IFieldCollector<T, P>> { like(query: string): IFieldCollector<T, P>; equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>; oneOf(value: IObjectPathValue<T, P>, ...values: IObjectPathValue<T, P>[]): IFieldCollector<T, P>; }",
+          "guidance": [],
+          "usageScore": 30,
+          "configuration": [],
+          "fragment": "utils-index--IFieldCollector"
+        }
+      ],
       "aliases": [
         {
           "identity": "packages/utils/dist/function.d.ts:assimilateCapturedThen:export declare function assimilateCapturedThen<T>(thenFn: (resolve: unknown, reject: unknown) => void, thenable: unknown): Promise<T>;",
@@ -2328,9 +2676,9 @@
           "ownerFragment": "utils-function--inspectThenable"
         },
         {
-          "identity": "packages/utils/dist/number.d.ts:INumberFormatOptions:export type INumberFormatOptions = { readonly locales?: Intl.LocalesArgument; readonly format?: Intl.NumberFormatOptions; };",
+          "identity": "packages/utils/dist/number.d.ts:INumberFormatOptions:export type INumberFormatOptions = { /** Locale preference passed through canonical `Intl.getCanonicalLocales` normalization. */ readonly locales?: Intl.LocalesArgument; /** Native `Intl.NumberFormat` policy merged with the helper-specific defaults. */ readonly format?: Intl.NumberFormatOptions; };",
           "name": "INumberFormatOptions",
-          "signature": "export type INumberFormatOptions = { readonly locales?: Intl.LocalesArgument; readonly format?: Intl.NumberFormatOptions; };",
+          "signature": "export type INumberFormatOptions = { /** Locale preference passed through canonical `Intl.getCanonicalLocales` normalization. */ readonly locales?: Intl.LocalesArgument; /** Native `Intl.NumberFormat` policy merged with the helper-specific defaults. */ readonly format?: Intl.NumberFormatOptions; };",
           "source": "packages/utils/dist/number.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./number",
@@ -4602,8 +4950,8 @@
               ]
             },
             {
-              "id": "1-截止时间-重试-只读配置",
-              "heading": "1. 截止时间 + 重试 + 只读配置",
+              "id": "高阶组合示例-1-截止时间-重试-只读配置",
+              "heading": "高阶组合示例 · 1. 截止时间 + 重试 + 只读配置",
               "blocks": [
                 {
                   "type": "code",
@@ -7706,8 +8054,8 @@
               ]
             },
             {
-              "id": "1-截止时间-重试-只读配置",
-              "heading": "1. 截止时间 + 重试 + 只读配置",
+              "id": "高阶组合示例-1-截止时间-重试-只读配置",
+              "heading": "高阶组合示例 · 1. 截止时间 + 重试 + 只读配置",
               "blocks": [
                 {
                   "type": "code",
@@ -7717,8 +8065,8 @@
               ]
             },
             {
-              "id": "3-对象路径-配置-把校验后的嵌套结构整体写回配置根",
-              "heading": "3. 对象路径 + 配置：把校验后的嵌套结构整体写回配置根",
+              "id": "高阶组合示例-3-对象路径-配置-把校验后的嵌套结构整体写回配置根",
+              "heading": "高阶组合示例 · 3. 对象路径 + 配置：把校验后的嵌套结构整体写回配置根",
               "blocks": [
                 {
                   "type": "code",
@@ -8480,8 +8828,8 @@
               ]
             },
             {
-              "id": "1-截止时间-重试-只读配置",
-              "heading": "1. 截止时间 + 重试 + 只读配置",
+              "id": "高阶组合示例-1-截止时间-重试-只读配置",
+              "heading": "高阶组合示例 · 1. 截止时间 + 重试 + 只读配置",
               "blocks": [
                 {
                   "type": "code",
@@ -8491,8 +8839,8 @@
               ]
             },
             {
-              "id": "3-对象路径-配置-把校验后的嵌套结构整体写回配置根",
-              "heading": "3. 对象路径 + 配置：把校验后的嵌套结构整体写回配置根",
+              "id": "高阶组合示例-3-对象路径-配置-把校验后的嵌套结构整体写回配置根",
+              "heading": "高阶组合示例 · 3. 对象路径 + 配置：把校验后的嵌套结构整体写回配置根",
               "blocks": [
                 {
                   "type": "code",
@@ -9224,8 +9572,8 @@
               ]
             },
             {
-              "id": "1-截止时间-重试-只读配置",
-              "heading": "1. 截止时间 + 重试 + 只读配置",
+              "id": "高阶组合示例-1-截止时间-重试-只读配置",
+              "heading": "高阶组合示例 · 1. 截止时间 + 重试 + 只读配置",
               "blocks": [
                 {
                   "type": "code",
@@ -9520,8 +9868,8 @@
               ]
             },
             {
-              "id": "4-一次性初始化-错误身份-确保初始化异常带上可识别的-code",
-              "heading": "4. 一次性初始化 + 错误身份：确保初始化异常带上可识别的 code",
+              "id": "高阶组合示例-4-一次性初始化-错误身份-确保初始化异常带上可识别的-code",
+              "heading": "高阶组合示例 · 4. 一次性初始化 + 错误身份：确保初始化异常带上可识别的 code",
               "blocks": [
                 {
                   "type": "code",
@@ -9879,8 +10227,8 @@
               ]
             },
             {
-              "id": "2-并发限流-重试-错误合并-批量拉取-容忍部分失败",
-              "heading": "2. 并发限流 + 重试 + 错误合并：批量拉取，容忍部分失败",
+              "id": "高阶组合示例-2-并发限流-重试-错误合并-批量拉取-容忍部分失败",
+              "heading": "高阶组合示例 · 2. 并发限流 + 重试 + 错误合并：批量拉取，容忍部分失败",
               "blocks": [
                 {
                   "type": "code",
@@ -10984,8 +11332,8 @@
               ]
             },
             {
-              "id": "2-并发限流-重试-错误合并-批量拉取-容忍部分失败",
-              "heading": "2. 并发限流 + 重试 + 错误合并：批量拉取，容忍部分失败",
+              "id": "高阶组合示例-2-并发限流-重试-错误合并-批量拉取-容忍部分失败",
+              "heading": "高阶组合示例 · 2. 并发限流 + 重试 + 错误合并：批量拉取，容忍部分失败",
               "blocks": [
                 {
                   "type": "code",
@@ -12672,8 +13020,8 @@
           "identity": "packages/utils/dist/function.d.ts:once:export declare function once<T extends (...args: never[]) => unknown>(functionValue: T): T;",
           "guidance": [
             {
-              "id": "4-一次性初始化-错误身份-确保初始化异常带上可识别的-code",
-              "heading": "4. 一次性初始化 + 错误身份：确保初始化异常带上可识别的 code",
+              "id": "高阶组合示例-4-一次性初始化-错误身份-确保初始化异常带上可识别的-code",
+              "heading": "高阶组合示例 · 4. 一次性初始化 + 错误身份：确保初始化异常带上可识别的 code",
               "blocks": [
                 {
                   "type": "code",
@@ -12927,7 +13275,7 @@
           "name": "createNumberFormatter",
           "kind": "function",
           "signature": "export declare function createNumberFormatter(options?: INumberFormatOptions): INumberFormatter;",
-          "declarationLine": 11,
+          "declarationLine": 13,
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Creates a reusable formatter so hot loops pay option parsing and cache lookup only once.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createNumberFormatter.",
@@ -13033,7 +13381,7 @@
           "name": "formatCompactNumber",
           "kind": "function",
           "signature": "export declare function formatCompactNumber(value: INumericValue, options?: INumberFormatOptions): string;",
-          "declarationLine": 21,
+          "declarationLine": 23,
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Formats large quantitative values with compact notation and caller-owned precision.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for formatCompactNumber.",
@@ -13149,7 +13497,7 @@
           "name": "formatCurrency",
           "kind": "function",
           "signature": "export declare function formatCurrency(value: INumericValue, currency: string, options?: INumberFormatOptions): string;",
-          "declarationLine": 15,
+          "declarationLine": 17,
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Formats money while requiring the caller to own currency and rounding policy.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for formatCurrency.",
@@ -13281,7 +13629,7 @@
           "name": "formatInteger",
           "kind": "function",
           "signature": "export declare function formatInteger(value: INumericValue, options?: INumberFormatOptions): string;",
-          "declarationLine": 19,
+          "declarationLine": 21,
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Formats inventory-style whole numbers; callers may override fraction policy explicitly.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for formatInteger.",
@@ -13397,7 +13745,7 @@
           "name": "formatNumber",
           "kind": "function",
           "signature": "export declare function formatNumber(value: INumericValue, options?: INumberFormatOptions): string;",
-          "declarationLine": 13,
+          "declarationLine": 15,
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Formats one number or bigint with explicit Intl policy and cached formatter reuse.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for formatNumber.",
@@ -13513,7 +13861,7 @@
           "name": "formatPercent",
           "kind": "function",
           "signature": "export declare function formatPercent(value: INumericValue, options?: INumberFormatOptions): string;",
-          "declarationLine": 17,
+          "declarationLine": 19,
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Formats a ratio as a percentage while leaving precision policy configurable.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for formatPercent.",
@@ -13628,7 +13976,7 @@
         {
           "name": "INumberFormatOptions",
           "kind": "type",
-          "signature": "export type INumberFormatOptions = { readonly locales?: Intl.LocalesArgument; readonly format?: Intl.NumberFormatOptions; };",
+          "signature": "export type INumberFormatOptions = { /** Locale preference passed through canonical `Intl.getCanonicalLocales` normalization. */ readonly locales?: Intl.LocalesArgument; /** Native `Intl.NumberFormat` policy merged with the helper-specific defaults. */ readonly format?: Intl.NumberFormatOptions; };",
           "declarationLine": 4,
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Locale and Intl policy used by all numeric format helpers.",
@@ -13642,7 +13990,7 @@
           "examples": [],
           "exportPath": "./number",
           "overloadSignatures": [
-            "export type INumberFormatOptions = { readonly locales?: Intl.LocalesArgument; readonly format?: Intl.NumberFormatOptions; };"
+            "export type INumberFormatOptions = { /** Locale preference passed through canonical `Intl.getCanonicalLocales` normalization. */ readonly locales?: Intl.LocalesArgument; /** Native `Intl.NumberFormat` policy merged with the helper-specific defaults. */ readonly format?: Intl.NumberFormatOptions; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -13681,7 +14029,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/utils/dist/number.d.ts:INumberFormatOptions:export type INumberFormatOptions = { readonly locales?: Intl.LocalesArgument; readonly format?: Intl.NumberFormatOptions; };",
+          "identity": "packages/utils/dist/number.d.ts:INumberFormatOptions:export type INumberFormatOptions = { /** Locale preference passed through canonical `Intl.getCanonicalLocales` normalization. */ readonly locales?: Intl.LocalesArgument; /** Native `Intl.NumberFormat` policy merged with the helper-specific defaults. */ readonly format?: Intl.NumberFormatOptions; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -13691,7 +14039,7 @@
           "name": "INumberFormatter",
           "kind": "type",
           "signature": "export type INumberFormatter = (value: INumericValue) => string;",
-          "declarationLine": 9,
+          "declarationLine": 11,
           "source": "packages/utils/dist/number.d.ts",
           "purpose": "Reusable formatter for hot loops such as inventory tables and market data.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for INumberFormatter.",
@@ -15248,8 +15596,8 @@
               ]
             },
             {
-              "id": "3-对象路径-配置-把校验后的嵌套结构整体写回配置根",
-              "heading": "3. 对象路径 + 配置：把校验后的嵌套结构整体写回配置根",
+              "id": "高阶组合示例-3-对象路径-配置-把校验后的嵌套结构整体写回配置根",
+              "heading": "高阶组合示例 · 3. 对象路径 + 配置：把校验后的嵌套结构整体写回配置根",
               "blocks": [
                 {
                   "type": "code",
@@ -15348,6 +15696,7 @@
             "function set<T, P extends IObjectPathInput<T>>(\n  object: T,\n  path: P,\n  nextValue: IObjectPathWriteValue<T, P>\n): T;",
             "type IPathGetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathValue<T, P>;\n  replace(value: IObjectPathValue<T, P>): void;\n};\ntype IPathSetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathWriteValue<T, P>;\n  replace(value: IObjectPathWriteValue<T, P>): void;\n};\ntype IPathAccessorOptions<T> = {\n  readonly ifMissing?: (probe: IPathMissingProbe) => void;\n  readonly ifBlocked?: (probe: IPathBlockedProbe) => void;\n  readonly ifFailed?: (probe: IPathFailedProbe) => void;\n  readonly onGet?: (event: IPathGetEvent<T>) => void;\n  readonly onSet?: (event: IPathSetEvent<T>) => void;\n};\ntype IPathAccessor<T> = {\n  readonly value: T;\n  get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined;\n  set<P extends IObjectPathInput<T>>(path: P, value: IObjectPathWriteValue<T, P>): T;\n  probeValue<P extends IObjectPathInput<T>>(path: P): IPathProbe<T, P>;\n  parsePath(path: string | IObjectPathTuple): IObjectPathTuple;\n};\nfunction createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>;",
             "/** 按一个 string 或 tuple 对象路径对联合类型分组，路径解析规则与 /object 模块的 IObjectPath 完全一致。 */\ntype IDiscriminatedByPath<T, P extends IObjectPathInput<T>> = {\n  [K in Extract<IObjectPathValue<T, P>, PropertyKey>]: IExtractDiscriminatedByPath<T, P, K>;\n};",
+            "type ICollectorActions<T, Self> = {\n  readonly result: readonly T[];\n  fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(\n    ...paths: P\n  ): IFieldCollector<T, P[number]>;\n  where(predicate: (source: T) => boolean): Self;\n  distinctBy<P extends IObjectPathInput<T>>(path: P): Self;\n  skip(count: number): Self;\n  take(count: number): Self;\n};\n\ninterface ICollector<T> extends ICollectorActions<T, ICollector<T>> {}\n\ninterface IFieldCollector<T, P extends IObjectPathInput<T>>\n  extends ICollectorActions<T, IFieldCollector<T, P>> {\n  like(query: string): IFieldCollector<T, P>;\n  equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>;\n  oneOf(\n    value: IObjectPathValue<T, P>,\n    ...values: IObjectPathValue<T, P>[]\n  ): IFieldCollector<T, P>;\n}\n\nfunction collect<T>(dataSource: readonly T[]): ICollector<T>;",
             "import type {\n  IDiscriminatedByField,\n  IDiscriminatedByPath,\n  IObjectPath,\n  IObjectPathInput,\n  IObjectPathSegment,\n  IObjectPathTuple,\n  IObjectPathTupleFor,\n  IObjectPathValue,\n  IObjectPathWriteValue,\n  IProbePropertyResult,\n  IAbortSignal,\n  IDeferred\n} from '@migaia/utils/typing';"
           ],
           "exportPath": "./object-path",
@@ -15393,7 +15742,7 @@
           "declaredConfiguration": [],
           "identity": "packages/utils/dist/object-path.d.ts:IObjectPathInput:export type IObjectPathInput<T> = IObjectPath<T> | IObjectPathTupleFor<T>;",
           "guidance": [],
-          "usageScore": 94,
+          "usageScore": 116,
           "configuration": [],
           "fragment": "utils-object-path--IObjectPathInput"
         },
@@ -15608,6 +15957,7 @@
             "function get<T, P extends IObjectPathInput<T>>(\n  object: T,\n  path: P\n): IObjectPathValue<T, P> | undefined;",
             "type IPathGetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathValue<T, P>;\n  replace(value: IObjectPathValue<T, P>): void;\n};\ntype IPathSetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathWriteValue<T, P>;\n  replace(value: IObjectPathWriteValue<T, P>): void;\n};\ntype IPathAccessorOptions<T> = {\n  readonly ifMissing?: (probe: IPathMissingProbe) => void;\n  readonly ifBlocked?: (probe: IPathBlockedProbe) => void;\n  readonly ifFailed?: (probe: IPathFailedProbe) => void;\n  readonly onGet?: (event: IPathGetEvent<T>) => void;\n  readonly onSet?: (event: IPathSetEvent<T>) => void;\n};\ntype IPathAccessor<T> = {\n  readonly value: T;\n  get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined;\n  set<P extends IObjectPathInput<T>>(path: P, value: IObjectPathWriteValue<T, P>): T;\n  probeValue<P extends IObjectPathInput<T>>(path: P): IPathProbe<T, P>;\n  parsePath(path: string | IObjectPathTuple): IObjectPathTuple;\n};\nfunction createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>;",
             "/** 按一个 string 或 tuple 对象路径对联合类型分组，路径解析规则与 /object 模块的 IObjectPath 完全一致。 */\ntype IDiscriminatedByPath<T, P extends IObjectPathInput<T>> = {\n  [K in Extract<IObjectPathValue<T, P>, PropertyKey>]: IExtractDiscriminatedByPath<T, P, K>;\n};",
+            "type ICollectorActions<T, Self> = {\n  readonly result: readonly T[];\n  fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(\n    ...paths: P\n  ): IFieldCollector<T, P[number]>;\n  where(predicate: (source: T) => boolean): Self;\n  distinctBy<P extends IObjectPathInput<T>>(path: P): Self;\n  skip(count: number): Self;\n  take(count: number): Self;\n};\n\ninterface ICollector<T> extends ICollectorActions<T, ICollector<T>> {}\n\ninterface IFieldCollector<T, P extends IObjectPathInput<T>>\n  extends ICollectorActions<T, IFieldCollector<T, P>> {\n  like(query: string): IFieldCollector<T, P>;\n  equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>;\n  oneOf(\n    value: IObjectPathValue<T, P>,\n    ...values: IObjectPathValue<T, P>[]\n  ): IFieldCollector<T, P>;\n}\n\nfunction collect<T>(dataSource: readonly T[]): ICollector<T>;",
             "import type {\n  IDiscriminatedByField,\n  IDiscriminatedByPath,\n  IObjectPath,\n  IObjectPathInput,\n  IObjectPathSegment,\n  IObjectPathTuple,\n  IObjectPathTupleFor,\n  IObjectPathValue,\n  IObjectPathWriteValue,\n  IProbePropertyResult,\n  IAbortSignal,\n  IDeferred\n} from '@migaia/utils/typing';"
           ],
           "exportPath": "./object-path",
@@ -15653,7 +16003,7 @@
           "declaredConfiguration": [],
           "identity": "packages/utils/dist/object-path.d.ts:IObjectPathValue:export type IObjectPathValue<T, P extends IObjectPath<T> | IObjectPathTuple> = P extends string ? IStringPathValue<T, P> : P extends IObjectPathTuple ? ITuplePathValue<T, P> : never;",
           "guidance": [],
-          "usageScore": 60,
+          "usageScore": 78,
           "configuration": [],
           "fragment": "utils-object-path--IObjectPathValue"
         },
@@ -17036,8 +17386,8 @@
               ]
             },
             {
-              "id": "3-对象路径-配置-把校验后的嵌套结构整体写回配置根",
-              "heading": "3. 对象路径 + 配置：把校验后的嵌套结构整体写回配置根",
+              "id": "高阶组合示例-3-对象路径-配置-把校验后的嵌套结构整体写回配置根",
+              "heading": "高阶组合示例 · 3. 对象路径 + 配置：把校验后的嵌套结构整体写回配置根",
               "blocks": [
                 {
                   "type": "code",
@@ -17359,8 +17709,8 @@
               ]
             },
             {
-              "id": "2-并发限流-重试-错误合并-批量拉取-容忍部分失败",
-              "heading": "2. 并发限流 + 重试 + 错误合并：批量拉取，容忍部分失败",
+              "id": "高阶组合示例-2-并发限流-重试-错误合并-批量拉取-容忍部分失败",
+              "heading": "高阶组合示例 · 2. 并发限流 + 重试 + 错误合并：批量拉取，容忍部分失败",
               "blocks": [
                 {
                   "type": "code",
@@ -17453,8 +17803,8 @@
               ]
             },
             {
-              "id": "1-截止时间-重试-只读配置",
-              "heading": "1. 截止时间 + 重试 + 只读配置",
+              "id": "高阶组合示例-1-截止时间-重试-只读配置",
+              "heading": "高阶组合示例 · 1. 截止时间 + 重试 + 只读配置",
               "blocks": [
                 {
                   "type": "code",
@@ -18780,8 +19130,8 @@
               ]
             },
             {
-              "id": "1-截止时间-重试-只读配置",
-              "heading": "1. 截止时间 + 重试 + 只读配置",
+              "id": "高阶组合示例-1-截止时间-重试-只读配置",
+              "heading": "高阶组合示例 · 1. 截止时间 + 重试 + 只读配置",
               "blocks": [
                 {
                   "type": "code",
@@ -18791,8 +19141,8 @@
               ]
             },
             {
-              "id": "2-并发限流-重试-错误合并-批量拉取-容忍部分失败",
-              "heading": "2. 并发限流 + 重试 + 错误合并：批量拉取，容忍部分失败",
+              "id": "高阶组合示例-2-并发限流-重试-错误合并-批量拉取-容忍部分失败",
+              "heading": "高阶组合示例 · 2. 并发限流 + 重试 + 错误合并：批量拉取，容忍部分失败",
               "blocks": [
                 {
                   "type": "code",
@@ -19223,8 +19573,8 @@
               ]
             },
             {
-              "id": "1-截止时间-重试-只读配置",
-              "heading": "1. 截止时间 + 重试 + 只读配置",
+              "id": "高阶组合示例-1-截止时间-重试-只读配置",
+              "heading": "高阶组合示例 · 1. 截止时间 + 重试 + 只读配置",
               "blocks": [
                 {
                   "type": "code",

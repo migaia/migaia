@@ -3,7 +3,7 @@
   "library": {
     "slug": "capability",
     "description": "Store-neutral capability lifecycle and feature gate.",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "exports": [".", "./graph", "./graph/dynamic", "./graph/topology"],
     "documentation": {
       "readme": {
@@ -76,7 +76,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  createCapabilityGraph,\n  type IGraphNodeId,\n  type IGraphNodeDefinition\n} from '@migaia/capability/graph';"
+                "code": "import {\n  createCapabilityGraph,\n  type IGraphNodeId,\n  type IGraphNodeDefinition\n} from '@migaia/capability/graph'"
               },
               {
                 "type": "paragraph",
@@ -89,7 +89,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const graph = createCapabilityGraph({ onError: (error) => console.error(error) });\nconst provider = 'provider' as IGraphNodeId;\ngraph.register({\n  id: provider,\n  kind: 'service',\n  dependencies: [],\n  start: () => ({ value: { ready: true }, release: () => undefined })\n});\nconst consumer = 'consumer' as IGraphNodeId;\ngraph.register({\n  id: consumer,\n  kind: 'consumer',\n  dependencies: [{ provider, required: true }],\n  start: ({ get }) => ({ value: get(provider), release: () => undefined })\n});\nawait graph.ready();\nconst service = graph.get<{ readonly ready: boolean }>(consumer, provider);\nawait graph.dispose();"
+                "code": "const graph = createCapabilityGraph({ onError: (error) => console.error(error) })\nconst provider = 'provider' as IGraphNodeId\ngraph.register({\n  id: provider,\n  kind: 'service',\n  dependencies: [],\n  start: () => ({ value: { ready: true }, release: () => undefined })\n})\nconst consumer = 'consumer' as IGraphNodeId\ngraph.register({\n  id: consumer,\n  kind: 'consumer',\n  dependencies: [{ provider, required: true }],\n  start: ({ get }) => ({ value: get(provider), release: () => undefined })\n})\nawait graph.ready()\nconst service = graph.get<{ readonly ready: boolean }>(consumer, provider)\nawait graph.dispose()"
               },
               {
                 "type": "paragraph",
@@ -104,7 +104,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability';"
+                "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
               },
               {
                 "type": "paragraph",
@@ -113,7 +113,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n);"
+                "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
               },
               {
                 "type": "paragraph",
@@ -141,7 +141,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> };"
+                "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
               },
               {
                 "type": "paragraph",
@@ -150,7 +150,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000);\n    return { dispose: () => clearInterval(timer) };\n  }\n});"
+                "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
               },
               {
                 "type": "paragraph",
@@ -174,7 +174,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "capabilities.names; // ['greeting']"
+                "code": "capabilities.names // ['greeting']"
               },
               {
                 "type": "paragraph",
@@ -187,7 +187,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "capabilities.state('greeting'); // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
+                "code": "capabilities.state('greeting') // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
               },
               {
                 "type": "paragraph",
@@ -200,7 +200,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const h = capabilities.handle<{ dispose(): void }>('greeting'); // 未启用返回 undefined"
+                "code": "const h = capabilities.handle<{ dispose(): void }>('greeting') // 未启用返回 undefined"
               },
               {
                 "type": "paragraph",
@@ -213,7 +213,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "capabilities.error('greeting'); // unknown，成功重启或重新配置后会被清空"
+                "code": "capabilities.error('greeting') // unknown，成功重启或重新配置后会被清空"
               },
               {
                 "type": "paragraph",
@@ -226,7 +226,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "capabilities.setFlag('greeting', false); // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true); // 打开：不会自动启用，仍需调用 enable()"
+                "code": "capabilities.setFlag('greeting', false) // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true) // 打开：不会自动启用，仍需调用 enable()"
               },
               {
                 "type": "paragraph",
@@ -239,7 +239,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "capabilities.setFlags({ greeting: true, persistence: false });"
+                "code": "capabilities.setFlags({ greeting: true, persistence: false })"
               },
               {
                 "type": "paragraph",
@@ -252,7 +252,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const result = await capabilities.enable('greeting');\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
+                "code": "const result = await capabilities.enable('greeting')\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
               },
               {
                 "type": "paragraph",
@@ -265,7 +265,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "await capabilities.enableResult('greeting');"
+                "code": "await capabilities.enableResult('greeting')"
               },
               {
                 "type": "paragraph",
@@ -278,7 +278,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const changed = await capabilities.disable('greeting'); // boolean：是否确实关掉了一个启用态能力"
+                "code": "const changed = await capabilities.disable('greeting') // boolean：是否确实关掉了一个启用态能力"
               },
               {
                 "type": "paragraph",
@@ -291,7 +291,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "await capabilities.dispose(); // 之后 host 永久不可用"
+                "code": "await capabilities.dispose() // 之后 host 永久不可用"
               },
               {
                 "type": "paragraph",
@@ -304,7 +304,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting');"
+                "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting')"
               },
               {
                 "type": "paragraph",
@@ -317,7 +317,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const changed: boolean = capabilities.disableNow('greeting');"
+                "code": "const changed: boolean = capabilities.disableNow('greeting')"
               },
               {
                 "type": "paragraph",
@@ -330,7 +330,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "capabilities.disposed; // boolean"
+                "code": "capabilities.disposed // boolean"
               },
               {
                 "type": "paragraph",
@@ -345,7 +345,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { CapabilityState, CapabilityEnableStatus } from '@migaia/capability';"
+                "code": "import { CapabilityState, CapabilityEnableStatus } from '@migaia/capability'"
               },
               {
                 "type": "paragraph",
@@ -381,7 +381,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "if (result.status === CapabilityEnableStatus.failed) console.error(result.error);"
+                "code": "if (result.status === CapabilityEnableStatus.failed) console.error(result.error)"
               },
               {
                 "type": "paragraph",
@@ -405,7 +405,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';"
+                "code": "import {\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'"
               },
               {
                 "type": "paragraph",
@@ -445,7 +445,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "CAPABILITY_SOURCE; // '@migaia/capability'"
+                "code": "CAPABILITY_SOURCE // '@migaia/capability'"
               },
               {
                 "type": "paragraph",
@@ -454,57 +454,57 @@
             ]
           },
           {
-            "id": "1-按开关懒加载一个持久化能力-附错误上报与优雅收尾",
-            "heading": "1. 按开关懒加载一个持久化能力，附错误上报与优雅收尾",
+            "id": "高阶组合示例-1-按开关懒加载一个持久化能力-附错误上报与优雅收尾",
+            "heading": "高阶组合示例 · 1. 按开关懒加载一个持久化能力，附错误上报与优雅收尾",
             "blocks": [
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createCapabilityHost } from '@migaia/capability';\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n);\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    // 只有开关打开、真正 enable() 时才会下载这个 chunk\n    const { persist, memoryStorage } = await import('@migaia/store-persist');\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() });\n    return { dispose: () => handle.dispose() };\n  }\n});\n\nconst result = await capabilities.enable('persistence');\nif (result.status === 'enabled') console.log('持久化已启用');\n\nawait capabilities.disable('persistence');\nawait capabilities.dispose();"
+                "code": "import { createCapabilityHost } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    // 只有开关打开、真正 enable() 时才会下载这个 chunk\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === 'enabled') console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose()"
               }
             ]
           },
           {
-            "id": "2-多租户隔离-每个租户一份独立开关表",
-            "heading": "2. 多租户隔离：每个租户一份独立开关表",
+            "id": "高阶组合示例-2-多租户隔离-每个租户一份独立开关表",
+            "heading": "高阶组合示例 · 2. 多租户隔离：每个租户一份独立开关表",
             "blocks": [
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createCapabilityHost } from '@migaia/capability';\n\nfunction createTenantCapabilities(tenant: string, flags: Record<string, boolean>) {\n  const host = createCapabilityHost({ tenant }, { flags });\n  host.register({\n    name: 'experimental-ai',\n    activate: async ({ tenant }) => {\n      const controller = await connectAiSidecar(tenant);\n      return { dispose: () => controller.close() };\n    }\n  });\n  return host;\n}\n\nconst acme = createTenantCapabilities('acme', { 'experimental-ai': true });\nconst globex = createTenantCapabilities('globex', { 'experimental-ai': false });\n\nawait acme.enable('experimental-ai'); // { status: 'enabled' }\nawait globex.enable('experimental-ai'); // { status: 'gated' }"
+                "code": "import { createCapabilityHost } from '@migaia/capability'\n\nfunction createTenantCapabilities(tenant: string, flags: Record<string, boolean>) {\n  const host = createCapabilityHost({ tenant }, { flags })\n  host.register({\n    name: 'experimental-ai',\n    activate: async ({ tenant }) => {\n      const controller = await connectAiSidecar(tenant)\n      return { dispose: () => controller.close() }\n    }\n  })\n  return host\n}\n\nconst acme = createTenantCapabilities('acme', { 'experimental-ai': true })\nconst globex = createTenantCapabilities('globex', { 'experimental-ai': false })\n\nawait acme.enable('experimental-ai') // { status: 'enabled' }\nawait globex.enable('experimental-ai') // { status: 'gated' }"
               }
             ]
           },
           {
-            "id": "3-setflag-false-触发的原子回退-无需再手动调用-disable",
-            "heading": "3. setFlag(false) 触发的原子回退：无需再手动调用 disable()",
+            "id": "高阶组合示例-3-setflag-false-触发的原子回退-无需再手动调用-disable",
+            "heading": "高阶组合示例 · 3. setFlag(false) 触发的原子回退：无需再手动调用 disable()",
             "blocks": [
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createCapabilityHost, CapabilityState } from '@migaia/capability';\n\nconst host = createCapabilityHost({}, { flags: { worker: true } });\nhost.register({\n  name: 'worker',\n  async activate() {\n    const port = await connectWorkerPort();\n    return { dispose: () => port.close() };\n  }\n});\n\nawait host.enable('worker');\nhost.state('worker'); // CapabilityState.on\n\nhost.setFlag('worker', false); // 同步作废在途激活/释放已有 handle，不需要再调用 disable()\nhost.state('worker'); // CapabilityState.gated"
+                "code": "import { createCapabilityHost, CapabilityState } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { worker: true } })\nhost.register({\n  name: 'worker',\n  async activate() {\n    const port = await connectWorkerPort()\n    return { dispose: () => port.close() }\n  }\n})\n\nawait host.enable('worker')\nhost.state('worker') // CapabilityState.on\n\nhost.setFlag('worker', false) // 同步作废在途激活/释放已有 handle，不需要再调用 disable()\nhost.state('worker') // CapabilityState.gated"
               }
             ]
           },
           {
-            "id": "4-并发-enable-幂等共享同一次激活",
-            "heading": "4. 并发 enable() 幂等共享同一次激活",
+            "id": "高阶组合示例-4-并发-enable-幂等共享同一次激活",
+            "heading": "高阶组合示例 · 4. 并发 enable() 幂等共享同一次激活",
             "blocks": [
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createCapabilityHost } from '@migaia/capability';\n\nconst host = createCapabilityHost({}, { flags: { search: true } });\nlet activateCalls = 0;\nhost.register({\n  name: 'search',\n  async activate() {\n    activateCalls++;\n    const index = await buildSearchIndex();\n    return { dispose: () => index.close() };\n  }\n});\n\nconst [a, b, c] = await Promise.all([\n  host.enable('search'),\n  host.enable('search'),\n  host.enableLegacyBoolean('search')\n]);\nactivateCalls; // 1 —— 三个并发调用共享同一次 activate()"
+                "code": "import { createCapabilityHost } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { search: true } })\nlet activateCalls = 0\nhost.register({\n  name: 'search',\n  async activate() {\n    activateCalls++\n    const index = await buildSearchIndex()\n    return { dispose: () => index.close() }\n  }\n})\n\nconst [a, b, c] = await Promise.all([\n  host.enable('search'),\n  host.enable('search'),\n  host.enableLegacyBoolean('search')\n])\nactivateCalls // 1 —— 三个并发调用共享同一次 activate()"
               }
             ]
           },
           {
-            "id": "5-能力启用失败后查询原因-再重新配置恢复",
-            "heading": "5. 能力启用失败后查询原因，再重新配置恢复",
+            "id": "高阶组合示例-5-能力启用失败后查询原因-再重新配置恢复",
+            "heading": "高阶组合示例 · 5. 能力启用失败后查询原因，再重新配置恢复",
             "blocks": [
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createCapabilityHost, CapabilityState } from '@migaia/capability';\n\nconst host = createCapabilityHost({}, { flags: { flaky: true } });\nhost.register({\n  name: 'flaky',\n  activate: async () => {\n    throw new Error('chunk 404');\n  }\n});\n\nconst result = await host.enable('flaky');\nresult; // { status: 'failed', error: Error('chunk 404') }\nhost.state('flaky'); // CapabilityState.failed\nString(host.error('flaky')); // 包含 'chunk 404'\n\nhost.setFlag('flaky', false); // 重新配置会清空 error(name)\nhost.error('flaky'); // undefined"
+                "code": "import { createCapabilityHost, CapabilityState } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { flaky: true } })\nhost.register({\n  name: 'flaky',\n  activate: async () => {\n    throw new Error('chunk 404')\n  }\n})\n\nconst result = await host.enable('flaky')\nresult // { status: 'failed', error: Error('chunk 404') }\nhost.state('flaky') // CapabilityState.failed\nString(host.error('flaky')) // 包含 'chunk 404'\n\nhost.setFlag('flaky', false) // 重新配置会清空 error(name)\nhost.error('flaky') // undefined"
               }
             ]
           },
@@ -577,7 +577,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';"
+                "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'"
               },
               {
                 "type": "paragraph",
@@ -592,7 +592,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph';"
+                "code": "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph'"
               },
               {
                 "type": "paragraph",
@@ -601,7 +601,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IGraphNodeDefinition<T> = {\n  readonly id: IGraphNodeId;\n  readonly kind: string;\n  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[];\n  readonly start: (\n    context: IGraphStartContext\n  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>;\n};"
+                "code": "type IGraphNodeDefinition<T> = {\n  readonly id: IGraphNodeId\n  readonly kind: string\n  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[]\n  readonly start: (\n    context: IGraphStartContext\n  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>\n}"
               },
               {
                 "type": "paragraph",
@@ -675,7 +675,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const CapabilityState = {\n  off: 'off',\n  gated: 'gated',\n  activating: 'activating',\n  on: 'on',\n  failed: 'failed'\n} as const;\ntype ICapabilityStateValue = (typeof CapabilityState)[keyof typeof CapabilityState];"
+                "code": "const CapabilityState = {\n  off: 'off',\n  gated: 'gated',\n  activating: 'activating',\n  on: 'on',\n  failed: 'failed'\n} as const\ntype ICapabilityStateValue = (typeof CapabilityState)[keyof typeof CapabilityState]"
               },
               {
                 "type": "paragraph",
@@ -684,7 +684,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const CapabilityEnableStatus = {\n  enabled: 'enabled',\n  gated: 'gated',\n  cancelled: 'cancelled',\n  failed: 'failed'\n} as const;\ntype ICapabilityEnableStatusValue =\n  (typeof CapabilityEnableStatus)[keyof typeof CapabilityEnableStatus];"
+                "code": "const CapabilityEnableStatus = {\n  enabled: 'enabled',\n  gated: 'gated',\n  cancelled: 'cancelled',\n  failed: 'failed'\n} as const\ntype ICapabilityEnableStatusValue =\n  (typeof CapabilityEnableStatus)[keyof typeof CapabilityEnableStatus]"
               },
               {
                 "type": "paragraph",
@@ -697,7 +697,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type ICapabilityEnableResult =\n  | { readonly status: 'enabled' }\n  | { readonly status: 'gated' }\n  | { readonly status: 'cancelled' }\n  | { readonly status: 'failed'; readonly error: unknown };"
+                "code": "type ICapabilityEnableResult =\n  | { readonly status: 'enabled' }\n  | { readonly status: 'gated' }\n  | { readonly status: 'cancelled' }\n  | { readonly status: 'failed'; readonly error: unknown }"
               },
               {
                 "type": "list",
@@ -717,7 +717,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function createCapabilityHost<Context>(\n  context: Context,\n  options?: ICapabilityHostOptions\n): ICapabilityHost<Context>;\n\ntype ICapabilityHostOptions = {\n  readonly flags?: Readonly<Record<string, boolean>>;\n  readonly onError?: (name: string, error: unknown) => void;\n};"
+                "code": "function createCapabilityHost<Context>(\n  context: Context,\n  options?: ICapabilityHostOptions\n): ICapabilityHost<Context>\n\ntype ICapabilityHostOptions = {\n  readonly flags?: Readonly<Record<string, boolean>>\n  readonly onError?: (name: string, error: unknown) => void\n}"
               },
               {
                 "type": "paragraph",
@@ -793,7 +793,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type ICapabilityHost<Context> = {\n  register<Handle extends ICapabilityHandle>(\n    definition: ICapabilityDefinition<Context, Handle>\n  ): void;\n  readonly names: readonly string[];\n  state(name: string): ICapabilityState;\n  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined;\n  error(name: string): unknown;\n  setFlag(name: string, enabled: boolean): void;\n  setFlags(flags: Readonly<Record<string, boolean>>): void;\n  enable(name: string): Promise<ICapabilityEnableResult>;\n  enableResult(name: string): Promise<ICapabilityEnableResult>;\n  disable(name: string): Promise<boolean>;\n  dispose(): Promise<void>;\n  enableLegacyBoolean(name: string): Promise<boolean>;\n  disableNow(name: string): boolean;\n  readonly disposed: boolean;\n};"
+                "code": "type ICapabilityHost<Context> = {\n  register<Handle extends ICapabilityHandle>(\n    definition: ICapabilityDefinition<Context, Handle>\n  ): void\n  readonly names: readonly string[]\n  state(name: string): ICapabilityState\n  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined\n  error(name: string): unknown\n  setFlag(name: string, enabled: boolean): void\n  setFlags(flags: Readonly<Record<string, boolean>>): void\n  enable(name: string): Promise<ICapabilityEnableResult>\n  enableResult(name: string): Promise<ICapabilityEnableResult>\n  disable(name: string): Promise<boolean>\n  dispose(): Promise<void>\n  enableLegacyBoolean(name: string): Promise<boolean>\n  disableNow(name: string): boolean\n  readonly disposed: boolean\n}"
               }
             ]
           },
@@ -983,7 +983,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type ICapabilityError = Error & { readonly source: string; readonly code: string };\nfunction createCapabilityError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown }\n): ICapabilityError;\nfunction tagCapabilityError<E extends Error>(error: E, code: string): E;\nconst CAPABILITY_SOURCE = '@migaia/capability';"
+                "code": "type ICapabilityError = Error & { readonly source: string; readonly code: string }\nfunction createCapabilityError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown }\n): ICapabilityError\nfunction tagCapabilityError<E extends Error>(error: E, code: string): E\nconst CAPABILITY_SOURCE = '@migaia/capability'"
               },
               {
                 "type": "paragraph",
@@ -996,7 +996,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const CapabilityErrorCode = {\n  hostDisposed: 'HOST_DISPOSED',\n  hostTransitioning: 'HOST_TRANSITIONING',\n  notRegistered: 'NOT_REGISTERED',\n  alreadyRegistered: 'ALREADY_REGISTERED',\n  invalidName: 'INVALID_NAME',\n  invalidActivate: 'INVALID_ACTIVATE',\n  invalidHandle: 'INVALID_HANDLE',\n  gated: 'GATED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode];"
+                "code": "const CapabilityErrorCode = {\n  hostDisposed: 'HOST_DISPOSED',\n  hostTransitioning: 'HOST_TRANSITIONING',\n  notRegistered: 'NOT_REGISTERED',\n  alreadyRegistered: 'ALREADY_REGISTERED',\n  invalidName: 'INVALID_NAME',\n  invalidActivate: 'INVALID_ACTIVATE',\n  invalidHandle: 'INVALID_HANDLE',\n  gated: 'GATED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode]"
               },
               {
                 "type": "paragraph",
@@ -1098,7 +1098,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability';\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n);\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist');\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() });\n    return { dispose: () => handle.dispose() };\n  }\n});\n\nconst result = await capabilities.enable('persistence');\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用');\n\nawait capabilities.disable('persistence');\nawait capabilities.dispose(); // LIFO 释放全部已启用能力，之后 host 不可再用"
+                "code": "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用"
               },
               {
                 "type": "paragraph",
@@ -1148,7 +1148,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic';\n\nconst graph = createDynamicCapabilityGraph<{ readonly version: number }>({\n  startBatch: (entries) =>\n    entries.map((entry) => ({ value: entry.binding, release: async () => undefined })),\n  releaseBatch: async (entries, fence) => {\n    await fence;\n    // 这里只释放 entries 对应的 exact old generation。\n  }\n});"
+                "code": "import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'\n\nconst graph = createDynamicCapabilityGraph<{ readonly version: number }>({\n  startBatch: (entries) =>\n    entries.map((entry) => ({ value: entry.binding, release: async () => undefined })),\n  releaseBatch: async (entries, fence) => {\n    await fence\n    // 这里只释放 entries 对应的 exact old generation。\n  }\n})"
               },
               {
                 "type": "paragraph",
@@ -1196,10 +1196,10 @@
           "errors": ["No documented errors are declared for CAPABILITY_SOURCE."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for CAPABILITY_SOURCE.",
           "examples": [
-            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';",
-            "type ICapabilityError = Error & { readonly source: string; readonly code: string };\nfunction createCapabilityError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown }\n): ICapabilityError;\nfunction tagCapabilityError<E extends Error>(error: E, code: string): E;\nconst CAPABILITY_SOURCE = '@migaia/capability';",
-            "import {\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';",
-            "CAPABILITY_SOURCE; // '@migaia/capability'"
+            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'",
+            "type ICapabilityError = Error & { readonly source: string; readonly code: string }\nfunction createCapabilityError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown }\n): ICapabilityError\nfunction tagCapabilityError<E extends Error>(error: E, code: string): E\nconst CAPABILITY_SOURCE = '@migaia/capability'",
+            "import {\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'",
+            "CAPABILITY_SOURCE // '@migaia/capability'"
           ],
           "aliasOf": "CAPABILITY_SOURCE",
           "exportPath": ".",
@@ -1252,7 +1252,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ICapabilityError = Error & { readonly source: string; readonly code: string };\nfunction createCapabilityError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown }\n): ICapabilityError;\nfunction tagCapabilityError<E extends Error>(error: E, code: string): E;\nconst CAPABILITY_SOURCE = '@migaia/capability';"
+                  "code": "type ICapabilityError = Error & { readonly source: string; readonly code: string }\nfunction createCapabilityError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown }\n): ICapabilityError\nfunction tagCapabilityError<E extends Error>(error: E, code: string): E\nconst CAPABILITY_SOURCE = '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -1265,7 +1265,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const CapabilityErrorCode = {\n  hostDisposed: 'HOST_DISPOSED',\n  hostTransitioning: 'HOST_TRANSITIONING',\n  notRegistered: 'NOT_REGISTERED',\n  alreadyRegistered: 'ALREADY_REGISTERED',\n  invalidName: 'INVALID_NAME',\n  invalidActivate: 'INVALID_ACTIVATE',\n  invalidHandle: 'INVALID_HANDLE',\n  gated: 'GATED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode];"
+                  "code": "const CapabilityErrorCode = {\n  hostDisposed: 'HOST_DISPOSED',\n  hostTransitioning: 'HOST_TRANSITIONING',\n  notRegistered: 'NOT_REGISTERED',\n  alreadyRegistered: 'ALREADY_REGISTERED',\n  invalidName: 'INVALID_NAME',\n  invalidActivate: 'INVALID_ACTIVATE',\n  invalidHandle: 'INVALID_HANDLE',\n  gated: 'GATED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -1351,7 +1351,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';"
+                  "code": "import {\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -1391,7 +1391,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "CAPABILITY_SOURCE; // '@migaia/capability'"
+                  "code": "CAPABILITY_SOURCE // '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -1419,11 +1419,11 @@
           "errors": ["No documented errors are declared for CapabilityEnableStatus."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for CapabilityEnableStatus.",
           "examples": [
-            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';",
-            "const CapabilityEnableStatus = {\n  enabled: 'enabled',\n  gated: 'gated',\n  cancelled: 'cancelled',\n  failed: 'failed'\n} as const;\ntype ICapabilityEnableStatusValue =\n  (typeof CapabilityEnableStatus)[keyof typeof CapabilityEnableStatus];",
-            "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability';\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n);\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist');\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() });\n    return { dispose: () => handle.dispose() };\n  }\n});\n\nconst result = await capabilities.enable('persistence');\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用');\n\nawait capabilities.disable('persistence');\nawait capabilities.dispose(); // LIFO 释放全部已启用能力，之后 host 不可再用",
-            "import { CapabilityState, CapabilityEnableStatus } from '@migaia/capability';",
-            "if (result.status === CapabilityEnableStatus.failed) console.error(result.error);"
+            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'",
+            "const CapabilityEnableStatus = {\n  enabled: 'enabled',\n  gated: 'gated',\n  cancelled: 'cancelled',\n  failed: 'failed'\n} as const\ntype ICapabilityEnableStatusValue =\n  (typeof CapabilityEnableStatus)[keyof typeof CapabilityEnableStatus]",
+            "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用",
+            "import { CapabilityState, CapabilityEnableStatus } from '@migaia/capability'",
+            "if (result.status === CapabilityEnableStatus.failed) console.error(result.error)"
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -1475,7 +1475,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability';\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n);\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist');\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() });\n    return { dispose: () => handle.dispose() };\n  }\n});\n\nconst result = await capabilities.enable('persistence');\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用');\n\nawait capabilities.disable('persistence');\nawait capabilities.dispose(); // LIFO 释放全部已启用能力，之后 host 不可再用"
+                  "code": "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用"
                 },
                 {
                   "type": "paragraph",
@@ -1503,9 +1503,9 @@
           "errors": ["No documented errors are declared for CapabilityErrorCode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for CapabilityErrorCode.",
           "examples": [
-            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';",
-            "const CapabilityErrorCode = {\n  hostDisposed: 'HOST_DISPOSED',\n  hostTransitioning: 'HOST_TRANSITIONING',\n  notRegistered: 'NOT_REGISTERED',\n  alreadyRegistered: 'ALREADY_REGISTERED',\n  invalidName: 'INVALID_NAME',\n  invalidActivate: 'INVALID_ACTIVATE',\n  invalidHandle: 'INVALID_HANDLE',\n  gated: 'GATED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode];",
-            "import {\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';",
+            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'",
+            "const CapabilityErrorCode = {\n  hostDisposed: 'HOST_DISPOSED',\n  hostTransitioning: 'HOST_TRANSITIONING',\n  notRegistered: 'NOT_REGISTERED',\n  alreadyRegistered: 'ALREADY_REGISTERED',\n  invalidName: 'INVALID_NAME',\n  invalidActivate: 'INVALID_ACTIVATE',\n  invalidHandle: 'INVALID_HANDLE',\n  gated: 'GATED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode]",
+            "import {\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'",
             "if (error.code === CapabilityErrorCode.hostDisposed) {\n  /* ... */\n}"
           ],
           "aliasOf": "CapabilityErrorCode",
@@ -1559,7 +1559,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ICapabilityError = Error & { readonly source: string; readonly code: string };\nfunction createCapabilityError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown }\n): ICapabilityError;\nfunction tagCapabilityError<E extends Error>(error: E, code: string): E;\nconst CAPABILITY_SOURCE = '@migaia/capability';"
+                  "code": "type ICapabilityError = Error & { readonly source: string; readonly code: string }\nfunction createCapabilityError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown }\n): ICapabilityError\nfunction tagCapabilityError<E extends Error>(error: E, code: string): E\nconst CAPABILITY_SOURCE = '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -1572,7 +1572,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const CapabilityErrorCode = {\n  hostDisposed: 'HOST_DISPOSED',\n  hostTransitioning: 'HOST_TRANSITIONING',\n  notRegistered: 'NOT_REGISTERED',\n  alreadyRegistered: 'ALREADY_REGISTERED',\n  invalidName: 'INVALID_NAME',\n  invalidActivate: 'INVALID_ACTIVATE',\n  invalidHandle: 'INVALID_HANDLE',\n  gated: 'GATED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode];"
+                  "code": "const CapabilityErrorCode = {\n  hostDisposed: 'HOST_DISPOSED',\n  hostTransitioning: 'HOST_TRANSITIONING',\n  notRegistered: 'NOT_REGISTERED',\n  alreadyRegistered: 'ALREADY_REGISTERED',\n  invalidName: 'INVALID_NAME',\n  invalidActivate: 'INVALID_ACTIVATE',\n  invalidHandle: 'INVALID_HANDLE',\n  gated: 'GATED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -1658,7 +1658,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';"
+                  "code": "import {\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -1698,7 +1698,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "CAPABILITY_SOURCE; // '@migaia/capability'"
+                  "code": "CAPABILITY_SOURCE // '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -1726,12 +1726,12 @@
           "errors": ["No documented errors are declared for CapabilityState."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for CapabilityState.",
           "examples": [
-            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';",
-            "const CapabilityState = {\n  off: 'off',\n  gated: 'gated',\n  activating: 'activating',\n  on: 'on',\n  failed: 'failed'\n} as const;\ntype ICapabilityStateValue = (typeof CapabilityState)[keyof typeof CapabilityState];",
-            "import { CapabilityState, CapabilityEnableStatus } from '@migaia/capability';",
+            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'",
+            "const CapabilityState = {\n  off: 'off',\n  gated: 'gated',\n  activating: 'activating',\n  on: 'on',\n  failed: 'failed'\n} as const\ntype ICapabilityStateValue = (typeof CapabilityState)[keyof typeof CapabilityState]",
+            "import { CapabilityState, CapabilityEnableStatus } from '@migaia/capability'",
             "if (capabilities.state('greeting') === CapabilityState.on) {\n  /* ... */\n}",
-            "import { createCapabilityHost, CapabilityState } from '@migaia/capability';\n\nconst host = createCapabilityHost({}, { flags: { worker: true } });\nhost.register({\n  name: 'worker',\n  async activate() {\n    const port = await connectWorkerPort();\n    return { dispose: () => port.close() };\n  }\n});\n\nawait host.enable('worker');\nhost.state('worker'); // CapabilityState.on\n\nhost.setFlag('worker', false); // 同步作废在途激活/释放已有 handle，不需要再调用 disable()\nhost.state('worker'); // CapabilityState.gated",
-            "import { createCapabilityHost, CapabilityState } from '@migaia/capability';\n\nconst host = createCapabilityHost({}, { flags: { flaky: true } });\nhost.register({\n  name: 'flaky',\n  activate: async () => {\n    throw new Error('chunk 404');\n  }\n});\n\nconst result = await host.enable('flaky');\nresult; // { status: 'failed', error: Error('chunk 404') }\nhost.state('flaky'); // CapabilityState.failed\nString(host.error('flaky')); // 包含 'chunk 404'\n\nhost.setFlag('flaky', false); // 重新配置会清空 error(name)\nhost.error('flaky'); // undefined"
+            "import { createCapabilityHost, CapabilityState } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { worker: true } })\nhost.register({\n  name: 'worker',\n  async activate() {\n    const port = await connectWorkerPort()\n    return { dispose: () => port.close() }\n  }\n})\n\nawait host.enable('worker')\nhost.state('worker') // CapabilityState.on\n\nhost.setFlag('worker', false) // 同步作废在途激活/释放已有 handle，不需要再调用 disable()\nhost.state('worker') // CapabilityState.gated",
+            "import { createCapabilityHost, CapabilityState } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { flaky: true } })\nhost.register({\n  name: 'flaky',\n  activate: async () => {\n    throw new Error('chunk 404')\n  }\n})\n\nconst result = await host.enable('flaky')\nresult // { status: 'failed', error: Error('chunk 404') }\nhost.state('flaky') // CapabilityState.failed\nString(host.error('flaky')) // 包含 'chunk 404'\n\nhost.setFlag('flaky', false) // 重新配置会清空 error(name)\nhost.error('flaky') // undefined"
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -1783,7 +1783,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability';"
+                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -1792,7 +1792,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n);"
+                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
                 },
                 {
                   "type": "paragraph",
@@ -1820,7 +1820,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> };"
+                  "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
                 },
                 {
                   "type": "paragraph",
@@ -1829,7 +1829,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000);\n    return { dispose: () => clearInterval(timer) };\n  }\n});"
+                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -1853,7 +1853,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.names; // ['greeting']"
+                  "code": "capabilities.names // ['greeting']"
                 },
                 {
                   "type": "paragraph",
@@ -1866,7 +1866,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.state('greeting'); // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
+                  "code": "capabilities.state('greeting') // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
                 },
                 {
                   "type": "paragraph",
@@ -1879,7 +1879,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const h = capabilities.handle<{ dispose(): void }>('greeting'); // 未启用返回 undefined"
+                  "code": "const h = capabilities.handle<{ dispose(): void }>('greeting') // 未启用返回 undefined"
                 },
                 {
                   "type": "paragraph",
@@ -1892,7 +1892,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.error('greeting'); // unknown，成功重启或重新配置后会被清空"
+                  "code": "capabilities.error('greeting') // unknown，成功重启或重新配置后会被清空"
                 },
                 {
                   "type": "paragraph",
@@ -1905,7 +1905,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.setFlag('greeting', false); // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true); // 打开：不会自动启用，仍需调用 enable()"
+                  "code": "capabilities.setFlag('greeting', false) // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true) // 打开：不会自动启用，仍需调用 enable()"
                 },
                 {
                   "type": "paragraph",
@@ -1918,7 +1918,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.setFlags({ greeting: true, persistence: false });"
+                  "code": "capabilities.setFlags({ greeting: true, persistence: false })"
                 },
                 {
                   "type": "paragraph",
@@ -1931,7 +1931,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const result = await capabilities.enable('greeting');\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
+                  "code": "const result = await capabilities.enable('greeting')\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
                 },
                 {
                   "type": "paragraph",
@@ -1944,7 +1944,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await capabilities.enableResult('greeting');"
+                  "code": "await capabilities.enableResult('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -1957,7 +1957,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const changed = await capabilities.disable('greeting'); // boolean：是否确实关掉了一个启用态能力"
+                  "code": "const changed = await capabilities.disable('greeting') // boolean：是否确实关掉了一个启用态能力"
                 },
                 {
                   "type": "paragraph",
@@ -1970,7 +1970,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await capabilities.dispose(); // 之后 host 永久不可用"
+                  "code": "await capabilities.dispose() // 之后 host 永久不可用"
                 },
                 {
                   "type": "paragraph",
@@ -1983,7 +1983,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting');"
+                  "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -1996,7 +1996,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const changed: boolean = capabilities.disableNow('greeting');"
+                  "code": "const changed: boolean = capabilities.disableNow('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -2009,7 +2009,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.disposed; // boolean"
+                  "code": "capabilities.disposed // boolean"
                 },
                 {
                   "type": "paragraph",
@@ -2018,13 +2018,13 @@
               ]
             },
             {
-              "id": "5-能力启用失败后查询原因-再重新配置恢复",
-              "heading": "5. 能力启用失败后查询原因，再重新配置恢复",
+              "id": "高阶组合示例-5-能力启用失败后查询原因-再重新配置恢复",
+              "heading": "高阶组合示例 · 5. 能力启用失败后查询原因，再重新配置恢复",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createCapabilityHost, CapabilityState } from '@migaia/capability';\n\nconst host = createCapabilityHost({}, { flags: { flaky: true } });\nhost.register({\n  name: 'flaky',\n  activate: async () => {\n    throw new Error('chunk 404');\n  }\n});\n\nconst result = await host.enable('flaky');\nresult; // { status: 'failed', error: Error('chunk 404') }\nhost.state('flaky'); // CapabilityState.failed\nString(host.error('flaky')); // 包含 'chunk 404'\n\nhost.setFlag('flaky', false); // 重新配置会清空 error(name)\nhost.error('flaky'); // undefined"
+                  "code": "import { createCapabilityHost, CapabilityState } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { flaky: true } })\nhost.register({\n  name: 'flaky',\n  activate: async () => {\n    throw new Error('chunk 404')\n  }\n})\n\nconst result = await host.enable('flaky')\nresult // { status: 'failed', error: Error('chunk 404') }\nhost.state('flaky') // CapabilityState.failed\nString(host.error('flaky')) // 包含 'chunk 404'\n\nhost.setFlag('flaky', false) // 重新配置会清空 error(name)\nhost.error('flaky') // undefined"
                 }
               ]
             }
@@ -2059,13 +2059,13 @@
           "errors": ["No documented errors are declared for createCapabilityHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createCapabilityHost.",
           "examples": [
-            "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability';\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n);\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist');\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() });\n    return { dispose: () => handle.dispose() };\n  }\n});\n\nconst result = await capabilities.enable('persistence');\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用');\n\nawait capabilities.disable('persistence');\nawait capabilities.dispose(); // LIFO 释放全部已启用能力，之后 host 不可再用",
-            "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n);",
-            "import { createCapabilityHost } from '@migaia/capability';\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n);\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    // 只有开关打开、真正 enable() 时才会下载这个 chunk\n    const { persist, memoryStorage } = await import('@migaia/store-persist');\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() });\n    return { dispose: () => handle.dispose() };\n  }\n});\n\nconst result = await capabilities.enable('persistence');\nif (result.status === 'enabled') console.log('持久化已启用');\n\nawait capabilities.disable('persistence');\nawait capabilities.dispose();",
-            "import { createCapabilityHost } from '@migaia/capability';\n\nfunction createTenantCapabilities(tenant: string, flags: Record<string, boolean>) {\n  const host = createCapabilityHost({ tenant }, { flags });\n  host.register({\n    name: 'experimental-ai',\n    activate: async ({ tenant }) => {\n      const controller = await connectAiSidecar(tenant);\n      return { dispose: () => controller.close() };\n    }\n  });\n  return host;\n}\n\nconst acme = createTenantCapabilities('acme', { 'experimental-ai': true });\nconst globex = createTenantCapabilities('globex', { 'experimental-ai': false });\n\nawait acme.enable('experimental-ai'); // { status: 'enabled' }\nawait globex.enable('experimental-ai'); // { status: 'gated' }",
-            "import { createCapabilityHost, CapabilityState } from '@migaia/capability';\n\nconst host = createCapabilityHost({}, { flags: { worker: true } });\nhost.register({\n  name: 'worker',\n  async activate() {\n    const port = await connectWorkerPort();\n    return { dispose: () => port.close() };\n  }\n});\n\nawait host.enable('worker');\nhost.state('worker'); // CapabilityState.on\n\nhost.setFlag('worker', false); // 同步作废在途激活/释放已有 handle，不需要再调用 disable()\nhost.state('worker'); // CapabilityState.gated",
-            "import { createCapabilityHost } from '@migaia/capability';\n\nconst host = createCapabilityHost({}, { flags: { search: true } });\nlet activateCalls = 0;\nhost.register({\n  name: 'search',\n  async activate() {\n    activateCalls++;\n    const index = await buildSearchIndex();\n    return { dispose: () => index.close() };\n  }\n});\n\nconst [a, b, c] = await Promise.all([\n  host.enable('search'),\n  host.enable('search'),\n  host.enableLegacyBoolean('search')\n]);\nactivateCalls; // 1 —— 三个并发调用共享同一次 activate()",
-            "import { createCapabilityHost, CapabilityState } from '@migaia/capability';\n\nconst host = createCapabilityHost({}, { flags: { flaky: true } });\nhost.register({\n  name: 'flaky',\n  activate: async () => {\n    throw new Error('chunk 404');\n  }\n});\n\nconst result = await host.enable('flaky');\nresult; // { status: 'failed', error: Error('chunk 404') }\nhost.state('flaky'); // CapabilityState.failed\nString(host.error('flaky')); // 包含 'chunk 404'\n\nhost.setFlag('flaky', false); // 重新配置会清空 error(name)\nhost.error('flaky'); // undefined"
+            "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用",
+            "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)",
+            "import { createCapabilityHost } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    // 只有开关打开、真正 enable() 时才会下载这个 chunk\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === 'enabled') console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose()",
+            "import { createCapabilityHost } from '@migaia/capability'\n\nfunction createTenantCapabilities(tenant: string, flags: Record<string, boolean>) {\n  const host = createCapabilityHost({ tenant }, { flags })\n  host.register({\n    name: 'experimental-ai',\n    activate: async ({ tenant }) => {\n      const controller = await connectAiSidecar(tenant)\n      return { dispose: () => controller.close() }\n    }\n  })\n  return host\n}\n\nconst acme = createTenantCapabilities('acme', { 'experimental-ai': true })\nconst globex = createTenantCapabilities('globex', { 'experimental-ai': false })\n\nawait acme.enable('experimental-ai') // { status: 'enabled' }\nawait globex.enable('experimental-ai') // { status: 'gated' }",
+            "import { createCapabilityHost, CapabilityState } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { worker: true } })\nhost.register({\n  name: 'worker',\n  async activate() {\n    const port = await connectWorkerPort()\n    return { dispose: () => port.close() }\n  }\n})\n\nawait host.enable('worker')\nhost.state('worker') // CapabilityState.on\n\nhost.setFlag('worker', false) // 同步作废在途激活/释放已有 handle，不需要再调用 disable()\nhost.state('worker') // CapabilityState.gated",
+            "import { createCapabilityHost } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { search: true } })\nlet activateCalls = 0\nhost.register({\n  name: 'search',\n  async activate() {\n    activateCalls++\n    const index = await buildSearchIndex()\n    return { dispose: () => index.close() }\n  }\n})\n\nconst [a, b, c] = await Promise.all([\n  host.enable('search'),\n  host.enable('search'),\n  host.enableLegacyBoolean('search')\n])\nactivateCalls // 1 —— 三个并发调用共享同一次 activate()",
+            "import { createCapabilityHost, CapabilityState } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { flaky: true } })\nhost.register({\n  name: 'flaky',\n  activate: async () => {\n    throw new Error('chunk 404')\n  }\n})\n\nconst result = await host.enable('flaky')\nresult // { status: 'failed', error: Error('chunk 404') }\nhost.state('flaky') // CapabilityState.failed\nString(host.error('flaky')) // 包含 'chunk 404'\n\nhost.setFlag('flaky', false) // 重新配置会清空 error(name)\nhost.error('flaky') // undefined"
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -2143,7 +2143,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability';\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n);\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist');\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() });\n    return { dispose: () => handle.dispose() };\n  }\n});\n\nconst result = await capabilities.enable('persistence');\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用');\n\nawait capabilities.disable('persistence');\nawait capabilities.dispose(); // LIFO 释放全部已启用能力，之后 host 不可再用"
+                  "code": "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用"
                 },
                 {
                   "type": "paragraph",
@@ -2158,7 +2158,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability';"
+                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -2167,7 +2167,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n);"
+                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
                 },
                 {
                   "type": "paragraph",
@@ -2195,7 +2195,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> };"
+                  "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
                 },
                 {
                   "type": "paragraph",
@@ -2204,7 +2204,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000);\n    return { dispose: () => clearInterval(timer) };\n  }\n});"
+                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -2228,7 +2228,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.names; // ['greeting']"
+                  "code": "capabilities.names // ['greeting']"
                 },
                 {
                   "type": "paragraph",
@@ -2241,7 +2241,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.state('greeting'); // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
+                  "code": "capabilities.state('greeting') // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
                 },
                 {
                   "type": "paragraph",
@@ -2254,7 +2254,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const h = capabilities.handle<{ dispose(): void }>('greeting'); // 未启用返回 undefined"
+                  "code": "const h = capabilities.handle<{ dispose(): void }>('greeting') // 未启用返回 undefined"
                 },
                 {
                   "type": "paragraph",
@@ -2267,7 +2267,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.error('greeting'); // unknown，成功重启或重新配置后会被清空"
+                  "code": "capabilities.error('greeting') // unknown，成功重启或重新配置后会被清空"
                 },
                 {
                   "type": "paragraph",
@@ -2280,7 +2280,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.setFlag('greeting', false); // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true); // 打开：不会自动启用，仍需调用 enable()"
+                  "code": "capabilities.setFlag('greeting', false) // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true) // 打开：不会自动启用，仍需调用 enable()"
                 },
                 {
                   "type": "paragraph",
@@ -2293,7 +2293,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.setFlags({ greeting: true, persistence: false });"
+                  "code": "capabilities.setFlags({ greeting: true, persistence: false })"
                 },
                 {
                   "type": "paragraph",
@@ -2306,7 +2306,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const result = await capabilities.enable('greeting');\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
+                  "code": "const result = await capabilities.enable('greeting')\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
                 },
                 {
                   "type": "paragraph",
@@ -2319,7 +2319,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await capabilities.enableResult('greeting');"
+                  "code": "await capabilities.enableResult('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -2332,7 +2332,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const changed = await capabilities.disable('greeting'); // boolean：是否确实关掉了一个启用态能力"
+                  "code": "const changed = await capabilities.disable('greeting') // boolean：是否确实关掉了一个启用态能力"
                 },
                 {
                   "type": "paragraph",
@@ -2345,7 +2345,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await capabilities.dispose(); // 之后 host 永久不可用"
+                  "code": "await capabilities.dispose() // 之后 host 永久不可用"
                 },
                 {
                   "type": "paragraph",
@@ -2358,7 +2358,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting');"
+                  "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -2371,7 +2371,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const changed: boolean = capabilities.disableNow('greeting');"
+                  "code": "const changed: boolean = capabilities.disableNow('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -2384,7 +2384,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.disposed; // boolean"
+                  "code": "capabilities.disposed // boolean"
                 },
                 {
                   "type": "paragraph",
@@ -2393,24 +2393,24 @@
               ]
             },
             {
-              "id": "1-按开关懒加载一个持久化能力-附错误上报与优雅收尾",
-              "heading": "1. 按开关懒加载一个持久化能力，附错误上报与优雅收尾",
+              "id": "高阶组合示例-1-按开关懒加载一个持久化能力-附错误上报与优雅收尾",
+              "heading": "高阶组合示例 · 1. 按开关懒加载一个持久化能力，附错误上报与优雅收尾",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createCapabilityHost } from '@migaia/capability';\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n);\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    // 只有开关打开、真正 enable() 时才会下载这个 chunk\n    const { persist, memoryStorage } = await import('@migaia/store-persist');\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() });\n    return { dispose: () => handle.dispose() };\n  }\n});\n\nconst result = await capabilities.enable('persistence');\nif (result.status === 'enabled') console.log('持久化已启用');\n\nawait capabilities.disable('persistence');\nawait capabilities.dispose();"
+                  "code": "import { createCapabilityHost } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    // 只有开关打开、真正 enable() 时才会下载这个 chunk\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === 'enabled') console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose()"
                 }
               ]
             },
             {
-              "id": "5-能力启用失败后查询原因-再重新配置恢复",
-              "heading": "5. 能力启用失败后查询原因，再重新配置恢复",
+              "id": "高阶组合示例-5-能力启用失败后查询原因-再重新配置恢复",
+              "heading": "高阶组合示例 · 5. 能力启用失败后查询原因，再重新配置恢复",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createCapabilityHost, CapabilityState } from '@migaia/capability';\n\nconst host = createCapabilityHost({}, { flags: { flaky: true } });\nhost.register({\n  name: 'flaky',\n  activate: async () => {\n    throw new Error('chunk 404');\n  }\n});\n\nconst result = await host.enable('flaky');\nresult; // { status: 'failed', error: Error('chunk 404') }\nhost.state('flaky'); // CapabilityState.failed\nString(host.error('flaky')); // 包含 'chunk 404'\n\nhost.setFlag('flaky', false); // 重新配置会清空 error(name)\nhost.error('flaky'); // undefined"
+                  "code": "import { createCapabilityHost, CapabilityState } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { flaky: true } })\nhost.register({\n  name: 'flaky',\n  activate: async () => {\n    throw new Error('chunk 404')\n  }\n})\n\nconst result = await host.enable('flaky')\nresult // { status: 'failed', error: Error('chunk 404') }\nhost.state('flaky') // CapabilityState.failed\nString(host.error('flaky')) // 包含 'chunk 404'\n\nhost.setFlag('flaky', false) // 重新配置会清空 error(name)\nhost.error('flaky') // undefined"
                 }
               ]
             }
@@ -2451,9 +2451,9 @@
           "errors": ["No documented errors are declared for ICapabilityDefinition."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICapabilityDefinition.",
           "examples": [
-            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';",
-            "type ICapabilityHost<Context> = {\n  register<Handle extends ICapabilityHandle>(\n    definition: ICapabilityDefinition<Context, Handle>\n  ): void;\n  readonly names: readonly string[];\n  state(name: string): ICapabilityState;\n  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined;\n  error(name: string): unknown;\n  setFlag(name: string, enabled: boolean): void;\n  setFlags(flags: Readonly<Record<string, boolean>>): void;\n  enable(name: string): Promise<ICapabilityEnableResult>;\n  enableResult(name: string): Promise<ICapabilityEnableResult>;\n  disable(name: string): Promise<boolean>;\n  dispose(): Promise<void>;\n  enableLegacyBoolean(name: string): Promise<boolean>;\n  disableNow(name: string): boolean;\n  readonly disposed: boolean;\n};",
-            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability';"
+            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'",
+            "type ICapabilityHost<Context> = {\n  register<Handle extends ICapabilityHandle>(\n    definition: ICapabilityDefinition<Context, Handle>\n  ): void\n  readonly names: readonly string[]\n  state(name: string): ICapabilityState\n  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined\n  error(name: string): unknown\n  setFlag(name: string, enabled: boolean): void\n  setFlags(flags: Readonly<Record<string, boolean>>): void\n  enable(name: string): Promise<ICapabilityEnableResult>\n  enableResult(name: string): Promise<ICapabilityEnableResult>\n  disable(name: string): Promise<boolean>\n  dispose(): Promise<void>\n  enableLegacyBoolean(name: string): Promise<boolean>\n  disableNow(name: string): boolean\n  readonly disposed: boolean\n}",
+            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -2505,7 +2505,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability';"
+                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -2514,7 +2514,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n);"
+                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
                 },
                 {
                   "type": "paragraph",
@@ -2542,7 +2542,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> };"
+                  "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
                 },
                 {
                   "type": "paragraph",
@@ -2551,7 +2551,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000);\n    return { dispose: () => clearInterval(timer) };\n  }\n});"
+                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -2575,7 +2575,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.names; // ['greeting']"
+                  "code": "capabilities.names // ['greeting']"
                 },
                 {
                   "type": "paragraph",
@@ -2588,7 +2588,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.state('greeting'); // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
+                  "code": "capabilities.state('greeting') // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
                 },
                 {
                   "type": "paragraph",
@@ -2601,7 +2601,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const h = capabilities.handle<{ dispose(): void }>('greeting'); // 未启用返回 undefined"
+                  "code": "const h = capabilities.handle<{ dispose(): void }>('greeting') // 未启用返回 undefined"
                 },
                 {
                   "type": "paragraph",
@@ -2614,7 +2614,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.error('greeting'); // unknown，成功重启或重新配置后会被清空"
+                  "code": "capabilities.error('greeting') // unknown，成功重启或重新配置后会被清空"
                 },
                 {
                   "type": "paragraph",
@@ -2627,7 +2627,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.setFlag('greeting', false); // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true); // 打开：不会自动启用，仍需调用 enable()"
+                  "code": "capabilities.setFlag('greeting', false) // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true) // 打开：不会自动启用，仍需调用 enable()"
                 },
                 {
                   "type": "paragraph",
@@ -2640,7 +2640,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.setFlags({ greeting: true, persistence: false });"
+                  "code": "capabilities.setFlags({ greeting: true, persistence: false })"
                 },
                 {
                   "type": "paragraph",
@@ -2653,7 +2653,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const result = await capabilities.enable('greeting');\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
+                  "code": "const result = await capabilities.enable('greeting')\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
                 },
                 {
                   "type": "paragraph",
@@ -2666,7 +2666,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await capabilities.enableResult('greeting');"
+                  "code": "await capabilities.enableResult('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -2679,7 +2679,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const changed = await capabilities.disable('greeting'); // boolean：是否确实关掉了一个启用态能力"
+                  "code": "const changed = await capabilities.disable('greeting') // boolean：是否确实关掉了一个启用态能力"
                 },
                 {
                   "type": "paragraph",
@@ -2692,7 +2692,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await capabilities.dispose(); // 之后 host 永久不可用"
+                  "code": "await capabilities.dispose() // 之后 host 永久不可用"
                 },
                 {
                   "type": "paragraph",
@@ -2705,7 +2705,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting');"
+                  "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -2718,7 +2718,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const changed: boolean = capabilities.disableNow('greeting');"
+                  "code": "const changed: boolean = capabilities.disableNow('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -2731,7 +2731,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.disposed; // boolean"
+                  "code": "capabilities.disposed // boolean"
                 },
                 {
                   "type": "paragraph",
@@ -2759,10 +2759,10 @@
           "errors": ["No documented errors are declared for ICapabilityEnableResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICapabilityEnableResult.",
           "examples": [
-            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';",
-            "type ICapabilityEnableResult =\n  | { readonly status: 'enabled' }\n  | { readonly status: 'gated' }\n  | { readonly status: 'cancelled' }\n  | { readonly status: 'failed'; readonly error: unknown };",
-            "type ICapabilityHost<Context> = {\n  register<Handle extends ICapabilityHandle>(\n    definition: ICapabilityDefinition<Context, Handle>\n  ): void;\n  readonly names: readonly string[];\n  state(name: string): ICapabilityState;\n  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined;\n  error(name: string): unknown;\n  setFlag(name: string, enabled: boolean): void;\n  setFlags(flags: Readonly<Record<string, boolean>>): void;\n  enable(name: string): Promise<ICapabilityEnableResult>;\n  enableResult(name: string): Promise<ICapabilityEnableResult>;\n  disable(name: string): Promise<boolean>;\n  dispose(): Promise<void>;\n  enableLegacyBoolean(name: string): Promise<boolean>;\n  disableNow(name: string): boolean;\n  readonly disposed: boolean;\n};",
-            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability';"
+            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'",
+            "type ICapabilityEnableResult =\n  | { readonly status: 'enabled' }\n  | { readonly status: 'gated' }\n  | { readonly status: 'cancelled' }\n  | { readonly status: 'failed'; readonly error: unknown }",
+            "type ICapabilityHost<Context> = {\n  register<Handle extends ICapabilityHandle>(\n    definition: ICapabilityDefinition<Context, Handle>\n  ): void\n  readonly names: readonly string[]\n  state(name: string): ICapabilityState\n  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined\n  error(name: string): unknown\n  setFlag(name: string, enabled: boolean): void\n  setFlags(flags: Readonly<Record<string, boolean>>): void\n  enable(name: string): Promise<ICapabilityEnableResult>\n  enableResult(name: string): Promise<ICapabilityEnableResult>\n  disable(name: string): Promise<boolean>\n  dispose(): Promise<void>\n  enableLegacyBoolean(name: string): Promise<boolean>\n  disableNow(name: string): boolean\n  readonly disposed: boolean\n}",
+            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -2814,7 +2814,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability';"
+                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -2823,7 +2823,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n);"
+                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
                 },
                 {
                   "type": "paragraph",
@@ -2851,7 +2851,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> };"
+                  "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
                 },
                 {
                   "type": "paragraph",
@@ -2860,7 +2860,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000);\n    return { dispose: () => clearInterval(timer) };\n  }\n});"
+                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -2884,7 +2884,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.names; // ['greeting']"
+                  "code": "capabilities.names // ['greeting']"
                 },
                 {
                   "type": "paragraph",
@@ -2897,7 +2897,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.state('greeting'); // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
+                  "code": "capabilities.state('greeting') // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
                 },
                 {
                   "type": "paragraph",
@@ -2910,7 +2910,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const h = capabilities.handle<{ dispose(): void }>('greeting'); // 未启用返回 undefined"
+                  "code": "const h = capabilities.handle<{ dispose(): void }>('greeting') // 未启用返回 undefined"
                 },
                 {
                   "type": "paragraph",
@@ -2923,7 +2923,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.error('greeting'); // unknown，成功重启或重新配置后会被清空"
+                  "code": "capabilities.error('greeting') // unknown，成功重启或重新配置后会被清空"
                 },
                 {
                   "type": "paragraph",
@@ -2936,7 +2936,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.setFlag('greeting', false); // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true); // 打开：不会自动启用，仍需调用 enable()"
+                  "code": "capabilities.setFlag('greeting', false) // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true) // 打开：不会自动启用，仍需调用 enable()"
                 },
                 {
                   "type": "paragraph",
@@ -2949,7 +2949,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.setFlags({ greeting: true, persistence: false });"
+                  "code": "capabilities.setFlags({ greeting: true, persistence: false })"
                 },
                 {
                   "type": "paragraph",
@@ -2962,7 +2962,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const result = await capabilities.enable('greeting');\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
+                  "code": "const result = await capabilities.enable('greeting')\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
                 },
                 {
                   "type": "paragraph",
@@ -2975,7 +2975,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await capabilities.enableResult('greeting');"
+                  "code": "await capabilities.enableResult('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -2988,7 +2988,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const changed = await capabilities.disable('greeting'); // boolean：是否确实关掉了一个启用态能力"
+                  "code": "const changed = await capabilities.disable('greeting') // boolean：是否确实关掉了一个启用态能力"
                 },
                 {
                   "type": "paragraph",
@@ -3001,7 +3001,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await capabilities.dispose(); // 之后 host 永久不可用"
+                  "code": "await capabilities.dispose() // 之后 host 永久不可用"
                 },
                 {
                   "type": "paragraph",
@@ -3014,7 +3014,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting');"
+                  "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -3027,7 +3027,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const changed: boolean = capabilities.disableNow('greeting');"
+                  "code": "const changed: boolean = capabilities.disableNow('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -3040,7 +3040,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.disposed; // boolean"
+                  "code": "capabilities.disposed // boolean"
                 },
                 {
                   "type": "paragraph",
@@ -3068,7 +3068,7 @@
           "errors": ["No documented errors are declared for ICapabilityEnableStatusValue."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICapabilityEnableStatusValue.",
           "examples": [
-            "const CapabilityEnableStatus = {\n  enabled: 'enabled',\n  gated: 'gated',\n  cancelled: 'cancelled',\n  failed: 'failed'\n} as const;\ntype ICapabilityEnableStatusValue =\n  (typeof CapabilityEnableStatus)[keyof typeof CapabilityEnableStatus];"
+            "const CapabilityEnableStatus = {\n  enabled: 'enabled',\n  gated: 'gated',\n  cancelled: 'cancelled',\n  failed: 'failed'\n} as const\ntype ICapabilityEnableStatusValue =\n  (typeof CapabilityEnableStatus)[keyof typeof CapabilityEnableStatus]"
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -3132,9 +3132,9 @@
           "errors": ["No documented errors are declared for ICapabilityErrorCode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICapabilityErrorCode.",
           "examples": [
-            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';",
-            "const CapabilityErrorCode = {\n  hostDisposed: 'HOST_DISPOSED',\n  hostTransitioning: 'HOST_TRANSITIONING',\n  notRegistered: 'NOT_REGISTERED',\n  alreadyRegistered: 'ALREADY_REGISTERED',\n  invalidName: 'INVALID_NAME',\n  invalidActivate: 'INVALID_ACTIVATE',\n  invalidHandle: 'INVALID_HANDLE',\n  gated: 'GATED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode];",
-            "import {\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';"
+            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'",
+            "const CapabilityErrorCode = {\n  hostDisposed: 'HOST_DISPOSED',\n  hostTransitioning: 'HOST_TRANSITIONING',\n  notRegistered: 'NOT_REGISTERED',\n  alreadyRegistered: 'ALREADY_REGISTERED',\n  invalidName: 'INVALID_NAME',\n  invalidActivate: 'INVALID_ACTIVATE',\n  invalidHandle: 'INVALID_HANDLE',\n  gated: 'GATED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode]",
+            "import {\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'"
           ],
           "aliasOf": "ICapabilityErrorCode",
           "exportPath": ".",
@@ -3187,7 +3187,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ICapabilityError = Error & { readonly source: string; readonly code: string };\nfunction createCapabilityError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown }\n): ICapabilityError;\nfunction tagCapabilityError<E extends Error>(error: E, code: string): E;\nconst CAPABILITY_SOURCE = '@migaia/capability';"
+                  "code": "type ICapabilityError = Error & { readonly source: string; readonly code: string }\nfunction createCapabilityError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown }\n): ICapabilityError\nfunction tagCapabilityError<E extends Error>(error: E, code: string): E\nconst CAPABILITY_SOURCE = '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -3200,7 +3200,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const CapabilityErrorCode = {\n  hostDisposed: 'HOST_DISPOSED',\n  hostTransitioning: 'HOST_TRANSITIONING',\n  notRegistered: 'NOT_REGISTERED',\n  alreadyRegistered: 'ALREADY_REGISTERED',\n  invalidName: 'INVALID_NAME',\n  invalidActivate: 'INVALID_ACTIVATE',\n  invalidHandle: 'INVALID_HANDLE',\n  gated: 'GATED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode];"
+                  "code": "const CapabilityErrorCode = {\n  hostDisposed: 'HOST_DISPOSED',\n  hostTransitioning: 'HOST_TRANSITIONING',\n  notRegistered: 'NOT_REGISTERED',\n  alreadyRegistered: 'ALREADY_REGISTERED',\n  invalidName: 'INVALID_NAME',\n  invalidActivate: 'INVALID_ACTIVATE',\n  invalidHandle: 'INVALID_HANDLE',\n  gated: 'GATED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -3286,7 +3286,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';"
+                  "code": "import {\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -3326,7 +3326,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "CAPABILITY_SOURCE; // '@migaia/capability'"
+                  "code": "CAPABILITY_SOURCE // '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -3354,10 +3354,10 @@
           "errors": ["No documented errors are declared for ICapabilityHandle."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICapabilityHandle.",
           "examples": [
-            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';",
-            "type ICapabilityHost<Context> = {\n  register<Handle extends ICapabilityHandle>(\n    definition: ICapabilityDefinition<Context, Handle>\n  ): void;\n  readonly names: readonly string[];\n  state(name: string): ICapabilityState;\n  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined;\n  error(name: string): unknown;\n  setFlag(name: string, enabled: boolean): void;\n  setFlags(flags: Readonly<Record<string, boolean>>): void;\n  enable(name: string): Promise<ICapabilityEnableResult>;\n  enableResult(name: string): Promise<ICapabilityEnableResult>;\n  disable(name: string): Promise<boolean>;\n  dispose(): Promise<void>;\n  enableLegacyBoolean(name: string): Promise<boolean>;\n  disableNow(name: string): boolean;\n  readonly disposed: boolean;\n};",
-            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability';",
-            "type ICapabilityHandle = { dispose(): void | PromiseLike<void> };"
+            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'",
+            "type ICapabilityHost<Context> = {\n  register<Handle extends ICapabilityHandle>(\n    definition: ICapabilityDefinition<Context, Handle>\n  ): void\n  readonly names: readonly string[]\n  state(name: string): ICapabilityState\n  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined\n  error(name: string): unknown\n  setFlag(name: string, enabled: boolean): void\n  setFlags(flags: Readonly<Record<string, boolean>>): void\n  enable(name: string): Promise<ICapabilityEnableResult>\n  enableResult(name: string): Promise<ICapabilityEnableResult>\n  disable(name: string): Promise<boolean>\n  dispose(): Promise<void>\n  enableLegacyBoolean(name: string): Promise<boolean>\n  disableNow(name: string): boolean\n  readonly disposed: boolean\n}",
+            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'",
+            "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -3409,7 +3409,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability';"
+                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -3418,7 +3418,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n);"
+                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
                 },
                 {
                   "type": "paragraph",
@@ -3446,7 +3446,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> };"
+                  "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
                 },
                 {
                   "type": "paragraph",
@@ -3455,7 +3455,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000);\n    return { dispose: () => clearInterval(timer) };\n  }\n});"
+                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -3479,7 +3479,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.names; // ['greeting']"
+                  "code": "capabilities.names // ['greeting']"
                 },
                 {
                   "type": "paragraph",
@@ -3492,7 +3492,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.state('greeting'); // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
+                  "code": "capabilities.state('greeting') // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
                 },
                 {
                   "type": "paragraph",
@@ -3505,7 +3505,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const h = capabilities.handle<{ dispose(): void }>('greeting'); // 未启用返回 undefined"
+                  "code": "const h = capabilities.handle<{ dispose(): void }>('greeting') // 未启用返回 undefined"
                 },
                 {
                   "type": "paragraph",
@@ -3518,7 +3518,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.error('greeting'); // unknown，成功重启或重新配置后会被清空"
+                  "code": "capabilities.error('greeting') // unknown，成功重启或重新配置后会被清空"
                 },
                 {
                   "type": "paragraph",
@@ -3531,7 +3531,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.setFlag('greeting', false); // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true); // 打开：不会自动启用，仍需调用 enable()"
+                  "code": "capabilities.setFlag('greeting', false) // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true) // 打开：不会自动启用，仍需调用 enable()"
                 },
                 {
                   "type": "paragraph",
@@ -3544,7 +3544,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.setFlags({ greeting: true, persistence: false });"
+                  "code": "capabilities.setFlags({ greeting: true, persistence: false })"
                 },
                 {
                   "type": "paragraph",
@@ -3557,7 +3557,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const result = await capabilities.enable('greeting');\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
+                  "code": "const result = await capabilities.enable('greeting')\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
                 },
                 {
                   "type": "paragraph",
@@ -3570,7 +3570,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await capabilities.enableResult('greeting');"
+                  "code": "await capabilities.enableResult('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -3583,7 +3583,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const changed = await capabilities.disable('greeting'); // boolean：是否确实关掉了一个启用态能力"
+                  "code": "const changed = await capabilities.disable('greeting') // boolean：是否确实关掉了一个启用态能力"
                 },
                 {
                   "type": "paragraph",
@@ -3596,7 +3596,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await capabilities.dispose(); // 之后 host 永久不可用"
+                  "code": "await capabilities.dispose() // 之后 host 永久不可用"
                 },
                 {
                   "type": "paragraph",
@@ -3609,7 +3609,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting');"
+                  "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -3622,7 +3622,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const changed: boolean = capabilities.disableNow('greeting');"
+                  "code": "const changed: boolean = capabilities.disableNow('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -3635,7 +3635,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.disposed; // boolean"
+                  "code": "capabilities.disposed // boolean"
                 },
                 {
                   "type": "paragraph",
@@ -3663,10 +3663,10 @@
           "errors": ["No documented errors are declared for ICapabilityHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICapabilityHost.",
           "examples": [
-            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';",
-            "function createCapabilityHost<Context>(\n  context: Context,\n  options?: ICapabilityHostOptions\n): ICapabilityHost<Context>;\n\ntype ICapabilityHostOptions = {\n  readonly flags?: Readonly<Record<string, boolean>>;\n  readonly onError?: (name: string, error: unknown) => void;\n};",
-            "type ICapabilityHost<Context> = {\n  register<Handle extends ICapabilityHandle>(\n    definition: ICapabilityDefinition<Context, Handle>\n  ): void;\n  readonly names: readonly string[];\n  state(name: string): ICapabilityState;\n  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined;\n  error(name: string): unknown;\n  setFlag(name: string, enabled: boolean): void;\n  setFlags(flags: Readonly<Record<string, boolean>>): void;\n  enable(name: string): Promise<ICapabilityEnableResult>;\n  enableResult(name: string): Promise<ICapabilityEnableResult>;\n  disable(name: string): Promise<boolean>;\n  dispose(): Promise<void>;\n  enableLegacyBoolean(name: string): Promise<boolean>;\n  disableNow(name: string): boolean;\n  readonly disposed: boolean;\n};",
-            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability';"
+            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'",
+            "function createCapabilityHost<Context>(\n  context: Context,\n  options?: ICapabilityHostOptions\n): ICapabilityHost<Context>\n\ntype ICapabilityHostOptions = {\n  readonly flags?: Readonly<Record<string, boolean>>\n  readonly onError?: (name: string, error: unknown) => void\n}",
+            "type ICapabilityHost<Context> = {\n  register<Handle extends ICapabilityHandle>(\n    definition: ICapabilityDefinition<Context, Handle>\n  ): void\n  readonly names: readonly string[]\n  state(name: string): ICapabilityState\n  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined\n  error(name: string): unknown\n  setFlag(name: string, enabled: boolean): void\n  setFlags(flags: Readonly<Record<string, boolean>>): void\n  enable(name: string): Promise<ICapabilityEnableResult>\n  enableResult(name: string): Promise<ICapabilityEnableResult>\n  disable(name: string): Promise<boolean>\n  dispose(): Promise<void>\n  enableLegacyBoolean(name: string): Promise<boolean>\n  disableNow(name: string): boolean\n  readonly disposed: boolean\n}",
+            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -3718,7 +3718,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability';"
+                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -3727,7 +3727,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n);"
+                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
                 },
                 {
                   "type": "paragraph",
@@ -3755,7 +3755,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> };"
+                  "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
                 },
                 {
                   "type": "paragraph",
@@ -3764,7 +3764,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000);\n    return { dispose: () => clearInterval(timer) };\n  }\n});"
+                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -3788,7 +3788,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.names; // ['greeting']"
+                  "code": "capabilities.names // ['greeting']"
                 },
                 {
                   "type": "paragraph",
@@ -3801,7 +3801,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.state('greeting'); // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
+                  "code": "capabilities.state('greeting') // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
                 },
                 {
                   "type": "paragraph",
@@ -3814,7 +3814,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const h = capabilities.handle<{ dispose(): void }>('greeting'); // 未启用返回 undefined"
+                  "code": "const h = capabilities.handle<{ dispose(): void }>('greeting') // 未启用返回 undefined"
                 },
                 {
                   "type": "paragraph",
@@ -3827,7 +3827,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.error('greeting'); // unknown，成功重启或重新配置后会被清空"
+                  "code": "capabilities.error('greeting') // unknown，成功重启或重新配置后会被清空"
                 },
                 {
                   "type": "paragraph",
@@ -3840,7 +3840,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.setFlag('greeting', false); // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true); // 打开：不会自动启用，仍需调用 enable()"
+                  "code": "capabilities.setFlag('greeting', false) // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true) // 打开：不会自动启用，仍需调用 enable()"
                 },
                 {
                   "type": "paragraph",
@@ -3853,7 +3853,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.setFlags({ greeting: true, persistence: false });"
+                  "code": "capabilities.setFlags({ greeting: true, persistence: false })"
                 },
                 {
                   "type": "paragraph",
@@ -3866,7 +3866,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const result = await capabilities.enable('greeting');\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
+                  "code": "const result = await capabilities.enable('greeting')\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
                 },
                 {
                   "type": "paragraph",
@@ -3879,7 +3879,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await capabilities.enableResult('greeting');"
+                  "code": "await capabilities.enableResult('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -3892,7 +3892,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const changed = await capabilities.disable('greeting'); // boolean：是否确实关掉了一个启用态能力"
+                  "code": "const changed = await capabilities.disable('greeting') // boolean：是否确实关掉了一个启用态能力"
                 },
                 {
                   "type": "paragraph",
@@ -3905,7 +3905,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await capabilities.dispose(); // 之后 host 永久不可用"
+                  "code": "await capabilities.dispose() // 之后 host 永久不可用"
                 },
                 {
                   "type": "paragraph",
@@ -3918,7 +3918,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting');"
+                  "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -3931,7 +3931,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const changed: boolean = capabilities.disableNow('greeting');"
+                  "code": "const changed: boolean = capabilities.disableNow('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -3944,7 +3944,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.disposed; // boolean"
+                  "code": "capabilities.disposed // boolean"
                 },
                 {
                   "type": "paragraph",
@@ -3972,9 +3972,9 @@
           "errors": ["No documented errors are declared for ICapabilityHostOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICapabilityHostOptions.",
           "examples": [
-            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';",
-            "function createCapabilityHost<Context>(\n  context: Context,\n  options?: ICapabilityHostOptions\n): ICapabilityHost<Context>;\n\ntype ICapabilityHostOptions = {\n  readonly flags?: Readonly<Record<string, boolean>>;\n  readonly onError?: (name: string, error: unknown) => void;\n};",
-            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability';"
+            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'",
+            "function createCapabilityHost<Context>(\n  context: Context,\n  options?: ICapabilityHostOptions\n): ICapabilityHost<Context>\n\ntype ICapabilityHostOptions = {\n  readonly flags?: Readonly<Record<string, boolean>>\n  readonly onError?: (name: string, error: unknown) => void\n}",
+            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -4026,7 +4026,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability';"
+                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -4035,7 +4035,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n);"
+                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
                 },
                 {
                   "type": "paragraph",
@@ -4063,7 +4063,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> };"
+                  "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
                 },
                 {
                   "type": "paragraph",
@@ -4072,7 +4072,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000);\n    return { dispose: () => clearInterval(timer) };\n  }\n});"
+                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -4096,7 +4096,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.names; // ['greeting']"
+                  "code": "capabilities.names // ['greeting']"
                 },
                 {
                   "type": "paragraph",
@@ -4109,7 +4109,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.state('greeting'); // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
+                  "code": "capabilities.state('greeting') // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
                 },
                 {
                   "type": "paragraph",
@@ -4122,7 +4122,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const h = capabilities.handle<{ dispose(): void }>('greeting'); // 未启用返回 undefined"
+                  "code": "const h = capabilities.handle<{ dispose(): void }>('greeting') // 未启用返回 undefined"
                 },
                 {
                   "type": "paragraph",
@@ -4135,7 +4135,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.error('greeting'); // unknown，成功重启或重新配置后会被清空"
+                  "code": "capabilities.error('greeting') // unknown，成功重启或重新配置后会被清空"
                 },
                 {
                   "type": "paragraph",
@@ -4148,7 +4148,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.setFlag('greeting', false); // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true); // 打开：不会自动启用，仍需调用 enable()"
+                  "code": "capabilities.setFlag('greeting', false) // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true) // 打开：不会自动启用，仍需调用 enable()"
                 },
                 {
                   "type": "paragraph",
@@ -4161,7 +4161,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.setFlags({ greeting: true, persistence: false });"
+                  "code": "capabilities.setFlags({ greeting: true, persistence: false })"
                 },
                 {
                   "type": "paragraph",
@@ -4174,7 +4174,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const result = await capabilities.enable('greeting');\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
+                  "code": "const result = await capabilities.enable('greeting')\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
                 },
                 {
                   "type": "paragraph",
@@ -4187,7 +4187,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await capabilities.enableResult('greeting');"
+                  "code": "await capabilities.enableResult('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -4200,7 +4200,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const changed = await capabilities.disable('greeting'); // boolean：是否确实关掉了一个启用态能力"
+                  "code": "const changed = await capabilities.disable('greeting') // boolean：是否确实关掉了一个启用态能力"
                 },
                 {
                   "type": "paragraph",
@@ -4213,7 +4213,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await capabilities.dispose(); // 之后 host 永久不可用"
+                  "code": "await capabilities.dispose() // 之后 host 永久不可用"
                 },
                 {
                   "type": "paragraph",
@@ -4226,7 +4226,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting');"
+                  "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -4239,7 +4239,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const changed: boolean = capabilities.disableNow('greeting');"
+                  "code": "const changed: boolean = capabilities.disableNow('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -4252,7 +4252,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.disposed; // boolean"
+                  "code": "capabilities.disposed // boolean"
                 },
                 {
                   "type": "paragraph",
@@ -4343,9 +4343,9 @@
           "errors": ["No documented errors are declared for ICapabilityState."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICapabilityState.",
           "examples": [
-            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';",
-            "type ICapabilityHost<Context> = {\n  register<Handle extends ICapabilityHandle>(\n    definition: ICapabilityDefinition<Context, Handle>\n  ): void;\n  readonly names: readonly string[];\n  state(name: string): ICapabilityState;\n  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined;\n  error(name: string): unknown;\n  setFlag(name: string, enabled: boolean): void;\n  setFlags(flags: Readonly<Record<string, boolean>>): void;\n  enable(name: string): Promise<ICapabilityEnableResult>;\n  enableResult(name: string): Promise<ICapabilityEnableResult>;\n  disable(name: string): Promise<boolean>;\n  dispose(): Promise<void>;\n  enableLegacyBoolean(name: string): Promise<boolean>;\n  disableNow(name: string): boolean;\n  readonly disposed: boolean;\n};",
-            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability';"
+            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'",
+            "type ICapabilityHost<Context> = {\n  register<Handle extends ICapabilityHandle>(\n    definition: ICapabilityDefinition<Context, Handle>\n  ): void\n  readonly names: readonly string[]\n  state(name: string): ICapabilityState\n  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined\n  error(name: string): unknown\n  setFlag(name: string, enabled: boolean): void\n  setFlags(flags: Readonly<Record<string, boolean>>): void\n  enable(name: string): Promise<ICapabilityEnableResult>\n  enableResult(name: string): Promise<ICapabilityEnableResult>\n  disable(name: string): Promise<boolean>\n  dispose(): Promise<void>\n  enableLegacyBoolean(name: string): Promise<boolean>\n  disableNow(name: string): boolean\n  readonly disposed: boolean\n}",
+            "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -4397,7 +4397,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability';"
+                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -4406,7 +4406,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n);"
+                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
                 },
                 {
                   "type": "paragraph",
@@ -4434,7 +4434,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> };"
+                  "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
                 },
                 {
                   "type": "paragraph",
@@ -4443,7 +4443,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000);\n    return { dispose: () => clearInterval(timer) };\n  }\n});"
+                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -4467,7 +4467,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.names; // ['greeting']"
+                  "code": "capabilities.names // ['greeting']"
                 },
                 {
                   "type": "paragraph",
@@ -4480,7 +4480,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.state('greeting'); // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
+                  "code": "capabilities.state('greeting') // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
                 },
                 {
                   "type": "paragraph",
@@ -4493,7 +4493,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const h = capabilities.handle<{ dispose(): void }>('greeting'); // 未启用返回 undefined"
+                  "code": "const h = capabilities.handle<{ dispose(): void }>('greeting') // 未启用返回 undefined"
                 },
                 {
                   "type": "paragraph",
@@ -4506,7 +4506,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.error('greeting'); // unknown，成功重启或重新配置后会被清空"
+                  "code": "capabilities.error('greeting') // unknown，成功重启或重新配置后会被清空"
                 },
                 {
                   "type": "paragraph",
@@ -4519,7 +4519,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.setFlag('greeting', false); // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true); // 打开：不会自动启用，仍需调用 enable()"
+                  "code": "capabilities.setFlag('greeting', false) // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true) // 打开：不会自动启用，仍需调用 enable()"
                 },
                 {
                   "type": "paragraph",
@@ -4532,7 +4532,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.setFlags({ greeting: true, persistence: false });"
+                  "code": "capabilities.setFlags({ greeting: true, persistence: false })"
                 },
                 {
                   "type": "paragraph",
@@ -4545,7 +4545,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const result = await capabilities.enable('greeting');\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
+                  "code": "const result = await capabilities.enable('greeting')\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
                 },
                 {
                   "type": "paragraph",
@@ -4558,7 +4558,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await capabilities.enableResult('greeting');"
+                  "code": "await capabilities.enableResult('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -4571,7 +4571,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const changed = await capabilities.disable('greeting'); // boolean：是否确实关掉了一个启用态能力"
+                  "code": "const changed = await capabilities.disable('greeting') // boolean：是否确实关掉了一个启用态能力"
                 },
                 {
                   "type": "paragraph",
@@ -4584,7 +4584,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await capabilities.dispose(); // 之后 host 永久不可用"
+                  "code": "await capabilities.dispose() // 之后 host 永久不可用"
                 },
                 {
                   "type": "paragraph",
@@ -4597,7 +4597,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting');"
+                  "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -4610,7 +4610,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const changed: boolean = capabilities.disableNow('greeting');"
+                  "code": "const changed: boolean = capabilities.disableNow('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -4623,7 +4623,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.disposed; // boolean"
+                  "code": "capabilities.disposed // boolean"
                 },
                 {
                   "type": "paragraph",
@@ -4651,7 +4651,7 @@
           "errors": ["No documented errors are declared for ICapabilityStateValue."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICapabilityStateValue.",
           "examples": [
-            "const CapabilityState = {\n  off: 'off',\n  gated: 'gated',\n  activating: 'activating',\n  on: 'on',\n  failed: 'failed'\n} as const;\ntype ICapabilityStateValue = (typeof CapabilityState)[keyof typeof CapabilityState];"
+            "const CapabilityState = {\n  off: 'off',\n  gated: 'gated',\n  activating: 'activating',\n  on: 'on',\n  failed: 'failed'\n} as const\ntype ICapabilityStateValue = (typeof CapabilityState)[keyof typeof CapabilityState]"
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -5000,7 +5000,7 @@
           "errors": ["No documented errors are declared for CapabilityGraphErrorCode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for CapabilityGraphErrorCode.",
           "examples": [
-            "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph';"
+            "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph'"
           ],
           "aliasOf": "CapabilityGraphErrorCode",
           "exportPath": "./graph",
@@ -5197,7 +5197,7 @@
           "errors": ["No documented errors are declared for createCapabilityGraph."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createCapabilityGraph.",
           "examples": [
-            "const graph = createCapabilityGraph({ onError: (error) => console.error(error) });\nconst provider = 'provider' as IGraphNodeId;\ngraph.register({\n  id: provider,\n  kind: 'service',\n  dependencies: [],\n  start: () => ({ value: { ready: true }, release: () => undefined })\n});\nconst consumer = 'consumer' as IGraphNodeId;\ngraph.register({\n  id: consumer,\n  kind: 'consumer',\n  dependencies: [{ provider, required: true }],\n  start: ({ get }) => ({ value: get(provider), release: () => undefined })\n});\nawait graph.ready();\nconst service = graph.get<{ readonly ready: boolean }>(consumer, provider);\nawait graph.dispose();"
+            "const graph = createCapabilityGraph({ onError: (error) => console.error(error) })\nconst provider = 'provider' as IGraphNodeId\ngraph.register({\n  id: provider,\n  kind: 'service',\n  dependencies: [],\n  start: () => ({ value: { ready: true }, release: () => undefined })\n})\nconst consumer = 'consumer' as IGraphNodeId\ngraph.register({\n  id: consumer,\n  kind: 'consumer',\n  dependencies: [{ provider, required: true }],\n  start: ({ get }) => ({ value: get(provider), release: () => undefined })\n})\nawait graph.ready()\nconst service = graph.get<{ readonly ready: boolean }>(consumer, provider)\nawait graph.dispose()"
           ],
           "exportPath": "./graph",
           "overloadSignatures": [
@@ -5723,9 +5723,9 @@
           "errors": ["No documented errors are declared for IGraphNodeDefinition."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphNodeDefinition.",
           "examples": [
-            "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph';",
-            "type IGraphNodeDefinition<T> = {\n  readonly id: IGraphNodeId;\n  readonly kind: string;\n  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[];\n  readonly start: (\n    context: IGraphStartContext\n  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>;\n};",
-            "import {\n  createCapabilityGraph,\n  type IGraphNodeId,\n  type IGraphNodeDefinition\n} from '@migaia/capability/graph';"
+            "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph'",
+            "type IGraphNodeDefinition<T> = {\n  readonly id: IGraphNodeId\n  readonly kind: string\n  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[]\n  readonly start: (\n    context: IGraphStartContext\n  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>\n}",
+            "import {\n  createCapabilityGraph,\n  type IGraphNodeId,\n  type IGraphNodeDefinition\n} from '@migaia/capability/graph'"
           ],
           "exportPath": "./graph",
           "overloadSignatures": [
@@ -5851,10 +5851,10 @@
           "errors": ["No documented errors are declared for IGraphNodeId."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphNodeId.",
           "examples": [
-            "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph';",
-            "type IGraphNodeDefinition<T> = {\n  readonly id: IGraphNodeId;\n  readonly kind: string;\n  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[];\n  readonly start: (\n    context: IGraphStartContext\n  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>;\n};",
-            "import {\n  createCapabilityGraph,\n  type IGraphNodeId,\n  type IGraphNodeDefinition\n} from '@migaia/capability/graph';",
-            "const graph = createCapabilityGraph({ onError: (error) => console.error(error) });\nconst provider = 'provider' as IGraphNodeId;\ngraph.register({\n  id: provider,\n  kind: 'service',\n  dependencies: [],\n  start: () => ({ value: { ready: true }, release: () => undefined })\n});\nconst consumer = 'consumer' as IGraphNodeId;\ngraph.register({\n  id: consumer,\n  kind: 'consumer',\n  dependencies: [{ provider, required: true }],\n  start: ({ get }) => ({ value: get(provider), release: () => undefined })\n});\nawait graph.ready();\nconst service = graph.get<{ readonly ready: boolean }>(consumer, provider);\nawait graph.dispose();"
+            "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph'",
+            "type IGraphNodeDefinition<T> = {\n  readonly id: IGraphNodeId\n  readonly kind: string\n  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[]\n  readonly start: (\n    context: IGraphStartContext\n  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>\n}",
+            "import {\n  createCapabilityGraph,\n  type IGraphNodeId,\n  type IGraphNodeDefinition\n} from '@migaia/capability/graph'",
+            "const graph = createCapabilityGraph({ onError: (error) => console.error(error) })\nconst provider = 'provider' as IGraphNodeId\ngraph.register({\n  id: provider,\n  kind: 'service',\n  dependencies: [],\n  start: () => ({ value: { ready: true }, release: () => undefined })\n})\nconst consumer = 'consumer' as IGraphNodeId\ngraph.register({\n  id: consumer,\n  kind: 'consumer',\n  dependencies: [{ provider, required: true }],\n  start: ({ get }) => ({ value: get(provider), release: () => undefined })\n})\nawait graph.ready()\nconst service = graph.get<{ readonly ready: boolean }>(consumer, provider)\nawait graph.dispose()"
           ],
           "exportPath": "./graph",
           "overloadSignatures": [
@@ -5918,8 +5918,8 @@
           "errors": ["No documented errors are declared for IGraphNodeInstance."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphNodeInstance.",
           "examples": [
-            "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph';",
-            "type IGraphNodeDefinition<T> = {\n  readonly id: IGraphNodeId;\n  readonly kind: string;\n  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[];\n  readonly start: (\n    context: IGraphStartContext\n  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>;\n};"
+            "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph'",
+            "type IGraphNodeDefinition<T> = {\n  readonly id: IGraphNodeId\n  readonly kind: string\n  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[]\n  readonly start: (\n    context: IGraphStartContext\n  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>\n}"
           ],
           "exportPath": "./graph",
           "overloadSignatures": [
@@ -6045,8 +6045,8 @@
           "errors": ["No documented errors are declared for IGraphStartContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphStartContext.",
           "examples": [
-            "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph';",
-            "type IGraphNodeDefinition<T> = {\n  readonly id: IGraphNodeId;\n  readonly kind: string;\n  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[];\n  readonly start: (\n    context: IGraphStartContext\n  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>;\n};"
+            "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph'",
+            "type IGraphNodeDefinition<T> = {\n  readonly id: IGraphNodeId\n  readonly kind: string\n  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[]\n  readonly start: (\n    context: IGraphStartContext\n  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>\n}"
           ],
           "exportPath": "./graph",
           "overloadSignatures": [
@@ -6179,7 +6179,7 @@
           "name": "createDynamicCapabilityGraph",
           "kind": "function",
           "signature": "export declare function createDynamicCapabilityGraph<TBinding = unknown>(options?: IDynamicCapabilityGraphOptions<TBinding>): IDynamicCapabilityGraph<TBinding>;",
-          "declarationLine": 65,
+          "declarationLine": 75,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Creates a serialized dynamic graph with fail-closed required-edge reconciliation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createDynamicCapabilityGraph.",
@@ -6196,7 +6196,7 @@
           "errors": ["No documented errors are declared for createDynamicCapabilityGraph."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createDynamicCapabilityGraph.",
           "examples": [
-            "import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic';\n\nconst graph = createDynamicCapabilityGraph<{ readonly version: number }>({\n  startBatch: (entries) =>\n    entries.map((entry) => ({ value: entry.binding, release: async () => undefined })),\n  releaseBatch: async (entries, fence) => {\n    await fence;\n    // 这里只释放 entries 对应的 exact old generation。\n  }\n});"
+            "import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'\n\nconst graph = createDynamicCapabilityGraph<{ readonly version: number }>({\n  startBatch: (entries) =>\n    entries.map((entry) => ({ value: entry.binding, release: async () => undefined })),\n  releaseBatch: async (entries, fence) => {\n    await fence\n    // 这里只释放 entries 对应的 exact old generation。\n  }\n})"
           ],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
@@ -6270,6 +6270,12 @@
               "type": "(entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>",
               "optional": true,
               "description": "Composition-owned physical release for one sealed cascade."
+            },
+            {
+              "name": "releaseBinding",
+              "type": "(entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>",
+              "optional": true,
+              "description": "Releases custody for an exact binding generation after its instance cleanup fence."
             }
           ],
           "identity": "packages/capability/dist/graph/dynamic.d.ts:createDynamicCapabilityGraph:export declare function createDynamicCapabilityGraph<TBinding = unknown>(options?: IDynamicCapabilityGraphOptions<TBinding>): IDynamicCapabilityGraph<TBinding>;",
@@ -6307,6 +6313,14 @@
               "description": "`releaseBatch` 收到的 `fence` 只在所有 exact leases 归零后 resolve。owner 可以先提交逻辑撤销并返回 incomplete observation，但不能在 fence 之前启动物理 disposer。`metrics.queueTimeMs` 只计算 mutation 在 Graph FIFO 中等待的时间；`wallTimeMs` 计算实际 affected reconciliation，二者不可相互替代。",
               "descriptionEn": "Composition-owned physical release for one sealed cascade.",
               "descriptionZh": "`releaseBatch` 收到的 `fence` 只在所有 exact leases 归零后 resolve。owner 可以先提交逻辑撤销并返回 incomplete observation，但不能在 fence 之前启动物理 disposer。`metrics.queueTimeMs` 只计算 mutation 在 Graph FIFO 中等待的时间；`wallTimeMs` 计算实际 affected reconciliation，二者不可相互替代。"
+            },
+            {
+              "name": "releaseBinding",
+              "type": "(entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>",
+              "optional": true,
+              "description": "Releases custody for an exact binding generation after its instance cleanup fence.",
+              "descriptionEn": "Releases custody for an exact binding generation after its instance cleanup fence.",
+              "descriptionZh": ""
             }
           ],
           "fragment": "capability-graph-dynamic--createDynamicCapabilityGraph"
@@ -6315,7 +6329,7 @@
           "name": "IDynamicCapabilityGraph",
           "kind": "type",
           "signature": "export type IDynamicCapabilityGraph<TBinding = unknown> = Readonly<{ readonly nodes: readonly IGraphNodeId[]; readonly state: ICapabilityGraphState; readonly generation: number; register<T>(node: IGraphNodeDefinition<T>, binding?: TBinding): Promise<IGraphMutationResult>; remove(id: IGraphNodeId): Promise<IGraphMutationResult>; replace<T>(node: IGraphNodeDefinition<T>, binding?: TBinding): Promise<IGraphMutationResult>; ready(): Promise<void>; nodeState(id: IGraphNodeId): IGraphNodeDiagnostic; getBinding<T = TBinding>(id: IGraphNodeId): T | undefined; acquireBinding(id: IGraphNodeId): IGraphBindingLease<TBinding>; dispose(): Promise<void>; }>;",
-          "declarationLine": 51,
+          "declarationLine": 61,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Dynamic required-edge graph used by composition owners.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDynamicCapabilityGraph.",
@@ -6376,7 +6390,7 @@
         {
           "name": "IDynamicCapabilityGraphOptions",
           "kind": "type",
-          "signature": "export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{ /** * Receives contained startup, release, and late failures without replacing the primary graph * result. */ readonly report?: (error: unknown) => void; /** Maximum time an accepted mutation may wait behind an older serialized mutation. */ readonly mutationAdmissionMs?: number; /** Composition-owned startup for one topologically ordered affected frontier. */ readonly startBatch?: (entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>; /** Composition-owned physical release for one sealed cascade. */ readonly releaseBatch?: (entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>; }>;",
+          "signature": "export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{ /** * Receives contained startup, release, and late failures without replacing the primary graph * result. */ readonly report?: (error: unknown) => void; /** Maximum time an accepted mutation may wait behind an older serialized mutation. */ readonly mutationAdmissionMs?: number; /** Composition-owned startup for one topologically ordered affected frontier. */ readonly startBatch?: (entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>; /** Composition-owned physical release for one sealed cascade. */ readonly releaseBatch?: (entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>; /** Releases custody for an exact binding generation after its instance cleanup fence. */ readonly releaseBinding?: (entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>; }>;",
           "declarationLine": 20,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Runtime-neutral dynamic graph options.",
@@ -6390,7 +6404,7 @@
           "examples": [],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
-            "export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{ /** * Receives contained startup, release, and late failures without replacing the primary graph * result. */ readonly report?: (error: unknown) => void; /** Maximum time an accepted mutation may wait behind an older serialized mutation. */ readonly mutationAdmissionMs?: number; /** Composition-owned startup for one topologically ordered affected frontier. */ readonly startBatch?: (entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>; /** Composition-owned physical release for one sealed cascade. */ readonly releaseBatch?: (entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>; }>;"
+            "export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{ /** * Receives contained startup, release, and late failures without replacing the primary graph * result. */ readonly report?: (error: unknown) => void; /** Maximum time an accepted mutation may wait behind an older serialized mutation. */ readonly mutationAdmissionMs?: number; /** Composition-owned startup for one topologically ordered affected frontier. */ readonly startBatch?: (entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>; /** Composition-owned physical release for one sealed cascade. */ readonly releaseBatch?: (entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>; /** Releases custody for an exact binding generation after its instance cleanup fence. */ readonly releaseBinding?: (entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6429,7 +6443,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/dynamic.d.ts:IDynamicCapabilityGraphOptions:export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{ /** * Receives contained startup, release, and late failures without replacing the primary graph * result. */ readonly report?: (error: unknown) => void; /** Maximum time an accepted mutation may wait behind an older serialized mutation. */ readonly mutationAdmissionMs?: number; /** Composition-owned startup for one topologically ordered affected frontier. */ readonly startBatch?: (entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>; /** Composition-owned physical release for one sealed cascade. */ readonly releaseBatch?: (entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>; }>;",
+          "identity": "packages/capability/dist/graph/dynamic.d.ts:IDynamicCapabilityGraphOptions:export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{ /** * Receives contained startup, release, and late failures without replacing the primary graph * result. */ readonly report?: (error: unknown) => void; /** Maximum time an accepted mutation may wait behind an older serialized mutation. */ readonly mutationAdmissionMs?: number; /** Composition-owned startup for one topologically ordered affected frontier. */ readonly startBatch?: (entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>; /** Composition-owned physical release for one sealed cascade. */ readonly releaseBatch?: (entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>; /** Releases custody for an exact binding generation after its instance cleanup fence. */ readonly releaseBinding?: (entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -6439,7 +6453,7 @@
           "name": "IGraphBindingLease",
           "kind": "type",
           "signature": "export type IGraphBindingLease<TBinding> = Readonly<{ readonly value: TBinding; readonly release: () => void; }>;",
-          "declarationLine": 34,
+          "declarationLine": 44,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Exact binding-generation lease retained by a consumer until it no longer observes the value.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphBindingLease.",
@@ -6496,6 +6510,130 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "capability-graph-dynamic--IGraphBindingLease"
+        },
+        {
+          "name": "IGraphBindingReleaseEntry",
+          "kind": "type",
+          "signature": "export type IGraphBindingReleaseEntry<TBinding> = Readonly<{ readonly id: IGraphNodeId; readonly binding: TBinding; readonly reason: IGraphBindingReleaseReason; }>;",
+          "declarationLine": 38,
+          "source": "packages/capability/dist/graph/dynamic.d.ts",
+          "purpose": "Exact binding custody released after graph-owned instance cleanup.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphBindingReleaseEntry.",
+          "advanced": "No additional advanced behavior is declared for IGraphBindingReleaseEntry.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IGraphBindingReleaseEntry."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphBindingReleaseEntry.",
+          "examples": [],
+          "exportPath": "./graph/dynamic",
+          "overloadSignatures": [
+            "export type IGraphBindingReleaseEntry<TBinding> = Readonly<{ readonly id: IGraphNodeId; readonly binding: TBinding; readonly reason: IGraphBindingReleaseReason; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IGraphBindingReleaseEntry when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IGraphBindingReleaseEntry does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Exact binding custody released after graph-owned instance cleanup."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IGraphBindingReleaseEntry from @migaia/capability/graph/dynamic, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IGraphBindingReleaseEntry when its type contract and declared inputs match the result you need. Choose a different public symbol when IGraphBindingReleaseEntry does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphBindingReleaseEntry."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IGraphBindingReleaseEntry."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/capability/dist/graph/dynamic.d.ts:IGraphBindingReleaseEntry:export type IGraphBindingReleaseEntry<TBinding> = Readonly<{ readonly id: IGraphNodeId; readonly binding: TBinding; readonly reason: IGraphBindingReleaseReason; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "capability-graph-dynamic--IGraphBindingReleaseEntry"
+        },
+        {
+          "name": "IGraphBindingReleaseReason",
+          "kind": "type",
+          "signature": "export type IGraphBindingReleaseReason = 'remove' | 'replace' | 'dispose';",
+          "declarationLine": 36,
+          "source": "packages/capability/dist/graph/dynamic.d.ts",
+          "purpose": "Identifies why one exact graph binding generation left the graph.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphBindingReleaseReason.",
+          "advanced": "No additional advanced behavior is declared for IGraphBindingReleaseReason.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IGraphBindingReleaseReason."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphBindingReleaseReason.",
+          "examples": [],
+          "exportPath": "./graph/dynamic",
+          "overloadSignatures": [
+            "export type IGraphBindingReleaseReason = 'remove' | 'replace' | 'dispose';"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IGraphBindingReleaseReason when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IGraphBindingReleaseReason does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Identifies why one exact graph binding generation left the graph."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IGraphBindingReleaseReason from @migaia/capability/graph/dynamic, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IGraphBindingReleaseReason when its type contract and declared inputs match the result you need. Choose a different public symbol when IGraphBindingReleaseReason does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphBindingReleaseReason."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IGraphBindingReleaseReason."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/capability/dist/graph/dynamic.d.ts:IGraphBindingReleaseReason:export type IGraphBindingReleaseReason = 'remove' | 'replace' | 'dispose';",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "capability-graph-dynamic--IGraphBindingReleaseReason"
         },
         {
           "name": "IGraphMutationResult",
@@ -6563,7 +6701,7 @@
           "name": "IGraphReleaseEntry",
           "kind": "type",
           "signature": "export type IGraphReleaseEntry<TBinding = unknown> = Readonly<{ readonly id: IGraphNodeId; readonly binding: TBinding | undefined; readonly instance: IGraphNodeInstance<unknown>; }>;",
-          "declarationLine": 45,
+          "declarationLine": 55,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Immutable view of one graph node supplied to a composition release owner.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphReleaseEntry.",
@@ -6625,7 +6763,7 @@
           "name": "IGraphStartEntry",
           "kind": "type",
           "signature": "export type IGraphStartEntry<TBinding = unknown> = Readonly<{ readonly id: IGraphNodeId; readonly binding: TBinding | undefined; readonly definition: IGraphNodeDefinition<unknown>; }>;",
-          "declarationLine": 39,
+          "declarationLine": 49,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Immutable node information supplied to a composition startup owner.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphStartEntry.",

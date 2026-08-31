@@ -4,7 +4,7 @@
     {
       "slug": "capability",
       "description": "Store-neutral capability lifecycle and feature gate.",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "exports": [".", "./graph", "./graph/dynamic", "./graph/topology"],
       "documentation": {
         "readme": {
@@ -77,7 +77,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createCapabilityGraph,\n  type IGraphNodeId,\n  type IGraphNodeDefinition\n} from '@migaia/capability/graph';"
+                  "code": "import {\n  createCapabilityGraph,\n  type IGraphNodeId,\n  type IGraphNodeDefinition\n} from '@migaia/capability/graph'"
                 },
                 {
                   "type": "paragraph",
@@ -90,7 +90,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const graph = createCapabilityGraph({ onError: (error) => console.error(error) });\nconst provider = 'provider' as IGraphNodeId;\ngraph.register({\n  id: provider,\n  kind: 'service',\n  dependencies: [],\n  start: () => ({ value: { ready: true }, release: () => undefined })\n});\nconst consumer = 'consumer' as IGraphNodeId;\ngraph.register({\n  id: consumer,\n  kind: 'consumer',\n  dependencies: [{ provider, required: true }],\n  start: ({ get }) => ({ value: get(provider), release: () => undefined })\n});\nawait graph.ready();\nconst service = graph.get<{ readonly ready: boolean }>(consumer, provider);\nawait graph.dispose();"
+                  "code": "const graph = createCapabilityGraph({ onError: (error) => console.error(error) })\nconst provider = 'provider' as IGraphNodeId\ngraph.register({\n  id: provider,\n  kind: 'service',\n  dependencies: [],\n  start: () => ({ value: { ready: true }, release: () => undefined })\n})\nconst consumer = 'consumer' as IGraphNodeId\ngraph.register({\n  id: consumer,\n  kind: 'consumer',\n  dependencies: [{ provider, required: true }],\n  start: ({ get }) => ({ value: get(provider), release: () => undefined })\n})\nawait graph.ready()\nconst service = graph.get<{ readonly ready: boolean }>(consumer, provider)\nawait graph.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -105,7 +105,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability';"
+                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -114,7 +114,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n);"
+                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
                 },
                 {
                   "type": "paragraph",
@@ -142,7 +142,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> };"
+                  "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
                 },
                 {
                   "type": "paragraph",
@@ -151,7 +151,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000);\n    return { dispose: () => clearInterval(timer) };\n  }\n});"
+                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -175,7 +175,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.names; // ['greeting']"
+                  "code": "capabilities.names // ['greeting']"
                 },
                 {
                   "type": "paragraph",
@@ -188,7 +188,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.state('greeting'); // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
+                  "code": "capabilities.state('greeting') // 'off' | 'gated' | 'activating' | 'on' | 'failed'"
                 },
                 {
                   "type": "paragraph",
@@ -201,7 +201,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const h = capabilities.handle<{ dispose(): void }>('greeting'); // 未启用返回 undefined"
+                  "code": "const h = capabilities.handle<{ dispose(): void }>('greeting') // 未启用返回 undefined"
                 },
                 {
                   "type": "paragraph",
@@ -214,7 +214,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.error('greeting'); // unknown，成功重启或重新配置后会被清空"
+                  "code": "capabilities.error('greeting') // unknown，成功重启或重新配置后会被清空"
                 },
                 {
                   "type": "paragraph",
@@ -227,7 +227,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.setFlag('greeting', false); // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true); // 打开：不会自动启用，仍需调用 enable()"
+                  "code": "capabilities.setFlag('greeting', false) // 关闭：同步作废在途激活并释放已有 handle\ncapabilities.setFlag('greeting', true) // 打开：不会自动启用，仍需调用 enable()"
                 },
                 {
                   "type": "paragraph",
@@ -240,7 +240,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.setFlags({ greeting: true, persistence: false });"
+                  "code": "capabilities.setFlags({ greeting: true, persistence: false })"
                 },
                 {
                   "type": "paragraph",
@@ -253,7 +253,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const result = await capabilities.enable('greeting');\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
+                  "code": "const result = await capabilities.enable('greeting')\n// { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }"
                 },
                 {
                   "type": "paragraph",
@@ -266,7 +266,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await capabilities.enableResult('greeting');"
+                  "code": "await capabilities.enableResult('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -279,7 +279,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const changed = await capabilities.disable('greeting'); // boolean：是否确实关掉了一个启用态能力"
+                  "code": "const changed = await capabilities.disable('greeting') // boolean：是否确实关掉了一个启用态能力"
                 },
                 {
                   "type": "paragraph",
@@ -292,7 +292,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await capabilities.dispose(); // 之后 host 永久不可用"
+                  "code": "await capabilities.dispose() // 之后 host 永久不可用"
                 },
                 {
                   "type": "paragraph",
@@ -305,7 +305,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting');"
+                  "code": "const ok: boolean = await capabilities.enableLegacyBoolean('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -318,7 +318,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const changed: boolean = capabilities.disableNow('greeting');"
+                  "code": "const changed: boolean = capabilities.disableNow('greeting')"
                 },
                 {
                   "type": "paragraph",
@@ -331,7 +331,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.disposed; // boolean"
+                  "code": "capabilities.disposed // boolean"
                 },
                 {
                   "type": "paragraph",
@@ -346,7 +346,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { CapabilityState, CapabilityEnableStatus } from '@migaia/capability';"
+                  "code": "import { CapabilityState, CapabilityEnableStatus } from '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -382,7 +382,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "if (result.status === CapabilityEnableStatus.failed) console.error(result.error);"
+                  "code": "if (result.status === CapabilityEnableStatus.failed) console.error(result.error)"
                 },
                 {
                   "type": "paragraph",
@@ -406,7 +406,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';"
+                  "code": "import {\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -446,7 +446,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "CAPABILITY_SOURCE; // '@migaia/capability'"
+                  "code": "CAPABILITY_SOURCE // '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -455,57 +455,57 @@
               ]
             },
             {
-              "id": "1-按开关懒加载一个持久化能力-附错误上报与优雅收尾",
-              "heading": "1. 按开关懒加载一个持久化能力，附错误上报与优雅收尾",
+              "id": "高阶组合示例-1-按开关懒加载一个持久化能力-附错误上报与优雅收尾",
+              "heading": "高阶组合示例 · 1. 按开关懒加载一个持久化能力，附错误上报与优雅收尾",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createCapabilityHost } from '@migaia/capability';\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n);\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    // 只有开关打开、真正 enable() 时才会下载这个 chunk\n    const { persist, memoryStorage } = await import('@migaia/store-persist');\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() });\n    return { dispose: () => handle.dispose() };\n  }\n});\n\nconst result = await capabilities.enable('persistence');\nif (result.status === 'enabled') console.log('持久化已启用');\n\nawait capabilities.disable('persistence');\nawait capabilities.dispose();"
+                  "code": "import { createCapabilityHost } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    // 只有开关打开、真正 enable() 时才会下载这个 chunk\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === 'enabled') console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose()"
                 }
               ]
             },
             {
-              "id": "2-多租户隔离-每个租户一份独立开关表",
-              "heading": "2. 多租户隔离：每个租户一份独立开关表",
+              "id": "高阶组合示例-2-多租户隔离-每个租户一份独立开关表",
+              "heading": "高阶组合示例 · 2. 多租户隔离：每个租户一份独立开关表",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createCapabilityHost } from '@migaia/capability';\n\nfunction createTenantCapabilities(tenant: string, flags: Record<string, boolean>) {\n  const host = createCapabilityHost({ tenant }, { flags });\n  host.register({\n    name: 'experimental-ai',\n    activate: async ({ tenant }) => {\n      const controller = await connectAiSidecar(tenant);\n      return { dispose: () => controller.close() };\n    }\n  });\n  return host;\n}\n\nconst acme = createTenantCapabilities('acme', { 'experimental-ai': true });\nconst globex = createTenantCapabilities('globex', { 'experimental-ai': false });\n\nawait acme.enable('experimental-ai'); // { status: 'enabled' }\nawait globex.enable('experimental-ai'); // { status: 'gated' }"
+                  "code": "import { createCapabilityHost } from '@migaia/capability'\n\nfunction createTenantCapabilities(tenant: string, flags: Record<string, boolean>) {\n  const host = createCapabilityHost({ tenant }, { flags })\n  host.register({\n    name: 'experimental-ai',\n    activate: async ({ tenant }) => {\n      const controller = await connectAiSidecar(tenant)\n      return { dispose: () => controller.close() }\n    }\n  })\n  return host\n}\n\nconst acme = createTenantCapabilities('acme', { 'experimental-ai': true })\nconst globex = createTenantCapabilities('globex', { 'experimental-ai': false })\n\nawait acme.enable('experimental-ai') // { status: 'enabled' }\nawait globex.enable('experimental-ai') // { status: 'gated' }"
                 }
               ]
             },
             {
-              "id": "3-setflag-false-触发的原子回退-无需再手动调用-disable",
-              "heading": "3. setFlag(false) 触发的原子回退：无需再手动调用 disable()",
+              "id": "高阶组合示例-3-setflag-false-触发的原子回退-无需再手动调用-disable",
+              "heading": "高阶组合示例 · 3. setFlag(false) 触发的原子回退：无需再手动调用 disable()",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createCapabilityHost, CapabilityState } from '@migaia/capability';\n\nconst host = createCapabilityHost({}, { flags: { worker: true } });\nhost.register({\n  name: 'worker',\n  async activate() {\n    const port = await connectWorkerPort();\n    return { dispose: () => port.close() };\n  }\n});\n\nawait host.enable('worker');\nhost.state('worker'); // CapabilityState.on\n\nhost.setFlag('worker', false); // 同步作废在途激活/释放已有 handle，不需要再调用 disable()\nhost.state('worker'); // CapabilityState.gated"
+                  "code": "import { createCapabilityHost, CapabilityState } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { worker: true } })\nhost.register({\n  name: 'worker',\n  async activate() {\n    const port = await connectWorkerPort()\n    return { dispose: () => port.close() }\n  }\n})\n\nawait host.enable('worker')\nhost.state('worker') // CapabilityState.on\n\nhost.setFlag('worker', false) // 同步作废在途激活/释放已有 handle，不需要再调用 disable()\nhost.state('worker') // CapabilityState.gated"
                 }
               ]
             },
             {
-              "id": "4-并发-enable-幂等共享同一次激活",
-              "heading": "4. 并发 enable() 幂等共享同一次激活",
+              "id": "高阶组合示例-4-并发-enable-幂等共享同一次激活",
+              "heading": "高阶组合示例 · 4. 并发 enable() 幂等共享同一次激活",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createCapabilityHost } from '@migaia/capability';\n\nconst host = createCapabilityHost({}, { flags: { search: true } });\nlet activateCalls = 0;\nhost.register({\n  name: 'search',\n  async activate() {\n    activateCalls++;\n    const index = await buildSearchIndex();\n    return { dispose: () => index.close() };\n  }\n});\n\nconst [a, b, c] = await Promise.all([\n  host.enable('search'),\n  host.enable('search'),\n  host.enableLegacyBoolean('search')\n]);\nactivateCalls; // 1 —— 三个并发调用共享同一次 activate()"
+                  "code": "import { createCapabilityHost } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { search: true } })\nlet activateCalls = 0\nhost.register({\n  name: 'search',\n  async activate() {\n    activateCalls++\n    const index = await buildSearchIndex()\n    return { dispose: () => index.close() }\n  }\n})\n\nconst [a, b, c] = await Promise.all([\n  host.enable('search'),\n  host.enable('search'),\n  host.enableLegacyBoolean('search')\n])\nactivateCalls // 1 —— 三个并发调用共享同一次 activate()"
                 }
               ]
             },
             {
-              "id": "5-能力启用失败后查询原因-再重新配置恢复",
-              "heading": "5. 能力启用失败后查询原因，再重新配置恢复",
+              "id": "高阶组合示例-5-能力启用失败后查询原因-再重新配置恢复",
+              "heading": "高阶组合示例 · 5. 能力启用失败后查询原因，再重新配置恢复",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createCapabilityHost, CapabilityState } from '@migaia/capability';\n\nconst host = createCapabilityHost({}, { flags: { flaky: true } });\nhost.register({\n  name: 'flaky',\n  activate: async () => {\n    throw new Error('chunk 404');\n  }\n});\n\nconst result = await host.enable('flaky');\nresult; // { status: 'failed', error: Error('chunk 404') }\nhost.state('flaky'); // CapabilityState.failed\nString(host.error('flaky')); // 包含 'chunk 404'\n\nhost.setFlag('flaky', false); // 重新配置会清空 error(name)\nhost.error('flaky'); // undefined"
+                  "code": "import { createCapabilityHost, CapabilityState } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { flaky: true } })\nhost.register({\n  name: 'flaky',\n  activate: async () => {\n    throw new Error('chunk 404')\n  }\n})\n\nconst result = await host.enable('flaky')\nresult // { status: 'failed', error: Error('chunk 404') }\nhost.state('flaky') // CapabilityState.failed\nString(host.error('flaky')) // 包含 'chunk 404'\n\nhost.setFlag('flaky', false) // 重新配置会清空 error(name)\nhost.error('flaky') // undefined"
                 }
               ]
             },
@@ -578,7 +578,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability';"
+                  "code": "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -593,7 +593,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph';"
+                  "code": "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph'"
                 },
                 {
                   "type": "paragraph",
@@ -602,7 +602,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IGraphNodeDefinition<T> = {\n  readonly id: IGraphNodeId;\n  readonly kind: string;\n  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[];\n  readonly start: (\n    context: IGraphStartContext\n  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>;\n};"
+                  "code": "type IGraphNodeDefinition<T> = {\n  readonly id: IGraphNodeId\n  readonly kind: string\n  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[]\n  readonly start: (\n    context: IGraphStartContext\n  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>\n}"
                 },
                 {
                   "type": "paragraph",
@@ -676,7 +676,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const CapabilityState = {\n  off: 'off',\n  gated: 'gated',\n  activating: 'activating',\n  on: 'on',\n  failed: 'failed'\n} as const;\ntype ICapabilityStateValue = (typeof CapabilityState)[keyof typeof CapabilityState];"
+                  "code": "const CapabilityState = {\n  off: 'off',\n  gated: 'gated',\n  activating: 'activating',\n  on: 'on',\n  failed: 'failed'\n} as const\ntype ICapabilityStateValue = (typeof CapabilityState)[keyof typeof CapabilityState]"
                 },
                 {
                   "type": "paragraph",
@@ -685,7 +685,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const CapabilityEnableStatus = {\n  enabled: 'enabled',\n  gated: 'gated',\n  cancelled: 'cancelled',\n  failed: 'failed'\n} as const;\ntype ICapabilityEnableStatusValue =\n  (typeof CapabilityEnableStatus)[keyof typeof CapabilityEnableStatus];"
+                  "code": "const CapabilityEnableStatus = {\n  enabled: 'enabled',\n  gated: 'gated',\n  cancelled: 'cancelled',\n  failed: 'failed'\n} as const\ntype ICapabilityEnableStatusValue =\n  (typeof CapabilityEnableStatus)[keyof typeof CapabilityEnableStatus]"
                 },
                 {
                   "type": "paragraph",
@@ -698,7 +698,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ICapabilityEnableResult =\n  | { readonly status: 'enabled' }\n  | { readonly status: 'gated' }\n  | { readonly status: 'cancelled' }\n  | { readonly status: 'failed'; readonly error: unknown };"
+                  "code": "type ICapabilityEnableResult =\n  | { readonly status: 'enabled' }\n  | { readonly status: 'gated' }\n  | { readonly status: 'cancelled' }\n  | { readonly status: 'failed'; readonly error: unknown }"
                 },
                 {
                   "type": "list",
@@ -718,7 +718,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createCapabilityHost<Context>(\n  context: Context,\n  options?: ICapabilityHostOptions\n): ICapabilityHost<Context>;\n\ntype ICapabilityHostOptions = {\n  readonly flags?: Readonly<Record<string, boolean>>;\n  readonly onError?: (name: string, error: unknown) => void;\n};"
+                  "code": "function createCapabilityHost<Context>(\n  context: Context,\n  options?: ICapabilityHostOptions\n): ICapabilityHost<Context>\n\ntype ICapabilityHostOptions = {\n  readonly flags?: Readonly<Record<string, boolean>>\n  readonly onError?: (name: string, error: unknown) => void\n}"
                 },
                 {
                   "type": "paragraph",
@@ -794,7 +794,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ICapabilityHost<Context> = {\n  register<Handle extends ICapabilityHandle>(\n    definition: ICapabilityDefinition<Context, Handle>\n  ): void;\n  readonly names: readonly string[];\n  state(name: string): ICapabilityState;\n  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined;\n  error(name: string): unknown;\n  setFlag(name: string, enabled: boolean): void;\n  setFlags(flags: Readonly<Record<string, boolean>>): void;\n  enable(name: string): Promise<ICapabilityEnableResult>;\n  enableResult(name: string): Promise<ICapabilityEnableResult>;\n  disable(name: string): Promise<boolean>;\n  dispose(): Promise<void>;\n  enableLegacyBoolean(name: string): Promise<boolean>;\n  disableNow(name: string): boolean;\n  readonly disposed: boolean;\n};"
+                  "code": "type ICapabilityHost<Context> = {\n  register<Handle extends ICapabilityHandle>(\n    definition: ICapabilityDefinition<Context, Handle>\n  ): void\n  readonly names: readonly string[]\n  state(name: string): ICapabilityState\n  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined\n  error(name: string): unknown\n  setFlag(name: string, enabled: boolean): void\n  setFlags(flags: Readonly<Record<string, boolean>>): void\n  enable(name: string): Promise<ICapabilityEnableResult>\n  enableResult(name: string): Promise<ICapabilityEnableResult>\n  disable(name: string): Promise<boolean>\n  dispose(): Promise<void>\n  enableLegacyBoolean(name: string): Promise<boolean>\n  disableNow(name: string): boolean\n  readonly disposed: boolean\n}"
                 }
               ]
             },
@@ -984,7 +984,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ICapabilityError = Error & { readonly source: string; readonly code: string };\nfunction createCapabilityError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown }\n): ICapabilityError;\nfunction tagCapabilityError<E extends Error>(error: E, code: string): E;\nconst CAPABILITY_SOURCE = '@migaia/capability';"
+                  "code": "type ICapabilityError = Error & { readonly source: string; readonly code: string }\nfunction createCapabilityError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown }\n): ICapabilityError\nfunction tagCapabilityError<E extends Error>(error: E, code: string): E\nconst CAPABILITY_SOURCE = '@migaia/capability'"
                 },
                 {
                   "type": "paragraph",
@@ -997,7 +997,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const CapabilityErrorCode = {\n  hostDisposed: 'HOST_DISPOSED',\n  hostTransitioning: 'HOST_TRANSITIONING',\n  notRegistered: 'NOT_REGISTERED',\n  alreadyRegistered: 'ALREADY_REGISTERED',\n  invalidName: 'INVALID_NAME',\n  invalidActivate: 'INVALID_ACTIVATE',\n  invalidHandle: 'INVALID_HANDLE',\n  gated: 'GATED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode];"
+                  "code": "const CapabilityErrorCode = {\n  hostDisposed: 'HOST_DISPOSED',\n  hostTransitioning: 'HOST_TRANSITIONING',\n  notRegistered: 'NOT_REGISTERED',\n  alreadyRegistered: 'ALREADY_REGISTERED',\n  invalidName: 'INVALID_NAME',\n  invalidActivate: 'INVALID_ACTIVATE',\n  invalidHandle: 'INVALID_HANDLE',\n  gated: 'GATED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -1099,7 +1099,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability';\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n);\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist');\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() });\n    return { dispose: () => handle.dispose() };\n  }\n});\n\nconst result = await capabilities.enable('persistence');\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用');\n\nawait capabilities.disable('persistence');\nawait capabilities.dispose(); // LIFO 释放全部已启用能力，之后 host 不可再用"
+                  "code": "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用"
                 },
                 {
                   "type": "paragraph",
@@ -1149,7 +1149,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic';\n\nconst graph = createDynamicCapabilityGraph<{ readonly version: number }>({\n  startBatch: (entries) =>\n    entries.map((entry) => ({ value: entry.binding, release: async () => undefined })),\n  releaseBatch: async (entries, fence) => {\n    await fence;\n    // 这里只释放 entries 对应的 exact old generation。\n  }\n});"
+                  "code": "import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'\n\nconst graph = createDynamicCapabilityGraph<{ readonly version: number }>({\n  startBatch: (entries) =>\n    entries.map((entry) => ({ value: entry.binding, release: async () => undefined })),\n  releaseBatch: async (entries, fence) => {\n    await fence\n    // 这里只释放 entries 对应的 exact old generation。\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -1168,7 +1168,7 @@
     {
       "slug": "event-subscriber",
       "description": "Runtime-neutral transient event subscription and fan-out primitives.",
-      "version": "0.0.3",
+      "version": "0.0.5",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -1563,8 +1563,8 @@
               ]
             },
             {
-              "id": "1-按-taskid-定向到唯一订阅者并等待结果",
-              "heading": "1. 按 taskId 定向到唯一订阅者并等待结果",
+              "id": "高阶组合示例-1-按-taskid-定向到唯一订阅者并等待结果",
+              "heading": "高阶组合示例 · 1. 按 taskId 定向到唯一订阅者并等待结果",
               "blocks": [
                 {
                   "type": "code",
@@ -1574,8 +1574,8 @@
               ]
             },
             {
-              "id": "2-并行结算-集中上报未处理的迟到失败",
-              "heading": "2. 并行结算 + 集中上报未处理的迟到失败",
+              "id": "高阶组合示例-2-并行结算-集中上报未处理的迟到失败",
+              "heading": "高阶组合示例 · 2. 并行结算 + 集中上报未处理的迟到失败",
               "blocks": [
                 {
                   "type": "code",
@@ -1585,8 +1585,8 @@
               ]
             },
             {
-              "id": "3-subscribeuntil-abortcontroller-管理订阅生命周期",
-              "heading": "3. subscribeUntil + AbortController 管理订阅生命周期",
+              "id": "高阶组合示例-3-subscribeuntil-abortcontroller-管理订阅生命周期",
+              "heading": "高阶组合示例 · 3. subscribeUntil + AbortController 管理订阅生命周期",
               "blocks": [
                 {
                   "type": "code",
@@ -1596,8 +1596,8 @@
               ]
             },
             {
-              "id": "4-用-hub-统一路由多种事件并集中上报",
-              "heading": "4. 用 Hub 统一路由多种事件并集中上报",
+              "id": "高阶组合示例-4-用-hub-统一路由多种事件并集中上报",
+              "heading": "高阶组合示例 · 4. 用 Hub 统一路由多种事件并集中上报",
               "blocks": [
                 {
                   "type": "code",
@@ -1607,8 +1607,8 @@
               ]
             },
             {
-              "id": "5-对象订阅者-串行结算-保证副作用按序执行",
-              "heading": "5. 对象订阅者 + 串行结算，保证副作用按序执行",
+              "id": "高阶组合示例-5-对象订阅者-串行结算-保证副作用按序执行",
+              "heading": "高阶组合示例 · 5. 对象订阅者 + 串行结算，保证副作用按序执行",
               "blocks": [
                 {
                   "type": "code",
@@ -1618,8 +1618,8 @@
               ]
             },
             {
-              "id": "6-用静态路径为-context-增加只读-alias",
-              "heading": "6. 用静态路径为 context 增加只读 alias",
+              "id": "高阶组合示例-6-用静态路径为-context-增加只读-alias",
+              "heading": "高阶组合示例 · 6. 用静态路径为 context 增加只读 alias",
               "blocks": [
                 {
                   "type": "code",
@@ -2243,8 +2243,8 @@
               ]
             },
             {
-              "id": "1-按-taskid-定向到唯一订阅者并等待结果",
-              "heading": "1. 按 taskId 定向到唯一订阅者并等待结果",
+              "id": "高阶组合示例-1-按-taskid-定向到唯一订阅者并等待结果",
+              "heading": "高阶组合示例 · 1. 按 taskId 定向到唯一订阅者并等待结果",
               "blocks": [
                 {
                   "type": "code",
@@ -2254,8 +2254,8 @@
               ]
             },
             {
-              "id": "2-并行结算-集中上报未处理的迟到失败",
-              "heading": "2. 并行结算 + 集中上报未处理的迟到失败",
+              "id": "高阶组合示例-2-并行结算-集中上报未处理的迟到失败",
+              "heading": "高阶组合示例 · 2. 并行结算 + 集中上报未处理的迟到失败",
               "blocks": [
                 {
                   "type": "code",
@@ -2265,8 +2265,8 @@
               ]
             },
             {
-              "id": "3-subscribeuntil-abortcontroller-管理订阅生命周期",
-              "heading": "3. subscribeUntil + AbortController 管理订阅生命周期",
+              "id": "高阶组合示例-3-subscribeuntil-abortcontroller-管理订阅生命周期",
+              "heading": "高阶组合示例 · 3. subscribeUntil + AbortController 管理订阅生命周期",
               "blocks": [
                 {
                   "type": "code",
@@ -2276,8 +2276,8 @@
               ]
             },
             {
-              "id": "4-用-hub-统一路由多种事件并集中上报",
-              "heading": "4. 用 Hub 统一路由多种事件并集中上报",
+              "id": "高阶组合示例-4-用-hub-统一路由多种事件并集中上报",
+              "heading": "高阶组合示例 · 4. 用 Hub 统一路由多种事件并集中上报",
               "blocks": [
                 {
                   "type": "code",
@@ -2287,8 +2287,8 @@
               ]
             },
             {
-              "id": "5-对象订阅者-串行结算-保证副作用按序执行",
-              "heading": "5. 对象订阅者 + 串行结算，保证副作用按序执行",
+              "id": "高阶组合示例-5-对象订阅者-串行结算-保证副作用按序执行",
+              "heading": "高阶组合示例 · 5. 对象订阅者 + 串行结算，保证副作用按序执行",
               "blocks": [
                 {
                   "type": "code",
@@ -2298,8 +2298,8 @@
               ]
             },
             {
-              "id": "6-静态-value-path-alias",
-              "heading": "6. 静态 value path alias",
+              "id": "高阶组合示例-6-静态-value-path-alias",
+              "heading": "高阶组合示例 · 6. 静态 value path alias",
               "blocks": [
                 {
                   "type": "paragraph",
@@ -2349,7 +2349,7 @@
     {
       "slug": "lifecycle",
       "description": "Runtime-neutral lifecycle primitives: scopes, generations, quiescence tracking and dispose transactions.",
-      "version": "0.0.2",
+      "version": "0.0.4",
       "exports": [
         ".",
         "./abort",
@@ -3124,8 +3124,8 @@
               ]
             },
             {
-              "id": "1-作用域-代数-请求场景下取代过期结果",
-              "heading": "1. 作用域 + 代数：请求场景下取代过期结果",
+              "id": "高阶组合示例-1-作用域-代数-请求场景下取代过期结果",
+              "heading": "高阶组合示例 · 1. 作用域 + 代数：请求场景下取代过期结果",
               "blocks": [
                 {
                   "type": "code",
@@ -3135,8 +3135,8 @@
               ]
             },
             {
-              "id": "2-事务性所有权-构造期失败自动回滚-成功后转移给长期-scope",
-              "heading": "2. 事务性所有权：构造期失败自动回滚，成功后转移给长期 scope",
+              "id": "高阶组合示例-2-事务性所有权-构造期失败自动回滚-成功后转移给长期-scope",
+              "heading": "高阶组合示例 · 2. 事务性所有权：构造期失败自动回滚，成功后转移给长期 scope",
               "blocks": [
                 {
                   "type": "code",
@@ -3146,8 +3146,8 @@
               ]
             },
             {
-              "id": "3-静默追踪-变更队列-确保排空后才提交下一批变更",
-              "heading": "3. 静默追踪 + 变更队列：确保排空后才提交下一批变更",
+              "id": "高阶组合示例-3-静默追踪-变更队列-确保排空后才提交下一批变更",
+              "heading": "高阶组合示例 · 3. 静默追踪 + 变更队列：确保排空后才提交下一批变更",
               "blocks": [
                 {
                   "type": "code",
@@ -3157,8 +3157,8 @@
               ]
             },
             {
-              "id": "4-释放事务-有界等待-手动编排一组资源的优雅关闭",
-              "heading": "4. 释放事务 + 有界等待：手动编排一组资源的优雅关闭",
+              "id": "高阶组合示例-4-释放事务-有界等待-手动编排一组资源的优雅关闭",
+              "heading": "高阶组合示例 · 4. 释放事务 + 有界等待：手动编排一组资源的优雅关闭",
               "blocks": [
                 {
                   "type": "code",
@@ -3168,8 +3168,8 @@
               ]
             },
             {
-              "id": "5-同步作用域-可暴露-using-语法的纯同步资源",
-              "heading": "5. 同步作用域：可暴露 using 语法的纯同步资源",
+              "id": "高阶组合示例-5-同步作用域-可暴露-using-语法的纯同步资源",
+              "heading": "高阶组合示例 · 5. 同步作用域：可暴露 using 语法的纯同步资源",
               "blocks": [
                 {
                   "type": "code",
@@ -4422,8 +4422,8 @@
               ]
             },
             {
-              "id": "1-作用域-代数-请求场景下取代过期结果",
-              "heading": "1. 作用域 + 代数：请求场景下取代过期结果",
+              "id": "高阶组合示例-1-作用域-代数-请求场景下取代过期结果",
+              "heading": "高阶组合示例 · 1. 作用域 + 代数：请求场景下取代过期结果",
               "blocks": [
                 {
                   "type": "code",
@@ -4433,8 +4433,8 @@
               ]
             },
             {
-              "id": "2-事务性所有权-构造期失败自动回滚-成功后转移给长期-scope",
-              "heading": "2. 事务性所有权：构造期失败自动回滚，成功后转移给长期 scope",
+              "id": "高阶组合示例-2-事务性所有权-构造期失败自动回滚-成功后转移给长期-scope",
+              "heading": "高阶组合示例 · 2. 事务性所有权：构造期失败自动回滚，成功后转移给长期 scope",
               "blocks": [
                 {
                   "type": "code",
@@ -4444,8 +4444,8 @@
               ]
             },
             {
-              "id": "3-静默追踪-变更队列-确保排空后才提交下一批变更",
-              "heading": "3. 静默追踪 + 变更队列：确保排空后才提交下一批变更",
+              "id": "高阶组合示例-3-静默追踪-变更队列-确保排空后才提交下一批变更",
+              "heading": "高阶组合示例 · 3. 静默追踪 + 变更队列：确保排空后才提交下一批变更",
               "blocks": [
                 {
                   "type": "code",
@@ -4455,8 +4455,8 @@
               ]
             },
             {
-              "id": "4-释放事务-有界等待-手动编排一组资源的优雅关闭",
-              "heading": "4. 释放事务 + 有界等待：手动编排一组资源的优雅关闭",
+              "id": "高阶组合示例-4-释放事务-有界等待-手动编排一组资源的优雅关闭",
+              "heading": "高阶组合示例 · 4. 释放事务 + 有界等待：手动编排一组资源的优雅关闭",
               "blocks": [
                 {
                   "type": "code",
@@ -4466,8 +4466,8 @@
               ]
             },
             {
-              "id": "5-同步作用域-可暴露-using-语法的纯同步资源",
-              "heading": "5. 同步作用域：可暴露 using 语法的纯同步资源",
+              "id": "高阶组合示例-5-同步作用域-可暴露-using-语法的纯同步资源",
+              "heading": "高阶组合示例 · 5. 同步作用域：可暴露 using 语法的纯同步资源",
               "blocks": [
                 {
                   "type": "code",
@@ -4477,8 +4477,8 @@
               ]
             },
             {
-              "id": "6-同步入口-异步清理-registry-的-residual-disposer",
-              "heading": "6. 同步入口 + 异步清理：Registry 的 residual disposer",
+              "id": "高阶组合示例-6-同步入口-异步清理-registry-的-residual-disposer",
+              "heading": "高阶组合示例 · 6. 同步入口 + 异步清理：Registry 的 residual disposer",
               "blocks": [
                 {
                   "type": "paragraph",
@@ -4496,8 +4496,8 @@
               ]
             },
             {
-              "id": "7-服务退出-停止接单-等待在途任务-再释放资源",
-              "heading": "7. 服务退出：停止接单，等待在途任务，再释放资源",
+              "id": "高阶组合示例-7-服务退出-停止接单-等待在途任务-再释放资源",
+              "heading": "高阶组合示例 · 7. 服务退出：停止接单，等待在途任务，再释放资源",
               "blocks": [
                 {
                   "type": "code",
@@ -4568,7 +4568,7 @@
     {
       "slug": "logger",
       "description": null,
-      "version": "0.0.5",
+      "version": "0.0.6",
       "exports": [".", "./plugins"],
       "documentation": {
         "readme": {
@@ -4662,7 +4662,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Logger } from '@migaia/logger';\nimport { color, level } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['api'],\n  plugins: [level({ level: 'info' }), color({ format: 'pretty', color: 'auto' })]\n});\n\nlog.info('server listening on %d', 3000);\nlog.error('request failed', new Error('timeout'));\n\nawait log.flush(); // 确保上面这些日志真正落地了再退出/继续"
+                  "code": "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['api'],\n  plugins: [level({ level: 'info' }), color({ format: 'pretty', color: 'auto' })]\n})\n\nlog.info('server listening on %d', 3000)\nlog.error('request failed', new Error('timeout'))\n\nawait log.flush() // 确保上面这些日志真正落地了再退出/继续"
                 },
                 {
                   "type": "paragraph",
@@ -4671,7 +4671,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Logger } from '@migaia/logger';\nimport { batch, http, level, process } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n});\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error));"
+                  "code": "import { Logger } from '@migaia/logger'\nimport { batch, http, level, process } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n})\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error))"
                 }
               ]
             },
@@ -4800,8 +4800,27 @@
               ]
             },
             {
-              "id": "9-深入参考",
-              "heading": "9. 深入参考",
+              "id": "9-高阶组合示例-失败隔离-批量上报与确定性关闭",
+              "heading": "9. 高阶组合示例 · 失败隔离、批量上报与确定性关闭",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "生产日志链路既不能让上报失败打断业务，也不能在进程退出时丢掉已经接纳的批次。把失败观察器、批处理和 HTTP sink 安装在同一个 Logger 上，并在宿主关闭边界显式等待 `shutdown()`："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: 'https://logs.example/v1/entries' })\n  ]\n})\n\nconst stopFailureObservation = log.onFailure(({ source, error }) => {\n  console.error(`[logger:${source}]`, error)\n})\n\ntry {\n  log.info('checkout completed: %s', 'order-42')\n  await log.flush()\n} finally {\n  stopFailureObservation()\n  await log.shutdown('manual')\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`batch()` 必须位于 `http()` 前面，才能让 HTTP sink 使用批量调度。`onFailure()` 是日志基础设施失败的观察出口；业务日志调用不会替它抛错。并发或重入的 `shutdown()` 共享同一个进行中的关闭 Promise，因此宿主的多个收尾入口可以安全汇合，但终态 Logger 不能重新启用，需要创建新实例。"
+                }
+              ]
+            },
+            {
+              "id": "10-深入参考",
+              "heading": "10. 深入参考",
               "blocks": [
                 {
                   "type": "paragraph",
@@ -5753,7 +5772,7 @@
     {
       "slug": "middleware-pipeline",
       "description": "Runtime-neutral sync, async middleware and generator chain executors.",
-      "version": "0.0.2",
+      "version": "0.0.4",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -6149,8 +6168,8 @@
               ]
             },
             {
-              "id": "1-sync-校验链-短路-violation-上报",
-              "heading": "1. Sync 校验链：短路 + violation 上报",
+              "id": "高阶组合示例-1-sync-校验链-短路-violation-上报",
+              "heading": "高阶组合示例 · 1. Sync 校验链：短路 + violation 上报",
               "blocks": [
                 {
                   "type": "code",
@@ -6160,8 +6179,8 @@
               ]
             },
             {
-              "id": "2-async-洋葱模型-认证-路由-短路跳过-health",
-              "heading": "2. Async 洋葱模型：认证 + 路由，短路跳过 /health",
+              "id": "高阶组合示例-2-async-洋葱模型-认证-路由-短路跳过-health",
+              "heading": "高阶组合示例 · 2. Async 洋葱模型：认证 + 路由，短路跳过 /health",
               "blocks": [
                 {
                   "type": "code",
@@ -6171,8 +6190,8 @@
               ]
             },
             {
-              "id": "3-async-双失败-自定义组合器接管领域错误",
-              "heading": "3. Async 双失败：自定义组合器接管领域错误",
+              "id": "高阶组合示例-3-async-双失败-自定义组合器接管领域错误",
+              "heading": "高阶组合示例 · 3. Async 双失败：自定义组合器接管领域错误",
               "blocks": [
                 {
                   "type": "code",
@@ -6182,8 +6201,8 @@
               ]
             },
             {
-              "id": "4-generator-多次-yield-采集-显式终止",
-              "heading": "4. Generator：多次 yield 采集 + 显式终止",
+              "id": "高阶组合示例-4-generator-多次-yield-采集-显式终止",
+              "heading": "高阶组合示例 · 4. Generator：多次 yield 采集 + 显式终止",
               "blocks": [
                 {
                   "type": "code",
@@ -6193,8 +6212,8 @@
               ]
             },
             {
-              "id": "5-混用同步与异步-stage-用适配器统一到-async-chain",
-              "heading": "5. 混用同步与异步 stage：用适配器统一到 async chain",
+              "id": "高阶组合示例-5-混用同步与异步-stage-用适配器统一到-async-chain",
+              "heading": "高阶组合示例 · 5. 混用同步与异步 stage：用适配器统一到 async chain",
               "blocks": [
                 {
                   "type": "code",
@@ -6204,8 +6223,8 @@
               ]
             },
             {
-              "id": "6-async-generator-abortcontroller-可取消的多步异步处理",
-              "heading": "6. Async-generator + AbortController：可取消的多步异步处理",
+              "id": "高阶组合示例-6-async-generator-abortcontroller-可取消的多步异步处理",
+              "heading": "高阶组合示例 · 6. Async-generator + AbortController：可取消的多步异步处理",
               "blocks": [
                 {
                   "type": "code",
@@ -6705,8 +6724,8 @@
     {
       "slug": "plugin-host",
       "description": "Runtime-neutral plugin lifecycle, extension and pipeline host for Node.js, Bun, browsers and workers.",
-      "version": "0.0.5",
-      "exports": [".", "./defined", "./structural"],
+      "version": "0.0.6",
+      "exports": [".", "./composition", "./defined", "./structural"],
       "documentation": {
         "readme": {
           "sections": [
@@ -6745,7 +6764,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "包只公开根入口 `@migaia/plugin-host`：`PluginHost`、插件/配置/pipeline 类型、状态常量、错误码与错误类、pipeline 适配器、`GENERATOR_*` 信号量、dispose symbol 均从这里导入。没有稳定的深层子路径；不要依赖 `src`/`dist` 内部文件。"
+                  "text": "包公开根入口 `@migaia/plugin-host`，另有稳定的 `@migaia/plugin-host/composition` 子路径。根入口 提供 `PluginHost`、插件/配置/pipeline 类型、状态常量、错误码与错误类、pipeline 适配器、 `GENERATOR_*` 信号量与 dispose symbol；composition 子路径仅提供 opaque `IRegistrationToken`、`IRegistrationView<TPlugin>` 与 `createView(token)`。不要依赖 `src`/`dist` 内部文件，也不要把 composition view 当成 Host mutation/config/shared 能力。"
                 }
               ]
             },
@@ -7141,8 +7160,8 @@
               ]
             },
             {
-              "id": "1-带配置-shared-能力-失败回滚的完整插件组合",
-              "heading": "1. 带配置、shared 能力、失败回滚的完整插件组合",
+              "id": "高阶组合示例-1-带配置-shared-能力-失败回滚的完整插件组合",
+              "heading": "高阶组合示例 · 1. 带配置、shared 能力、失败回滚的完整插件组合",
               "blocks": [
                 {
                   "type": "code",
@@ -7152,8 +7171,8 @@
               ]
             },
             {
-              "id": "2-async-pipeline-做请求耗时统计-洋葱模型的-前置-后置",
-              "heading": "2. async pipeline 做请求耗时统计（洋葱模型的\"前置 + 后置\"）",
+              "id": "高阶组合示例-2-async-pipeline-做请求耗时统计-洋葱模型的-前置-后置",
+              "heading": "高阶组合示例 · 2. async pipeline 做请求耗时统计（洋葱模型的\"前置 + 后置\"）",
               "blocks": [
                 {
                   "type": "code",
@@ -7163,8 +7182,8 @@
               ]
             },
             {
-              "id": "3-用-diagnostic-自定义队列-清理超时观测宿主内部行为",
-              "heading": "3. 用 diagnostic + 自定义队列/清理超时观测宿主内部行为",
+              "id": "高阶组合示例-3-用-diagnostic-自定义队列-清理超时观测宿主内部行为",
+              "heading": "高阶组合示例 · 3. 用 diagnostic + 自定义队列/清理超时观测宿主内部行为",
               "blocks": [
                 {
                   "type": "code",
@@ -7174,8 +7193,8 @@
               ]
             },
             {
-              "id": "4-优雅降级-安装失败时读出真实原因与回滚详情",
-              "heading": "4. 优雅降级：安装失败时读出真实原因与回滚详情",
+              "id": "高阶组合示例-4-优雅降级-安装失败时读出真实原因与回滚详情",
+              "heading": "高阶组合示例 · 4. 优雅降级：安装失败时读出真实原因与回滚详情",
               "blocks": [
                 {
                   "type": "code",
@@ -7185,8 +7204,8 @@
               ]
             },
             {
-              "id": "5-generator-pipeline-用-generator-halt-提前截断处理链",
-              "heading": "5. generator pipeline：用 GENERATOR_HALT 提前截断处理链",
+              "id": "高阶组合示例-5-generator-pipeline-用-generator-halt-提前截断处理链",
+              "heading": "高阶组合示例 · 5. generator pipeline：用 GENERATOR_HALT 提前截断处理链",
               "blocks": [
                 {
                   "type": "code",
@@ -7196,8 +7215,8 @@
               ]
             },
             {
-              "id": "6-async-generator-串行异步处理-host-中途-dispose-自动止损",
-              "heading": "6. Async-generator：串行异步处理 + host 中途 dispose 自动止损",
+              "id": "高阶组合示例-6-async-generator-串行异步处理-host-中途-dispose-自动止损",
+              "heading": "高阶组合示例 · 6. Async-generator：串行异步处理 + host 中途 dispose 自动止损",
               "blocks": [
                 {
                   "type": "code",
@@ -7211,8 +7230,8 @@
               ]
             },
             {
-              "id": "7-async-generator-多-stage-链式处理-复用已有的同步-generator-stage",
-              "heading": "7. Async-generator 多 stage 链式处理，复用已有的同步 generator stage",
+              "id": "高阶组合示例-7-async-generator-多-stage-链式处理-复用已有的同步-generator-stage",
+              "heading": "高阶组合示例 · 7. Async-generator 多 stage 链式处理，复用已有的同步 generator stage",
               "blocks": [
                 {
                   "type": "code",
@@ -8144,6 +8163,25 @@
                   "text": "Q：`host.dispose()` 卡住不 resolve。 先检查是否存在某个 disposer 反过来 `await` 了触发它的这次 `dispose()` 调用——这是循环等待，见 §8。默认情况下 `disposeStepTimeoutMs` 是 5000ms，超时后这一步会被计为 `DISPOSE_STEP_TIMEOUT` 失败并继续推进，最终仍会收敛到 `disposed`；如果 `dispose()` 迟迟不 resolve，检查是否传了 `disposeStepTimeoutMs: false`（永久等待，不会强制推进）。"
                 }
               ]
+            },
+            {
+              "id": "composition-registration-view",
+              "heading": "Composition registration view",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/plugin-host/composition` 是独立的 composition 子路径："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  createView,\n  type IRegistrationToken,\n  type IRegistrationView\n} from '@migaia/plugin-host/composition'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createView(token)` 只发布该 exact registration 的 extensions。token 是 opaque identity，foreign 或已撤销 token 会 fail closed；view 不包含 Host、config、shared 或 mutation 能力。历史 `IPluginRegistrationReceipt` 仍是 deprecated 的 `IRegistrationToken` 类型别名，保持编译兼容。"
+                }
+              ]
             }
           ]
         }
@@ -8152,7 +8190,7 @@
     {
       "slug": "reactive",
       "description": "Store-neutral reactive runtime, signals, computed values, and effects.",
-      "version": "0.0.2",
+      "version": "0.0.4",
       "exports": [
         ".",
         "./copy-check",
@@ -9046,8 +9084,8 @@
               ]
             },
             {
-              "id": "1-隔离的-runtime-手动冲刷-ssr-单测场景",
-              "heading": "1. 隔离的 Runtime + 手动冲刷（SSR/单测场景）",
+              "id": "高阶组合示例-1-隔离的-runtime-手动冲刷-ssr-单测场景",
+              "heading": "高阶组合示例 · 1. 隔离的 Runtime + 手动冲刷（SSR/单测场景）",
               "blocks": [
                 {
                   "type": "code",
@@ -9057,8 +9095,8 @@
               ]
             },
             {
-              "id": "2-三段式绑定-实现一个最小的并发安全订阅适配层",
-              "heading": "2. 三段式绑定：实现一个最小的并发安全订阅适配层",
+              "id": "高阶组合示例-2-三段式绑定-实现一个最小的并发安全订阅适配层",
+              "heading": "高阶组合示例 · 2. 三段式绑定：实现一个最小的并发安全订阅适配层",
               "blocks": [
                 {
                   "type": "code",
@@ -9068,8 +9106,8 @@
               ]
             },
             {
-              "id": "3-批处理-错误优先级-一次动作里业务失败与收尾冲刷失败的顺序",
-              "heading": "3. 批处理 + 错误优先级：一次动作里业务失败与收尾冲刷失败的顺序",
+              "id": "高阶组合示例-3-批处理-错误优先级-一次动作里业务失败与收尾冲刷失败的顺序",
+              "heading": "高阶组合示例 · 3. 批处理 + 错误优先级：一次动作里业务失败与收尾冲刷失败的顺序",
               "blocks": [
                 {
                   "type": "code",
@@ -9079,8 +9117,8 @@
               ]
             },
             {
-              "id": "4-自定义调度策略-切到-requestanimationframe",
-              "heading": "4. 自定义调度策略：切到 requestAnimationFrame",
+              "id": "高阶组合示例-4-自定义调度策略-切到-requestanimationframe",
+              "heading": "高阶组合示例 · 4. 自定义调度策略：切到 requestAnimationFrame",
               "blocks": [
                 {
                   "type": "code",
@@ -9121,7 +9159,7 @@
     {
       "slug": "resource",
       "description": "Store-neutral cancellable asynchronous reactive resources.",
-      "version": "0.0.2",
+      "version": "0.0.4",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -9633,8 +9671,8 @@
               ]
             },
             {
-              "id": "1-suspense-兼容读取-error-boundary",
-              "heading": "1. Suspense 兼容读取 + Error Boundary",
+              "id": "高阶组合示例-1-suspense-兼容读取-error-boundary",
+              "heading": "高阶组合示例 · 1. Suspense 兼容读取 + Error Boundary",
               "blocks": [
                 {
                   "type": "code",
@@ -9644,8 +9682,8 @@
               ]
             },
             {
-              "id": "2-ssr-快照恢复-客户端不重新请求",
-              "heading": "2. SSR 快照恢复，客户端不重新请求",
+              "id": "高阶组合示例-2-ssr-快照恢复-客户端不重新请求",
+              "heading": "高阶组合示例 · 2. SSR 快照恢复，客户端不重新请求",
               "blocks": [
                 {
                   "type": "code",
@@ -9655,8 +9693,8 @@
               ]
             },
             {
-              "id": "3-后台刷新且展示旧数据",
-              "heading": "3. 后台刷新且展示旧数据",
+              "id": "高阶组合示例-3-后台刷新且展示旧数据",
+              "heading": "高阶组合示例 · 3. 后台刷新且展示旧数据",
               "blocks": [
                 {
                   "type": "code",
@@ -9666,8 +9704,8 @@
               ]
             },
             {
-              "id": "4-自定义重试退避",
-              "heading": "4. 自定义重试退避",
+              "id": "高阶组合示例-4-自定义重试退避",
+              "heading": "高阶组合示例 · 4. 自定义重试退避",
               "blocks": [
                 {
                   "type": "code",
@@ -9677,8 +9715,8 @@
               ]
             },
             {
-              "id": "5-手动失效-取消",
-              "heading": "5. 手动失效 + 取消",
+              "id": "高阶组合示例-5-手动失效-取消",
+              "heading": "高阶组合示例 · 5. 手动失效 + 取消",
               "blocks": [
                 {
                   "type": "code",
@@ -9718,7 +9756,7 @@
     {
       "slug": "serialize",
       "description": "Store-neutral chunked serialization and codec registry.",
-      "version": "0.0.2",
+      "version": "0.0.4",
       "exports": [".", "./core", "./plugins", "./registry"],
       "documentation": {
         "readme": {
@@ -10003,8 +10041,8 @@
               ]
             },
             {
-              "id": "1-大数据导出-分片编码-协作式取消-错误定位",
-              "heading": "1. 大数据导出：分片编码 + 协作式取消 + 错误定位",
+              "id": "高阶组合示例-1-大数据导出-分片编码-协作式取消-错误定位",
+              "heading": "高阶组合示例 · 1. 大数据导出：分片编码 + 协作式取消 + 错误定位",
               "blocks": [
                 {
                   "type": "code",
@@ -10014,8 +10052,8 @@
               ]
             },
             {
-              "id": "2-多格式共存-新旧存档平滑迁移",
-              "heading": "2. 多格式共存：新旧存档平滑迁移",
+              "id": "高阶组合示例-2-多格式共存-新旧存档平滑迁移",
+              "heading": "高阶组合示例 · 2. 多格式共存：新旧存档平滑迁移",
               "blocks": [
                 {
                   "type": "code",
@@ -10025,8 +10063,8 @@
               ]
             },
             {
-              "id": "3-二进制走文本通道-编码-base64-带截止时间释放",
-              "heading": "3. 二进制走文本通道：编码 + Base64 + 带截止时间释放",
+              "id": "高阶组合示例-3-二进制走文本通道-编码-base64-带截止时间释放",
+              "heading": "高阶组合示例 · 3. 二进制走文本通道：编码 + Base64 + 带截止时间释放",
               "blocks": [
                 {
                   "type": "code",
@@ -10036,8 +10074,8 @@
               ]
             },
             {
-              "id": "4-自定义-parser-接入-安全的-type-校验",
-              "heading": "4. 自定义 parser 接入 + 安全的 type 校验",
+              "id": "高阶组合示例-4-自定义-parser-接入-安全的-type-校验",
+              "heading": "高阶组合示例 · 4. 自定义 parser 接入 + 安全的 type 校验",
               "blocks": [
                 {
                   "type": "code",
@@ -11199,7 +11237,7 @@
     {
       "slug": "storage-contract",
       "description": "Runtime-neutral storage contract: key-value store, codec, capability, context, key-domain and contract-level error types.",
-      "version": "0.0.2",
+      "version": "0.0.4",
       "exports": ["."],
       "documentation": {
         "readme": {
@@ -11887,8 +11925,8 @@
               ]
             },
             {
-              "id": "1-只依赖-l0-需要-l1-时才在功能边界收窄",
-              "heading": "1. 只依赖 L0，需要 L1 时才在功能边界收窄",
+              "id": "高阶组合示例-1-只依赖-l0-需要-l1-时才在功能边界收窄",
+              "heading": "高阶组合示例 · 1. 只依赖 L0，需要 L1 时才在功能边界收窄",
               "blocks": [
                 {
                   "type": "code",
@@ -11898,8 +11936,8 @@
               ]
             },
             {
-              "id": "2-按能力分支而不是按后端名字分支",
-              "heading": "2. 按能力分支而不是按后端名字分支",
+              "id": "高阶组合示例-2-按能力分支而不是按后端名字分支",
+              "heading": "高阶组合示例 · 2. 按能力分支而不是按后端名字分支",
               "blocks": [
                 {
                   "type": "code",
@@ -11909,8 +11947,8 @@
               ]
             },
             {
-              "id": "3-事务内读改写-冲突策略",
-              "heading": "3. 事务内读改写 + 冲突策略",
+              "id": "高阶组合示例-3-事务内读改写-冲突策略",
+              "heading": "高阶组合示例 · 3. 事务内读改写 + 冲突策略",
               "blocks": [
                 {
                   "type": "code",
@@ -11920,8 +11958,8 @@
               ]
             },
             {
-              "id": "4-校验-超时组合的存储读",
-              "heading": "4. 校验 + 超时组合的存储读",
+              "id": "高阶组合示例-4-校验-超时组合的存储读",
+              "heading": "高阶组合示例 · 4. 校验 + 超时组合的存储读",
               "blocks": [
                 {
                   "type": "code",
@@ -11931,8 +11969,8 @@
               ]
             },
             {
-              "id": "5-自定义-codec-接入契约边界",
-              "heading": "5. 自定义 codec 接入契约边界",
+              "id": "高阶组合示例-5-自定义-codec-接入契约边界",
+              "heading": "高阶组合示例 · 5. 自定义 codec 接入契约边界",
               "blocks": [
                 {
                   "type": "code",
@@ -12422,7 +12460,7 @@
     {
       "slug": "storage-web",
       "description": "Independent web storage library: localStorage, sessionStorage, cookies, IndexedDB CRUD with entity, schema and serialize extension points.",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "exports": [
         ".",
         "./cookies",
@@ -12977,8 +13015,8 @@
               ]
             },
             {
-              "id": "1-indexeddb-standard-schema-版本迁移",
-              "heading": "1. IndexedDB + Standard Schema + 版本迁移",
+              "id": "高阶组合示例-1-indexeddb-standard-schema-版本迁移",
+              "heading": "高阶组合示例 · 1. IndexedDB + Standard Schema + 版本迁移",
               "blocks": [
                 {
                   "type": "code",
@@ -12988,8 +13026,8 @@
               ]
             },
             {
-              "id": "2-kv-only-后端上做能力检查后再决定用记录还是值",
-              "heading": "2. KV-only 后端上做能力检查后再决定用记录还是值",
+              "id": "高阶组合示例-2-kv-only-后端上做能力检查后再决定用记录还是值",
+              "heading": "高阶组合示例 · 2. KV-only 后端上做能力检查后再决定用记录还是值",
               "blocks": [
                 {
                   "type": "code",
@@ -12999,8 +13037,8 @@
               ]
             },
             {
-              "id": "3-批量事务写入-冲突重试-结构化后端",
-              "heading": "3. 批量事务写入 + 冲突重试（结构化后端）",
+              "id": "高阶组合示例-3-批量事务写入-冲突重试-结构化后端",
+              "heading": "高阶组合示例 · 3. 批量事务写入 + 冲突重试（结构化后端）",
               "blocks": [
                 {
                   "type": "code",
@@ -13010,8 +13048,8 @@
               ]
             },
             {
-              "id": "4-自定义-codec-二进制降级诊断",
-              "heading": "4. 自定义 codec + 二进制降级诊断",
+              "id": "高阶组合示例-4-自定义-codec-二进制降级诊断",
+              "heading": "高阶组合示例 · 4. 自定义 codec + 二进制降级诊断",
               "blocks": [
                 {
                   "type": "code",
@@ -13021,8 +13059,8 @@
               ]
             },
             {
-              "id": "5-命名空间隔离-显式-replace-冲突策略",
-              "heading": "5. 命名空间隔离 + 显式 replace 冲突策略",
+              "id": "高阶组合示例-5-命名空间隔离-显式-replace-冲突策略",
+              "heading": "高阶组合示例 · 5. 命名空间隔离 + 显式 replace 冲突策略",
               "blocks": [
                 {
                   "type": "code",
@@ -14785,8 +14823,8 @@
               ]
             },
             {
-              "id": "1-开发期挂载诊断会话-卸载时释放",
-              "heading": "1. 开发期挂载诊断会话，卸载时释放",
+              "id": "高阶组合示例-1-开发期挂载诊断会话-卸载时释放",
+              "heading": "高阶组合示例 · 1. 开发期挂载诊断会话，卸载时释放",
               "blocks": [
                 {
                   "type": "code",
@@ -14796,8 +14834,8 @@
               ]
             },
             {
-              "id": "2-手动打标签的可回退锚点-时间旅行",
-              "heading": "2. 手动打标签的可回退锚点 + 时间旅行",
+              "id": "高阶组合示例-2-手动打标签的可回退锚点-时间旅行",
+              "heading": "高阶组合示例 · 2. 手动打标签的可回退锚点 + 时间旅行",
               "blocks": [
                 {
                   "type": "code",
@@ -14807,8 +14845,8 @@
               ]
             },
             {
-              "id": "3-关闭-runtime-trace-只保留状态历史-降低高频写入场景的开销",
-              "heading": "3. 关闭 runtime trace，只保留状态历史，降低高频写入场景的开销",
+              "id": "高阶组合示例-3-关闭-runtime-trace-只保留状态历史-降低高频写入场景的开销",
+              "heading": "高阶组合示例 · 3. 关闭 runtime trace，只保留状态历史，降低高频写入场景的开销",
               "blocks": [
                 {
                   "type": "code",
@@ -14818,8 +14856,8 @@
               ]
             },
             {
-              "id": "4-排查一个-effect-到底依赖了哪些节点-再反向确认谁订阅了某个-signal",
-              "heading": "4. 排查一个 Effect 到底依赖了哪些节点，再反向确认谁订阅了某个 Signal",
+              "id": "高阶组合示例-4-排查一个-effect-到底依赖了哪些节点-再反向确认谁订阅了某个-signal",
+              "heading": "高阶组合示例 · 4. 排查一个 Effect 到底依赖了哪些节点，再反向确认谁订阅了某个 Signal",
               "blocks": [
                 {
                   "type": "code",
@@ -14829,8 +14867,8 @@
               ]
             },
             {
-              "id": "5-用自定义-clone-对敏感字段脱敏后再进入历史",
-              "heading": "5. 用自定义 clone 对敏感字段脱敏后再进入历史",
+              "id": "高阶组合示例-5-用自定义-clone-对敏感字段脱敏后再进入历史",
+              "heading": "高阶组合示例 · 5. 用自定义 clone 对敏感字段脱敏后再进入历史",
               "blocks": [
                 {
                   "type": "code",
@@ -15274,8 +15312,8 @@
               ]
             },
             {
-              "id": "6-用-trace-精确定位一次意外的多余重算",
-              "heading": "6. 用 trace 精确定位一次意外的多余重算",
+              "id": "高阶组合示例-6-用-trace-精确定位一次意外的多余重算",
+              "heading": "高阶组合示例 · 6. 用 trace 精确定位一次意外的多余重算",
               "blocks": [
                 {
                   "type": "code",
@@ -15285,8 +15323,8 @@
               ]
             },
             {
-              "id": "7-jumpto-抛-unknown-history-entry-时按错误码分支处理",
-              "heading": "7. jumpTo 抛 UNKNOWN_HISTORY_ENTRY 时按错误码分支处理",
+              "id": "高阶组合示例-7-jumpto-抛-unknown-history-entry-时按错误码分支处理",
+              "heading": "高阶组合示例 · 7. jumpTo 抛 UNKNOWN_HISTORY_ENTRY 时按错误码分支处理",
               "blocks": [
                 {
                   "type": "code",
@@ -15591,8 +15629,8 @@
               ]
             },
             {
-              "id": "1-表格行细粒度订阅-定期-prune",
-              "heading": "1. 表格行细粒度订阅 + 定期 prune()",
+              "id": "高阶组合示例-1-表格行细粒度订阅-定期-prune",
+              "heading": "高阶组合示例 · 1. 表格行细粒度订阅 + 定期 prune()",
               "blocks": [
                 {
                   "type": "code",
@@ -15602,8 +15640,8 @@
               ]
             },
             {
-              "id": "2-mutationguard-集成-仅允许在-action-内写入",
-              "heading": "2. mutationGuard 集成：仅允许在 action 内写入",
+              "id": "高阶组合示例-2-mutationguard-集成-仅允许在-action-内写入",
+              "heading": "高阶组合示例 · 2. mutationGuard 集成：仅允许在 action 内写入",
               "blocks": [
                 {
                   "type": "code",
@@ -15613,8 +15651,8 @@
               ]
             },
             {
-              "id": "3-多-runtime-隔离-跨-runtime-保护",
-              "heading": "3. 多 Runtime 隔离 + 跨 Runtime 保护",
+              "id": "高阶组合示例-3-多-runtime-隔离-跨-runtime-保护",
+              "heading": "高阶组合示例 · 3. 多 Runtime 隔离 + 跨 Runtime 保护",
               "blocks": [
                 {
                   "type": "code",
@@ -15624,8 +15662,8 @@
               ]
             },
             {
-              "id": "4-自定义错误保留同一套-source-code-约定",
-              "heading": "4. 自定义错误保留同一套 (source, code) 约定",
+              "id": "高阶组合示例-4-自定义错误保留同一套-source-code-约定",
+              "heading": "高阶组合示例 · 4. 自定义错误保留同一套 (source, code) 约定",
               "blocks": [
                 {
                   "type": "code",
@@ -15635,8 +15673,8 @@
               ]
             },
             {
-              "id": "5-只读快照批量遍历-避免误建十万个-cell",
-              "heading": "5. 只读快照批量遍历，避免误建十万个 cell",
+              "id": "高阶组合示例-5-只读快照批量遍历-避免误建十万个-cell",
+              "heading": "高阶组合示例 · 5. 只读快照批量遍历，避免误建十万个 cell",
               "blocks": [
                 {
                   "type": "code",
@@ -17233,8 +17271,8 @@
               ]
             },
             {
-              "id": "1-每个会话一份状态-字段可独立订阅-列表按-key-拆分",
-              "heading": "1. 每个会话一份状态 + 字段可独立订阅 + 列表按 key 拆分",
+              "id": "高阶组合示例-1-每个会话一份状态-字段可独立订阅-列表按-key-拆分",
+              "heading": "高阶组合示例 · 1. 每个会话一份状态 + 字段可独立订阅 + 列表按 key 拆分",
               "blocks": [
                 {
                   "type": "code",
@@ -17244,8 +17282,8 @@
               ]
             },
             {
-              "id": "2-按-key-产出的-family-跨会话共享定义但各自独立取值",
-              "heading": "2. 按 key 产出的 family，跨会话共享定义但各自独立取值",
+              "id": "高阶组合示例-2-按-key-产出的-family-跨会话共享定义但各自独立取值",
+              "heading": "高阶组合示例 · 2. 按 key 产出的 family，跨会话共享定义但各自独立取值",
               "blocks": [
                 {
                   "type": "code",
@@ -17255,8 +17293,8 @@
               ]
             },
             {
-              "id": "3-测试期用-override-替身某个派生定义",
-              "heading": "3. 测试期用 override 替身某个派生定义",
+              "id": "高阶组合示例-3-测试期用-override-替身某个派生定义",
+              "heading": "高阶组合示例 · 3. 测试期用 override 替身某个派生定义",
               "blocks": [
                 {
                   "type": "code",
@@ -17266,8 +17304,8 @@
               ]
             },
             {
-              "id": "4-用底层-optics-工具函数手写自定义拆分逻辑",
-              "heading": "4. 用底层 optics 工具函数手写自定义拆分逻辑",
+              "id": "高阶组合示例-4-用底层-optics-工具函数手写自定义拆分逻辑",
+              "heading": "高阶组合示例 · 4. 用底层 optics 工具函数手写自定义拆分逻辑",
               "blocks": [
                 {
                   "type": "code",
@@ -17277,8 +17315,8 @@
               ]
             },
             {
-              "id": "5-捕获包边界错误并按-code-分支处理",
-              "heading": "5. 捕获包边界错误并按 code 分支处理",
+              "id": "高阶组合示例-5-捕获包边界错误并按-code-分支处理",
+              "heading": "高阶组合示例 · 5. 捕获包边界错误并按 code 分支处理",
               "blocks": [
                 {
                   "type": "code",
@@ -18727,8 +18765,8 @@
               ]
             },
             {
-              "id": "1-严格写入守卫-异步资源-用户设置面板",
-              "heading": "1. 严格写入守卫 + 异步资源：用户设置面板",
+              "id": "高阶组合示例-1-严格写入守卫-异步资源-用户设置面板",
+              "heading": "高阶组合示例 · 1. 严格写入守卫 + 异步资源：用户设置面板",
               "blocks": [
                 {
                   "type": "paragraph",
@@ -18742,8 +18780,8 @@
               ]
             },
             {
-              "id": "2-hydrate-plain-往返持久化快照",
-              "heading": "2. $hydrate + $plain：往返持久化快照",
+              "id": "高阶组合示例-2-hydrate-plain-往返持久化快照",
+              "heading": "高阶组合示例 · 2. $hydrate + $plain：往返持久化快照",
               "blocks": [
                 {
                   "type": "code",
@@ -18753,8 +18791,8 @@
               ]
             },
             {
-              "id": "3-own-把外部资源纳入-store-生命周期",
-              "heading": "3. $own 把外部资源纳入 Store 生命周期",
+              "id": "高阶组合示例-3-own-把外部资源纳入-store-生命周期",
+              "heading": "高阶组合示例 · 3. $own 把外部资源纳入 Store 生命周期",
               "blocks": [
                 {
                   "type": "code",
@@ -18764,8 +18802,8 @@
               ]
             },
             {
-              "id": "4-自定义-fieldbuilder-接入-store",
-              "heading": "4. 自定义 FieldBuilder 接入 Store",
+              "id": "高阶组合示例-4-自定义-fieldbuilder-接入-store",
+              "heading": "高阶组合示例 · 4. 自定义 FieldBuilder 接入 Store",
               "blocks": [
                 {
                   "type": "code",
@@ -19995,8 +20033,8 @@
               ]
             },
             {
-              "id": "1-接入已有-store-actions-only-策略-日志中间件-devtools",
-              "heading": "1. 接入已有 Store：actions-only 策略 + 日志中间件 + DevTools",
+              "id": "高阶组合示例-1-接入已有-store-actions-only-策略-日志中间件-devtools",
+              "heading": "高阶组合示例 · 1. 接入已有 Store：actions-only 策略 + 日志中间件 + DevTools",
               "blocks": [
                 {
                   "type": "code",
@@ -20006,8 +20044,8 @@
               ]
             },
             {
-              "id": "2-自定义领域插件-只在-action-结束时上报审计事件",
-              "heading": "2. 自定义领域插件：只在 action 结束时上报审计事件",
+              "id": "高阶组合示例-2-自定义领域插件-只在-action-结束时上报审计事件",
+              "heading": "高阶组合示例 · 2. 自定义领域插件：只在 action 结束时上报审计事件",
               "blocks": [
                 {
                   "type": "code",
@@ -20017,8 +20055,8 @@
               ]
             },
             {
-              "id": "3-独立使用-mutationpolicy-不接-store-错误身份识别",
-              "heading": "3. 独立使用 MutationPolicy（不接 Store）+ 错误身份识别",
+              "id": "高阶组合示例-3-独立使用-mutationpolicy-不接-store-错误身份识别",
+              "heading": "高阶组合示例 · 3. 独立使用 MutationPolicy（不接 Store）+ 错误身份识别",
               "blocks": [
                 {
                   "type": "code",
@@ -20028,8 +20066,8 @@
               ]
             },
             {
-              "id": "4-大状态树下换用零拷贝-clonepolicy-opaque-降低-getstate-开销",
-              "heading": "4. 大状态树下换用零拷贝 ClonePolicy.opaque 降低 getState() 开销",
+              "id": "高阶组合示例-4-大状态树下换用零拷贝-clonepolicy-opaque-降低-getstate-开销",
+              "heading": "高阶组合示例 · 4. 大状态树下换用零拷贝 ClonePolicy.opaque 降低 getState() 开销",
               "blocks": [
                 {
                   "type": "code",
@@ -20039,8 +20077,8 @@
               ]
             },
             {
-              "id": "5-手动构造-host-不经-bindstoremiddleware-支持-devtools-时间旅行",
-              "heading": "5. 手动构造 Host（不经 bindStoreMiddleware），支持 DevTools 时间旅行",
+              "id": "高阶组合示例-5-手动构造-host-不经-bindstoremiddleware-支持-devtools-时间旅行",
+              "heading": "高阶组合示例 · 5. 手动构造 Host（不经 bindStoreMiddleware），支持 DevTools 时间旅行",
               "blocks": [
                 {
                   "type": "code",
@@ -20807,8 +20845,8 @@
               ]
             },
             {
-              "id": "1-三种-store-形状统一接入-登出时统一收尾",
-              "heading": "1. 三种 store 形状统一接入 + 登出时统一收尾",
+              "id": "高阶组合示例-1-三种-store-形状统一接入-登出时统一收尾",
+              "heading": "高阶组合示例 · 1. 三种 store 形状统一接入 + 登出时统一收尾",
               "blocks": [
                 {
                   "type": "code",
@@ -20818,8 +20856,8 @@
               ]
             },
             {
-              "id": "2-版本迁移-schema-从-v1-升级到-v2",
-              "heading": "2. 版本迁移：schema 从 v1 升级到 v2",
+              "id": "高阶组合示例-2-版本迁移-schema-从-v1-升级到-v2",
+              "heading": "高阶组合示例 · 2. 版本迁移：schema 从 v1 升级到 v2",
               "blocks": [
                 {
                   "type": "code",
@@ -20829,8 +20867,8 @@
               ]
             },
             {
-              "id": "3-flush-在页面卸载前确保落盘",
-              "heading": "3. flush() 在页面卸载前确保落盘",
+              "id": "高阶组合示例-3-flush-在页面卸载前确保落盘",
+              "heading": "高阶组合示例 · 3. flush() 在页面卸载前确保落盘",
               "blocks": [
                 {
                   "type": "code",
@@ -21778,8 +21816,8 @@
               ]
             },
             {
-              "id": "1-storeprovider-就绪屏障-storetoken-注入-suspense-异步读取",
-              "heading": "1. StoreProvider + 就绪屏障 + StoreToken 注入 + Suspense 异步读取",
+              "id": "高阶组合示例-1-storeprovider-就绪屏障-storetoken-注入-suspense-异步读取",
+              "heading": "高阶组合示例 · 1. StoreProvider + 就绪屏障 + StoreToken 注入 + Suspense 异步读取",
               "blocks": [
                 {
                   "type": "code",
@@ -21789,8 +21827,8 @@
               ]
             },
             {
-              "id": "2-usetracked-手写跨节点组合读取-不经过-store",
-              "heading": "2. useTracked 手写跨节点组合读取（不经过 Store）",
+              "id": "高阶组合示例-2-usetracked-手写跨节点组合读取-不经过-store",
+              "heading": "高阶组合示例 · 2. useTracked 手写跨节点组合读取（不经过 Store）",
               "blocks": [
                 {
                   "type": "code",
@@ -21800,8 +21838,8 @@
               ]
             },
             {
-              "id": "3-atomstore-useatomdefinition-精细订阅",
-              "heading": "3. AtomStore + useAtomDefinition 精细订阅",
+              "id": "高阶组合示例-3-atomstore-useatomdefinition-精细订阅",
+              "heading": "高阶组合示例 · 3. AtomStore + useAtomDefinition 精细订阅",
               "blocks": [
                 {
                   "type": "code",
@@ -21811,8 +21849,8 @@
               ]
             },
             {
-              "id": "4-ssr-请求作用域-手动-registry-storeprovider-接管",
-              "heading": "4. SSR 请求作用域：手动 Registry + StoreProvider 接管",
+              "id": "高阶组合示例-4-ssr-请求作用域-手动-registry-storeprovider-接管",
+              "heading": "高阶组合示例 · 4. SSR 请求作用域：手动 Registry + StoreProvider 接管",
               "blocks": [
                 {
                   "type": "code",
@@ -23034,8 +23072,8 @@
               ]
             },
             {
-              "id": "1-主线程-worker-共享数组-自动推送-优雅关闭",
-              "heading": "1. 主线程 + Worker：共享数组、自动推送、优雅关闭",
+              "id": "高阶组合示例-1-主线程-worker-共享数组-自动推送-优雅关闭",
+              "heading": "高阶组合示例 · 1. 主线程 + Worker：共享数组、自动推送、优雅关闭",
               "blocks": [
                 {
                   "type": "code",
@@ -23050,8 +23088,8 @@
               ]
             },
             {
-              "id": "2-不支持-atomics-waitasync-的环境-手动轮询-错误码分支",
-              "heading": "2. 不支持 Atomics.waitAsync 的环境：手动轮询 + 错误码分支",
+              "id": "高阶组合示例-2-不支持-atomics-waitasync-的环境-手动轮询-错误码分支",
+              "heading": "高阶组合示例 · 2. 不支持 Atomics.waitAsync 的环境：手动轮询 + 错误码分支",
               "blocks": [
                 {
                   "type": "code",
@@ -23061,8 +23099,8 @@
               ]
             },
             {
-              "id": "3-单信号跨线程握手-postmessage-只传-buffer-不传对象",
-              "heading": "3. 单信号跨线程握手：postMessage 只传 buffer，不传对象",
+              "id": "高阶组合示例-3-单信号跨线程握手-postmessage-只传-buffer-不传对象",
+              "heading": "高阶组合示例 · 3. 单信号跨线程握手：postMessage 只传 buffer，不传对象",
               "blocks": [
                 {
                   "type": "code",
@@ -23072,8 +23110,8 @@
               ]
             },
             {
-              "id": "4-高频轮换下标读取-prune-主动回收响应式-cell",
-              "heading": "4. 高频轮换下标读取：prune() 主动回收响应式 cell",
+              "id": "高阶组合示例-4-高频轮换下标读取-prune-主动回收响应式-cell",
+              "heading": "高阶组合示例 · 4. 高频轮换下标读取：prune() 主动回收响应式 cell",
               "blocks": [
                 {
                   "type": "code",
@@ -23083,8 +23121,8 @@
               ]
             },
             {
-              "id": "5-用-createstoresharedrangeerror-包装上层校验-保持同一套错误身份",
-              "heading": "5. 用 createStoreSharedRangeError 包装上层校验，保持同一套错误身份",
+              "id": "高阶组合示例-5-用-createstoresharedrangeerror-包装上层校验-保持同一套错误身份",
+              "heading": "高阶组合示例 · 5. 用 createStoreSharedRangeError 包装上层校验，保持同一套错误身份",
               "blocks": [
                 {
                   "type": "code",
@@ -24173,8 +24211,8 @@
               ]
             },
             {
-              "id": "1-带异步-resource-预取的完整请求处理流程",
-              "heading": "1. 带异步 Resource 预取的完整请求处理流程",
+              "id": "高阶组合示例-1-带异步-resource-预取的完整请求处理流程",
+              "heading": "高阶组合示例 · 1. 带异步 Resource 预取的完整请求处理流程",
               "blocks": [
                 {
                   "type": "code",
@@ -24184,8 +24222,8 @@
               ]
             },
             {
-              "id": "2-客户端复水",
-              "heading": "2. 客户端复水",
+              "id": "高阶组合示例-2-客户端复水",
+              "heading": "高阶组合示例 · 2. 客户端复水",
               "blocks": [
                 {
                   "type": "code",
@@ -24195,8 +24233,8 @@
               ]
             },
             {
-              "id": "3-非-json-编解码器-属性转义内联",
-              "heading": "3. 非 JSON 编解码器 + 属性转义内联",
+              "id": "高阶组合示例-3-非-json-编解码器-属性转义内联",
+              "heading": "高阶组合示例 · 3. 非 JSON 编解码器 + 属性转义内联",
               "blocks": [
                 {
                   "type": "code",
@@ -24206,8 +24244,8 @@
               ]
             },
             {
-              "id": "4-用错误码分支处理-hydrate-失败",
-              "heading": "4. 用错误码分支处理 hydrate 失败",
+              "id": "高阶组合示例-4-用错误码分支处理-hydrate-失败",
+              "heading": "高阶组合示例 · 4. 用错误码分支处理 hydrate 失败",
               "blocks": [
                 {
                   "type": "code",
@@ -25344,8 +25382,8 @@
               ]
             },
             {
-              "id": "1-storeprovider-就绪屏障-wasm-字段的组件树",
-              "heading": "1. StoreProvider 就绪屏障 + wasm 字段的组件树",
+              "id": "高阶组合示例-1-storeprovider-就绪屏障-wasm-字段的组件树",
+              "heading": "高阶组合示例 · 1. StoreProvider 就绪屏障 + wasm 字段的组件树",
               "blocks": [
                 {
                   "type": "code",
@@ -25355,8 +25393,8 @@
               ]
             },
             {
-              "id": "2-大规模浮点数组的分桶粒度取舍",
-              "heading": "2. 大规模浮点数组的分桶粒度取舍",
+              "id": "高阶组合示例-2-大规模浮点数组的分桶粒度取舍",
+              "heading": "高阶组合示例 · 2. 大规模浮点数组的分桶粒度取舍",
               "blocks": [
                 {
                   "type": "code",
@@ -25366,8 +25404,8 @@
               ]
             },
             {
-              "id": "3-record-拆分定长结构体-逐字段独立订阅",
-              "heading": "3. record 拆分定长结构体，逐字段独立订阅",
+              "id": "高阶组合示例-3-record-拆分定长结构体-逐字段独立订阅",
+              "heading": "高阶组合示例 · 3. record 拆分定长结构体，逐字段独立订阅",
               "blocks": [
                 {
                   "type": "code",
@@ -25377,8 +25415,8 @@
               ]
             },
             {
-              "id": "4-识别本包错误并按错误码分支处理",
-              "heading": "4. 识别本包错误并按错误码分支处理",
+              "id": "高阶组合示例-4-识别本包错误并按错误码分支处理",
+              "heading": "高阶组合示例 · 4. 识别本包错误并按错误码分支处理",
               "blocks": [
                 {
                   "type": "code",
@@ -26451,8 +26489,8 @@
               ]
             },
             {
-              "id": "1-大对象派生计算-带取消与-ttl-缓存",
-              "heading": "1. 大对象派生计算，带取消与 TTL 缓存",
+              "id": "高阶组合示例-1-大对象派生计算-带取消与-ttl-缓存",
+              "heading": "高阶组合示例 · 1. 大对象派生计算，带取消与 TTL 缓存",
               "blocks": [
                 {
                   "type": "code",
@@ -26467,8 +26505,8 @@
               ]
             },
             {
-              "id": "2-序列化编解码卸载-接入现有注册表并连带终止-worker",
-              "heading": "2. 序列化编解码卸载，接入现有注册表并连带终止 Worker",
+              "id": "高阶组合示例-2-序列化编解码卸载-接入现有注册表并连带终止-worker",
+              "heading": "高阶组合示例 · 2. 序列化编解码卸载，接入现有注册表并连带终止 Worker",
               "blocks": [
                 {
                   "type": "code",
@@ -26483,8 +26521,8 @@
               ]
             },
             {
-              "id": "3-用错误码分支处理-abort-场景-判断是否可以重试",
-              "heading": "3. 用错误码分支处理 abort 场景，判断是否可以重试",
+              "id": "高阶组合示例-3-用错误码分支处理-abort-场景-判断是否可以重试",
+              "heading": "高阶组合示例 · 3. 用错误码分支处理 abort 场景，判断是否可以重试",
               "blocks": [
                 {
                   "type": "code",
@@ -27178,8 +27216,8 @@
     {
       "slug": "tray",
       "description": null,
-      "version": "0.0.1",
-      "exports": [".", "./host"],
+      "version": "0.0.2",
+      "exports": [".", "./adapter", "./host", "./loader", "./runtime"],
       "documentation": {
         "readme": {
           "sections": [
@@ -27229,7 +27267,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray';\n\nconst key = (value: string): ITrayKey => value as ITrayKey;\nconst configKey = key('config');\nconst apiKey = key('api');\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey);\n      const client = { baseUrl: config.baseUrl };\n      return { value: client, release: () => undefined };\n    }\n  }\n];\n\nconst tray = createTray(entries);\nawait tray.ready();\nconst api = tray.get<{ baseUrl: string }>(apiKey);\n\ntry {\n  console.log(api.baseUrl);\n} finally {\n  await tray.dispose();\n}"
+                  "code": "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTray(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -27257,7 +27295,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { TRAY_SOURCE, TrayErrorCode } from '@migaia/tray';\n\ntry {\n  tray.get(apiKey);\n} catch (error) {\n  const diagnostic = error as { source?: string; code?: string };\n  if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n    // 等待 ready()，或处理启动/就绪门失败。\n  } else {\n    throw error;\n  }\n}"
+                  "code": "import { TRAY_SOURCE, TrayErrorCode } from '@migaia/tray'\n\ntry {\n  tray.get(apiKey)\n} catch (error) {\n  const diagnostic = error as { source?: string; code?: string }\n  if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n    // 等待 ready()，或处理启动/就绪门失败。\n  } else {\n    throw error\n  }\n}"
                 },
                 {
                   "type": "paragraph",
@@ -27266,8 +27304,8 @@
               ]
             },
             {
-              "id": "托管-pluginhost-动态加载与卸载",
-              "heading": "托管 PluginHost：动态加载与卸载",
+              "id": "高阶组合示例-托管-pluginhost-动态加载-依赖阻塞与确定性卸载",
+              "heading": "高阶组合示例 · 托管 PluginHost：动态加载、依赖阻塞与确定性卸载",
               "blocks": [
                 {
                   "type": "paragraph",
@@ -27276,11 +27314,38 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost, type IPlugin } from '@migaia/plugin-host';\nimport { createHost } from '@migaia/tray/host';\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\n\nconst provider = {\n  name: 'provider',\n  install: () => ({ providerValue: 1 })\n} satisfies IPlugin<AppHost, { readonly providerValue: number }>;\n\nawait using host = await createHost({\n  create: () =>\n    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' }\n});\n\nawait host.use({ name: 'late', requires: ['provider'], install: () => ({ late: true }) });\nawait host.unUse('provider'); // `late` 保留为 blocked definition，不再留在 Host 可见面。"
+                  "code": "import { PluginHost, type IPlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\n\nconst provider = {\n  name: 'provider',\n  install: () => ({ providerValue: 1 })\n} satisfies IPlugin<AppHost, { readonly providerValue: number }>\n\nawait using host = await createHost({\n  create: () =>\n    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' }\n})\n\nawait host.use({ name: 'late', requires: ['provider'], install: () => ({ late: true }) })\nawait host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。"
                 },
                 {
                   "type": "paragraph",
                   "text": "同名 `replace()` 与 provider 恢复会复用该 definition 的 Host ordering slot；真正 `unUse()` 删除 definition 后 slot 永久退休，之后同名 `use()` 获得新的单调 slot。逻辑 bounded 结果可能先返回 `cleanupComplete: false`，但 `physicalCompletion` 严格等待 Graph binding lease、 pipeline lease、插件 disposer 与资源 disposer，未完成前不会启动后项。不能使用 `await using` 的编译目标可用 `try/finally { await host.dispose() }`。"
+                }
+              ]
+            },
+            {
+              "id": "高阶组合示例-loader-adapter-与-runtime-子路径",
+              "heading": "高阶组合示例 · Loader、Adapter 与 Runtime 子路径",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "三个能力只从显式子路径导入，不由 Tray 根入口聚合："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { defineLoader, loadIntoHost } from '@migaia/tray/loader'\nimport { defineAdapter } from '@migaia/tray/adapter'\nimport { createRuntime } from '@migaia/tray/runtime'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Loader 只负责 `source → { value, release }`，Adapter 只负责 artifact 到插件描述子的转换； `loadIntoHost()` 才拥有 `load → adapt → use/replace` 事务。提交前失败回滚临时 scope，提交后 artifact 由对应 definition generation 清理。Runtime 从托管 Host 取得 exact generation lease， 只向 callback 发布目标插件的 extensions；callback settle 前不会释放 lease。`dispose()` 停止 新 run、abort active signal，并按 `bounded` 或 `strict-drain` 策略观察真实完成，不宣称终止 不合作的 same-realm callback。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Runtime callback 同时收到只绑定当前 run、插件名称与 generation 的 `context.self`。调用 `self.unUse()` 或 `self.replace(plugin)` 会同步返回不具 thenable 行为的 ticket；ticket 的 `completion` 只在 callback settle、lease release 后由 managed Host queue 执行。callback 内 等待同一 ticket 的 completion 会立即得到 `RUNTIME_CONTRACT_INVALID`，而 callback 返回 ticket 后可在外层等待 `ticket.completion`。外部 `host."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "unUse/replace` 继续遵循原有 queue 与 lease 语义；callback 不应捕获 concrete Host 做 self mutation。"
                 }
               ]
             }
@@ -27305,7 +27370,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray';"
+                  "code": "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'"
                 },
                 {
                   "type": "paragraph",
@@ -27314,7 +27379,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const trayKey = (value: string): ITrayKey => value as ITrayKey;\nexport const AppTrayKey = {\n  config: trayKey('config'),\n  api: trayKey('api')\n} as const;"
+                  "code": "const trayKey = (value: string): ITrayKey => value as ITrayKey\nexport const AppTrayKey = {\n  config: trayKey('config'),\n  api: trayKey('api')\n} as const"
                 }
               ]
             },
@@ -27325,7 +27390,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service';\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey;\n  readonly kind: ITrayEntryKind;\n  readonly requires?: readonly ITrayKey[];\n  readonly readiness?: IGraphReadinessSnapshot;\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>;\n};"
+                  "code": "type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
                 },
                 {
                   "type": "list",
@@ -27358,7 +27423,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createTray(entries: readonly ITrayEntryDefinition<unknown>[]): ITray;"
+                  "code": "function createTray(entries: readonly ITrayEntryDefinition<unknown>[]): ITray"
                 },
                 {
                   "type": "paragraph",
@@ -27400,7 +27465,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ITray = {\n  readonly keys: readonly ITrayKey[];\n  readonly state: ITrayState;\n  readonly error: unknown | undefined;\n  ready(): Promise<void>;\n  get<T>(key: ITrayKey): T;\n  entryState(key: ITrayKey): string;\n  dispose(): Promise<void>;\n};"
+                  "code": "type ITray = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}"
                 },
                 {
                   "type": "list",
@@ -27476,6 +27541,60 @@
                       "`HOST_MUTATION_BYPASS`",
                       "escaped concrete Host 绕过 managed Graph receipt 发生 mutation",
                       "停止使用 raw Host mutation；只通过 `@migaia/tray/host` facade 写入"
+                    ],
+                    [
+                      "`loaderContractInvalid`",
+                      "`LOADER_CONTRACT_INVALID`",
+                      "loader/result/release descriptor 外形非法",
+                      "修正 Loader contract，不重试相同输入"
+                    ],
+                    [
+                      "`loaderExecutionFailed`",
+                      "`LOADER_EXECUTION_FAILED`",
+                      "Loader 执行抛错；原错误仍在 cause/identity 链",
+                      "检查 source 与 cause 后处理"
+                    ],
+                    [
+                      "`adapterContractInvalid`",
+                      "`ADAPTER_CONTRACT_INVALID`",
+                      "Adapter 或 plugin descriptor 外形非法",
+                      "修正 Adapter 输出"
+                    ],
+                    [
+                      "`adapterExecutionFailed`",
+                      "`ADAPTER_EXECUTION_FAILED`",
+                      "Adapter 执行抛错；原错误保持可达",
+                      "检查 artifact compatibility"
+                    ],
+                    [
+                      "`runtimeContractInvalid`",
+                      "`RUNTIME_CONTRACT_INVALID`",
+                      "foreign Host、name/options/execute 外形非法",
+                      "修正 Runtime 调用契约"
+                    ],
+                    [
+                      "`runtimeDisposed`",
+                      "`RUNTIME_DISPOSED`",
+                      "closing/terminal 后仍 admission",
+                      "创建新 Runtime 或停止 admission"
+                    ],
+                    [
+                      "`runtimeExecutionFailed`",
+                      "`RUNTIME_EXECUTION_FAILED`",
+                      "callback 抛错；lease 仍在 finally 释放",
+                      "检查 callback cause"
+                    ],
+                    [
+                      "`runtimeAborted`",
+                      "`RUNTIME_ABORTED`",
+                      "caller/runtime/deadline cooperative abort",
+                      "按 cancellation 处理并等待 settlement"
+                    ],
+                    [
+                      "`artifactCleanupFailed`",
+                      "`ARTIFACT_CLEANUP_FAILED`",
+                      "artifact secondary cleanup failure",
+                      "检查 cleanupErrors，不替换 mutation primary"
                     ]
                   ]
                 },
@@ -27524,7 +27643,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createHost,\n  type ICreateHostOptions,\n  type ITrayResolvedHost\n} from '@migaia/tray/host';"
+                  "code": "import { createHost, type ICreateHostOptions, type ITrayResolvedHost } from '@migaia/tray/host'"
                 },
                 {
                   "type": "paragraph",
@@ -27574,6 +27693,46 @@
                   "text": "不要绕过 facade 调用 escaped concrete Host mutation。Tray 会以 `(source: '@migaia/tray', code: 'HOST_MUTATION_BYPASS')` fail closed，因为 Graph 与 Host 已不再拥有同一 publication receipt。"
                 }
               ]
+            },
+            {
+              "id": "11-loader-adapter-与-runtime",
+              "heading": "11. Loader、Adapter 与 Runtime",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "能力边界通过显式子路径保持隔离："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { defineLoader, loadIntoHost } from '@migaia/tray/loader'\nimport { defineAdapter } from '@migaia/tray/adapter'\nimport { createRuntime } from '@migaia/tray/runtime'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`defineLoader()` 快照一次 `load` contract，并兼容同步值、原生 Promise 与 foreign thenable； 结果必须提供 `value` 与可调用的 lifecycle `release` descriptor。`defineAdapter()` 同样只 快照并执行一次转换，不拥有 Host、Graph、scope 或 artifact 清理。`loadIntoHost()` 是唯一事务 owner：提交前的 loader/adapt/mutation failure 回滚 provisional artifact；只有 committed definition generation 接管 cleanup。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Runtime 不创建第二个 Host 或 Graph。`runtime.run(name, options, callback)` 取得目标 ready plugin 的 exact generation lease，并只发布该 registration 的 extension snapshot。同步返回、 Promise 与 foreign thenable 都在 callback settle 后释放 lease；caller signal、Runtime dispose 和 timeout 只 abort cooperative signal，不伪造任务已终止。`strict-drain` 等待真实 settlement， `bounded` 可返回未完成的物理观察结果。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "callback context 的 `self` 是当前 run/name/generation 专属 mutation capability："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const ticket = await runtime.run('search', { timeoutMs: false }, ({ self }) => self.unUse())\nawait ticket.completion"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "ticket 不可 thenable，且只在 callback 已 settle 并释放 generation lease 后才调度 canonical managed Host mutation。callback 内等待 `ticket.completion` 会 fail fast 并返回 `RUNTIME_CONTRACT_INVALID`；外部 `host.unUse/replace` 仍按既有 queue 等待 exact lease。不要 从 callback 捕获 concrete Host 执行 self mutation。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Loader/Adapter/Runtime 契约错误分别使用 `LOADER_*`、`ADAPTER_*`、`RUNTIME_*` 码；原始 native error 保留 identity、type、stack 与 cause。artifact secondary cleanup 使用 `ARTIFACT_CLEANUP_FAILED` 作为观察码，不能替换更早 mutation primary。"
+                }
+              ]
             }
           ]
         }
@@ -27582,7 +27741,7 @@
     {
       "slug": "utils",
       "description": "Runtime-neutral reusable utility primitives.",
-      "version": "0.0.2",
+      "version": "0.0.4",
       "exports": [
         ".",
         "./bytes",
@@ -27649,6 +27808,7 @@
                     "`/typing`：跨项目复用类型",
                     "`/config`：带所有权语义的配置对象",
                     "`/function`：一次性调用",
+                    "Collector：惰性字段筛选流水线",
                     "高阶组合示例",
                     "构建门禁"
                   ]
@@ -28368,8 +28528,31 @@
               ]
             },
             {
-              "id": "1-截止时间-重试-只读配置",
-              "heading": "1. 截止时间 + 重试 + 只读配置",
+              "id": "collector-惰性字段筛选流水线",
+              "heading": "Collector：惰性字段筛选流水线",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`collect` 只从包根入口导出。它借用一个 `readonly` 数组，链式动作立即改变查询语义，首次读取 `result` 时才按调用顺序扫描一次并缓存："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { collect } from '@migaia/utils';\n\nconst collector = collect(users)\n  .fieldBy('profile.name-zh', 'profile.name-en')\n  .like(' world ')\n  .where((user) => user.active)\n  .take(20);\n\nconst result = collector.result;"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`fieldBy` 本身会过滤掉所有候选字段都为 `undefined` 的 source，并启用 `like`、`equals`、`oneOf` 的 typestate；未调用它时，TypeScript 不暴露这些方法。`like` 只匹配字符串，trim 后为空时为 no-op。另有 `distinctBy`、`skip`、`take`，所有动作保留原 source 项的身份与顺序。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Collector 不复制或追踪外部修改：调用方必须在 collector 生命周期内遵守传入数组及对象的只读约定。相同查询 revision 重复读取 `result` 返回同一缓存引用；新增动作后会从原 source 重新求值，但不会修改旧结果快照。"
+                }
+              ]
+            },
+            {
+              "id": "高阶组合示例-1-截止时间-重试-只读配置",
+              "heading": "高阶组合示例 · 1. 截止时间 + 重试 + 只读配置",
               "blocks": [
                 {
                   "type": "code",
@@ -28379,8 +28562,8 @@
               ]
             },
             {
-              "id": "2-并发限流-重试-错误合并-批量拉取-容忍部分失败",
-              "heading": "2. 并发限流 + 重试 + 错误合并：批量拉取，容忍部分失败",
+              "id": "高阶组合示例-2-并发限流-重试-错误合并-批量拉取-容忍部分失败",
+              "heading": "高阶组合示例 · 2. 并发限流 + 重试 + 错误合并：批量拉取，容忍部分失败",
               "blocks": [
                 {
                   "type": "code",
@@ -28390,8 +28573,8 @@
               ]
             },
             {
-              "id": "3-对象路径-配置-把校验后的嵌套结构整体写回配置根",
-              "heading": "3. 对象路径 + 配置：把校验后的嵌套结构整体写回配置根",
+              "id": "高阶组合示例-3-对象路径-配置-把校验后的嵌套结构整体写回配置根",
+              "heading": "高阶组合示例 · 3. 对象路径 + 配置：把校验后的嵌套结构整体写回配置根",
               "blocks": [
                 {
                   "type": "code",
@@ -28401,8 +28584,8 @@
               ]
             },
             {
-              "id": "4-一次性初始化-错误身份-确保初始化异常带上可识别的-code",
-              "heading": "4. 一次性初始化 + 错误身份：确保初始化异常带上可识别的 code",
+              "id": "高阶组合示例-4-一次性初始化-错误身份-确保初始化异常带上可识别的-code",
+              "heading": "高阶组合示例 · 4. 一次性初始化 + 错误身份：确保初始化异常带上可识别的 code",
               "blocks": [
                 {
                   "type": "code",
@@ -28459,6 +28642,7 @@
                     "`/typing` 模块",
                     "`/config` 模块",
                     "`/function` 模块",
+                    "Collector",
                     "组合工作流示例",
                     "排查与构建门禁"
                   ]
@@ -29320,6 +29504,57 @@
               ]
             },
             {
+              "id": "collector",
+              "heading": "Collector",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Collector 是包根入口提供的、数组专用的惰性查询流水线："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "type ICollectorActions<T, Self> = {\n  readonly result: readonly T[];\n  fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(\n    ...paths: P\n  ): IFieldCollector<T, P[number]>;\n  where(predicate: (source: T) => boolean): Self;\n  distinctBy<P extends IObjectPathInput<T>>(path: P): Self;\n  skip(count: number): Self;\n  take(count: number): Self;\n};\n\ninterface ICollector<T> extends ICollectorActions<T, ICollector<T>> {}\n\ninterface IFieldCollector<T, P extends IObjectPathInput<T>>\n  extends ICollectorActions<T, IFieldCollector<T, P>> {\n  like(query: string): IFieldCollector<T, P>;\n  equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>;\n  oneOf(\n    value: IObjectPathValue<T, P>,\n    ...values: IObjectPathValue<T, P>[]\n  ): IFieldCollector<T, P>;\n}\n\nfunction collect<T>(dataSource: readonly T[]): ICollector<T>;"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const collector = collect(users)\n  .fieldBy('profile.name-zh', 'profile.name-en')\n  .like(' World ')\n  .distinctBy('id')\n  .skip(10)\n  .take(20);\n\nconst result = collector.result;"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "执行与缓存："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`collect` 借用原 `readonly` 数组且不复制；无动作或全部 source 通过时，`result` 直接复用原数组。",
+                    "每个动作立即写入有序语义流水线，但不会扫描 source；首次读取 `result` 时单次遍历并缓存。同 revision 重复读取返回同一引用，新增有效动作后缓存失效。",
+                    "动作顺序可观察：`take(2).where(predicate)` 与 `where(predicate).take(2)` 不等价。连续链式调用不会生成每步中间数组。",
+                    "求值失败不缓存；getter、Proxy 与 `where` 抛出的错误保持原始身份。求值回调中重读或修改同一 collector 会抛 `REENTRANT_CALL`。"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "字段动作："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`fieldBy` 立即解析路径，并加入“任一字段值非 `undefined`”过滤；missing、blocked 和显式 `undefined` 统一视为无有效值。重复调用会保留前一个过滤动作，同时替换后续字段谓词的活动字段域。",
+                    "`like` 对 query 执行 `trim().toLowerCase()`；trim 后为空是 no-op。只对字符串字段进行忽略大小写的连续子串匹配，多个字段使用 OR。",
+                    "`equals` 与 `oneOf` 使用 `Object.is`；多个字段使用 OR，多个动作按顺序组成 AND。`oneOf` 固定线性扫描候选值，不按数据量升级为索引。",
+                    "`distinctBy` 只去重已定义 key，保留第一次出现；missing、blocked、显式 `undefined` 均不参与去重。",
+                    "`where` 只接收 source，不注入 index。`skip`/`take` 只接受非负安全整数，否则抛出带 `INVALID_ARGUMENT` 的原生 `RangeError`。"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "输入数组和嵌套 source 由调用方维持只读。Collector 不监听外部 mutation；外部绕过类型修改数据后，已缓存 revision 不会自动失效。"
+                }
+              ]
+            },
+            {
               "id": "组合工作流示例-截止时间-配置",
               "heading": "组合工作流示例：截止时间 + 配置",
               "blocks": [
@@ -29418,7 +29653,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import init, {\n  alloc_bytes,\n  ptr_of,\n  byte_len_of,\n  dealloc_bytes,\n  json_to_msgpack,\n  msgpack_to_json\n} from '@migaia/wasm';"
+                  "code": "import init, {\n  alloc_bytes,\n  ptr_of,\n  byte_len_of,\n  dealloc_bytes,\n  json_to_msgpack,\n  msgpack_to_json\n} from '@migaia/wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -29431,12 +29666,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ConversionResult = {\n  readonly id: number;    // 成功时的新输出分配，失败时为 0\n  readonly len: number;   // 精确输出长度，失败时为 0\n  readonly error: string; // 成功为空串，失败为原因\n};"
+                  "code": "type ConversionResult = {\n  readonly id: number // 成功时的新输出分配，失败时为 0\n  readonly len: number // 精确输出长度，失败时为 0\n  readonly error: string // 成功为空串，失败为原因\n}"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const wasm = await init();\nconst input = alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json);\n\nconst result = json_to_msgpack(input, json.length);\nif (result.id === 0) throw new Error(result.error);\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice();\n\ndealloc_bytes(input);\ndealloc_bytes(result.id);"
+                  "code": "const wasm = await init()\nconst input = alloc_bytes(json.length)\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json)\n\nconst result = json_to_msgpack(input, json.length)\nif (result.id === 0) throw new Error(result.error)\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n\ndealloc_bytes(input)\ndealloc_bytes(result.id)"
                 },
                 {
                   "type": "paragraph",
@@ -29455,6 +29690,25 @@
                 {
                   "type": "paragraph",
                   "text": "arena 使用 `Vec<u64>`，保证指针适合 `Float64Array`/`BigInt64Array`。WASM memory 增长会使旧 `ArrayBuffer` 视图失效；每次分配或读取前都从当前 `memory.buffer` 创建视图。所有分配都必须显式释放；`@migaia/store-wasm` 另外提供 FinalizationRegistry 兜底，但不替代确定性 dispose。"
+                }
+              ]
+            },
+            {
+              "id": "高阶组合示例-交错转码并在一个所有权边界内释放全部分配",
+              "heading": "高阶组合示例 · 交错转码并在一个所有权边界内释放全部分配",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "每次转码返回独立的 `ConversionResult`，因此可以先保留多个结果，再按业务顺序读取。输入 id 和成功结果 id 都归调用者所有；用 `try/finally` 把释放收拢到同一个边界，避免异常路径泄漏 arena 分配："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import init, { alloc_bytes, dealloc_bytes, json_to_msgpack, ptr_of } from '@migaia/wasm'\n\nconst wasm = await init()\n\nfunction writeJson(value: unknown): { id: number; length: number } {\n  const bytes = new TextEncoder().encode(JSON.stringify(value))\n  const id = alloc_bytes(bytes.length)\n  if (id === 0) throw new Error('WASM arena allocation failed')\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  return { id, length: bytes.length }\n}\n\nconst firstInput = writeJson({ id: 1, status: 'ready' })\nconst secondInput = writeJson({ id: 2, status: 'queued' })\nconst outputIds: number[] = []\n\ntry {\n  const first = json_to_msgpack(firstInput.id, firstInput.length)\n  const second = json_to_msgpack(secondInput.id, secondInput.length)\n  for (const result of [first, second]) {\n    if (result.id === 0) throw new Error(result.error)\n    outputIds.push(result.id)\n    const ownedCopy = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log(ownedCopy.byteLength)\n  }\n} finally {\n  dealloc_bytes(firstInput.id)\n  dealloc_bytes(secondInput.id)\n  for (const id of outputIds) dealloc_bytes(id)\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "每次读取前都重新访问 `wasm.memory.buffer`，因为后续分配可能触发 memory growth 并使旧视图失效。`.slice()` 得到 JavaScript 自有副本后即可释放 WASM 输出；如果要保留零拷贝视图，就必须把对应 id 的释放延后到最后一次读取之后。"
                 }
               ]
             },
@@ -29494,7 +29748,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import init, { initSync } from '@migaia/wasm';\n\nconst wasm = await init();\n// 或：const wasm = initSync(moduleOrBytes);"
+                  "code": "import init, { initSync } from '@migaia/wasm'\n\nconst wasm = await init()\n// 或：const wasm = initSync(moduleOrBytes);"
                 },
                 {
                   "type": "paragraph",
@@ -29546,7 +29800,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }));\nconst inputId = wasm.alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json);\n\nconst encoded = wasm.json_to_msgpack(inputId, json.length);\nif (encoded.id === 0) {\n  wasm.dealloc_bytes(inputId);\n  throw new Error(encoded.error);\n}\nconst packed = new Uint8Array(\n  wasm.memory.buffer,\n  wasm.ptr_of(encoded.id),\n  encoded.len\n).slice();\nwasm.dealloc_bytes(inputId);\nwasm.dealloc_bytes(encoded.id);"
+                  "code": "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }))\nconst inputId = wasm.alloc_bytes(json.length)\nnew Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json)\n\nconst encoded = wasm.json_to_msgpack(inputId, json.length)\nif (encoded.id === 0) {\n  wasm.dealloc_bytes(inputId)\n  throw new Error(encoded.error)\n}\nconst packed = new Uint8Array(wasm.memory.buffer, wasm.ptr_of(encoded.id), encoded.len).slice()\nwasm.dealloc_bytes(inputId)\nwasm.dealloc_bytes(encoded.id)"
                 }
               ]
             },
@@ -29596,7 +29850,7 @@
     {
       "slug": "web-rpc",
       "description": "Type-safe bidirectional RPC — schema-typed method/params/result with transport-agnostic endpoints. No dependency on Store, React, WASM, or any specific host (DOM/Node).",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "exports": [
         ".",
         "./adapters/broadcast-channel",
@@ -30375,8 +30629,8 @@
               ]
             },
             {
-              "id": "1-主线程调度-web-worker",
-              "heading": "1. 主线程调度 Web Worker",
+              "id": "11-高阶组合示例-1-主线程调度-web-worker",
+              "heading": "11. 高阶组合示例 · 1. 主线程调度 Web Worker",
               "blocks": [
                 {
                   "type": "code",
@@ -30391,8 +30645,8 @@
               ]
             },
             {
-              "id": "2-iframe-白名单鉴权通信",
-              "heading": "2. iframe 白名单鉴权通信",
+              "id": "11-高阶组合示例-2-iframe-白名单鉴权通信",
+              "heading": "11. 高阶组合示例 · 2. iframe 白名单鉴权通信",
               "blocks": [
                 {
                   "type": "code",
@@ -30402,8 +30656,8 @@
               ]
             },
             {
-              "id": "3-标签页广播通知-不需要响应",
-              "heading": "3. 标签页广播通知（不需要响应）",
+              "id": "11-高阶组合示例-3-标签页广播通知-不需要响应",
+              "heading": "11. 高阶组合示例 · 3. 标签页广播通知（不需要响应）",
               "blocks": [
                 {
                   "type": "code",
@@ -30413,8 +30667,8 @@
               ]
             },
             {
-              "id": "4-大文件跨端传输-自动分片",
-              "heading": "4. 大文件跨端传输（自动分片）",
+              "id": "11-高阶组合示例-4-大文件跨端传输-自动分片",
+              "heading": "11. 高阶组合示例 · 4. 大文件跨端传输（自动分片）",
               "blocks": [
                 {
                   "type": "code",
@@ -30424,8 +30678,8 @@
               ]
             },
             {
-              "id": "5-超时-可取消调用",
-              "heading": "5. 超时 + 可取消调用",
+              "id": "11-高阶组合示例-5-超时-可取消调用",
+              "heading": "11. 高阶组合示例 · 5. 超时 + 可取消调用",
               "blocks": [
                 {
                   "type": "code",

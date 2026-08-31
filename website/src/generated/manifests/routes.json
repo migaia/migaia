@@ -323,6 +323,18 @@
       "library": "capability"
     },
     {
+      "path": "/en/docs/capability/graph-dynamic/IGraphBindingReleaseEntry",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph-dynamic/IGraphBindingReleaseReason",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
       "path": "/en/docs/capability/graph-dynamic/IGraphMutationResult",
       "locale": "en",
       "domain": "docs",
@@ -2382,6 +2394,36 @@
     },
     {
       "path": "/en/docs/plugin-host/adaptSyncStageToGenerator",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/composition",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/composition/IRegistrationToken",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/composition/IRegistrationView",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/composition/createView",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/createRegistrationView",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
@@ -6905,6 +6947,30 @@
       "library": "tray"
     },
     {
+      "path": "/en/docs/tray/adapter",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/adapter/IAdapter",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/adapter/IAdapterContext",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/adapter/defineAdapter",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/en/docs/tray/createTray",
       "locale": "en",
       "domain": "docs",
@@ -7049,13 +7115,139 @@
       "library": "tray"
     },
     {
+      "path": "/en/docs/tray/loader",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/loader/ILoadIntoHostOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/loader/ILoadIntoHostResult",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/loader/ILoadedArtifact",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/loader/ILoader",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/loader/ILoaderContext",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/loader/defineLoader",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/loader/loadIntoHost",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/en/docs/tray/overview",
       "locale": "en",
       "domain": "docs",
       "library": "tray"
     },
     {
+      "path": "/en/docs/tray/runtime",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/runtime/IRuntime",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/runtime/IRuntimeDisposalResult",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/runtime/IRuntimeExtensionsFor",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/runtime/IRuntimeRunContext",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/runtime/IRuntimeRunOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/runtime/IRuntimeSelfMutation",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/runtime/IRuntimeSelfMutationTicket",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/runtime/IRuntimeShutdownOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/runtime/createRuntime",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/en/docs/utils",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/ICollector",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/ICollectorActions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/IFieldCollector",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
@@ -7116,6 +7308,12 @@
     },
     {
       "path": "/en/docs/utils/bytes/utf8ByteLength",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/collect",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
@@ -10151,6 +10349,12 @@
       "library": "utils"
     },
     {
+      "path": "/en/guides/utils/collector",
+      "locale": "en",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
       "path": "/en/guides/utils/configuration-ownership",
       "locale": "en",
       "domain": "guides",
@@ -10590,6 +10794,18 @@
     },
     {
       "path": "/zh/docs/capability/graph-dynamic/IGraphBindingLease",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph-dynamic/IGraphBindingReleaseEntry",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph-dynamic/IGraphBindingReleaseReason",
       "locale": "zh",
       "domain": "docs",
       "library": "capability"
@@ -12738,6 +12954,36 @@
     },
     {
       "path": "/zh/docs/plugin-host/api",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/composition",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/composition/IRegistrationToken",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/composition/IRegistrationView",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/composition/createView",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/createRegistrationView",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
@@ -17357,6 +17603,30 @@
       "library": "tray"
     },
     {
+      "path": "/zh/docs/tray/adapter",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/adapter/IAdapter",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/adapter/IAdapterContext",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/adapter/defineAdapter",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/zh/docs/tray/createTray",
       "locale": "zh",
       "domain": "docs",
@@ -17501,13 +17771,139 @@
       "library": "tray"
     },
     {
+      "path": "/zh/docs/tray/loader",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/loader/ILoadIntoHostOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/loader/ILoadIntoHostResult",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/loader/ILoadedArtifact",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/loader/ILoader",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/loader/ILoaderContext",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/loader/defineLoader",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/loader/loadIntoHost",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/zh/docs/tray/overview",
       "locale": "zh",
       "domain": "docs",
       "library": "tray"
     },
     {
+      "path": "/zh/docs/tray/runtime",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/runtime/IRuntime",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/runtime/IRuntimeDisposalResult",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/runtime/IRuntimeExtensionsFor",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/runtime/IRuntimeRunContext",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/runtime/IRuntimeRunOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/runtime/IRuntimeSelfMutation",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/runtime/IRuntimeSelfMutationTicket",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/runtime/IRuntimeShutdownOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/runtime/createRuntime",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/zh/docs/utils",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/ICollector",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/ICollectorActions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/IFieldCollector",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"
@@ -17580,6 +17976,12 @@
     },
     {
       "path": "/zh/docs/utils/bytes/utf8ByteLength",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/collect",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"
@@ -20634,6 +21036,12 @@
     },
     {
       "path": "/zh/guides/utils/bytes-and-text",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/guides/utils/collector",
       "locale": "zh",
       "domain": "guides",
       "library": "utils"
