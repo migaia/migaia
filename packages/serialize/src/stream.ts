@@ -669,6 +669,7 @@ export type IEncodeStreamOptions = IFrameBudgetOptions & {
 /** Captured policy for one collector operation; getters are read before iterator acquisition. */
 export type ICollectStreamOptions = {
   readonly signal?: ISerializeAbortSignal
+  /** Chooses whether an empty stream returns empty text or rejects; defaults to `text`. */
   readonly empty?: 'text' | 'reject'
   readonly context?: string
 }

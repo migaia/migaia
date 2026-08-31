@@ -48,7 +48,10 @@ type IEventChannelOptions<T> = {
   readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>
   readonly terminalReport?: (error: unknown) => void | PromiseLike<void>
   readonly dispatchPolicy?: EventDispatchPolicy
+  readonly removalPolicy?: 'handle' | 'listener-all'
+  readonly publishBudget?: number
   readonly style?: IEventApiStyle
+  readonly valueConfig?: IValidatedEventValueConfig<T>
 }
 
 type IEventApiStyleNames<
@@ -83,6 +86,10 @@ unsubscribe()
 `dispatchPolicy` 默认是 `EventDispatchPolicy.recursive`，保持 canonical channel 的同步 nested publish trace。需要当前 snapshot 完成后再交付重入值的消费者必须显式传入 `EventDispatchPolicy.queued`；该 opt-in 不改变其他消费者的默认行为。
 
 `publishBudget` 默认 `100_000`，必须是正安全整数。它限制一次顶层同步发布事务内实际调用的 listener 总数（包括 nested publish 展开的调用）；预算耗尽时停止继续展开，并以 `PUBLISH_FAILED` 抛出且在 `error.detail` 中记录已处理数量，避免递归或重入发布无限占用线程。
+
+`removalPolicy` 决定调用一个订阅句柄时解除多少登记。默认 `handle` 只解除该句柄所属的单次登记；`listener-all` 会同时解除同一 listener 在该 channel 上的全部登记。需要精确管理重复订阅时保持默认值；只有兼容“按函数整体移除”的调用方才选择 `listener-all`。其他值在构造阶段以 `INVALID_OPTIONS` 拒绝。
+
+`valueConfig` 在 channel 构造时固定读取路径与可选 alias，把 payload 中的稳定路径投影到每次 listener 收到的 event context；它不保存、转换或重放 payload。需要按路径读取并保留完整原始 `event.value` 时使用，配置与失败语义见[静态 value path alias](#6-静态-value-path-alias)。
 
 `ICanonicalEventChannel<T, R>` 上的成员：
 
@@ -498,7 +505,7 @@ import {
 | `invalidTaskId`                      | `INVALID_TASK_ID`                       | 传入的 `taskId` 为空或不是字符串                                                                                                                         |
 | `invalidOptions`                     | `INVALID_OPTIONS`                       | 公开 options 对象或字段结构非法                                                                                                                          |
 | `publishFailed`                      | `PUBLISH_FAILED`                        | 完整目标快照处理完毕后，一个或多个 listener 失败（`publish()`/`invokeParallel`/`invokeSerial`/`invokeTask` 的抛出通道）                                  |
-| `valueProjectionFailed`              | `VALUE_PROJECTION_FAILED`               | listener 的 value alias 路径缺失、被阻断或 getter 抛错                                                                                                  |
+| `valueProjectionFailed`              | `VALUE_PROJECTION_FAILED`               | listener 的 value alias 路径缺失、被阻断或 getter 抛错                                                                                                   |
 | `unhandledListenerFailure`           | `UNHANDLED_LISTENER_FAILURE`            | fire-and-forget 的迟到 listener 失败在 `report` 处理失败或缺失后，到达终端诊断通道                                                                       |
 | `subscriptionClosed`                 | `SUBSCRIPTION_CLOSED`                   | 订阅句柄链已关闭后又调用其 `.subscribe()` 追加新订阅                                                                                                     |
 | `subscriptionHandleProjectionFailed` | `SUBSCRIPTION_HANDLE_PROJECTION_FAILED` | handle alias descriptor projection fails after registration; the first registration is rolled back and the original projection failure remains reachable |

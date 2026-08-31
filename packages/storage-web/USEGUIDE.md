@@ -1118,6 +1118,21 @@ host.backends() // mutation-incapable snapshot
 
 `installTimeoutMs` 默认 30 秒，作用于整个安装 batch；`scheduler` 可注入确定性时间；`report` 只接收 late rejection/cleanup 等诊断，reporter 自己失败不会覆盖主错误。安装中再次 `use()` 会抛 `STORAGE_HOST_BUSY`。
 
+### `StorageHostFacade`
+
+`StorageHostFacade` 是 `createStorageHost()` 使用的同一 Host shell，不是另一套运行时。直接构造只创建空 Host，之后用 `await host.use(plugin)` 安装 backend；需要在返回前原子安装首批 plugins 时优先使用 `createStorageHost({ plugins })`。
+
+构造参数与 factory 共用同一契约：`installTimeoutMs` 限制完整安装 batch，`scheduler` 注入生命周期时间，`report` 只接收 late rejection 和 cleanup 诊断且不会替换主错误。`backend()`、`hasBackend()`、`backends()`、`use()` 和 `dispose()` 的行为与 factory 返回对象完全一致。
+
+```ts
+const host = new StorageHostFacade({
+  installTimeoutMs: 10_000,
+  report: (error) => diagnostics.capture(error)
+})
+await host.use(memoryBackendPlugin({ id: 'cache' }))
+const cache = host.backend('cache')
+```
+
 ### Dispose
 
 `host.dispose()` 同步关闭新 admission，取消正在安装的 batch，等待已接纳 mutation/query quiescent，再按 PluginHost/lifecycle 所有权释放 adapter、store 和 transport。它是幂等的：同一 tick 的重复调用返回同一个 Promise。dispose 后的 `backend`、`use`、`liveQuery` 等调用都失败，不会复活 Host；cleanup 错误被聚合且原始 cause 保持可达。

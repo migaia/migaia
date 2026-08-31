@@ -130,7 +130,7 @@ clear(): void
 recordAction(trace: Omit<IActionTrace, 'timestamp'>): void
 ```
 
-手动追加一条 action 记录，`timestamp` 由内部 `now()` 补上。`actions.length` 超过 `maxHistory`（**不是 `maxTrace`**——`actions` 与 `trace` 共用同一份 runtime trace 输入，但队列上限各自独立，`actions` 复用的是 `maxHistory` 这个数字，没有独立的 `maxActions` 选项）时从头部裁掉最旧条目。
+手动追加一条 action 记录，`timestamp` 由内部 `now()` 补上。`actions.length` 超过 `maxTrace` 时淘汰最旧条目。`actions` 与 `trace` 共用同一个配置上限，但各自使用独立的有界队列，因此一条队列增长不会占用另一条队列的容量；当前没有独立的 `maxActions` 选项。
 
 把 `options.captureRuntimeTrace` 设为 `false` 会连带关闭 action 的自动记录（两者共享同一条 trace 订阅），此时 `actions` 只能靠手动 `recordAction()` 填充。
 

@@ -7,7 +7,9 @@ export type INumericValue = number | bigint
 
 /** Locale and Intl policy used by all numeric format helpers. */
 export type INumberFormatOptions = {
+  /** Locale preference passed through canonical `Intl.getCanonicalLocales` normalization. */
   readonly locales?: Intl.LocalesArgument
+  /** Native `Intl.NumberFormat` policy merged with the helper-specific defaults. */
   readonly format?: Intl.NumberFormatOptions
 }
 
