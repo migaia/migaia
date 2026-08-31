@@ -11,6 +11,7 @@ import { indexedDbReactive } from '../src/plugins/reactive/indexed-db.js'
 import { localStorageReactive } from '../src/plugins/reactive/local-storage.js'
 import { memoryReactive } from '../src/plugins/reactive/memory.js'
 import { sessionStorageReactive } from '../src/plugins/reactive/session-storage.js'
+import { captureOperationCleanup } from './helpers/operation-reporter.js'
 
 /** Deterministic R16 business probes over the canonical lifecycle, Resource, and Host owners. */
 describe('SWV4 R16 deterministic shared harness', () => {
@@ -24,7 +25,15 @@ describe('SWV4 R16 deterministic shared harness', () => {
     })
     const unsubscribeObserver = controller.subscribe((event) => events.push(event))
 
-    await expect(store.set('r16-commit', 'value')).resolves.toBeUndefined()
+    const cleanup = await captureOperationCleanup(() => store.set('r16-commit', 'value'))
+    expect(cleanup.result).toBeUndefined()
+    expect(cleanup.reports).toEqual([
+      expect.objectContaining({
+        source: '@migaia/event-subscriber',
+        code: 'PUBLISH_FAILED',
+        cause: expect.objectContaining({ message: 'r16 listener failure' })
+      })
+    ])
     expect(events).toHaveLength(1)
     await expect(store.set('r16-invalid', 42 as never)).rejects.toMatchObject({
       code: 'INVALID_CONFIG'

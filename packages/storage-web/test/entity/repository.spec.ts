@@ -44,9 +44,11 @@ it('SWV4-R05 projects explicit selectors and indexed list through the shared que
   type IIndexedUser = { id: string; email: string; tags: string[] }
   let selectorCalls = 0
   let keyReads = 0
+  const diagnostics: string[] = []
   const entity = defineEntity<IIndexedUser>()({
     name: 'indexed-list-users',
     key: 'id',
+    onDiagnostic: (message) => diagnostics.push(message),
     indexes: {
       email: { path: 'email' },
       tags: { path: 'tags', multiEntry: true },
@@ -113,6 +115,10 @@ it('SWV4-R05 projects explicit selectors and indexed list through the shared que
   for await (const value of repository.stream(hostileOptions as never)) hostileStream.push(value)
   expect(hostileStream).toEqual([{ id: 'u1', email: 'ada@example.com', tags: ['admin', 'staff'] }])
   expect(reads).toEqual({ index: 1, range: 1, limit: 1, orderBy: 1, direction: 1, onInvalid: 1 })
+  expect(diagnostics).toHaveLength(5)
+  expect(diagnostics).toEqual(
+    diagnostics.map(() => expect.stringContaining('uses authoritative full-scan fallback'))
+  )
   expect(selectorCalls).toBe(4)
   expect(keyReads).toBe(4)
 })
