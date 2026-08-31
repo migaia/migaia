@@ -20,6 +20,7 @@ export default defineConfig({
     lib: {
       entry: {
         index: 'src/index.ts',
+        'composition-entry': 'src/composition-entry.ts',
         defined: 'src/defined.ts',
         structural: 'src/structural.ts'
       },
@@ -33,7 +34,7 @@ export default defineConfig({
       output: {
         preserveModules: true,
         preserveModulesRoot: 'src',
-      entryFileNames: '[name].js'
+        entryFileNames: '[name].js'
       }
     }
   }

@@ -14,7 +14,11 @@
 pnpm add @migaia/plugin-host
 ```
 
-包只公开根入口 `@migaia/plugin-host`：`PluginHost`、插件/配置/pipeline 类型、状态常量、错误码与错误类、pipeline 适配器、`GENERATOR_*` 信号量、dispose symbol 均从这里导入。没有稳定的深层子路径；不要依赖 `src`/`dist` 内部文件。
+包公开根入口 `@migaia/plugin-host`，另有稳定的 `@migaia/plugin-host/composition` 子路径。根入口
+提供 `PluginHost`、插件/配置/pipeline 类型、状态常量、错误码与错误类、pipeline 适配器、
+`GENERATOR_*` 信号量与 dispose symbol；composition 子路径仅提供 opaque
+`IRegistrationToken`、`IRegistrationView<TPlugin>` 与 `createView(token)`。不要依赖 `src`/`dist`
+内部文件，也不要把 composition view 当成 Host mutation/config/shared 能力。
 
 ## 目录
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { runInNewContext } from 'node:vm'
 import { PluginHost, PluginHostPipelineMode, type IPluginHostCore } from '../src/index.js'
+import { createView } from '../src/composition-entry.js'
 
 class ManagedStageHost extends PluginHost<Record<string, never>, string> {
   /** Executes the current pipeline and exposes its final value to the test fixture. */
@@ -126,6 +127,31 @@ describe('PluginHost managed stage publication', () => {
       beforeCleanup: Promise.resolve()
     })
     expect(removal).toMatchObject({ ok: true, committed: true, cleanupComplete: true })
+    await host.dispose()
+  })
+
+  it('publishes only the exact token extensions and revokes stale or foreign tokens', async () => {
+    const host = new ManagedStageHost({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    const admission = host.createPluginAdmission({
+      name: 'viewed',
+      install: () => ({ extension: true })
+    } as never)
+    const prepared = await host.prepareAdmissions([
+      { admission, slot: host.createDataOrderSlot('viewed') }
+    ])
+    const [receipt] = host.commitPreparedAdmissions(prepared)
+    const view = createView(receipt)
+    expect(view.extensions.extension).toBe(true)
+    expect('host' in view).toBe(false)
+    await host.commitPreparedUnUseBatch(host.prepareUnUseBatch([receipt]), {})
+    expect(() => createView(receipt)).toThrowError(
+      expect.objectContaining({ code: 'VIEW_REVOKED' })
+    )
+    expect(() => createView(Object.freeze({}) as never)).toThrowError(
+      expect.objectContaining({ code: 'VIEW_REVOKED' })
+    )
     await host.dispose()
   })
 

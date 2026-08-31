@@ -434,8 +434,18 @@ export type IPluginAdmissionRequest = Readonly<{
 /** Opaque prepared candidate admission owned by one concrete PluginHost. */
 export type IPluginPreparedAdmissions = object
 
-/** Opaque exact registration receipt returned at prepared admission commit. */
-export type IPluginRegistrationReceipt = object
+/** Canonical name for the opaque token accepted by composition publication. */
+export type IRegistrationToken<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> =
+  object & Readonly<{ readonly __plugin?: TPlugin }>
+
+/** @deprecated Use IRegistrationToken from `@migaia/plugin-host/composition`. */
+export type IPluginRegistrationReceipt<
+  TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>
+> = IRegistrationToken<TPlugin>
+
+/** Narrow extension-only view for one live registration token. */
+export type IRegistrationView<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> =
+  Readonly<{ readonly extensions: Readonly<IExtractPluginExt<TPlugin>> }>
 
 /** Opaque exact registration batch prepared for logical removal. */
 export type IPluginPreparedRemovalBatch = object

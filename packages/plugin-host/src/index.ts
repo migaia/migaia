@@ -74,6 +74,8 @@ export type {
   IPluginAdmissionRequest,
   IPluginPreparedAdmissions,
   IPluginRegistrationReceipt,
+  IRegistrationToken,
+  IRegistrationView,
   IPluginPreparedRemovalBatch,
   IPluginBatchRemovalOptions,
   IPluginBatchRemovalResult,
@@ -95,3 +97,4 @@ export {
 } from './pipeline.js'
 export { disposeKey, asyncDisposeKey } from './symbols.js'
 export { invokeCaptured } from './invocation.js'
+export { createRegistrationView } from './composition.js'

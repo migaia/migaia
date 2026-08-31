@@ -1,6 +1,5 @@
 import { assimilateCapturedThen } from '@migaia/lifecycle'
-import { createPluginHostTypeError } from './error-text.js'
-import ERROR_TEXT from './error-text.js'
+import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import type {
   IPluginDataOrderSlot,
   IPluginAdmissionRequest,
@@ -9,6 +8,8 @@ import type {
   IPluginPreparedRemovalBatch,
   IPluginRegistrationReceipt
 } from './typing.js'
+import { createPluginHostExtensionPublication } from './publication.js'
+import { PluginHostErrorCode } from './error-code.js'
 
 /** Validates a publication-ordered request list and resolves its Host-owned definition snapshots. */
 export const resolveAdmissionDefinitions = <TDefinition>(
@@ -73,6 +74,13 @@ const preparedAdmissions = new WeakMap<object, IPreparedAdmissionsState<unknown,
 const preparedRemovals = new WeakMap<object, IPreparedRemovalState<unknown>>()
 /** Exact committed registration to opaque receipt provenance. */
 const registrationReceipts = new WeakMap<object, IPluginRegistrationReceipt>()
+/** Reverse receipt lookup keeps standalone composition views identity-bound. */
+const receiptRegistrations = new WeakMap<
+  object,
+  { readonly registration: object; readonly host: object }
+>()
+/** Permanent revocation marker retained after physical cleanup resets registration lifecycle. */
+const revokedRegistrations = new WeakSet<object>()
 /** Opaque admission snapshot to captured plugin definition provenance. */
 const admissionDefinitions = new WeakMap<object, unknown>()
 /** Opaque data-order handle to its Host-owned ordering lane. */
@@ -141,10 +149,14 @@ export const readPreparedRemoval = <TRegistration>(
   preparedRemovals.get(prepared) as IPreparedRemovalState<TRegistration> | undefined
 
 /** Creates and binds one opaque receipt to an exact committed registration. */
-export const createRegistrationReceipt = (registration: object): IPluginRegistrationReceipt => {
+export const createRegistrationReceipt = (
+  registration: object,
+  host: object
+): IPluginRegistrationReceipt => {
   /** Frozen receipt exposes only identity-based authority. */
   const receipt = Object.freeze({})
   registrationReceipts.set(registration, receipt)
+  receiptRegistrations.set(receipt, { registration, host })
   return receipt
 }
 
@@ -152,6 +164,57 @@ export const createRegistrationReceipt = (registration: object): IPluginRegistra
 export const readRegistrationReceipt = (
   registration: object
 ): IPluginRegistrationReceipt | undefined => registrationReceipts.get(registration)
+
+/** Resolves a token to its exact registration without exposing registry ownership. */
+export const readRegistrationForReceipt = (
+  receipt: IPluginRegistrationReceipt
+): { readonly registration: object; readonly host: object } | undefined =>
+  receiptRegistrations.get(receipt)
+
+/** Marks a registration token permanently stale at logical revocation. */
+export const markRegistrationRevoked = (registration: object): void => {
+  revokedRegistrations.add(registration)
+}
+
+/** Creates a narrow extension-only view for one live registration token. */
+export const createRegistrationView = (
+  receipt: IPluginRegistrationReceipt
+): Readonly<{ readonly extensions: Readonly<Record<PropertyKey, unknown>> }> => {
+  const resolved = readRegistrationForReceipt(receipt)
+  const registration = resolved?.registration as
+    | {
+        readonly extensions: readonly {
+          readonly key: PropertyKey
+          readonly descriptor: PropertyDescriptor
+        }[]
+        readonly installed: boolean
+        readonly lifecycle: string
+        readonly name: string
+        readonly plugin: { readonly owner: object }
+      }
+    | undefined
+  if (
+    !resolved ||
+    !registration ||
+    revokedRegistrations.has(resolved.registration) ||
+    !registration.installed ||
+    registration.lifecycle === 'dispose'
+  )
+    throw new PluginHostError(PluginHostErrorCode.viewRevoked, ERROR_TEXT.VIEW_REVOKED)
+  return createPluginHostExtensionPublication(
+    [registration] as never,
+    resolved.host,
+    (captured) => {
+      if (
+        !captured[0] ||
+        revokedRegistrations.has(captured[0]) ||
+        !captured[0].installed ||
+        captured[0].lifecycle === 'dispose'
+      )
+        throw new PluginHostError(PluginHostErrorCode.viewRevoked, ERROR_TEXT.VIEW_REVOKED)
+    }
+  ) as Readonly<{ readonly extensions: Readonly<Record<PropertyKey, unknown>> }>
+}
 
 /**
  * Captures one cleanup-fence `then` exactly once and assimilates foreign-realm promises and
