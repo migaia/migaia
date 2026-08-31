@@ -15,7 +15,7 @@ import {
 import { tmpdir } from 'node:os'
 import { relative, resolve } from 'node:path'
 
-/** Computes the canonical path-set hash sealed by the D47 ledger. */
+/** Computes the canonical path-set hash used to verify complete inverse coverage. */
 export const hashCompleteStorageInversePaths = (paths) =>
   createHash('sha256')
     .update(`${[...paths].sort().join('\n')}\n`)
@@ -308,7 +308,7 @@ export function buildCompleteStorageInversePackage(tree, packageDirectory, binar
       resolve(binaryRoot, 'node_modules/.bin', binary),
       args,
       packageRoot,
-      `D47 dependency build ${packageDirectory}:${stepIndex}`
+      `complete inverse dependency build ${packageDirectory}:${stepIndex}`
     )
   }
 }
