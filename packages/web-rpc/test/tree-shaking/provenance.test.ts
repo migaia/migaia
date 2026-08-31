@@ -29,7 +29,16 @@ type IProvenance = {
       readonly typescript: string
       readonly vitest: string
     }
-    readonly resolvedBuildOptions: { readonly root: string; readonly build: object }
+    readonly resolvedBuildOptions: {
+      readonly root: string
+      readonly logLevel: string
+      readonly build: {
+        readonly write: boolean
+        readonly sourcemap: boolean
+        readonly minify: boolean
+        readonly rollupOptions: object
+      }
+    }
     readonly outputOptions: object
     readonly emitted: {
       readonly moduleCount: number
@@ -143,6 +152,17 @@ describe('WRC-C-B11 retained provenance', () => {
       'vitest'
     ])
     expect(JSON.stringify(report.subject)).not.toContain(repositoryRoot)
+    expect(Object.keys(report.subject.resolvedBuildOptions).sort()).toEqual([
+      'build',
+      'logLevel',
+      'root'
+    ])
+    expect(Object.keys(report.subject.resolvedBuildOptions.build).sort()).toEqual([
+      'minify',
+      'rollupOptions',
+      'sourcemap',
+      'write'
+    ])
     expect(report.subject.resolvedBuildOptions.root).toMatch(/packages\/web-rpc$/)
     expect(repeat.subject.digest).toBe(report.subject.digest)
     expect(repeat.tuple).toEqual(report.tuple)
