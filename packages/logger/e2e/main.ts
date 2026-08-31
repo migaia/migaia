@@ -80,12 +80,27 @@ window.runLoggerScenario = async (): Promise<void> => {
 }
 
 window.runLoggerDeadlineScenario = async (): Promise<void> => {
-  const logger = new Logger({
-    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+  const restoreRuntime = setLoggerRuntimeManager({
+    randomUUID: () => crypto.randomUUID(),
+    defer: (task) => queueMicrotask(task),
+    write: () => {},
+    console: {
+      log: () => {},
+      warn: () => {},
+      error: () => {}
+    },
+    fetch
   })
-  logger.useSink(() => new Promise<void>(() => undefined))
-  logger.log('deadline', 'never-settling')
-  const startedAt = performance.now()
-  await logger.flush()
-  window.loggerDeadlineElapsedMs = performance.now() - startedAt
+  try {
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    logger.useSink(() => new Promise<void>(() => undefined))
+    logger.log('deadline', 'never-settling')
+    const startedAt = performance.now()
+    await logger.flush()
+    window.loggerDeadlineElapsedMs = performance.now() - startedAt
+  } finally {
+    restoreRuntime()
+  }
 }
