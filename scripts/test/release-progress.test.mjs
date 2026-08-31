@@ -23,13 +23,36 @@ test('returns the contiguous release prefix committed at HEAD', () => {
   )
 })
 
-test('does not inherit non-contiguous historical release commits', () => {
+test('resumes a current-version release across intervening repair commits', () => {
   assert.deepEqual(
     releasePatchPrefix(packages, versions, [
       'fix: unrelated change',
       'chore(release): utils v0.0.3'
     ]),
-    []
+    ['utils']
+  )
+})
+
+test('does not skip a missing dependency-order release commit', () => {
+  assert.deepEqual(
+    releasePatchPrefix(packages, versions, [
+      'chore(release): lifecycle v0.0.2',
+      'fix: unrelated change',
+      'chore(release): utils v0.0.3'
+    ]),
+    ['utils']
+  )
+})
+
+test('ignores matching historical releases before the current run anchor', () => {
+  assert.deepEqual(
+    releasePatchPrefix(packages, versions, [
+      'fix: current repair',
+      'chore(release): utils v0.0.3',
+      'chore(release): lifecycle v0.0.2',
+      'chore(release): event-subscriber v0.0.4'
+    ]),
+    ['utils']
   )
 })
 
