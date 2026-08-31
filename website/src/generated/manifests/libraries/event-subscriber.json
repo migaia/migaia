@@ -3,7 +3,7 @@
   "library": {
     "slug": "event-subscriber",
     "description": "Runtime-neutral transient event subscription and fan-out primitives.",
-    "version": "0.0.3",
+    "version": "0.0.5",
     "exports": ["."],
     "documentation": {
       "readme": {
@@ -398,8 +398,8 @@
             ]
           },
           {
-            "id": "1-按-taskid-定向到唯一订阅者并等待结果",
-            "heading": "1. 按 taskId 定向到唯一订阅者并等待结果",
+            "id": "高阶组合示例-1-按-taskid-定向到唯一订阅者并等待结果",
+            "heading": "高阶组合示例 · 1. 按 taskId 定向到唯一订阅者并等待结果",
             "blocks": [
               {
                 "type": "code",
@@ -409,8 +409,8 @@
             ]
           },
           {
-            "id": "2-并行结算-集中上报未处理的迟到失败",
-            "heading": "2. 并行结算 + 集中上报未处理的迟到失败",
+            "id": "高阶组合示例-2-并行结算-集中上报未处理的迟到失败",
+            "heading": "高阶组合示例 · 2. 并行结算 + 集中上报未处理的迟到失败",
             "blocks": [
               {
                 "type": "code",
@@ -420,8 +420,8 @@
             ]
           },
           {
-            "id": "3-subscribeuntil-abortcontroller-管理订阅生命周期",
-            "heading": "3. subscribeUntil + AbortController 管理订阅生命周期",
+            "id": "高阶组合示例-3-subscribeuntil-abortcontroller-管理订阅生命周期",
+            "heading": "高阶组合示例 · 3. subscribeUntil + AbortController 管理订阅生命周期",
             "blocks": [
               {
                 "type": "code",
@@ -431,8 +431,8 @@
             ]
           },
           {
-            "id": "4-用-hub-统一路由多种事件并集中上报",
-            "heading": "4. 用 Hub 统一路由多种事件并集中上报",
+            "id": "高阶组合示例-4-用-hub-统一路由多种事件并集中上报",
+            "heading": "高阶组合示例 · 4. 用 Hub 统一路由多种事件并集中上报",
             "blocks": [
               {
                 "type": "code",
@@ -442,8 +442,8 @@
             ]
           },
           {
-            "id": "5-对象订阅者-串行结算-保证副作用按序执行",
-            "heading": "5. 对象订阅者 + 串行结算，保证副作用按序执行",
+            "id": "高阶组合示例-5-对象订阅者-串行结算-保证副作用按序执行",
+            "heading": "高阶组合示例 · 5. 对象订阅者 + 串行结算，保证副作用按序执行",
             "blocks": [
               {
                 "type": "code",
@@ -453,8 +453,8 @@
             ]
           },
           {
-            "id": "6-用静态路径为-context-增加只读-alias",
-            "heading": "6. 用静态路径为 context 增加只读 alias",
+            "id": "高阶组合示例-6-用静态路径为-context-增加只读-alias",
+            "heading": "高阶组合示例 · 6. 用静态路径为 context 增加只读 alias",
             "blocks": [
               {
                 "type": "code",
@@ -1078,8 +1078,8 @@
             ]
           },
           {
-            "id": "1-按-taskid-定向到唯一订阅者并等待结果",
-            "heading": "1. 按 taskId 定向到唯一订阅者并等待结果",
+            "id": "高阶组合示例-1-按-taskid-定向到唯一订阅者并等待结果",
+            "heading": "高阶组合示例 · 1. 按 taskId 定向到唯一订阅者并等待结果",
             "blocks": [
               {
                 "type": "code",
@@ -1089,8 +1089,8 @@
             ]
           },
           {
-            "id": "2-并行结算-集中上报未处理的迟到失败",
-            "heading": "2. 并行结算 + 集中上报未处理的迟到失败",
+            "id": "高阶组合示例-2-并行结算-集中上报未处理的迟到失败",
+            "heading": "高阶组合示例 · 2. 并行结算 + 集中上报未处理的迟到失败",
             "blocks": [
               {
                 "type": "code",
@@ -1100,8 +1100,8 @@
             ]
           },
           {
-            "id": "3-subscribeuntil-abortcontroller-管理订阅生命周期",
-            "heading": "3. subscribeUntil + AbortController 管理订阅生命周期",
+            "id": "高阶组合示例-3-subscribeuntil-abortcontroller-管理订阅生命周期",
+            "heading": "高阶组合示例 · 3. subscribeUntil + AbortController 管理订阅生命周期",
             "blocks": [
               {
                 "type": "code",
@@ -1111,8 +1111,8 @@
             ]
           },
           {
-            "id": "4-用-hub-统一路由多种事件并集中上报",
-            "heading": "4. 用 Hub 统一路由多种事件并集中上报",
+            "id": "高阶组合示例-4-用-hub-统一路由多种事件并集中上报",
+            "heading": "高阶组合示例 · 4. 用 Hub 统一路由多种事件并集中上报",
             "blocks": [
               {
                 "type": "code",
@@ -1122,8 +1122,8 @@
             ]
           },
           {
-            "id": "5-对象订阅者-串行结算-保证副作用按序执行",
-            "heading": "5. 对象订阅者 + 串行结算，保证副作用按序执行",
+            "id": "高阶组合示例-5-对象订阅者-串行结算-保证副作用按序执行",
+            "heading": "高阶组合示例 · 5. 对象订阅者 + 串行结算，保证副作用按序执行",
             "blocks": [
               {
                 "type": "code",
@@ -1133,8 +1133,8 @@
             ]
           },
           {
-            "id": "6-静态-value-path-alias",
-            "heading": "6. 静态 value path alias",
+            "id": "高阶组合示例-6-静态-value-path-alias",
+            "heading": "高阶组合示例 · 6. 静态 value path alias",
             "blocks": [
               {
                 "type": "paragraph",
@@ -1642,8 +1642,8 @@
               ]
             },
             {
-              "id": "3-subscribeuntil-abortcontroller-管理订阅生命周期",
-              "heading": "3. subscribeUntil + AbortController 管理订阅生命周期",
+              "id": "高阶组合示例-3-subscribeuntil-abortcontroller-管理订阅生命周期",
+              "heading": "高阶组合示例 · 3. subscribeUntil + AbortController 管理订阅生命周期",
               "blocks": [
                 {
                   "type": "code",
@@ -6305,8 +6305,8 @@
               ]
             },
             {
-              "id": "3-subscribeuntil-abortcontroller-管理订阅生命周期",
-              "heading": "3. subscribeUntil + AbortController 管理订阅生命周期",
+              "id": "高阶组合示例-3-subscribeuntil-abortcontroller-管理订阅生命周期",
+              "heading": "高阶组合示例 · 3. subscribeUntil + AbortController 管理订阅生命周期",
               "blocks": [
                 {
                   "type": "code",

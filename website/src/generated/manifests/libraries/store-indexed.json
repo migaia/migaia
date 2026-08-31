@@ -281,8 +281,8 @@
             ]
           },
           {
-            "id": "1-表格行细粒度订阅-定期-prune",
-            "heading": "1. 表格行细粒度订阅 + 定期 prune()",
+            "id": "高阶组合示例-1-表格行细粒度订阅-定期-prune",
+            "heading": "高阶组合示例 · 1. 表格行细粒度订阅 + 定期 prune()",
             "blocks": [
               {
                 "type": "code",
@@ -292,8 +292,8 @@
             ]
           },
           {
-            "id": "2-mutationguard-集成-仅允许在-action-内写入",
-            "heading": "2. mutationGuard 集成：仅允许在 action 内写入",
+            "id": "高阶组合示例-2-mutationguard-集成-仅允许在-action-内写入",
+            "heading": "高阶组合示例 · 2. mutationGuard 集成：仅允许在 action 内写入",
             "blocks": [
               {
                 "type": "code",
@@ -303,8 +303,8 @@
             ]
           },
           {
-            "id": "3-多-runtime-隔离-跨-runtime-保护",
-            "heading": "3. 多 Runtime 隔离 + 跨 Runtime 保护",
+            "id": "高阶组合示例-3-多-runtime-隔离-跨-runtime-保护",
+            "heading": "高阶组合示例 · 3. 多 Runtime 隔离 + 跨 Runtime 保护",
             "blocks": [
               {
                 "type": "code",
@@ -314,8 +314,8 @@
             ]
           },
           {
-            "id": "4-自定义错误保留同一套-source-code-约定",
-            "heading": "4. 自定义错误保留同一套 (source, code) 约定",
+            "id": "高阶组合示例-4-自定义错误保留同一套-source-code-约定",
+            "heading": "高阶组合示例 · 4. 自定义错误保留同一套 (source, code) 约定",
             "blocks": [
               {
                 "type": "code",
@@ -325,8 +325,8 @@
             ]
           },
           {
-            "id": "5-只读快照批量遍历-避免误建十万个-cell",
-            "heading": "5. 只读快照批量遍历，避免误建十万个 cell",
+            "id": "高阶组合示例-5-只读快照批量遍历-避免误建十万个-cell",
+            "heading": "高阶组合示例 · 5. 只读快照批量遍历，避免误建十万个 cell",
             "blocks": [
               {
                 "type": "code",
@@ -1348,8 +1348,8 @@
               ]
             },
             {
-              "id": "4-自定义错误保留同一套-source-code-约定",
-              "heading": "4. 自定义错误保留同一套 (source, code) 约定",
+              "id": "高阶组合示例-4-自定义错误保留同一套-source-code-约定",
+              "heading": "高阶组合示例 · 4. 自定义错误保留同一套 (source, code) 约定",
               "blocks": [
                 {
                   "type": "code",

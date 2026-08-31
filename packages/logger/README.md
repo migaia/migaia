@@ -34,26 +34,26 @@
 ## 4. 五分钟上手
 
 ```ts
-import { Logger } from '@migaia/logger';
-import { color, level } from '@migaia/logger/plugins';
+import { Logger } from '@migaia/logger'
+import { color, level } from '@migaia/logger/plugins'
 
 const log = new Logger({
   execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
   context: ['api'],
   plugins: [level({ level: 'info' }), color({ format: 'pretty', color: 'auto' })]
-});
+})
 
-log.info('server listening on %d', 3000);
-log.error('request failed', new Error('timeout'));
+log.info('server listening on %d', 3000)
+log.error('request failed', new Error('timeout'))
 
-await log.flush(); // 确保上面这些日志真正落地了再退出/继续
+await log.flush() // 确保上面这些日志真正落地了再退出/继续
 ```
 
 生产环境加上批量 HTTP 上报和优雅退出：
 
 ```ts
-import { Logger } from '@migaia/logger';
-import { batch, http, level, process } from '@migaia/logger/plugins';
+import { Logger } from '@migaia/logger'
+import { batch, http, level, process } from '@migaia/logger/plugins'
 
 const log = new Logger({
   execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
@@ -63,9 +63,9 @@ const log = new Logger({
     http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),
     process() // 进程退出/崩溃前自动 flush
   ]
-});
+})
 
-log.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error));
+log.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error))
 ```
 
 ## 5. 核心概念一览
@@ -114,6 +114,40 @@ pnpm add @migaia/logger
 7. **`extends()` 只转发运行时输出路径**，不会把目标 logger 的 TypeScript 扩展方法合并进当前变量的类型。
 8. **批处理队列有界且不会静默丢日志**：`maxPendingBatches` 默认 `1024`，满载时抛出/上报 `BATCH_OVERFLOW`；生产环境应通过 `onFailure()` 监控并在下游恢复后再接纳新日志。
 
-## 9. 深入参考
+## 9. 高阶组合示例
+
+### 失败隔离、批量上报与确定性关闭
+
+生产日志链路既不能让上报失败打断业务，也不能在进程退出时丢掉已经接纳的批次。把失败观察器、批处理和 HTTP sink 安装在同一个 Logger 上，并在宿主关闭边界显式等待 `shutdown()`：
+
+```ts
+import { Logger } from '@migaia/logger'
+import { batch, http, level } from '@migaia/logger/plugins'
+
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 },
+  plugins: [
+    level({ level: 'info' }),
+    batch({ maxSize: 50, maxWaitMs: 1_000 }),
+    http({ url: 'https://logs.example/v1/entries' })
+  ]
+})
+
+const stopFailureObservation = log.onFailure(({ source, error }) => {
+  console.error(`[logger:${source}]`, error)
+})
+
+try {
+  log.info('checkout completed: %s', 'order-42')
+  await log.flush()
+} finally {
+  stopFailureObservation()
+  await log.shutdown('manual')
+}
+```
+
+`batch()` 必须位于 `http()` 前面，才能让 HTTP sink 使用批量调度。`onFailure()` 是日志基础设施失败的观察出口；业务日志调用不会替它抛错。并发或重入的 `shutdown()` 共享同一个进行中的关闭 Promise，因此宿主的多个收尾入口可以安全汇合，但终态 Logger 不能重新启用，需要创建新实例。
+
+## 10. 深入参考
 
 完整构造选项、全部 API 精确签名、pipeline 三种模式的执行顺序差异、每个内置插件的完整配置项、`flush`/`shutdown` 的精确语义与边界情况、自定义 runtime manager（替换底层能力用于测试/特殊宿主）、以及更多组合示例，见 **[USEGUIDE.md](./USEGUIDE.md)**。

@@ -922,6 +922,26 @@
       "type": "domain-peer"
     },
     {
+      "from": "/en/docs/capability/graph-dynamic/IGraphBindingReleaseEntry",
+      "to": "/en/guides/capability",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/capability",
+      "to": "/en/docs/capability/graph-dynamic/IGraphBindingReleaseEntry",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/capability/graph-dynamic/IGraphBindingReleaseReason",
+      "to": "/en/guides/capability",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/capability",
+      "to": "/en/docs/capability/graph-dynamic/IGraphBindingReleaseReason",
+      "type": "domain-peer"
+    },
+    {
       "from": "/en/docs/capability/graph-dynamic/IGraphMutationResult",
       "to": "/en/guides/capability",
       "type": "domain-peer"
@@ -3642,6 +3662,16 @@
       "type": "domain-peer"
     },
     {
+      "from": "/en/docs/plugin-host/createRegistrationView",
+      "to": "/en/guides/plugin-host",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/plugin-host",
+      "to": "/en/docs/plugin-host/createRegistrationView",
+      "type": "domain-peer"
+    },
+    {
       "from": "/en/docs/plugin-host/IAsyncGeneratorPipelineStage",
       "to": "/en/guides/plugin-host",
       "type": "domain-peer"
@@ -4169,6 +4199,46 @@
     {
       "from": "/en/guides/plugin-host",
       "to": "/en/docs/plugin-host/PluginHostStatus",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition",
+      "to": "/en/guides/plugin-host",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/plugin-host",
+      "to": "/en/docs/plugin-host/composition",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition/createView",
+      "to": "/en/guides/plugin-host",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/plugin-host",
+      "to": "/en/docs/plugin-host/composition/createView",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition/IRegistrationToken",
+      "to": "/en/guides/plugin-host",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/plugin-host",
+      "to": "/en/docs/plugin-host/composition/IRegistrationToken",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition/IRegistrationView",
+      "to": "/en/guides/plugin-host",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/plugin-host",
+      "to": "/en/docs/plugin-host/composition/IRegistrationView",
       "type": "domain-peer"
     },
     {
@@ -11702,6 +11772,46 @@
       "type": "domain-peer"
     },
     {
+      "from": "/en/docs/tray/adapter",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/adapter",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/adapter/defineAdapter",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/adapter/defineAdapter",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/adapter/IAdapter",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/adapter/IAdapter",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/adapter/IAdapterContext",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/adapter/IAdapterContext",
+      "type": "domain-peer"
+    },
+    {
       "from": "/en/docs/tray/host",
       "to": "/en/guides/tray",
       "type": "domain-peer"
@@ -11932,6 +12042,186 @@
       "type": "domain-peer"
     },
     {
+      "from": "/en/docs/tray/loader",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/loader",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/loader/defineLoader",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/loader/defineLoader",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/loader/ILoadedArtifact",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/loader/ILoadedArtifact",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/loader/ILoader",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/loader/ILoader",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/loader/ILoaderContext",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/loader/ILoaderContext",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/loader/ILoadIntoHostOptions",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/loader/ILoadIntoHostOptions",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/loader/ILoadIntoHostResult",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/loader/ILoadIntoHostResult",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/loader/loadIntoHost",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/loader/loadIntoHost",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/runtime",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/runtime",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/runtime/createRuntime",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/runtime/createRuntime",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/runtime/IRuntime",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/runtime/IRuntime",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/runtime/IRuntimeDisposalResult",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/runtime/IRuntimeDisposalResult",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/runtime/IRuntimeExtensionsFor",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/runtime/IRuntimeExtensionsFor",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/runtime/IRuntimeRunContext",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/runtime/IRuntimeRunContext",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/runtime/IRuntimeRunOptions",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/runtime/IRuntimeRunOptions",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/runtime/IRuntimeSelfMutation",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/runtime/IRuntimeSelfMutation",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/runtime/IRuntimeSelfMutationTicket",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/runtime/IRuntimeSelfMutationTicket",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/tray/runtime/IRuntimeShutdownOptions",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/runtime/IRuntimeShutdownOptions",
+      "type": "domain-peer"
+    },
+    {
       "from": "/en/docs/utils",
       "to": "/en/guides/utils",
       "type": "domain-peer"
@@ -11949,6 +12239,46 @@
     {
       "from": "/en/guides/utils",
       "to": "/en/docs/utils/overview",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/utils/collect",
+      "to": "/en/guides/utils",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/utils",
+      "to": "/en/docs/utils/collect",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/utils/ICollector",
+      "to": "/en/guides/utils",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/utils",
+      "to": "/en/docs/utils/ICollector",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/utils/ICollectorActions",
+      "to": "/en/guides/utils",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/utils",
+      "to": "/en/docs/utils/ICollectorActions",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/utils/IFieldCollector",
+      "to": "/en/guides/utils",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/utils",
+      "to": "/en/docs/utils/IFieldCollector",
       "type": "domain-peer"
     },
     {
@@ -17082,6 +17412,16 @@
       "type": "domain-peer"
     },
     {
+      "from": "/en/guides/utils/collector",
+      "to": "/en/docs/utils",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/utils",
+      "to": "/en/guides/utils/collector",
+      "type": "domain-peer"
+    },
+    {
       "from": "/en/guides/utils/deadlines-and-abort",
       "to": "/en/docs/utils",
       "type": "domain-peer"
@@ -18009,6 +18349,26 @@
     {
       "from": "/zh/guides/capability",
       "to": "/zh/docs/capability/graph-dynamic/IGraphBindingLease",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/capability/graph-dynamic/IGraphBindingReleaseEntry",
+      "to": "/zh/guides/capability",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/capability",
+      "to": "/zh/docs/capability/graph-dynamic/IGraphBindingReleaseEntry",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/capability/graph-dynamic/IGraphBindingReleaseReason",
+      "to": "/zh/guides/capability",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/capability",
+      "to": "/zh/docs/capability/graph-dynamic/IGraphBindingReleaseReason",
       "type": "domain-peer"
     },
     {
@@ -20732,6 +21092,16 @@
       "type": "domain-peer"
     },
     {
+      "from": "/zh/docs/plugin-host/createRegistrationView",
+      "to": "/zh/guides/plugin-host",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/plugin-host",
+      "to": "/zh/docs/plugin-host/createRegistrationView",
+      "type": "domain-peer"
+    },
+    {
       "from": "/zh/docs/plugin-host/IAsyncGeneratorPipelineStage",
       "to": "/zh/guides/plugin-host",
       "type": "domain-peer"
@@ -21259,6 +21629,46 @@
     {
       "from": "/zh/guides/plugin-host",
       "to": "/zh/docs/plugin-host/PluginHostStatus",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition",
+      "to": "/zh/guides/plugin-host",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/plugin-host",
+      "to": "/zh/docs/plugin-host/composition",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition/createView",
+      "to": "/zh/guides/plugin-host",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/plugin-host",
+      "to": "/zh/docs/plugin-host/composition/createView",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition/IRegistrationToken",
+      "to": "/zh/guides/plugin-host",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/plugin-host",
+      "to": "/zh/docs/plugin-host/composition/IRegistrationToken",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition/IRegistrationView",
+      "to": "/zh/guides/plugin-host",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/plugin-host",
+      "to": "/zh/docs/plugin-host/composition/IRegistrationView",
       "type": "domain-peer"
     },
     {
@@ -28792,6 +29202,46 @@
       "type": "domain-peer"
     },
     {
+      "from": "/zh/docs/tray/adapter",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/adapter",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/adapter/defineAdapter",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/adapter/defineAdapter",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/adapter/IAdapter",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/adapter/IAdapter",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/adapter/IAdapterContext",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/adapter/IAdapterContext",
+      "type": "domain-peer"
+    },
+    {
       "from": "/zh/docs/tray/host",
       "to": "/zh/guides/tray",
       "type": "domain-peer"
@@ -29022,6 +29472,186 @@
       "type": "domain-peer"
     },
     {
+      "from": "/zh/docs/tray/loader",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/loader",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/loader/defineLoader",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/loader/defineLoader",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/loader/ILoadedArtifact",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/loader/ILoadedArtifact",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/loader/ILoader",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/loader/ILoader",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/loader/ILoaderContext",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/loader/ILoaderContext",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/loader/ILoadIntoHostOptions",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/loader/ILoadIntoHostOptions",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/loader/ILoadIntoHostResult",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/loader/ILoadIntoHostResult",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/loader/loadIntoHost",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/loader/loadIntoHost",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/runtime",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/runtime",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/runtime/createRuntime",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/runtime/createRuntime",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/runtime/IRuntime",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/runtime/IRuntime",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/runtime/IRuntimeDisposalResult",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/runtime/IRuntimeDisposalResult",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/runtime/IRuntimeExtensionsFor",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/runtime/IRuntimeExtensionsFor",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/runtime/IRuntimeRunContext",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/runtime/IRuntimeRunContext",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/runtime/IRuntimeRunOptions",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/runtime/IRuntimeRunOptions",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/runtime/IRuntimeSelfMutation",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/runtime/IRuntimeSelfMutation",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/runtime/IRuntimeSelfMutationTicket",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/runtime/IRuntimeSelfMutationTicket",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/tray/runtime/IRuntimeShutdownOptions",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/runtime/IRuntimeShutdownOptions",
+      "type": "domain-peer"
+    },
+    {
       "from": "/zh/docs/utils",
       "to": "/zh/guides/utils",
       "type": "domain-peer"
@@ -29039,6 +29669,46 @@
     {
       "from": "/zh/guides/utils",
       "to": "/zh/docs/utils/overview",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/utils/collect",
+      "to": "/zh/guides/utils",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/utils",
+      "to": "/zh/docs/utils/collect",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/utils/ICollector",
+      "to": "/zh/guides/utils",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/utils",
+      "to": "/zh/docs/utils/ICollector",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/utils/ICollectorActions",
+      "to": "/zh/guides/utils",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/utils",
+      "to": "/zh/docs/utils/ICollectorActions",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/utils/IFieldCollector",
+      "to": "/zh/guides/utils",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/utils",
+      "to": "/zh/docs/utils/IFieldCollector",
       "type": "domain-peer"
     },
     {
@@ -34172,6 +34842,16 @@
       "type": "domain-peer"
     },
     {
+      "from": "/zh/guides/utils/collector",
+      "to": "/zh/docs/utils",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/utils",
+      "to": "/zh/guides/utils/collector",
+      "type": "domain-peer"
+    },
+    {
       "from": "/zh/guides/utils/deadlines-and-abort",
       "to": "/zh/docs/utils",
       "type": "domain-peer"
@@ -37163,6 +37843,66 @@
     },
     {
       "from": "/en/docs/capability/graph-dynamic",
+      "to": "/en/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseEntry",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseEntry",
+      "to": "/en/docs/capability/graph-dynamic",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseEntry",
+      "to": "/en/guides/capability/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/capability/getting-started",
+      "to": "/en/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseEntry",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseEntry",
+      "to": "/en/architecture/capability",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/capability",
+      "to": "/en/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseEntry",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/capability/graph-dynamic",
+      "to": "/en/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseReason",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseReason",
+      "to": "/en/docs/capability/graph-dynamic",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseReason",
+      "to": "/en/guides/capability/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/capability/getting-started",
+      "to": "/en/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseReason",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseReason",
+      "to": "/en/architecture/capability",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/capability",
+      "to": "/en/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseReason",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/capability/graph-dynamic",
       "to": "/en/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphMutationResult",
       "type": "api-symbol"
     },
@@ -37419,6 +38159,66 @@
     {
       "from": "/zh/architecture/capability",
       "to": "/zh/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingLease",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/capability/graph-dynamic",
+      "to": "/zh/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseEntry",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseEntry",
+      "to": "/zh/docs/capability/graph-dynamic",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseEntry",
+      "to": "/zh/guides/capability/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/capability/getting-started",
+      "to": "/zh/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseEntry",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseEntry",
+      "to": "/zh/architecture/capability",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/capability",
+      "to": "/zh/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseEntry",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/capability/graph-dynamic",
+      "to": "/zh/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseReason",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseReason",
+      "to": "/zh/docs/capability/graph-dynamic",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseReason",
+      "to": "/zh/guides/capability/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/capability/getting-started",
+      "to": "/zh/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseReason",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseReason",
+      "to": "/zh/architecture/capability",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/capability",
+      "to": "/zh/docs/capability/graph-dynamic#capability-graph-dynamic--IGraphBindingReleaseReason",
       "type": "architecture-symbol"
     },
     {
@@ -53803,6 +54603,36 @@
     },
     {
       "from": "/en/docs/plugin-host",
+      "to": "/en/docs/plugin-host#plugin-host-index--createRegistrationView",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host#plugin-host-index--createRegistrationView",
+      "to": "/en/docs/plugin-host",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/plugin-host#plugin-host-index--createRegistrationView",
+      "to": "/en/guides/plugin-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/plugin-host/getting-started",
+      "to": "/en/docs/plugin-host#plugin-host-index--createRegistrationView",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host#plugin-host-index--createRegistrationView",
+      "to": "/en/architecture/plugin-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/plugin-host",
+      "to": "/en/docs/plugin-host#plugin-host-index--createRegistrationView",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host",
       "to": "/en/docs/plugin-host#plugin-host-index--IAsyncGeneratorPipelineStage",
       "type": "api-symbol"
     },
@@ -55492,6 +56322,26 @@
       "type": "alias-symbol"
     },
     {
+      "from": "/en/docs/plugin-host#IRegistrationToken",
+      "to": "/en/docs/plugin-host/composition#plugin-host-composition--IRegistrationToken",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition#plugin-host-composition--IRegistrationToken",
+      "to": "/en/docs/plugin-host#IRegistrationToken",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host#IRegistrationView",
+      "to": "/en/docs/plugin-host/composition#plugin-host-composition--IRegistrationView",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition#plugin-host-composition--IRegistrationView",
+      "to": "/en/docs/plugin-host#IRegistrationView",
+      "type": "alias-symbol"
+    },
+    {
       "from": "/en/docs/plugin-host#ISetupHostOptions",
       "to": "/en/docs/plugin-host/defined#plugin-host-defined--ISetupHostOptions",
       "type": "symbol-alias"
@@ -55709,6 +56559,36 @@
     {
       "from": "/zh/architecture/plugin-host",
       "to": "/zh/docs/plugin-host#plugin-host-index--adaptSyncStageToGenerator",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host",
+      "to": "/zh/docs/plugin-host#plugin-host-index--createRegistrationView",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host#plugin-host-index--createRegistrationView",
+      "to": "/zh/docs/plugin-host",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/plugin-host#plugin-host-index--createRegistrationView",
+      "to": "/zh/guides/plugin-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/plugin-host/getting-started",
+      "to": "/zh/docs/plugin-host#plugin-host-index--createRegistrationView",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host#plugin-host-index--createRegistrationView",
+      "to": "/zh/architecture/plugin-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/plugin-host",
+      "to": "/zh/docs/plugin-host#plugin-host-index--createRegistrationView",
       "type": "architecture-symbol"
     },
     {
@@ -57402,6 +58282,26 @@
       "type": "alias-symbol"
     },
     {
+      "from": "/zh/docs/plugin-host#IRegistrationToken",
+      "to": "/zh/docs/plugin-host/composition#plugin-host-composition--IRegistrationToken",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition#plugin-host-composition--IRegistrationToken",
+      "to": "/zh/docs/plugin-host#IRegistrationToken",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host#IRegistrationView",
+      "to": "/zh/docs/plugin-host/composition#plugin-host-composition--IRegistrationView",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition#plugin-host-composition--IRegistrationView",
+      "to": "/zh/docs/plugin-host#IRegistrationView",
+      "type": "alias-symbol"
+    },
+    {
       "from": "/zh/docs/plugin-host#ISetupHostOptions",
       "to": "/zh/docs/plugin-host/defined#plugin-host-defined--ISetupHostOptions",
       "type": "symbol-alias"
@@ -57480,6 +58380,226 @@
       "from": "/zh/docs/plugin-host/defined#plugin-host-defined--setupHost",
       "to": "/zh/docs/plugin-host#setupHost",
       "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition",
+      "to": "/en/guides/plugin-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/guides/plugin-host/getting-started",
+      "to": "/en/docs/plugin-host/composition",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition",
+      "to": "/en/architecture/plugin-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/architecture/plugin-host",
+      "to": "/en/docs/plugin-host/composition",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition",
+      "to": "/en/docs/plugin-host/composition#plugin-host-composition--createView",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition#plugin-host-composition--createView",
+      "to": "/en/docs/plugin-host/composition",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition#plugin-host-composition--createView",
+      "to": "/en/guides/plugin-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/plugin-host/getting-started",
+      "to": "/en/docs/plugin-host/composition#plugin-host-composition--createView",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition#plugin-host-composition--createView",
+      "to": "/en/architecture/plugin-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/plugin-host",
+      "to": "/en/docs/plugin-host/composition#plugin-host-composition--createView",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition",
+      "to": "/en/docs/plugin-host/composition#plugin-host-composition--IRegistrationToken",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition#plugin-host-composition--IRegistrationToken",
+      "to": "/en/docs/plugin-host/composition",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition#plugin-host-composition--IRegistrationToken",
+      "to": "/en/guides/plugin-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/plugin-host/getting-started",
+      "to": "/en/docs/plugin-host/composition#plugin-host-composition--IRegistrationToken",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition#plugin-host-composition--IRegistrationToken",
+      "to": "/en/architecture/plugin-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/plugin-host",
+      "to": "/en/docs/plugin-host/composition#plugin-host-composition--IRegistrationToken",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition",
+      "to": "/en/docs/plugin-host/composition#plugin-host-composition--IRegistrationView",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition#plugin-host-composition--IRegistrationView",
+      "to": "/en/docs/plugin-host/composition",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition#plugin-host-composition--IRegistrationView",
+      "to": "/en/guides/plugin-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/plugin-host/getting-started",
+      "to": "/en/docs/plugin-host/composition#plugin-host-composition--IRegistrationView",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host/composition#plugin-host-composition--IRegistrationView",
+      "to": "/en/architecture/plugin-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/plugin-host",
+      "to": "/en/docs/plugin-host/composition#plugin-host-composition--IRegistrationView",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition",
+      "to": "/zh/guides/plugin-host/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/guides/plugin-host/getting-started",
+      "to": "/zh/docs/plugin-host/composition",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition",
+      "to": "/zh/architecture/plugin-host",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/architecture/plugin-host",
+      "to": "/zh/docs/plugin-host/composition",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition",
+      "to": "/zh/docs/plugin-host/composition#plugin-host-composition--createView",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition#plugin-host-composition--createView",
+      "to": "/zh/docs/plugin-host/composition",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition#plugin-host-composition--createView",
+      "to": "/zh/guides/plugin-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/plugin-host/getting-started",
+      "to": "/zh/docs/plugin-host/composition#plugin-host-composition--createView",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition#plugin-host-composition--createView",
+      "to": "/zh/architecture/plugin-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/plugin-host",
+      "to": "/zh/docs/plugin-host/composition#plugin-host-composition--createView",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition",
+      "to": "/zh/docs/plugin-host/composition#plugin-host-composition--IRegistrationToken",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition#plugin-host-composition--IRegistrationToken",
+      "to": "/zh/docs/plugin-host/composition",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition#plugin-host-composition--IRegistrationToken",
+      "to": "/zh/guides/plugin-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/plugin-host/getting-started",
+      "to": "/zh/docs/plugin-host/composition#plugin-host-composition--IRegistrationToken",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition#plugin-host-composition--IRegistrationToken",
+      "to": "/zh/architecture/plugin-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/plugin-host",
+      "to": "/zh/docs/plugin-host/composition#plugin-host-composition--IRegistrationToken",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition",
+      "to": "/zh/docs/plugin-host/composition#plugin-host-composition--IRegistrationView",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition#plugin-host-composition--IRegistrationView",
+      "to": "/zh/docs/plugin-host/composition",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition#plugin-host-composition--IRegistrationView",
+      "to": "/zh/guides/plugin-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/plugin-host/getting-started",
+      "to": "/zh/docs/plugin-host/composition#plugin-host-composition--IRegistrationView",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host/composition#plugin-host-composition--IRegistrationView",
+      "to": "/zh/architecture/plugin-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/plugin-host",
+      "to": "/zh/docs/plugin-host/composition#plugin-host-composition--IRegistrationView",
+      "type": "architecture-symbol"
     },
     {
       "from": "/en/docs/plugin-host/defined",
@@ -102782,6 +103902,226 @@
       "type": "architecture-symbol"
     },
     {
+      "from": "/en/docs/tray/adapter",
+      "to": "/en/guides/tray/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/adapter",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/tray/adapter",
+      "to": "/en/architecture/tray",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/adapter",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/tray/adapter",
+      "to": "/en/docs/tray/adapter#tray-adapter--defineAdapter",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/adapter#tray-adapter--defineAdapter",
+      "to": "/en/docs/tray/adapter",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/adapter#tray-adapter--defineAdapter",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/adapter#tray-adapter--defineAdapter",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/adapter#tray-adapter--defineAdapter",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/adapter#tray-adapter--defineAdapter",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/adapter",
+      "to": "/en/docs/tray/adapter#tray-adapter--IAdapter",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/adapter#tray-adapter--IAdapter",
+      "to": "/en/docs/tray/adapter",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/adapter#tray-adapter--IAdapter",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/adapter#tray-adapter--IAdapter",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/adapter#tray-adapter--IAdapter",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/adapter#tray-adapter--IAdapter",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/adapter",
+      "to": "/en/docs/tray/adapter#tray-adapter--IAdapterContext",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/adapter#tray-adapter--IAdapterContext",
+      "to": "/en/docs/tray/adapter",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/adapter#tray-adapter--IAdapterContext",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/adapter#tray-adapter--IAdapterContext",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/adapter#tray-adapter--IAdapterContext",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/adapter#tray-adapter--IAdapterContext",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/adapter",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/adapter",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/tray/adapter",
+      "to": "/zh/architecture/tray",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/adapter",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/tray/adapter",
+      "to": "/zh/docs/tray/adapter#tray-adapter--defineAdapter",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/adapter#tray-adapter--defineAdapter",
+      "to": "/zh/docs/tray/adapter",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/adapter#tray-adapter--defineAdapter",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/adapter#tray-adapter--defineAdapter",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/adapter#tray-adapter--defineAdapter",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/adapter#tray-adapter--defineAdapter",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/adapter",
+      "to": "/zh/docs/tray/adapter#tray-adapter--IAdapter",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/adapter#tray-adapter--IAdapter",
+      "to": "/zh/docs/tray/adapter",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/adapter#tray-adapter--IAdapter",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/adapter#tray-adapter--IAdapter",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/adapter#tray-adapter--IAdapter",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/adapter#tray-adapter--IAdapter",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/adapter",
+      "to": "/zh/docs/tray/adapter#tray-adapter--IAdapterContext",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/adapter#tray-adapter--IAdapterContext",
+      "to": "/zh/docs/tray/adapter",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/adapter#tray-adapter--IAdapterContext",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/adapter#tray-adapter--IAdapterContext",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/adapter#tray-adapter--IAdapterContext",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/adapter#tray-adapter--IAdapterContext",
+      "type": "architecture-symbol"
+    },
+    {
       "from": "/en/docs/tray/host",
       "to": "/en/guides/tray/getting-started",
       "type": "api-guide"
@@ -104139,6 +105479,1046 @@
     {
       "from": "/zh/architecture/tray",
       "to": "/zh/docs/tray/host#tray-host--TrayHostState",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader",
+      "to": "/en/guides/tray/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/loader",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/tray/loader",
+      "to": "/en/architecture/tray",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/loader",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/tray/loader",
+      "to": "/en/docs/tray/loader#tray-loader--defineLoader",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--defineLoader",
+      "to": "/en/docs/tray/loader",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--defineLoader",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/loader#tray-loader--defineLoader",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--defineLoader",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/loader#tray-loader--defineLoader",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader",
+      "to": "/en/docs/tray/loader#tray-loader--ILoadedArtifact",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--ILoadedArtifact",
+      "to": "/en/docs/tray/loader",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--ILoadedArtifact",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/loader#tray-loader--ILoadedArtifact",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--ILoadedArtifact",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/loader#tray-loader--ILoadedArtifact",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader",
+      "to": "/en/docs/tray/loader#tray-loader--ILoader",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--ILoader",
+      "to": "/en/docs/tray/loader",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--ILoader",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/loader#tray-loader--ILoader",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--ILoader",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/loader#tray-loader--ILoader",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader",
+      "to": "/en/docs/tray/loader#tray-loader--ILoaderContext",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--ILoaderContext",
+      "to": "/en/docs/tray/loader",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--ILoaderContext",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/loader#tray-loader--ILoaderContext",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--ILoaderContext",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/loader#tray-loader--ILoaderContext",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader",
+      "to": "/en/docs/tray/loader#tray-loader--ILoadIntoHostOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--ILoadIntoHostOptions",
+      "to": "/en/docs/tray/loader",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--ILoadIntoHostOptions",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/loader#tray-loader--ILoadIntoHostOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--ILoadIntoHostOptions",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/loader#tray-loader--ILoadIntoHostOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader",
+      "to": "/en/docs/tray/loader#tray-loader--ILoadIntoHostResult",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--ILoadIntoHostResult",
+      "to": "/en/docs/tray/loader",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--ILoadIntoHostResult",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/loader#tray-loader--ILoadIntoHostResult",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--ILoadIntoHostResult",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/loader#tray-loader--ILoadIntoHostResult",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader",
+      "to": "/en/docs/tray/loader#tray-loader--loadIntoHost",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--loadIntoHost",
+      "to": "/en/docs/tray/loader",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--loadIntoHost",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/loader#tray-loader--loadIntoHost",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/loader#tray-loader--loadIntoHost",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/loader#tray-loader--loadIntoHost",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/loader",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/tray/loader",
+      "to": "/zh/architecture/tray",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/loader",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/tray/loader",
+      "to": "/zh/docs/tray/loader#tray-loader--defineLoader",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--defineLoader",
+      "to": "/zh/docs/tray/loader",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--defineLoader",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/loader#tray-loader--defineLoader",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--defineLoader",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/loader#tray-loader--defineLoader",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader",
+      "to": "/zh/docs/tray/loader#tray-loader--ILoadedArtifact",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--ILoadedArtifact",
+      "to": "/zh/docs/tray/loader",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--ILoadedArtifact",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/loader#tray-loader--ILoadedArtifact",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--ILoadedArtifact",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/loader#tray-loader--ILoadedArtifact",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader",
+      "to": "/zh/docs/tray/loader#tray-loader--ILoader",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--ILoader",
+      "to": "/zh/docs/tray/loader",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--ILoader",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/loader#tray-loader--ILoader",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--ILoader",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/loader#tray-loader--ILoader",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader",
+      "to": "/zh/docs/tray/loader#tray-loader--ILoaderContext",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--ILoaderContext",
+      "to": "/zh/docs/tray/loader",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--ILoaderContext",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/loader#tray-loader--ILoaderContext",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--ILoaderContext",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/loader#tray-loader--ILoaderContext",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader",
+      "to": "/zh/docs/tray/loader#tray-loader--ILoadIntoHostOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--ILoadIntoHostOptions",
+      "to": "/zh/docs/tray/loader",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--ILoadIntoHostOptions",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/loader#tray-loader--ILoadIntoHostOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--ILoadIntoHostOptions",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/loader#tray-loader--ILoadIntoHostOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader",
+      "to": "/zh/docs/tray/loader#tray-loader--ILoadIntoHostResult",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--ILoadIntoHostResult",
+      "to": "/zh/docs/tray/loader",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--ILoadIntoHostResult",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/loader#tray-loader--ILoadIntoHostResult",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--ILoadIntoHostResult",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/loader#tray-loader--ILoadIntoHostResult",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader",
+      "to": "/zh/docs/tray/loader#tray-loader--loadIntoHost",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--loadIntoHost",
+      "to": "/zh/docs/tray/loader",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--loadIntoHost",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/loader#tray-loader--loadIntoHost",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/loader#tray-loader--loadIntoHost",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/loader#tray-loader--loadIntoHost",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime",
+      "to": "/en/guides/tray/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/runtime",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/tray/runtime",
+      "to": "/en/architecture/tray",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/runtime",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/tray/runtime",
+      "to": "/en/docs/tray/runtime#tray-runtime--createRuntime",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--createRuntime",
+      "to": "/en/docs/tray/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--createRuntime",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/runtime#tray-runtime--createRuntime",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--createRuntime",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/runtime#tray-runtime--createRuntime",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntime",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntime",
+      "to": "/en/docs/tray/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntime",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntime",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntime",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntime",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeDisposalResult",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeDisposalResult",
+      "to": "/en/docs/tray/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeDisposalResult",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeDisposalResult",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeDisposalResult",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeDisposalResult",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeExtensionsFor",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeExtensionsFor",
+      "to": "/en/docs/tray/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeExtensionsFor",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeExtensionsFor",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeExtensionsFor",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeExtensionsFor",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeRunContext",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeRunContext",
+      "to": "/en/docs/tray/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeRunContext",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeRunContext",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeRunContext",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeRunContext",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeRunOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeRunOptions",
+      "to": "/en/docs/tray/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeRunOptions",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeRunOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeRunOptions",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeRunOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeSelfMutation",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeSelfMutation",
+      "to": "/en/docs/tray/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeSelfMutation",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeSelfMutation",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeSelfMutation",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeSelfMutation",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeSelfMutationTicket",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeSelfMutationTicket",
+      "to": "/en/docs/tray/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeSelfMutationTicket",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeSelfMutationTicket",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeSelfMutationTicket",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeSelfMutationTicket",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeShutdownOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeShutdownOptions",
+      "to": "/en/docs/tray/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeShutdownOptions",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeShutdownOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/runtime#tray-runtime--IRuntimeShutdownOptions",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray/runtime#tray-runtime--IRuntimeShutdownOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/runtime",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/tray/runtime",
+      "to": "/zh/architecture/tray",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/runtime",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/tray/runtime",
+      "to": "/zh/docs/tray/runtime#tray-runtime--createRuntime",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--createRuntime",
+      "to": "/zh/docs/tray/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--createRuntime",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/runtime#tray-runtime--createRuntime",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--createRuntime",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/runtime#tray-runtime--createRuntime",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntime",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntime",
+      "to": "/zh/docs/tray/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntime",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntime",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntime",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntime",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeDisposalResult",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeDisposalResult",
+      "to": "/zh/docs/tray/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeDisposalResult",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeDisposalResult",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeDisposalResult",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeDisposalResult",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeExtensionsFor",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeExtensionsFor",
+      "to": "/zh/docs/tray/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeExtensionsFor",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeExtensionsFor",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeExtensionsFor",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeExtensionsFor",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeRunContext",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeRunContext",
+      "to": "/zh/docs/tray/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeRunContext",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeRunContext",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeRunContext",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeRunContext",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeRunOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeRunOptions",
+      "to": "/zh/docs/tray/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeRunOptions",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeRunOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeRunOptions",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeRunOptions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeSelfMutation",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeSelfMutation",
+      "to": "/zh/docs/tray/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeSelfMutation",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeSelfMutation",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeSelfMutation",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeSelfMutation",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeSelfMutationTicket",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeSelfMutationTicket",
+      "to": "/zh/docs/tray/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeSelfMutationTicket",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeSelfMutationTicket",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeSelfMutationTicket",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeSelfMutationTicket",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeShutdownOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeShutdownOptions",
+      "to": "/zh/docs/tray/runtime",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeShutdownOptions",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeShutdownOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/runtime#tray-runtime--IRuntimeShutdownOptions",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray/runtime#tray-runtime--IRuntimeShutdownOptions",
       "type": "architecture-symbol"
     },
     {
@@ -104160,6 +106540,126 @@
       "from": "/en/architecture/utils",
       "to": "/en/docs/utils",
       "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/utils",
+      "to": "/en/docs/utils#utils-index--collect",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/utils#utils-index--collect",
+      "to": "/en/docs/utils",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/utils#utils-index--collect",
+      "to": "/en/guides/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/utils/getting-started",
+      "to": "/en/docs/utils#utils-index--collect",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/utils#utils-index--collect",
+      "to": "/en/architecture/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/utils",
+      "to": "/en/docs/utils#utils-index--collect",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/utils",
+      "to": "/en/docs/utils#utils-index--ICollector",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/utils#utils-index--ICollector",
+      "to": "/en/docs/utils",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/utils#utils-index--ICollector",
+      "to": "/en/guides/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/utils/getting-started",
+      "to": "/en/docs/utils#utils-index--ICollector",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/utils#utils-index--ICollector",
+      "to": "/en/architecture/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/utils",
+      "to": "/en/docs/utils#utils-index--ICollector",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/utils",
+      "to": "/en/docs/utils#utils-index--ICollectorActions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/utils#utils-index--ICollectorActions",
+      "to": "/en/docs/utils",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/utils#utils-index--ICollectorActions",
+      "to": "/en/guides/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/utils/getting-started",
+      "to": "/en/docs/utils#utils-index--ICollectorActions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/utils#utils-index--ICollectorActions",
+      "to": "/en/architecture/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/utils",
+      "to": "/en/docs/utils#utils-index--ICollectorActions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/utils",
+      "to": "/en/docs/utils#utils-index--IFieldCollector",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/utils#utils-index--IFieldCollector",
+      "to": "/en/docs/utils",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/utils#utils-index--IFieldCollector",
+      "to": "/en/guides/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/utils/getting-started",
+      "to": "/en/docs/utils#utils-index--IFieldCollector",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/utils#utils-index--IFieldCollector",
+      "to": "/en/architecture/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/utils",
+      "to": "/en/docs/utils#utils-index--IFieldCollector",
+      "type": "architecture-symbol"
     },
     {
       "from": "/en/docs/utils#assimilateCapturedThen",
@@ -105460,6 +107960,126 @@
       "from": "/zh/architecture/utils",
       "to": "/zh/docs/utils",
       "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/utils",
+      "to": "/zh/docs/utils#utils-index--collect",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/utils#utils-index--collect",
+      "to": "/zh/docs/utils",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/utils#utils-index--collect",
+      "to": "/zh/guides/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/utils/getting-started",
+      "to": "/zh/docs/utils#utils-index--collect",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/utils#utils-index--collect",
+      "to": "/zh/architecture/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/utils",
+      "to": "/zh/docs/utils#utils-index--collect",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/utils",
+      "to": "/zh/docs/utils#utils-index--ICollector",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/utils#utils-index--ICollector",
+      "to": "/zh/docs/utils",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/utils#utils-index--ICollector",
+      "to": "/zh/guides/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/utils/getting-started",
+      "to": "/zh/docs/utils#utils-index--ICollector",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/utils#utils-index--ICollector",
+      "to": "/zh/architecture/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/utils",
+      "to": "/zh/docs/utils#utils-index--ICollector",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/utils",
+      "to": "/zh/docs/utils#utils-index--ICollectorActions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/utils#utils-index--ICollectorActions",
+      "to": "/zh/docs/utils",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/utils#utils-index--ICollectorActions",
+      "to": "/zh/guides/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/utils/getting-started",
+      "to": "/zh/docs/utils#utils-index--ICollectorActions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/utils#utils-index--ICollectorActions",
+      "to": "/zh/architecture/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/utils",
+      "to": "/zh/docs/utils#utils-index--ICollectorActions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/utils",
+      "to": "/zh/docs/utils#utils-index--IFieldCollector",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/utils#utils-index--IFieldCollector",
+      "to": "/zh/docs/utils",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/utils#utils-index--IFieldCollector",
+      "to": "/zh/guides/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/utils/getting-started",
+      "to": "/zh/docs/utils#utils-index--IFieldCollector",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/utils#utils-index--IFieldCollector",
+      "to": "/zh/architecture/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/utils",
+      "to": "/zh/docs/utils#utils-index--IFieldCollector",
+      "type": "architecture-symbol"
     },
     {
       "from": "/zh/docs/utils#assimilateCapturedThen",

@@ -7,6 +7,952 @@ export type IGuideJourney = {
   readonly title: string
 }
 
+type IGuideSections = IGuideJourney['document']['sections']
+
+/** Complete host-by-host WebRPC transport tutorials, kept separate from endpoint policy. */
+const webRpcTransportGuideSections: Readonly<Record<ILocale, IGuideSections>> = {
+  zh: [
+    {
+      id: 'memory-transport',
+      heading: 'Memory：测试同一进程中的完整调用链',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'Memory transport 用来在同一个 JavaScript 进程里建立一条真实的 WebRPC 调用链，最适合单元测试、组件测试和学习 endpoint。工厂返回已经互联的两端：一端交给 Client 发起调用，另一端交给 Provider 注册并执行方法。消息仍通过 microtask 异步投递，但不会跨线程、跨页面或跨进程。'
+        },
+        {
+          type: 'list',
+          items: [
+            'Provider endpoint 是服务端：用 provide 注册可以被调用的方法。',
+            'Client endpoint 是调用端：通过目标 id、方法名和参数发送请求。',
+            '两端必须使用不同的 transport；把同一端交给双方会导致消息无法到达。'
+          ]
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "import { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\n\n\n// 1. 创建一对已经互联的 transport。\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\n// 2. Provider 拥有服务 id，并注册可调用的方法。\nconst calculator = await createEndpoint({\n  id: 'calculator',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ]\n})\ncalculator.provide('add', (context) => {\n  const { left, right } = context.data as { left: number; right: number }\n  return context.success(left + right)\n})\n\n// 3. Client 声明允许调用的目标，然后像调用异步函数一样发送请求。\nconst app = await createEndpoint({\n  id: 'test-app',\n  targetIds: ['calculator'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport })\n  ]\n})\nconst result = await app.send<number>('calculator', 'add', { left: 20, right: 22 })\nconsole.assert(result === 42)\n\n// 4. 测试结束时释放两端，避免监听器泄漏到下一个用例。\nawait Promise.all([app.dispose(), calculator.dispose()])"
+        },
+        {
+          type: 'list',
+          items: [
+            '适合：不依赖浏览器宿主的 endpoint 测试、middleware 测试和最小复现。',
+            '不适合：验证 structured clone、Worker 生命周期、Window origin 或真实网络行为。',
+            '生产跨端通信应选择下面与宿主匹配的 adapter；业务 endpoint 代码可以保持不变。'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'window-transport',
+      heading: 'Window：页面、iframe 与弹窗之间通信',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: '页面需要调用 iframe、window.open 返回的弹窗或 window.opener 时使用。必须把发送目标与接收事件的 Window 分开声明，并固定可信 targetOrigin。'
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// parent.ts：父页面调用 iframe\nimport { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\n\nimport { createWindowMessageTransport } from '@migaia/web-rpc/adapters/window'\n\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nawait new Promise<void>((resolve) => iframe.addEventListener('load', () => resolve(), { once: true }))\nconst childOrigin = new URL(iframe.src).origin\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: childOrigin\n})\nconst billing = await createEndpoint({\n  id: 'checkout-page',\n  targetIds: ['billing-frame'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst total = await billing.send<number>('billing-frame', 'calculateTotal', {\n  prices: [12, 30],\n  taxRate: 0.08\n})\nconsole.log(total) // 45.36\n\nawait billing.dispose()"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// billing-frame.ts：iframe 提供方法给父页面\nimport { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\n\nimport { createWindowMessageTransport } from '@migaia/web-rpc/adapters/window'\n\nif (!window.parent) throw new Error('This page must run inside the billing iframe')\nconst parentOrigin = 'https://shop.example'\nconst transport = createWindowMessageTransport({\n  target: window.parent,\n  receiver: window,\n  targetOrigin: parentOrigin\n})\nconst billing = await createEndpoint({\n  id: 'billing-frame',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nbilling.provide('calculateTotal', (context) => {\n  const input = context.data as { prices: number[]; taxRate: number }\n  const subtotal = input.prices.reduce((sum, price) => sum + price, 0)\n  return context.success(subtotal * (1 + input.taxRate))\n})\n\nwindow.addEventListener('pagehide', () => void billing.dispose(), { once: true })"
+        },
+        {
+          type: 'list',
+          items: [
+            'target 必填；receiver 在浏览器页面中默认是当前 window。',
+            'targetOrigin 默认当前 origin；跨源必须显式传入。',
+            "只有确实需要 '*' 时才设置 allowUnsafeTargetOrigin: true；它不会关闭入站 source 校验。"
+          ]
+        }
+      ]
+    },
+    {
+      id: 'browser-message-port-transport',
+      heading: 'Browser MessagePort：把一条专用端口交给 Worker 或 iframe',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'MessageChannel 会创建 `port1` 与 `port2` 两个互相连接的端口。它适合页面已经知道唯一通信对象、又不希望继续在 Worker 或 Window 的公共 message 事件上混合业务消息时使用。WebRPC 不负责把端口送到对端：宿主必须先通过 Worker.postMessage、Window.postMessage 或已有握手转移其中一端，然后双方分别把自己持有的端口包装成 transport。'
+        },
+        {
+          type: 'table',
+          headers: ['角色', '持有对象', '负责的工作'],
+          rows: [
+            ['页面', 'port1', '创建调用端 endpoint，向 search-worker 发送 find 请求'],
+            ['Worker', '被转移的 port2', '创建服务 endpoint，注册并执行 find 方法'],
+            ['MessageChannel', 'port1 ↔ port2', '提供一对一消息链路，不负责 RPC、发现或认证']
+          ]
+        },
+        {
+          type: 'paragraph',
+          text: '下面示例把搜索索引放在 Worker 中。页面只知道 `search-worker` 这个 endpoint id；Worker 只暴露 `find` 方法。完整执行顺序是：创建 Worker → 创建端口对 → 转移 port2 → 两端创建 transport 和 endpoint → Worker 注册 provider → 页面调用 send → 双方释放资源。'
+        },
+        {
+          type: 'list',
+          items: [
+            '前提：Worker 已成功加载；实际项目应增加 ready 握手，确认 Worker 完成 provide 后再发送第一条请求。',
+            '端口转移：postMessage 的第二个参数必须包含 port2；转移后页面不得再次读取或关闭 port2。',
+            '类型边界：find 的请求和返回类型应在共享契约文件中定义，页面与 Worker 同时导入，避免两边各写一份。'
+          ]
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// main.ts：创建专用端口，把另一端转移给 Worker\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createBrowserMessagePortTransport } from '@migaia/web-rpc/adapters/message-port'\n\nconst worker = new Worker(new URL('./search.worker.ts', import.meta.url), { type: 'module' })\nconst { port1, port2 } = new MessageChannel()\nworker.postMessage({ type: 'rpc-port', port: port2 }, [port2])\n\nconst transport = createBrowserMessagePortTransport(port1, { ownership: 'owned' })\nconst search = await createEndpoint({\n  id: 'search-page',\n  targetIds: ['search-worker'],\n  transport,\n  middlewares: [connect({ transport })]\n})\nconst matches = await search.send<string[]>('search-worker', 'find', { query: 'migaia' })\n\nawait search.dispose() // ownership: owned 会同时关闭 port1\nworker.terminate()"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// search.worker.ts：接收被转移的 port2，并在同一专用链路提供方法\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createBrowserMessagePortTransport } from '@migaia/web-rpc/adapters/message-port'\n\nself.addEventListener('message', (event: MessageEvent) => {\n  if (event.data?.type !== 'rpc-port') return\n  const port = event.data.port as MessagePort\n  const transport = createBrowserMessagePortTransport(port, { ownership: 'owned' })\n  void createEndpoint({\n    id: 'search-worker',\n    transport,\n    middlewares: [connect({ transport })]\n  }).then((search) => {\n    search.provide('find', (context) => {\n      const { query } = context.data as { query: string }\n      return context.success(index.filter((item) => item.includes(query)))\n    })\n  })\n})"
+        },
+        {
+          type: 'list',
+          items: [
+            '选择 `owned`：endpoint 是端口的唯一使用者。dispose endpoint 时 transport 会关闭端口，后续调用应创建新的 MessageChannel、transport 与 endpoint。',
+            '选择 `borrowed`：端口生命周期由外层连接管理器拥有。dispose 只移除 WebRPC 监听器，外层仍可继续使用或稍后关闭端口。',
+            '错误处理：Worker 加载失败、messageerror、端口提前关闭或 endpoint 超时都应进入应用的失败界面；不要自动在旧端口上重试。',
+            '并发：一条 MessagePort 可以承载多个并发请求；请求由 WebRPC id 匹配响应，不需要为每次调用创建新端口。',
+            '安全：MessagePort 是独占拓扑，但转移端口的那次 Window/Worker 握手仍需验证 origin 与消息来源。独占不等于自动认证。',
+            '不要用于：需要一个发送者同时广播给多个页面，或需要动态发现多个服务实例；这些场景分别考虑 BroadcastChannel 或 SharedWorker。'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'node-message-port-transport',
+      heading: 'Node MessagePort：主线程与 worker_threads 通信',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'Node MessagePort adapter 用于 `node:worker_threads` 的主线程与 Worker。它不是“浏览器 MessagePort 的 Node 写法”：Node 端口使用 `on/off` 事件接口，必须由专用 adapter 负责订阅和清理。选择它通常是因为一条 Worker 连接上还要隔离多条独立 RPC 链路，或端口需要转交给另一个组件；如果主线程只与一个 Worker 直接通信，Dedicated Worker adapter 会更简单。'
+        },
+        {
+          type: 'table',
+          headers: ['阶段', '主线程', 'Worker'],
+          rows: [
+            ['建立链路', '创建 Worker 与 MessageChannel', '等待 parentPort 交付 port2'],
+            ['建立 endpoint', '用 port1 创建 node-main', '用 port2 创建 hash-worker'],
+            ['业务调用', 'send sha256 请求', 'provide sha256 并返回摘要'],
+            ['终止', '先 dispose endpoint，再 terminate Worker', '端口关闭后停止接收新请求']
+          ]
+        },
+        {
+          type: 'paragraph',
+          text: '下面示例把 CPU 密集的 SHA-256 工作移到 Worker。主线程只负责提交字符串并等待摘要；Worker 拥有 `node:crypto` 和 provider。`targetIds: [hash-worker]` 表示调用目标，不是认证凭证。生产代码应在 Worker endpoint 创建完成后回传 ready 消息，主线程收到 ready 后才发送第一条 RPC。'
+        },
+        {
+          type: 'list',
+          items: [
+            'Worker 入口在运行时是 Node ESM 文件，因此发布后的相对 import 必须包含 `.js` 扩展名。',
+            'port2 必须出现在 transferList 中；转移后主线程只拥有 port1。',
+            '请求和结果必须可被 structured clone；函数、带宿主句柄的对象和不可克隆值不能作为 payload。'
+          ]
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// main.ts：Node 主线程\nimport { MessageChannel, Worker } from 'node:worker_threads'\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createNodeMessagePortTransport } from '@migaia/web-rpc/adapters/message-port'\n\nconst worker = new Worker(new URL('./hash.worker.js', import.meta.url))\nconst { port1, port2 } = new MessageChannel()\nworker.postMessage({ type: 'rpc-port', port: port2 }, [port2])\nconst transport = createNodeMessagePortTransport(port1)\nconst hashing = await createEndpoint({\n  id: 'node-main', targetIds: ['hash-worker'], transport,\n  middlewares: [connect({ transport })]\n})\nconst digest = await hashing.send<string>('hash-worker', 'sha256', 'hello')\nawait hashing.dispose()\nawait worker.terminate()"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// hash.worker.ts：worker_threads Worker\nimport { parentPort, type MessagePort } from 'node:worker_threads'\nimport { createHash } from 'node:crypto'\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createNodeMessagePortTransport } from '@migaia/web-rpc/adapters/message-port'\n\nparentPort?.once('message', (message: { type: string; port: MessagePort }) => {\n  if (message.type !== 'rpc-port') return\n  const transport = createNodeMessagePortTransport(message.port)\n  void createEndpoint({\n    id: 'hash-worker', transport, middlewares: [connect({ transport })]\n  }).then((hashing) => {\n    hashing.provide('sha256', (context) =>\n      context.success(createHash('sha256').update(String(context.data)).digest('hex'))\n    )\n  })\n})"
+        },
+        {
+          type: 'list',
+          items: [
+            '为什么不用浏览器工厂：node:worker_threads.MessagePort 没有相同的 DOM EventTarget 生命周期，错误地包装会造成监听器无法正确移除。',
+            '失败顺序：Worker error/exit 后先把 endpoint 视为终态，让 pending 请求失败，再决定是否启动新 Worker。不要把旧 endpoint 绑定到新 Worker。',
+            '释放顺序：停止提交新任务 → 等待或取消 pending 请求 → dispose endpoint → terminate Worker。这个顺序避免结果返回到已拆除的监听器。',
+            '重启策略：新 Worker 必须创建新的 MessageChannel、transport 和 endpoint；endpoint id 可以复用，但旧请求不能跨实例恢复。',
+            '并发与背压：MessagePort 可以并发承载请求，但 CPU Worker 的实际吞吐受任务执行限制；应用应设置 provider 并发上限和请求 timeout。',
+            '不要用于：任务很短且序列化成本高于计算成本，或必须共享同一内存对象；前者留在主线程，后者评估 SharedArrayBuffer 与专门的并发协议。'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'web-worker-transport',
+      heading: 'Dedicated Worker：页面与单个 Worker 通信',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: '一个页面拥有一个 Dedicated Worker，且不需要额外协商 MessagePort 时使用。adapter 直接监听 Worker 的 message、error 与 messageerror。'
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// main.ts：主线程调用 Worker\nimport { connect, contract, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\n\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst worker = new Worker(new URL('./image.worker.ts', import.meta.url), { type: 'module' })\nconst transport = createWebWorkerTransport(worker, { peerId: 'image-worker' })\nconst images = await createEndpoint({\n  id: 'editor-page',\n  targetIds: ['image-worker'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport }), timeout({ timeoutMs: 30_000 })]\n})\n\nconst thumbnail = await images.send<Blob>('image-worker', 'resize', { file, width: 320 })\n\nawait images.dispose()\nworker.terminate()"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// image.worker.ts：Worker 接收调用并返回结果\nimport { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\n\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst scope = globalThis as unknown as DedicatedWorkerGlobalScope\nconst transport = createWebWorkerTransport(scope)\nconst images = await createEndpoint({\n  id: 'image-worker',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nimages.provide('resize', async (context) => {\n  const { file, width } = context.data as { file: Blob; width: number }\n  const result = await resizeImage(file, width)\n  return context.success(result)\n})"
+        },
+        {
+          type: 'list',
+          items: [
+            'peerId/origin 是已知对端元数据，不是认证凭证。',
+            'Worker error/messageerror 会通过 transport error 让全部 pending 调用尽快失败。',
+            '是否 terminate Worker 仍由创建 Worker 的宿主决定。'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'shared-worker-transport',
+      heading: 'Shared Worker：多个页面共享后台连接',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'SharedWorker 允许多个同源页面连接到同一个后台 Worker，适合共享缓存、WebSocket、索引或协调状态。它不是一条所有页面共用的 MessagePort：每次页面连接都会触发一次 `connect`，并产生一条只属于该页面的 port。Worker 必须为每个 port 创建独立 transport 与 endpoint，不能把不同页面的消息混进同一个独占 endpoint。'
+        },
+        {
+          type: 'table',
+          headers: ['对象', '数量', '生命周期与职责'],
+          rows: [
+            ['SharedWorker 实例', '同源页面共享一个', '保存共享计数器或连接状态'],
+            ['页面端 port', '每个页面一个', '页面自己的请求与响应链路'],
+            ['Worker endpoint', '每个 connect port 一个', '隔离 sender、pending 请求和释放状态'],
+            ['共享 value', 'Worker 内一个', '由多个 endpoint 的 provider 共同读写']
+          ]
+        },
+        {
+          type: 'paragraph',
+          text: '示例让多个标签页共享计数器。页面 A 与页面 B 都调用 `shared-counter.increment`，请求经各自 port 到达 Worker；Worker 中的所有 provider 闭包访问同一个 `value`，因此返回值在标签页之间连续递增。endpoint id 用于路由，不代表用户身份；需要用户级隔离时必须在握手或 provider 中加入应用认证。'
+        },
+        {
+          type: 'list',
+          items: [
+            '页面必须调用 worker.port.start()，然后在自己的 port 上创建 transport 与 createEndpoint。',
+            'Worker 的 connect 事件可能发生多次；每次只使用 event.ports[0] 创建该连接的 endpoint。',
+            '生产实现应保存 endpoint 集合，在 port 关闭、页面离开或 Worker 终止时逐个 dispose。'
+          ]
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// page.ts：每个标签页创建自己的 endpoint\nimport { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\n\nimport { createSharedWorkerTransport } from '@migaia/web-rpc/adapters/shared-worker'\n\nconst worker = new SharedWorker(new URL('./counter.worker.ts', import.meta.url), { type: 'module' })\nworker.port.start()\nconst transport = createSharedWorkerTransport(worker.port)\nconst counter = await createEndpoint({\n  id: crypto.randomUUID(),\n  targetIds: ['shared-counter'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst value = await counter.send<number>('shared-counter', 'increment', undefined)\nwindow.addEventListener('pagehide', () => void counter.dispose(), { once: true })"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// counter.worker.ts：每个 connect 事件带来一条独立端口\nimport { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\n\nimport { createSharedWorkerTransport } from '@migaia/web-rpc/adapters/shared-worker'\n\nlet value = 0\nself.addEventListener('connect', (event: MessageEvent) => {\n  const port = event.ports[0]\n  port.start()\n  const transport = createSharedWorkerTransport(port)\n  void createEndpoint({\n    id: 'shared-counter',\n    transport,\n    middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n  }).then((counter) => {\n    counter.provide('increment', (context) => context.success(++value))\n  })\n})"
+        },
+        {
+          type: 'list',
+          items: [
+            '状态范围：Worker 顶层变量会被所有已连接页面共享；不要把页面私有状态误放在顶层。',
+            '身份边界：SharedWorker 只保证同源可连接，不会证明当前端口属于哪个登录用户；provider 必须验证应用凭证。',
+            '页面退出：pagehide 时 dispose 页面 endpoint；不要关闭其他页面的 endpoint 或共享 Worker 状态。',
+            'Worker 更新：脚本版本变化后，新旧 Worker 可能短暂并存；频道、协议版本和 endpoint 合约必须显式版本化。',
+            '失败隔离：一个页面的 port 或 provider 失败不应终止其他页面的 endpoint；错误只回到对应请求。',
+            '不要用于：每个页面都需要独立后台状态，或浏览器不支持 SharedWorker；这些场景使用 Dedicated Worker 或 ServiceWorker。'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'service-worker-transport',
+      heading: 'Service Worker：页面与站点 ServiceWorker 通信',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'ServiceWorker transport 用于受控页面调用当前站点的 ServiceWorker，例如查询离线缓存、触发后台同步或读取 Worker 管理的站点状态。它与 Dedicated Worker 最大的不同是发送和接收不属于同一个对象：页面通过 `navigator.serviceWorker.controller.postMessage` 发送，却从 `navigator.serviceWorker` 接收 message；Worker 则通过具体 `Client.postMessage` 回应，并从全局 scope 接收事件。'
+        },
+        {
+          type: 'table',
+          headers: ['运行位置', '发送目标 target', '接收对象 receiver', 'endpoint id'],
+          rows: [
+            ['受控页面', '当前 controller', 'navigator.serviceWorker', '页面生成的 clientId'],
+            ['ServiceWorker', '发起握手的 Client', 'ServiceWorkerGlobalScope', 'service-worker']
+          ]
+        },
+        {
+          type: 'paragraph',
+          text: '页面第一次注册 ServiceWorker 后通常还没有 controller，需要等下一次导航、调用 clients.claim()，或明确提示用户刷新。下面的 `rpc-connect` 是应用层握手：页面先声明自己的 clientId；ServiceWorker 从 `event.source` 取得真实 Client，为该页面建立返回 transport。每个页面都应拥有独立 endpoint，不能把一个 Client 的返回目标复用于另一个页面。'
+        },
+        {
+          type: 'list',
+          items: [
+            '注册阶段：register() 只表示开始安装；await navigator.serviceWorker.ready 才表示存在 active registration。',
+            '控制阶段：ready 不保证当前页面已有 controller；必须单独检查 navigator.serviceWorker.controller。',
+            '握手阶段：生产实现应让 Worker 回传 rpc-ready，页面收到后再发送第一条 WebRPC 请求，避免 provider 尚未注册。',
+            '多页面：event.source 是当前消息对应的 Client；ServiceWorker 必须用它作为该 endpoint 的 target。'
+          ]
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// page.ts：受控页面先把自己的 client id 告诉 ServiceWorker\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createServiceWorkerTransport } from '@migaia/web-rpc/adapters/service-worker'\n\nawait navigator.serviceWorker.ready\nconst controller = navigator.serviceWorker.controller\nif (!controller) throw new Error('Reload once so the ServiceWorker controls this page')\nconst clientId = crypto.randomUUID()\ncontroller.postMessage({ type: 'rpc-connect', clientId })\n\nconst transport = createServiceWorkerTransport({\n  target: controller, receiver: navigator.serviceWorker, peerId: 'service-worker'\n})\nconst cache = await createEndpoint({\n  id: clientId, targetIds: ['service-worker'], transport,\n  middlewares: [connect({ transport })]\n})\nconst cached = await cache.send<boolean>('service-worker', 'hasCache', '/catalog.json')\nwindow.addEventListener('pagehide', () => void cache.dispose(), { once: true })"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// service-worker.ts：为发起握手的具体 Client 建立返回链路\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createServiceWorkerTransport } from '@migaia/web-rpc/adapters/service-worker'\n\nself.addEventListener('message', (event: ExtendableMessageEvent) => {\n  if (event.data?.type !== 'rpc-connect' || !event.source) return\n  const client = event.source as Client\n  const transport = createServiceWorkerTransport({\n    target: client, receiver: self, peerId: event.data.clientId\n  })\n  event.waitUntil(\n    createEndpoint({\n      id: 'service-worker', transport, middlewares: [connect({ transport })]\n    }).then((cache) => {\n      cache.provide('hasCache', async (context) =>\n        context.success(Boolean(await caches.match(String(context.data))))\n      )\n    })\n  )\n})"
+        },
+        {
+          type: 'list',
+          items: [
+            'controllerchange：新 Worker 接管页面后，旧 controller、transport 和 endpoint 都应终止，然后用新 controller 重新握手。',
+            '页面退出：pagehide 时 dispose 页面 endpoint；Worker 端应在 Client 消失或端口终态时清理对应 endpoint。',
+            '失败处理：controller 为 null、Worker 激活失败、Client 被关闭和请求 timeout 必须成为明确的 UI 状态，不能无限等待。',
+            '身份与授权：Client.id/clientId 只用于路由，不是用户凭证；敏感 provider 仍需验证会话、签名或应用 token。',
+            '版本兼容：页面静态资源可能与新旧 Worker 交错运行；contract version 必须拒绝不兼容调用并触发刷新策略。',
+            '不要用于：页面关闭后必须保证完成的长任务；这类任务应使用 Background Sync 等宿主能力，并把 RPC 仅作为触发与查询界面。'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'broadcast-channel-transport',
+      heading: 'BroadcastChannel：同源标签页广播',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'BroadcastChannel 让同源、同频道名的标签页、iframe 和 Worker 同时接收每一条底层消息。WebRPC 会在这个广播链路上按 endpoint id 路由请求和响应，因此“所有参与者都能看到帧”与“只有目标 endpoint 执行业务方法”可以同时成立。它适合跨标签页发现、设置同步和轻量协调，但不提供保密、身份认证或可靠的唯一服务选举。'
+        },
+        {
+          type: 'table',
+          headers: ['层次', '实际行为', '应用必须负责'],
+          rows: [
+            ['BroadcastChannel', '向同名频道的所有上下文投递消息', '频道命名、版本和关闭'],
+            ['WebRPC transport', '把广播事件转换为 RPC 帧', '真实暴露 broadcast topology'],
+            ['Endpoint', '按 targetId/receiverId 选择处理者', '唯一 id、方法契约和 timeout'],
+            ['Authentication', '可对每一帧签名或加密', '密钥分发、轮换与授权策略']
+          ]
+        },
+        {
+          type: 'paragraph',
+          text: '示例中一个标签页以 `settings-service` 提供主题设置，另一个标签页使用随机 endpoint id 调用 `readTheme`。两个页面必须使用完全相同且已版本化的频道名。调用是定向 RPC，不是业务广播：其他标签页虽然能收到底层帧，但 endpoint 路由不会执行不属于自己的 provider。'
+        },
+        {
+          type: 'list',
+          items: [
+            '启动顺序：服务标签页先创建 endpoint 并 provide；客户端再创建 endpoint 和 send。生产代码应先发现或确认服务在线。',
+            '唯一服务：如果多个标签页同时声明 settings-service，调用可能面对多个 receiver；应用必须选主、使用 uniqueTargetId 或接受多接收端语义。',
+            '频道版本：使用 migaia-settings-v1，而不是 settings；破坏协议兼容时创建 v2，避免新旧页面互相解析。',
+            '存储事件：如果需求只是同步 localStorage 的少量变化，原生 storage 事件可能更简单，不必引入 RPC。'
+          ]
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// service-tab.ts：任意一个标签页可提供同步服务\nimport { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\n\nimport { createBroadcastChannelTransport } from '@migaia/web-rpc/adapters/broadcast-channel'\n\nconst channel = new BroadcastChannel('migaia-settings-v1')\nconst transport = createBroadcastChannelTransport(channel)\nconst settings = await createEndpoint({\n  id: 'settings-service',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nsettings.provide('readTheme', (context) => context.success(localStorage.getItem('theme') ?? 'system'))"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// client-tab.ts：另一个同源标签页调用服务\nimport { connect, contract, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\n\nimport { createBroadcastChannelTransport } from '@migaia/web-rpc/adapters/broadcast-channel'\n\nconst channel = new BroadcastChannel('migaia-settings-v1')\nconst transport = createBroadcastChannelTransport(channel)\nconst settings = await createEndpoint({\n  id: crypto.randomUUID(),\n  targetIds: ['settings-service'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport }), timeout({ timeoutMs: 2_000 })]\n})\n\nconst theme = await settings.send<string>('settings-service', 'readTheme', undefined)\n\nawait settings.dispose()\nchannel.close()"
+        },
+        {
+          type: 'list',
+          items: [
+            '安全：任何同源脚本都可以加入频道并伪造帧；涉及身份、权限或敏感数据时必须安装 authentication 并验证业务授权。',
+            '可靠性：页面关闭、冻结或浏览器回收时消息可能无法送达；不要把它当作持久队列或事务日志。',
+            '超时：目标标签页不存在或尚未启动时 send 必须有有限 timeout，并向用户展示可恢复状态。',
+            '释放：先 dispose endpoint 移除 WebRPC 订阅，再 channel.close() 释放浏览器频道；不要只关闭 channel 留下 pending 请求。',
+            '并发：不同 endpoint id 可以共享频道；高流量业务会让所有参与者承担反序列化成本，应改用专用 MessagePort。',
+            '不要用于：跨源通信、可靠后台任务或严格点对点保密链路；分别选择 Window 握手、ServiceWorker/队列或 MessagePort。'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'rtc-data-channel-transport',
+      heading: 'RTCDataChannel：浏览器之间的点对点 RPC',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'RTCDataChannel transport 用于两个浏览器已经通过 WebRTC 建立 PeerConnection 后的点对点 RPC，例如协作编辑、局域网设备控制或端到端会话。adapter 只接管已打开 DataChannel 上的消息，不负责信令服务器、offer/answer、ICE candidate 交换、TURN、中继选择或 PeerConnection 重连。应用必须先完成这些宿主步骤。'
+        },
+        {
+          type: 'table',
+          headers: ['参与方', '取得 DataChannel 的方式', 'WebRPC 角色'],
+          rows: [
+            ['浏览器 A', 'createDataChannel 创建', 'createEndpoint 后调用 browser-b'],
+            ['浏览器 B', '监听 datachannel 事件取得', 'createEndpoint 并 provide readProfile'],
+            ['信令服务', '交换 SDP 与 ICE', '不承载 WebRPC 业务帧'],
+            ['RTC adapter', '包装双方已打开的 channel', '编码、收发和终态传播']
+          ]
+        },
+        {
+          type: 'paragraph',
+          text: '下面假设 `peerConnection` 已连接。A 创建名为 `migaia-rpc` 的可靠有序 channel；B 从 `datachannel` 事件收到配对 channel。双方分别等待 open，再直接创建 endpoint。A 调用 `browser-b.readProfile`，B 的 provider 返回资料。endpoint id 负责路由，但远端身份仍必须由可信信令和应用认证确认。'
+        },
+        {
+          type: 'list',
+          items: [
+            '必须使用 ordered: true，且不要设置 maxRetransmits 或 maxPacketLifeTime；RPC 请求与响应不能接受主动丢包。',
+            '双方约定唯一且版本化的 channel label，并拒绝未知 label，避免把其他业务 DataChannel 接入 RPC。',
+            'waitForOpen 必须同时处理 open、error 和 close；已关闭 channel 不能通过重试恢复。'
+          ]
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// rtc-channel.ts：双方共用的打开状态检查\nexport function waitForOpen(channel: RTCDataChannel): Promise<void> {\n  if (channel.readyState === 'open') return Promise.resolve()\n  return new Promise((resolve, reject) => {\n    channel.addEventListener('open', () => resolve(), { once: true })\n    channel.addEventListener('error', () => reject(new Error('RTC channel failed')), { once: true })\n    channel.addEventListener('close', () => reject(new Error('RTC channel closed before open')), { once: true })\n  })\n}"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// caller.ts：信令完成后，调用方创建可靠有序 DataChannel\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createRtcDataChannelTransport } from '@migaia/web-rpc/adapters/rtc-data-channel'\n\nimport { waitForOpen } from './rtc-channel.js'\n\nconst channel = peerConnection.createDataChannel('migaia-rpc', { ordered: true })\nawait waitForOpen(channel)\nconst transport = createRtcDataChannelTransport(channel)\nconst peer = await createEndpoint({\n  id: 'browser-a', targetIds: ['browser-b'], transport,\n  middlewares: [connect({ transport })]\n})\nconst profile = await peer.send('browser-b', 'readProfile', { userId: '42' })\nawait peer.dispose()\nchannel.close()"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// receiver.ts：另一端从 datachannel 事件取得同一条逻辑链路\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createRtcDataChannelTransport } from '@migaia/web-rpc/adapters/rtc-data-channel'\n\nimport { waitForOpen } from './rtc-channel.js'\n\npeerConnection.addEventListener('datachannel', (event) => {\n  const channel = event.channel\n  if (channel.label !== 'migaia-rpc') return\n  void waitForOpen(channel).then(async () => {\n    const transport = createRtcDataChannelTransport(channel)\n    const peer = await createEndpoint({\n      id: 'browser-b', transport, middlewares: [connect({ transport })]\n    })\n    peer.provide('readProfile', async (context) =>\n      context.success(await loadProfile((context.data as { userId: string }).userId))\n    )\n  })\n})"
+        },
+        {
+          type: 'list',
+          items: [
+            '安全：WebRTC 使用 DTLS 加密链路，但不会自动证明对端是哪个应用用户；信令身份、会话授权和 provider 权限仍由应用验证。',
+            '容量：adapter 以 string 编码消息；大 payload 会增加 bufferedAmount，应用应限制消息大小并观察背压。',
+            '失败：iceConnectionState failed、channel error/close 或 timeout 后立即终止 endpoint，让 pending 请求失败。',
+            '重连：重新协商或创建新 DataChannel 后必须创建新的 transport 与 endpoint；旧请求不能迁移。',
+            '释放：停止新调用 → settle/cancel pending → dispose endpoint → close DataChannel → 按宿主策略关闭 PeerConnection。',
+            '不要用于：必须经服务端审计、离线可靠补发或大文件流式传输；分别选择服务端 RPC、持久队列或专用流。'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'web-transport-datagram-transport',
+      heading: 'WebTransport Datagram：HTTP/3 字节数据报',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'WebTransport Datagram transport 适合浏览器与 HTTP/3 服务端之间的低延迟、可丢失消息，例如实时指标快照、光标位置或下一帧会覆盖上一帧的状态。它不是普通可靠 RPC 通道：单个 datagram 可能丢失、重复或乱序。adapter 只包装 session.datagrams 的 readable/writable 字节流，不负责 TLS 证书、HTTP/3 监听、WebTransport session 接受、用户认证或重连。'
+        },
+        {
+          type: 'table',
+          headers: ['层', '应用负责', 'WebRPC 负责'],
+          rows: [
+            ['HTTP/3 服务', '接受 session、认证请求、限制来源', '不创建监听器或 TLS'],
+            ['Datagram', '定义大小、丢包、顺序与幂等策略', '通过 adapter 收发 Uint8Array'],
+            ['Protocol', '选择双方一致的版本与 codec', '编码和解码 WebRPC 帧'],
+            ['Endpoint', '配置 id、targetIds、timeout 与 provider', '路由 send/provide 和终态']
+          ]
+        },
+        {
+          type: 'paragraph',
+          text: '下面是一条完整链路。浏览器先等待 session.ready，再创建 transport、codec 和根 createEndpoint，然后调用 metrics-service.latest。服务端 HTTP/3 框架完成握手与认证后，把已接受 session 的 datagrams 交给相同 adapter，以 metrics-service 创建根 createEndpoint 并 provide latest。两端 encodedType 和 codec 必须逐字一致。'
+        },
+        {
+          type: 'list',
+          items: [
+            '只把天然幂等、允许丢失且新值能覆盖旧值的方法放在 datagram endpoint；付款、写库和一次性命令必须改用可靠流或 HTTP RPC。',
+            '浏览器必须等待 session.ready；服务端必须先完成 WebTransport 握手和用户认证，再创建 endpoint。',
+            '为每条请求设置有限 timeout。丢失的 datagram 不会产生 transport error，调用方只能通过 timeout 得知没有响应。'
+          ]
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// browser.ts：调用 HTTP/3 服务端公开的指标方法\nimport { connect, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\nimport { createWebTransportDatagramTransport } from '@migaia/web-rpc/adapters/web-transport'\n\nconst session = new WebTransport('https://api.example/rpc')\nawait session.ready\nconst transport = createWebTransportDatagramTransport(session.datagrams)\nconst codec = protocol({\n  encodedType: 'uint8array',\n  encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n  decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n})\nconst metrics = await createEndpoint({\n  id: crypto.randomUUID(),\n  targetIds: ['metrics-service'],\n  transport,\n  middlewares: [codec, connect({ transport }), timeout({ timeoutMs: 1_000 })]\n})\n\nconst snapshot = await metrics.send<{ cpu: number; at: number }>(\n  'metrics-service',\n  'latest',\n  undefined\n)\nrenderMetrics(snapshot)\n\nawait metrics.dispose()\nsession.close()"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// metrics-session.ts：由 HTTP/3 框架在认证并接受 session 后调用\nimport { connect, createEndpoint, protocol } from '@migaia/web-rpc'\nimport { createWebTransportDatagramTransport } from '@migaia/web-rpc/adapters/web-transport'\n\ntype IAcceptedSession = {\n  datagrams: {\n    readable: ReadableStream<Uint8Array>\n    writable: WritableStream<Uint8Array>\n  }\n  closed: Promise<void>\n}\n\nexport async function serveMetrics(session: IAcceptedSession): Promise<void> {\n  const transport = createWebTransportDatagramTransport(session.datagrams)\n  const codec = protocol({\n    encodedType: 'uint8array',\n    encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n    decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n  })\n  const metrics = await createEndpoint({\n    id: 'metrics-service',\n    transport,\n    middlewares: [codec, connect({ transport })]\n  })\n\n  metrics.provide('latest', (context) =>\n    context.success({ cpu: readCpuUsage(), at: Date.now() })\n  )\n\n  await session.closed.finally(() => metrics.dispose())\n}"
+        },
+        {
+          type: 'list',
+          items: [
+            '身份与权限：TLS 只证明服务器；服务端仍须在握手阶段认证用户，并在 provider 中校验其读取权限。不要把 token 放进每个 datagram。',
+            '大小：遵守 session.datagrams.maxDatagramSize 或服务端等价限制；超大 WebRPC 帧不会自动分片，改用 bidirectional stream。',
+            '背压：WritableStream writer.ready 之外还要限制应用并发；持续产生快照时丢弃旧任务，只保留最新值。',
+            '版本：双方固定 codec 和 contract 版本；滚动升级时用不同 URL、endpoint id 或显式协议版本隔离不兼容客户端。',
+            '失败：监听 session.closed；关闭或解码失败后终止 endpoint，让 pending 调用尽快失败，不要在旧 session 上重试。',
+            '释放：停止新调用 → dispose endpoint → transport.close() 释放 reader/writer 锁 → session.close()。',
+            '恢复：新建 WebTransport session、transport 与 endpoint；只重放仍然有意义且幂等的最新查询。',
+            '需要可靠有序请求、流式大消息或服务器推送确认时，选择 WebTransport bidirectional stream 或常规 HTTP/WebSocket RPC。'
+          ]
+        }
+      ]
+    }
+  ],
+  en: [
+    {
+      id: 'memory-transport',
+      heading: 'Memory: test a complete call path in one process',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'Memory transport builds a real WebRPC call path inside one JavaScript process. It is intended for unit tests, component tests, and learning endpoint behavior. The factory returns two connected ends: the Client sends through one end while the Provider registers and executes methods through the other. Delivery is asynchronous through a microtask, but it does not cross threads, pages, or processes.'
+        },
+        {
+          type: 'list',
+          items: [
+            'The Provider endpoint owns a service id and registers callable methods with provide.',
+            'The Client endpoint sends a target id, method name, and input.',
+            'Each endpoint must receive a different end of the pair.'
+          ]
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "import { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\n\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst calculator = await createEndpoint({\n  id: 'calculator',\n  transport: providerTransport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport: providerTransport })]\n})\ncalculator.provide('add', (context) => {\n  const { left, right } = context.data as { left: number; right: number }\n  return context.success(left + right)\n})\n\nconst app = await createEndpoint({\n  id: 'test-app',\n  targetIds: ['calculator'],\n  transport: clientTransport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport: clientTransport })]\n})\nconst result = await app.send<number>('calculator', 'add', { left: 20, right: 22 })\nconsole.assert(result === 42)\n\nawait Promise.all([app.dispose(), calculator.dispose()])"
+        },
+        {
+          type: 'list',
+          items: [
+            'Use it for endpoint, middleware, and minimal reproduction tests without a browser host.',
+            'Do not use it to verify structured clone, Worker lifecycle, Window origin, or network behavior.',
+            'Choose the matching host adapter below for production communication; the endpoint code can stay the same.'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'window-transport',
+      heading: 'Window: communicate with an iframe or popup',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'Use this when a page calls an iframe, a window.open popup, or window.opener. Declare the outbound target separately from the Window receiving events, and pin a trusted targetOrigin.'
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// parent.ts: call the iframe\nimport { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\n\nimport { createWindowMessageTransport } from '@migaia/web-rpc/adapters/window'\n\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nawait new Promise<void>((resolve) => iframe.addEventListener('load', () => resolve(), { once: true }))\nconst childOrigin = new URL(iframe.src).origin\nconst transport = createWindowMessageTransport({ target: iframe.contentWindow!, receiver: window, targetOrigin: childOrigin })\nconst billing = await createEndpoint({\n  id: 'checkout-page', targetIds: ['billing-frame'], transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nconst total = await billing.send<number>('billing-frame', 'calculateTotal', { prices: [12, 30], taxRate: 0.08 })\nawait billing.dispose()"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// billing-frame.ts: expose a method to the parent\nimport { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\n\nimport { createWindowMessageTransport } from '@migaia/web-rpc/adapters/window'\n\nconst transport = createWindowMessageTransport({ target: window.parent, receiver: window, targetOrigin: 'https://shop.example' })\nconst billing = await createEndpoint({\n  id: 'billing-frame', transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nbilling.provide('calculateTotal', (context) => {\n  const input = context.data as { prices: number[]; taxRate: number }\n  return context.success(input.prices.reduce((sum, price) => sum + price, 0) * (1 + input.taxRate))\n})"
+        },
+        {
+          type: 'list',
+          items: [
+            'target is required; receiver defaults to the current window in a browser page.',
+            'targetOrigin defaults to the current origin and must be explicit across origins.',
+            "Set allowUnsafeTargetOrigin only for an intentional '*' target; inbound source checks remain active."
+          ]
+        }
+      ]
+    },
+    {
+      id: 'browser-message-port-transport',
+      heading: 'Browser MessagePort: transfer a dedicated port to a Worker or iframe',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'MessageChannel creates two connected endpoints, port1 and port2. Use it when the page already knows its single peer and you want RPC traffic isolated from the public Worker or Window message event. WebRPC does not deliver the port to the peer: the host must transfer one end through Worker.postMessage, Window.postMessage, or an existing handshake before each side wraps its own port.'
+        },
+        {
+          type: 'table',
+          headers: ['Role', 'Owns', 'Responsibility'],
+          rows: [
+            ['Page', 'port1', 'Create the caller endpoint and send find to search-worker'],
+            ['Worker', 'transferred port2', 'Create the service endpoint and provide find'],
+            [
+              'MessageChannel',
+              'port1 ↔ port2',
+              'Carry one-peer messages; it does not implement RPC or discovery'
+            ]
+          ]
+        },
+        {
+          type: 'paragraph',
+          text: 'The example keeps a search index inside a Worker. The page only knows the search-worker endpoint id, while the Worker exposes one find method. The full order is: create Worker → create the port pair → transfer port2 → create both transports and endpoints → register the provider → send the request → release both owners.'
+        },
+        {
+          type: 'list',
+          items: [
+            'Prerequisite: add a ready handshake in production so the page does not send before the Worker has registered find.',
+            'Transfer: include port2 in the postMessage transfer list; the page must not read or close it after transfer.',
+            'Types: define find input and output in one shared contract module instead of duplicating shapes on both sides.'
+          ]
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// main.ts: transfer one dedicated port to the Worker\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createBrowserMessagePortTransport } from '@migaia/web-rpc/adapters/message-port'\n\nconst worker = new Worker(new URL('./search.worker.ts', import.meta.url), { type: 'module' })\nconst { port1, port2 } = new MessageChannel()\nworker.postMessage({ type: 'rpc-port', port: port2 }, [port2])\nconst transport = createBrowserMessagePortTransport(port1, { ownership: 'owned' })\nconst search = await createEndpoint({\n  id: 'search-page', targetIds: ['search-worker'], transport,\n  middlewares: [connect({ transport })]\n})\nconst matches = await search.send<string[]>('search-worker', 'find', { query: 'migaia' })\nawait search.dispose()\nworker.terminate()"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// search.worker.ts: receive port2 and expose a method on that link\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createBrowserMessagePortTransport } from '@migaia/web-rpc/adapters/message-port'\n\nself.addEventListener('message', (event: MessageEvent) => {\n  if (event.data?.type !== 'rpc-port') return\n  const port = event.data.port as MessagePort\n  const transport = createBrowserMessagePortTransport(port, { ownership: 'owned' })\n  void createEndpoint({\n    id: 'search-worker', transport, middlewares: [connect({ transport })]\n  }).then((search) => {\n    search.provide('find', (context) => {\n      const { query } = context.data as { query: string }\n      return context.success(index.filter((item) => item.includes(query)))\n    })\n  })\n})"
+        },
+        {
+          type: 'list',
+          items: [
+            'Use `owned` when the endpoint is the only port consumer; disposal closes the port and reconnection creates a new channel, transport, and endpoint.',
+            'Use `borrowed` when an outer connection manager owns the port; endpoint disposal removes WebRPC listeners but leaves the port open.',
+            'Handle Worker load failure, messageerror, early port closure, and endpoint timeout in application UI; do not retry through a terminal port.',
+            'One MessagePort supports concurrent requests because WebRPC correlates responses by request id.',
+            'An exclusive port is not automatic authentication: validate the origin and source of the handshake that transfers the port.',
+            'Do not use it for one-to-many broadcast or dynamic multi-provider discovery; consider BroadcastChannel or SharedWorker instead.'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'node-message-port-transport',
+      heading: 'Node MessagePort: communicate with worker_threads',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'Use the Node MessagePort adapter for a main thread and a node:worker_threads Worker. This is not merely the browser recipe with Node imports: the Node port uses an on/off event surface and needs its dedicated adapter for correct subscription cleanup. Choose it when one Worker connection carries isolated RPC links or a port must be handed to another component; use the direct Worker adapter for one simple main-to-Worker link.'
+        },
+        {
+          type: 'table',
+          headers: ['Stage', 'Main thread', 'Worker'],
+          rows: [
+            ['Link', 'Create Worker and MessageChannel', 'Receive port2 through parentPort'],
+            ['Endpoint', 'Create node-main on port1', 'Create hash-worker on port2'],
+            ['Call', 'Send sha256 input', 'Provide sha256 and return the digest'],
+            [
+              'Shutdown',
+              'Dispose endpoint, then terminate Worker',
+              'Stop accepting calls after port closure'
+            ]
+          ]
+        },
+        {
+          type: 'paragraph',
+          text: 'The example moves CPU-bound SHA-256 work into the Worker. The main thread submits a string and awaits its digest; the Worker owns node:crypto and the provider. targetIds names the intended peer and is not a credential. In production, let the Worker send ready after endpoint construction and wait for it before the first RPC.'
+        },
+        {
+          type: 'list',
+          items: [
+            'A deployed Node ESM Worker entry uses runtime files, so relative imports in emitted code need explicit .js extensions.',
+            'Include port2 in transferList; the main thread owns only port1 after transfer.',
+            'Inputs and outputs must support structured clone; functions and host handles cannot be payloads.'
+          ]
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// main.ts\nimport { MessageChannel, Worker } from 'node:worker_threads'\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createNodeMessagePortTransport } from '@migaia/web-rpc/adapters/message-port'\n\nconst worker = new Worker(new URL('./hash.worker.js', import.meta.url))\nconst { port1, port2 } = new MessageChannel()\nworker.postMessage({ type: 'rpc-port', port: port2 }, [port2])\nconst transport = createNodeMessagePortTransport(port1)\nconst hashing = await createEndpoint({\n  id: 'node-main', targetIds: ['hash-worker'], transport,\n  middlewares: [connect({ transport })]\n})\nconst digest = await hashing.send<string>('hash-worker', 'sha256', 'hello')\nawait hashing.dispose()\nawait worker.terminate()"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// hash.worker.ts\nimport { parentPort, type MessagePort } from 'node:worker_threads'\nimport { createHash } from 'node:crypto'\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createNodeMessagePortTransport } from '@migaia/web-rpc/adapters/message-port'\n\nparentPort?.once('message', (message: { type: string; port: MessagePort }) => {\n  if (message.type !== 'rpc-port') return\n  const transport = createNodeMessagePortTransport(message.port)\n  void createEndpoint({\n    id: 'hash-worker', transport, middlewares: [connect({ transport })]\n  }).then((hashing) => {\n    hashing.provide('sha256', (context) =>\n      context.success(createHash('sha256').update(String(context.data)).digest('hex'))\n    )\n  })\n})"
+        },
+        {
+          type: 'list',
+          items: [
+            'Do not use the browser factory: node:worker_threads.MessagePort has a different listener lifecycle and would not clean up correctly.',
+            'After Worker error or exit, terminalize the endpoint so pending calls fail before deciding whether to restart.',
+            'Shutdown order is stop new work → settle or cancel pending calls → dispose endpoint → terminate Worker.',
+            'A restart creates a new MessageChannel, transport, and endpoint; old requests never resume across instances.',
+            'MessagePort carries concurrent requests, but CPU throughput still needs provider concurrency limits and request timeouts.',
+            'Avoid it when serialization costs more than the task or the design requires shared mutable memory.'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'web-worker-transport',
+      heading: 'Dedicated Worker: connect one page to one Worker',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'Use this when one page owns a Dedicated Worker and no separate MessagePort negotiation is needed. The adapter listens to message, error, and messageerror directly on the Worker.'
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// main.ts: call the Worker\nimport { connect, contract, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\n\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst worker = new Worker(new URL('./image.worker.ts', import.meta.url), { type: 'module' })\nconst transport = createWebWorkerTransport(worker, { peerId: 'image-worker' })\nconst images = await createEndpoint({\n  id: 'editor-page', targetIds: ['image-worker'], transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport }), timeout({ timeoutMs: 30_000 })]\n})\nconst thumbnail = await images.send<Blob>('image-worker', 'resize', { file, width: 320 })\nawait images.dispose()\nworker.terminate()"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// image.worker.ts: handle the call and return a result\nimport { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\n\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst scope = globalThis as unknown as DedicatedWorkerGlobalScope\nconst transport = createWebWorkerTransport(scope)\nconst images = await createEndpoint({\n  id: 'image-worker', transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nimages.provide('resize', async (context) => {\n  const { file, width } = context.data as { file: Blob; width: number }\n  return context.success(await resizeImage(file, width))\n})"
+        },
+        {
+          type: 'list',
+          items: [
+            'peerId and origin are known-peer metadata, not credentials.',
+            'Worker error/messageerror fails current pending calls through the transport error path.',
+            'The host that created the Worker still owns terminate().'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'shared-worker-transport',
+      heading: 'Shared Worker: share background state across pages',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'SharedWorker lets several same-origin pages connect to one background Worker for a shared cache, WebSocket, index, or coordination state. It is not one MessagePort shared by all pages: every page connection emits connect with a dedicated port. The Worker must create a separate transport and endpoint for every port instead of mixing page traffic into one exclusive endpoint.'
+        },
+        {
+          type: 'table',
+          headers: ['Object', 'Count', 'Lifecycle and responsibility'],
+          rows: [
+            ['SharedWorker instance', 'One per same-origin group', 'Own shared counter or connection state'],
+            ['Page port', 'One per page', 'Carry that page request and response traffic'],
+            ['Worker endpoint', 'One per connect port', 'Isolate sender, pending work, and disposal'],
+            ['Shared value', 'One inside the Worker', 'Read and update through all provider closures']
+          ]
+        },
+        {
+          type: 'paragraph',
+          text: 'The example shares one counter across tabs. Pages A and B both call shared-counter.increment through their own ports, while all Worker provider closures access one value. Endpoint ids route messages and are not user identities; add application authentication when users require isolation.'
+        },
+        {
+          type: 'list',
+          items: [
+            'The page starts worker.port and creates its transport and createEndpoint on that port.',
+            'The Worker connect event can run repeatedly; create one endpoint from event.ports[0] each time.',
+            'A production Worker keeps an endpoint set and disposes entries when ports close, pages leave, or the Worker terminates.'
+          ]
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// page.ts: each tab creates its own endpoint\nimport { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\n\nimport { createSharedWorkerTransport } from '@migaia/web-rpc/adapters/shared-worker'\n\nconst worker = new SharedWorker(new URL('./counter.worker.ts', import.meta.url), { type: 'module' })\nworker.port.start()\nconst transport = createSharedWorkerTransport(worker.port)\nconst counter = await createEndpoint({\n  id: crypto.randomUUID(), targetIds: ['shared-counter'], transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nconst value = await counter.send<number>('shared-counter', 'increment', undefined)"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// counter.worker.ts: attach every connection port\nimport { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\n\nimport { createSharedWorkerTransport } from '@migaia/web-rpc/adapters/shared-worker'\n\nlet value = 0\nself.addEventListener('connect', (event: MessageEvent) => {\n  const port = event.ports[0]\n  port.start()\n  const transport = createSharedWorkerTransport(port)\n  void createEndpoint({\n    id: 'shared-counter', transport,\n    middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n  }).then((counter) => counter.provide('increment', (context) => context.success(++value)))\n})"
+        },
+        {
+          type: 'list',
+          items: [
+            'Worker top-level state is shared by every connected page; keep page-private state outside that shared scope.',
+            'Same-origin connection is not logged-in user authentication; providers still validate application credentials.',
+            'On pagehide, dispose only that page endpoint and do not close other page endpoints or shared state.',
+            'During Worker upgrades, old and new instances can overlap; version channel names, protocol, and endpoint contracts.',
+            'A failed page port or provider must not terminate endpoints belonging to other pages.',
+            'Use Dedicated Worker or ServiceWorker when pages need independent state or SharedWorker is unavailable.'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'service-worker-transport',
+      heading: 'Service Worker: connect a page to its site worker',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'ServiceWorker transport lets a controlled page call its site Worker for offline cache queries, background-sync triggers, or Worker-owned site state. Unlike Dedicated Worker, sending and receiving belong to different host objects: the page sends through navigator.serviceWorker.controller but receives from navigator.serviceWorker; the Worker replies through a concrete Client and receives on its global scope.'
+        },
+        {
+          type: 'table',
+          headers: ['Location', 'Outbound target', 'Inbound receiver', 'Endpoint id'],
+          rows: [
+            ['Controlled page', 'Current controller', 'navigator.serviceWorker', 'Generated clientId'],
+            ['ServiceWorker', 'Client that initiated handshake', 'ServiceWorkerGlobalScope', 'service-worker']
+          ]
+        },
+        {
+          type: 'paragraph',
+          text: 'A page commonly has no controller immediately after first registration. Wait for another navigation, use clients.claim(), or explicitly request a reload. The rpc-connect message below is an application handshake: the page declares its clientId, and the Worker obtains the real Client from event.source to build that page return transport. Every page needs its own endpoint.'
+        },
+        {
+          type: 'list',
+          items: [
+            'register() starts installation; navigator.serviceWorker.ready means an active registration exists.',
+            'ready does not guarantee this page has a controller, so check navigator.serviceWorker.controller separately.',
+            'In production, let the Worker reply rpc-ready and send the first RPC only after providers are registered.',
+            'event.source identifies the Client for this message and must be the Worker endpoint outbound target.'
+          ]
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// page.ts\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createServiceWorkerTransport } from '@migaia/web-rpc/adapters/service-worker'\n\nawait navigator.serviceWorker.ready\nconst controller = navigator.serviceWorker.controller\nif (!controller) throw new Error('Reload once so the ServiceWorker controls this page')\nconst clientId = crypto.randomUUID()\ncontroller.postMessage({ type: 'rpc-connect', clientId })\nconst transport = createServiceWorkerTransport({\n  target: controller, receiver: navigator.serviceWorker, peerId: 'service-worker'\n})\nconst cache = await createEndpoint({\n  id: clientId, targetIds: ['service-worker'], transport,\n  middlewares: [connect({ transport })]\n})\nconst cached = await cache.send<boolean>('service-worker', 'hasCache', '/catalog.json')"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// service-worker.ts\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createServiceWorkerTransport } from '@migaia/web-rpc/adapters/service-worker'\n\nself.addEventListener('message', (event: ExtendableMessageEvent) => {\n  if (event.data?.type !== 'rpc-connect' || !event.source) return\n  const client = event.source as Client\n  const transport = createServiceWorkerTransport({\n    target: client, receiver: self, peerId: event.data.clientId\n  })\n  event.waitUntil(\n    createEndpoint({\n      id: 'service-worker', transport, middlewares: [connect({ transport })]\n    }).then((cache) => {\n      cache.provide('hasCache', async (context) =>\n        context.success(Boolean(await caches.match(String(context.data))))\n      )\n    })\n  )\n})"
+        },
+        {
+          type: 'list',
+          items: [
+            'On controllerchange, terminalize the old controller, transport, and endpoint, then handshake with the replacement.',
+            'Dispose the page endpoint on pagehide and remove the Worker endpoint when its Client disappears.',
+            'Expose null controller, activation failure, closed Client, and request timeout as explicit UI states.',
+            'Client ids route messages and are not user credentials; sensitive providers still authenticate application sessions.',
+            'Old and new page assets can overlap with Worker upgrades; contract versions reject incompatible calls.',
+            'Do not model guaranteed work after page closure as RPC; use Background Sync and keep RPC for triggering or querying.'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'broadcast-channel-transport',
+      heading: 'BroadcastChannel: broadcast among same-origin tabs',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'BroadcastChannel delivers every low-level message to all same-origin contexts using the same channel name. WebRPC routes requests and responses by endpoint id on top of that broadcast link, so every participant may observe a frame while only the targeted endpoint executes the method. It fits cross-tab discovery, settings synchronization, and light coordination, but provides no confidentiality, authentication, or reliable leader election.'
+        },
+        {
+          type: 'table',
+          headers: ['Layer', 'Behavior', 'Application responsibility'],
+          rows: [
+            ['BroadcastChannel', 'Deliver to every context on the name', 'Channel naming, version, and closure'],
+            ['WebRPC transport', 'Convert broadcast events to RPC frames', 'Report broadcast topology truthfully'],
+            ['Endpoint', 'Route by targetId and receiverId', 'Unique ids, method contracts, and timeout'],
+            ['Authentication', 'Sign or encrypt every frame', 'Key distribution, rotation, and authorization']
+          ]
+        },
+        {
+          type: 'paragraph',
+          text: 'One tab in the example provides theme settings as settings-service, while another tab calls readTheme from a random endpoint id. Both pages use the same versioned channel name. This is targeted RPC rather than a business broadcast: other tabs can receive the frame, but endpoint routing does not execute providers they do not own.'
+        },
+        {
+          type: 'list',
+          items: [
+            'Start the provider endpoint and register readTheme before the client sends; production code first discovers or confirms service availability.',
+            'If several tabs claim settings-service, define leader election, uniqueTargetId selection, or intentional multi-receiver behavior.',
+            'Use a versioned name such as migaia-settings-v1 and move incompatible peers to v2.',
+            'For a few localStorage changes, the native storage event may be simpler than RPC.'
+          ]
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// service-tab.ts: one tab provides the service\nimport { connect, contract, createEndpoint, protocol } from '@migaia/web-rpc'\n\nimport { createBroadcastChannelTransport } from '@migaia/web-rpc/adapters/broadcast-channel'\n\nconst channel = new BroadcastChannel('migaia-settings-v1')\nconst transport = createBroadcastChannelTransport(channel)\nconst settings = await createEndpoint({\n  id: 'settings-service', transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nsettings.provide('readTheme', (context) => context.success(localStorage.getItem('theme') ?? 'system'))"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// client-tab.ts: another same-origin tab calls it\nimport { connect, contract, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\n\nimport { createBroadcastChannelTransport } from '@migaia/web-rpc/adapters/broadcast-channel'\n\nconst channel = new BroadcastChannel('migaia-settings-v1')\nconst transport = createBroadcastChannelTransport(channel)\nconst settings = await createEndpoint({\n  id: crypto.randomUUID(), targetIds: ['settings-service'], transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport }), timeout({ timeoutMs: 2_000 })]\n})\nconst theme = await settings.send<string>('settings-service', 'readTheme', undefined)\nawait settings.dispose()\nchannel.close()"
+        },
+        {
+          type: 'list',
+          items: [
+            'Any same-origin script can join and forge frames; sensitive traffic needs authentication and business authorization.',
+            'Messages are not a durable queue when pages close, freeze, or are reclaimed by the browser.',
+            'Bound send with a timeout and expose a recoverable state when no provider is online.',
+            'Dispose the endpoint before channel.close() so pending requests and listeners settle cleanly.',
+            'All peers pay parsing costs for high traffic; move that work to a dedicated MessagePort.',
+            'Use Window handshake, ServiceWorker/queue, or MessagePort for cross-origin, durable background, or confidential point-to-point work.'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'rtc-data-channel-transport',
+      heading: 'RTCDataChannel: peer-to-peer RPC between browsers',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'RTCDataChannel transport carries peer-to-peer RPC after two browsers have already established a WebRTC PeerConnection—for example collaborative editing, LAN device control, or an end-to-end session. The adapter only owns WebRPC messages on an open DataChannel. It does not own signaling, offer/answer, ICE candidate exchange, TURN selection, PeerConnection authentication, or reconnection.'
+        },
+        {
+          type: 'table',
+          headers: ['Participant', 'How it receives a DataChannel', 'WebRPC role'],
+          rows: [
+            ['Browser A', 'Calls createDataChannel', 'Creates an endpoint and calls browser-b'],
+            ['Browser B', 'Handles the datachannel event', 'Creates an endpoint and provides readProfile'],
+            ['Signaling service', 'Exchanges SDP and ICE', 'Does not carry WebRPC application frames'],
+            ['RTC adapter', 'Wraps each already-open channel', 'Encodes, sends, receives, and reports terminal state']
+          ]
+        },
+        {
+          type: 'paragraph',
+          text: 'The example assumes peerConnection is connected. A creates a reliable ordered channel named migaia-rpc; B receives its paired channel from the datachannel event. Both sides wait for open and then call the root createEndpoint directly. A sends browser-b.readProfile and B provides that method. Endpoint ids route messages; trusted signaling and application authentication must still establish who owns each remote id.'
+        },
+        {
+          type: 'list',
+          items: [
+            'Use ordered: true without maxRetransmits or maxPacketLifeTime; RPC request/response traffic cannot tolerate intentional packet loss.',
+            'Version the channel label and reject unknown labels so unrelated DataChannels cannot enter this RPC route.',
+            'waitForOpen must handle open, error, and close. A closed DataChannel cannot be revived by retrying the same transport.'
+          ]
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// rtc-channel.ts: shared open-state check\nexport function waitForOpen(channel: RTCDataChannel): Promise<void> {\n  if (channel.readyState === 'open') return Promise.resolve()\n  return new Promise((resolve, reject) => {\n    channel.addEventListener('open', () => resolve(), { once: true })\n    channel.addEventListener('error', () => reject(new Error('RTC channel failed')), { once: true })\n    channel.addEventListener('close', () => reject(new Error('RTC channel closed before open')), { once: true })\n  })\n}"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// caller.ts: create a reliable ordered DataChannel after signaling\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createRtcDataChannelTransport } from '@migaia/web-rpc/adapters/rtc-data-channel'\n\nimport { waitForOpen } from './rtc-channel.js'\n\nconst channel = peerConnection.createDataChannel('migaia-rpc', { ordered: true })\nawait waitForOpen(channel)\nconst transport = createRtcDataChannelTransport(channel)\nconst peer = await createEndpoint({\n  id: 'browser-a', targetIds: ['browser-b'], transport,\n  middlewares: [connect({ transport })]\n})\nconst profile = await peer.send('browser-b', 'readProfile', { userId: '42' })\nawait peer.dispose()\nchannel.close()"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// receiver.ts: obtain the paired channel from the datachannel event\nimport { connect, createEndpoint } from '@migaia/web-rpc'\nimport { createRtcDataChannelTransport } from '@migaia/web-rpc/adapters/rtc-data-channel'\n\nimport { waitForOpen } from './rtc-channel.js'\n\npeerConnection.addEventListener('datachannel', (event) => {\n  const channel = event.channel\n  if (channel.label !== 'migaia-rpc') return\n  void waitForOpen(channel).then(async () => {\n    const transport = createRtcDataChannelTransport(channel)\n    const peer = await createEndpoint({\n      id: 'browser-b', transport, middlewares: [connect({ transport })]\n    })\n    peer.provide('readProfile', async (context) =>\n      context.success(await loadProfile((context.data as { userId: string }).userId))\n    )\n  })\n})"
+        },
+        {
+          type: 'list',
+          items: [
+            'Security: WebRTC encrypts the link with DTLS but does not identify an application user; authenticate signaling sessions and authorize every provided method.',
+            'Capacity: the adapter encodes messages as strings. Limit payload size and watch bufferedAmount before sending more work.',
+            'Failure: iceConnectionState failed, channel error/close, or a request timeout must terminalize the endpoint and reject pending calls.',
+            'Reconnect by negotiating or opening a new DataChannel, then creating a new transport and endpoint. Old pending calls cannot migrate.',
+            'Shut down in order: stop new calls, settle or cancel pending work, dispose the endpoint, close the DataChannel, then close the PeerConnection when host policy allows.',
+            'Use a server RPC, durable queue, or dedicated stream instead when calls require central audit, offline delivery, or large-file streaming.'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'web-transport-datagram-transport',
+      heading: 'WebTransport Datagram: HTTP/3 byte datagrams',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'WebTransport Datagram transport is for low-latency, loss-tolerant messages between a browser and an HTTP/3 server, such as metric snapshots, cursor positions, or state where the next update supersedes the previous one. It is not an ordinary reliable RPC link: an individual datagram may be lost, duplicated, or reordered. The adapter only wraps the session.datagrams byte streams; it does not own TLS, HTTP/3 listening, session acceptance, authentication, or reconnection.'
+        },
+        {
+          type: 'table',
+          headers: ['Layer', 'Application responsibility', 'WebRPC responsibility'],
+          rows: [
+            ['HTTP/3 service', 'Accept sessions, authenticate, restrict origin', 'Does not create the listener or TLS'],
+            ['Datagram', 'Define size, loss, ordering, and idempotency policy', 'Send and receive Uint8Array through the adapter'],
+            ['Protocol', 'Choose one version and codec on both sides', 'Encode and decode WebRPC frames'],
+            ['Endpoint', 'Configure ids, timeout, and providers', 'Route send/provide and terminal state']
+          ]
+        },
+        {
+          type: 'paragraph',
+          text: 'This is a complete call path. The browser waits for session.ready, creates the transport, codec, and root createEndpoint, then calls metrics-service.latest. After its HTTP/3 framework accepts and authenticates a session, the server passes the accepted datagram streams to the same adapter, creates a root endpoint with id metrics-service, and provides latest. encodedType and the codec must match exactly on both sides.'
+        },
+        {
+          type: 'list',
+          items: [
+            'Expose only naturally idempotent, loss-tolerant methods whose newer value supersedes an older one. Payments, durable writes, and one-shot commands need a reliable stream or HTTP RPC.',
+            'The browser waits for session.ready; the server authenticates and completes the WebTransport handshake before creating an endpoint.',
+            'Bound every call with a timeout. Datagram loss does not raise a transport error, so timeout is how the caller observes a missing response.'
+          ]
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// browser.ts: call the metric method exposed by the HTTP/3 server\nimport { connect, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\nimport { createWebTransportDatagramTransport } from '@migaia/web-rpc/adapters/web-transport'\n\nconst session = new WebTransport('https://api.example/rpc')\nawait session.ready\nconst transport = createWebTransportDatagramTransport(session.datagrams)\nconst codec = protocol({\n  encodedType: 'uint8array',\n  encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n  decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n})\nconst metrics = await createEndpoint({\n  id: crypto.randomUUID(),\n  targetIds: ['metrics-service'],\n  transport,\n  middlewares: [codec, connect({ transport }), timeout({ timeoutMs: 1_000 })]\n})\n\nconst snapshot = await metrics.send<{ cpu: number; at: number }>(\n  'metrics-service',\n  'latest',\n  undefined\n)\nrenderMetrics(snapshot)\n\nawait metrics.dispose()\nsession.close()"
+        },
+        {
+          type: 'code',
+          language: 'ts',
+          code: "// metrics-session.ts: called after the HTTP/3 framework authenticates and accepts a session\nimport { connect, createEndpoint, protocol } from '@migaia/web-rpc'\nimport { createWebTransportDatagramTransport } from '@migaia/web-rpc/adapters/web-transport'\n\ntype IAcceptedSession = {\n  datagrams: {\n    readable: ReadableStream<Uint8Array>\n    writable: WritableStream<Uint8Array>\n  }\n  closed: Promise<void>\n}\n\nexport async function serveMetrics(session: IAcceptedSession): Promise<void> {\n  const transport = createWebTransportDatagramTransport(session.datagrams)\n  const codec = protocol({\n    encodedType: 'uint8array',\n    encode: (message) => new TextEncoder().encode(JSON.stringify(message)),\n    decode: (bytes) => JSON.parse(new TextDecoder().decode(bytes))\n  })\n  const metrics = await createEndpoint({\n    id: 'metrics-service',\n    transport,\n    middlewares: [codec, connect({ transport })]\n  })\n\n  metrics.provide('latest', (context) =>\n    context.success({ cpu: readCpuUsage(), at: Date.now() })\n  )\n\n  await session.closed.finally(() => metrics.dispose())\n}"
+        },
+        {
+          type: 'list',
+          items: [
+            'Identity and authorization: TLS identifies the server, but the server must still authenticate the user during the handshake and authorize each provider. Do not put a token in every datagram.',
+            'Size: honor session.datagrams.maxDatagramSize or the server equivalent. Oversized WebRPC frames are not fragmented; move them to a bidirectional stream.',
+            'Backpressure: bound application concurrency in addition to WritableStream writer.ready. For continuous snapshots, discard stale work and keep only the newest value.',
+            'Versioning: pin codec and contract versions on both sides. Isolate incompatible rolling upgrades with another URL, endpoint id, or explicit protocol version.',
+            'Failure: observe session.closed. Terminalize the endpoint on close or decode failure so pending calls fail promptly; do not retry on the old session.',
+            'Shutdown order: stop new calls, dispose the endpoint, transport.close() to release stream locks, then session.close().',
+            'Recovery creates a new WebTransport session, transport, and endpoint, and only replays the newest request when it remains useful and idempotent.',
+            'Choose a WebTransport bidirectional stream or ordinary HTTP/WebSocket RPC when requests require reliable ordering, large streaming payloads, or acknowledged server delivery.'
+          ]
+        }
+      ]
+    }
+  ]
+}
+
 /** Task-owned guide pages; generated API declarations are intentionally not used as prose. */
 const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IGuideJourney>>>>> = {
   'store-react:index': {
@@ -11009,6 +11955,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '界面需要安全插值或本地化数字',
                     '/string、/number',
                     'format、createNumberFormatter'
+                  ],
+                  [
+                    '内存数组需要惰性筛选、去重与分页',
+                    '包根入口',
+                    'collect'
                   ]
                 ]
               }
@@ -11031,6 +11982,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
+        { label: 'Collector 惰性数组查询', path: 'collector' },
         { label: '五分钟组合 deadline、retry 与 limiter', path: 'getting-started' },
         { label: '截止时间与取消', path: 'deadlines-and-abort' }
       ]
@@ -11074,6 +12026,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'A UI needs safe interpolation or localized numbers',
                     '/string, /number',
                     'format, createNumberFormatter'
+                  ],
+                  [
+                    'An in-memory array needs lazy filtering, deduplication, and pagination',
+                    'package root',
+                    'collect'
                   ]
                 ]
               }
@@ -11096,11 +12053,176 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
+        { label: 'Lazy array queries with Collector', path: 'collector' },
         {
           label: 'Compose a deadline, retry, and limiter in five minutes',
           path: 'getting-started'
         },
         { label: 'Deadlines and abort', path: 'deadlines-and-abort' }
+      ]
+    }
+  },
+  'utils:collector': {
+    zh: {
+      title: '用 Collector 组合惰性数组查询',
+      lede: 'Collector 借用 readonly source，把字段筛选、业务 predicate、稳定去重和分页记录成有序流水线；首次读取 result 时扫描并缓存。',
+      document: {
+        sections: [
+          {
+            id: 'complete-example',
+            heading: '从完整查询开始',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'collect 只从 @migaia/utils 包根入口导出。它不会复制输入，也不会在每次链式调用时立刻扫描。下面的查询先保留至少存在一个名称字段的用户，再执行忽略大小写的子串匹配、业务状态过滤、按 id 保留第一次出现，最后分页。动作顺序就是执行顺序。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { collect } from '@migaia/utils'\n\ntype IUser = {\n  readonly id: string\n  readonly active: boolean\n  readonly profile: {\n    readonly nameZh?: string\n    readonly nameEn?: string\n  }\n}\n\nconst visibleUsers = collect(users)\n  .fieldBy('profile.nameZh', 'profile.nameEn')\n  .like(searchText)\n  .where((user) => user.active)\n  .distinctBy('id')\n  .skip(page * pageSize)\n  .take(pageSize)\n  .result"
+              },
+              {
+                type: 'table',
+                headers: ['动作', '语义', '关键边界'],
+                rows: [
+                  ['fieldBy(...paths)', '选择活动字段并过滤所有字段均为 undefined 的项', '至少传一个安全 object path'],
+                  ['like(query)', '字符串字段 trim 后忽略大小写做连续子串 OR 匹配', '空 query 是 no-op；非字符串不匹配'],
+                  ['equals(value)', '字段之间 OR；与其他动作按顺序组成 AND', '使用 Object.is'],
+                  ['oneOf(...values)', '任一字段等于任一候选值', '候选值线性扫描'],
+                  ['where(predicate)', '对 source 项执行同步业务 predicate', '异常保持原始身份'],
+                  ['distinctBy(path)', '按已定义 key 保留第一次出现', 'undefined 不参与去重'],
+                  ['skip/take(count)', '在当前位置跳过或截断', '只接受非负安全整数']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ordering-and-cache',
+            heading: '顺序、缓存与快照身份',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const first = collect(users).take(2).where(isActive).result\nconst second = collect(users).where(isActive).take(2).result\n// first 与 second 语义不同：take 所在位置不同。\n\nconst query = collect(users).where(isActive)\nconst a = query.result\nconst b = query.result\nconsole.assert(a === b) // 同一 revision 复用缓存引用\n\nquery.take(10)\nconst c = query.result\nconsole.assert(c !== a) // 新动作形成新 revision；旧快照不变"
+              },
+              {
+                type: 'list',
+                items: [
+                  '无动作或所有 source 均通过时，result 可以直接复用原 readonly 数组。',
+                  '每个动作立刻改变查询 revision，但直到读取 result 才求值。',
+                  '新增动作后从原 source 重新求值，不会接着修改旧结果数组。',
+                  '求值失败不写缓存；修复外部原因后再次读取可以重新求值。',
+                  '求值回调中重读 result 或修改同一 collector 会抛带 REENTRANT_CALL 的 TypeError。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ownership-and-choice',
+            heading: '输入所有权与何时不要使用',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Collector 借用 source 和其中对象；readonly 是调用方契约，不是运行时深冻结。外部绕过类型修改数组或嵌套字段后，已缓存 revision 不会自动失效。需要响应式更新时，应在 Store/Signal 变化后创建新 collector；需要远端过滤、索引、排序或稳定游标时，应把查询交给数据库或存储层。'
+              },
+              {
+                type: 'list',
+                items: [
+                  '适合：中小型内存快照、一次渲染派生、命令结果整理和测试数据筛选。',
+                  '不适合：持续变化的共享数组、百万级全表搜索、远端数据、异步 predicate 或事务查询。',
+                  'like 不是全文搜索、locale collation 或模糊匹配；这些需求必须使用专用搜索设施。',
+                  'skip/take 是当前位置的流水线动作，不是固定在查询末尾的 SQL OFFSET/LIMIT。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'collect API', path: 'docs/utils/collect' },
+        { label: '不可变对象与安全路径', path: 'immutable-objects-and-paths' },
+        { label: '返回 Utils 学习路径', path: 'index' }
+      ]
+    },
+    en: {
+      title: 'Compose lazy array queries with Collector',
+      lede: 'Collector borrows a readonly source and records field filters, business predicates, stable deduplication, and pagination as an ordered pipeline evaluated and cached on first result access.',
+      document: {
+        sections: [
+          {
+            id: 'complete-example',
+            heading: 'Start with a complete query',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'collect is exported only from the @migaia/utils package root. It neither copies input nor scans on every chained call. This query keeps users with at least one defined name, applies a case-insensitive substring match, filters active users, keeps the first occurrence of each id, and then pages the result. Stage order is execution order.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { collect } from '@migaia/utils'\n\ntype IUser = {\n  readonly id: string\n  readonly active: boolean\n  readonly profile: {\n    readonly nameZh?: string\n    readonly nameEn?: string\n  }\n}\n\nconst visibleUsers = collect(users)\n  .fieldBy('profile.nameZh', 'profile.nameEn')\n  .like(searchText)\n  .where((user) => user.active)\n  .distinctBy('id')\n  .skip(page * pageSize)\n  .take(pageSize)\n  .result"
+              },
+              {
+                type: 'table',
+                headers: ['Stage', 'Meaning', 'Boundary'],
+                rows: [
+                  ['fieldBy(...paths)', 'Selects active fields and removes items where every field is undefined', 'Requires at least one safe object path'],
+                  ['like(query)', 'Trimmed case-insensitive substring OR across string fields', 'Blank query is a no-op; non-strings do not match'],
+                  ['equals(value)', 'OR across fields and ordered AND with other stages', 'Uses Object.is'],
+                  ['oneOf(...values)', 'Any selected field equals any candidate', 'Candidates use a linear scan'],
+                  ['where(predicate)', 'Runs a synchronous business predicate on each source item', 'Preserves thrown error identity'],
+                  ['distinctBy(path)', 'Keeps the first occurrence of each defined key', 'Undefined keys do not deduplicate'],
+                  ['skip/take(count)', 'Skips or truncates at its pipeline position', 'Requires a non-negative safe integer']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ordering-and-cache',
+            heading: 'Ordering, caching, and snapshot identity',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const first = collect(users).take(2).where(isActive).result\nconst second = collect(users).where(isActive).take(2).result\n// first and second differ because take runs at another position.\n\nconst query = collect(users).where(isActive)\nconst a = query.result\nconst b = query.result\nconsole.assert(a === b) // one revision reuses its cached reference\n\nquery.take(10)\nconst c = query.result\nconsole.assert(c !== a) // a new revision leaves the old snapshot unchanged"
+              },
+              {
+                type: 'list',
+                items: [
+                  'With no stages, or when every source passes, result may reuse the original readonly array.',
+                  'Each stage immediately changes query revision, but evaluation waits until result is read.',
+                  'A new stage reevaluates from the original source and never mutates an earlier result array.',
+                  'Failed evaluation is not cached, allowing a later read after its external cause is fixed.',
+                  'Reading result or mutating the same collector during evaluation throws a REENTRANT_CALL TypeError.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ownership-and-choice',
+            heading: 'Input ownership and when not to use it',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Collector borrows the source and its objects. readonly is a caller contract, not runtime deep freezing. If external code bypasses types and mutates the array or nested fields, an already cached revision does not invalidate itself. Create a new collector after Store or Signal changes. Delegate remote filtering, indexes, sorting, and stable cursors to the database or storage owner.'
+              },
+              {
+                type: 'list',
+                items: [
+                  'Use it for small or medium in-memory snapshots, render derivation, command-result shaping, and test-data filtering.',
+                  'Avoid it for continuously mutated shared arrays, million-row scans, remote data, async predicates, or transactional queries.',
+                  'like is not full-text search, locale collation, or fuzzy matching; use a dedicated search facility for those semantics.',
+                  'skip and take run at their exact pipeline positions and are not fixed SQL OFFSET/LIMIT clauses.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'collect API', path: 'docs/utils/collect' },
+        { label: 'Immutable objects and safe paths', path: 'immutable-objects-and-paths' },
+        { label: 'Back to Utils learning paths', path: 'index' }
       ]
     }
   },
@@ -12273,7 +13395,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { connect, contract, protocol, timeout } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createProviderEndpoint } from '@migaia/web-rpc/provider'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst provider = await createProviderEndpoint({\n  id: 'provider',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ] as const\n})\n\nconst client = await createClientEndpoint({\n  id: 'client',\n  targetIds: ['provider'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport }),\n    timeout({ timeoutMs: 5_000 })\n  ] as const\n})"
+                code: "import { connect, contract, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\n\n\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst provider = await createEndpoint({\n  id: 'provider',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ] as const\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  targetIds: ['provider'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport }),\n    timeout({ timeoutMs: 5_000 })\n  ] as const\n})"
               },
               {
                 type: 'list',
@@ -12364,7 +13486,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { connect, contract, protocol, timeout } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createProviderEndpoint } from '@migaia/web-rpc/provider'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst provider = await createProviderEndpoint({\n  id: 'provider',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ] as const\n})\n\nconst client = await createClientEndpoint({\n  id: 'client',\n  targetIds: ['provider'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport }),\n    timeout({ timeoutMs: 5_000 })\n  ] as const\n})"
+                code: "import { connect, contract, createEndpoint, protocol, timeout } from '@migaia/web-rpc'\n\n\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst provider = await createEndpoint({\n  id: 'provider',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ] as const\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  targetIds: ['provider'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport }),\n    timeout({ timeoutMs: 5_000 })\n  ] as const\n})"
               },
               {
                 type: 'list',
@@ -12901,25 +14023,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               }
             ]
           },
-          {
-            id: 'adapter',
-            heading: '从宿主子路径导入 adapter',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createMessagePortTransport } from '@migaia/web-rpc/adapters/message-port'\n\nconst transport = createMessagePortTransport(port, { ownership: 'borrowed' })\nconst endpoint = await createClientEndpoint({\n  id: 'ui',\n  targetIds: ['worker'],\n  transport,\n  middlewares: [connect({ transport })] as const\n})"
-              },
-              {
-                type: 'list',
-                items: [
-                  'adapter 不从根入口导出，避免把宿主专属代码带入不需要的 bundle。',
-                  'owned transport 随 endpoint.dispose 关闭；borrowed transport 只解除当前 endpoint 的订阅。',
-                  'origin 和 senderId 都不是单独的凭证；多发送方链路还需要 sourceProof 或 identifier。'
-                ]
-              }
-            ]
-          },
+          ...webRpcTransportGuideSections.zh,
           {
             id: 'authentication',
             heading: '需要保密或抗篡改时保护每一帧',
@@ -12973,25 +14077,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               }
             ]
           },
-          {
-            id: 'adapter',
-            heading: 'Import adapters from host-specific subpaths',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createMessagePortTransport } from '@migaia/web-rpc/adapters/message-port'\n\nconst transport = createMessagePortTransport(port, { ownership: 'borrowed' })\nconst endpoint = await createClientEndpoint({\n  id: 'ui',\n  targetIds: ['worker'],\n  transport,\n  middlewares: [connect({ transport })] as const\n})"
-              },
-              {
-                type: 'list',
-                items: [
-                  'Adapters are excluded from the root entry so host-specific code does not enter unrelated bundles.',
-                  'An owned transport closes with endpoint.dispose; a borrowed one only loses this endpoint’s subscriptions.',
-                  'Neither origin nor senderId is a credential by itself; multi-sender links also need sourceProof or identifier.'
-                ]
-              }
-            ]
-          },
+          ...webRpcTransportGuideSections.en,
           {
             id: 'authentication',
             heading: 'Protect every frame when confidentiality or integrity matters',
@@ -15325,7 +16411,10 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Install multiple plugins', path: 'install-and-compose' },
-        { label: 'Understand every constructor option', path: 'docs/plugin-host/structural/PluginHost' }
+        {
+          label: 'Understand every constructor option',
+          path: 'docs/plugin-host/structural/PluginHost'
+        }
       ]
     }
   },
@@ -15505,7 +16594,10 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         { label: 'Build a pipeline', path: 'pipelines' },
-        { label: 'PluginHost configuration reference', path: 'docs/plugin-host/structural/PluginHost' }
+        {
+          label: 'PluginHost configuration reference',
+          path: 'docs/plugin-host/structural/PluginHost'
+        }
       ]
     }
   },
@@ -20919,4 +22011,18 @@ export function findGuideJourney(
 ): IGuideJourney | undefined {
   const normalizedTopic = topic === 'overview' ? 'index' : topic
   return guideJourneys[`${library}:${normalizedTopic}`]?.[locale]
+}
+
+/** Lists stable task-guide topics so navigation never depends on hidden registry knowledge. */
+export function listGuideJourneys(
+  library: string,
+  locale: ILocale
+): readonly { readonly title: string; readonly topic: string }[] {
+  const prefix = `${library}:`
+  return Object.entries(guideJourneys)
+    .filter(([key, localized]) => key.startsWith(prefix) && localized[locale])
+    .map(([key, localized]) => ({
+      title: localized[locale]?.title ?? key.slice(prefix.length),
+      topic: key.slice(prefix.length)
+    }))
 }

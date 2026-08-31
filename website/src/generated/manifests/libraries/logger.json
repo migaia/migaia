@@ -3,7 +3,7 @@
   "library": {
     "slug": "logger",
     "description": null,
-    "version": "0.0.5",
+    "version": "0.0.6",
     "exports": [".", "./plugins"],
     "documentation": {
       "readme": {
@@ -97,7 +97,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { Logger } from '@migaia/logger';\nimport { color, level } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['api'],\n  plugins: [level({ level: 'info' }), color({ format: 'pretty', color: 'auto' })]\n});\n\nlog.info('server listening on %d', 3000);\nlog.error('request failed', new Error('timeout'));\n\nawait log.flush(); // 确保上面这些日志真正落地了再退出/继续"
+                "code": "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['api'],\n  plugins: [level({ level: 'info' }), color({ format: 'pretty', color: 'auto' })]\n})\n\nlog.info('server listening on %d', 3000)\nlog.error('request failed', new Error('timeout'))\n\nawait log.flush() // 确保上面这些日志真正落地了再退出/继续"
               },
               {
                 "type": "paragraph",
@@ -106,7 +106,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { Logger } from '@migaia/logger';\nimport { batch, http, level, process } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n});\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error));"
+                "code": "import { Logger } from '@migaia/logger'\nimport { batch, http, level, process } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n})\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error))"
               }
             ]
           },
@@ -235,8 +235,27 @@
             ]
           },
           {
-            "id": "9-深入参考",
-            "heading": "9. 深入参考",
+            "id": "9-高阶组合示例-失败隔离-批量上报与确定性关闭",
+            "heading": "9. 高阶组合示例 · 失败隔离、批量上报与确定性关闭",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "生产日志链路既不能让上报失败打断业务，也不能在进程退出时丢掉已经接纳的批次。把失败观察器、批处理和 HTTP sink 安装在同一个 Logger 上，并在宿主关闭边界显式等待 `shutdown()`："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: 'https://logs.example/v1/entries' })\n  ]\n})\n\nconst stopFailureObservation = log.onFailure(({ source, error }) => {\n  console.error(`[logger:${source}]`, error)\n})\n\ntry {\n  log.info('checkout completed: %s', 'order-42')\n  await log.flush()\n} finally {\n  stopFailureObservation()\n  await log.shutdown('manual')\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "`batch()` 必须位于 `http()` 前面，才能让 HTTP sink 使用批量调度。`onFailure()` 是日志基础设施失败的观察出口；业务日志调用不会替它抛错。并发或重入的 `shutdown()` 共享同一个进行中的关闭 Promise，因此宿主的多个收尾入口可以安全汇合，但终态 Logger 不能重新启用，需要创建新实例。"
+              }
+            ]
+          },
+          {
+            "id": "10-深入参考",
+            "heading": "10. 深入参考",
             "blocks": [
               {
                 "type": "paragraph",
@@ -3394,8 +3413,9 @@
             "const audit = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }, topic: 'audit' });\naudit.useSink((entry) => sendToAuditSystem(entry));\n\nconst api = new Logger({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }, topic: 'api' });\napi.extends(audit);\n\napi.info('user created'); // 同时经过 api 自己的 pipeline/sink，也完整转发给 audit",
             "import { getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger';\n\nconst previous = getLoggerRuntimeManager();\nconst restore = setLoggerRuntimeManager({\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => console.log(text),\n  fetch: (url, init) => fetch(url, init)\n});\n\ntry {\n  // 在这段作用域内创建和使用的 Logger 都会用上面这份能力\n} finally {\n  restore(); // 恢复到替换之前的 runtime manager\n}",
             "import { Logger } from '@migaia/logger';\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n});\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error));\nlog.info('job started', { jobId: 'j_1' });\nawait log.flush();",
-            "import { Logger } from '@migaia/logger';\nimport { color, level } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['api'],\n  plugins: [level({ level: 'info' }), color({ format: 'pretty', color: 'auto' })]\n});\n\nlog.info('server listening on %d', 3000);\nlog.error('request failed', new Error('timeout'));\n\nawait log.flush(); // 确保上面这些日志真正落地了再退出/继续",
-            "import { Logger } from '@migaia/logger';\nimport { batch, http, level, process } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n});\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error));"
+            "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['api'],\n  plugins: [level({ level: 'info' }), color({ format: 'pretty', color: 'auto' })]\n})\n\nlog.info('server listening on %d', 3000)\nlog.error('request failed', new Error('timeout'))\n\nawait log.flush() // 确保上面这些日志真正落地了再退出/继续",
+            "import { Logger } from '@migaia/logger'\nimport { batch, http, level, process } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n})\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error))",
+            "import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: 'https://logs.example/v1/entries' })\n  ]\n})\n\nconst stopFailureObservation = log.onFailure(({ source, error }) => {\n  console.error(`[logger:${source}]`, error)\n})\n\ntry {\n  log.info('checkout completed: %s', 'order-42')\n  await log.flush()\n} finally {\n  stopFailureObservation()\n  await log.shutdown('manual')\n}"
           ],
           "aliasOf": "Logger",
           "exportPath": ".",
@@ -3586,7 +3606,7 @@
               ]
             }
           ],
-          "usageScore": 154,
+          "usageScore": 168,
           "configuration": [],
           "fragment": "logger-index--Logger"
         },
@@ -4226,7 +4246,8 @@
           "examples": [
             "import { Logger, setLoggerRuntimeManager } from '@migaia/logger';\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins';",
             "import { Logger } from '@migaia/logger';\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n});\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error));\nlog.info('job started', { jobId: 'j_1' });\nawait log.flush();",
-            "import { Logger } from '@migaia/logger';\nimport { batch, http, level, process } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n});\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error));"
+            "import { Logger } from '@migaia/logger'\nimport { batch, http, level, process } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n})\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error))",
+            "import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: 'https://logs.example/v1/entries' })\n  ]\n})\n\nconst stopFailureObservation = log.onFailure(({ source, error }) => {\n  console.error(`[logger:${source}]`, error)\n})\n\ntry {\n  log.info('checkout completed: %s', 'order-42')\n  await log.flush()\n} finally {\n  stopFailureObservation()\n  await log.shutdown('manual')\n}"
           ],
           "aliasOf": "batch",
           "exportPath": "./plugins",
@@ -4494,7 +4515,7 @@
               ]
             }
           ],
-          "usageScore": 84,
+          "usageScore": 96,
           "configuration": [
             {
               "name": "maxSize",
@@ -4618,7 +4639,7 @@
             "import { Logger, setLoggerRuntimeManager } from '@migaia/logger';\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins';",
             "const log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['app', 'api'],\n  topic: 'gateway',\n  options: { service: 'gateway' },\n  on: { before: (entry) => {} },\n  pipeline: { mode: 'sync' },\n  plugins: [level(), color()]\n});",
             "import { Logger } from '@migaia/logger';\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n});\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error));\nlog.info('job started', { jobId: 'j_1' });\nawait log.flush();",
-            "import { Logger } from '@migaia/logger';\nimport { color, level } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['api'],\n  plugins: [level({ level: 'info' }), color({ format: 'pretty', color: 'auto' })]\n});\n\nlog.info('server listening on %d', 3000);\nlog.error('request failed', new Error('timeout'));\n\nawait log.flush(); // 确保上面这些日志真正落地了再退出/继续"
+            "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['api'],\n  plugins: [level({ level: 'info' }), color({ format: 'pretty', color: 'auto' })]\n})\n\nlog.info('server listening on %d', 3000)\nlog.error('request failed', new Error('timeout'))\n\nawait log.flush() // 确保上面这些日志真正落地了再退出/继续"
           ],
           "aliasOf": "color",
           "exportPath": "./plugins",
@@ -4866,7 +4887,7 @@
           "name": "http",
           "kind": "const",
           "signature": "export declare const http: (config: IHttpPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IHttpPluginConfig, IPipelineMode, {}, Partial<IBatchShared>>;",
-          "declarationLine": 23,
+          "declarationLine": 28,
           "source": "packages/logger/dist/plugins/http.d.ts",
           "purpose": "http is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for http.",
@@ -4879,7 +4900,8 @@
           "examples": [
             "import { Logger, setLoggerRuntimeManager } from '@migaia/logger';\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins';",
             "import { Logger } from '@migaia/logger';\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n});\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error));\nlog.info('job started', { jobId: 'j_1' });\nawait log.flush();",
-            "import { Logger } from '@migaia/logger';\nimport { batch, http, level, process } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n});\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error));"
+            "import { Logger } from '@migaia/logger'\nimport { batch, http, level, process } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n})\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error))",
+            "import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: 'https://logs.example/v1/entries' })\n  ]\n})\n\nconst stopFailureObservation = log.onFailure(({ source, error }) => {\n  console.error(`[logger:${source}]`, error)\n})\n\ntry {\n  log.info('checkout completed: %s', 'order-42')\n  await log.flush()\n} finally {\n  stopFailureObservation()\n  await log.shutdown('manual')\n}"
           ],
           "aliasOf": "http",
           "exportPath": "./plugins",
@@ -4955,7 +4977,7 @@
             },
             {
               "name": "batch",
-              "type": "{ maxSize?: number; maxWaitMs?: number; maxConcurrentBatches?: number; maxPendingBatches?: number; asyncOutput?: boolean; }",
+              "type": "{ /** Flushes a batch when it reaches this many entries. */ maxSize?: number; /** Flushes a non-empty batch after this many milliseconds. */ maxWaitMs?: number; /** Bounds the number of batch callbacks executing concurrently. */ maxConcurrentBatches?: number; /** Bounds queued plus executing batches so sustained overload cannot grow memory without limit. */ maxPendingBatches?: number; /** Schedules size-triggered output asynchronously instead of running it in the caller stack. */ asyncOutput?: boolean; }",
               "optional": true,
               "description": "是否复用 batch 插件的批量能力；未装 batch 插件时自动退化为每条日志单独发送"
             },
@@ -5189,7 +5211,7 @@
               ]
             }
           ],
-          "usageScore": 92,
+          "usageScore": 104,
           "configuration": [
             {
               "name": "url",
@@ -5233,7 +5255,7 @@
             },
             {
               "name": "batch",
-              "type": "{ maxSize?: number; maxWaitMs?: number; maxConcurrentBatches?: number; maxPendingBatches?: number; asyncOutput?: boolean; }",
+              "type": "{ /** Flushes a batch when it reaches this many entries. */ maxSize?: number; /** Flushes a non-empty batch after this many milliseconds. */ maxWaitMs?: number; /** Bounds the number of batch callbacks executing concurrently. */ maxConcurrentBatches?: number; /** Bounds queued plus executing batches so sustained overload cannot grow memory without limit. */ maxPendingBatches?: number; /** Schedules size-triggered output asynchronously instead of running it in the caller stack. */ asyncOutput?: boolean; }",
               "optional": true,
               "description": "`batch` — `{ maxSize?, maxWaitMs?, asyncOutput? }` — 可选 — 无 — 覆盖传给 `batch()` shared factory 的配置。",
               "descriptionEn": "",
@@ -5294,7 +5316,7 @@
           "name": "HTTP_PLUGIN_NAME",
           "kind": "const",
           "signature": "export declare const HTTP_PLUGIN_NAME: \"http\";",
-          "declarationLine": 22,
+          "declarationLine": 27,
           "source": "packages/logger/dist/plugins/http.d.ts",
           "purpose": "HTTP_PLUGIN_NAME is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for HTTP_PLUGIN_NAME.",
@@ -5730,7 +5752,7 @@
         {
           "name": "IHttpPluginConfig",
           "kind": "type",
-          "signature": "export type IHttpPluginConfig = { url: string; authToken?: string; headers?: Record<string, string>; retries?: number; /** 单次 HTTP 请求最长等待时间；默认 10000ms。 */ requestTimeoutMs?: number; /** 是否复用 batch 插件的批量能力；未装 batch 插件时自动退化为每条日志单独发送 */ batch?: { maxSize?: number; maxWaitMs?: number; maxConcurrentBatches?: number; maxPendingBatches?: number; asyncOutput?: boolean; }; /** Maximum valid Retry-After delay; valid excess is clamped. Defaults to 30000ms. */ maxRetryAfterMs?: number; };",
+          "signature": "export type IHttpPluginConfig = { url: string; authToken?: string; headers?: Record<string, string>; retries?: number; /** 单次 HTTP 请求最长等待时间；默认 10000ms。 */ requestTimeoutMs?: number; /** 是否复用 batch 插件的批量能力；未装 batch 插件时自动退化为每条日志单独发送 */ batch?: { /** Flushes a batch when it reaches this many entries. */ maxSize?: number; /** Flushes a non-empty batch after this many milliseconds. */ maxWaitMs?: number; /** Bounds the number of batch callbacks executing concurrently. */ maxConcurrentBatches?: number; /** Bounds queued plus executing batches so sustained overload cannot grow memory without limit. */ maxPendingBatches?: number; /** Schedules size-triggered output asynchronously instead of running it in the caller stack. */ asyncOutput?: boolean; }; /** Maximum valid Retry-After delay; valid excess is clamped. Defaults to 30000ms. */ maxRetryAfterMs?: number; };",
           "declarationLine": 4,
           "source": "packages/logger/dist/plugins/http.d.ts",
           "purpose": "IHttpPluginConfig is part of this module's public type contract.",
@@ -5745,7 +5767,7 @@
           "aliasOf": "IHttpPluginConfig",
           "exportPath": "./plugins",
           "overloadSignatures": [
-            "export type IHttpPluginConfig = { url: string; authToken?: string; headers?: Record<string, string>; retries?: number; /** 单次 HTTP 请求最长等待时间；默认 10000ms。 */ requestTimeoutMs?: number; /** 是否复用 batch 插件的批量能力；未装 batch 插件时自动退化为每条日志单独发送 */ batch?: { maxSize?: number; maxWaitMs?: number; maxConcurrentBatches?: number; maxPendingBatches?: number; asyncOutput?: boolean; }; /** Maximum valid Retry-After delay; valid excess is clamped. Defaults to 30000ms. */ maxRetryAfterMs?: number; };"
+            "export type IHttpPluginConfig = { url: string; authToken?: string; headers?: Record<string, string>; retries?: number; /** 单次 HTTP 请求最长等待时间；默认 10000ms。 */ requestTimeoutMs?: number; /** 是否复用 batch 插件的批量能力；未装 batch 插件时自动退化为每条日志单独发送 */ batch?: { /** Flushes a batch when it reaches this many entries. */ maxSize?: number; /** Flushes a non-empty batch after this many milliseconds. */ maxWaitMs?: number; /** Bounds the number of batch callbacks executing concurrently. */ maxConcurrentBatches?: number; /** Bounds queued plus executing batches so sustained overload cannot grow memory without limit. */ maxPendingBatches?: number; /** Schedules size-triggered output asynchronously instead of running it in the caller stack. */ asyncOutput?: boolean; }; /** Maximum valid Retry-After delay; valid excess is clamped. Defaults to 30000ms. */ maxRetryAfterMs?: number; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5784,7 +5806,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/logger/dist/plugins/http.d.ts:IHttpPluginConfig:export type IHttpPluginConfig = { url: string; authToken?: string; headers?: Record<string, string>; retries?: number; /** 单次 HTTP 请求最长等待时间；默认 10000ms。 */ requestTimeoutMs?: number; /** 是否复用 batch 插件的批量能力；未装 batch 插件时自动退化为每条日志单独发送 */ batch?: { maxSize?: number; maxWaitMs?: number; maxConcurrentBatches?: number; maxPendingBatches?: number; asyncOutput?: boolean; }; /** Maximum valid Retry-After delay; valid excess is clamped. Defaults to 30000ms. */ maxRetryAfterMs?: number; };",
+          "identity": "packages/logger/dist/plugins/http.d.ts:IHttpPluginConfig:export type IHttpPluginConfig = { url: string; authToken?: string; headers?: Record<string, string>; retries?: number; /** 单次 HTTP 请求最长等待时间；默认 10000ms。 */ requestTimeoutMs?: number; /** 是否复用 batch 插件的批量能力；未装 batch 插件时自动退化为每条日志单独发送 */ batch?: { /** Flushes a batch when it reaches this many entries. */ maxSize?: number; /** Flushes a non-empty batch after this many milliseconds. */ maxWaitMs?: number; /** Bounds the number of batch callbacks executing concurrently. */ maxConcurrentBatches?: number; /** Bounds queued plus executing batches so sustained overload cannot grow memory without limit. */ maxPendingBatches?: number; /** Schedules size-triggered output asynchronously instead of running it in the caller stack. */ asyncOutput?: boolean; }; /** Maximum valid Retry-After delay; valid excess is clamped. Defaults to 30000ms. */ maxRetryAfterMs?: number; };",
           "guidance": [],
           "usageScore": 2,
           "configuration": [],
@@ -6310,8 +6332,9 @@
             "import { Logger, setLoggerRuntimeManager } from '@migaia/logger';\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins';",
             "const log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['app', 'api'],\n  topic: 'gateway',\n  options: { service: 'gateway' },\n  on: { before: (entry) => {} },\n  pipeline: { mode: 'sync' },\n  plugins: [level(), color()]\n});",
             "import { Logger } from '@migaia/logger';\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n});\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error));\nlog.info('job started', { jobId: 'j_1' });\nawait log.flush();",
-            "import { Logger } from '@migaia/logger';\nimport { color, level } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['api'],\n  plugins: [level({ level: 'info' }), color({ format: 'pretty', color: 'auto' })]\n});\n\nlog.info('server listening on %d', 3000);\nlog.error('request failed', new Error('timeout'));\n\nawait log.flush(); // 确保上面这些日志真正落地了再退出/继续",
-            "import { Logger } from '@migaia/logger';\nimport { batch, http, level, process } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n});\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error));"
+            "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['api'],\n  plugins: [level({ level: 'info' }), color({ format: 'pretty', color: 'auto' })]\n})\n\nlog.info('server listening on %d', 3000)\nlog.error('request failed', new Error('timeout'))\n\nawait log.flush() // 确保上面这些日志真正落地了再退出/继续",
+            "import { Logger } from '@migaia/logger'\nimport { batch, http, level, process } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n})\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error))",
+            "import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: 'https://logs.example/v1/entries' })\n  ]\n})\n\nconst stopFailureObservation = log.onFailure(({ source, error }) => {\n  console.error(`[logger:${source}]`, error)\n})\n\ntry {\n  log.info('checkout completed: %s', 'order-42')\n  await log.flush()\n} finally {\n  stopFailureObservation()\n  await log.shutdown('manual')\n}"
           ],
           "aliasOf": "level",
           "exportPath": "./plugins",
@@ -6495,7 +6518,7 @@
               ]
             }
           ],
-          "usageScore": 98,
+          "usageScore": 110,
           "configuration": [
             {
               "name": "level",
@@ -6602,7 +6625,7 @@
           "examples": [
             "import { Logger, setLoggerRuntimeManager } from '@migaia/logger';\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins';",
             "import { Logger } from '@migaia/logger';\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n});\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error));\nlog.info('job started', { jobId: 'j_1' });\nawait log.flush();",
-            "import { Logger } from '@migaia/logger';\nimport { batch, http, level, process } from '@migaia/logger/plugins';\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n});\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error));"
+            "import { Logger } from '@migaia/logger'\nimport { batch, http, level, process } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n})\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error))"
           ],
           "aliasOf": "process",
           "exportPath": "./plugins",

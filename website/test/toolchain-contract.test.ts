@@ -3,6 +3,7 @@ import { dirname, join, parse, resolve } from 'node:path'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { findApiGuide, findOptionTranslation } from '../app/api-guides.js'
+import { findGuideJourney } from '../app/guide-journeys.js'
 
 /** Root directory used for all website-owned contract observations. */
 const websiteRoot = fileURLToPath(new URL('../', import.meta.url))
@@ -417,6 +418,96 @@ test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual dec
     }
 })
 
+test('SITE-T-WEB-RPC-TRANSPORTS gives every public adapter a bilingual runnable tutorial', () => {
+  const transports = [
+    ['memory-transport', 'createMemoryTransportPair'],
+    ['window-transport', 'createWindowMessageTransport'],
+    ['browser-message-port-transport', 'createBrowserMessagePortTransport'],
+    ['node-message-port-transport', 'createNodeMessagePortTransport'],
+    ['web-worker-transport', 'createWebWorkerTransport'],
+    ['shared-worker-transport', 'createSharedWorkerTransport'],
+    ['service-worker-transport', 'createServiceWorkerTransport'],
+    ['broadcast-channel-transport', 'createBroadcastChannelTransport'],
+    ['rtc-data-channel-transport', 'createRtcDataChannelTransport'],
+    ['web-transport-datagram-transport', 'createWebTransportDatagramTransport']
+  ] as const
+
+  for (const locale of ['en', 'zh'] as const) {
+    const journey = findGuideJourney('web-rpc', 'transports-and-security', locale)
+    assert.ok(journey)
+    const completeGuideCode = journey.document.sections
+      .flatMap((section) => section.blocks)
+      .filter((block) => block.type === 'code')
+      .map((block) => block.code)
+      .join('\n')
+    assert.doesNotMatch(completeGuideCode, /createClientEndpoint/u)
+    assert.doesNotMatch(completeGuideCode, /createProviderEndpoint/u)
+    for (const [sectionId, factory] of transports) {
+      const section = journey.document.sections.find((candidate) => candidate.id === sectionId)
+      assert.ok(section, `${locale} transport guide misses ${sectionId}`)
+      const code = section.blocks
+        .filter((block) => block.type === 'code')
+        .map((block) => block.code)
+        .join('\n')
+      assert.match(code, new RegExp(`\\b${factory}\\b`, 'u'))
+      assert.match(code, /createEndpoint/u, `${locale} ${sectionId} has no direct endpoint example`)
+      assert.ok(section.blocks.some((block) => block.type === 'paragraph'))
+      assert.ok(section.blocks.some((block) => block.type === 'list'))
+    }
+    for (const sectionId of [
+      'memory-transport',
+      'window-transport',
+      'web-worker-transport',
+      'shared-worker-transport',
+      'broadcast-channel-transport'
+    ]) {
+      const section = journey.document.sections.find((candidate) => candidate.id === sectionId)
+      assert.ok(section)
+      const code = section.blocks
+        .filter((block) => block.type === 'code')
+        .map((block) => block.code)
+        .join('\n')
+      assert.match(code, /createEndpoint/u)
+      assert.match(code, /\.provide\(/u)
+      assert.match(code, /\.send</u)
+    }
+    for (const sectionId of [
+      'browser-message-port-transport',
+      'node-message-port-transport',
+      'service-worker-transport',
+      'rtc-data-channel-transport',
+      'web-transport-datagram-transport'
+    ]) {
+      const section = journey.document.sections.find((candidate) => candidate.id === sectionId)
+      assert.ok(section)
+      const code = section.blocks
+        .filter((block) => block.type === 'code')
+        .map((block) => block.code)
+        .join('\n')
+      assert.match(code, /\.provide\(/u)
+      assert.match(code, /\.send(?:<|\()/u)
+    }
+    for (const sectionId of [
+      'browser-message-port-transport',
+      'node-message-port-transport',
+      'shared-worker-transport',
+      'service-worker-transport',
+      'broadcast-channel-transport',
+      'rtc-data-channel-transport',
+      'web-transport-datagram-transport'
+    ]) {
+      const tutorial = journey.document.sections.find((candidate) => candidate.id === sectionId)
+      assert.ok(tutorial)
+      assert.ok(tutorial.blocks.filter((block) => block.type === 'paragraph').length >= 2)
+      assert.ok(tutorial.blocks.some((block) => block.type === 'table'))
+      assert.ok(
+        tutorial.blocks.filter((block) => block.type === 'list').flatMap((block) => block.items)
+          .length >= 8
+      )
+    }
+  }
+})
+
 test('SITE-T-UTILS-GUIDES gives every runtime export an explicit bilingual decision guide', () => {
   const runtimeSymbols = generatedApis
     .filter((api) => api.library === 'utils')
@@ -426,7 +517,7 @@ test('SITE-T-UTILS-GUIDES gives every runtime export an explicit bilingual decis
         .map((symbol) => ({ api, symbol }))
     )
 
-  assert.equal(runtimeSymbols.length, 72)
+  assert.equal(runtimeSymbols.length, 73)
   for (const { api, symbol } of runtimeSymbols)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide(api.library, api.module, symbol.name, locale)
@@ -438,6 +529,37 @@ test('SITE-T-UTILS-GUIDES gives every runtime export an explicit bilingual decis
       for (const statement of [...guide.scenarios, ...guide.avoidWhen])
         assert.ok(statement.trim().length >= 12)
     }
+})
+
+test('SITE-T-UTILS-COLLECTOR publishes a bilingual API and task guide', () => {
+  const collectorApi = generatedApis
+    .filter((api) => api.library === 'utils')
+    .flatMap((api) => api.symbols.map((symbol) => ({ api, symbol })))
+    .find(({ symbol }) => symbol.name === 'collect')
+  assert.ok(collectorApi)
+  assert.equal(collectorApi.api.module, 'index')
+
+  for (const locale of ['en', 'zh'] as const) {
+    const guide = findApiGuide('utils', 'index', 'collect', locale)
+    assert.ok(guide?.quickStart?.includes('collect(users)'))
+
+    const journey = findGuideJourney('utils', 'collector', locale)
+    assert.ok(journey)
+    const blocks = journey.document.sections.flatMap((section) => section.blocks)
+    const code = blocks
+      .filter((block) => block.type === 'code')
+      .map((block) => block.code)
+      .join('\n')
+    assert.match(code, /import \{ collect \} from '@migaia\/utils'/u)
+    assert.match(code, /\.fieldBy\(/u)
+    assert.match(code, /\.distinctBy\(/u)
+    assert.match(code, /\.skip\(/u)
+    assert.match(code, /\.take\(/u)
+    assert.ok(blocks.some((block) => block.type === 'table'))
+    assert.ok(
+      blocks.filter((block) => block.type === 'list').flatMap((block) => block.items).length >= 8
+    )
+  }
 })
 
 test('SITE-T-CONFIG-LOCALE gives every runtime option a Chinese explanation', () => {

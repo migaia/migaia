@@ -20,8 +20,9 @@ import {
 } from '../content-loader.js'
 import { copyFor, domainDescription, domainTitle } from '../copy.js'
 import type { IApiGuide } from '../api-guides.js'
-import { findGuideJourney, type IGuideJourney } from '../guide-journeys.js'
+import { findGuideJourney, listGuideJourneys, type IGuideJourney } from '../guide-journeys.js'
 import { ScrollArea } from '../components/ui/scroll-area.js'
+import { normalizeExampleImports } from '../example-imports.js'
 
 type IDocsLoaderData = ILibraryRouteContent & {
   readonly guide?: IApiGuide
@@ -122,12 +123,8 @@ export async function loader({
     const guideModule = await import('../api-guides.js')
     const guideLocale = locale === 'zh' ? 'zh' : 'en'
     guide =
-      guideModule.findApiGuide(
-        librarySlug,
-        selectedApi.module,
-        selectedSymbol.name,
-        guideLocale
-      ) ?? guideModule.createSupportingContractGuide(librarySlug, selectedSymbol, guideLocale)
+      guideModule.findApiGuide(librarySlug, selectedApi.module, selectedSymbol.name, guideLocale) ??
+      guideModule.createSupportingContractGuide(librarySlug, selectedSymbol, guideLocale)
     optionTranslations = Object.fromEntries(
       selectedSymbol.configuration.flatMap((field) => {
         const description = guideModule.findOptionTranslation(
@@ -320,6 +317,17 @@ function DocsLibrary({
       symbol.kind !== 'interface'
   )
   const selectedGuide = selectedSymbol ? guide : undefined
+  /** Exact section inventory shared by the desktop and mobile tables of contents. */
+  const onPageSections = selectedSymbol
+    ? referenceSections(
+        locale,
+        selectedSymbol,
+        Boolean(selectedGuide),
+        Boolean(selectedGuide?.options.length)
+      )
+    : api
+      ? moduleReferenceSections(library.documentation, api)
+      : []
   return (
     <main id="main-content" className="page-shell content-page" lang={locale} data-pagefind-body>
       <Breadcrumb
@@ -401,19 +409,11 @@ function DocsLibrary({
         </article>
         {api ? (
           <>
-            <RightRail guide={selectedGuide} locale={locale} symbol={selectedSymbol} />
+            <RightRail locale={locale} sections={onPageSections} symbol={selectedSymbol} />
             <aside className="mobile-toc">
               <strong>{copy.onPage}</strong>
               <nav aria-label={copy.mobileSections}>
-                {(selectedSymbol
-                  ? referenceSections(
-                      locale,
-                      selectedSymbol,
-                      Boolean(selectedGuide),
-                      Boolean(selectedGuide?.options.length)
-                    )
-                  : moduleReferenceSections
-                ).map((section) => (
+                {onPageSections.map((section) => (
                   <a
                     key={section}
                     href={
@@ -455,60 +455,87 @@ function LibraryModuleLinks({
   readonly locale: ILocale
   readonly selectedSymbol: IApiSymbol | undefined
 }) {
-  return libraryApis.map((candidate) => (
-    <div className="left-rail-group" key={candidate.id}>
-      <Link
-        className={candidate === api && !selectedSymbol ? 'active' : ''}
-        to={docsModulePath(locale, librarySlug, candidate.module)}
-      >
-        {candidate.module === 'index'
-          ? locale === 'zh'
-            ? '核心 API'
-            : 'Core API'
-          : candidate.module}
-      </Link>
-      {candidate === api ? (
-        <div className="left-rail-children">
-          {runtimeSymbolGroups(candidate.symbols).map((group) => (
-            <div className="left-rail-symbol-group" key={group.key}>
-              <span>{symbolGroupLabel(locale, group.key)}</span>
-              {group.symbols.map((symbol) => (
-                <Link
-                  className={symbol === selectedSymbol ? 'active' : ''}
-                  key={symbol.fragment}
-                  to={docsModulePath(
-                    locale,
-                    librarySlug,
-                    candidate.module,
-                    symbolSlug(symbol, candidate.symbols)
-                  )}
-                >
-                  {symbol.name}
-                </Link>
-              ))}
-            </div>
-          ))}
+  /** Primary WebRPC entry points must not be buried under generated module names. */
+  const primaryEntries =
+    librarySlug === 'web-rpc'
+      ? ([
+          ['createEndpoint', 'index', 'createEndpoint'],
+          ['createClientEndpoint', 'client', 'createClientEndpoint'],
+          ['createProviderEndpoint', 'provider', 'createProviderEndpoint'],
+          ['createFullEndpoint', 'full', 'createFullEndpoint'],
+          ['createComposedEndpoint', 'core', 'createComposedEndpoint']
+        ] as const)
+      : []
+  return (
+    <>
+      {primaryEntries.length > 0 ? (
+        <div className="left-rail-group left-rail-primary">
+          <span>{locale === 'zh' ? '常用 Endpoint' : 'Primary endpoints'}</span>
+          <div className="left-rail-children">
+            {primaryEntries.map(([label, moduleName, symbol]) => (
+              <Link key={label} to={docsModulePath(locale, librarySlug, moduleName, symbol)}>
+                {label}
+              </Link>
+            ))}
+          </div>
+          <Link to={`/${locale}/guides/web-rpc/transports-and-security`}>
+            {locale === 'zh' ? 'Transport 选择与完整案例' : 'Transport selection and examples'}
+          </Link>
         </div>
       ) : null}
-    </div>
-  ))
+      {libraryApis.map((candidate) => (
+        <div className="left-rail-group" key={candidate.id}>
+          <Link
+            className={candidate === api && !selectedSymbol ? 'active' : ''}
+            to={docsModulePath(locale, librarySlug, candidate.module)}
+          >
+            {candidate.module === 'index'
+              ? locale === 'zh'
+                ? '核心 API'
+                : 'Core API'
+              : candidate.module}
+          </Link>
+          {candidate === api ? (
+            <div className="left-rail-children">
+              {runtimeSymbolGroups(candidate.symbols).map((group) => (
+                <div className="left-rail-symbol-group" key={group.key}>
+                  <span>{symbolGroupLabel(locale, group.key)}</span>
+                  {group.symbols.map((symbol) => (
+                    <Link
+                      className={symbol === selectedSymbol ? 'active' : ''}
+                      key={symbol.fragment}
+                      to={docsModulePath(
+                        locale,
+                        librarySlug,
+                        candidate.module,
+                        symbolSlug(symbol, candidate.symbols)
+                      )}
+                    >
+                      {symbol.name}
+                    </Link>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ))}
+    </>
+  )
 }
 
 /** Tracks the URL fragment so the visible right-rail anchor follows direct loads and history. */
 function RightRail({
-  guide,
   locale,
+  sections,
   symbol
 }: {
-  readonly guide?: IApiGuide
   readonly locale: ILocale
+  readonly sections: readonly string[]
   readonly symbol?: IApiSymbol
 }) {
   const copy = copyFor(locale)
   const railRef = useRef<HTMLElement>(null)
-  const sections = symbol
-    ? referenceSections(locale, symbol, Boolean(guide), Boolean(guide?.options.length))
-    : moduleReferenceSections
   useEffect(() => {
     const updateHash = () => {
       const currentHash = window.location.hash
@@ -552,14 +579,16 @@ function RightRail({
 }
 
 /** Mirrors the rendered package landing-page learning order in both table-of-contents rails. */
-const moduleReferenceSections = [
-  'module-guidance',
-  'learning-scenarios',
-  'learning-quick-start',
-  'learning-composition',
-  'learning-advanced',
-  'api-index'
-] as const
+function moduleReferenceSections(
+  documentation: ILibrary['documentation'],
+  api: IApi
+): readonly string[] {
+  return [
+    'module-guidance',
+    ...packageLearningSections(documentation, api).map(({ kind }) => `learning-${kind}`),
+    'api-index'
+  ]
+}
 
 /** Gives package learning anchors explicit task-oriented labels. */
 function moduleReferenceSectionLabel(locale: ILocale, section: string): string {
@@ -826,8 +855,16 @@ function TypeExpression({
 const webRpcTransportChoices = [
   ['createMemoryTransportPair', 'adapters-memory', '同一进程内测试或本地连接两个 endpoint'],
   ['createBroadcastChannelTransport', 'adapters-broadcast-channel', '同源浏览器标签页之间通信'],
-  ['createBrowserMessagePortTransport', 'adapters-message-port', '浏览器 MessagePort 或 MessageChannel'],
-  ['createNodeMessagePortTransport', 'adapters-message-port', 'Node.js worker_threads 的 MessagePort'],
+  [
+    'createBrowserMessagePortTransport',
+    'adapters-message-port',
+    '浏览器 MessagePort 或 MessageChannel'
+  ],
+  [
+    'createNodeMessagePortTransport',
+    'adapters-message-port',
+    'Node.js worker_threads 的 MessagePort'
+  ],
   ['createWindowMessageTransport', 'adapters-window', '窗口、iframe 或弹窗之间通信'],
   ['createWebWorkerTransport', 'adapters-web-worker', '页面与 Dedicated Worker 通信'],
   ['createSharedWorkerTransport', 'adapters-shared-worker', '多个页面共享一个 Shared Worker'],
@@ -864,18 +901,24 @@ function ParameterGuide({
             <span>
               {locale === 'zh'
                 ? description
-                : ({
-                    createMemoryTransportPair: 'Connect two endpoints in one process or test.',
-                    createBroadcastChannelTransport: 'Communicate between same-origin browser tabs.',
-                    createBrowserMessagePortTransport: 'Use a browser MessagePort or MessageChannel.',
-                    createNodeMessagePortTransport: 'Use a Node.js worker_threads MessagePort.',
-                    createWindowMessageTransport: 'Communicate with a window, iframe, or popup.',
-                    createWebWorkerTransport: 'Communicate between a page and a dedicated worker.',
-                    createSharedWorkerTransport: 'Share one worker across multiple pages.',
-                    createServiceWorkerTransport: 'Communicate between pages and a service worker.',
-                    createRtcDataChannelTransport: 'Use an established WebRTC data channel.',
-                    createWebTransportDatagramTransport: 'Use a WebTransport datagram channel.'
-                  } as const)[name]}
+                : (
+                    {
+                      createMemoryTransportPair: 'Connect two endpoints in one process or test.',
+                      createBroadcastChannelTransport:
+                        'Communicate between same-origin browser tabs.',
+                      createBrowserMessagePortTransport:
+                        'Use a browser MessagePort or MessageChannel.',
+                      createNodeMessagePortTransport: 'Use a Node.js worker_threads MessagePort.',
+                      createWindowMessageTransport: 'Communicate with a window, iframe, or popup.',
+                      createWebWorkerTransport:
+                        'Communicate between a page and a dedicated worker.',
+                      createSharedWorkerTransport: 'Share one worker across multiple pages.',
+                      createServiceWorkerTransport:
+                        'Communicate between pages and a service worker.',
+                      createRtcDataChannelTransport: 'Use an established WebRTC data channel.',
+                      createWebTransportDatagramTransport: 'Use a WebTransport datagram channel.'
+                    } as const
+                  )[name]}
             </span>
           </li>
         ))}
@@ -1313,18 +1356,47 @@ function ModuleGuidance({
           ))}
         </ol>
       </section>
-      {learningSections.map(({ kind, labelEn, labelZh, section }) => (
+      {learningSections.map(({ kind, labelEn, labelZh, sections }) => (
         <section
           className="section-block compact learning-section"
           data-learning-kind={kind}
           id={`learning-${kind}`}
-          key={`${labelEn}:${section.id}`}
+          key={`${labelEn}:${sections[0]?.id}`}
         >
           <p className="eyebrow">{locale === 'zh' ? labelZh : labelEn}</p>
-          <h2>{section.heading}</h2>
-          {section.blocks.map((block, index) => (
-            <MaintainedBlock block={block} key={`${section.id}:${index}`} locale={locale} />
-          ))}
+          <h2>
+            {kind === 'advanced'
+              ? locale === 'zh'
+                ? '高阶用法教程'
+                : 'Advanced usage tutorials'
+              : sections[0]?.heading}
+          </h2>
+          {kind === 'advanced' ? (
+            <p>
+              {locale === 'zh'
+                ? '按真实场景完成组合，再结合代码确认生命周期、失败与性能边界。'
+                : 'Compose a real scenario, then use the code to verify lifecycle, failure, and performance boundaries.'}
+            </p>
+          ) : null}
+          {sections.map((section) =>
+            kind === 'advanced' ? (
+              <section className="advanced-tutorial" key={section.id}>
+                <h3>{advancedTutorialTitle(section.heading)}</h3>
+                <p>
+                  {locale === 'zh'
+                    ? `本教程演示“${advancedTutorialTitle(section.heading)}”。代码给出完整调用顺序；复制前先确认宿主、资源所有权和失败处理符合当前场景。`
+                    : `This tutorial demonstrates “${advancedTutorialTitle(section.heading)}”. The code shows complete call order; verify host, resource ownership, and failure handling before adapting it.`}
+                </p>
+                {section.blocks.map((block, index) => (
+                  <MaintainedBlock block={block} key={`${section.id}:${index}`} locale={locale} />
+                ))}
+              </section>
+            ) : (
+              section.blocks.map((block, index) => (
+                <MaintainedBlock block={block} key={`${section.id}:${index}`} locale={locale} />
+              ))
+            )
+          )}
         </section>
       ))}
       <p className="document-next-step">
@@ -1340,7 +1412,7 @@ type ILearningSection = {
   readonly kind: 'advanced' | 'composition' | 'quick-start' | 'scenarios'
   readonly labelEn: string
   readonly labelZh: string
-  readonly section: IMaintainedDocument['sections'][number]
+  readonly sections: readonly IMaintainedDocument['sections'][number][]
 }
 
 /** Selects a non-overlapping task-first reading path from package-maintained documentation. */
@@ -1355,11 +1427,12 @@ function packageLearningSections(
   const selected = new Set<string>()
   const hasCode = (section: (typeof sections)[number]) =>
     section.blocks.some((block) => block.type === 'code')
-  const pick = (pattern: RegExp, requireCode = false) => {
+  const pick = (pattern: RegExp, requireCode = false, excluded?: RegExp) => {
     const candidate = sections.find(
       (section) =>
         !selected.has(`${section.heading}:${section.id}`) &&
         pattern.test(section.heading) &&
+        !excluded?.test(section.heading) &&
         (!requireCode || hasCode(section))
     )
     if (candidate) selected.add(`${candidate.heading}:${candidate.id}`)
@@ -1378,17 +1451,20 @@ function packageLearningSections(
       )
       .join('\n')
   /** Chooses a substantial task example, preferring sections that teach frequently used APIs. */
-  const pickBestCode = () => {
+  const pickBestCode = (excluded?: RegExp) => {
     const candidate = sections
-      .filter((section) => !selected.has(`${section.heading}:${section.id}`) && hasCode(section))
+      .filter(
+        (section) =>
+          !selected.has(`${section.heading}:${section.id}`) &&
+          hasCode(section) &&
+          !excluded?.test(section.heading)
+      )
       .map((section) => {
         const text = sectionText(section)
         const apiScore = api.symbols.reduce(
           (score, symbol) =>
             score +
-            (new RegExp(`\\b${symbol.name}\\b`).test(text)
-              ? Math.max(symbol.usageScore, 1)
-              : 0),
+            (new RegExp(`\\b${symbol.name}\\b`).test(text) ? Math.max(symbol.usageScore, 1) : 0),
           0
         )
         const headingBoost = /上手|快速|开始|创建|使用|overview|quick|start|usage/i.test(
@@ -1410,44 +1486,77 @@ function packageLearningSections(
     pick(/场景|定位|适用|概览|overview|motivation|why/i) ??
     sections.find((section) => section.blocks.some((block) => block.type === 'paragraph'))
   if (scenario) selected.add(`${scenario.heading}:${scenario.id}`)
-  const quickStart = pick(/quick|快速|上手|入门|开始|最小|\d+\s*秒/i, true) ?? pickBestCode()
+  const advancedPattern =
+    /高阶组合示例|高阶用法|进阶用法|性能特征|advanced usage|advanced composition|performance/i
+  const advanced = sections
+    .filter((section) => advancedPattern.test(section.heading) && hasCode(section))
+    .map((section) => {
+      const text = sectionText(section)
+      return { length: text.length, section }
+    })
+    .sort((left, right) => left.length - right.length)
+    .slice(0, 1)
+    .map(({ section }) => section)
+  for (const section of advanced) selected.add(`${section.heading}:${section.id}`)
+  const quickStart =
+    pick(/quick|快速|上手|入门|开始|最小|\d+\s*秒/i, true, advancedPattern) ??
+    pickBestCode(advancedPattern)
   const composition =
-    pick(/组合|协作|集成|工作流|composition|integration|workflow|plugin/i, true) ??
-    pickBestCode()
-  const advanced =
-    pick(
-      /高阶|进阶|性能|并发|生命周期|错误|恢复|advanced|performance|concurrency|lifecycle|error|recovery/i
-    ) ?? pickBestCode()
-  return [
-    scenario
-      ? { kind: 'scenarios', labelEn: 'Use cases', labelZh: '使用场景', section: scenario }
-      : undefined,
-    quickStart
-      ? { kind: 'quick-start', labelEn: 'Quick Start', labelZh: '快速上手', section: quickStart }
-      : undefined,
-    composition
-      ? { kind: 'composition', labelEn: 'Composition', labelZh: '组合用法', section: composition }
-      : undefined,
-    advanced
-      ? { kind: 'advanced', labelEn: 'Advanced usage', labelZh: '高级用法', section: advanced }
-      : undefined
-  ].filter((entry): entry is ILearningSection => entry !== undefined)
+    pick(/组合|协作|集成|工作流|composition|integration|workflow|plugin/i, true, advancedPattern) ??
+    pickBestCode(advancedPattern)
+  const learningSections: ILearningSection[] = []
+  if (scenario)
+    learningSections.push({
+      kind: 'scenarios',
+      labelEn: 'Use cases',
+      labelZh: '使用场景',
+      sections: [scenario]
+    })
+  if (quickStart)
+    learningSections.push({
+      kind: 'quick-start',
+      labelEn: 'Quick Start',
+      labelZh: '快速上手',
+      sections: [quickStart]
+    })
+  if (composition && advanced.length === 0)
+    learningSections.push({
+      kind: 'composition',
+      labelEn: 'Composition',
+      labelZh: '组合用法',
+      sections: [composition]
+    })
+  if (advanced.length > 0)
+    learningSections.push({
+      kind: 'advanced',
+      labelEn: 'Advanced usage',
+      labelZh: '高级用法',
+      sections: advanced
+    })
+  return learningSections
+}
+
+/** Removes hierarchy prefixes while preserving the task-specific tutorial title. */
+function advancedTutorialTitle(heading: string): string {
+  return heading.replace(/^.*(?:高阶组合示例|高阶用法|进阶用法|性能特征) · /, '')
 }
 
 /** Renders maintained prose as semantic reading content instead of generated filler. */
 function MaintainedDocument({
   document,
   headingLevel = 2,
+  idPrefix = 'maintained-',
   locale
 }: {
   readonly document: IMaintainedDocument
   readonly headingLevel?: 2 | 3
+  readonly idPrefix?: string
   readonly locale: ILocale
 }) {
   return (
     <div className="maintained-document">
       {document.sections.map((section) => (
-        <section className="section-block compact" id={`maintained-${section.id}`} key={section.id}>
+        <section className="section-block compact" id={`${idPrefix}${section.id}`} key={section.id}>
           {headingLevel === 2 ? <h2>{section.heading}</h2> : <h3>{section.heading}</h3>}
           {section.blocks.map((block, index) => (
             <MaintainedBlock block={block} key={`${section.id}:${index}`} locale={locale} />
@@ -1569,38 +1678,96 @@ function DomainLibrary({
   const topic = modulePath ?? 'index'
   const guide = domain === 'guides'
   const document = guide ? library.documentation.guide : library.documentation.readme
+  /** Stable guide inventory makes every task page reachable from the left rail. */
+  const guideTopics = guide ? listGuideJourneys(library.slug, locale) : []
+  /** Visible guide headings back the right-side reading outline. */
+  const guideSections = journey?.document.sections ?? []
+  const article = (
+    <article className={guide ? 'article-column' : 'article-column full-article'}>
+      <p className="eyebrow">
+        {guide ? (locale === 'zh' ? '指南' : 'Guide') : locale === 'zh' ? '架构' : 'Architecture'} ·{' '}
+        {library.slug}
+      </p>
+      <h1>{journey?.title ?? (modulePath ? topic : library.slug)}</h1>
+      <p className="lede">
+        {journey?.lede ??
+          (locale === 'zh'
+            ? guide
+              ? `使用 ${library.slug} 产出可验证结果的有限任务路径。`
+              : `${library.slug} 的归属与边界模型。`
+            : guide
+              ? `A bounded task path for producing a verifiable result with ${library.slug}.`
+              : `The ownership and boundary model for ${library.slug}.`)}
+      </p>
+      {journey ? (
+        <GuideJourneyContent journey={journey} library={library.slug} locale={locale} />
+      ) : locale === 'zh' && document ? (
+        <MaintainedDocument document={document} locale={locale} />
+      ) : (
+        <EnglishDomainOverview guide={guide} library={library} />
+      )}
+      <p className="document-next-step">
+        <Link className="text-link" to={docsModulePath(locale, library.slug, 'index')}>
+          {locale === 'zh' ? '查看具体 API 与类型 →' : 'Explore concrete APIs and types →'}
+        </Link>
+      </p>
+    </article>
+  )
   return (
     <main id="main-content" className="page-shell content-page" lang={locale} data-pagefind-body>
       <Breadcrumb locale={locale} domain={domain} library={library.slug} moduleName={topic} />
-      <article className="article-column full-article">
-        <p className="eyebrow">
-          {guide ? (locale === 'zh' ? '指南' : 'Guide') : locale === 'zh' ? '架构' : 'Architecture'}{' '}
-          · {library.slug}
-        </p>
-        <h1>{journey?.title ?? (modulePath ? topic : library.slug)}</h1>
-        <p className="lede">
-          {journey?.lede ??
-            (locale === 'zh'
-              ? guide
-                ? `使用 ${library.slug} 产出可验证结果的有限任务路径。`
-                : `${library.slug} 的归属与边界模型。`
-              : guide
-                ? `A bounded task path for producing a verifiable result with ${library.slug}.`
-                : `The ownership and boundary model for ${library.slug}.`)}
-        </p>
-        {journey ? (
-          <GuideJourneyContent journey={journey} library={library.slug} locale={locale} />
-        ) : locale === 'zh' && document ? (
-          <MaintainedDocument document={document} locale={locale} />
-        ) : (
-          <EnglishDomainOverview guide={guide} library={library} />
-        )}
-        <p className="document-next-step">
-          <Link className="text-link" to={docsModulePath(locale, library.slug, 'index')}>
-            {locale === 'zh' ? '查看具体 API 与类型 →' : 'Explore concrete APIs and types →'}
-          </Link>
-        </p>
-      </article>
+      {guide ? (
+        <div className="reading-layout">
+          <ScrollArea className="left-rail">
+            <aside className="left-rail-content" aria-label={copyFor(locale).taskGuides}>
+              <strong>{library.slug}</strong>
+              <span>{locale === 'zh' ? '任务指南' : 'Task guides'}</span>
+              {guideTopics.map((entry) => (
+                <Link
+                  className={entry.topic === topic ? 'active' : ''}
+                  key={entry.topic}
+                  to={
+                    entry.topic === 'index'
+                      ? `/${locale}/guides/${library.slug}`
+                      : `/${locale}/guides/${library.slug}/${entry.topic}`
+                  }
+                >
+                  {entry.title}
+                </Link>
+              ))}
+            </aside>
+          </ScrollArea>
+          <section className="mobile-module-nav" aria-label={copyFor(locale).taskGuides}>
+            <h2>{locale === 'zh' ? '任务指南' : 'Task guides'}</h2>
+            <nav aria-label={copyFor(locale).taskGuides}>
+              {guideTopics.map((entry) => (
+                <Link
+                  className={entry.topic === topic ? 'active' : ''}
+                  key={entry.topic}
+                  to={
+                    entry.topic === 'index'
+                      ? `/${locale}/guides/${library.slug}`
+                      : `/${locale}/guides/${library.slug}/${entry.topic}`
+                  }
+                >
+                  {entry.title}
+                </Link>
+              ))}
+            </nav>
+          </section>
+          {article}
+          <aside className="right-rail" aria-label={copyFor(locale).onPage}>
+            <strong>{copyFor(locale).onPage}</strong>
+            {guideSections.map((section) => (
+              <a href={`#${section.id}`} key={section.id}>
+                {section.heading}
+              </a>
+            ))}
+          </aside>
+        </div>
+      ) : (
+        article
+      )}
       <NextActions locale={locale} domain={domain} library={library.slug} />
     </main>
   )
@@ -1618,7 +1785,7 @@ function GuideJourneyContent({
 }) {
   return (
     <>
-      <MaintainedDocument document={journey.document} locale={locale} />
+      <MaintainedDocument document={journey.document} idPrefix="" locale={locale} />
       <nav className="guide-journey-next" aria-label={copyFor(locale).continueReading}>
         {journey.next.map((next) => (
           <Link
@@ -1864,6 +2031,8 @@ function CodeBlock({
 }) {
   const normalizedLanguage = language.toLowerCase()
   const isTypeScript = ['ts', 'tsx', 'typescript'].includes(normalizedLanguage)
+  /** Reader-facing source with each public symbol imported from its narrowest owner. */
+  const displayCode = isTypeScript ? normalizeExampleImports(code) : code
   return (
     <figure className="code-frame">
       <figcaption className="code-toolbar">
@@ -1871,7 +2040,7 @@ function CodeBlock({
         <span>{label}</span>
       </figcaption>
       <pre className="code-block">
-        <code>{isTypeScript ? highlightTypeScript(code) : code}</code>
+        <code>{isTypeScript ? highlightTypeScript(displayCode) : displayCode}</code>
       </pre>
     </figure>
   )

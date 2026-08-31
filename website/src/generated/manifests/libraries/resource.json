@@ -3,7 +3,7 @@
   "library": {
     "slug": "resource",
     "description": "Store-neutral cancellable asynchronous reactive resources.",
-    "version": "0.0.2",
+    "version": "0.0.4",
     "exports": ["."],
     "documentation": {
       "readme": {
@@ -515,8 +515,8 @@
             ]
           },
           {
-            "id": "1-suspense-兼容读取-error-boundary",
-            "heading": "1. Suspense 兼容读取 + Error Boundary",
+            "id": "高阶组合示例-1-suspense-兼容读取-error-boundary",
+            "heading": "高阶组合示例 · 1. Suspense 兼容读取 + Error Boundary",
             "blocks": [
               {
                 "type": "code",
@@ -526,8 +526,8 @@
             ]
           },
           {
-            "id": "2-ssr-快照恢复-客户端不重新请求",
-            "heading": "2. SSR 快照恢复，客户端不重新请求",
+            "id": "高阶组合示例-2-ssr-快照恢复-客户端不重新请求",
+            "heading": "高阶组合示例 · 2. SSR 快照恢复，客户端不重新请求",
             "blocks": [
               {
                 "type": "code",
@@ -537,8 +537,8 @@
             ]
           },
           {
-            "id": "3-后台刷新且展示旧数据",
-            "heading": "3. 后台刷新且展示旧数据",
+            "id": "高阶组合示例-3-后台刷新且展示旧数据",
+            "heading": "高阶组合示例 · 3. 后台刷新且展示旧数据",
             "blocks": [
               {
                 "type": "code",
@@ -548,8 +548,8 @@
             ]
           },
           {
-            "id": "4-自定义重试退避",
-            "heading": "4. 自定义重试退避",
+            "id": "高阶组合示例-4-自定义重试退避",
+            "heading": "高阶组合示例 · 4. 自定义重试退避",
             "blocks": [
               {
                 "type": "code",
@@ -559,8 +559,8 @@
             ]
           },
           {
-            "id": "5-手动失效-取消",
-            "heading": "5. 手动失效 + 取消",
+            "id": "高阶组合示例-5-手动失效-取消",
+            "heading": "高阶组合示例 · 5. 手动失效 + 取消",
             "blocks": [
               {
                 "type": "code",
@@ -1106,7 +1106,7 @@
         {
           "name": "IResourceOptions",
           "kind": "type",
-          "signature": "export type IResourceOptions<T = unknown> = { debugName?: string; /** * Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a * dependency changes or `refetch()` is called. */ ttl?: number; /** Start the first request in the constructor. Defaults to true. */ autoStart?: boolean; /** Keep stale success data visible while a background refresh runs. */ staleWhileRevalidate?: boolean; /** Retry count or predicate. Suspense Promise throws do not count. */ retry?: IResourceRetryPolicy; retryDelay?: number | ((failureCount: number, error: unknown) => number); /** Keep upstream reactive edges while no state consumer exists. */ keepAlive?: boolean; /** SSR/persisted success cache used before optional revalidation. */ initialSnapshot?: IResourceCacheSnapshot<T>; /** * 时间域与排程来源（`runtime-neutrality.sdd.md` R-9 / AR-02）：TTL/`updatedAt`/`expiresAt`/retry delay 全部走同一 * scheduler，默认 lifecycle `systemScheduler`。缺宿主能力时 fail-fast，不静默降级成微任务。 */ scheduler?: ILifecycleScheduler; };",
+          "signature": "export type IResourceOptions<T = unknown> = { /** Human-readable owner label used in reactive diagnostics and request error context. */ debugName?: string; /** * Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a * dependency changes or `refetch()` is called. */ ttl?: number; /** Start the first request in the constructor. Defaults to true. */ autoStart?: boolean; /** Keep stale success data visible while a background refresh runs. */ staleWhileRevalidate?: boolean; /** Retry count or predicate. Suspense Promise throws do not count. */ retry?: IResourceRetryPolicy; retryDelay?: number | ((failureCount: number, error: unknown) => number); /** Keep upstream reactive edges while no state consumer exists. */ keepAlive?: boolean; /** SSR/persisted success cache used before optional revalidation. */ initialSnapshot?: IResourceCacheSnapshot<T>; /** * 时间域与排程来源（`runtime-neutrality.sdd.md` R-9 / AR-02）：TTL/`updatedAt`/`expiresAt`/retry delay 全部走同一 * scheduler，默认 lifecycle `systemScheduler`。缺宿主能力时 fail-fast，不静默降级成微任务。 */ scheduler?: ILifecycleScheduler; };",
           "declarationLine": 33,
           "source": "packages/resource/dist/resource.class.d.ts",
           "purpose": "IResourceOptions is part of this module's public type contract.",
@@ -1124,7 +1124,7 @@
           "aliasOf": "IResourceOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IResourceOptions<T = unknown> = { debugName?: string; /** * Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a * dependency changes or `refetch()` is called. */ ttl?: number; /** Start the first request in the constructor. Defaults to true. */ autoStart?: boolean; /** Keep stale success data visible while a background refresh runs. */ staleWhileRevalidate?: boolean; /** Retry count or predicate. Suspense Promise throws do not count. */ retry?: IResourceRetryPolicy; retryDelay?: number | ((failureCount: number, error: unknown) => number); /** Keep upstream reactive edges while no state consumer exists. */ keepAlive?: boolean; /** SSR/persisted success cache used before optional revalidation. */ initialSnapshot?: IResourceCacheSnapshot<T>; /** * 时间域与排程来源（`runtime-neutrality.sdd.md` R-9 / AR-02）：TTL/`updatedAt`/`expiresAt`/retry delay 全部走同一 * scheduler，默认 lifecycle `systemScheduler`。缺宿主能力时 fail-fast，不静默降级成微任务。 */ scheduler?: ILifecycleScheduler; };"
+            "export type IResourceOptions<T = unknown> = { /** Human-readable owner label used in reactive diagnostics and request error context. */ debugName?: string; /** * Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a * dependency changes or `refetch()` is called. */ ttl?: number; /** Start the first request in the constructor. Defaults to true. */ autoStart?: boolean; /** Keep stale success data visible while a background refresh runs. */ staleWhileRevalidate?: boolean; /** Retry count or predicate. Suspense Promise throws do not count. */ retry?: IResourceRetryPolicy; retryDelay?: number | ((failureCount: number, error: unknown) => number); /** Keep upstream reactive edges while no state consumer exists. */ keepAlive?: boolean; /** SSR/persisted success cache used before optional revalidation. */ initialSnapshot?: IResourceCacheSnapshot<T>; /** * 时间域与排程来源（`runtime-neutrality.sdd.md` R-9 / AR-02）：TTL/`updatedAt`/`expiresAt`/retry delay 全部走同一 * scheduler，默认 lifecycle `systemScheduler`。缺宿主能力时 fail-fast，不静默降级成微任务。 */ scheduler?: ILifecycleScheduler; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1163,7 +1163,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/resource/dist/resource.class.d.ts:IResourceOptions:export type IResourceOptions<T = unknown> = { debugName?: string; /** * Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a * dependency changes or `refetch()` is called. */ ttl?: number; /** Start the first request in the constructor. Defaults to true. */ autoStart?: boolean; /** Keep stale success data visible while a background refresh runs. */ staleWhileRevalidate?: boolean; /** Retry count or predicate. Suspense Promise throws do not count. */ retry?: IResourceRetryPolicy; retryDelay?: number | ((failureCount: number, error: unknown) => number); /** Keep upstream reactive edges while no state consumer exists. */ keepAlive?: boolean; /** SSR/persisted success cache used before optional revalidation. */ initialSnapshot?: IResourceCacheSnapshot<T>; /** * 时间域与排程来源（`runtime-neutrality.sdd.md` R-9 / AR-02）：TTL/`updatedAt`/`expiresAt`/retry delay 全部走同一 * scheduler，默认 lifecycle `systemScheduler`。缺宿主能力时 fail-fast，不静默降级成微任务。 */ scheduler?: ILifecycleScheduler; };",
+          "identity": "packages/resource/dist/resource.class.d.ts:IResourceOptions:export type IResourceOptions<T = unknown> = { /** Human-readable owner label used in reactive diagnostics and request error context. */ debugName?: string; /** * Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a * dependency changes or `refetch()` is called. */ ttl?: number; /** Start the first request in the constructor. Defaults to true. */ autoStart?: boolean; /** Keep stale success data visible while a background refresh runs. */ staleWhileRevalidate?: boolean; /** Retry count or predicate. Suspense Promise throws do not count. */ retry?: IResourceRetryPolicy; retryDelay?: number | ((failureCount: number, error: unknown) => number); /** Keep upstream reactive edges while no state consumer exists. */ keepAlive?: boolean; /** SSR/persisted success cache used before optional revalidation. */ initialSnapshot?: IResourceCacheSnapshot<T>; /** * 时间域与排程来源（`runtime-neutrality.sdd.md` R-9 / AR-02）：TTL/`updatedAt`/`expiresAt`/retry delay 全部走同一 * scheduler，默认 lifecycle `systemScheduler`。缺宿主能力时 fail-fast，不静默降级成微任务。 */ scheduler?: ILifecycleScheduler; };",
           "guidance": [
             {
               "id": "配置项-iresourceoptions",
@@ -1425,7 +1425,7 @@
           "name": "Resource",
           "kind": "class",
           "signature": "export declare class Resource<T> implements IObserver, IDisposable { #private; readonly deps: ReadonlySet<IObservable>; readonly depVersions: ReadonlyMap<IObservable, number>; readonly runtime: IRuntime; debugName?: string; constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>); /** Reactive state-machine snapshot. Expired success values revalidate. */ get state(): IResourceState<T>; /** * Shared promise for the current request or fresh cached value. Multiple readers receive the same * promise; it starts work only when idle/stale. */ get promise(): Promise<T>; get disposed(): boolean; /** True while a fresh request runs without hiding an existing success value. */ get refreshing(): boolean; /** Transport status, separate from the visible data/error state. */ get fetchStatus(): IResourceFetchStatus; /** Whether the currently cached success value has crossed its TTL. */ get isStale(): boolean; /** Whether reactive consumers currently observe this resource's state. */ get observed(): boolean; /** * Suspense-compatible read: returns cached data, throws the active Promise while pending, and * throws the fetch error after failure. */ read(): T; /** * 非追踪读，形状与 `read()` 相同（success 返回值，pending throw Promise，error throw）。 * * 与 `read()` 的差别只有两条：不建依赖边；不顺手 `ensureFresh()` 启动请求。 React getSnapshot / * 外部诊断需要「读当前快照但不加入别人的追踪窗口」。 */ peek(): T; /** * Force a new request. Explicit refetches do not reuse a fresh cache entry; passive * `promise`/`read()` consumers do. */ refetch(): Promise<T>; /** Mark cached data stale and immediately start a replacement request. */ invalidate(): Promise<T>; /** Cancel only the active generation; the Resource remains reusable. */ cancel(): void; dehydrate(): IResourceCacheSnapshot<T> | undefined; hydrate(snapshot: IResourceCacheSnapshot<T>): void; /** A reactive dependency changed. Coalesce diamond/batched invalidations. */ markDirty(): void; /** A dependency was disposed; force re-evaluation so failure is observable. */ onDependencyDisconnected(): void; dispose(): void; }",
-          "declarationLine": 65,
+          "declarationLine": 66,
           "source": "packages/resource/dist/resource.class.d.ts",
           "purpose": "Cancellable async derivation. Reactive values read synchronously by the fetcher (including an async function's work before its first await) become dependencies. A dependency change coalesces into one fresh request. Reads after an await cannot be tracked by JavaScript's synchronous dependency context and should be moved into a Computed read before awaiting.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for Resource.",
@@ -1639,8 +1639,8 @@
               ]
             },
             {
-              "id": "1-suspense-兼容读取-error-boundary",
-              "heading": "1. Suspense 兼容读取 + Error Boundary",
+              "id": "高阶组合示例-1-suspense-兼容读取-error-boundary",
+              "heading": "高阶组合示例 · 1. Suspense 兼容读取 + Error Boundary",
               "blocks": [
                 {
                   "type": "code",

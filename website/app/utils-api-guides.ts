@@ -34,6 +34,22 @@ function utilsGuide(input: IUtilsGuideInput): Readonly<Record<IGuideLocale, IApi
 const foundationalUtilsApiGuides: Readonly<
   Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>
 > = {
+  'utils:index:collect': utilsGuide({
+    purposeEn:
+      'Creates a lazy, ordered, single-pass query pipeline over a borrowed readonly array and caches one result snapshot per query revision.',
+    purposeZh:
+      '基于借用的 readonly array 创建惰性、有序、单次扫描的查询流水线，并为每个 query revision 缓存一次结果快照。',
+    quickStart:
+      "const visible = collect(users).fieldBy('profile.name').like(search).where(user => user.active).take(20).result",
+    useEn:
+      'An in-memory list needs composable field filtering, predicates, stable deduplication, or pagination without allocating an intermediate array for every stage.',
+    useZh:
+      '内存列表需要组合字段筛选、predicate、稳定去重或分页，同时避免每个阶段都分配中间数组。',
+    avoidEn:
+      'The data is remote, mutates behind the collector, needs reactive invalidation, or requires indexed lookup and database query planning.',
+    avoidZh:
+      '数据来自远端、会在 collector 背后修改、需要响应式失效，或需要索引查询与数据库 query plan。'
+  }),
   'utils:bytes:encodeUtf8': utilsGuide({ purposeEn: 'Encodes a JavaScript string as UTF-8 bytes with the host TextEncoder contract.', purposeZh: '按宿主 TextEncoder contract 把 JavaScript string 编码为 UTF-8 bytes。', quickStart: "const bytes = encodeUtf8('Migaia')", useEn: 'Text must cross a binary storage, hashing, or transport boundary.', useZh: 'text 需要跨 binary storage、hashing 或 transport boundary。', avoidEn: 'The destination expects UTF-16 code units or another character encoding.', avoidZh: 'destination 期望 UTF-16 code unit 或其他 character encoding。' }),
   'utils:bytes:decodeUtf8': utilsGuide({ purposeEn: 'Decodes UTF-8 bytes into a JavaScript string using one consistent TextDecoder boundary.', purposeZh: '通过统一 TextDecoder boundary 把 UTF-8 bytes 解码为 JavaScript string。', quickStart: 'const text = decodeUtf8(bytes)', useEn: 'UTF-8 data returns from storage, a stream, or a transport.', useZh: 'UTF-8 data 从 storage、stream 或 transport 返回。', avoidEn: 'The byte sequence uses a different encoding or invalid input must be rejected with a custom fatal policy.', avoidZh: 'byte sequence 使用其他 encoding，或 invalid input 需要 custom fatal policy。' }),
   'utils:bytes:utf8ByteLength': utilsGuide({ purposeEn: 'Returns the encoded UTF-8 byte count rather than JavaScript UTF-16 string length.', purposeZh: '返回 UTF-8 encoded byte count，而不是 JavaScript UTF-16 string length。', quickStart: "const size = utf8ByteLength('你好') // 6", useEn: 'A transport, storage, or chunk budget is measured in wire bytes.', useZh: 'transport、storage 或 chunk budget 按 wire byte 计算。', avoidEn: 'The caller needs character, grapheme, or UTF-16 code-unit length.', avoidZh: 'caller 需要 character、grapheme 或 UTF-16 code-unit length。' }),

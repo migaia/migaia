@@ -365,8 +365,8 @@
             ]
           },
           {
-            "id": "1-主线程-worker-共享数组-自动推送-优雅关闭",
-            "heading": "1. 主线程 + Worker：共享数组、自动推送、优雅关闭",
+            "id": "高阶组合示例-1-主线程-worker-共享数组-自动推送-优雅关闭",
+            "heading": "高阶组合示例 · 1. 主线程 + Worker：共享数组、自动推送、优雅关闭",
             "blocks": [
               {
                 "type": "code",
@@ -381,8 +381,8 @@
             ]
           },
           {
-            "id": "2-不支持-atomics-waitasync-的环境-手动轮询-错误码分支",
-            "heading": "2. 不支持 Atomics.waitAsync 的环境：手动轮询 + 错误码分支",
+            "id": "高阶组合示例-2-不支持-atomics-waitasync-的环境-手动轮询-错误码分支",
+            "heading": "高阶组合示例 · 2. 不支持 Atomics.waitAsync 的环境：手动轮询 + 错误码分支",
             "blocks": [
               {
                 "type": "code",
@@ -392,8 +392,8 @@
             ]
           },
           {
-            "id": "3-单信号跨线程握手-postmessage-只传-buffer-不传对象",
-            "heading": "3. 单信号跨线程握手：postMessage 只传 buffer，不传对象",
+            "id": "高阶组合示例-3-单信号跨线程握手-postmessage-只传-buffer-不传对象",
+            "heading": "高阶组合示例 · 3. 单信号跨线程握手：postMessage 只传 buffer，不传对象",
             "blocks": [
               {
                 "type": "code",
@@ -403,8 +403,8 @@
             ]
           },
           {
-            "id": "4-高频轮换下标读取-prune-主动回收响应式-cell",
-            "heading": "4. 高频轮换下标读取：prune() 主动回收响应式 cell",
+            "id": "高阶组合示例-4-高频轮换下标读取-prune-主动回收响应式-cell",
+            "heading": "高阶组合示例 · 4. 高频轮换下标读取：prune() 主动回收响应式 cell",
             "blocks": [
               {
                 "type": "code",
@@ -414,8 +414,8 @@
             ]
           },
           {
-            "id": "5-用-createstoresharedrangeerror-包装上层校验-保持同一套错误身份",
-            "heading": "5. 用 createStoreSharedRangeError 包装上层校验，保持同一套错误身份",
+            "id": "高阶组合示例-5-用-createstoresharedrangeerror-包装上层校验-保持同一套错误身份",
+            "heading": "高阶组合示例 · 5. 用 createStoreSharedRangeError 包装上层校验，保持同一套错误身份",
             "blocks": [
               {
                 "type": "code",
@@ -1464,8 +1464,8 @@
               ]
             },
             {
-              "id": "5-用-createstoresharedrangeerror-包装上层校验-保持同一套错误身份",
-              "heading": "5. 用 createStoreSharedRangeError 包装上层校验，保持同一套错误身份",
+              "id": "高阶组合示例-5-用-createstoresharedrangeerror-包装上层校验-保持同一套错误身份",
+              "heading": "高阶组合示例 · 5. 用 createStoreSharedRangeError 包装上层校验，保持同一套错误身份",
               "blocks": [
                 {
                   "type": "code",
@@ -1614,8 +1614,8 @@
           "identity": "packages/store-shared/dist/shared-state.d.ts:sharedInt32:export declare const sharedInt32: (runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer) => SharedInt32Signal;",
           "guidance": [
             {
-              "id": "2-不支持-atomics-waitasync-的环境-手动轮询-错误码分支",
-              "heading": "2. 不支持 Atomics.waitAsync 的环境：手动轮询 + 错误码分支",
+              "id": "高阶组合示例-2-不支持-atomics-waitasync-的环境-手动轮询-错误码分支",
+              "heading": "高阶组合示例 · 2. 不支持 Atomics.waitAsync 的环境：手动轮询 + 错误码分支",
               "blocks": [
                 {
                   "type": "code",
@@ -1625,8 +1625,8 @@
               ]
             },
             {
-              "id": "5-用-createstoresharedrangeerror-包装上层校验-保持同一套错误身份",
-              "heading": "5. 用 createStoreSharedRangeError 包装上层校验，保持同一套错误身份",
+              "id": "高阶组合示例-5-用-createstoresharedrangeerror-包装上层校验-保持同一套错误身份",
+              "heading": "高阶组合示例 · 5. 用 createStoreSharedRangeError 包装上层校验，保持同一套错误身份",
               "blocks": [
                 {
                   "type": "code",
@@ -1712,8 +1712,8 @@
           "identity": "packages/store-shared/dist/shared-state.d.ts:sharedInt32Array:export declare const sharedInt32Array: (runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }) => SharedInt32Array;",
           "guidance": [
             {
-              "id": "2-不支持-atomics-waitasync-的环境-手动轮询-错误码分支",
-              "heading": "2. 不支持 Atomics.waitAsync 的环境：手动轮询 + 错误码分支",
+              "id": "高阶组合示例-2-不支持-atomics-waitasync-的环境-手动轮询-错误码分支",
+              "heading": "高阶组合示例 · 2. 不支持 Atomics.waitAsync 的环境：手动轮询 + 错误码分支",
               "blocks": [
                 {
                   "type": "code",
@@ -1723,8 +1723,8 @@
               ]
             },
             {
-              "id": "5-用-createstoresharedrangeerror-包装上层校验-保持同一套错误身份",
-              "heading": "5. 用 createStoreSharedRangeError 包装上层校验，保持同一套错误身份",
+              "id": "高阶组合示例-5-用-createstoresharedrangeerror-包装上层校验-保持同一套错误身份",
+              "heading": "高阶组合示例 · 5. 用 createStoreSharedRangeError 包装上层校验，保持同一套错误身份",
               "blocks": [
                 {
                   "type": "code",

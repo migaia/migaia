@@ -3,7 +3,7 @@
   "library": {
     "slug": "middleware-pipeline",
     "description": "Runtime-neutral sync, async middleware and generator chain executors.",
-    "version": "0.0.2",
+    "version": "0.0.4",
     "exports": ["."],
     "documentation": {
       "readme": {
@@ -399,8 +399,8 @@
             ]
           },
           {
-            "id": "1-sync-校验链-短路-violation-上报",
-            "heading": "1. Sync 校验链：短路 + violation 上报",
+            "id": "高阶组合示例-1-sync-校验链-短路-violation-上报",
+            "heading": "高阶组合示例 · 1. Sync 校验链：短路 + violation 上报",
             "blocks": [
               {
                 "type": "code",
@@ -410,8 +410,8 @@
             ]
           },
           {
-            "id": "2-async-洋葱模型-认证-路由-短路跳过-health",
-            "heading": "2. Async 洋葱模型：认证 + 路由，短路跳过 /health",
+            "id": "高阶组合示例-2-async-洋葱模型-认证-路由-短路跳过-health",
+            "heading": "高阶组合示例 · 2. Async 洋葱模型：认证 + 路由，短路跳过 /health",
             "blocks": [
               {
                 "type": "code",
@@ -421,8 +421,8 @@
             ]
           },
           {
-            "id": "3-async-双失败-自定义组合器接管领域错误",
-            "heading": "3. Async 双失败：自定义组合器接管领域错误",
+            "id": "高阶组合示例-3-async-双失败-自定义组合器接管领域错误",
+            "heading": "高阶组合示例 · 3. Async 双失败：自定义组合器接管领域错误",
             "blocks": [
               {
                 "type": "code",
@@ -432,8 +432,8 @@
             ]
           },
           {
-            "id": "4-generator-多次-yield-采集-显式终止",
-            "heading": "4. Generator：多次 yield 采集 + 显式终止",
+            "id": "高阶组合示例-4-generator-多次-yield-采集-显式终止",
+            "heading": "高阶组合示例 · 4. Generator：多次 yield 采集 + 显式终止",
             "blocks": [
               {
                 "type": "code",
@@ -443,8 +443,8 @@
             ]
           },
           {
-            "id": "5-混用同步与异步-stage-用适配器统一到-async-chain",
-            "heading": "5. 混用同步与异步 stage：用适配器统一到 async chain",
+            "id": "高阶组合示例-5-混用同步与异步-stage-用适配器统一到-async-chain",
+            "heading": "高阶组合示例 · 5. 混用同步与异步 stage：用适配器统一到 async chain",
             "blocks": [
               {
                 "type": "code",
@@ -454,8 +454,8 @@
             ]
           },
           {
-            "id": "6-async-generator-abortcontroller-可取消的多步异步处理",
-            "heading": "6. Async-generator + AbortController：可取消的多步异步处理",
+            "id": "高阶组合示例-6-async-generator-abortcontroller-可取消的多步异步处理",
+            "heading": "高阶组合示例 · 6. Async-generator + AbortController：可取消的多步异步处理",
             "blocks": [
               {
                 "type": "code",
@@ -4069,8 +4069,8 @@
               ]
             },
             {
-              "id": "3-async-双失败-自定义组合器接管领域错误",
-              "heading": "3. Async 双失败：自定义组合器接管领域错误",
+              "id": "高阶组合示例-3-async-双失败-自定义组合器接管领域错误",
+              "heading": "高阶组合示例 · 3. Async 双失败：自定义组合器接管领域错误",
               "blocks": [
                 {
                   "type": "code",
