@@ -1,5 +1,8 @@
 SHELL := /bin/sh
 export CI := true
+# Release validation must report missing dependencies instead of allowing pnpm
+# to repair the workspace implicitly or access the registry during a dry-run.
+export PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN := false
 
 # Publish foundations before every consumer. scripts/release-plan.mjs verifies
 # that this remains a closed, dependency-topological release set.
@@ -12,8 +15,8 @@ PATCH_TARGETS := $(addsuffix -patch,$(RELEASE_PACKAGES))
 PUBLISH_TARGETS := $(addsuffix -publish,$(RELEASE_PACKAGES))
 
 .PHONY: $(RELEASE_PACKAGES) $(CHECK_TARGETS) $(PATCH_TARGETS) $(PUBLISH_TARGETS) \
-	ship ship-preflight ship-check ship-release release-plan-check \
-	check-package release-check git-release-check git-publish-check auth-check patch publish
+	ship ship-dry-run ship-preflight ship-check ship-pack-check ship-release release-plan-check \
+	dependencies-check check-package release-check git-release-check git-publish-check auth-check patch publish
 
 # Ship has one visible direction: prove the whole plan, prove every package,
 # then enter the irreversible release loop. No package is versioned before all
@@ -24,16 +27,39 @@ ship:
 	@$(MAKE) ship-release
 	@echo "==> all release packages shipped"
 
+# Executes every local release gate and previews each package artifact without
+# changing versions, Git state, registry state, or remote refs.
+ship-dry-run:
+	@$(MAKE) release-plan-check
+	@$(MAKE) dependencies-check
+	@$(MAKE) ship-check
+	@$(MAKE) ship-pack-check
+	@echo "==> ship dry-run passed; no release mutations performed"
+
 ship-preflight:
 	@$(MAKE) release-plan-check
+	@$(MAKE) dependencies-check
 	@$(MAKE) git-release-check
 	@$(MAKE) auth-check
+
+dependencies-check:
+	@test -x node_modules/.bin/oxfmt || { echo "Missing workspace dependencies; run pnpm install --frozen-lockfile" >&2; exit 1; }
+	@test -x node_modules/.bin/oxlint || { echo "Missing workspace dependencies; run pnpm install --frozen-lockfile" >&2; exit 1; }
+	@test -x node_modules/.bin/tsc || { echo "Missing workspace dependencies; run pnpm install --frozen-lockfile" >&2; exit 1; }
+	@test -x node_modules/.bin/vitest || { echo "Missing workspace dependencies; run pnpm install --frozen-lockfile" >&2; exit 1; }
 
 ship-check:
 	@set -eu; \
 	for package in $(RELEASE_PACKAGES); do \
 		echo "==> validating $$package"; \
 		$(MAKE) "$$package-check"; \
+	done
+
+ship-pack-check:
+	@set -eu; \
+	for package in $(RELEASE_PACKAGES); do \
+		echo "==> previewing @migaia/$$package artifact"; \
+		pnpm --filter "./packages/$$package" pack --dry-run --json >/dev/null; \
 	done
 
 ship-release:
@@ -57,15 +83,17 @@ check-package:
 		*) echo "Unsupported PACKAGE=$(PACKAGE)" >&2; exit 2 ;; \
 	esac
 
-# Mandatory gates are explicit. Optional typecheck, packed, and browser gates
-# are discovered from the package manifest so adding one cannot be overlooked.
+# Mandatory gates are explicit. Formatting is checked without rewriting source.
+# Optional typecheck, packed, and browser gates are discovered from the package
+# manifest so adding one cannot be overlooked.
 release-check: check-package
 	@set -eu; \
 	package="$(PACKAGE)"; \
 	directory="./packages/$$package"; \
 	manifest="packages/$$package/package.json"; \
 	echo "==> checking @migaia/$$package"; \
-	pnpm --filter "$$directory" run fmt; \
+	format_paths=$$(node -e 'const p=require("./"+process.argv[1]); const command=p.scripts?.fmt??""; if (!command.startsWith("oxfmt ")) process.exit(2); console.log(command.slice(6))' "$$manifest"); \
+	(cd "$$directory" && ../../node_modules/.bin/oxfmt --check $$format_paths); \
 	pnpm --filter "$$directory" run lint; \
 	pnpm --filter "$$directory" run typecheck; \
 	optional_typechecks=$$(node -e 'const p=require("./"+process.argv[1]); console.log(Object.keys(p.scripts||{}).filter((name)=>name.startsWith("typecheck:")).sort().join(" "))' "$$manifest"); \
