@@ -108,12 +108,12 @@ const expectedRetainedModules = [
   '@migaia/storage-web/dist/constants-dsZodWbf.js',
   '@migaia/storage-web/dist/errors-QY7pE_Oy.js',
   '@migaia/storage-web/dist/key-Cp7wL7rA.js',
-  '@migaia/storage-web/dist/memory-BKFpDiCE.js',
+  '@migaia/storage-web/dist/memory-l4Jc5jbU.js',
   '@migaia/storage-web/dist/operation-DeSu1sk5.js',
   '@migaia/storage-web/dist/operation-reporter-CxbWTNcw.js',
   '@migaia/storage-web/dist/query-DPXXsCtN.js',
-  '@migaia/storage-web/dist/reactive-controller-B5Zxko2x.js',
-  '@migaia/storage-web/dist/transaction-Bi-i3iMi.js',
+  '@migaia/storage-web/dist/reactive-controller-CpuxW6K8.js',
+  '@migaia/storage-web/dist/transaction-WSMVixyE.js',
   '@migaia/utils/dist/bytes.js',
   '@migaia/utils/dist/error-text-Cw8rxmXe.js',
   '@migaia/utils/dist/error.js',
@@ -1079,7 +1079,7 @@ function createPublishFixture(): IPublishFixture {
     `#!/bin/sh
 set -eu
 if [ "\${1-}" = whoami ]; then exit 0; fi
-if [ "\${1-}" != @utils ] || [ "\${2-}" != release:publish ]; then exit 90; fi
+if [ "\${1-}" != --filter ] || [ "\${2-}" != ./packages/utils ] || [ "\${3-}" != run ] || [ "\${4-}" != release:publish ]; then exit 90; fi
 if grep -q '"private"[[:space:]]*:[[:space:]]*true' packages/utils/package.json; then exit 91; fi
 printf 'private-removed\\n' > '${publishLog}'
 case "\${STUB_MODE-}" in
@@ -1104,6 +1104,7 @@ esac
     `#!/bin/sh
 if [ "\${1-}" = rev-parse ] && [ "\${2-}" = --abbrev-ref ]; then printf 'fixture\\n'; exit 0; fi
 if [ "\${1-}" = rev-parse ]; then exit 1; fi
+if [ "\${1-}" = symbolic-ref ]; then printf 'main\\n'; exit 0; fi
 exit 0
 `,
     'utf8'
