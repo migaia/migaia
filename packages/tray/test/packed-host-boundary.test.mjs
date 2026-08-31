@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os'
 import { basename, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { build } from 'vite'
 import { describe, it } from 'vitest'
 
 /** Tray package root used as the sole source of the packed artifacts. */
@@ -28,6 +29,15 @@ describe('TPD-T60 packed consumer boundary', () => {
       const consumerDirectory = installTarballs()
       runConsumerRuntime(consumerDirectory)
       runConsumerTypecheck(consumerDirectory)
+    } finally {
+      rmSync(smokeDirectory, { recursive: true, force: true })
+    }
+  }, 120_000)
+
+  it('proves root and single-subpath packed consumers retain no forbidden sibling owners', async () => {
+    try {
+      const consumerDirectory = installTarballs()
+      await runTreeShakingConsumers(consumerDirectory)
     } finally {
       rmSync(smokeDirectory, { recursive: true, force: true })
     }
@@ -160,7 +170,11 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PluginHost } from '@migaia/plugin-host'
+import { createView } from '@migaia/plugin-host/composition'
 import { createHost } from '@migaia/tray/host'
+import { defineLoader, loadIntoHost } from '@migaia/tray/loader'
+import { defineAdapter } from '@migaia/tray/adapter'
+import { createRuntime } from '@migaia/tray/runtime'
 
 const require = createRequire(import.meta.url)
 const consumerDirectory = dirname(fileURLToPath(import.meta.url))
@@ -181,6 +195,20 @@ const create = () => new PluginHost({ execution: { mutationTimeoutMs: false, pip
 const options = { create, plugins: [{ name: 'packed', install: () => ({}) }], mutationAdmissionMs: 100, quiescenceMs: 100, shutdown: { mode: 'bounded' } }
 await using managed = await createHost(options)
 if (managed.pluginState('packed') !== 'ready') throw new Error('packed plugin was not ready')
+const loaded = await loadIntoHost({
+  host: managed,
+  source: 'packed-source',
+  loader: defineLoader({ load: (source) => ({ value: source, release: { force: () => undefined } }) }),
+  adapter: defineAdapter({ adapt: (value) => ({ name: 'loaded', install: () => ({ value }) }) }),
+  mutation: 'use',
+  timeoutMs: false
+})
+if (!loaded.committed || managed.pluginState('loaded') !== 'ready') throw new Error('packed loader failed')
+const runtime = createRuntime(managed)
+const runtimeValue = await runtime.run('loaded', { timeoutMs: false }, ({ extensions }) => extensions.value)
+if (runtimeValue !== 'packed-source') throw new Error('packed runtime failed')
+await runtime.dispose()
+if (createView === undefined) throw new Error('composition subpath failed')
 let explicit
 try {
   explicit = await createHost(options)
@@ -194,6 +222,10 @@ try {
 /** Emits a consumer-only declaration probe against the extracted public subpath. */
 function typeSource() {
   return `import { PluginHost, type IPlugin } from '@migaia/plugin-host'
+import { createView, type IRegistrationToken, type IRegistrationView } from '@migaia/plugin-host/composition'
+import { defineLoader, loadIntoHost, type ILoader } from '@migaia/tray/loader'
+import { defineAdapter, type IAdapter } from '@migaia/tray/adapter'
+import { createRuntime, type IRuntime } from '@migaia/tray/runtime'
 import {
   createHost,
   type ICanResolveReadyDefinitions,
@@ -258,6 +290,16 @@ type IPublicHostTypes = [
 ]
 declare const publicTypes: IPublicHostTypes
 void publicTypes
+void createView
+void (undefined as unknown as IRegistrationToken)
+void (undefined as unknown as IRegistrationView)
+void (undefined as unknown as ILoader<unknown, unknown>)
+void (undefined as unknown as IAdapter<unknown, ConsumerHost, typeof plugin>)
+void (undefined as unknown as IRuntime<readonly [typeof plugin]>)
+void defineLoader
+void defineAdapter
+void loadIntoHost
+void createRuntime
 `
 }
 
@@ -285,4 +327,62 @@ function runConsumerTypecheck(consumerDirectory) {
   })
   if (relative(repositoryDirectory, consumerDirectory).startsWith('..') === false)
     throw new Error('consumer unexpectedly lives inside workspace')
+}
+
+/** Bundles four isolated packed consumers and checks the retained owner boundary for each. */
+async function runTreeShakingConsumers(consumerDirectory) {
+  const consumers = [
+    {
+      name: 'root-only',
+      source: "import { createTray } from '@migaia/tray'\nexport default createTray([])\n",
+      forbidden: ['defineLoader', 'defineAdapter', 'createRuntime', 'loadIntoHost']
+    },
+    {
+      name: 'loader-only',
+      source: "import { defineLoader } from '@migaia/tray/loader'\nexport default defineLoader\n",
+      forbidden: ['defineAdapter', 'createRuntime', 'createTray']
+    },
+    {
+      name: 'adapter-only',
+      source:
+        "import { defineAdapter } from '@migaia/tray/adapter'\nexport default defineAdapter\n",
+      forbidden: ['defineLoader', 'createRuntime', 'createTray']
+    },
+    {
+      name: 'runtime-only',
+      source:
+        "import { createRuntime } from '@migaia/tray/runtime'\nexport default createRuntime\n",
+      forbidden: [
+        'defineLoader',
+        'defineAdapter',
+        'loadIntoHost',
+        'createTray',
+        'createDynamicCapabilityGraph'
+      ]
+    }
+  ]
+  for (const consumer of consumers) {
+    const entry = join(consumerDirectory, `${consumer.name}.js`)
+    const outputDirectory = join(consumerDirectory, `bundle-${consumer.name}`)
+    writeFileSync(entry, consumer.source, 'utf8')
+    await build({
+      root: consumerDirectory,
+      configFile: false,
+      logLevel: 'silent',
+      build: {
+        emptyOutDir: true,
+        outDir: outputDirectory,
+        lib: { entry, formats: ['es'], fileName: 'consumer' },
+        rollupOptions: { external: [] }
+      }
+    })
+    const bundle = readdirSync(outputDirectory)
+      .filter((file) => file.endsWith('.js'))
+      .map((file) => readFileSync(join(outputDirectory, file), 'utf8'))
+      .join('\n')
+    for (const forbidden of consumer.forbidden) {
+      if (bundle.includes(forbidden))
+        throw new Error(`${consumer.name} bundle retained forbidden owner ${forbidden}`)
+    }
+  }
 }

@@ -9,9 +9,6 @@
   ],
   "type": "module",
   "sideEffects": false,
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
-  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -22,7 +19,22 @@
     "./host": {
       "types": "./dist/host/index.d.ts",
       "default": "./dist/host/index.js"
+    },
+    "./loader": {
+      "types": "./dist/loader/index.d.ts",
+      "default": "./dist/loader/index.js"
+    },
+    "./adapter": {
+      "types": "./dist/adapter/index.d.ts",
+      "default": "./dist/adapter/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime/index.d.ts",
+      "default": "./dist/runtime/index.js"
     }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
     "fmt": "oxfmt src test",
