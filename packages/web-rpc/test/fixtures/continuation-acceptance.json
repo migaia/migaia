@@ -7614,7 +7614,7 @@
       "id": "WRC-C-T32",
       "kind": "assertion",
       "path": "packages/web-rpc/test/tree-shaking/b11f-candidate.test.ts",
-      "line": 537,
+      "line": 518,
       "title": "keeps legacy and unselected concrete owners outside every selected closure"
     },
     {

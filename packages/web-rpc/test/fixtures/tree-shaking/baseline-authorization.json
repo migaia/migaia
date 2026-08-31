@@ -1,44 +1,44 @@
 {
   "status": "approved",
   "requirement": "PDLC-R06 / T14 / T15",
-  "reason": "PDLC r5 custody refresh after two byte-identical canonical builds attributed the current 108-module WebRPC closure to the admitted Utils publication split.",
+  "reason": "Ship dry-run custody refresh after two byte-identical canonical builds attributed the current 121-module closure to the admitted managed PluginHost composition; raw and gzip bytes decreased.",
   "approvalRecord": {
     "schema": "WRC-C-B11-approval-v2",
     "authorityId": "web-rpc-release-coordinator-v1",
-    "keyId": "coordinator-ed25519-bc42d020131451c6",
-    "decisionId": "WRC-C-B11-decision-20260830-PDLC-R5",
-    "issuedAt": "2026-08-30T04:35:30.636Z",
-    "rationale": "PDLC r5 custody refresh after two byte-identical canonical builds attributed the current 108-module WebRPC closure to the admitted Utils publication split.",
+    "keyId": "coordinator-ed25519-a5907cf9ee31549e",
+    "decisionId": "WRC-C-B11-decision-20260831-SHIP-DRY-RUN-R1",
+    "issuedAt": "2026-08-31T02:06:36.991Z",
+    "rationale": "Ship dry-run custody refresh after two byte-identical canonical builds attributed the current 121-module closure to the admitted managed PluginHost composition; raw and gzip bytes decreased.",
     "oldTuple": {
       "moduleCount": 53,
       "rawBytes": 250129,
       "gzipBytes": 61171
     },
     "newTuple": {
-      "moduleCount": 108,
-      "rawBytes": 501031,
-      "gzipBytes": 121196
+      "moduleCount": 121,
+      "rawBytes": 475725,
+      "gzipBytes": 113838
     },
-    "digest": "32c50cab53845d11301a21b82cdc22a726f93873300087d14d0f8b55d8c76980",
-    "signature": "dHbsE6Z8z3QnDP+3nKiattWkbVcSgs9wEHUu8DFYbTOIKmVY/kJtCMxebIx+VrYGkuX8EkSoTtSZuqoE1JpLBg==",
+    "digest": "a5907cf9ee31549e6c0c9ec3e7cbecb389dd17ee23dda56480970051e5955995",
+    "signature": "r62eipIkhtf0f166kcNv6XKKPgk4Z3mN+o7eZBb+pn/RlWr9p1cDWtONQIxdavWi/zwpWItqxcgMHzC8zeWxDw==",
     "payload": {
       "schema": "WRC-C-B11-approval-v2",
       "authorityId": "web-rpc-release-coordinator-v1",
-      "keyId": "coordinator-ed25519-bc42d020131451c6",
-      "decisionId": "WRC-C-B11-decision-20260830-PDLC-R5",
-      "issuedAt": "2026-08-30T04:35:30.636Z",
-      "rationale": "PDLC r5 custody refresh after two byte-identical canonical builds attributed the current 108-module WebRPC closure to the admitted Utils publication split.",
+      "keyId": "coordinator-ed25519-a5907cf9ee31549e",
+      "decisionId": "WRC-C-B11-decision-20260831-SHIP-DRY-RUN-R1",
+      "issuedAt": "2026-08-31T02:06:36.991Z",
+      "rationale": "Ship dry-run custody refresh after two byte-identical canonical builds attributed the current 121-module closure to the admitted managed PluginHost composition; raw and gzip bytes decreased.",
       "oldTuple": {
         "moduleCount": 53,
         "rawBytes": 250129,
         "gzipBytes": 61171
       },
       "newTuple": {
-        "moduleCount": 108,
-        "rawBytes": 501031,
-        "gzipBytes": 121196
+        "moduleCount": 121,
+        "rawBytes": 475725,
+        "gzipBytes": 113838
       },
-      "digest": "32c50cab53845d11301a21b82cdc22a726f93873300087d14d0f8b55d8c76980"
+      "digest": "a5907cf9ee31549e6c0c9ec3e7cbecb389dd17ee23dda56480970051e5955995"
     }
   }
 }
