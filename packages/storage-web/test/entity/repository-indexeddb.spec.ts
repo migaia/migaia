@@ -253,12 +253,21 @@ describe('repository over real indexedDb backend', () => {
       indexes: { email: { path: 'email' } }
     }).connect(store)
 
-    await expect(
-      indexed.findManyBy('email', { lower: 'large@example.com', upper: 'large@example.com' })
-    ).rejects.toMatchObject({
-      code: 'VALUE_TOO_LARGE',
-      cause: expect.any(RangeError)
-    })
+    const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      await expect(
+        indexed.findManyBy('email', { lower: 'large@example.com', upper: 'large@example.com' })
+      ).rejects.toMatchObject({
+        code: 'VALUE_TOO_LARGE',
+        cause: expect.any(RangeError)
+      })
+      expect(report).toHaveBeenCalledWith(
+        '[storage-web] operation cleanup failed',
+        expect.objectContaining({ code: 'VALUE_TOO_LARGE' })
+      )
+    } finally {
+      report.mockRestore()
+    }
     const capability = asIndexedDbBackfillStore(store)!
     const handle = await capability.ensureRecordIndexes('decoded-cap-codec', [
       { name: 'email', unique: false, multiEntry: false, revision: 1 }
@@ -296,10 +305,19 @@ describe('repository over real indexedDb backend', () => {
       indexes: { email: { path: 'email' } }
     }).connect(store)
 
-    await expect(indexed.findManyBy('email')).rejects.toMatchObject({
-      code: 'VALUE_TOO_LARGE',
-      cause: expect.any(RangeError)
-    })
+    const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      await expect(indexed.findManyBy('email')).rejects.toMatchObject({
+        code: 'VALUE_TOO_LARGE',
+        cause: expect.any(RangeError)
+      })
+      expect(report).toHaveBeenCalledWith(
+        '[storage-web] operation cleanup failed',
+        expect.objectContaining({ code: 'VALUE_TOO_LARGE' })
+      )
+    } finally {
+      report.mockRestore()
+    }
     await store.dispose()
   })
 

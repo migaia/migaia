@@ -1108,9 +1108,17 @@ esac
   writeFileSync(
     gitStub,
     `#!/bin/sh
-if [ "\${1-}" = rev-parse ] && [ "\${2-}" = --abbrev-ref ]; then printf 'fixture\\n'; exit 0; fi
-if [ "\${1-}" = rev-parse ]; then exit 1; fi
+set -eu
 if [ "\${1-}" = symbolic-ref ]; then printf 'main\\n'; exit 0; fi
+if [ "\${1-}" = status ]; then exit 0; fi
+if [ "\${1-}" = log ]; then printf 'fixture-release-commit\\n'; exit 0; fi
+if [ "\${1-}" = show ]; then
+  version=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' packages/utils/package.json)
+  printf 'chore(release): utils v%s\\n' "$version"
+  exit 0
+fi
+if [ "\${1-}" = rev-parse ]; then exit 1; fi
+if [ "\${1-}" = ls-remote ]; then exit 0; fi
 exit 0
 `,
     'utf8'
