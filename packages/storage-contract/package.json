@@ -1,6 +1,6 @@
 {
   "name": "@migaia/storage-contract",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": true,
   "description": "Runtime-neutral storage contract: key-value store, codec, capability, context, key-domain and contract-level error types.",
   "license": "MIT",
