@@ -67,6 +67,16 @@ type IPreauthorizedPackageIdentity = {
 }
 /** Repository root used by the release and lockfile acceptance probes. */
 const repositoryRoot = resolve(import.meta.dirname, '..', '..', '..')
+/** Reads one JSON file without allowing a module cache to hide a rewritten manifest. */
+const readJson = (fileName: string): Record<string, unknown> =>
+  JSON.parse(readFileSync(fileName, 'utf8')) as Record<string, unknown>
+/** Binds packed-package identity to the current source manifest used by the release under test. */
+const packageDefinition = (directory: string, name: string): IPackageDefinition => {
+  const manifest = readJson(resolve(repositoryRoot, 'packages', directory, 'package.json'))
+  if (typeof manifest.version !== 'string' || !/^\d+\.\d+\.\d+$/.test(manifest.version))
+    throw new Error(`invalid release package version: ${directory}`)
+  return { directory, name, version: manifest.version }
+}
 /** Exact package-manager version whose virtual-store naming algorithm is reproduced below. */
 const pinnedPnpmVersion = storageV2PinnedPnpmVersion
 /** Uses pnpm's configured cache so offline packed installs exercise normal dependency resolution. */
@@ -76,27 +86,27 @@ const configuredPnpmStoreDirectory = execFileSync('pnpm', ['store', 'path'], {
 }).trim()
 /** Pnpm 11.20.0 default persisted in the fresh consumer's `.modules.yaml`. */
 const pnpmVirtualStoreDirMaxLength = storageV2VirtualStoreDirMaxLength
-/** D18 foundation order and exact versions authorized for the C2-R4 rehearsal. */
+/** D18 foundation order and source-manifest identities authorized for the C2-R4 rehearsal. */
 const releasePackages: readonly IPackageDefinition[] = [
-  { directory: 'utils', name: '@migaia/utils', version: '0.0.2' },
-  { directory: 'event-subscriber', name: '@migaia/event-subscriber', version: '0.0.3' },
-  { directory: 'lifecycle', name: '@migaia/lifecycle', version: '0.0.2' },
-  { directory: 'reactive', name: '@migaia/reactive', version: '0.0.2' },
-  { directory: 'storage-contract', name: '@migaia/storage-contract', version: '0.0.2' },
-  { directory: 'storage-web', name: '@migaia/storage-web', version: '0.0.3' }
+  packageDefinition('utils', '@migaia/utils'),
+  packageDefinition('event-subscriber', '@migaia/event-subscriber'),
+  packageDefinition('lifecycle', '@migaia/lifecycle'),
+  packageDefinition('reactive', '@migaia/reactive'),
+  packageDefinition('storage-contract', '@migaia/storage-contract'),
+  packageDefinition('storage-web', '@migaia/storage-web')
 ]
 /** Full packed dependency closure required for a normal-resolution storage-web install. */
 const packedPackages: readonly IPackageDefinition[] = [
-  { directory: 'utils', name: '@migaia/utils', version: '0.0.2' },
-  { directory: 'event-subscriber', name: '@migaia/event-subscriber', version: '0.0.3' },
-  { directory: 'lifecycle', name: '@migaia/lifecycle', version: '0.0.2' },
-  { directory: 'reactive', name: '@migaia/reactive', version: '0.0.2' },
-  { directory: 'middleware-pipeline', name: '@migaia/middleware-pipeline', version: '0.0.2' },
-  { directory: 'resource', name: '@migaia/resource', version: '0.0.2' },
-  { directory: 'storage-contract', name: '@migaia/storage-contract', version: '0.0.2' },
-  { directory: 'plugin-host', name: '@migaia/plugin-host', version: '0.0.5' },
-  { directory: 'capability', name: '@migaia/capability', version: '0.0.1' },
-  { directory: 'storage-web', name: '@migaia/storage-web', version: '0.0.3' }
+  packageDefinition('utils', '@migaia/utils'),
+  packageDefinition('event-subscriber', '@migaia/event-subscriber'),
+  packageDefinition('lifecycle', '@migaia/lifecycle'),
+  packageDefinition('reactive', '@migaia/reactive'),
+  packageDefinition('middleware-pipeline', '@migaia/middleware-pipeline'),
+  packageDefinition('resource', '@migaia/resource'),
+  packageDefinition('storage-contract', '@migaia/storage-contract'),
+  packageDefinition('plugin-host', '@migaia/plugin-host'),
+  packageDefinition('capability', '@migaia/capability'),
+  packageDefinition('storage-web', '@migaia/storage-web')
 ]
 /** Exact memory-only retained graph after package-manager installation of the packed root. */
 const expectedRetainedModules = [
@@ -124,10 +134,6 @@ const expectedRetainedModules = [
 /** Binds the reviewed retained inventory to the root-owned exact-set tool. */
 const assertExactRetainedModules = (modules: Iterable<string>): void =>
   assertExactRetainedModuleSet(modules, expectedRetainedModules)
-/** Reads one JSON file without allowing a module cache to hide a rewritten manifest. */
-const readJson = (fileName: string): Record<string, unknown> =>
-  JSON.parse(readFileSync(fileName, 'utf8')) as Record<string, unknown>
-
 /** Converts a fresh packed graph into the shared source-owned semantic ledger. */
 function normalizeSemanticRetainedGraph(
   outputs: readonly {

@@ -6,6 +6,7 @@ import { StorageError, StorageErrorCode } from '../../src/types/errors'
 import type { IStorageKey } from '../../src/types/context'
 import { asIndexedDbBackfillStore } from '../../src/backends/indexed-db-backfill'
 import { composeRepositoryKey, repositoryEntityRange } from '../../src/entity/key'
+import { captureOperationCleanup } from '../helpers/operation-reporter.js'
 
 type IUser = { id: string; name: string; email: string }
 
@@ -328,6 +329,7 @@ describe('repository over real indexedDb backend', () => {
   it('SWV4-R06 scans nested legacy IDs across foreign-key adjacency', async () => {
     type INestedUser = { id: IStorageKey; email: string }
     const store = freshIndexedDb()
+    const diagnostics: string[] = []
     const entity = defineEntity<INestedUser>({ name: 'nested-legacy', key: 'id' })
     await entity.connect(store).migrate()
     const nestedId: IStorageKey = ['tenant', ['region', 'user-1']]
@@ -342,11 +344,13 @@ describe('repository over real indexedDb backend', () => {
     const indexed = defineEntity<INestedUser>()({
       name: 'nested-legacy',
       key: 'id',
+      onDiagnostic: (message) => diagnostics.push(message),
       indexes: { email: { path: 'email' } }
     }).connect(store)
     await expect(indexed.findManyBy('email')).resolves.toEqual([
       { id: nestedId, email: 'nested@example.com' }
     ])
+    expect(diagnostics).toEqual([expect.stringContaining('uses authoritative full-scan fallback')])
     const capability = asIndexedDbBackfillStore(store)!
     const handle = await capability.ensureRecordIndexes('nested-legacy', [
       { name: 'email', unique: false, multiEntry: false, revision: 1 }
@@ -558,10 +562,12 @@ describe('repository over real indexedDb backend', () => {
       { name: 'email', unique: false, multiEntry: true, revision: 1 }
     ])
 
-    await expect(indexed.findManyBy('email')).rejects.toBe(selectorFailure)
-    await expect(capability.getRecordIndexReadiness(handle)).resolves.toMatchObject({
-      status: 'failed'
+    const cleanup = await captureOperationCleanup(async () => {
+      await expect(indexed.findManyBy('email')).rejects.toBe(selectorFailure)
+      return capability.getRecordIndexReadiness(handle)
     })
+    expect(cleanup.result).toMatchObject({ status: 'failed' })
+    expect(cleanup.reports).toEqual([selectorFailure])
     const freshHandle = await capability.ensureRecordIndexes('failed-selector-backfill', [
       { name: 'email', unique: false, multiEntry: true, revision: 1 }
     ])
