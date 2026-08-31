@@ -18,15 +18,18 @@ const requiredScripts = [
  *
  * @param {string} repositoryRoot Absolute repository root
  * @param {readonly string[]} packageNames Ordered unscoped package names
+ * @param {{ allowedExternalDependencies?: readonly string[] }} [options] Plan-scoped dependency exceptions
  * @returns {readonly { name: string; dependencies: readonly string[] }[]} Normalized plan
  * @throws {Error} When the plan is duplicated, incomplete, out of order, or not publishable
  */
-export function verifyReleasePlan(repositoryRoot, packageNames) {
+export function verifyReleasePlan(repositoryRoot, packageNames, options = {}) {
   /** Workspace registry authority inherited by packages without an override. */
   const npmConfig = readFileSync(resolve(repositoryRoot, '.npmrc'), 'utf8')
   if (!/^@migaia:registry=https:\/\/npm\.pkg\.github\.com$/m.test(npmConfig))
     throw new Error('Workspace does not target GitHub Packages')
   const seen = new Set()
+  /** Foundations released by another independently gated ship plan. */
+  const allowedExternalDependencies = new Set(options.allowedExternalDependencies ?? [])
   return packageNames.map((name) => {
     if (seen.has(name)) throw new Error(`Duplicate release package: ${name}`)
     const manifestPath = resolve(repositoryRoot, 'packages', name, 'package.json')
@@ -50,9 +53,10 @@ export function verifyReleasePlan(repositoryRoot, packageNames) {
       .map((dependency) => dependency.slice('@migaia/'.length))
       .sort()
     for (const dependency of dependencies) {
-      if (!packageNames.includes(dependency))
+      if (!packageNames.includes(dependency) && !allowedExternalDependencies.has(dependency))
         throw new Error(`${name} depends on omitted release package ${dependency}`)
-      if (!seen.has(dependency)) throw new Error(`${name} appears before dependency ${dependency}`)
+      if (packageNames.includes(dependency) && !seen.has(dependency))
+        throw new Error(`${name} appears before dependency ${dependency}`)
     }
     seen.add(name)
     return { name, dependencies }
@@ -66,10 +70,20 @@ const isMain =
 if (isMain) {
   /** Repository root owned by the executable entry point. */
   const repositoryRoot = resolve(fileURLToPath(new URL('..', import.meta.url)))
+  /** Optional comma-separated foundations owned by another release plan. */
+  const externalArgument = process.argv.slice(2).find((argument) =>
+    argument.startsWith('--allow-external=')
+  )
+  /** Foundations explicitly admitted without entering this plan's mutation loop. */
+  const allowedExternalDependencies = externalArgument
+    ? externalArgument.slice('--allow-external='.length).split(/\s+/).filter(Boolean)
+    : []
   /** Ordered package names supplied by Make. */
-  const packageNames = process.argv.slice(2)
+  const packageNames = process.argv
+    .slice(2)
+    .filter((argument) => !argument.startsWith('--allow-external='))
   if (packageNames.length === 0) throw new Error('Release plan is empty')
   /** Validated release plan printed for operator review before mutation. */
-  const plan = verifyReleasePlan(repositoryRoot, packageNames)
+  const plan = verifyReleasePlan(repositoryRoot, packageNames, { allowedExternalDependencies })
   console.log(`Release plan OK: ${plan.map(({ name }) => name).join(' -> ')}`)
 }

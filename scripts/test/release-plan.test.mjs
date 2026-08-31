@@ -20,6 +20,14 @@ function readMakeReleasePackages() {
   return match[1].trim().split(/\s+/)
 }
 
+/** Reads one exact single-line package inventory from the Makefile. */
+function readMakePackages(variable) {
+  const makefile = readFileSync(resolve(repositoryRoot, 'Makefile'), 'utf8')
+  const match = makefile.match(new RegExp(`^${variable} := (.+)$`, 'm'))
+  assert.ok(match, `Makefile must declare ${variable}`)
+  return match[1].trim().split(/\s+/)
+}
+
 test('accepts the complete dependency-topological Make release plan', () => {
   /** Current Make release inventory. */
   const packageNames = readMakeReleasePackages()
@@ -46,6 +54,28 @@ test('rejects a release plan whose consumer precedes its dependency', () => {
   )
 })
 
+test('accepts the independent store plan with foundation dependencies admitted externally', () => {
+  const packageNames = readMakePackages('STORE_RELEASE_PACKAGES')
+  assert.equal(
+    verifyReleasePlan(repositoryRoot, packageNames, {
+      allowedExternalDependencies: readMakeReleasePackages()
+    }).length,
+    packageNames.length
+  )
+})
+
+test('keeps store-wasm behind its package-owned wasm prerequisite', () => {
+  const packageNames = readMakePackages('STORE_RELEASE_PACKAGES')
+  packageNames.splice(packageNames.indexOf('wasm'), 1)
+  assert.throws(
+    () =>
+      verifyReleasePlan(repositoryRoot, packageNames, {
+        allowedExternalDependencies: readMakeReleasePackages()
+      }),
+    /store-wasm depends on omitted release package wasm/
+  )
+})
+
 test('ship dry-run cannot reach release mutations', () => {
   /** Expanded dry-run command graph emitted by Make without executing recipes. */
   const commandGraph = execFileSync('make', ['-n', 'ship-dry-run'], {
@@ -68,6 +98,25 @@ test('ship dry-run cannot reach release mutations', () => {
     assert.doesNotMatch(commandGraph, new RegExp(forbidden))
 })
 
+test('store ship dry-run cannot reach release mutations', () => {
+  /** Expanded Store dry-run command graph emitted by Make without executing recipes. */
+  const commandGraph = execFileSync('make', ['-n', 'store-ship-dry-run'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8'
+  })
+  assert.match(commandGraph, /pack --dry-run --json/)
+  for (const forbidden of [
+    'version patch',
+    'git add',
+    'git commit',
+    'git push',
+    'pnpm publish',
+    'npm whoami'
+  ]) {
+    assert.doesNotMatch(commandGraph, new RegExp(forbidden))
+  }
+})
+
 test('ship completes every CI and pack gate before entering resumable CD', () => {
   /** Expanded ship graph proves phase ordering without version, Git, or registry mutation. */
   const commandGraph = execFileSync('make', ['-n', 'ship'], {
@@ -85,4 +134,16 @@ test('ship completes every CI and pack gate before entering resumable CD', () =>
   assert.match(commandGraph, /pnpm view/)
   assert.match(commandGraph, /already published/)
   assert.match(commandGraph, /resuming tag push/)
+})
+
+test('store ship is a separate all-CI then resumable-CD command graph', () => {
+  const commandGraph = execFileSync('make', ['-n', 'store-ship'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8'
+  })
+  const ci = commandGraph.indexOf('echo "==> Store CI validating $package"')
+  const pack = commandGraph.indexOf('echo "==> previewing @migaia/$package artifact"')
+  const cd = commandGraph.indexOf('echo "==> Store CD releasing $package"')
+  assert.ok(ci >= 0 && pack > ci && cd > pack)
+  assert.match(commandGraph, /release-progress\.mjs/)
 })

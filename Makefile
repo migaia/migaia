@@ -7,16 +7,22 @@ export PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN := false
 # Publish foundations before every consumer. scripts/release-plan.mjs verifies
 # that this remains a closed, dependency-topological release set.
 RELEASE_PACKAGES := utils event-subscriber lifecycle reactive middleware-pipeline serialize resource storage-contract capability plugin-host tray web-rpc logger storage-web
+# Store packages release independently from the foundation ship. `wasm` is the
+# package-owned prerequisite for store-wasm and therefore leads this plan.
+STORE_RELEASE_PACKAGES := wasm store-light store-keyed store-shared store-ssr store-worker store-indexed store-middleware store-react store-persist store-devtools store-wasm
+PUBLISHABLE_PACKAGES := $(RELEASE_PACKAGES) $(STORE_RELEASE_PACKAGES)
 RELEASE_BRANCH ?= main
 GITHUB_PACKAGES_REGISTRY := https://npm.pkg.github.com
 
-CHECK_TARGETS := $(addsuffix -check,$(RELEASE_PACKAGES))
-PATCH_TARGETS := $(addsuffix -patch,$(RELEASE_PACKAGES))
-PUBLISH_TARGETS := $(addsuffix -publish,$(RELEASE_PACKAGES))
+CHECK_TARGETS := $(addsuffix -check,$(PUBLISHABLE_PACKAGES))
+PATCH_TARGETS := $(addsuffix -patch,$(PUBLISHABLE_PACKAGES))
+PUBLISH_TARGETS := $(addsuffix -publish,$(PUBLISHABLE_PACKAGES))
 
-.PHONY: $(RELEASE_PACKAGES) $(CHECK_TARGETS) $(PATCH_TARGETS) $(PUBLISH_TARGETS) \
+.PHONY: $(PUBLISHABLE_PACKAGES) $(CHECK_TARGETS) $(PATCH_TARGETS) $(PUBLISH_TARGETS) \
 	ship ship-dry-run ship-preflight ship-check ship-pack-check ship-release release-plan-check \
 	ship-ci ship-cd \
+	store-ship store-ship-dry-run store-ship-preflight store-ship-ci store-ship-pack-check \
+	store-ship-cd store-release-plan-check \
 	dependencies-check check-package release-check git-release-check git-publish-check auth-check patch publish
 
 # Ship has one visible direction: prove the whole plan, prove every package,
@@ -87,12 +93,63 @@ ship-release:
 release-plan-check:
 	@node scripts/release-plan.mjs $(RELEASE_PACKAGES)
 
+# Store delivery is deliberately isolated from `ship`: it owns a separate plan,
+# progress prefix, CI sweep, artifact preview, and CD loop.
+store-ship:
+	@$(MAKE) store-ship-preflight
+	@$(MAKE) store-ship-ci
+	@$(MAKE) store-ship-pack-check
+	@$(MAKE) store-ship-cd
+	@echo "==> all store release packages shipped"
+
+store-ship-dry-run:
+	@$(MAKE) store-release-plan-check
+	@$(MAKE) dependencies-check
+	@$(MAKE) store-ship-ci
+	@$(MAKE) store-ship-pack-check
+	@echo "==> store ship dry-run passed; no release mutations performed"
+
+store-ship-preflight:
+	@$(MAKE) store-release-plan-check
+	@$(MAKE) dependencies-check
+	@$(MAKE) git-release-check
+	@$(MAKE) auth-check
+
+store-ship-ci:
+	@set -eu; \
+	for package in $(STORE_RELEASE_PACKAGES); do \
+		echo "==> Store CI validating $$package"; \
+		$(MAKE) "$$package-check"; \
+	done
+
+store-ship-pack-check:
+	@set -eu; \
+	for package in $(STORE_RELEASE_PACKAGES); do \
+		echo "==> previewing @migaia/$$package artifact"; \
+		pnpm --filter "./packages/$$package" pack --dry-run --json >/dev/null; \
+	done
+
+store-ship-cd:
+	@set -eu; \
+	patched_packages=$$(node scripts/release-progress.mjs $(STORE_RELEASE_PACKAGES)); \
+	for package in $(STORE_RELEASE_PACKAGES); do \
+		echo "==> Store CD releasing $$package"; \
+		case " $$patched_packages " in \
+			*" $$package "*) echo "==> resuming already patched $$package" ;; \
+			*) $(MAKE) "$$package-patch" ;; \
+		esac; \
+		$(MAKE) "$$package-publish"; \
+	done
+
+store-release-plan-check:
+	@node scripts/release-plan.mjs --allow-external="$(RELEASE_PACKAGES)" $(STORE_RELEASE_PACKAGES)
+
 check-package:
 	@if [ -z "$(PACKAGE)" ]; then \
 		echo "Internal error: PACKAGE is not set" >&2; \
 		exit 2; \
 	fi; \
-	case " $(RELEASE_PACKAGES) " in \
+	case " $(PUBLISHABLE_PACKAGES) " in \
 		*" $(PACKAGE) "*) ;; \
 		*) echo "Unsupported PACKAGE=$(PACKAGE)" >&2; exit 2 ;; \
 	esac
@@ -235,7 +292,7 @@ $(PATCH_TARGETS): %-patch:
 $(PUBLISH_TARGETS): %-publish:
 	@$(MAKE) publish PACKAGE=$*
 
-$(RELEASE_PACKAGES):
+$(PUBLISHABLE_PACKAGES):
 	@$(MAKE) $@-check
 	@$(MAKE) $@-patch
 	@$(MAKE) $@-publish
