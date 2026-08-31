@@ -68,7 +68,21 @@ function main() {
       "import { createEventChannel, createEventHub, defineEventApiStyle, invokeParallel, invokeParallelSettled, invokeSerial, invokeSerialSettled, invokeTask, invokeTaskSettled, type IEventChannelSubscription, type IEventHubSubscription, type IEventContext } from '@migaia/event-subscriber';\nconst channel = createEventChannel<number>();\nconst listener = (event: IEventContext<number>): void => { void event.value; };\nconst textListener = (event: IEventContext<string>): void => { void event.value; };\nconst channelHandle: IEventChannelSubscription<number> = channel.subscribe(listener);\nchannelHandle.subscribe(listener);\n// @ts-expect-error The default style does not install the on alias.\nchannel.on(listener);\nconst styled = createEventChannel<number>({ style: 'on-emit' });\nconst styledHandle = styled.on(listener).on(listener); styledHandle.off(); styled.emit(1);\nconst style = defineEventApiStyle({ subscribe: 'observe', publish: 'dispatch', unsubscribe: 'dispose' });\nconst custom = createEventChannel<number, void, typeof style>({ style });\nconst customHandle = custom.observe(listener).observe(listener); customHandle.dispose(); custom.dispatch(1);\nconst listenStyle = createEventChannel<number>({ style: 'listen-fire' });\nlistenStyle.listen(listener).unlisten(); listenStyle.fire(1);\nconst asConstStyle = { subscribe: 'watch', publish: 'send' } as const;\nconst asConstCustom = createEventChannel<number, void, typeof asConstStyle>({ style: asConstStyle });\nasConstCustom.watch(listener); asConstCustom.send(1);\nconst widenedStyle: { readonly subscribe: string; readonly publish: string } = { subscribe: 'observe', publish: 'dispatch' };\nconst widened = createEventChannel<number, void, typeof widenedStyle>({ style: widenedStyle });\n// @ts-expect-error A widened custom style must not expose an arbitrary exact alias.\nwidened.observe(listener);\n// @ts-expect-error Channel custom styles require the explicit third style generic.\ncreateEventChannel<number>({ style: { subscribe: 'observe', publish: 'dispatch' } });\n// @ts-expect-error custom collision is rejected at the options boundary\ncreateEventChannel<number, void, { readonly subscribe: 'publish'; readonly publish: 'emit' }>({ style: { subscribe: 'publish', publish: 'emit' } });\nconst hub = createEventHub<{ ready: number; done: string }>();\nconst hubHandle: IEventHubSubscription<{ ready: number; done: string }, 'ready'> = hub.subscribe('ready', listener);\nhubHandle.subscribe('done', (event) => { const value: string = event.value; void value; });\n// @ts-expect-error finite key cannot repeat in one chain\nhubHandle.subscribe('ready', listener);\nconst styledHub = createEventHub<{ ready: number; done: string }>({ style: 'on-emit' });\nconst styledHubHandle = styledHub.on('ready', listener).on('done', textListener); styledHubHandle.off();\nconst customHub = createEventHub<{ ready: number }, typeof style>({ style });\nconst customHubHandle = customHub.observe('ready', listener); customHubHandle.dispose(); customHub.dispatch('ready', 1);\n// @ts-expect-error Hub custom styles require the explicit second style generic.\ncreateEventHub<{ ready: number }>({ style: { subscribe: 'observe', publish: 'dispatch' } });\nconst wide = createEventHub<Record<string, number>>();\nwide.subscribe('dynamic', listener).subscribe('dynamic', listener);\nconst result = invokeParallelSettled(channel, 1); const result2 = invokeParallel(channel, 1); const result3 = invokeSerialSettled(channel, 1); const result4 = invokeSerial(channel, 1); const result5 = invokeTaskSettled(channel, 'task', 1); const result6 = invokeTask(channel, 'task', 1); void [result, result2, result3, result4, result5, result6];\n// @ts-expect-error legacy publish helper exports are intentionally removed.\nimport { publishParallel } from '@migaia/event-subscriber';\nvoid publishParallel;\n",
       'utf8'
     )
+    writeFileSync(
+      join(consumerDirectory, 'subscriber-runtime.mjs'),
+      "import { createEventChannel } from '@migaia/event-subscriber';\nimport { subscribeOnce, subscribeSubscriber, subscribeUntil } from '@migaia/event-subscriber/subscriber';\nconst channel = createEventChannel({ style: 'on-emit' });\nconst onceStop = subscribeOnce(channel, () => {}); if ('off' in onceStop) throw new Error('helper leaked style alias'); onceStop();\nconst subscriberStop = subscribeSubscriber(channel, { handle: () => {} }); subscriberStop();\nconst controller = new AbortController(); const untilStop = subscribeUntil(channel, controller.signal, () => {}); untilStop();\n",
+      'utf8'
+    )
+    writeFileSync(
+      join(consumerDirectory, 'subscriber-types.ts'),
+      "import { createEventChannel } from '@migaia/event-subscriber';\nimport { subscribeOnce, type IUnsubscribe } from '@migaia/event-subscriber/subscriber';\nconst stop: IUnsubscribe = subscribeOnce(createEventChannel<number>({ style: 'on-emit' }), () => undefined); stop();\n// @ts-expect-error Standalone helpers return canonical handles without style aliases.\nstop.off();\n",
+      'utf8'
+    )
     execFileSync(process.execPath, [join(consumerDirectory, 'runtime.mjs')], {
+      cwd: consumerDirectory,
+      stdio: 'inherit'
+    })
+    execFileSync(process.execPath, [join(consumerDirectory, 'subscriber-runtime.mjs')], {
       cwd: consumerDirectory,
       stdio: 'inherit'
     })
@@ -87,6 +101,24 @@ function main() {
         '--moduleResolution',
         'NodeNext',
         'types.ts'
+      ],
+      { cwd: consumerDirectory, stdio: 'inherit' }
+    )
+    execFileSync(
+      'pnpm',
+      [
+        'exec',
+        'tsc',
+        '--noEmit',
+        '--strict',
+        '--skipLibCheck',
+        '--target',
+        'ES2022',
+        '--module',
+        'NodeNext',
+        '--moduleResolution',
+        'NodeNext',
+        'subscriber-types.ts'
       ],
       { cwd: consumerDirectory, stdio: 'inherit' }
     )

@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { ACTIVE_CALLABLE_CASES, assertSdd, authoritativeSdd, parseSdd } from './sdd-validator.js'
 
 describe('runtime-neutral boundary', () => {
-  it('ES-T12 ships one side-effect-free root with only the admitted utils foundation dependency', () => {
+  it('ES-T12 ships side-effect-free admitted entries with only the utils foundation dependency', () => {
     const packageRoot = resolve(import.meta.dirname, '..')
     const manifest = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8')) as {
       readonly sideEffects?: boolean
@@ -13,7 +13,7 @@ describe('runtime-neutral boundary', () => {
     }
     expect(manifest.sideEffects).toBe(false)
     expect(manifest.dependencies ?? {}).toEqual({ '@migaia/utils': 'workspace:^' })
-    expect(Object.keys(manifest.exports ?? {})).toEqual(['.'])
+    expect(Object.keys(manifest.exports ?? {})).toEqual(['.', './subscriber'])
   })
 
   it('ES-T17 confines host scheduler access to the terminal adapter', () => {

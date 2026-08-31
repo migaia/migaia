@@ -1,15 +1,23 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
 
-/** Builds the single runtime-neutral event-subscriber entry. */
+/** Builds runtime-neutral root and focused subscription-helper entries. */
 export default defineConfig({
   cacheDir: fileURLToPath(new URL('../../node_modules/.vite/event-subscriber', import.meta.url)),
   build: {
     target: 'es2020',
-    lib: { entry: 'src/index.ts', formats: ['es'], fileName: () => 'index.js' },
+    lib: {
+      entry: {
+        index: 'src/index.ts',
+        subscriber: 'src/subscriber.ts'
+      },
+      formats: ['es'],
+      fileName: (_format, entryName) => `${entryName}.js`
+    },
     sourcemap: true,
     rollupOptions: {
-      external: [/^@migaia\/utils(?:\/|$)/]
+      external: [/^@migaia\/utils(?:\/|$)/],
+      preserveEntrySignatures: 'strict'
     }
   }
 });

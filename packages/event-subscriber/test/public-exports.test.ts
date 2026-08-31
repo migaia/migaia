@@ -7,8 +7,15 @@ import {
   type IEventSubscriber
 } from '../src/index.js'
 import { describe, expect, it } from 'vitest'
+import * as SubscriberEntry from '../src/subscriber.js'
 
 describe('public exports', () => {
+  it('ES-T182 exposes subscription helpers through the focused subscriber entry', () => {
+    expect(SubscriberEntry.subscribeOnce).toBe(EventSubscriber.subscribeOnce)
+    expect(SubscriberEntry.subscribeUntil).toBe(EventSubscriber.subscribeUntil)
+    expect(SubscriberEntry.subscribeSubscriber).toBe(EventSubscriber.subscribeSubscriber)
+  })
+
   it('ES-T16 exposes one root with all runtime helpers', () => {
     expect(EventSubscriber.createEventChannel).toBeTypeOf('function')
     expect(EventSubscriber.createEventHub).toBeTypeOf('function')

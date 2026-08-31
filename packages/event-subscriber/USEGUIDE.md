@@ -139,8 +139,9 @@ style 是构造阶段的一次性命名投影。四个 preset 映射如下：
 
 ```ts
 const events = createEventChannel<number>({ style: 'on-trigger' })
-events.on((event) => console.log(event.value))
+const off = events.on((event) => console.log(event.value))
 events.trigger(1)
+off.off()
 
 const style = defineEventApiStyle({
   subscribe: 'observe',
@@ -152,6 +153,8 @@ const customHandle = custom.observe((event) => console.log(event.value))
 custom.dispatch(1)
 customHandle.dispose()
 ```
+
+第一段中，`on()` 创建一条独立 registration，返回值 `off` 只控制这次订阅；`trigger(1)` 同步把 `1` 交给当前监听器；`off.off()` 后再次发布不会再调用它。第二段只是把这三个动作改名为 `observe()`、`dispatch()`、`dispose()`。preset 和自定义 style 都不改变交付顺序、错误处理或资源所有权，也不会增加 queue、drain、backpressure 或跨进程传输能力。
 
 例如，`createEventChannel<number>({ style: { subscribe: 'observe', publish: 'dispatch' } })` 会被 TypeScript 拒绝；请写成 `createEventChannel<number, void, typeof style>({ style })`，或直接在第三个泛型中给出 custom style。Hub 同理使用第二个泛型。
 
@@ -184,10 +187,10 @@ import {
   subscribeUntil,
   subscribeSubscriber,
   type IEventSubscriber
-} from '@migaia/event-subscriber'
+} from '@migaia/event-subscriber/subscriber'
 ```
 
-这三个 helper 只需要结构化 `IEventChannelLike<T, R>`（有 `subscribe(listener, options?)` 方法即可），因此也能用于兼容结构的第三方 channel，不要求是 `createEventChannel()` 产出的实例。
+这三个 helper 只调用 canonical `subscribe(listener, options?)`，因此可接收保留该方法的 styled channel，也能用于结构兼容的第三方 channel，不要求是 `createEventChannel()` 产出的实例。但 helper 本身**不读取 style 配置**：导出名固定，返回值固定为 canonical `IUnsubscribe`，不会投影 `off`、`dispose`、`unlisten` 等 alias。需要 styled handle 时，直接调用 channel 实例上的 `subscribeOnce()` / `subscribeUntil()`。
 
 ### `subscribeOnce`
 
@@ -249,16 +252,24 @@ type IEventSubscriber<T, R = void> = { handle(event: IEventContext<T>): R | Prom
 用对象而非函数订阅，保留 `this`：
 
 ```ts
+import { createEventChannel } from '@migaia/event-subscriber'
+import { subscribeSubscriber, type IEventSubscriber } from '@migaia/event-subscriber/subscriber'
+
 class Counter implements IEventSubscriber<number> {
   total = 0
   handle(event: { readonly value: number }) {
     this.total += event.value
   }
 }
+const channel = createEventChannel<number>()
 subscribeSubscriber(channel, new Counter())
 ```
 
 `channel`、`subscriber` 均必填，`subscriber` 必须是携带可调用 `handle` 方法的对象。`subscriber` 非对象或缺少可调用 `handle` 抛 `INVALID_SUBSCRIBER`。返回 `IUnsubscribe`。
+
+旧草案曾提供 `abstract class EventSubscriber`，要求子类声明静态 `EVENT_NAME`，并实现 `onCall()`。当前版本已经明确移除该设计：它会让 payload 同时受 class 的 `EVENT_NAME` 与容器 key 两套信息约束，而 TypeScript 也不能强制子类实现 abstract static 字段。
+
+因此当前的 `IEventSubscriber` 只要求一个 `handle(event)` 方法；`Counter` 不声明 `EVENT_NAME`（也不是 `EVENTNAME`）。`subscribeSubscriber(channel, subscriber)` 通过 `channel` 确定事件来源。需要在同一个容器中按名字路由多种事件时，使用 `createEventHub<{ count: number }>()`，并调用 `hub.subscribe('count', listener)`：名称属于 Hub 的订阅 key，不属于 subscriber class。
 
 ---
 
@@ -356,8 +367,31 @@ function invokeTask<T, R>(
 精确选择唯一一个 `taskId` 并等待其结算，不调用 `report`：
 
 ```ts
+import { createEventChannel, invokeTaskSettled } from '@migaia/event-subscriber'
+
+type IEmailJob = { readonly recipient: string; readonly template: 'welcome' }
+type IEmailReceipt = { readonly messageId: string }
+
+const tasks = createEventChannel<IEmailJob, IEmailReceipt>()
+tasks.subscribe(
+  async ({ value: job }) => {
+    const response = await fetch('/api/email', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(job)
+    })
+    return response.json() as Promise<IEmailReceipt>
+  },
+  { taskId: 'email' }
+)
+
+const job: IEmailJob = { recipient: 'ada@example.com', template: 'welcome' }
 const result = await invokeTaskSettled(tasks, 'email', job)
+// result 是 { status: 'fulfilled', value: { messageId } }
+// 或 { status: 'rejected', reason }
 ```
+
+`tasks` 是这个示例自己创建的 canonical event channel，不是库内置变量。`tasks.subscribe(..., { taskId: 'email' })` 把唯一标识绑在这条 registration 上；`invokeTaskSettled(tasks, 'email', job)` 用相同标识选择它，并把 `job` 作为 `event.value` 传入。这样调用者既能检查成功返回的 `messageId`，也能在 `rejected` 分支读取原始失败原因。
 
 入口快照匹配数为 0 时**同步**抛 `TASK_NOT_FOUND`；匹配数大于 1 时**同步**抛 `TASK_NOT_UNIQUE`（错误对象携带可枚举的 `taskId`/`matchCount` 字段）；选择动作发生在任何 listener 调用之前。`invokeTask` 是 throwing 版本：listener 失败时以携带 `PUBLISH_FAILED` 码的 `AggregateError`（内含单个原始失败）reject。
 

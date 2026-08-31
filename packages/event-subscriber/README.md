@@ -80,6 +80,8 @@ events.emit(1)
 stop.off()
 ```
 
+这段代码选择 `on-emit` 命名风格：`on()` 登记监听器，并返回只属于这次订阅的取消句柄 `stop`；`emit(1)` 同步把值 `1` 交给当前监听器；`stop.off()` 删除这条 registration，之后再次 `emit()` 不会再调用它。这里的 `on`、`emit`、`off` 只是 `subscribe`、`publish`、`unsubscribe` 的别名，不会改变同步交付、错误聚合或退订语义。
+
 内置 preset：`subscribe-publish`（默认）、`on-emit`、`on-trigger`、`listen-fire`。自定义 style 使用语义到名称的对象映射；预声明变量可用 `defineEventApiStyle()` 保留字面量：
 
 ```ts
@@ -93,6 +95,8 @@ const handle = events.observe((event) => console.log(event.value))
 events.dispatch(1)
 handle.dispose()
 ```
+
+自定义 style 只改变调用者看到的方法名：`observe()` 创建 registration，`dispatch(1)` 同步发布，`handle.dispose()` 只撤销这一次订阅。它适合接入已有代码的命名习惯，不适合用来伪装不同的事件模型；如果需要排队、背压或异步结算，应选择对应的调度或 helper API。
 
 Channel 的泛型顺序是 `<T, R, S>`，其中 `S` 是 custom style；因此显式指定 `T` 时，内联 custom style 必须显式提供第三个泛型。`createEventChannel<number>({ style: { subscribe: 'observe', publish: 'dispatch' } })` 不会声称推导出精确 alias。Hub 的顺序是 `<C, S>`。
 
@@ -110,10 +114,10 @@ import {
   subscribeUntil,
   subscribeSubscriber,
   type IEventSubscriber
-} from '@migaia/event-subscriber'
+} from '@migaia/event-subscriber/subscriber'
 ```
 
-这三个 helper 只需要结构化 `IEventChannelLike<T, R>`（有 `subscribe(listener, options?)` 方法即可），因此也能用于兼容结构的第三方 channel。
+这三个 helper 只调用 canonical `subscribe(listener, options?)`，因此可接收保留该方法的 styled channel，也能用于结构兼容的第三方 channel；但它们**不读取 style 配置**，函数名固定为 `subscribeOnce` / `subscribeUntil` / `subscribeSubscriber`，返回值固定为 canonical `IUnsubscribe`，不会带上 `off`、`dispose`、`unlisten` 等 style alias。需要 styled handle 时，请直接调用 channel 自己的 `subscribeOnce()` / `subscribeUntil()` 方法。
 
 **`subscribeOnce`｜5 秒上手** —— 只执行一次，调用 listener **之前**先退订：
 
@@ -136,16 +140,24 @@ controller.abort('owner closed')
 **`subscribeSubscriber`｜5 秒上手** —— 用对象而非函数订阅，保留 `this`：
 
 ```ts
+import { createEventChannel } from '@migaia/event-subscriber'
+import { subscribeSubscriber, type IEventSubscriber } from '@migaia/event-subscriber/subscriber'
+
 class Counter implements IEventSubscriber<number> {
   total = 0
   handle(event: { readonly value: number }) {
     this.total += event.value
   }
 }
+const channel = createEventChannel<number>()
 subscribeSubscriber(channel, new Counter())
 ```
 
 参数：`channel: IEventChannelLike<T, R>`（必填）、`subscriber: { handle(event): R | PromiseLike<R> }`（必填，必须实现 `handle`）。返回 `IUnsubscribe`。`subscriber` 非对象或缺少可调用 `handle` 抛 `INVALID_SUBSCRIBER`。
+
+如果你用过旧草案里的 `abstract class EventSubscriber`，可能会记得 class 需要声明静态 `EVENT_NAME`，并通过 `onCall()` 接收事件。那套接口没有进入当前公开契约：同一份 payload 会同时由 `EVENT_NAME` 和外部容器的 key 描述，而且 TypeScript 不能要求实现类提供 abstract static 字段。
+
+当前的 `IEventSubscriber` 只是 `{ handle(event) }` 这一个对象形状，所以 `Counter` 不声明 `EVENT_NAME`（也不是 `EVENTNAME`）。它订阅哪个事件，由传给 `subscribeSubscriber(channel, subscriber)` 的 `channel` 决定。需要在同一容器中按名字区分多种事件时，把名字放在 Hub 的订阅位置：`hub.subscribe('count', listener)`。也就是说，单事件用不同 channel 区分来源，多事件用 Hub key 路由；事件名不再存进 subscriber class。
 
 ---
 
@@ -200,8 +212,31 @@ const values = await invokeSerial(channel, payload)
 **`invokeTaskSettled`｜10 秒上手** —— 精确选择唯一一个 `taskId` 并等待其结算，不调用 reporter：
 
 ```ts
+import { createEventChannel, invokeTaskSettled } from '@migaia/event-subscriber'
+
+type IEmailJob = { readonly recipient: string; readonly template: 'welcome' }
+type IEmailReceipt = { readonly messageId: string }
+
+const tasks = createEventChannel<IEmailJob, IEmailReceipt>()
+tasks.subscribe(
+  async ({ value: job }) => {
+    const response = await fetch('/api/email', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(job)
+    })
+    return response.json() as Promise<IEmailReceipt>
+  },
+  { taskId: 'email' }
+)
+
+const job: IEmailJob = { recipient: 'ada@example.com', template: 'welcome' }
 const result = await invokeTaskSettled(tasks, 'email', job)
+// result 是 { status: 'fulfilled', value: { messageId } }
+// 或 { status: 'rejected', reason }
 ```
+
+这里的 `tasks` 不是特殊类型或全局任务表，而是由 `createEventChannel<IEmailJob, IEmailReceipt>()` 创建的普通 channel。登记 listener 时用 `{ taskId: 'email' }` 给这条 registration 命名；调用时再用同一个 `'email'` 精确找到它。`job` 会成为 listener 收到的 `event.value`，`result` 则明确区分发送成功的 receipt 与发送失败的原因。
 
 参数：`channel: ICanonicalEventChannel<T, R>`（必填）、`taskId: string`（必填）、`value: T`（必填），无选项。入口快照匹配数为 0 时同步抛 `TASK_NOT_FOUND`；多个时同步抛 `TASK_NOT_UNIQUE`（错误对象携带可枚举的 `taskId`/`matchCount`），选择动作发生在任何 listener 调用之前。
 
