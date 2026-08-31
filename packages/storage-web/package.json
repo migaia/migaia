@@ -1,6 +1,6 @@
 {
   "name": "@migaia/storage-web",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": true,
   "description": "Independent web storage library: localStorage, sessionStorage, cookies, IndexedDB CRUD with entity, schema and serialize extension points.",
   "repository": {
@@ -124,8 +124,8 @@
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
   "dependencies": {
-    "@migaia/event-subscriber": "workspace:^",
     "@migaia/capability": "workspace:^",
+    "@migaia/event-subscriber": "workspace:^",
     "@migaia/lifecycle": "workspace:^",
     "@migaia/plugin-host": "workspace:^",
     "@migaia/reactive": "workspace:^",
