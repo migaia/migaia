@@ -1,6 +1,6 @@
 {
   "name": "@migaia/reactive",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "description": "Store-neutral reactive runtime, signals, computed values, and effects.",
   "license": "MIT",
