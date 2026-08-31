@@ -1,6 +1,6 @@
 {
   "name": "@migaia/utils",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": true,
   "description": "Runtime-neutral reusable utility primitives.",
   "license": "MIT",
