@@ -1,10 +1,23 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Logger } from '../src/index.js'
 import { batch } from '../src/plugins/batch.js'
 import { http } from '../src/plugins/http.js'
 import { process as processPlugin } from '../src/plugins/process.js'
 import { LoggerErrorCode, LOGGER_SOURCE } from '../src/errors.js'
 import { setLoggerRuntimeManager } from '../src/runtime-manager.js'
+import { installSilentLoggerReporter } from './helpers/silent-runtime.js'
+
+/** Restores the reporter layer installed for the currently running scheduler case. */
+let restoreSilentReporter: (() => void) | undefined
+
+beforeEach(() => {
+  restoreSilentReporter = installSilentLoggerReporter()
+})
+
+afterEach(() => {
+  restoreSilentReporter?.()
+  restoreSilentReporter = undefined
+})
 
 type ITask = { cancel(): void }
 

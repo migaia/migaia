@@ -3,6 +3,7 @@ import { configDefaults, defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'jsdom',
+    setupFiles: ['test/setup.ts'],
     // e2e/*.spec.ts 用的是 @playwright/test 的 test()，只能由 playwright 自己的
     // runner 执行（见 e2e/playwright.config.ts）；vitest 默认的 testMatch 会
     // 误把它们当成自己的测试文件，必须显式排除。
