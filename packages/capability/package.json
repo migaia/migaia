@@ -25,6 +25,10 @@
     "./graph/topology": {
       "types": "./dist/graph/topology.d.ts",
       "default": "./dist/graph/topology.js"
+    },
+    "./graph/dynamic": {
+      "types": "./dist/graph/dynamic.d.ts",
+      "default": "./dist/graph/dynamic.js"
     }
   },
   "scripts": {

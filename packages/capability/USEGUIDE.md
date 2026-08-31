@@ -6,6 +6,7 @@
 
 - [导入与运行环境](#导入与运行环境)
 - [静态 Capability Graph](#静态-capability-graph)
+- [Dynamic Capability Graph](#dynamic-capability-graph)
 - [状态机](#状态机)
 - [宿主创建与开关快照](#宿主创建与开关快照)
 - [完整 API 参考](#完整-api-参考)
@@ -430,3 +431,25 @@ await capabilities.dispose(); // LIFO 释放全部已启用能力，之后 host 
 ```bash
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
+## Dynamic Capability Graph
+
+```ts
+import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic';
+
+const graph = createDynamicCapabilityGraph<{ readonly version: number }>({
+  startBatch: (entries) =>
+    entries.map((entry) => ({ value: entry.binding, release: async () => undefined })),
+  releaseBatch: async (entries, fence) => {
+    await fence;
+    // 这里只释放 entries 对应的 exact old generation。
+  }
+});
+```
+
+`getBinding()` 是非 owning 诊断读取；需要把 binding 保留到异步工作结束时必须使用
+`acquireBinding()`，并在 `finally` 调用 lease 的 `release()`。Graph 对 remove/replace/dispose 的旧 generation
+先 seal 后 drain，新 generation 使用不同 lease key，因而晚到的旧 release 不会替新 binding 解锁。
+
+`releaseBatch` 收到的 `fence` 只在所有 exact leases 归零后 resolve。owner 可以先提交逻辑撤销并返回
+incomplete observation，但不能在 fence 之前启动物理 disposer。`metrics.queueTimeMs` 只计算 mutation 在 Graph
+FIFO 中等待的时间；`wallTimeMs` 计算实际 affected reconciliation，二者不可相互替代。
