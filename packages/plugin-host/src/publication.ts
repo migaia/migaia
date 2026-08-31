@@ -112,3 +112,34 @@ export const createPluginHostPublication = <
   })
   return Object.freeze(view) as IPluginHostView<THost, TViewPlugins>
 }
+
+/** Materializes only extension capabilities for one exact registration token. */
+export const createPluginHostExtensionPublication = <THost, TDomainCore extends object, TValue>(
+  registrations: readonly IRegistration<TDomainCore, TValue>[],
+  host: THost,
+  assertLive: (registrations: readonly IRegistration<TDomainCore, TValue>[]) => void
+): Readonly<{ readonly extensions: Readonly<Record<PropertyKey, unknown>> }> => {
+  const captured = Object.freeze([...registrations])
+  const extensions = Object.create(null) as Record<PropertyKey, unknown>
+  for (const registration of captured)
+    for (const { key, descriptor } of registration.extensions) {
+      const value = descriptor.value
+      const published =
+        typeof value === 'function'
+          ? (...args: unknown[]) => invokeCaptured(value, host, args)
+          : value
+      Object.defineProperty(extensions, key, {
+        value: published,
+        enumerable: true,
+        configurable: false,
+        writable: false
+      })
+    }
+  Object.freeze(extensions)
+  return Object.freeze({
+    get extensions() {
+      assertLive(captured)
+      return extensions
+    }
+  })
+}

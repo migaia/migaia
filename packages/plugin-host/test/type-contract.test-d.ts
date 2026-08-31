@@ -4,8 +4,14 @@ import {
   type IPlugin,
   type IPluginHostCompositionIntegration,
   type IPluginHostOptions,
+  type IPluginRegistrationReceipt,
   PluginHost
 } from '../src/index.js'
+import {
+  createView,
+  type IRegistrationToken,
+  type IRegistrationView
+} from '../src/composition-entry.js'
 
 type IContractA = IPlugin<{}, { aExtension: string }, { aConfig: number }, { aShared: boolean }> & {
   readonly name: 'a'
@@ -42,6 +48,15 @@ void compositionIntegration.createPluginAdmission(contractA)
 void compositionIntegration.createDataOrderSlot('a')
 void compositionIntegration.getCurrentView()
 void compositionIntegration.revision
+
+declare const legacyToken: IPluginRegistrationReceipt<IContractA>
+declare const canonicalToken: IRegistrationToken<IContractA>
+const canonicalFromLegacy: IRegistrationToken<IContractA> = legacyToken
+const legacyFromCanonical: IPluginRegistrationReceipt<IContractA> = canonicalToken
+const canonicalView: IRegistrationView<IContractA> = createView(canonicalToken)
+void canonicalFromLegacy
+void legacyFromCanonical
+void canonicalView.extensions.aExtension
 
 // @ts-expect-error Host must reject plugins requiring capabilities it does not provide.
 restrictedHost.use(adminPlugin)

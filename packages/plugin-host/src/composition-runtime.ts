@@ -180,7 +180,11 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
         )
     this.#port.publish(state.installed, state.batch)
     state.committed = true
-    return Object.freeze(state.installed.map(createRegistrationReceipt))
+    return Object.freeze(
+      state.installed.map((registration) =>
+        createRegistrationReceipt(registration, this.#port.host)
+      )
+    )
   }
 
   /** Rolls back an unpublished candidate and returns exact cleanup observations. */

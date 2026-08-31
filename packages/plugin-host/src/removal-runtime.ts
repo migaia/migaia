@@ -5,6 +5,7 @@ import { PluginHostErrorCode } from './error-code.js'
 import { invokeCaptured } from './invocation.js'
 import type { IRegistration, ISharedEntry } from './registry.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
+import { markRegistrationRevoked } from './composition.js'
 import type { IPluginDisposalContext } from './typing.js'
 
 export type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = Readonly<{
@@ -32,6 +33,7 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
   /** Removes a registration from every committed registry without invoking user code. */
   revokeRegistration(registration: IRegistration<TDomainCore, TValue>): unknown[] {
     const errors: unknown[] = []
+    markRegistrationRevoked(registration)
     registration.lifecycle = PluginHostRegistrationLifecycle.dispose
     for (const detach of [...registration.pipelineDisposers].reverse()) {
       try {

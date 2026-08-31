@@ -24,6 +24,10 @@
       "types": "./dist/defined.d.ts",
       "default": "./dist/defined.js"
     },
+    "./composition": {
+      "types": "./dist/composition-entry.d.ts",
+      "default": "./dist/composition-entry.js"
+    },
     "./structural": {
       "types": "./dist/structural.d.ts",
       "default": "./dist/structural.js"

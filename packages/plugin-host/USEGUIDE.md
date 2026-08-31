@@ -568,3 +568,19 @@ pnpm --filter @migaia/plugin-host test
 
 **Q：`host.dispose()` 卡住不 resolve。**
 先检查是否存在某个 disposer 反过来 `await` 了触发它的这次 `dispose()` 调用——这是循环等待，见 [§8](#8-生命周期与错误)。默认情况下 `disposeStepTimeoutMs` 是 5000ms，超时后这一步会被计为 `DISPOSE_STEP_TIMEOUT` 失败并继续推进，最终仍会收敛到 `disposed`；如果 `dispose()` 迟迟不 resolve，检查是否传了 `disposeStepTimeoutMs: false`（永久等待，不会强制推进）。
+
+## Composition registration view
+
+`@migaia/plugin-host/composition` 是独立的 composition 子路径：
+
+```ts
+import {
+  createView,
+  type IRegistrationToken,
+  type IRegistrationView
+} from '@migaia/plugin-host/composition'
+```
+
+`createView(token)` 只发布该 exact registration 的 extensions。token 是 opaque identity，foreign
+或已撤销 token 会 fail closed；view 不包含 Host、config、shared 或 mutation 能力。历史
+`IPluginRegistrationReceipt` 仍是 deprecated 的 `IRegistrationToken` 类型别名，保持编译兼容。
