@@ -176,8 +176,11 @@ publish: check-package git-publish-check auth-check
 	branch=$$(git symbolic-ref --quiet --short HEAD); \
 	echo "==> pushing $$branch before registry mutation"; \
 	git push origin "HEAD:$$branch"; \
-	local_tag_commit=$$(git rev-parse "$$tag^{commit}" 2>/dev/null || true); \
-	remote_tag_commit=$$(git ls-remote --tags origin "refs/tags/$$tag" | awk '{print $$1}'); \
+	local_tag_commit=$$(git rev-parse --verify "$$tag^{commit}" 2>/dev/null || true); \
+	remote_tag_commit=$$(git ls-remote --tags origin "refs/tags/$$tag^{}" | awk '{print $$1}'); \
+	if [ -z "$$remote_tag_commit" ]; then \
+		remote_tag_commit=$$(git ls-remote --tags origin "refs/tags/$$tag" | awk '{print $$1}'); \
+	fi; \
 	for tag_commit in $$local_tag_commit $$remote_tag_commit; do \
 		[ "$$tag_commit" = "$$release_commit" ] || { echo "Release tag points at the wrong commit: $$tag" >&2; exit 1; }; \
 	done; \
