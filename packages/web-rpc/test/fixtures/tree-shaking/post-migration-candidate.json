@@ -3,9 +3,9 @@
   "status": "approved",
   "approval": {
     "status": "approved",
-    "decisionId": "WRC-C-B11-decision-20260831-SHIP-DRY-RUN-R1",
-    "keyId": "coordinator-ed25519-a5907cf9ee31549e",
-    "digest": "a5907cf9ee31549e6c0c9ec3e7cbecb389dd17ee23dda56480970051e5955995",
+    "decisionId": "WRC-C-B11-decision-20260831-CROSS-HOST-R3",
+    "keyId": "coordinator-ed25519-cf67090f4b18e27a",
+    "digest": "cf67090f4b18e27a189a6deec6303d78a3ba187c8cedd8f1a639bc89c1e14531",
     "oldTuple": {
       "moduleCount": 53,
       "rawBytes": 250129,
@@ -29,7 +29,7 @@
     "custody": "two byte-identical canonical builds plus signed current-source attribution",
     "attributionKinds": ["import-edge", "entry-root", "generated-artifact"]
   },
-  "provenanceDigest": "a5907cf9ee31549e6c0c9ec3e7cbecb389dd17ee23dda56480970051e5955995",
+  "provenanceDigest": "cf67090f4b18e27a189a6deec6303d78a3ba187c8cedd8f1a639bc89c1e14531",
   "oldTuple": {
     "moduleCount": 53,
     "rawBytes": 250129,
