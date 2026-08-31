@@ -323,6 +323,15 @@ describe('logger error-code contract (E-T9)', () => {
 
   it('LIFECYCLE_DEADLINE reports a real never-settling sink after its deadline', async () => {
     vi.useFakeTimers()
+    /** Captures the required deadline diagnostic without leaking it to the test process stderr. */
+    const report = vi.fn()
+    /** Restores the host runtime after the intentionally failing sink completes. */
+    const restore = setLoggerRuntimeManager({
+      randomUUID: () => 'lifecycle-deadline-code',
+      defer: (task) => task(),
+      write: () => undefined,
+      console: { log: () => undefined, warn: () => undefined, error: report }
+    })
     let release: (() => void) | undefined
     try {
       const logger = new Logger({
@@ -348,10 +357,19 @@ describe('logger error-code contract (E-T9)', () => {
         source: LOGGER_SOURCE,
         code: LoggerErrorCode.lifecycleDeadline
       })
+      expect(report).toHaveBeenCalledWith(
+        '[logger] flush 异常:',
+        expect.objectContaining({
+          source: LOGGER_SOURCE,
+          code: LoggerErrorCode.lifecycleDeadline,
+          message: LoggerErrorText.pendingAfterFlushDeadline
+        })
+      )
       expect((failure as Error & { cause?: unknown }).cause).toBeUndefined()
       release?.()
       await logger.shutdown('manual')
     } finally {
+      restore()
       vi.useRealTimers()
     }
   })
