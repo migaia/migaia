@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
@@ -43,4 +44,26 @@ test('rejects a release plan whose consumer precedes its dependency', () => {
     () => verifyReleasePlan(repositoryRoot, packageNames),
     /capability appears before dependency lifecycle/
   )
+})
+
+test('ship dry-run cannot reach release mutations', () => {
+  /** Expanded dry-run command graph emitted by Make without executing recipes. */
+  const commandGraph = execFileSync('make', ['-n', 'ship-dry-run'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8'
+  })
+  assert.match(commandGraph, /oxfmt --check/)
+  assert.match(commandGraph, /pack --dry-run --json/)
+  assert.match(commandGraph, /Missing workspace dependencies/)
+  for (const forbidden of [
+    'version patch',
+    'git add',
+    'git commit',
+    'git push',
+    'pnpm publish',
+    'git tag',
+    'pnpm whoami',
+    'git fetch'
+  ])
+    assert.doesNotMatch(commandGraph, new RegExp(forbidden))
 })
