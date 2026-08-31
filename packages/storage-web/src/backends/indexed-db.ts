@@ -2508,7 +2508,10 @@ export const indexedDb = <TValue = unknown>(
   ): Promise<void> => {
     const valueSnapshot = channel === StorageChannel.value ? value : snapshotWriteValue(value, key)
     const database = await open(runtime, inheritedLease)
-    assertLive()
+    // A top-level lease admits the complete operation before disposal starts.
+    // Rechecking global liveness after asynchronous preparation would reject
+    // that admitted write while dispose is correctly waiting for its lease.
+    if (inheritedLease === undefined) assertLive()
     const transaction = createTransaction(
       database,
       [
