@@ -1,0 +1,20922 @@
+import type { IMaintainedDocument, ILocale } from './content.js'
+
+export type IGuideJourney = {
+  readonly document: IMaintainedDocument
+  readonly lede: string
+  readonly next: readonly { readonly label: string; readonly path: string }[]
+  readonly title: string
+}
+
+/** Task-owned guide pages; generated API declarations are intentionally not used as prose. */
+const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IGuideJourney>>>>> = {
+  'store-react:index': {
+    zh: {
+      title: 'Store React 学习路径',
+      lede: '这一层只把 Store、Atom 和 Resource 接到 React 订阅与作用域模型，不重新定义状态。先确定 Provider 所有权，再选择最窄的 Hook。',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: '先按状态来源选择 Hook',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['状态来源', '入口', 'Provider'],
+                rows: [
+                  ['Store Light', 'useStore', '可选，直接订阅实例'],
+                  ['单个 Signal', 'useSignal', '不需要'],
+                  ['动态响应式读取', 'useTracked', '不需要，但 Runtime 必须正确'],
+                  ['Atom Definition', 'useAtomDefinition / useSetAtomDefinition', '必须'],
+                  ['Resource', 'useResource / useResourceValue', '不需要'],
+                  ['StoreResource', 'useStoreResource', '不需要，但有渲染版本租约']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'path',
+            heading: '沿 React 生命周期阅读',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Provider 决定 Registry 与 AtomStore 作用域，但永不拥有外部 Runtime。',
+                  'selector 在 render 捕获依赖，在 commit 后才成为正式订阅。',
+                  'Resource Promise 与错误从 render 抛出，交给 Suspense/Error Boundary。',
+                  'Registry owned 实例逆序释放；未 owned 实例仍由调用方负责。',
+                  'SSR 每请求创建独立 Runtime/Registry，不能复用进程级可变作用域。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟建立 Provider 与 Selector', path: 'getting-started' },
+        { label: 'Provider 所有权与 Readiness', path: 'provider-ownership-and-readiness' }
+      ]
+    },
+    en: {
+      title: 'Store React learning paths',
+      lede: 'This layer connects Stores, Atoms, and Resources to React subscriptions and scopes without redefining state. Establish Provider ownership before choosing the narrowest Hook.',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: 'Choose a Hook from the state source',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['State source', 'Entry', 'Provider'],
+                rows: [
+                  ['Store Light', 'useStore', 'Optional; subscribes directly to the instance'],
+                  ['One Signal', 'useSignal', 'Not required'],
+                  ['Dynamic reactive read', 'useTracked', 'Not required, but Runtime must match'],
+                  ['Atom Definition', 'useAtomDefinition / useSetAtomDefinition', 'Required'],
+                  ['Resource', 'useResource / useResourceValue', 'Not required'],
+                  ['StoreResource', 'useStoreResource', 'Not required; owns render-version leases']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'path',
+            heading: 'Read along the React lifecycle',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'A Provider scopes Registry and AtomStore but never owns an external Runtime.',
+                  'A selector captures dependencies during render and becomes a committed subscription only later.',
+                  'Resource Promises and errors throw from render into Suspense or an Error Boundary.',
+                  'Registry-owned values release in reverse order; unowned values remain caller-owned.',
+                  'SSR creates a separate Runtime and Registry per request instead of reusing mutable process state.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Build a Provider and Selector in five minutes', path: 'getting-started' },
+        { label: 'Provider ownership and readiness', path: 'provider-ownership-and-readiness' }
+      ]
+    }
+  },
+  'store-react:getting-started': {
+    zh: {
+      title: '五分钟建立作用域 Store 与精确 Selector',
+      lede: 'Registry 负责依赖注入，useProvidedStore 只订阅 selector 实际读取的字段；Provider unmount 是否释放实例由 owned 与 disposeOnUnmount 共同决定。',
+      document: {
+        sections: [
+          {
+            id: 'scope',
+            heading: '在挂载前注册，在组件中按 Token 读取',
+            blocks: [
+              {
+                type: 'code',
+                language: 'tsx',
+                code: "const sessionToken = createStoreToken<typeof sessionStore>('session')\nconst runtime = createRuntime()\nconst registry = createStoreRegistry(runtime)\nregistry.register(sessionToken, sessionStore, { owned: true })\n\nfunction UserName() {\n  const name = useProvidedStore(sessionToken, (store) => store.name)\n  return <span>{name}</span>\n}\n\nroot.render(\n  <StoreProvider registry={registry} disposeOnUnmount>\n    <UserName />\n  </StoreProvider>\n)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Token debugName 必须非空，并进入缺失注册错误。',
+                  'registry 与显式 runtime 同传时必须引用同一 Runtime。',
+                  'owned: true 让 Registry 释放实例；外部 Runtime 始终由调用方释放。',
+                  'selector 与 isEqual 引用应稳定，避免无意义的重新捕获。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Provider 所有权与 Readiness', path: 'provider-ownership-and-readiness' },
+        { label: 'StoreProvider API', path: 'docs/store-react/StoreProvider' }
+      ]
+    },
+    en: {
+      title: 'Build a scoped Store with a precise Selector in five minutes',
+      lede: 'Registry owns dependency injection, while useProvidedStore subscribes only to fields read by the selector. owned and disposeOnUnmount jointly decide release at Provider unmount.',
+      document: {
+        sections: [
+          {
+            id: 'scope',
+            heading: 'Register before mount and read by Token inside components',
+            blocks: [
+              {
+                type: 'code',
+                language: 'tsx',
+                code: "const sessionToken = createStoreToken<typeof sessionStore>('session')\nconst runtime = createRuntime()\nconst registry = createStoreRegistry(runtime)\nregistry.register(sessionToken, sessionStore, { owned: true })\n\nfunction UserName() {\n  const name = useProvidedStore(sessionToken, (store) => store.name)\n  return <span>{name}</span>\n}\n\nroot.render(\n  <StoreProvider registry={registry} disposeOnUnmount>\n    <UserName />\n  </StoreProvider>\n)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'A Token debugName is non-empty and appears in missing-registration errors.',
+                  'When registry and runtime are both passed, they reference the same Runtime.',
+                  'owned: true lets Registry release the value; an external Runtime always remains caller-owned.',
+                  'Keep selector and isEqual references stable to avoid needless recapture.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Provider ownership and readiness', path: 'provider-ownership-and-readiness' },
+        { label: 'StoreProvider API', path: 'docs/store-react/StoreProvider' }
+      ]
+    }
+  },
+  'store-react:provider-ownership-and-readiness': {
+    zh: {
+      title: '明确 StoreProvider 所有权与 Ready Barrier',
+      lede: 'Provider 可自建 Registry，也可借用外部 Registry；ready 只阻挡子树提交，不是可在每次 render 更换的任务列表。',
+      document: {
+        sections: [
+          {
+            id: 'ownership',
+            heading: '按输入决定默认 dispose 行为',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['输入', 'Registry 所有者', '默认 disposeOnUnmount'],
+                rows: [
+                  ['都不传', 'Provider 自建', 'true'],
+                  ['只传 runtime', 'Provider 自建 Registry', 'true；runtime 仍外部拥有'],
+                  ['只传 registry', '调用方', 'false'],
+                  ['registry + runtime', '调用方', '必须 registry.runtime === runtime']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ready',
+            heading: '锁定 Barrier 元素身份',
+            blocks: [
+              {
+                type: 'code',
+                language: 'tsx',
+                code: 'const ready = useMemo(() => [() => ensureWasm(), session.ready], [session.ready])\nconst config = useMemo(() => ({ ready, fallback: <Loading /> }), [ready])\n\nreturn <StoreProvider config={config}>{children}</StoreProvider>'
+              },
+              {
+                type: 'list',
+                items: [
+                  '挂载后 ready 元素身份变化只报告诊断，不替换当前 barrier。',
+                  '工厂在该 barrier scope 内缓存；非幂等初始化仍应自己 memoize Promise。',
+                  'pending 渲染 fallback；reject 在 render 中抛 Error，必须由外层 Error Boundary 捕获。',
+                  'features.wasm=true 却没有 ready 会 fail-closed，而不是假装初始化完成。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Selector 与并发追踪', path: 'selectors-and-concurrent-tracking' },
+        { label: 'StoreProviderState API', path: 'docs/store-react/StoreProviderState' }
+      ]
+    },
+    en: {
+      title: 'Define StoreProvider ownership and Ready Barriers',
+      lede: 'A Provider may create or borrow a Registry. ready blocks the child tree and is not a task list to replace on every render.',
+      document: {
+        sections: [
+          {
+            id: 'ownership',
+            heading: 'Derive default disposal from supplied ownership',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Input', 'Registry owner', 'Default disposeOnUnmount'],
+                rows: [
+                  ['Neither supplied', 'Provider creates it', 'true'],
+                  ['runtime only', 'Provider creates Registry', 'true; runtime remains external'],
+                  ['registry only', 'Caller', 'false'],
+                  ['registry plus runtime', 'Caller', 'Requires registry.runtime === runtime']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ready',
+            heading: 'Lock Barrier element identity',
+            blocks: [
+              {
+                type: 'code',
+                language: 'tsx',
+                code: 'const ready = useMemo(() => [() => ensureWasm(), session.ready], [session.ready])\nconst config = useMemo(() => ({ ready, fallback: <Loading /> }), [ready])\n\nreturn <StoreProvider config={config}>{children}</StoreProvider>'
+              },
+              {
+                type: 'list',
+                items: [
+                  'Changing ready element identity after mount reports a diagnostic without replacing the active barrier.',
+                  'A factory caches within this barrier scope; non-idempotent initialization still memoizes its own Promise.',
+                  'pending renders fallback; rejection throws an Error during render for an outer Error Boundary.',
+                  'features.wasm=true without ready fails closed instead of pretending initialization completed.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Selectors and concurrent tracking', path: 'selectors-and-concurrent-tracking' },
+        { label: 'StoreProviderState API', path: 'docs/store-react/StoreProviderState' }
+      ]
+    }
+  },
+  'store-react:selectors-and-concurrent-tracking': {
+    zh: {
+      title: '选择最窄 Hook，并保持并发订阅一致',
+      lede: 'useSyncExternalStore 只解决 React 订阅协议；真正的依赖集合来自 Runtime capture/commit，放弃的 render 不能污染已提交订阅。',
+      document: {
+        sections: [
+          {
+            id: 'hooks',
+            heading: '依赖越固定，Hook 越轻',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Hook', '依赖形状', '用途'],
+                rows: [
+                  ['useSignal', '固定一个 Signal', '值与稳定 setter'],
+                  ['useNodeValue', '固定一个 stable node', '自定义单节点适配'],
+                  ['useStore', 'selector 动态读取字段', 'Store Light 精确订阅'],
+                  ['useTracked', 'read 中任意动态节点', '组合多个响应式来源']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'concurrency',
+            heading: '捕获与提交必须分离',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'render 捕获候选依赖；只有 commit 后才替换正式订阅。',
+                  '被 transition 放弃的 render 不改变 live dependency set。',
+                  'runtime 变化会建立新 binding，旧 binding 留到 effect cleanup。',
+                  'useNodeValue 在 render 同步检查 node/runtime 所有权，跨 Runtime 由 Error Boundary 接住。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Atom 与 Definition', path: 'atoms-and-definitions' },
+        { label: 'useTracked API', path: 'docs/store-react/useTracked' }
+      ]
+    },
+    en: {
+      title: 'Choose the narrowest Hook and preserve concurrent subscription consistency',
+      lede: 'useSyncExternalStore solves only the React subscription protocol. Runtime capture and commit define dependencies, and an abandoned render cannot pollute committed subscriptions.',
+      document: {
+        sections: [
+          {
+            id: 'hooks',
+            heading: 'A more fixed dependency deserves a lighter Hook',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Hook', 'Dependency shape', 'Use it for'],
+                rows: [
+                  ['useSignal', 'One fixed Signal', 'Value plus stable setter'],
+                  ['useNodeValue', 'One fixed stable node', 'Custom single-node adapters'],
+                  [
+                    'useStore',
+                    'Fields dynamically read by selector',
+                    'Precise Store Light subscription'
+                  ],
+                  ['useTracked', 'Any dynamic nodes read by read', 'Combining reactive sources']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'concurrency',
+            heading: 'Capture and commit must remain separate',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Render captures candidate dependencies; only commit replaces the formal subscription.',
+                  'A render abandoned by a transition never changes the live dependency set.',
+                  'A Runtime change creates a new binding while the old one survives until effect cleanup.',
+                  'useNodeValue checks node and Runtime ownership synchronously during render for an Error Boundary.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Atoms and Definitions', path: 'atoms-and-definitions' },
+        { label: 'useTracked API', path: 'docs/store-react/useTracked' }
+      ]
+    }
+  },
+  'store-react:atoms-and-definitions': {
+    zh: {
+      title: '区分 Atom 协议 Hook 与 Definition Hook',
+      lede: '协议 Atom 可以直接订阅自身；Definition 本身没有值，必须路由到当前 Provider 的 AtomStore。',
+      document: {
+        sections: [
+          {
+            id: 'routes',
+            heading: '按是否拥有 Definition token 选择路径',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['入口', 'Provider 行为', '无 Provider'],
+                rows: [
+                  [
+                    'useAtomValue/useSetAtom/useAtom',
+                    'atomDefinition 存在时走 registry.atomStore',
+                    '直接读写 atom 节点'
+                  ],
+                  ['useAtomDefinition', 'store.preview + store.sub', '抛 requires StoreProvider'],
+                  ['useSetAtomDefinition', '稳定包装 store.set', '抛 requires StoreProvider']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'definition',
+            heading: 'Definition 在每个 Provider 下各有一份状态',
+            blocks: [
+              {
+                type: 'code',
+                language: 'tsx',
+                code: "const countDef = atomDef(0, 'count')\n\nfunction Counter() {\n  const count = useAtomDefinition(countDef)\n  const setCount = useSetAtomDefinition(countDef)\n  return <button onClick={() => setCount((n) => n + 1)}>{count}</button>\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  '同一个 countDef 在两棵 Provider 子树中实例化为两份值。',
+                  'preview 是并发渲染候选读，不提前提交正式依赖。',
+                  '普通 atomDefFactory 默认不能 speculative preview；使用纯 preview-safe factory。',
+                  'Hook 调用顺序在 Provider 有无之间保持不变。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Resource 与 Suspense', path: 'resources-and-suspense' },
+        { label: 'useAtomDefinition API', path: 'docs/store-react/useAtomDefinition' }
+      ]
+    },
+    en: {
+      title: 'Separate Atom protocol Hooks from Definition Hooks',
+      lede: 'A protocol Atom may subscribe to itself. A Definition has no value and must route to the current Provider AtomStore.',
+      document: {
+        sections: [
+          {
+            id: 'routes',
+            heading: 'Choose a path by whether a Definition token owns state',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Entry', 'With Provider', 'Without Provider'],
+                rows: [
+                  [
+                    'useAtomValue/useSetAtom/useAtom',
+                    'Uses registry.atomStore when atomDefinition exists',
+                    'Reads and writes atom node directly'
+                  ],
+                  [
+                    'useAtomDefinition',
+                    'store.preview plus store.sub',
+                    'Throws requires StoreProvider'
+                  ],
+                  [
+                    'useSetAtomDefinition',
+                    'Stable wrapper over store.set',
+                    'Throws requires StoreProvider'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'definition',
+            heading: 'A Definition owns one state per Provider',
+            blocks: [
+              {
+                type: 'code',
+                language: 'tsx',
+                code: "const countDef = atomDef(0, 'count')\n\nfunction Counter() {\n  const count = useAtomDefinition(countDef)\n  const setCount = useSetAtomDefinition(countDef)\n  return <button onClick={() => setCount((n) => n + 1)}>{count}</button>\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'The same countDef realizes two values under two Provider subtrees.',
+                  'preview is a concurrent-render candidate read and does not commit formal dependencies early.',
+                  'A regular atomDefFactory rejects speculative preview; use a pure preview-safe factory.',
+                  'Hook call order stays stable whether a Provider exists or not.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Resources and Suspense', path: 'resources-and-suspense' },
+        { label: 'useAtomDefinition API', path: 'docs/store-react/useAtomDefinition' }
+      ]
+    }
+  },
+  'store-react:resources-and-suspense': {
+    zh: {
+      title: '正确选择 Resource、StoreResource 与 Suspense Hook',
+      lede: '两种异步协议都能 Suspend，但状态机、版本租约和释放所有者不同，不能因为名字相似而互换。',
+      document: {
+        sections: [
+          {
+            id: 'protocols',
+            heading: '从资源来源选择 Hook',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['来源', '状态 Hook', '取值 Hook', '关键语义'],
+                rows: [
+                  [
+                    '@migaia/resource Resource',
+                    'useResource',
+                    'useResourceValue',
+                    'pending throw promise；error/cancelled throw error'
+                  ],
+                  [
+                    'Store Light IStoreResource',
+                    '—',
+                    'useStoreResource',
+                    'captureSnapshot/commitCapture 保护渲染版本'
+                  ],
+                  [
+                    '{ resource: Resource } Async Atom',
+                    '—',
+                    'useAsyncAtomValue',
+                    '等同 useResourceValue(atom.resource)'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'boundaries',
+            heading: 'Promise 与错误只从 Render 抛出',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'pending/idle Promise 进入最近 Suspense fallback。',
+                  'error/cancelled 原因进入最近 Error Boundary。',
+                  'useStoreResource 在 layout commit 把 capture 转为正式 lease。',
+                  'StrictMode 探测性 cleanup 通过 epoch 延迟判断，不能提前释放仍在用的版本。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Registry 与依赖注入', path: 'registry-and-dependency-injection' },
+        { label: 'useResourceValue API', path: 'docs/store-react/useResourceValue' }
+      ]
+    },
+    en: {
+      title: 'Choose Resource, StoreResource, and Suspense Hooks correctly',
+      lede: 'Both asynchronous protocols can Suspend, but their state machines, version leases, and release owners differ. Similar names do not make them interchangeable.',
+      document: {
+        sections: [
+          {
+            id: 'protocols',
+            heading: 'Choose a Hook from the resource source',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Source', 'State Hook', 'Value Hook', 'Defining semantic'],
+                rows: [
+                  [
+                    '@migaia/resource Resource',
+                    'useResource',
+                    'useResourceValue',
+                    'pending throws Promise; error/cancelled throws error'
+                  ],
+                  [
+                    'Store Light IStoreResource',
+                    '—',
+                    'useStoreResource',
+                    'captureSnapshot/commitCapture protects the rendered version'
+                  ],
+                  [
+                    '{ resource: Resource } Async Atom',
+                    '—',
+                    'useAsyncAtomValue',
+                    'Equivalent to useResourceValue(atom.resource)'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'boundaries',
+            heading: 'Promises and errors throw only from Render',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'A pending or idle Promise enters the nearest Suspense fallback.',
+                  'An error or cancellation reason enters the nearest Error Boundary.',
+                  'useStoreResource converts a capture into a formal lease during layout commit.',
+                  'StrictMode probe cleanup uses delayed epoch checking and cannot release a still-used version early.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Registry and dependency injection', path: 'registry-and-dependency-injection' },
+        { label: 'useResourceValue API', path: 'docs/store-react/useResourceValue' }
+      ]
+    }
+  },
+  'store-react:registry-and-dependency-injection': {
+    zh: {
+      title: '用 StoreToken 与 StoreRegistry 建立作用域依赖注入',
+      lede: 'Registry 是明确的 token → value 容器，不是可变全局对象；Runtime 一致性、owned 标记与释放顺序都属于注册契约。',
+      document: {
+        sections: [
+          {
+            id: 'operations',
+            heading: '区分注册、替换与移除',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['操作', '行为', '所有权'],
+                rows: [
+                  ['register', '重复 token 失败，返回 unregister', 'owned 可随 Registry 释放'],
+                  ['replace', '替换当前 value', '按新 options 更新所有权'],
+                  ['remove', '删除 token，可选择是否释放 owned', '默认释放 owned'],
+                  ['dispose/disposeAsync', '终止 Registry 与 AtomStore', 'owned 值按逆注册顺序释放']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'runtime',
+            heading: '跨 Runtime 值不能注册',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Registry 构造时绑定唯一 Runtime。带可检测 Runtime identity 的 Store、Atom 或资源属于另一图时立即拒绝，避免 Provider 子树订阅到跨作用域节点。dispose 同步收尾 sync-safe 资源；异步清理使用单飞 disposeAsync/whenTerminal。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Feature 与 Config', path: 'features-and-config' },
+        { label: 'StoreRegistry API', path: 'docs/store-react/StoreRegistry' }
+      ]
+    },
+    en: {
+      title: 'Build scoped dependency injection with StoreToken and StoreRegistry',
+      lede: 'Registry is an explicit token-to-value container, not a mutable global object. Runtime consistency, owned flags, and release order are registration contracts.',
+      document: {
+        sections: [
+          {
+            id: 'operations',
+            heading: 'Separate registration, replacement, and removal',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Operation', 'Behavior', 'Ownership'],
+                rows: [
+                  [
+                    'register',
+                    'Duplicate token fails and returns unregister',
+                    'owned may release with Registry'
+                  ],
+                  ['replace', 'Replaces current value', 'New options define ownership'],
+                  [
+                    'remove',
+                    'Deletes token and may release owned value',
+                    'Releases owned by default'
+                  ],
+                  [
+                    'dispose/disposeAsync',
+                    'Terminates Registry and AtomStore',
+                    'Owned values release in reverse registration order'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'runtime',
+            heading: 'A cross-Runtime value cannot register',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A Registry binds to one Runtime at construction. A Store, Atom, or resource with detectable ownership in another graph is rejected before a Provider subtree can subscribe across scopes. dispose closes sync-safe resources; asynchronous cleanup uses single-flight disposeAsync and whenTerminal.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Features and Config', path: 'features-and-config' },
+        { label: 'StoreRegistry API', path: 'docs/store-react/StoreRegistry' }
+      ]
+    }
+  },
+  'store-react:features-and-config': {
+    zh: {
+      title: '把 Feature Flag 当作入口守卫而不是自动配置',
+      lede: 'Provider config 是归一化快照；只有字面 true 开启 feature，defaults 也不会自动改写已经创建的 Store。',
+      document: {
+        sections: [
+          {
+            id: 'features',
+            heading: '查询用于降级，断言用于强前置条件',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['入口', '无 Provider', '关闭 feature'],
+                rows: [
+                  ['useStoreConfig', 'null', '仍返回 config'],
+                  ['useStoreFeature', 'false', 'false'],
+                  [
+                    'useAssertStoreFeature',
+                    '抛 requires Provider',
+                    '抛 requires explicitly enabled'
+                  ],
+                  ['read/assertStoreFeature', '非 Hook 同语义', '适合 SSR 装配与入口校验']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'defaults',
+            heading: 'defaults 是约定，不是隐式传播',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'defaults.warnAsyncActions 只供 useStoreConfig 读取，Provider 不会替 createStore 设置选项。业务装配层应显式读取配置再创建 Store，避免 UI Provider 在背后改变已存在实例。experimental key 与 wasm 只有严格等于 true 才启用。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'SSR、StrictMode 与关闭', path: 'ssr-strict-mode-and-shutdown' },
+        { label: 'normalizeStoreConfig API', path: 'docs/store-react/normalizeStoreConfig' }
+      ]
+    },
+    en: {
+      title: 'Treat Feature Flags as entry guards, not automatic configuration',
+      lede: 'Provider config is a normalized snapshot. Only literal true enables a feature, and defaults never rewrite a Store that already exists.',
+      document: {
+        sections: [
+          {
+            id: 'features',
+            heading: 'Query for fallback and assert for a hard precondition',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Entry', 'Without Provider', 'Feature disabled'],
+                rows: [
+                  ['useStoreConfig', 'null', 'Still returns config'],
+                  ['useStoreFeature', 'false', 'false'],
+                  [
+                    'useAssertStoreFeature',
+                    'Throws requires Provider',
+                    'Throws requires explicitly enabled'
+                  ],
+                  [
+                    'read/assertStoreFeature',
+                    'Same non-Hook semantics',
+                    'Fits SSR assembly and entry validation'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'defaults',
+            heading: 'defaults is a convention, not implicit propagation',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'defaults.warnAsyncActions is available through useStoreConfig only; Provider never changes createStore options. An application assembly layer reads config explicitly before creating a Store, preventing a UI Provider from mutating an existing instance behind the caller. Experimental keys and wasm enable only when strictly true.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'SSR, StrictMode, and shutdown', path: 'ssr-strict-mode-and-shutdown' },
+        { label: 'normalizeStoreConfig API', path: 'docs/store-react/normalizeStoreConfig' }
+      ]
+    }
+  },
+  'store-react:ssr-strict-mode-and-shutdown': {
+    zh: {
+      title: '隔离 SSR 请求，并在 StrictMode 下安全关闭',
+      lede: '请求作用域从 Runtime 开始，Registry、AtomStore 和 owned 状态向内依赖；关闭顺序反向执行，React 探测性卸载不能误判为真实终态。',
+      document: {
+        sections: [
+          {
+            id: 'ssr',
+            heading: '每个请求建立独立作用域',
+            blocks: [
+              {
+                type: 'code',
+                language: 'tsx',
+                code: 'export async function renderRequest(request: Request) {\n  const runtime = createRuntime()\n  const registry = createStoreRegistry(runtime)\n  registerRequestStores(registry, request)\n  try {\n    return renderToString(\n      <StoreProvider registry={registry}>{app}</StoreProvider>\n    )\n  } finally {\n    await registry.disposeAsync()\n  }\n}'
+              },
+              {
+                type: 'list',
+                items: [
+                  '进程级只复用无状态 Definition/Token，不复用可变 Registry。',
+                  'Provider 使用外部 Registry 时默认不 dispose，SSR 所有者在 finally 收尾。',
+                  'ready barrier cache 由 barrierScope 隔离，不跨请求共享工厂结果。',
+                  '上例使用同步 renderToString，因此 finally 可以安全释放；流式渲染必须等 stream 完成或取消后再关闭。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'strict',
+            heading: '区分探测性 Cleanup 与真实 Unmount',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Provider 候选 Registry 与 StoreResource lease 都使用 commit 标记/epoch 避免 StrictMode mount→cleanup→remount 提前释放。真正 unmount 后，Registry 进入 closing/terminal；同一个实例不能复活，新 root 创建新作用域。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '返回 Store React 学习路径', path: 'index' },
+        { label: 'createStoreRegistry API', path: 'docs/store-react/createStoreRegistry' }
+      ]
+    },
+    en: {
+      title: 'Isolate SSR requests and shut down safely under StrictMode',
+      lede: 'A request scope starts at Runtime, with Registry, AtomStore, and owned state depending inward. Shutdown reverses that order, and React probe unmounts cannot become false terminal state.',
+      document: {
+        sections: [
+          {
+            id: 'ssr',
+            heading: 'Create an isolated scope for every request',
+            blocks: [
+              {
+                type: 'code',
+                language: 'tsx',
+                code: 'export async function renderRequest(request: Request) {\n  const runtime = createRuntime()\n  const registry = createStoreRegistry(runtime)\n  registerRequestStores(registry, request)\n  try {\n    return renderToString(\n      <StoreProvider registry={registry}>{app}</StoreProvider>\n    )\n  } finally {\n    await registry.disposeAsync()\n  }\n}'
+              },
+              {
+                type: 'list',
+                items: [
+                  'Reuse stateless Definitions and Tokens at process scope, never a mutable Registry.',
+                  'A Provider with an external Registry does not dispose by default; the SSR owner closes it in finally.',
+                  'barrierScope isolates ready cache so factory results never leak across requests.',
+                  'This synchronous renderToString example can close in finally. Streaming render must close only after stream completion or cancellation.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'strict',
+            heading: 'Separate probe Cleanup from real Unmount',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Provider candidate Registries and StoreResource leases use commit markers or epochs to prevent StrictMode mount, cleanup, and remount probes from releasing early. After a real unmount, Registry reaches closing then terminal. The same instance cannot revive; a new root creates another scope.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Return to Store React learning paths', path: 'index' },
+        { label: 'createStoreRegistry API', path: 'docs/store-react/createStoreRegistry' }
+      ]
+    }
+  },
+  'store-shared:index': {
+    zh: {
+      title: 'Store Shared 学习路径',
+      lede: '这层把固定 int32 状态放进 SharedArrayBuffer，并为每个 Runtime 建立本地响应式镜像。共享的是 buffer，不是 JS 对象或 Runtime。',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: '先判断是否真的需要共享内存',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['需求', '入口', '建议'],
+                rows: [
+                  ['单个跨线程整数', 'sharedInt32', '适合计数器或标志位'],
+                  ['定长大量整数', 'sharedInt32Array', '适合稀疏下标更新'],
+                  ['字符串或对象图', 'postMessage / Serialize', 'Shared 不支持'],
+                  ['同线程普通状态', 'Signal', '更简单'],
+                  ['低频小消息', 'postMessage', '通常无需 Atomics']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'model',
+            heading: '每个线程创建自己的实例',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '创建方把 SharedArrayBuffer 交给另一端。',
+                  '另一端用自己的 Runtime attach 新实例。',
+                  '本地写立即通知本地 Runtime；远端写通过 sync/watch 进入本地图。',
+                  'dispose 只释放本地响应式连接，不销毁共享 buffer。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟共享一个响应式数组', path: 'getting-started' },
+        { label: '环境与 Buffer 交接', path: 'environment-and-buffer-handoff' }
+      ]
+    },
+    en: {
+      title: 'Store Shared learning paths',
+      lede: 'This layer stores fixed int32 state in SharedArrayBuffer and creates a local reactive mirror for each Runtime. The buffer is shared, not JavaScript objects or Runtime.',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: 'First decide whether shared memory is necessary',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Need', 'Entry', 'Fit'],
+                rows: [
+                  ['One cross-thread integer', 'sharedInt32', 'Counter or flag'],
+                  ['Many fixed integers', 'sharedInt32Array', 'Sparse index updates'],
+                  [
+                    'String or object graph',
+                    'postMessage / Serialize',
+                    'Shared does not support it'
+                  ],
+                  ['Ordinary same-thread state', 'Signal', 'Simpler'],
+                  ['Small infrequent messages', 'postMessage', 'Usually no Atomics needed']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'model',
+            heading: 'Create one local instance per thread',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'The creator sends SharedArrayBuffer to the peer.',
+                  'The peer attaches a new instance to its own Runtime.',
+                  'Local writes notify local Runtime immediately; sync or watch imports remote writes.',
+                  'dispose releases local reactive connections without destroying the shared buffer.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Share one reactive array in five minutes', path: 'getting-started' },
+        { label: 'Environment and Buffer handoff', path: 'environment-and-buffer-handoff' }
+      ]
+    }
+  },
+  'store-shared:getting-started': {
+    zh: {
+      title: '五分钟在主线程与 Worker 共享响应式数组',
+      lede: '主线程创建 buffer，两端各建实例。watch 只负责远端变化唤醒，本地写仍由各自 Runtime 即时通知。',
+      document: {
+        sections: [
+          {
+            id: 'main',
+            heading: '主线程创建并交接 Buffer',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const runtime = createRuntime()\nconst positions = sharedInt32Array(runtime, 1000)\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })\nworker.postMessage({ buffer: positions.buffer })\n\nconst stopWatch = positions.watch()\nconst render = new Effect(() => {\n  draw(positions.get(0), positions.get(1))\n}, runtime)"
+              }
+            ]
+          },
+          {
+            id: 'worker',
+            heading: 'Worker Attach 自己的实例',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'self.onmessage = ({ data }) => {\n  const runtime = createRuntime()\n  const positions = sharedInt32Array(runtime, 1000, { buffer: data.buffer })\n  positions.update(0, (x) => x + 1)\n}'
+              },
+              {
+                type: 'list',
+                items: [
+                  'attach 时 initialValues 被忽略，既有 buffer 是事实来源。',
+                  '两端 length 必须一致且 buffer 大小足够。',
+                  '关闭时先停 Effect/watch，再 dispose 本地实例，最后 terminate Worker。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '环境与 Buffer 交接', path: 'environment-and-buffer-handoff' },
+        { label: 'sharedInt32Array API', path: 'docs/store-shared/sharedInt32Array-const' }
+      ]
+    },
+    en: {
+      title: 'Share a reactive array between main thread and Worker in five minutes',
+      lede: 'Main creates the buffer and each side creates an instance. watch imports remote changes; each Runtime still notifies its own local writes immediately.',
+      document: {
+        sections: [
+          {
+            id: 'main',
+            heading: 'Create and hand off the Buffer on main',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const runtime = createRuntime()\nconst positions = sharedInt32Array(runtime, 1000)\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })\nworker.postMessage({ buffer: positions.buffer })\n\nconst stopWatch = positions.watch()\nconst render = new Effect(() => {\n  draw(positions.get(0), positions.get(1))\n}, runtime)"
+              }
+            ]
+          },
+          {
+            id: 'worker',
+            heading: 'Attach a separate instance in the Worker',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'self.onmessage = ({ data }) => {\n  const runtime = createRuntime()\n  const positions = sharedInt32Array(runtime, 1000, { buffer: data.buffer })\n  positions.update(0, (x) => x + 1)\n}'
+              },
+              {
+                type: 'list',
+                items: [
+                  'Attaching ignores initialValues because the existing buffer is authoritative.',
+                  'Both sides use the same length and a sufficiently large buffer.',
+                  'Stop Effect and watch, dispose local instances, then terminate Worker.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Environment and Buffer handoff', path: 'environment-and-buffer-handoff' },
+        { label: 'sharedInt32Array API', path: 'docs/store-shared/sharedInt32Array-const' }
+      ]
+    }
+  },
+  'store-shared:environment-and-buffer-handoff': {
+    zh: {
+      title: '先建立 SharedArrayBuffer 环境与 Buffer 合同',
+      lede: '浏览器中的 SharedArrayBuffer 依赖跨源隔离；watch 还要求 Atomics.waitAsync。库会显式拒绝缺失能力，不假装降级。',
+      document: {
+        sections: [
+          {
+            id: 'environment',
+            heading: '区分共享内存与自动唤醒能力',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['能力', '需要'],
+                rows: [
+                  ['创建/attach 共享状态', 'SharedArrayBuffer + Atomics'],
+                  ['浏览器部署', 'COOP/COEP 形成 crossOriginIsolated'],
+                  ['watch 自动唤醒', 'Atomics.waitAsync'],
+                  ['不支持 waitAsync', '由应用循环调用 sync']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'handoff',
+            heading: '共享 Buffer，不共享实例',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'SharedArrayBuffer 通过 postMessage 直接共享，不放 transfer list。',
+                  '每个实例绑定一个 Runtime，不能把同一 JS 对象改属另一 Runtime。',
+                  'Signal buffer 至少 8 字节；Array 大小由 length 布局决定。',
+                  '附着时不会覆盖现有值。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Shared Signal 与 Sync', path: 'shared-signal-and-sync' },
+        { label: 'sharedInt32 API', path: 'docs/store-shared/sharedInt32' }
+      ]
+    },
+    en: {
+      title: 'Establish SharedArrayBuffer environment and Buffer contracts first',
+      lede: 'SharedArrayBuffer in browsers requires cross-origin isolation, while watch also requires Atomics.waitAsync. Missing capabilities reject explicitly instead of pretending to degrade.',
+      document: {
+        sections: [
+          {
+            id: 'environment',
+            heading: 'Separate shared memory from automatic wakeup capability',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Capability', 'Requirement'],
+                rows: [
+                  ['Create or attach shared state', 'SharedArrayBuffer plus Atomics'],
+                  ['Browser deployment', 'COOP and COEP yield crossOriginIsolated'],
+                  ['watch automatic wakeup', 'Atomics.waitAsync'],
+                  ['No waitAsync', 'Application loop calls sync']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'handoff',
+            heading: 'Share the Buffer, not the instance',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'SharedArrayBuffer passes through postMessage without a transfer list.',
+                  'Each instance binds one Runtime and cannot move the same object to another Runtime.',
+                  'Signal needs at least eight bytes; Array size derives from length layout.',
+                  'Attachment never overwrites existing values.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Shared Signal and Sync', path: 'shared-signal-and-sync' },
+        { label: 'sharedInt32 API', path: 'docs/store-shared/sharedInt32' }
+      ]
+    }
+  },
+  'store-shared:shared-signal-and-sync': {
+    zh: {
+      title: '区分 Shared Signal 的追踪读、Peek 与远端 Sync',
+      lede: 'value 读取会拉取远端版本并参与依赖追踪；peek 只读本地已知值；sync 显式把远端变化通知本地 Runtime。',
+      document: {
+        sections: [
+          {
+            id: 'reads',
+            heading: '按是否需要新鲜度与依赖选择入口',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['入口', '拉取远端', '依赖追踪', '返回'],
+                rows: [
+                  ['value getter', '是', '是', '当前一致值'],
+                  ['peek', '否', '否', '本地已知值'],
+                  ['sync', '是', '否', '是否发现变化']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'writes',
+            heading: '本地写入立即通知，远端通知需要 Pump',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '所有值必须是合法 int32，不做位运算静默截断。',
+                  'Object.is 相同值跳过版本推进和通知。',
+                  '本地 setter 成功后立即通知所属 Runtime。',
+                  '另一端 Runtime 通过 value/sync/watch 才看见变化。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Shared Array 与响应式 Cell', path: 'shared-array-and-reactive-cells' },
+        { label: 'SharedInt32Signal API', path: 'docs/store-shared/SharedInt32Signal' }
+      ]
+    },
+    en: {
+      title: 'Separate tracked reads, Peek, and remote Sync for Shared Signal',
+      lede: 'value pulls remote version and tracks dependencies. peek reads only locally known state. sync explicitly notifies the local Runtime of remote change.',
+      document: {
+        sections: [
+          {
+            id: 'reads',
+            heading: 'Choose by freshness and dependency needs',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Entry', 'Pull remote', 'Track dependency', 'Returns'],
+                rows: [
+                  ['value getter', 'Yes', 'Yes', 'Current consistent value'],
+                  ['peek', 'No', 'No', 'Locally known value'],
+                  ['sync', 'Yes', 'No', 'Whether change was found']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'writes',
+            heading: 'Local writes notify now; remote notifications need a pump',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Every value is a valid int32 with no silent bitwise truncation.',
+                  'An Object.is-equal value skips version advancement and notification.',
+                  'A successful local setter immediately notifies its Runtime.',
+                  'Another Runtime observes it through value, sync, or watch.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Shared Array and reactive Cells', path: 'shared-array-and-reactive-cells' },
+        { label: 'SharedInt32Signal API', path: 'docs/store-shared/SharedInt32Signal' }
+      ]
+    }
+  },
+  'store-shared:shared-array-and-reactive-cells': {
+    zh: {
+      title: '按下标追踪 Shared Array，并控制 Cell 物化',
+      lede: 'SharedInt32Array 物理上是定长共享布局，响应式上只为追踪上下文实际读取的下标创建 Cell。',
+      document: {
+        sections: [
+          {
+            id: 'api',
+            heading: '选择单格操作、快照或批量 Sync',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['入口', '用途', '结果'],
+                rows: [
+                  ['get/set', '单格读写', '按 index 追踪与通知'],
+                  ['update', '并发读改写', 'CAS 成功的新值'],
+                  ['sync(index)', '检查一个下标', '0 或 1'],
+                  ['sync()', '稀疏扫描全部变化', '变化下标数'],
+                  ['snapshot', '一次性完整读取', '非共享 Int32Array 拷贝']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'cells',
+            heading: '普通读取不创建响应式 Cell',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Effect/Computed 中 get(index) 才物化 Cell。',
+                  '追踪外 get 走轻量一致读。',
+                  '放弃的投机读取会在微任务检查后自动回收无订阅 Cell。',
+                  '高频轮换下标可定期 prune，返回本次释放数。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Seqlock 与竞争限制', path: 'seqlock-and-contention' },
+        { label: 'SharedInt32Array API', path: 'docs/store-shared/SharedInt32Array-class' }
+      ]
+    },
+    en: {
+      title: 'Track Shared Array by index and control Cell materialization',
+      lede: 'SharedInt32Array is physically fixed shared layout and reactively creates Cells only for indexes read in tracking contexts.',
+      document: {
+        sections: [
+          {
+            id: 'api',
+            heading: 'Choose single-cell operations, snapshots, or bulk Sync',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Entry', 'Use', 'Result'],
+                rows: [
+                  ['get/set', 'Single-cell read and write', 'Per-index tracking and notification'],
+                  ['update', 'Concurrent read-modify-write', 'New CAS-committed value'],
+                  ['sync(index)', 'Check one index', 'Zero or one'],
+                  ['sync()', 'Sparse scan all changes', 'Changed index count'],
+                  ['snapshot', 'One full read', 'Non-shared Int32Array copy']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'cells',
+            heading: 'Ordinary reads create no reactive Cell',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'get inside Effect or Computed materializes a Cell.',
+                  'get outside tracking uses a lightweight consistent read.',
+                  'Abandoned speculative reads auto-remove unsubscribed Cells after a microtask.',
+                  'High-churn index access may call prune and observe the released count.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Seqlock and contention limits', path: 'seqlock-and-contention' },
+        { label: 'SharedInt32Array API', path: 'docs/store-shared/SharedInt32Array-class' }
+      ]
+    }
+  },
+  'store-shared:seqlock-and-contention': {
+    zh: {
+      title: '理解 Seqlock 一致读写与不可恢复竞争',
+      lede: '每格由 value 与 seq 组成。偶数 seq 表示稳定，奇数表示写锁；读者只有在两次 seq 相同且为偶数时接受 value。',
+      document: {
+        sections: [
+          {
+            id: 'protocol',
+            heading: '读写协议避免新值配旧版本',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['操作', '步骤'],
+                rows: [
+                  ['一致读', '读 seq → 读 value → 再读 seq；相同偶数才成功'],
+                  ['写入', 'CAS 偶数到奇数锁 → 写 value → 发布下一偶数版本'],
+                  ['CAS update', '回调在锁外执行 → expected 写入 → 冲突重试'],
+                  ['相同值', '释放锁但不推进 committed version']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'limit',
+            heading: '65536 次限制防止线程被永久拖死',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '一致读、获取锁和 update CAS 都有有限重试。超限抛 CONTENTION_LIMIT，通常意味着写者持锁时崩溃，seq 永久停在奇数。旧 buffer 不能可靠自愈，应放弃并重建共享状态。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '脏页与稀疏同步', path: 'dirty-pages-and-sparse-sync' },
+        { label: 'SharedInt32Array API', path: 'docs/store-shared/SharedInt32Array-class' }
+      ]
+    },
+    en: {
+      title: 'Understand Seqlock consistency and unrecoverable contention',
+      lede: 'Each cell contains value and seq. Even seq is stable and odd seq is a writer lock. A reader accepts value only when two seq reads match and are even.',
+      document: {
+        sections: [
+          {
+            id: 'protocol',
+            heading: 'The protocol prevents new value with an old version',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Operation', 'Steps'],
+                rows: [
+                  ['Consistent read', 'Read seq, value, seq again; accept matching even seq'],
+                  ['Write', 'CAS even to odd lock, write value, publish next even version'],
+                  ['CAS update', 'Run callback outside lock, write expected, retry conflict'],
+                  ['Equal value', 'Release lock without advancing committed version']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'limit',
+            heading: 'A 65536-attempt limit prevents permanent thread stalls',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Consistent read, lock acquisition, and update CAS are bounded. CONTENTION_LIMIT usually means a writer crashed while holding an odd seq. The old buffer cannot recover reliably and should be abandoned and rebuilt.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Dirty pages and sparse Sync', path: 'dirty-pages-and-sparse-sync' },
+        { label: 'SharedInt32Array API', path: 'docs/store-shared/SharedInt32Array-class' }
+      ]
+    }
+  },
+  'store-shared:dirty-pages-and-sparse-sync': {
+    zh: {
+      title: '用 Epoch 与脏页 Bitmap 收敛稀疏更新',
+      lede: '数组级 sync 不扫描所有下标：先比较 epoch，再交换 bitmap，只对命中的 32 格页验证真实 seqlock 版本。',
+      document: {
+        sections: [
+          {
+            id: 'layout',
+            heading: 'Bitmap 是候选索引，不是正确性来源',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '任意写入推进全局 epoch 并点亮所属页 bit。',
+                  'epoch 未变时 sync 直接返回 0。',
+                  'Atomics.exchange 取走并清零 bitmap word，并发 or 留给本轮或下轮。',
+                  '命中页仍逐格比较 seq，真正变化才通知。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'cost',
+            heading: '成本随变化页数增长',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '每页 32 格，每个 bitmap word 覆盖 32 页。百万格数组只改几个分散下标时，sync 只访问对应页；同轮多个变化包进一个 runtime.batch，避免下游重复调度。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Watch、waitAsync 与降级', path: 'watch-waitasync-and-fallback' },
+        { label: 'SharedInt32Array API', path: 'docs/store-shared/SharedInt32Array-class' }
+      ]
+    },
+    en: {
+      title: 'Converge sparse updates with Epoch and dirty-page Bitmap',
+      lede: 'Array sync avoids scanning every index. It compares epoch, exchanges bitmap words, and verifies real Seqlock versions only in matching 32-cell pages.',
+      document: {
+        sections: [
+          {
+            id: 'layout',
+            heading: 'Bitmap is a candidate index, not the source of correctness',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Any write advances global epoch and lights its page bit.',
+                  'Unchanged epoch lets sync return zero immediately.',
+                  'Atomics.exchange takes and clears a bitmap word while concurrent or remains in this or the next round.',
+                  'Matching pages still compare every seq and notify only real changes.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'cost',
+            heading: 'Cost grows with changed pages',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A page holds 32 cells and a bitmap word covers 32 pages. A million-cell array with a few scattered changes touches only those pages. One runtime.batch contains all notifications from the round.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Watch, waitAsync, and fallback', path: 'watch-waitasync-and-fallback' },
+        { label: 'SharedInt32Array API', path: 'docs/store-shared/SharedInt32Array-class' }
+      ]
+    }
+  },
+  'store-shared:watch-waitasync-and-fallback': {
+    zh: {
+      title: '选择 waitAsync 推送或应用自有 Sync Pump',
+      lede: 'watch 是一条单飞异步等待回路，不是跨线程消息通道。环境不支持 waitAsync 时显式失败，由应用决定轮询节奏。',
+      document: {
+        sections: [
+          {
+            id: 'watch',
+            heading: '自动模式只负责唤醒后 Sync',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Signal 等待 seq；Array 等待全局 epoch。',
+                  '唤醒后运行 sync，再挂起下一次 waitAsync。',
+                  '重复 watch 返回同一个停止函数，不叠加循环。',
+                  '停止或 dispose 会 notify 一次，使挂起 Promise 尽快 settle。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'fallback',
+            heading: '不支持时在既有循环中 Pump',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'let stop: () => void\ntry {\n  stop = positions.watch()\n} catch (error) {\n  if (error.code !== StoreSharedErrorCode.envUnsupported) throw error\n  const timer = setInterval(() => positions.sync(), 100)\n  stop = () => clearInterval(timer)\n}'
+              },
+              {
+                type: 'paragraph',
+                text: '轮询间隔属于应用延迟与能耗策略，库不静默选择。已有 render loop 或消息泵时优先在那里调用 sync。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '原子 Update 与底层原语', path: 'atomic-update-and-low-level-primitives' },
+        { label: 'SharedWaitMode API', path: 'docs/store-shared/SharedWaitMode' }
+      ]
+    },
+    en: {
+      title: 'Choose waitAsync push or an application-owned Sync pump',
+      lede: 'watch is one single-flight asynchronous wait loop, not a cross-thread message channel. Without waitAsync it fails explicitly and the application chooses polling cadence.',
+      document: {
+        sections: [
+          {
+            id: 'watch',
+            heading: 'Automatic mode only wakes and runs Sync',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Signal waits on seq while Array waits on global epoch.',
+                  'Wakeup runs sync and then starts the next waitAsync.',
+                  'Repeated watch returns the same stop function without stacking loops.',
+                  'Stop or dispose calls notify so a pending Promise settles quickly.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'fallback',
+            heading: 'Pump from an existing loop when unsupported',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'let stop: () => void\ntry {\n  stop = positions.watch()\n} catch (error) {\n  if (error.code !== StoreSharedErrorCode.envUnsupported) throw error\n  const timer = setInterval(() => positions.sync(), 100)\n  stop = () => clearInterval(timer)\n}'
+              },
+              {
+                type: 'paragraph',
+                text: 'Polling cadence is an application latency and energy policy, so the library does not choose silently. Prefer an existing render loop or message pump for sync.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Atomic Update and low-level primitives',
+          path: 'atomic-update-and-low-level-primitives'
+        },
+        { label: 'SharedWaitMode API', path: 'docs/store-shared/SharedWaitMode' }
+      ]
+    }
+  },
+  'store-shared:atomic-update-and-low-level-primitives': {
+    zh: {
+      title: '用 Update 做无锁回调与 CAS 提交',
+      lede: 'update 不在写锁内运行用户函数。它一致读旧值、锁外计算候选、带 expected CAS 提交，冲突时重新计算。',
+      document: {
+        sections: [
+          {
+            id: 'update',
+            heading: 'Updater 必须可重复执行',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '竞争时 updater 可能调用多次。',
+                  'updater 不应产生网络、日志计数或其他一次性副作用。',
+                  '每次候选结果都重新验证为 int32。',
+                  '持续冲突超过上限抛 CONTENTION_LIMIT。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'low-level',
+            heading: '底层原语只供明确组合场景',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['入口', '省略的保护', '调用方责任'],
+                rows: [
+                  ['readCell', 'active/index 校验', '保证合法下标与存活'],
+                  ['writeCell', '高层通知编排', '处理版本和失败'],
+                  ['notifyWaiters', '自动调用', '自定义写后推进 epoch'],
+                  ['recordObservedVersion', '同步记账', '避免重复或漏报']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '所有权、Prune 与释放', path: 'ownership-pruning-and-disposal' },
+        { label: 'SharedInt32Array API', path: 'docs/store-shared/SharedInt32Array-class' }
+      ]
+    },
+    en: {
+      title: 'Use Update for unlocked callbacks and CAS commit',
+      lede: 'update never runs user code under the writer lock. It consistently reads old value, computes outside the lock, commits with expected CAS, and recomputes on conflict.',
+      document: {
+        sections: [
+          {
+            id: 'update',
+            heading: 'Updater must tolerate repeated execution',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Contention may invoke updater more than once.',
+                  'Updater avoids network, logging counters, and other one-shot effects.',
+                  'Every candidate is validated again as int32.',
+                  'Persistent conflict beyond the limit throws CONTENTION_LIMIT.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'low-level',
+            heading: 'Low-level primitives fit explicit composition only',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Entry', 'Protection omitted', 'Caller responsibility'],
+                rows: [
+                  ['readCell', 'Active and index checks', 'Valid index and live instance'],
+                  [
+                    'writeCell',
+                    'High-level notification orchestration',
+                    'Handle version and failure'
+                  ],
+                  ['notifyWaiters', 'Automatic call', 'Advance epoch after custom writes'],
+                  [
+                    'recordObservedVersion',
+                    'Sync bookkeeping',
+                    'Avoid duplicate or missing reports'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Ownership, Prune, and disposal', path: 'ownership-pruning-and-disposal' },
+        { label: 'SharedInt32Array API', path: 'docs/store-shared/SharedInt32Array-class' }
+      ]
+    }
+  },
+  'store-shared:ownership-pruning-and-disposal': {
+    zh: {
+      title: '释放本地响应式镜像，而不是共享内存本身',
+      lede: '实例拥有 watch 回路和本地 Cells；SharedArrayBuffer 可能仍被其他线程使用，因此 dispose 不会清零或回收 buffer。',
+      document: {
+        sections: [
+          {
+            id: 'ownership',
+            heading: '每端独立关闭自己的实例',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '先释放 Effect/Computed，再停止 watch。',
+                  'Array 可在存活期间 prune 无订阅 Cell。',
+                  'dispose 停 watch、断开 Cells，并标记实例终态。',
+                  '其他线程实例继续使用同一 buffer，不受本端 dispose 影响。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'terminal',
+            heading: 'Disposed 实例不能复活',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['实例', '终态错误', '恢复'],
+                rows: [
+                  ['SharedInt32Signal', 'SIGNAL_DISPOSED', '用 buffer 新建实例'],
+                  ['SharedInt32Array', 'ARRAY_DISPOSED', '用相同 length/buffer 新建实例']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '安全、容量与恢复', path: 'security-capacity-and-recovery' },
+        { label: 'SharedInt32Array API', path: 'docs/store-shared/SharedInt32Array-class' }
+      ]
+    },
+    en: {
+      title: 'Release the local reactive mirror, not shared memory itself',
+      lede: 'An instance owns its watch loop and local Cells. Other threads may still use SharedArrayBuffer, so dispose does not clear or reclaim the buffer.',
+      document: {
+        sections: [
+          {
+            id: 'ownership',
+            heading: 'Each side closes its own instance',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Dispose Effect and Computed before stopping watch.',
+                  'A live Array may prune unsubscribed Cells.',
+                  'dispose stops watch, disconnects Cells, and marks terminal state.',
+                  'Other thread instances keep using the same buffer after local disposal.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'terminal',
+            heading: 'A disposed instance cannot revive',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Instance', 'Terminal error', 'Recovery'],
+                rows: [
+                  ['SharedInt32Signal', 'SIGNAL_DISPOSED', 'Create an instance from buffer'],
+                  ['SharedInt32Array', 'ARRAY_DISPOSED', 'Create with the same length and buffer']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Security, capacity, and recovery', path: 'security-capacity-and-recovery' },
+        { label: 'SharedInt32Array API', path: 'docs/store-shared/SharedInt32Array-class' }
+      ]
+    }
+  },
+  'store-shared:security-capacity-and-recovery': {
+    zh: {
+      title: '限制共享容量，并把坏锁视为 Buffer 终态',
+      lede: 'SharedArrayBuffer 是同源线程间的高权限共享面。长度、值域、写者可信度和异常终止恢复都必须在装配层明确。',
+      document: {
+        sections: [
+          {
+            id: 'bounds',
+            heading: '在分配前建立业务上限',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'length 必须是非负整数，且布局 slot 数不能溢出 Int32Array。',
+                  '所有初始值、set 和 update 结果必须落在 int32。',
+                  '不要从未验证请求直接分配攻击者指定长度。',
+                  '低层 readCell/writeCell 绕过 index 校验，只给受控组合使用。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'recovery',
+            heading: '持锁写者崩溃后重建共享状态',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '线程在 seq 为奇数时被强制终止会留下永久坏锁。CONTENTION_LIMIT 不能靠继续重试修复；停止所有端、放弃旧 buffer，从可信快照重新创建并重新 attach。Shared memory 不提供崩溃事务日志。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '返回 Store Shared 学习路径', path: 'index' },
+        {
+          label: 'createStoreSharedError API',
+          path: 'docs/store-shared/createStoreSharedError'
+        }
+      ]
+    },
+    en: {
+      title: 'Bound shared capacity and treat a broken lock as Buffer terminal state',
+      lede: 'SharedArrayBuffer is a privileged same-origin cross-thread surface. Assembly explicitly owns length, value range, writer trust, and crash recovery.',
+      document: {
+        sections: [
+          {
+            id: 'bounds',
+            heading: 'Establish product limits before allocation',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'length is a non-negative integer whose layout fits Int32Array indexing.',
+                  'Initial values, set, and update results all fit int32.',
+                  'Never allocate an unvalidated request-controlled length.',
+                  'Low-level readCell and writeCell skip index checks and belong only in controlled composition.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'recovery',
+            heading: 'Rebuild shared state after a writer crashes under lock',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Forced termination while seq is odd leaves a permanently broken lock. CONTENTION_LIMIT cannot be repaired by retrying. Stop every side, abandon the old buffer, rebuild from a trusted snapshot, and attach again. Shared memory provides no crash transaction log.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Return to Store Shared learning paths', path: 'index' },
+        {
+          label: 'createStoreSharedError API',
+          path: 'docs/store-shared/createStoreSharedError'
+        }
+      ]
+    }
+  },
+  'store-wasm:index': {
+    zh: {
+      title: 'Store WASM 学习路径',
+      lede: '这层提供存在线性内存中的响应式字段。先完成 WASM readiness，再按容量、布局和订阅粒度选择字段。',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: '按数据形状选择最窄字段',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['数据', '入口', '布局与追踪'],
+                rows: [
+                  ['单个浮点数', 'number', '8 字节 f64，单 Source'],
+                  ['单个布尔', 'boolean', '1 字节，单 Source'],
+                  ['定长 UTF-8', 'string', '4 字节长度 + 固定容量'],
+                  ['定长浮点数组', 'array(number(), length)', '连续 f64，按 granularity 分桶'],
+                  ['同结构数值记录', 'record', '连续 f64，每个 key 独立 Source']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'path',
+            heading: '沿分配生命周期阅读',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'ensureWasm 只负责模块与 Memory 就绪，不分配字段。',
+                  '字段 Builder 是同步协议；未就绪时同步拒绝。',
+                  'createStore 拥有字段并在 $dispose 时递归释放。',
+                  'view 返回拷贝，不暴露可绕过响应式提交的实时内存。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟建立 WASM 字段 Store', path: 'getting-started' },
+        { label: '初始化与 Provider Readiness', path: 'initialization-and-provider-readiness' }
+      ]
+    },
+    en: {
+      title: 'Store WASM learning paths',
+      lede: 'This layer provides reactive fields stored in linear memory. Complete WASM readiness first, then choose fields by capacity, layout, and subscription granularity.',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: 'Choose the narrowest field for the data shape',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Data', 'Entry', 'Layout and tracking'],
+                rows: [
+                  ['One floating number', 'number', '8-byte f64, one Source'],
+                  ['One boolean', 'boolean', '1 byte, one Source'],
+                  ['Bounded UTF-8', 'string', '4-byte length plus fixed capacity'],
+                  [
+                    'Fixed floating array',
+                    'array(number(), length)',
+                    'Contiguous f64, bucketed by granularity'
+                  ],
+                  ['Uniform numeric record', 'record', 'Contiguous f64, one Source per key']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'path',
+            heading: 'Follow the allocation lifecycle',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'ensureWasm makes the module and Memory ready but allocates no field.',
+                  'Field Builders are synchronous and reject before readiness.',
+                  'createStore owns fields and recursively releases them on $dispose.',
+                  'view returns a copy rather than live memory that bypasses reactive commits.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Build a WASM-field Store in five minutes', path: 'getting-started' },
+        {
+          label: 'Initialization and Provider Readiness',
+          path: 'initialization-and-provider-readiness'
+        }
+      ]
+    }
+  },
+  'store-wasm:getting-started': {
+    zh: {
+      title: '五分钟建立并释放 WASM 字段 Store',
+      lede: '先等待全局 WASM 初始化，再同步创建字段。字段生命周期交给 Store，不要在 Store 存活时单独释放。',
+      document: {
+        sections: [
+          {
+            id: 'create',
+            heading: '显式完成 Readiness 后创建 Store',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'await ensureWasm()\n\nconst telemetry = createStore({\n  temperature: number(),\n  connected: boolean(),\n  label: string(64),\n  samples: array(number(), 1024, 32),\n  position: record({ x: number(), y: number() })\n})\n\ntelemetry.temperature.value = 21.5\ntelemetry.samples.setRange(0, 3, [1, 2, 3])\ntelemetry.position.x = 10\n\ntelemetry.$dispose()'
+              },
+              {
+                type: 'list',
+                items: [
+                  'number/boolean/string 通过 value 读写。',
+                  'array 通过 at/setAt/setRange 读写。',
+                  'record 直接通过命名属性读写。',
+                  '$dispose 幂等并释放全部 owned WASM 分配。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '初始化与 Provider Readiness', path: 'initialization-and-provider-readiness' },
+        { label: 'ensureWasm API', path: 'docs/store-wasm/ensureWasm' }
+      ]
+    },
+    en: {
+      title: 'Build and release a WASM-field Store in five minutes',
+      lede: 'Await global WASM initialization, then construct fields synchronously. Let Store own field lifetime instead of disposing fields while Store is alive.',
+      document: {
+        sections: [
+          {
+            id: 'create',
+            heading: 'Complete Readiness before creating Store',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'await ensureWasm()\n\nconst telemetry = createStore({\n  temperature: number(),\n  connected: boolean(),\n  label: string(64),\n  samples: array(number(), 1024, 32),\n  position: record({ x: number(), y: number() })\n})\n\ntelemetry.temperature.value = 21.5\ntelemetry.samples.setRange(0, 3, [1, 2, 3])\ntelemetry.position.x = 10\n\ntelemetry.$dispose()'
+              },
+              {
+                type: 'list',
+                items: [
+                  'number, boolean, and string use value accessors.',
+                  'array uses at, setAt, and setRange.',
+                  'record exposes named properties directly.',
+                  '$dispose is idempotent and releases every owned WASM allocation.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Initialization and Provider Readiness',
+          path: 'initialization-and-provider-readiness'
+        },
+        { label: 'ensureWasm API', path: 'docs/store-wasm/ensureWasm' }
+      ]
+    }
+  },
+  'store-wasm:initialization-and-provider-readiness': {
+    zh: {
+      title: '在字段同步构造前完成 WASM Readiness',
+      lede: 'ensureWasm 是模块级单飞初始化；字段 create 是同步入口，两者通过明确屏障衔接，不能在 create 内隐式等待。',
+      document: {
+        sections: [
+          {
+            id: 'states',
+            heading: '理解单飞、失败重试和同步拒绝',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '已就绪时返回同一个 WebAssembly.Memory。',
+                  '加载中重复调用共享同一个 in-flight Promise。',
+                  '加载失败清除缓存，下一次调用重新尝试。',
+                  '字段在 readiness settle 前创建会抛 NOT_INITIALIZED，不自动回退 JS。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'react',
+            heading: 'React 子树用 StoreProvider Barrier',
+            blocks: [
+              {
+                type: 'code',
+                language: 'tsx',
+                code: '<StoreProvider\n  config={{\n    features: { wasm: true },\n    ready: [ensureWasm],\n    fallback: <Loading />\n  }}\n>\n  <Game />\n</StoreProvider>'
+              },
+              {
+                type: 'paragraph',
+                text: 'ready 工厂由 Provider barrier scope 缓存；features.wasm=true 但未提供 readiness 会 fail closed。非 React、SSR 和测试直接 await ensureWasm。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '选择字段布局', path: 'choose-a-field-layout' },
+        { label: 'ensureWasm API', path: 'docs/store-wasm/ensureWasm' }
+      ]
+    },
+    en: {
+      title: 'Complete WASM Readiness before synchronous field construction',
+      lede: 'ensureWasm is module-level single-flight initialization. Field create is synchronous, so an explicit barrier connects them instead of hidden waiting.',
+      document: {
+        sections: [
+          {
+            id: 'states',
+            heading: 'Understand single flight, retry, and synchronous rejection',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'A ready call returns the same WebAssembly.Memory.',
+                  'Concurrent initialization calls share one in-flight Promise.',
+                  'Failure clears the cache so a later call can retry.',
+                  'Construction before readiness throws NOT_INITIALIZED without a JS fallback.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'react',
+            heading: 'Use a StoreProvider Barrier for a React subtree',
+            blocks: [
+              {
+                type: 'code',
+                language: 'tsx',
+                code: '<StoreProvider\n  config={{\n    features: { wasm: true },\n    ready: [ensureWasm],\n    fallback: <Loading />\n  }}\n>\n  <Game />\n</StoreProvider>'
+              },
+              {
+                type: 'paragraph',
+                text: 'Provider caches the ready factory inside its barrier scope. features.wasm=true without readiness fails closed. Non-React, SSR, and tests await ensureWasm directly.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Choose a field layout', path: 'choose-a-field-layout' },
+        { label: 'ensureWasm API', path: 'docs/store-wasm/ensureWasm' }
+      ]
+    }
+  },
+  'store-wasm:choose-a-field-layout': {
+    zh: {
+      title: '用固定布局换取可预测内存与响应式粒度',
+      lede: 'Store WASM 不是任意 JS 对象容器。每种字段都提前确定容量、布局和可追踪边界。',
+      document: {
+        sections: [
+          {
+            id: 'tradeoff',
+            heading: '布局限制就是选择条件',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['字段', '容量', '限制'],
+                rows: [
+                  ['number', '固定 8 字节', 'f64 语义'],
+                  ['boolean', '固定 1 字节', '0/1 映射'],
+                  ['string', '构造时 maxBytes', 'UTF-8 超限拒绝，不截断'],
+                  ['array', '构造时 length', '只支持 number item，不扩容'],
+                  ['record', '构造时 keys', '只支持 number 字段，不嵌套']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'fallback',
+            heading: '不能满足固定布局时回到普通 Store 字段',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'class 实例、函数、循环对象、动态数组、异构嵌套记录和小规模低频状态更适合 Store Light 普通字段。不要为使用 WASM 强行编码复杂对象图。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '数值、布尔与字符串字段', path: 'number-boolean-and-string-fields' },
+        { label: 'number API', path: 'docs/store-wasm/number' }
+      ]
+    },
+    en: {
+      title: 'Trade fixed layout for predictable memory and reactive granularity',
+      lede: 'Store WASM is not an arbitrary JavaScript object container. Every field fixes capacity, layout, and tracking boundaries ahead of time.',
+      document: {
+        sections: [
+          {
+            id: 'tradeoff',
+            heading: 'Layout constraints decide the fit',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Field', 'Capacity', 'Constraint'],
+                rows: [
+                  ['number', 'Fixed 8 bytes', 'f64 semantics'],
+                  ['boolean', 'Fixed 1 byte', 'Zero/one mapping'],
+                  ['string', 'maxBytes at construction', 'Reject oversized UTF-8; never truncate'],
+                  ['array', 'length at construction', 'number items only; no growth'],
+                  ['record', 'keys at construction', 'number fields only; no nesting']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'fallback',
+            heading: 'Use ordinary Store fields when fixed layout does not fit',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Class instances, functions, cyclic objects, dynamic arrays, heterogeneous nested records, and small low-frequency state fit Store Light fields better. Do not force complex object graphs into WASM.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Number, boolean, and string fields', path: 'number-boolean-and-string-fields' },
+        { label: 'number API', path: 'docs/store-wasm/number' }
+      ]
+    }
+  },
+  'store-wasm:number-boolean-and-string-fields': {
+    zh: {
+      title: '正确使用标量字段与 UTF-8 容量',
+      lede: '标量字段共享 value/observed/disposed/dispose 协议；写入不变值跳过提交，字符串容量按编码字节而非字符计算。',
+      document: {
+        sections: [
+          {
+            id: 'scalars',
+            heading: '标量变化使用 Object.is',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['字段', '底层', '相同值写入'],
+                rows: [
+                  ['number', '小端 f64', 'Object.is 相同则跳过 commit'],
+                  ['boolean', 'uint8 0/1', '值相同则跳过 commit'],
+                  ['string', 'u32 长度 + UTF-8 bytes', '解码值相同则跳过 commit']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'string',
+            heading: '用真实 UTF-8 预算设置 maxBytes',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const label = string(12)\nlabel.value = 'hello'\n\n// 多字节字符按 TextEncoder 结果计数\nconst bytes = new TextEncoder().encode(nextLabel).byteLength\nif (bytes <= 12) label.value = nextLabel"
+              },
+              {
+                type: 'list',
+                items: [
+                  '默认 maxBytes 为 256，构造后不扩容。',
+                  '超容量抛错，旧值保持不变。',
+                  'maxBytes=0 合法，只能存空字符串。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '数组粒度与批量写', path: 'array-granularity-and-bulk-writes' },
+        { label: 'string API', path: 'docs/store-wasm/string' }
+      ]
+    },
+    en: {
+      title: 'Use scalar fields and UTF-8 capacity correctly',
+      lede: 'Scalar fields share value, observed, disposed, and dispose contracts. Equal writes skip commits, while string capacity counts encoded bytes rather than characters.',
+      document: {
+        sections: [
+          {
+            id: 'scalars',
+            heading: 'Scalar changes use Object.is semantics',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Field', 'Storage', 'Equal write'],
+                rows: [
+                  ['number', 'Little-endian f64', 'Object.is equal skips commit'],
+                  ['boolean', 'uint8 zero/one', 'Equal value skips commit'],
+                  ['string', 'u32 length plus UTF-8 bytes', 'Equal decoded value skips commit']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'string',
+            heading: 'Set maxBytes from the real UTF-8 budget',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const label = string(12)\nlabel.value = 'hello'\n\n// Multi-byte characters count by TextEncoder output\nconst bytes = new TextEncoder().encode(nextLabel).byteLength\nif (bytes <= 12) label.value = nextLabel"
+              },
+              {
+                type: 'list',
+                items: [
+                  'maxBytes defaults to 256 and never grows.',
+                  'An oversized write throws and preserves the old value.',
+                  'maxBytes zero is valid and stores only the empty string.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Array granularity and bulk writes', path: 'array-granularity-and-bulk-writes' },
+        { label: 'string API', path: 'docs/store-wasm/string' }
+      ]
+    }
+  },
+  'store-wasm:array-granularity-and-bulk-writes': {
+    zh: {
+      title: '按订阅密度选择 Array Granularity',
+      lede: 'array 物理上连续，响应式上按桶追踪。granularity 越小更新越精确，Source 数量和管理成本越高。',
+      document: {
+        sections: [
+          {
+            id: 'granularity',
+            heading: '从读取模式选择分桶',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['读取模式', 'granularity', '结果'],
+                rows: [
+                  ['整段图表或批处理', '64 或更大', '少 Source，桶内共同通知'],
+                  ['局部窗口', '8–32', '平衡精度与成本'],
+                  ['每个 index 独立组件', '1', '最高精度，Source 最多']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Source 按触碰的桶惰性创建，不会在构造大数组时立即创建 length/granularity 个节点。'
+              }
+            ]
+          },
+          {
+            id: 'writes',
+            heading: '批量写入使用 setRange',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '区间是 [lo, hi)，values.length 必须等于 hi-lo。',
+                  '同批同桶的多次写只提交一次通知。',
+                  'view 返回独立 Float64Array 拷贝，修改它不写回。',
+                  '所有 index、range 和 length 在写入前完整校验。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Record 布局与字段追踪', path: 'record-layout-and-field-tracking' },
+        { label: 'array API', path: 'docs/store-wasm/array' }
+      ]
+    },
+    en: {
+      title: 'Choose Array Granularity from subscription density',
+      lede: 'An array is physically contiguous and reactively bucketed. Smaller granularity gives more precise updates with more Sources and management cost.',
+      document: {
+        sections: [
+          {
+            id: 'granularity',
+            heading: 'Choose buckets from the read pattern',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Read pattern', 'granularity', 'Result'],
+                rows: [
+                  [
+                    'Whole chart or batch',
+                    '64 or larger',
+                    'Few Sources; shared bucket notifications'
+                  ],
+                  ['Local window', '8 to 32', 'Balanced precision and cost'],
+                  ['One component per index', '1', 'Maximum precision and Sources']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Sources are created lazily for touched buckets instead of allocating length divided by granularity nodes at construction.'
+              }
+            ]
+          },
+          {
+            id: 'writes',
+            heading: 'Use setRange for bulk writes',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'The interval is [lo, hi) and values.length equals hi minus lo.',
+                  'Writes in one batch and bucket commit one notification.',
+                  'view returns an independent Float64Array copy; mutating it does not write back.',
+                  'Every index, range, and length is validated before mutation.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Record layout and field tracking', path: 'record-layout-and-field-tracking' },
+        { label: 'array API', path: 'docs/store-wasm/array' }
+      ]
+    }
+  },
+  'store-wasm:record-layout-and-field-tracking': {
+    zh: {
+      title: '用 Record 表达定长数值结构',
+      lede: 'record 把命名 f64 放在一块连续分配中，但每个 key 拥有独立 Source；物理聚合不牺牲字段级订阅。',
+      document: {
+        sections: [
+          {
+            id: 'layout',
+            heading: 'Key 顺序决定内存偏移',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const position = record({\n  x: number(),\n  y: number(),\n  z: number()\n})\n\nposition.x = 1\nposition.y = 2'
+              },
+              {
+                type: 'list',
+                items: [
+                  'Object.keys 顺序决定每个 8 字节 f64 偏移。',
+                  '读 x 只追踪 x；写 y 不通知只订阅 x 的观察者。',
+                  '业务 key 可枚举；disposed/dispose 不可枚举。',
+                  'dispose 与 disposed 是保留名，构造时立即拒绝。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'limits',
+            heading: 'Record 不是嵌套结构序列化器',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'shape 当前只接受 number() Builder，不接受 array、record、string 或任意对象。需要嵌套结构时组合多个顶层字段，或使用普通 Store 状态。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '内存安全、View 与容量', path: 'memory-safety-views-and-capacity' },
+        { label: 'record API', path: 'docs/store-wasm/record' }
+      ]
+    },
+    en: {
+      title: 'Represent fixed numeric structures with Record',
+      lede: 'record places named f64 values in one contiguous allocation while giving each key its own Source. Physical grouping preserves field-level subscriptions.',
+      document: {
+        sections: [
+          {
+            id: 'layout',
+            heading: 'Key order determines memory offsets',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const position = record({\n  x: number(),\n  y: number(),\n  z: number()\n})\n\nposition.x = 1\nposition.y = 2'
+              },
+              {
+                type: 'list',
+                items: [
+                  'Object.keys order defines each 8-byte f64 offset.',
+                  'Reading x tracks only x; writing y does not notify x-only observers.',
+                  'Business keys are enumerable while disposed and dispose are not.',
+                  'dispose and disposed are reserved and reject at construction.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'limits',
+            heading: 'Record is not a nested structure serializer',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'shape currently accepts only number Builders, not array, record, string, or arbitrary objects. Compose several top-level fields or use ordinary Store state for nesting.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Memory safety, views, and capacity', path: 'memory-safety-views-and-capacity' },
+        { label: 'record API', path: 'docs/store-wasm/record' }
+      ]
+    }
+  },
+  'store-wasm:memory-safety-views-and-capacity': {
+    zh: {
+      title: '用拷贝 View、固定容量与 Wasm32 上限保护内存',
+      lede: '公开字段不泄漏线性内存实时视图。所有容量先验证为安全整数并受 32 位地址空间限制。',
+      document: {
+        sections: [
+          {
+            id: 'views',
+            heading: '不要绕过响应式写入口',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'array.view() 返回独立拷贝，防止调用方直接改 WASM 内存而跳过 Source commit，也避免长期持有会在 Memory growth 后失效的 TypedArray。写入必须走 setAt/setRange。'
+              }
+            ]
+          },
+          {
+            id: 'capacity',
+            heading: '在分配前验证容量乘法',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['字段', '上限'],
+                rows: [
+                  ['string maxBytes', '0 到 0xffff_ffff - 4'],
+                  ['array length', '0 到 floor(0xffff_ffff / 8)'],
+                  ['array granularity', '正安全整数'],
+                  ['record bytes', 'keys.length × 8 必须可分配']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '这些是格式上限，不代表适合实际分配到边界值。应用仍应设置符合设备内存预算的更小业务上限。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '错误、回滚与释放', path: 'errors-rollback-and-disposal' },
+        { label: 'array API', path: 'docs/store-wasm/array' }
+      ]
+    },
+    en: {
+      title: 'Protect memory with copied Views, fixed capacity, and Wasm32 limits',
+      lede: 'Public fields do not leak live linear-memory views. Every capacity is a safe integer checked against the 32-bit address space before allocation.',
+      document: {
+        sections: [
+          {
+            id: 'views',
+            heading: 'Do not bypass reactive write entries',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'array.view returns an independent copy, preventing direct memory mutation that skips Source commits and avoiding long-lived TypedArrays invalidated by Memory growth. Write through setAt or setRange.'
+              }
+            ]
+          },
+          {
+            id: 'capacity',
+            heading: 'Validate capacity multiplication before allocation',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Field', 'Limit'],
+                rows: [
+                  ['string maxBytes', 'Zero through 0xffff_ffff minus four'],
+                  ['array length', 'Zero through floor of 0xffff_ffff divided by eight'],
+                  ['array granularity', 'Positive safe integer'],
+                  ['record bytes', 'keys.length times eight must allocate']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'These are format limits, not practical allocation targets. Applications still impose smaller product limits based on device memory budgets.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Errors, rollback, and disposal', path: 'errors-rollback-and-disposal' },
+        { label: 'array API', path: 'docs/store-wasm/array' }
+      ]
+    }
+  },
+  'store-wasm:errors-rollback-and-disposal': {
+    zh: {
+      title: '保留构造原子性，并显式结束字段生命周期',
+      lede: '字段构造先分配再建立 Source；任一步失败都反序回滚。成功后由 Store 或直接调用方拥有 dispose。',
+      document: {
+        sections: [
+          {
+            id: 'rollback',
+            heading: '构造失败不能留下半分配字段',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '初始化 signal 已 abort 时抛 INIT_ABORTED。',
+                  '分配、对齐或 Source 创建失败时释放已取得资源。',
+                  '多个回滚失败保存在 CLEANUP_FAILED AggregateError.errors。',
+                  '原始失败通过 identity/cause 保持可追踪。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'dispose',
+            heading: 'Store owned 与直接 Builder owned 分开',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['创建方式', '释放所有者', '入口'],
+                rows: [
+                  ['createStore 字段', 'Store', 'store.$dispose'],
+                  ['builder.create(context)', '调用方', 'field.dispose'],
+                  ['遗漏显式释放', 'FinalizationRegistry 兜底', '时机不确定，不能依赖']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'dispose 幂等。释放后继续读写抛 FIELD_DISPOSED；已释放实例不能复活，创建新字段。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '性能与不适用场景', path: 'performance-and-when-not-to-use' },
+        { label: 'createStoreWasmError API', path: 'docs/store-wasm/createStoreWasmError' }
+      ]
+    },
+    en: {
+      title: 'Preserve construction atomicity and end field lifetime explicitly',
+      lede: 'Field construction allocates before creating Sources and rolls back in reverse order on any failure. After success, Store or the direct caller owns dispose.',
+      document: {
+        sections: [
+          {
+            id: 'rollback',
+            heading: 'Construction failure cannot leave a partial field',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'An already-aborted initialization signal throws INIT_ABORTED.',
+                  'Allocation, alignment, or Source failure releases acquired resources.',
+                  'Multiple rollback failures remain in CLEANUP_FAILED AggregateError.errors.',
+                  'The primary failure remains traceable through identity or cause.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'dispose',
+            heading: 'Separate Store ownership from direct Builder ownership',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Construction', 'Release owner', 'Entry'],
+                rows: [
+                  ['createStore field', 'Store', 'store.$dispose'],
+                  ['builder.create(context)', 'Caller', 'field.dispose'],
+                  [
+                    'Missing explicit release',
+                    'FinalizationRegistry fallback',
+                    'Unpredictable and not a lifecycle strategy'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'dispose is idempotent. Reads and writes after disposal throw FIELD_DISPOSED. A disposed field cannot revive; create a new field.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Performance and when not to use it', path: 'performance-and-when-not-to-use' },
+        { label: 'createStoreWasmError API', path: 'docs/store-wasm/createStoreWasmError' }
+      ]
+    }
+  },
+  'store-wasm:performance-and-when-not-to-use': {
+    zh: {
+      title: '只在布局、规模或互操作确有收益时使用 WASM 字段',
+      lede: '线性内存不是自动加速器。固定容量、异步 readiness、编码和 Source 管理都有成本，应以真实 workload 选择。',
+      document: {
+        sections: [
+          {
+            id: 'fit',
+            heading: '收益来自可预测布局和共享边界',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['场景', '建议', '原因'],
+                rows: [
+                  ['数万项连续数值', '适合 array', '紧凑连续布局与批量写'],
+                  ['与 WASM/Rust 共享定长结构', '适合 record/array', '明确字节布局'],
+                  ['单个低频表单字段', '普通 Store 字段', '减少 readiness 与容量复杂度'],
+                  ['动态对象图', '普通 Store/Indexed', 'WASM 字段不支持动态嵌套']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'measure',
+            heading: '测量端到端使用路径',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '同时测初始化、读写、通知、序列化和释放。',
+                  '按真实 granularity 与订阅密度测量。',
+                  '为字符串和数组设置业务容量上限，避免攻击者尺寸分配。',
+                  '无法证明收益时选择更简单的普通字段。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '返回 Store WASM 学习路径', path: 'index' },
+        { label: 'number API', path: 'docs/store-wasm/number' }
+      ]
+    },
+    en: {
+      title: 'Use WASM fields only when layout, scale, or interop provides value',
+      lede: 'Linear memory is not an automatic accelerator. Fixed capacity, asynchronous readiness, encoding, and Source management all cost work, so choose from real workloads.',
+      document: {
+        sections: [
+          {
+            id: 'fit',
+            heading: 'Value comes from predictable layout and shared boundaries',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Scenario', 'Choice', 'Reason'],
+                rows: [
+                  [
+                    'Tens of thousands of contiguous numbers',
+                    'array fits',
+                    'Compact layout and bulk writes'
+                  ],
+                  [
+                    'Fixed structures shared with WASM or Rust',
+                    'record or array fits',
+                    'Explicit byte layout'
+                  ],
+                  [
+                    'One low-frequency form field',
+                    'Ordinary Store field',
+                    'Avoid readiness and capacity complexity'
+                  ],
+                  [
+                    'Dynamic object graph',
+                    'Ordinary Store or Indexed',
+                    'WASM fields do not support dynamic nesting'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'measure',
+            heading: 'Measure the end-to-end usage path',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Measure initialization, reads, writes, notifications, serialization, and release together.',
+                  'Use the real granularity and subscription density.',
+                  'Set product capacity limits for strings and arrays to reject attacker-sized allocations.',
+                  'Choose simpler ordinary fields when benefit is unproven.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Return to Store WASM learning paths', path: 'index' },
+        { label: 'number API', path: 'docs/store-wasm/number' }
+      ]
+    }
+  },
+  'store-worker:index': {
+    zh: {
+      title: 'Store Worker 学习路径',
+      lede: '这层把重计算或字节编解码接到 Worker；通信、超时和取消仍由 WebRPC 拥有，Store Worker 只负责两种应用装配。',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: '先判断工作是否值得跨线程',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['任务', '入口', '建议'],
+                rows: [
+                  ['重 CPU 的 Input → Output', 'WorkerAdapter + createWorkerHandler', '适合'],
+                  ['响应式重计算与缓存', 'workerComputed', '适合大输入或昂贵计算'],
+                  ['Uint8Array 编解码', 'workerPlugin / workerParser', '适合字节进、字节出'],
+                  ['小型同步派生', '主线程直接计算', 'Worker 往返可能更慢'],
+                  ['对象图序列化后还要还原', '主线程 parser', '结构化克隆通常抵消收益']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ownership',
+            heading: '每条路径都要先声明所有者',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'workerComputed 不拥有传入的 WorkerAdapter。',
+                  'workerParser 默认不 terminate 外部 Worker。',
+                  'transfer 会让发送方 ArrayBuffer 立即失效。',
+                  'Resource、Adapter、Worker Handler 和 Worker 本体各有独立终态。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟完成计算卸载', path: 'getting-started' },
+        { label: '选择卸载路径', path: 'choose-an-offload-path' }
+      ]
+    },
+    en: {
+      title: 'Store Worker learning paths',
+      lede: 'This layer connects expensive computation or byte codecs to a Worker. WebRPC still owns messaging, timeout, and cancellation; Store Worker owns two application assemblies.',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: 'First decide whether work deserves a thread boundary',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Task', 'Entry', 'Fit'],
+                rows: [
+                  ['CPU-heavy Input to Output', 'WorkerAdapter plus createWorkerHandler', 'Good'],
+                  [
+                    'Reactive recomputation and cache',
+                    'workerComputed',
+                    'Good for large or expensive work'
+                  ],
+                  [
+                    'Uint8Array codec',
+                    'workerPlugin / workerParser',
+                    'Good for bytes in and bytes out'
+                  ],
+                  [
+                    'Small synchronous derivation',
+                    'Compute on main thread',
+                    'Worker round trip may cost more'
+                  ],
+                  [
+                    'Object graph serialized then restored',
+                    'Main-thread parser',
+                    'Structured clone often removes the gain'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ownership',
+            heading: 'Declare owners before selecting a path',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'workerComputed does not own its WorkerAdapter.',
+                  'workerParser does not terminate an external Worker by default.',
+                  'transfer immediately invalidates the sender ArrayBuffer.',
+                  'Resource, Adapter, Worker Handler, and Worker each have separate terminal state.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Offload one computation in five minutes', path: 'getting-started' },
+        { label: 'Choose an offload path', path: 'choose-an-offload-path' }
+      ]
+    }
+  },
+  'store-worker:getting-started': {
+    zh: {
+      title: '五分钟建立可取消的 Worker 计算链',
+      lede: 'Worker 侧只暴露一个 compute；主线程 Adapter 发请求，Resource 可选地负责响应式输入、缓存与取消。',
+      document: {
+        sections: [
+          {
+            id: 'worker',
+            heading: 'Worker 侧建立处理器',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const handler = createWorkerHandler<number[], number>(\n  (values, { signal }) => {\n    signal.throwIfAborted?.()\n    return values.reduce((sum, value) => sum + value, 0)\n  },\n  (message) => self.postMessage(message)\n)\n\nself.onmessage = (event) => {\n  void handler(event.data)\n}'
+              }
+            ]
+          },
+          {
+            id: 'main',
+            heading: '主线程请求并按所有权关闭',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const worker = new Worker(new URL('./sum.worker.ts', import.meta.url), { type: 'module' })\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 5000 })\n\ntry {\n  const sum = await adapter.request<number[], number>([1, 2, 3])\n  console.log(sum)\n} finally {\n  await adapter.dispose()\n  worker.terminate()\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'request 自动等待 endpoint 连接，无需额外 ready。',
+                  'Adapter dispose 不 terminate Worker；外部创建者负责 terminate。',
+                  'Worker 关闭前先停止新请求并等待 Adapter dispose。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '选择卸载路径', path: 'choose-an-offload-path' },
+        { label: 'WorkerAdapter API', path: 'docs/store-worker/WorkerAdapter' }
+      ]
+    },
+    en: {
+      title: 'Build a cancellable Worker computation path in five minutes',
+      lede: 'The Worker exposes one compute function. The main-thread Adapter sends requests, while an optional Resource owns reactive input, caching, and cancellation.',
+      document: {
+        sections: [
+          {
+            id: 'worker',
+            heading: 'Create the Worker-side handler',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const handler = createWorkerHandler<number[], number>(\n  (values, { signal }) => {\n    signal.throwIfAborted?.()\n    return values.reduce((sum, value) => sum + value, 0)\n  },\n  (message) => self.postMessage(message)\n)\n\nself.onmessage = (event) => {\n  void handler(event.data)\n}'
+              }
+            ]
+          },
+          {
+            id: 'main',
+            heading: 'Request on the main thread and close by ownership',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const worker = new Worker(new URL('./sum.worker.ts', import.meta.url), { type: 'module' })\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 5000 })\n\ntry {\n  const sum = await adapter.request<number[], number>([1, 2, 3])\n  console.log(sum)\n} finally {\n  await adapter.dispose()\n  worker.terminate()\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'request waits for endpoint connection automatically.',
+                  'Adapter disposal does not terminate the Worker; its creator owns terminate.',
+                  'Stop admission and await Adapter disposal before terminating the Worker.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Choose an offload path', path: 'choose-an-offload-path' },
+        { label: 'WorkerAdapter API', path: 'docs/store-worker/WorkerAdapter' }
+      ]
+    }
+  },
+  'store-worker:choose-an-offload-path': {
+    zh: {
+      title: '按数据形状与所有权选择 Worker 路径',
+      lede: 'Worker 不是性能开关。收益取决于主线程避免了多少同步工作，以及跨边界前后是否仍停留在字节表示。',
+      document: {
+        sections: [
+          {
+            id: 'paths',
+            heading: '两条集成路径互不替代',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['路径', '主线程', 'Worker', 'Payload'],
+                rows: [
+                  [
+                    '通用计算',
+                    'WorkerAdapter / workerComputed',
+                    'createWorkerHandler',
+                    '任意 Input → Output'
+                  ],
+                  [
+                    '序列化',
+                    'workerPlugin / workerParser',
+                    'createSerializeWorkerHandler',
+                    '{ phase, chunk }'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '两者都复用 WebRPC exclusive 拓扑和 call 方法，但请求形状、结果处理、错误包装与所有权不同，不应交叉模拟。'
+              }
+            ]
+          },
+          {
+            id: 'decision',
+            heading: '用主线程阻塞而不是墙钟总耗时判断收益',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '重计算即使墙钟相近，也能释放主线程响应能力。',
+                  '对象图 postMessage 会在发送线程同步结构化克隆。',
+                  '字节 transfer 才能避免大块复制，但输入会 detach。',
+                  '小任务优先留在主线程，减少连接和 RPC 固定成本。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Adapter 请求与取消', path: 'adapter-requests-and-cancellation' },
+        { label: 'workerComputed API', path: 'docs/store-worker/workerComputed' }
+      ]
+    },
+    en: {
+      title: 'Choose a Worker path by data shape and ownership',
+      lede: 'A Worker is not a performance switch. Benefit depends on synchronous main-thread work avoided and whether values stay in byte form across the boundary.',
+      document: {
+        sections: [
+          {
+            id: 'paths',
+            heading: 'Two integration paths do not replace each other',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Path', 'Main thread', 'Worker', 'Payload'],
+                rows: [
+                  [
+                    'General computation',
+                    'WorkerAdapter / workerComputed',
+                    'createWorkerHandler',
+                    'Any Input to Output'
+                  ],
+                  [
+                    'Serialization',
+                    'workerPlugin / workerParser',
+                    'createSerializeWorkerHandler',
+                    '{ phase, chunk }'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Both reuse WebRPC exclusive topology and the call method, but request shape, result processing, error wrapping, and ownership differ. Do not simulate one with the other.'
+              }
+            ]
+          },
+          {
+            id: 'decision',
+            heading: 'Judge benefit by main-thread blocking, not only wall time',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Heavy computation may preserve wall time while freeing main-thread responsiveness.',
+                  'Object graph postMessage performs structured clone synchronously on the sender.',
+                  'Byte transfer avoids bulk copying but detaches its input.',
+                  'Keep small tasks local to avoid connection and RPC fixed cost.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Adapter requests and cancellation', path: 'adapter-requests-and-cancellation' },
+        { label: 'workerComputed API', path: 'docs/store-worker/workerComputed' }
+      ]
+    }
+  },
+  'store-worker:adapter-requests-and-cancellation': {
+    zh: {
+      title: '配置 WorkerAdapter 请求、超时与取消',
+      lede: 'Adapter 是主线程 endpoint 句柄。默认 timeout 属于 Adapter，请求 signal 与 transfer 则属于单次调用。',
+      document: {
+        sections: [
+          {
+            id: 'config',
+            heading: '区分连接配置与单次请求配置',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['位置', '字段', '语义'],
+                rows: [
+                  ['构造', 'clientId', '本端拓扑 id，默认 main'],
+                  ['构造', 'timeoutMs', '所有请求的默认 deadline'],
+                  ['request', 'signal', '取消当前调用'],
+                  ['request', 'transfer', '当前消息的 Transferable 列表']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '非法 options 或 hostile getter 不会同步炸出半构造请求，而是让 request 返回带 INVALID_OPTION 的 rejected Promise。'
+              }
+            ]
+          },
+          {
+            id: 'terminal',
+            heading: 'close 与 dispose 是不同终态步骤',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'close 同步关闭准入，幂等；此后 request 立即拒绝。',
+                  'close 不释放底层 endpoint，也不等待异步初始化。',
+                  'dispose 先 close，再等待 endpoint 建立并释放；重复调用复用 Promise。',
+                  'Adapter 不拥有外部 Worker，除非上层 parser 明确启用 terminateOnDispose。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Worker Handler 与生命周期', path: 'worker-handlers-and-lifecycle' },
+        { label: 'WorkerAdapter API', path: 'docs/store-worker/WorkerAdapter' }
+      ]
+    },
+    en: {
+      title: 'Configure WorkerAdapter requests, timeout, and cancellation',
+      lede: 'Adapter is a main-thread endpoint handle. Its timeout is a shared default, while signal and transfer belong to one request.',
+      document: {
+        sections: [
+          {
+            id: 'config',
+            heading: 'Separate connection config from request config',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Location', 'Field', 'Meaning'],
+                rows: [
+                  ['Constructor', 'clientId', 'Local topology id; defaults main'],
+                  ['Constructor', 'timeoutMs', 'Default deadline for requests'],
+                  ['request', 'signal', 'Cancel this call'],
+                  ['request', 'transfer', 'Transferable list for this message']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Invalid options or hostile getters reject the request with INVALID_OPTION instead of escaping synchronously from a half-built call.'
+              }
+            ]
+          },
+          {
+            id: 'terminal',
+            heading: 'close and dispose are separate terminal steps',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'close synchronously and idempotently closes admission; later requests reject immediately.',
+                  'close does not release the endpoint or await asynchronous initialization.',
+                  'dispose closes, awaits endpoint creation, then releases it; repeated calls share one Promise.',
+                  'Adapter does not own the external Worker unless an upper parser explicitly enables terminateOnDispose.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Worker Handlers and lifecycle', path: 'worker-handlers-and-lifecycle' },
+        { label: 'WorkerAdapter API', path: 'docs/store-worker/WorkerAdapter' }
+      ]
+    }
+  },
+  'store-worker:worker-handlers-and-lifecycle': {
+    zh: {
+      title: '管理 Worker Handler 的消息准入与终态',
+      lede: 'Handler 本身是消息函数，同时暴露 pendingCount、close 和 dispose；Worker 事件监听器只负责把 event.data 交给它。',
+      document: {
+        sections: [
+          {
+            id: 'contract',
+            heading: 'compute 获得协作式取消上下文',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'compute 可同步返回、异步返回或抛错。',
+                  'context.signal 必须由长循环主动检查，取消不是线程强杀。',
+                  '异常由 WebRPC 转成失败响应，不成为 Worker unhandled error。',
+                  'postMessage 只负责回包；消息协议由底层 endpoint 管理。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'lifecycle',
+            heading: '先 close，再等待 pendingCount 收敛',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['入口', '行为', '调用时机'],
+                rows: [
+                  ['close', '拒绝新消息', 'Worker 准备关闭'],
+                  ['pendingCount', '当前处理中的消息数', '等待观察'],
+                  ['dispose', '关闭并异步释放 endpoint', '移除 onmessage 前']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Resource 计算与缓存', path: 'resource-computed-and-cache' },
+        { label: 'createWorkerHandler API', path: 'docs/store-worker/createWorkerHandler' }
+      ]
+    },
+    en: {
+      title: 'Manage Worker Handler admission and terminal state',
+      lede: 'A Handler is the message function and also exposes pendingCount, close, and dispose. The Worker listener only forwards event.data.',
+      document: {
+        sections: [
+          {
+            id: 'contract',
+            heading: 'compute receives cooperative cancellation',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'compute may return synchronously, asynchronously, or throw.',
+                  'A long loop checks context.signal explicitly; cancellation does not kill the thread.',
+                  'WebRPC converts exceptions into failure responses instead of Worker unhandled errors.',
+                  'postMessage returns messages while the endpoint owns protocol semantics.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'lifecycle',
+            heading: 'Close first, then let pendingCount converge',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Entry', 'Behavior', 'When'],
+                rows: [
+                  ['close', 'Reject new messages', 'Worker begins shutdown'],
+                  ['pendingCount', 'Current in-flight message count', 'Observe draining'],
+                  [
+                    'dispose',
+                    'Close and asynchronously release endpoint',
+                    'Before removing onmessage'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Resource computation and cache', path: 'resource-computed-and-cache' },
+        { label: 'createWorkerHandler API', path: 'docs/store-worker/createWorkerHandler' }
+      ]
+    }
+  },
+  'store-worker:resource-computed-and-cache': {
+    zh: {
+      title: '用 workerComputed 接入 Resource 缓存与取消',
+      lede: 'workerComputed 只替换 Resource fetcher，不创建新状态机。依赖追踪、TTL、重试和 stale-while-revalidate 仍遵循 Resource 合同。',
+      document: {
+        sections: [
+          {
+            id: 'flow',
+            heading: '同步选择输入，异步交给 Adapter',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const totals = workerComputed(adapter, () => rows.value, {\n  runtime,\n  ttl: 30_000,\n  staleWhileRevalidate: true,\n  retry: 2,\n  transfer: (input) => input instanceof Uint8Array ? [input.buffer] : []\n})'
+              },
+              {
+                type: 'list',
+                items: [
+                  'selectInput 同步读取的响应式值成为 Resource 依赖。',
+                  'await 后读取的值不会进入本轮依赖集合。',
+                  'transfer 在每次选出 input 后计算；输入可能被 detach。',
+                  'adapter 生命周期晚于 Resource，Resource dispose 不会替你释放 Adapter。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: '其余配置直接属于 Resource',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'runtime、debugName、ttl、autoStart、staleWhileRevalidate、retry、retryDelay、keepAlive、initialSnapshot 和 scheduler 原样交给 Resource。选择这些配置时应阅读 Resource 的缓存与取消语义，而不是假设 Worker 改变它们。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '序列化 Worker 管线', path: 'serialization-worker-pipeline' },
+        { label: 'workerComputed API', path: 'docs/store-worker/workerComputed' }
+      ]
+    },
+    en: {
+      title: 'Connect Worker computation to Resource cache and cancellation',
+      lede: 'workerComputed only replaces the Resource fetcher. Dependency tracking, TTL, retry, and stale-while-revalidate remain Resource contracts.',
+      document: {
+        sections: [
+          {
+            id: 'flow',
+            heading: 'Select input synchronously and send through Adapter',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const totals = workerComputed(adapter, () => rows.value, {\n  runtime,\n  ttl: 30_000,\n  staleWhileRevalidate: true,\n  retry: 2,\n  transfer: (input) => input instanceof Uint8Array ? [input.buffer] : []\n})'
+              },
+              {
+                type: 'list',
+                items: [
+                  'Reactive values read synchronously in selectInput become Resource dependencies.',
+                  'Reads after await do not join that dependency set.',
+                  'transfer runs for each selected input and may detach it.',
+                  'Adapter outlives Resource; Resource disposal does not release Adapter.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: 'All remaining configuration belongs to Resource',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'runtime, debugName, ttl, autoStart, staleWhileRevalidate, retry, retryDelay, keepAlive, initialSnapshot, and scheduler pass through unchanged. Choose them from Resource cache and cancellation semantics rather than assuming Worker changes them.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Serialization Worker pipeline', path: 'serialization-worker-pipeline' },
+        { label: 'workerComputed API', path: 'docs/store-worker/workerComputed' }
+      ]
+    }
+  },
+  'store-worker:serialization-worker-pipeline': {
+    zh: {
+      title: '把字节编解码接入 Serialize Registry',
+      lede: 'workerPlugin 是注册表包装；workerParser 是主线程 RPC parser；createSerializeWorkerHandler 是 Worker 对端。三层责任不能混为一个 API。',
+      document: {
+        sections: [
+          {
+            id: 'assembly',
+            heading: '两端使用对应组件',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['位置', '入口', '责任'],
+                rows: [
+                  ['主线程 Registry', 'workerPlugin', '提供 type + parser'],
+                  ['主线程单独使用', 'workerParser', 'encode/decode 走 RPC'],
+                  ['Worker', 'createSerializeWorkerHandler', '调用本地 parser 并回传 chunk']
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const registry = createSerializeRegistry([\n  workerPlugin({\n    worker,\n    type: 'gzip',\n    ownership: WorkerByteOwnership.transfer\n  })\n])"
+              }
+            ]
+          },
+          {
+            id: 'chunks',
+            heading: '保持 chunk 形状和 codec type 一致',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Uint8Array 按 bytes chunk 才可能 transfer。',
+                  '其他 value 使用结构化克隆。',
+                  'Worker 多段 encode 结果先在 Worker 内 collectStream，再回一份结果。',
+                  'type 是持久格式标签；读取旧数据时必须注册相同 type。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '字节复制与转移所有权', path: 'byte-copy-and-transfer-ownership' },
+        { label: 'workerPlugin API', path: 'docs/store-worker/serialize/workerPlugin' }
+      ]
+    },
+    en: {
+      title: 'Connect byte codecs to a Serialize Registry',
+      lede: 'workerPlugin wraps a registry entry, workerParser is the main-thread RPC parser, and createSerializeWorkerHandler is the Worker peer. Their responsibilities stay separate.',
+      document: {
+        sections: [
+          {
+            id: 'assembly',
+            heading: 'Use the matching component on each side',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Location', 'Entry', 'Responsibility'],
+                rows: [
+                  ['Main-thread Registry', 'workerPlugin', 'Provide type plus parser'],
+                  ['Main-thread standalone', 'workerParser', 'Forward encode/decode over RPC'],
+                  ['Worker', 'createSerializeWorkerHandler', 'Call local parser and return chunks']
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const registry = createSerializeRegistry([\n  workerPlugin({\n    worker,\n    type: 'gzip',\n    ownership: WorkerByteOwnership.transfer\n  })\n])"
+              }
+            ]
+          },
+          {
+            id: 'chunks',
+            heading: 'Keep chunk shape and codec type consistent',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Only a Uint8Array bytes chunk can transfer.',
+                  'Other values use structured clone.',
+                  'Worker-side collectStream combines multi-chunk encode output before one response.',
+                  'type is a persistent format label and must be registered when reading older data.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Byte copy and transfer ownership', path: 'byte-copy-and-transfer-ownership' },
+        { label: 'workerPlugin API', path: 'docs/store-worker/serialize/workerPlugin' }
+      ]
+    }
+  },
+  'store-worker:byte-copy-and-transfer-ownership': {
+    zh: {
+      title: '在 copy 安全性与 transfer 零拷贝之间选择',
+      lede: 'copy 保留发送方数据；transfer 交出底层 ArrayBuffer。默认 copy 是所有权裁定，不是遗漏的优化。',
+      document: {
+        sections: [
+          {
+            id: 'modes',
+            heading: '转移前确认输入是独占整块视图',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['模式', '发送后输入', '适用'],
+                rows: [
+                  ['copy', '仍可使用', '默认、安全重试、共享视图'],
+                  ['transfer', 'ArrayBuffer detach', '独占字节且不再读取'],
+                  ['transfer + subarray', '静默回退 copy', '避免连带 detach 其他视图']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'conditions',
+            heading: '真正零拷贝需要同时满足两个条件',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'ownership 必须是 transfer，chunk 必须是 bytes。',
+                  'Uint8Array 必须 byteOffset=0 且覆盖整个 buffer。',
+                  'text/value chunk 永远复制。',
+                  '请求取消或 Worker 崩溃后，已 transfer 输入不能取回或安全重试。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '错误、超时与清理', path: 'errors-timeouts-and-cleanup' },
+        { label: 'WorkerByteOwnership API', path: 'docs/store-worker/WorkerByteOwnership' }
+      ]
+    },
+    en: {
+      title: 'Choose between copy safety and zero-copy transfer',
+      lede: 'copy preserves sender data, while transfer gives away the underlying ArrayBuffer. The copy default is an ownership decision, not a missed optimization.',
+      document: {
+        sections: [
+          {
+            id: 'modes',
+            heading: 'Transfer only an exclusively owned full-buffer view',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Mode', 'Input after send', 'Use it for'],
+                rows: [
+                  ['copy', 'Still usable', 'Default, safe retry, shared views'],
+                  ['transfer', 'ArrayBuffer detached', 'Exclusive bytes no longer read'],
+                  ['transfer plus subarray', 'Falls back to copy', 'Avoid detaching sibling views']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'conditions',
+            heading: 'True zero-copy requires both conditions',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'ownership is transfer and the chunk is bytes.',
+                  'Uint8Array has byteOffset zero and covers the complete buffer.',
+                  'Text and value chunks always copy.',
+                  'After cancellation or Worker failure, transferred input cannot be recovered or safely retried.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Errors, timeouts, and cleanup', path: 'errors-timeouts-and-cleanup' },
+        { label: 'WorkerByteOwnership API', path: 'docs/store-worker/WorkerByteOwnership' }
+      ]
+    }
+  },
+  'store-worker:errors-timeouts-and-cleanup': {
+    zh: {
+      title: '按责任层处理 Worker 错误、超时与清理失败',
+      lede: '通用请求错误来自 WebRPC；序列化取消会增加 codec 上下文；Store Worker 自身错误只覆盖本层输入、chunk 与清理合同。',
+      document: {
+        sections: [
+          {
+            id: 'layers',
+            heading: '先看 source/code，再决定恢复动作',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['来源', '常见错误', '处理'],
+                rows: [
+                  ['WebRPC', 'DEADLINE_EXCEEDED / CANCELLED / TRANSPORT', '按连接与请求策略处理'],
+                  ['Serialize', '带 phase/type 的 SerializeError', '定位 codec 和阶段'],
+                  ['Store Worker', 'INVALID_*_CHUNK / ADAPTER_DISPOSED', '修正实现或新建 Adapter'],
+                  ['Cleanup', 'CLEANUP_FAILED AggregateError', '保留并检查全部 errors']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'abort',
+            heading: 'transfer 后的取消是不可逆所有权事件',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'workerParser 会把 AbortError 包装成带 type、phase、source、chunkIndex 和 bytesConsumed 的 SerializeError；transfer 模式下消息还会明确输入已 detach，调用方不能对同一字节重试。其他 RPC 错误保持原样。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '性能与关闭顺序', path: 'performance-and-shutdown-order' },
+        {
+          label: 'createStoreWorkerError API',
+          path: 'docs/store-worker/createStoreWorkerError'
+        }
+      ]
+    },
+    en: {
+      title: 'Handle Worker errors, timeouts, and cleanup by responsibility layer',
+      lede: 'General request failures come from WebRPC. Serialization cancellation adds codec context. Store Worker errors cover only local input, chunk, and cleanup contracts.',
+      document: {
+        sections: [
+          {
+            id: 'layers',
+            heading: 'Inspect source and code before choosing recovery',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Source', 'Typical error', 'Response'],
+                rows: [
+                  [
+                    'WebRPC',
+                    'DEADLINE_EXCEEDED / CANCELLED / TRANSPORT',
+                    'Apply connection or request policy'
+                  ],
+                  ['Serialize', 'SerializeError with phase and type', 'Locate codec and phase'],
+                  [
+                    'Store Worker',
+                    'INVALID_*_CHUNK / ADAPTER_DISPOSED',
+                    'Fix implementation or create a new Adapter'
+                  ],
+                  ['Cleanup', 'CLEANUP_FAILED AggregateError', 'Retain and inspect every error']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'abort',
+            heading: 'Cancellation after transfer is an irreversible ownership event',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'workerParser wraps AbortError in SerializeError with type, phase, source, chunkIndex, and bytesConsumed. In transfer mode it also states that input is detached, so the same bytes cannot be retried. Other RPC failures preserve their original form.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Performance and shutdown order', path: 'performance-and-shutdown-order' },
+        {
+          label: 'createStoreWorkerError API',
+          path: 'docs/store-worker/createStoreWorkerError'
+        }
+      ]
+    }
+  },
+  'store-worker:performance-and-shutdown-order': {
+    zh: {
+      title: '用主线程阻塞预算评估收益，并按依赖反序关闭',
+      lede: 'Worker 的价值是释放主线程，不保证总墙钟时间更短。关闭时必须先停止上层消费者，再释放通信层，最后 terminate Worker。',
+      document: {
+        sections: [
+          {
+            id: 'measure',
+            heading: '只对真实数据形状测量',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '同时记录主线程阻塞、总耗时、输入大小和输出形状。',
+                  '字节进/字节出可显著降低主线程阻塞。',
+                  '对象图往返常因结构化克隆变慢。',
+                  '不要用小 fixture 推断生产大对象或传输收益。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'shutdown',
+            heading: '按依赖方向反序释放',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['顺序', '对象', '原因'],
+                rows: [
+                  ['1', 'Resource / Serialize Registry', '停止产生新请求'],
+                  ['2', 'WorkerAdapter / workerParser', '等待 endpoint cleanup'],
+                  ['3', 'Worker Handler', '关闭 Worker 侧准入并释放'],
+                  ['4', 'Worker.terminate', '最后销毁执行环境']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'terminateOnDispose 只适合 parser 明确拥有 Worker 的场景；外部共享 Worker 保持 false，由共同所有者在所有消费者释放后终止。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '返回 Store Worker 学习路径', path: 'index' },
+        { label: 'workerParser API', path: 'docs/store-worker/serialize/workerParser' }
+      ]
+    },
+    en: {
+      title: 'Measure main-thread blocking and shut down in reverse dependency order',
+      lede: 'Worker value is freeing the main thread, not guaranteeing lower wall time. Stop upper consumers, release communication, then terminate the Worker.',
+      document: {
+        sections: [
+          {
+            id: 'measure',
+            heading: 'Measure the real data shape',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Record main-thread blocking, wall time, input size, and output shape together.',
+                  'Bytes in and bytes out can reduce main-thread blocking substantially.',
+                  'Object graph round trips often slow down because of structured clone.',
+                  'Do not extrapolate production transfer benefit from a tiny fixture.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'shutdown',
+            heading: 'Dispose in reverse dependency order',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Order', 'Object', 'Reason'],
+                rows: [
+                  ['1', 'Resource / Serialize Registry', 'Stop creating requests'],
+                  ['2', 'WorkerAdapter / workerParser', 'Await endpoint cleanup'],
+                  ['3', 'Worker Handler', 'Close Worker-side admission and release'],
+                  ['4', 'Worker.terminate', 'Destroy execution environment last']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'terminateOnDispose fits only a parser that explicitly owns its Worker. Keep it false for a shared external Worker and terminate after every consumer releases.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Return to Store Worker learning paths', path: 'index' },
+        { label: 'workerParser API', path: 'docs/store-worker/serialize/workerParser' }
+      ]
+    }
+  },
+  'store-devtools:index': {
+    zh: {
+      title: 'Store Devtools 学习路径',
+      lede: '这是一套进程内诊断能力：记录状态、action 与响应式图，不是浏览器扩展，也不是生产审计或事务回滚系统。',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: '先按要回答的问题选择入口',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['问题', '入口', '得到什么'],
+                rows: [
+                  ['状态何时改变', 'history / record', '有界状态快照'],
+                  ['哪次 action 失败或变慢', 'actions / trace', '完成、错误与耗时事件'],
+                  ['恢复某个调试现场', 'jumpTo', '把已知 signal 字段写回'],
+                  ['Effect 为什么重算', 'getDependencyTree', '向上依赖树'],
+                  ['Signal 影响谁', 'getObserverTree', '向下订阅树'],
+                  ['接 Redux DevTools', 'store-middleware connectDevTools', '真正扩展协议连接']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'limits',
+            heading: '诊断结果不是业务事实来源',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'history 只在内存中，受 maxHistory 裁剪。',
+                  'jumpTo 只复水 Store 状态，不能撤销网络、文件或其他副作用。',
+                  '默认 clone 不做敏感字段脱敏，生产数据必须自定义策略。',
+                  '会话持有订阅并产生克隆开销，结束时必须 dispose。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟建立诊断会话', path: 'getting-started' },
+        { label: '会话与状态历史', path: 'session-and-history' }
+      ]
+    },
+    en: {
+      title: 'Store Devtools learning paths',
+      lede: 'This is in-process diagnostics for state, actions, and reactive graphs. It is not a browser extension, production audit log, or transactional rollback system.',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: 'Choose an entry from the question',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Question', 'Entry', 'Result'],
+                rows: [
+                  ['When did state change', 'history / record', 'Bounded state snapshots'],
+                  [
+                    'Which action failed or slowed down',
+                    'actions / trace',
+                    'Completion, error, and duration events'
+                  ],
+                  ['Restore a debugging point', 'jumpTo', 'Known signal fields hydrated back'],
+                  ['Why did an Effect recompute', 'getDependencyTree', 'Upstream dependency tree'],
+                  ['Who observes a Signal', 'getObserverTree', 'Downstream observer tree'],
+                  [
+                    'Connect Redux DevTools',
+                    'store-middleware connectDevTools',
+                    'Real extension protocol connection'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'limits',
+            heading: 'Diagnostics are not a business source of truth',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'history is in-memory and trimmed by maxHistory.',
+                  'jumpTo hydrates Store state but cannot reverse network, file, or other side effects.',
+                  'The default clone does not redact secrets; production-like data needs an explicit policy.',
+                  'A session owns subscriptions and clone cost, so dispose it when finished.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Create a diagnostic session in five minutes', path: 'getting-started' },
+        { label: 'Sessions and state history', path: 'session-and-history' }
+      ]
+    }
+  },
+  'store-devtools:getting-started': {
+    zh: {
+      title: '五分钟记录状态、定位 Action 并安全释放',
+      lede: '只在开发期创建会话；先建立有界队列，再操作原 Store，最后在同一所有者处释放。',
+      document: {
+        sections: [
+          {
+            id: 'session',
+            heading: '围绕一个 Store 建立有界诊断会话',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const tools = import.meta.env.DEV\n  ? createStoreDevTools(counterStore, {\n      maxHistory: 100,\n      maxTrace: 500\n    })\n  : undefined\n\nconst checkpoint = tools?.record('before-submit')\ncounterStore.increment()\n\nconsole.table(tools?.actions)\nif (submitFailed && checkpoint) tools?.jumpTo(checkpoint.id)\n\ntools?.dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  '创建时立即产生 initial 历史条目。',
+                  'Store 字段变化自动记录 state change。',
+                  'Store 方法 action 完成或失败时进入 actions。',
+                  'dispose 后队列仍可读，但所有写操作拒绝。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '会话与状态历史', path: 'session-and-history' },
+        { label: 'createStoreDevTools API', path: 'docs/store-devtools/createStoreDevTools' }
+      ]
+    },
+    en: {
+      title: 'Record state, inspect Actions, and release safely in five minutes',
+      lede: 'Create sessions only in development. Bound queues first, operate on the original Store, then release from the same owner.',
+      document: {
+        sections: [
+          {
+            id: 'session',
+            heading: 'Build one bounded diagnostic session around a Store',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const tools = import.meta.env.DEV\n  ? createStoreDevTools(counterStore, {\n      maxHistory: 100,\n      maxTrace: 500\n    })\n  : undefined\n\nconst checkpoint = tools?.record('before-submit')\ncounterStore.increment()\n\nconsole.table(tools?.actions)\nif (submitFailed && checkpoint) tools?.jumpTo(checkpoint.id)\n\ntools?.dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Construction immediately records an initial entry.',
+                  'Store field changes automatically record state change.',
+                  'Completed or failed Store method actions enter actions.',
+                  'Queues remain readable after dispose, while mutations reject.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Sessions and state history', path: 'session-and-history' },
+        { label: 'createStoreDevTools API', path: 'docs/store-devtools/createStoreDevTools' }
+      ]
+    }
+  },
+  'store-devtools:session-and-history': {
+    zh: {
+      title: '配置有界会话并理解 History 生命周期',
+      lede: 'maxHistory 同时限制状态历史与 action 队列；记录失败不会留下半条记录或消耗 id。',
+      document: {
+        sections: [
+          {
+            id: 'options',
+            heading: '每个配置决定一种成本或确定性',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['选项', '默认值', '作用'],
+                rows: [
+                  ['maxHistory', '100', 'history 与 actions 各自最多保留数量'],
+                  ['maxTrace', '1000', 'runtime 原始事件上限'],
+                  ['captureRuntimeTrace', 'true', '是否订阅 trace 并自动生成 actions'],
+                  ['now', 'Date.now', '历史与手工 action 时间源'],
+                  ['clone', 'ClonePolicy.diagnostic', '快照隔离和 jumpTo 输入复制']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'maxHistory/maxTrace 必须是正安全整数；now/clone 必须是函数。选项在入口校验，错误不会被静默修正。'
+              }
+            ]
+          },
+          {
+            id: 'queue',
+            heading: '裁剪后用 id 判断条目是否仍有效',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'history 超限从头裁掉，initial 也可能消失。',
+                  'record 先取得时间并完成 clone，成功后才分配 id。',
+                  'clear 清空三种队列，再记录新的 initial；id 不归零。',
+                  '已裁剪 id 传给 jumpTo 会抛 UNKNOWN_HISTORY_ENTRY。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Action 与 Runtime Trace', path: 'actions-and-runtime-trace' },
+        { label: 'createStoreDevTools API', path: 'docs/store-devtools/createStoreDevTools' }
+      ]
+    },
+    en: {
+      title: 'Configure a bounded session and understand History lifetime',
+      lede: 'maxHistory bounds both state history and the action queue. A failed record leaves no partial entry and consumes no id.',
+      document: {
+        sections: [
+          {
+            id: 'options',
+            heading: 'Each option owns a cost or determinism contract',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Option', 'Default', 'Controls'],
+                rows: [
+                  ['maxHistory', '100', 'Independent history and actions queue limits'],
+                  ['maxTrace', '1000', 'Raw Runtime event limit'],
+                  ['captureRuntimeTrace', 'true', 'Trace subscription and automatic actions'],
+                  ['now', 'Date.now', 'Timestamp source for history and manual actions'],
+                  ['clone', 'ClonePolicy.diagnostic', 'Snapshot isolation and jumpTo input clone']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'maxHistory and maxTrace are positive safe integers; now and clone are functions. Invalid input rejects at construction rather than being clamped.'
+              }
+            ]
+          },
+          {
+            id: 'queue',
+            heading: 'Use id to test whether a trimmed entry survives',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'history trims from the front and may remove initial.',
+                  'record obtains time and clones state before allocating an id.',
+                  'clear empties all queues and records a new initial without resetting ids.',
+                  'jumpTo on a trimmed id throws UNKNOWN_HISTORY_ENTRY.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Actions and Runtime Trace', path: 'actions-and-runtime-trace' },
+        { label: 'createStoreDevTools API', path: 'docs/store-devtools/createStoreDevTools' }
+      ]
+    }
+  },
+  'store-devtools:actions-and-runtime-trace': {
+    zh: {
+      title: '区分 Action 摘要与 Runtime 原始 Trace',
+      lede: 'actions 面向业务操作完成结果，trace 面向响应式内核事件；两者共享 Runtime 订阅，但容量和使用目的不同。',
+      document: {
+        sections: [
+          {
+            id: 'events',
+            heading: '选择可读摘要或底层事件',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['数据', '来源', '适合回答'],
+                rows: [
+                  ['actions', 'action end/error 或 recordAction', '哪次操作、耗时、错误'],
+                  ['trace', 'Runtime 原始事件', '节点变化、依赖连接、observer 执行'],
+                  ['history', 'Store 粗粒度订阅', '操作后状态变成什么']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'capture',
+            heading: '关闭 Trace 也会关闭自动 Action',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'captureRuntimeTrace=false 时 trace 永远为空。',
+                  '自动 actions 来自同一订阅，因此也停止；仍可 recordAction。',
+                  'store.$batch、$set、$hydrate 不经过 runTracedAction，不会自动成为 action。',
+                  'trace 保存节点描述符，不长期持有响应式节点引用。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '时间旅行与副作用边界', path: 'time-travel-and-side-effects' },
+        { label: 'IStoreDevTools typing', path: 'docs/store-devtools/createStoreDevTools' }
+      ]
+    },
+    en: {
+      title: 'Separate Action summaries from raw Runtime Trace',
+      lede: 'actions describes completed business operations, while trace exposes reactive-kernel events. They share a Runtime subscription but serve different questions and limits.',
+      document: {
+        sections: [
+          {
+            id: 'events',
+            heading: 'Choose readable summaries or low-level events',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Data', 'Source', 'Best question'],
+                rows: [
+                  [
+                    'actions',
+                    'Action end/error or recordAction',
+                    'Which operation, duration, and error'
+                  ],
+                  ['trace', 'Raw Runtime events', 'Node changes, dependency links, observer runs'],
+                  ['history', 'Coarse Store subscription', 'What state followed the operation']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'capture',
+            heading: 'Disabling Trace also disables automatic Actions',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'captureRuntimeTrace=false keeps trace empty.',
+                  'Automatic actions stop because they share that subscription; recordAction remains available.',
+                  'store.$batch, $set, and $hydrate do not call runTracedAction and are not automatic actions.',
+                  'Trace retains node descriptors rather than keeping graph nodes alive.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Time travel and side-effect boundaries', path: 'time-travel-and-side-effects' },
+        { label: 'IStoreDevTools typing', path: 'docs/store-devtools/createStoreDevTools' }
+      ]
+    }
+  },
+  'store-devtools:time-travel-and-side-effects': {
+    zh: {
+      title: '把 jumpTo 当作状态复水，不是事务回滚',
+      lede: 'jumpTo 克隆历史 state 后调用 store.$hydrate；它只恢复 signal 支撑字段，外部世界已经发生的动作不会倒退。',
+      document: {
+        sections: [
+          {
+            id: 'restore',
+            heading: '明确能恢复与不能恢复的内容',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['内容', 'jumpTo 结果', '原因'],
+                rows: [
+                  ['signal 标量字段', '恢复', '$plain/$hydrate 合同'],
+                  ['computed', '不直接恢复', '由依赖重新计算'],
+                  ['方法与 WASM 字段', '不恢复', '不在 $plain 快照中'],
+                  ['网络、存储、消息', '不撤销', 'Store 外部副作用'],
+                  ['未知字段', '跳过', '$hydrate 宽松写回']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'replay',
+            heading: '回放通知不会制造新历史',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'jumpTo 在 hydrate 周围增加回放深度。由复水触发的 Store 通知不会再 record；计数器支持嵌套回放，内层结束不会提前解除外层屏蔽。用 jumpTo 做 UI 调试，不要把它作为失败补偿机制。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '依赖树与观察者树', path: 'dependency-and-observer-trees' },
+        { label: 'createStoreDevTools API', path: 'docs/store-devtools/createStoreDevTools' }
+      ]
+    },
+    en: {
+      title: 'Treat jumpTo as state hydration, not transaction rollback',
+      lede: 'jumpTo clones historical state and calls store.$hydrate. It restores signal-backed fields while external effects remain completed.',
+      document: {
+        sections: [
+          {
+            id: 'restore',
+            heading: 'Know what can and cannot be restored',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Content', 'jumpTo result', 'Reason'],
+                rows: [
+                  ['Signal scalar fields', 'Restored', '$plain and $hydrate contract'],
+                  ['Computed values', 'Not restored directly', 'Recomputed from dependencies'],
+                  ['Methods and WASM fields', 'Not restored', 'Absent from $plain'],
+                  ['Network, storage, messages', 'Not reversed', 'Effects outside Store'],
+                  ['Unknown fields', 'Skipped', 'Permissive $hydrate']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'replay',
+            heading: 'Replay notifications do not create new history',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'jumpTo increments replay depth around hydrate. Store notifications caused by replay do not record again. A counter supports nested replay without an inner call unmasking the outer call. Use jumpTo for UI diagnosis, not failure compensation.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Dependency and observer trees', path: 'dependency-and-observer-trees' },
+        { label: 'createStoreDevTools API', path: 'docs/store-devtools/createStoreDevTools' }
+      ]
+    }
+  },
+  'store-devtools:dependency-and-observer-trees': {
+    zh: {
+      title: '双向阅读响应式依赖图',
+      lede: 'Dependency Tree 从 observer 找输入；Observer Tree 从 observable 找下游。它们独立于诊断会话，可单独用于图定位。',
+      document: {
+        sections: [
+          {
+            id: 'direction',
+            heading: '按排查方向选择树',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const upstream = getDependencyTree(totalEffect, 5)\nconst downstream = getObserverTree(priceSignal, 5)\n\nconsole.log(JSON.stringify({ upstream, downstream }, null, 2))'
+              },
+              {
+                type: 'table',
+                headers: ['入口', '根', '展开方向'],
+                rows: [
+                  ['getDependencyTree', 'Effect/Computed observer', '它读取哪些 observable'],
+                  ['getObserverTree', 'Signal/Computed observable', '哪些 observer 订阅它']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'bounds',
+            heading: '用 maxDepth 和路径循环判定约束图',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'maxDepth 默认 20，必须是非负安全整数；0 只返回根。',
+                  '真正回到当前递归路径时标记 circular 并停止展开。',
+                  '菱形共享不算循环，两条路径都会显示。',
+                  '输出是诊断快照，不提供修改图的 authority。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '克隆、脱敏与失败隔离', path: 'clone-redaction-and-failure-containment' },
+        { label: 'getDependencyTree API', path: 'docs/store-devtools/getDependencyTree' }
+      ]
+    },
+    en: {
+      title: 'Read the reactive dependency graph in both directions',
+      lede: 'Dependency Tree finds inputs from an observer. Observer Tree finds consumers from an observable. Both work independently from a diagnostic session.',
+      document: {
+        sections: [
+          {
+            id: 'direction',
+            heading: 'Choose a tree by investigation direction',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const upstream = getDependencyTree(totalEffect, 5)\nconst downstream = getObserverTree(priceSignal, 5)\n\nconsole.log(JSON.stringify({ upstream, downstream }, null, 2))'
+              },
+              {
+                type: 'table',
+                headers: ['Entry', 'Root', 'Direction'],
+                rows: [
+                  [
+                    'getDependencyTree',
+                    'Effect or Computed observer',
+                    'Observable inputs it reads'
+                  ],
+                  [
+                    'getObserverTree',
+                    'Signal or Computed observable',
+                    'Observers subscribed downstream'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'bounds',
+            heading: 'Bound graph traversal with maxDepth and path cycles',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'maxDepth defaults to 20 and is a non-negative safe integer; zero returns only the root.',
+                  'Re-entering the current recursion path marks circular and stops expansion.',
+                  'Diamond sharing is not a cycle and appears through both paths.',
+                  'Output is a diagnostic snapshot with no graph-mutation authority.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Cloning, redaction, and failure containment',
+          path: 'clone-redaction-and-failure-containment'
+        },
+        { label: 'getDependencyTree API', path: 'docs/store-devtools/getDependencyTree' }
+      ]
+    }
+  },
+  'store-devtools:clone-redaction-and-failure-containment': {
+    zh: {
+      title: '在历史入口完成克隆、脱敏与故障隔离',
+      lede: '默认 diagnostic clone 优先可观测性而非保密性；敏感字段必须在进入 history 前由调用方主动移除。',
+      document: {
+        sections: [
+          {
+            id: 'redact',
+            heading: '替换 clone 以拥有数据策略',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const tools = createStoreDevTools(authStore, {\n  clone(state) {\n    const copy = ClonePolicy.diagnostic(state)\n    if ('token' in copy) copy.token = '[redacted]'\n    return copy\n  }\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  '默认策略遇到不可克隆值可能保留共享引用。',
+                  '它不会自动识别 token、密码或个人信息。',
+                  '同一个 clone 也用于 jumpTo 前复制历史条目。',
+                  '最安全做法是避免让敏感值进入 $plain。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'contain',
+            heading: '诊断失败不能打断业务写入',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '订阅监听器中的 now/clone/recordAction 失败会先报告给 runtime.reportError；报告本身失败时再降级到 global reportError 或 console。诊断错误被隔离，不反向让触发状态变化的业务调用失败。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '命令桥接边界', path: 'command-bridge-boundary' },
+        { label: 'createStoreDevTools API', path: 'docs/store-devtools/createStoreDevTools' }
+      ]
+    },
+    en: {
+      title: 'Own cloning, redaction, and failure containment at history entry',
+      lede: 'The default diagnostic clone favors observability, not confidentiality. Callers remove sensitive fields before they enter history.',
+      document: {
+        sections: [
+          {
+            id: 'redact',
+            heading: 'Replace clone to own the data policy',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const tools = createStoreDevTools(authStore, {\n  clone(state) {\n    const copy = ClonePolicy.diagnostic(state)\n    if ('token' in copy) copy.token = '[redacted]'\n    return copy\n  }\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'The default policy may retain a shared reference for an uncloneable value.',
+                  'It does not recognize tokens, passwords, or personal data automatically.',
+                  'The same clone copies historical state before jumpTo.',
+                  'The safest design keeps sensitive values out of $plain.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'contain',
+            heading: 'Diagnostic failures cannot break business writes',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A listener failure in now, clone, or recordAction reports through runtime.reportError first, then falls back to global reportError or console. The diagnostic failure is contained instead of escaping into the state-changing business call.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Command bridge boundaries', path: 'command-bridge-boundary' },
+        { label: 'createStoreDevTools API', path: 'docs/store-devtools/createStoreDevTools' }
+      ]
+    }
+  },
+  'store-devtools:command-bridge-boundary': {
+    zh: {
+      title: '不要把命令常量误认为浏览器扩展连接',
+      lede: 'StoreDevtoolsCommand 只是一张稳定字符串表。本包没有 transport、握手、消息解析或扩展生命周期。',
+      document: {
+        sections: [
+          {
+            id: 'authority',
+            heading: '区分本地诊断与扩展协议',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['能力', 'store-devtools', 'store-middleware connectDevTools'],
+                rows: [
+                  ['内存 history/actions/trace', '拥有', '不负责'],
+                  ['jumpTo 本地快照', '拥有', '协议命令可桥接'],
+                  ['Redux DevTools 连接', '不拥有', '拥有'],
+                  ['StoreDevtoolsCommand 字符串', '导出', '可由适配层消费']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'commands',
+            heading: '常量只解决协议拼写稳定性',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'dispatch、commit、jumpToState、jumpToAction、rollback、reset 与扩展协议同名，但 createStoreDevTools 不读取它们。需要开箱即用连接时直接使用 store-middleware；只有自己实现适配器时才引用这些常量。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '性能与释放', path: 'performance-and-disposal' },
+        {
+          label: 'StoreDevtoolsCommand API',
+          path: 'docs/store-devtools/StoreDevtoolsCommand'
+        }
+      ]
+    },
+    en: {
+      title: 'Do not mistake command constants for a browser-extension connection',
+      lede: 'StoreDevtoolsCommand is only a stable string table. This diagnostics layer owns no transport, handshake, message parser, or extension lifecycle.',
+      document: {
+        sections: [
+          {
+            id: 'authority',
+            heading: 'Separate local diagnostics from extension protocol',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Capability', 'store-devtools', 'store-middleware connectDevTools'],
+                rows: [
+                  ['In-memory history/actions/trace', 'Owns', 'Not responsible'],
+                  ['jumpTo local snapshot', 'Owns', 'May bridge a command'],
+                  ['Redux DevTools connection', 'Does not own', 'Owns'],
+                  ['StoreDevtoolsCommand strings', 'Exports', 'Adapter may consume']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'commands',
+            heading: 'Constants only stabilize protocol spelling',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'dispatch, commit, jumpToState, jumpToAction, rollback, and reset match extension terms, but createStoreDevTools never reads them. Use store-middleware for a ready connection; reference these constants only in a custom adapter.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Performance and disposal', path: 'performance-and-disposal' },
+        {
+          label: 'StoreDevtoolsCommand API',
+          path: 'docs/store-devtools/StoreDevtoolsCommand'
+        }
+      ]
+    }
+  },
+  'store-devtools:performance-and-disposal': {
+    zh: {
+      title: '控制诊断开销，并在所有者终点释放',
+      lede: '每次状态变化可能克隆整份 $plain，每次 Runtime 事件可能进入 trace；容量限制只约束内存，不消除持续计算成本。',
+      document: {
+        sections: [
+          {
+            id: 'cost',
+            heading: '按排查目标缩小采集面',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['场景', '配置', '权衡'],
+                rows: [
+                  ['一般本地调试', '默认值', '完整 history/actions/trace'],
+                  ['高频 Store，只看状态', 'captureRuntimeTrace: false', '无自动 actions 和 trace'],
+                  ['只看少量锚点', '低 maxHistory + 手动 record', '减少保留量，但自动快照仍会发生'],
+                  ['敏感或大对象', '自定义 clone', '自行承担脱敏和复制策略']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'dispose',
+            heading: 'dispose 必须由创建会话的一方调用',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'dispose 取消 Store 与 Runtime 两类订阅，且幂等。',
+                  '一个 cleanup 失败原样抛出，多个失败用 CLEANUP_FAILED AggregateError。',
+                  '构造中途失败会回滚已建立订阅，并保留原始失败。',
+                  '不释放会造成订阅泄漏，也让后续每次写入继续支付快照成本。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '返回 Store Devtools 学习路径', path: 'index' },
+        { label: 'createStoreDevTools API', path: 'docs/store-devtools/createStoreDevTools' }
+      ]
+    },
+    en: {
+      title: 'Control diagnostic cost and dispose at the owner boundary',
+      lede: 'Every state change may clone all of $plain and every Runtime event may enter trace. Queue limits bound memory but do not remove ongoing compute cost.',
+      document: {
+        sections: [
+          {
+            id: 'cost',
+            heading: 'Narrow collection to the investigation',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Scenario', 'Configuration', 'Tradeoff'],
+                rows: [
+                  ['General local debugging', 'Defaults', 'Complete history, actions, and trace'],
+                  [
+                    'High-frequency Store, state only',
+                    'captureRuntimeTrace: false',
+                    'No automatic actions or trace'
+                  ],
+                  [
+                    'Few manual checkpoints',
+                    'Low maxHistory plus record',
+                    'Less retention, but automatic snapshots still occur'
+                  ],
+                  [
+                    'Sensitive or large objects',
+                    'Custom clone',
+                    'Caller owns redaction and copy policy'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'dispose',
+            heading: 'The session creator owns dispose',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'dispose removes Store and Runtime subscriptions and is idempotent.',
+                  'One cleanup failure preserves identity; many use CLEANUP_FAILED AggregateError.',
+                  'Construction failure rolls back subscriptions already installed and retains the primary failure.',
+                  'A leaked session keeps subscriptions alive and pays snapshot cost on every later write.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Return to Store Devtools learning paths', path: 'index' },
+        { label: 'createStoreDevTools API', path: 'docs/store-devtools/createStoreDevTools' }
+      ]
+    }
+  },
+  'store-ssr:index': {
+    zh: {
+      title: 'Store SSR 学习路径',
+      lede: '这层解决请求隔离、异步资源收敛和安全状态传输。先建立每请求作用域，再选择脱水、内联与复水路径。',
+      document: {
+        sections: [
+          {
+            id: 'flow',
+            heading: '沿一次请求的生命周期阅读',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['阶段', '入口', '必须保证'],
+                rows: [
+                  ['创建', 'createSSRRequestScope', '每个请求独立 Runtime'],
+                  ['登记', 'register / registerResource', '对象属于同一 Runtime'],
+                  ['等待', 'awaitResources / dehydrateAsync', '总 timeout 有界'],
+                  ['传输', 'createSSRStateScript 或 With', '载荷校验并安全内联'],
+                  ['浏览器复水', 'read… + hydrate', '先读快照，再登记或应用'],
+                  ['关闭', 'disposeAsync', '等待 owned 异步 cleanup']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'choose',
+            heading: '先选择安全路径，再考虑快速路径',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '普通请求使用 dehydrate：深度校验、拷贝并冻结。',
+                  '有异步 Resource 使用 dehydrateAsync，并明确 timeout 与失败上报。',
+                  'dehydrateTrusted 返回活引用，只适用于完全受信且不会并发变化的数据。',
+                  '默认 JSON 足够时不要引入自定义 codec；二进制或压缩才使用 With 版本。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟完成一次 SSR 往返', path: 'getting-started' },
+        { label: '请求隔离与 Runtime', path: 'request-isolation-and-runtime' }
+      ]
+    },
+    en: {
+      title: 'Store SSR learning paths',
+      lede: 'This layer owns request isolation, async resource convergence, and safe state transfer. Establish one request scope before choosing dehydration, embedding, and hydration paths.',
+      document: {
+        sections: [
+          {
+            id: 'flow',
+            heading: 'Follow one request lifecycle',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Phase', 'Entry', 'Required invariant'],
+                rows: [
+                  ['Create', 'createSSRRequestScope', 'One isolated Runtime per request'],
+                  ['Register', 'register / registerResource', 'Values belong to that Runtime'],
+                  ['Wait', 'awaitResources / dehydrateAsync', 'Bound the total timeout'],
+                  ['Transfer', 'createSSRStateScript or With', 'Validate and embed safely'],
+                  ['Hydrate in browser', 'read… plus hydrate', 'Read then apply or defer'],
+                  ['Close', 'disposeAsync', 'Await owned async cleanup']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'choose',
+            heading: 'Choose the safe path before the fast path',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Use dehydrate for normal requests: it validates, clones, and freezes deeply.',
+                  'Use dehydrateAsync for Resources, with an explicit timeout and failure reporting.',
+                  'dehydrateTrusted returns live references and fits only trusted immutable inputs.',
+                  'Prefer JSON; use custom codecs only for binary formats or compression.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Complete one SSR round trip in five minutes', path: 'getting-started' },
+        { label: 'Request isolation and Runtime', path: 'request-isolation-and-runtime' }
+      ]
+    }
+  },
+  'store-ssr:getting-started': {
+    zh: {
+      title: '五分钟完成服务端脱水与浏览器复水',
+      lede: '服务端和浏览器各自创建作用域；HTML 只传 JSON-safe 快照，不传 Runtime 或 Store 实例。',
+      document: {
+        sections: [
+          {
+            id: 'server',
+            heading: '服务端：创建、渲染、注入、关闭',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const scope = createSSRRequestScope()\nconst app = createStore({ user: null }, { runtime: scope.runtime })\nscope.register('app', app)\n\ntry {\n  await loadSession(app, request)\n  const stateScript = createSSRStateScript(scope.dehydrate())\n  return renderHtml({ app, stateScript })\n} finally {\n  await scope.disposeAsync()\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'stateScript 应插入响应 HTML 的 body；它是 application/json 数据标签，不是可执行脚本。流式响应必须把 disposeAsync 放在流完成或取消之后。'
+              }
+            ]
+          },
+          {
+            id: 'client',
+            heading: '浏览器：读取后再登记同名 Store',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const state = readSSRStateFromDocument('__STORE_STATE__', document)\nconst scope = createSSRRequestScope()\nif (state) scope.hydrate(state)\n\nconst app = createStore({ user: null }, { runtime: scope.runtime })\nscope.register('app', app) // 自动消费待处理快照"
+              },
+              {
+                type: 'list',
+                items: [
+                  '服务端与浏览器 key 必须一致；这里都叫 app。',
+                  'hydrate 可先于 register，未登记条目会暂存。',
+                  '浏览器作用域在应用卸载时也要 disposeAsync。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '请求隔离与 Runtime', path: 'request-isolation-and-runtime' },
+        { label: 'createSSRRequestScope API', path: 'docs/store-ssr/createSSRRequestScope' }
+      ]
+    },
+    en: {
+      title: 'Complete server dehydration and browser hydration in five minutes',
+      lede: 'Server and browser create separate scopes. HTML transfers a JSON-safe snapshot, never Runtime or Store instances.',
+      document: {
+        sections: [
+          {
+            id: 'server',
+            heading: 'Server: create, render, embed, and close',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const scope = createSSRRequestScope()\nconst app = createStore({ user: null }, { runtime: scope.runtime })\nscope.register('app', app)\n\ntry {\n  await loadSession(app, request)\n  const stateScript = createSSRStateScript(scope.dehydrate())\n  return renderHtml({ app, stateScript })\n} finally {\n  await scope.disposeAsync()\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'Insert stateScript in the response body. It is an application/json data element, not executable script. A streaming response closes the scope only after completion or cancellation.'
+              }
+            ]
+          },
+          {
+            id: 'client',
+            heading: 'Browser: read before registering the matching Store',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const state = readSSRStateFromDocument('__STORE_STATE__', document)\nconst scope = createSSRRequestScope()\nif (state) scope.hydrate(state)\n\nconst app = createStore({ user: null }, { runtime: scope.runtime })\nscope.register('app', app) // consumes deferred hydration"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Server and browser use the same key: app.',
+                  'hydrate may run before register; unknown entries remain pending.',
+                  'The browser scope also closes with disposeAsync when the app unmounts.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Request isolation and Runtime', path: 'request-isolation-and-runtime' },
+        { label: 'createSSRRequestScope API', path: 'docs/store-ssr/createSSRRequestScope' }
+      ]
+    }
+  },
+  'store-ssr:request-isolation-and-runtime': {
+    zh: {
+      title: '用 Runtime 身份隔离并发 SSR 请求',
+      lede: '隔离不是命名约定，而是对象身份合同：一个 Scope 声明一个 Runtime，外来 Store 或 Resource 在登记入口立即被拒绝。',
+      document: {
+        sections: [
+          {
+            id: 'ownership',
+            heading: '每个请求只创建一个 Scope',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['构造方式', 'Runtime 来源', '何时使用'],
+                rows: [
+                  ['createSSRRequestScope()', '内部 createRuntime', '默认且最安全'],
+                  ['{ runtimeOptions }', '内部创建并应用运行时配置', '需要 onError/onTrace 等'],
+                  ['{ runtime }', '调用方提供的请求专属 Runtime', '装配层已建立 Runtime']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'runtime 与 runtimeOptions 互斥。绝不能把进程级默认 Runtime 或另一个请求的 Runtime 传给当前 Scope。Scope 通过 claimOwnership 阻止同一个 Runtime 被多个 Scope 同时拥有。'
+              }
+            ]
+          },
+          {
+            id: 'boundary',
+            heading: '在 register 边界阻止串请求状态',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Store 必须满足 store.$runtime === scope.runtime。',
+                  'Resource 必须满足 resource.runtime === scope.runtime。',
+                  '校验失败时不占用 key，也不会延迟到 dehydrate 才暴露。',
+                  'Scope disposed 后所有读写入口都拒绝继续工作。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '登记与所有权', path: 'register-and-own-state' },
+        { label: 'SSRRequestScope API', path: 'docs/store-ssr/SSRRequestScope' }
+      ]
+    },
+    en: {
+      title: 'Isolate concurrent SSR requests by Runtime identity',
+      lede: 'Isolation is an object-identity contract, not a naming convention. One Scope claims one Runtime and rejects foreign Stores or Resources at registration.',
+      document: {
+        sections: [
+          {
+            id: 'ownership',
+            heading: 'Create exactly one Scope per request',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Construction', 'Runtime source', 'Use it when'],
+                rows: [
+                  ['createSSRRequestScope()', 'Internal createRuntime', 'Default and safest path'],
+                  [
+                    '{ runtimeOptions }',
+                    'Internally created with Runtime config',
+                    'Need onError, onTrace, or scheduling'
+                  ],
+                  [
+                    '{ runtime }',
+                    'Caller-supplied request Runtime',
+                    'Assembly already owns a Runtime'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'runtime and runtimeOptions are mutually exclusive. Never pass a process-global Runtime or another request Runtime. claimOwnership prevents multiple Scopes from owning the same Runtime.'
+              }
+            ]
+          },
+          {
+            id: 'boundary',
+            heading: 'Reject cross-request state at register',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'A Store requires store.$runtime === scope.runtime.',
+                  'A Resource requires resource.runtime === scope.runtime.',
+                  'Failure leaves the key free instead of surfacing later during dehydration.',
+                  'Every stateful entry rejects work after the Scope is disposed.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Registration and ownership', path: 'register-and-own-state' },
+        { label: 'SSRRequestScope API', path: 'docs/store-ssr/SSRRequestScope' }
+      ]
+    }
+  },
+  'store-ssr:register-and-own-state': {
+    zh: {
+      title: '登记 Store 与 Resource，并明确释放所有权',
+      lede: 'register 建立 key、Runtime 和清理责任三项合同；unregister 与 detach 的差别就是是否仍由 Scope 释放。',
+      document: {
+        sections: [
+          {
+            id: 'operations',
+            heading: '按所有权转移选择操作',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['操作', '移除登记', '释放 owned 对象'],
+                rows: [
+                  ['register(key, value)', '否', 'Scope 关闭时释放，owned 默认 true'],
+                  ['unregister(key)', '是', '立即启动释放'],
+                  ['unregister(key, false)', '是', '不释放'],
+                  ['detach(key)', '是', '从不释放，所有权转给调用方']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'keys',
+            heading: 'Key 是跨 HTML 的稳定协议',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'key 必须是非空字符串，且不能是 __proto__。',
+                  'Store 与 Resource 各有独立登记表；同类重复 key 立即失败。',
+                  '浏览器必须用服务端相同 key 才能消费对应快照。',
+                  'register 前若已有 pending hydration，会先 hydrate；失败时不提交登记，允许修复后重试。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '复水与脱水', path: 'hydrate-and-dehydrate' },
+        { label: 'SSRRequestScope API', path: 'docs/store-ssr/SSRRequestScope' }
+      ]
+    },
+    en: {
+      title: 'Register Stores and Resources with explicit disposal ownership',
+      lede: 'register binds a key, Runtime, and cleanup responsibility. unregister and detach differ by whether Scope still releases the value.',
+      document: {
+        sections: [
+          {
+            id: 'operations',
+            heading: 'Choose an operation by ownership transfer',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Operation', 'Removes registration', 'Releases owned value'],
+                rows: [
+                  ['register(key, value)', 'No', 'On Scope close; owned defaults true'],
+                  ['unregister(key)', 'Yes', 'Starts release immediately'],
+                  ['unregister(key, false)', 'Yes', 'No release'],
+                  ['detach(key)', 'Yes', 'Never; ownership transfers to caller']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'keys',
+            heading: 'A key is a stable protocol across HTML',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'A key is a non-empty string and cannot be __proto__.',
+                  'Stores and Resources use separate registries; duplicates fail within each kind.',
+                  'Browser registration uses the same key emitted by the server.',
+                  'Pending hydration runs before commit; failure leaves the key free for retry.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Hydration and dehydration', path: 'hydrate-and-dehydrate' },
+        { label: 'SSRRequestScope API', path: 'docs/store-ssr/SSRRequestScope' }
+      ]
+    }
+  },
+  'store-ssr:hydrate-and-dehydrate': {
+    zh: {
+      title: '理解复水的尽力语义与脱水的快照语义',
+      lede: 'hydrate 会尝试全部条目但不是事务；dehydrate 则生成经过校验、拷贝和冻结的稳定传输快照。',
+      document: {
+        sections: [
+          {
+            id: 'hydrate',
+            heading: '复水允许先于对象创建',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '输入先经 assertSSRState 完整校验。',
+                  '已登记条目立即 hydrate；未知条目进入 pending 表。',
+                  '每次 hydrate 整体替换 pending 表，不合并旧的未知条目。',
+                  '单个失败继续尝试其他条目；一个错误原样抛出，多个错误使用 AggregateError。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'dehydrate',
+            heading: '安全快照按 key 稳定排序',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['来源', '读取入口', '输出规则'],
+                rows: [
+                  ['Store', '$plain()', 'JSON 校验、深拷贝、深冻结'],
+                  ['Resource', 'dehydrate()', 'undefined 跳过；仅 data 深拷贝冻结'],
+                  ['整体', 'dehydrate()', 'key 字典序、顶层冻结、version 1']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '等待异步 Resource', path: 'await-resources-and-timeouts' },
+        { label: 'assertSSRState API', path: 'docs/store-ssr/assertSSRState' }
+      ]
+    },
+    en: {
+      title: 'Understand best-effort hydration and stable dehydration snapshots',
+      lede: 'hydrate attempts every entry but is not transactional. dehydrate produces a validated, cloned, and frozen transfer snapshot.',
+      document: {
+        sections: [
+          {
+            id: 'hydrate',
+            heading: 'Hydration may precede object construction',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'assertSSRState validates the complete input first.',
+                  'Registered entries hydrate now; unknown entries enter pending maps.',
+                  'Each hydrate call replaces pending maps instead of merging stale entries.',
+                  'One failure does not stop later entries; one error preserves identity and many use AggregateError.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'dehydrate',
+            heading: 'Safe snapshots use stable key order',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Source', 'Read entry', 'Output rule'],
+                rows: [
+                  ['Store', '$plain()', 'JSON validation, deep clone, deep freeze'],
+                  ['Resource', 'dehydrate()', 'Skip undefined; clone and freeze data'],
+                  ['Whole state', 'dehydrate()', 'Lexical keys, frozen root, version 1']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Await async Resources', path: 'await-resources-and-timeouts' },
+        { label: 'assertSSRState API', path: 'docs/store-ssr/assertSSRState' }
+      ]
+    }
+  },
+  'store-ssr:await-resources-and-timeouts': {
+    zh: {
+      title: '用总预算收敛异步 Resource',
+      lede: 'awaitResources 等待请求期间出现的全部 Promise 世代，不让单个失败阻断整页，也不允许瀑布式注册无限延长。',
+      document: {
+        sections: [
+          {
+            id: 'wait',
+            heading: 'timeoutMs 是整个等待过程的预算',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const state = await scope.dehydrateAsync({\n  timeoutMs: 3000,\n  onResourceError(failure) {\n    logger.warn({ key: failure.key, error: failure.error })\n  }\n})'
+              },
+              {
+                type: 'list',
+                items: [
+                  '不设置 timeoutMs 会等待全部 Resource settle；0 表示立即过期。',
+                  '按 Promise 身份去重；同一 Resource 换出新 Promise 会继续等待。',
+                  '最多 64 轮，防止 settle 时不断注册新 Resource。',
+                  'Scope dispose 会中止等待并返回已收集失败。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'failure',
+            heading: '失败 Resource 被排除，其余状态继续输出',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'dehydrateAsync 先 awaitResources，再脱水成功项。提供 onResourceError 后由调用方处理；不提供时转发给 runtime.reportError，phase 为 ssr-resource。failure 包含稳定 key 与原始 error。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '安全内联与读取', path: 'embed-and-read-state' },
+        { label: 'SSRRequestScope API', path: 'docs/store-ssr/SSRRequestScope' }
+      ]
+    },
+    en: {
+      title: 'Converge async Resources under one total budget',
+      lede: 'awaitResources follows every Promise generation created during a request without letting one failure abort the page or an infinite waterfall extend forever.',
+      document: {
+        sections: [
+          {
+            id: 'wait',
+            heading: 'timeoutMs budgets the complete wait',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const state = await scope.dehydrateAsync({\n  timeoutMs: 3000,\n  onResourceError(failure) {\n    logger.warn({ key: failure.key, error: failure.error })\n  }\n})'
+              },
+              {
+                type: 'list',
+                items: [
+                  'Omit timeoutMs to wait for every Resource; zero expires immediately.',
+                  'Promise identity is deduplicated; a new Promise generation is awaited again.',
+                  'A 64-round cap contains Resources that keep registering more work.',
+                  'Scope disposal interrupts the wait and returns failures collected so far.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'failure',
+            heading: 'Exclude failed Resources and preserve the rest',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'dehydrateAsync awaits first, then dehydrates successful entries. onResourceError takes reporting authority when supplied; otherwise runtime.reportError receives phase ssr-resource. Each failure preserves its key and original error.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Embed and read state safely', path: 'embed-and-read-state' },
+        { label: 'SSRRequestScope API', path: 'docs/store-ssr/SSRRequestScope' }
+      ]
+    }
+  },
+  'store-ssr:embed-and-read-state': {
+    zh: {
+      title: '把 JSON 状态安全内联进 HTML',
+      lede: 'JSON.stringify 不足以直接放进 script；store-ssr 额外转义可闭合标签或改变 JavaScript 行结构的字符。',
+      document: {
+        sections: [
+          {
+            id: 'json',
+            heading: '选择字符串、完整标签或文档读取',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['入口', '产物', '用途'],
+                rows: [
+                  ['serializeSSRState', '转义后的 JSON 文本', '已有模板系统自行建标签'],
+                  ['createSSRStateScript', '完整 application/json 标签', '直接插入 HTML'],
+                  [
+                    'readSSRStateFromDocument',
+                    'ISSRState 或 undefined',
+                    '显式传 document 并校验载荷'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '默认 elementId 是 __STORE_STATE__。自定义 id 必须满足 HTML 安全白名单。读取不到元素或 textContent 为空返回 undefined，不代表错误。'
+              }
+            ]
+          },
+          {
+            id: 'escape',
+            heading: '防止载荷逃逸数据标签',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '转义 &、<、>，所以用户数据中的 </script> 不能提前闭合。',
+                  '转义 U+2028/U+2029，避免嵌入上下文中的行分隔歧义。',
+                  'deserializeSSRState 在 JSON.parse 后仍运行 assertSSRState。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '自定义 Codec 与取消', path: 'custom-codecs-and-abort' },
+        { label: 'createSSRStateScript API', path: 'docs/store-ssr/createSSRStateScript' }
+      ]
+    },
+    en: {
+      title: 'Embed JSON state safely in HTML',
+      lede: 'JSON.stringify alone is not safe inside a script element. store-ssr also escapes characters that can close the element or alter JavaScript line structure.',
+      document: {
+        sections: [
+          {
+            id: 'json',
+            heading: 'Choose text, a complete element, or document reading',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Entry', 'Result', 'Use it for'],
+                rows: [
+                  ['serializeSSRState', 'Escaped JSON text', 'A template that owns markup'],
+                  [
+                    'createSSRStateScript',
+                    'Complete application/json element',
+                    'Direct HTML insertion'
+                  ],
+                  [
+                    'readSSRStateFromDocument',
+                    'ISSRState or undefined',
+                    'Injected document plus validation'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'The default elementId is __STORE_STATE__. A custom id must pass the HTML-safe allowlist. A missing element or empty textContent returns undefined rather than an error.'
+              }
+            ]
+          },
+          {
+            id: 'escape',
+            heading: 'Keep payload data inside its element',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Escaping ampersand and angle brackets prevents user data such as </script> from closing the element.',
+                  'U+2028 and U+2029 are escaped to avoid line-separator ambiguity.',
+                  'deserializeSSRState still runs assertSSRState after JSON.parse.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Custom codecs and cancellation', path: 'custom-codecs-and-abort' },
+        { label: 'createSSRStateScript API', path: 'docs/store-ssr/createSSRStateScript' }
+      ]
+    }
+  },
+  'store-ssr:custom-codecs-and-abort': {
+    zh: {
+      title: '只在需要时引入自定义 Codec',
+      lede: 'With 版本把序列化 authority 交给 Serialize Registry，同时保留 wire 类型、codec 标识、取消与最终状态校验。',
+      document: {
+        sections: [
+          {
+            id: 'write',
+            heading: '编码格式决定 HTML 承载方式',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['编码结果', 'data-wire', '标签类型'],
+                rows: [
+                  ['json text', 'text', 'application/json，并执行 HTML 转义'],
+                  ['其他 text 或 bytes', 'b64', 'text/plain，先 Base64'],
+                  ['value chunk', '不允许', '抛 TypeError，线上必须是可传输数据']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'read',
+            heading: '读取端注册相同 codec',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const codecs = createSerializeRegistry([jsonPlugin()])\nconst html = await createSSRStateScriptWith(state, {\n  codecs,\n  signal: request.signal\n})\n\nconst restored = await readSSRStateFromDocumentWith({\n  codecs,\n  document,\n  signal: hydrateSignal\n})'
+              },
+              {
+                type: 'list',
+                items: [
+                  'codecs 必填；第一个插件决定 primaryType。',
+                  '写入的 data-codec 在读取端未注册时立即失败。',
+                  'signal 原样传给 encode/decode，不替换 AbortError。',
+                  '解码结果仍必须通过 assertSSRState。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '校验、安全与 Trusted 快速路径', path: 'validation-security-and-trusted-path' },
+        {
+          label: 'createSSRStateScriptWith API',
+          path: 'docs/store-ssr/createSSRStateScriptWith'
+        }
+      ]
+    },
+    en: {
+      title: 'Introduce a custom codec only when transport needs it',
+      lede: 'With variants delegate serialization authority to a Serialize Registry while retaining wire metadata, codec identity, cancellation, and final state validation.',
+      document: {
+        sections: [
+          {
+            id: 'write',
+            heading: 'Encoded form determines the HTML carrier',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Encode result', 'data-wire', 'Element type'],
+                rows: [
+                  ['json text', 'text', 'application/json with HTML escaping'],
+                  ['Other text or bytes', 'b64', 'text/plain after Base64'],
+                  ['value chunk', 'Rejected', 'TypeError because wire data is required']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'read',
+            heading: 'Register the same codec on the reader',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const codecs = createSerializeRegistry([jsonPlugin()])\nconst html = await createSSRStateScriptWith(state, {\n  codecs,\n  signal: request.signal\n})\n\nconst restored = await readSSRStateFromDocumentWith({\n  codecs,\n  document,\n  signal: hydrateSignal\n})'
+              },
+              {
+                type: 'list',
+                items: [
+                  'codecs is required and its first plugin defines primaryType.',
+                  'Reading fails when data-codec names an unregistered codec.',
+                  'signal passes through encode and decode without replacing AbortError.',
+                  'Decoded output still passes assertSSRState.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Validation, security, and trusted fast paths',
+          path: 'validation-security-and-trusted-path'
+        },
+        {
+          label: 'createSSRStateScriptWith API',
+          path: 'docs/store-ssr/createSSRStateScriptWith'
+        }
+      ]
+    }
+  },
+  'store-ssr:validation-security-and-trusted-path': {
+    zh: {
+      title: '建立载荷边界，再决定是否使用 Trusted 快速路径',
+      lede: 'SSR 状态来自 HTML，必须当作不可信输入。默认路径限制形状、深度、节点数和数字域，避免原型污染与无界遍历。',
+      document: {
+        sections: [
+          {
+            id: 'limits',
+            heading: 'assertSSRState 的拒绝边界',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['边界', '要求'],
+                rows: [
+                  ['根', '纯对象且 version === 1'],
+                  ['stores/resources', '纯对象；key 非空且不是 __proto__'],
+                  ['JSON 值', '拒绝循环、非有限数字和非纯对象'],
+                  ['遍历预算', '最大深度 256，最多 1,000,000 节点'],
+                  ['Resource 元数据', '有限 updatedAt；expiresAt 为有限数字或 null']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'trusted',
+            heading: 'dehydrateTrusted 不是快照',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '返回 $plain/dehydrate 的活引用，不校验、不拷贝、不深冻结。',
+                  '只接受完全受信、已知 JSON-safe、序列化前不会变化的值。',
+                  '调用后必须立刻 serializeTrustedSSRState，中间不能 await 或 mutation。',
+                  '请求输入、用户数据、共享可变 Store 一律使用普通 dehydrate。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '关闭、错误与流式响应', path: 'shutdown-errors-and-streaming' },
+        { label: 'dehydrateTrusted API', path: 'docs/store-ssr/SSRRequestScope' }
+      ]
+    },
+    en: {
+      title: 'Establish payload boundaries before choosing the trusted fast path',
+      lede: 'SSR state comes from HTML and is untrusted input. The default path limits shape, depth, node count, and numeric domains to contain prototype pollution and unbounded traversal.',
+      document: {
+        sections: [
+          {
+            id: 'limits',
+            heading: 'assertSSRState rejection boundaries',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Boundary', 'Requirement'],
+                rows: [
+                  ['Root', 'Plain object with version === 1'],
+                  ['stores/resources', 'Plain objects; non-empty keys other than __proto__'],
+                  ['JSON value', 'No cycles, non-finite numbers, or non-plain objects'],
+                  ['Traversal budget', 'Depth at most 256 and 1,000,000 nodes'],
+                  ['Resource metadata', 'Finite updatedAt; finite expiresAt or null']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'trusted',
+            heading: 'dehydrateTrusted is not a snapshot',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'It returns live $plain and dehydrate references without validation, cloning, or deep freezing.',
+                  'Use only fully trusted, known JSON-safe values that cannot change before serialization.',
+                  'Call serializeTrustedSSRState immediately with no await or mutation between.',
+                  'Request input, user data, and shared mutable Stores always use normal dehydrate.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Shutdown, errors, and streaming responses',
+          path: 'shutdown-errors-and-streaming'
+        },
+        { label: 'dehydrateTrusted API', path: 'docs/store-ssr/SSRRequestScope' }
+      ]
+    }
+  },
+  'store-ssr:shutdown-errors-and-streaming': {
+    zh: {
+      title: '在真实响应终点关闭 Scope，并保留全部清理错误',
+      lede: 'dispose 关闭准入并启动清理；disposeAsync 是单飞终态，负责等待异步 Store cleanup 并汇总失败。',
+      document: {
+        sections: [
+          {
+            id: 'close',
+            heading: '把关闭点绑定到响应所有权',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['响应类型', '关闭点', '原因'],
+                rows: [
+                  ['同步 renderToString', 'render 返回后的 finally', 'HTML 已完全读取状态'],
+                  ['Node/Bun stream', 'finish/close/cancel 后', '函数返回不等于流完成'],
+                  ['客户端断连', '取消资源后 disposeAsync', 'awaitResources 会观察 disposed signal']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'errors',
+            heading: '清理失败不应静默丢失',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'dispose 幂等，先阻止新工作，再按所有权顺序启动清理。',
+                  '异步 $dispose 由 disposeAsync 等待；重复调用返回同一个 Promise。',
+                  '一个清理错误保留原始 identity；多个错误使用 AggregateError。',
+                  '业务主错误仍由业务路径持有；清理错误应记录或组合，不能覆盖并丢失主错误。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '返回 Store SSR 学习路径', path: 'index' },
+        { label: 'createStoreSsrError API', path: 'docs/store-ssr/createStoreSsrError' }
+      ]
+    },
+    en: {
+      title: 'Close Scope at the real response boundary and retain cleanup failures',
+      lede: 'dispose closes admission and starts cleanup. disposeAsync is the single-flight terminal operation that awaits async Store cleanup and aggregates failures.',
+      document: {
+        sections: [
+          {
+            id: 'close',
+            heading: 'Bind shutdown to response ownership',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Response', 'Close point', 'Why'],
+                rows: [
+                  [
+                    'Synchronous renderToString',
+                    'finally after render returns',
+                    'HTML has consumed state'
+                  ],
+                  [
+                    'Node or Bun stream',
+                    'After finish, close, or cancel',
+                    'Function return is not stream completion'
+                  ],
+                  [
+                    'Client disconnect',
+                    'Cancel resources, then disposeAsync',
+                    'awaitResources observes disposed signal'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'errors',
+            heading: 'Never lose cleanup failures silently',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'dispose is idempotent: it rejects new work before starting owned cleanup.',
+                  'disposeAsync awaits async $dispose and repeated calls return the same Promise.',
+                  'One cleanup error preserves identity; many errors use AggregateError.',
+                  'Business code retains the primary failure; report or combine cleanup errors without replacing it.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Return to Store SSR learning paths', path: 'index' },
+        { label: 'createStoreSsrError API', path: 'docs/store-ssr/createStoreSsrError' }
+      ]
+    }
+  },
+  'store-persist:index': {
+    zh: {
+      title: 'Store Persist 学习路径',
+      lede: '三种状态模型共用一个恢复、迁移和有序写入引擎。先选择适配器，再确定启动竞态、部分状态与存储能力。',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: '先按内存状态模型选择入口',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['状态模型', '入口', '恢复方式'],
+                rows: [
+                  ['Store Light 对象', 'persist', '$plain → $hydrate，部分字段宽松写回'],
+                  ['Store Indexed 集合', 'persistCollection', 'snapshot → 原子 replace'],
+                  ['Store Keyed 单个 Definition', 'persistKeyed', '每个 id 一个独立持久化单位'],
+                  ['直接存取一次性数据', 'Storage Contract', '无需订阅、迁移和写队列']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'path',
+            heading: '沿数据安全路径阅读',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '等待 ready，区分“已构造 handle”和“已完成 hydrate”。',
+                  '决定启动读取期间本地写入与持久化值怎样合并。',
+                  '为 partialize 同时定义能保留当前状态的 merge。',
+                  '理解 debounce 只延迟入队，flush 才等待真实落盘。',
+                  '最后核对 codec output、backend capability、retry 与 dispose。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟持久化设置', path: 'getting-started' },
+        { label: '选择适配器', path: 'choose-an-adapter' }
+      ]
+    },
+    en: {
+      title: 'Store Persist learning paths',
+      lede: 'Three state models share one restoration, migration, and ordered-write engine. Choose an adapter before startup-race, partial-state, and storage-capability behavior.',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: 'Choose the entry from the in-memory state model',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['State model', 'Entry', 'Restore behavior'],
+                rows: [
+                  [
+                    'Store Light object',
+                    'persist',
+                    '$plain to $hydrate with tolerant partial writes'
+                  ],
+                  ['Store Indexed collection', 'persistCollection', 'snapshot to atomic replace'],
+                  ['One Store Keyed Definition', 'persistKeyed', 'One persistence unit per id'],
+                  [
+                    'One-off direct storage access',
+                    'Storage Contract',
+                    'No subscription, migration, or write queue needed'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'path',
+            heading: 'Read along the data-safety path',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Await ready and distinguish handle construction from completed hydration.',
+                  'Decide how local writes during startup reads merge with persisted values.',
+                  'Pair partialize with a merge that preserves current state.',
+                  'Understand that debounce delays enqueueing while flush waits for physical persistence.',
+                  'Finally verify codec output, backend capability, retry, and disposal.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Persist settings in five minutes', path: 'getting-started' },
+        { label: 'Choose an adapter', path: 'choose-an-adapter' }
+      ]
+    }
+  },
+  'store-persist:getting-started': {
+    zh: {
+      title: '五分钟恢复、修改并落盘用户设置',
+      lede: '先等待首次恢复，再允许用户修改；退出或切换作用域前 flush，最后 dispose 停止未来写入。',
+      document: {
+        sections: [
+          {
+            id: 'persist',
+            heading: '把 readiness 和物理写入放进调用流程',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { indexedDb } from '@migaia/storage-web/indexed-db'\n\nconst settings = createStore({ theme: 'light', fontSize: 14 })\nconst persistence = persist(settings, {\n  key: 'settings',\n  storage: indexedDb({ dbName: 'app' }),\n  version: 1,\n  debounceMs: 250\n})\n\nawait persistence.ready\nsettings.theme = 'dark'\nawait persistence.flush()\npersistence.dispose()\nawait settings.$dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'ready 在 hydrate 成功时 resolve，失败时 reject；settled 始终 resolve。',
+                  '状态变化先进入 debounce/写队列，不等于已经保存。',
+                  'flush 立即快照并等待本次有序写入完成。',
+                  'dispose 中止 I/O 并退订，但不 dispose Store 或 storage backend。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '选择适配器', path: 'choose-an-adapter' },
+        { label: 'persist API', path: 'docs/store-persist/light/persist' }
+      ]
+    },
+    en: {
+      title: 'Restore, modify, and persist user settings in five minutes',
+      lede: 'Wait for first restoration before user edits. Flush before leaving the scope, then dispose to stop future writes.',
+      document: {
+        sections: [
+          {
+            id: 'persist',
+            heading: 'Place readiness and physical writing in the caller flow',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { indexedDb } from '@migaia/storage-web/indexed-db'\n\nconst settings = createStore({ theme: 'light', fontSize: 14 })\nconst persistence = persist(settings, {\n  key: 'settings',\n  storage: indexedDb({ dbName: 'app' }),\n  version: 1,\n  debounceMs: 250\n})\n\nawait persistence.ready\nsettings.theme = 'dark'\nawait persistence.flush()\npersistence.dispose()\nawait settings.$dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'ready resolves after successful hydration and rejects on failure; settled always resolves.',
+                  'A state change enters debounce and the write queue; it is not yet saved.',
+                  'flush snapshots immediately and waits for this ordered write to complete.',
+                  'dispose aborts I/O and unsubscribes without disposing the Store or storage backend.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Choose an adapter', path: 'choose-an-adapter' },
+        { label: 'persist API', path: 'docs/store-persist/light/persist' }
+      ]
+    }
+  },
+  'store-persist:choose-an-adapter': {
+    zh: {
+      title: '选择 Light、Indexed 或 Keyed 持久化适配器',
+      lede: '三个入口只适配状态读写与订阅形状；hydrate、版本、codec、防抖和错误都由同一个 persistUnit 引擎处理。',
+      document: {
+        sections: [
+          {
+            id: 'adapters',
+            heading: '按恢复原语确定边界',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['入口', '快照', '恢复', 'Handle'],
+                rows: [
+                  ['persist', '$plain()', '$hydrate(partial)', '完整 IPersistHandle'],
+                  ['persistCollection', 'snapshot()', 'replace(state)', '完整 IPersistHandle'],
+                  [
+                    'persistKeyed',
+                    'atomStore.peek(def)',
+                    'atomStore.set(def)',
+                    '完整 IPersistHandle + 构造时 value 快照'
+                  ],
+                  ['persistUnit', '自定义 snapshot', '自定义 restore', '扩展第四种状态模型']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ownership',
+            heading: '适配器不取得底层对象所有权',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '每个 handle 只拥有自己的订阅、timer、AbortController 与写队列。Store、AtomStore、集合和 backend 仍由创建它们的作用域释放。persistKeyed 每次调用只管理一个 Definition/id，不能枚举整个 family。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Hydration 与启动竞态', path: 'hydration-and-startup-races' },
+        { label: 'persistUnit API', path: 'docs/store-persist/persistUnit' }
+      ]
+    },
+    en: {
+      title: 'Choose the Light, Indexed, or Keyed persistence adapter',
+      lede: 'The three entries adapt only state read, restore, and subscription shapes. One persistUnit engine owns hydration, versioning, codecs, debounce, and errors.',
+      document: {
+        sections: [
+          {
+            id: 'adapters',
+            heading: 'Define the boundary from the restore primitive',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Entry', 'Snapshot', 'Restore', 'Handle'],
+                rows: [
+                  ['persist', '$plain()', '$hydrate(partial)', 'Full IPersistHandle'],
+                  ['persistCollection', 'snapshot()', 'replace(state)', 'Full IPersistHandle'],
+                  [
+                    'persistKeyed',
+                    'atomStore.peek(def)',
+                    'atomStore.set(def)',
+                    'Full IPersistHandle plus a construction-time value snapshot'
+                  ],
+                  [
+                    'persistUnit',
+                    'Custom snapshot',
+                    'Custom restore',
+                    'A fourth state-model extension'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ownership',
+            heading: 'An adapter never takes ownership of its underlying object',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Each handle owns only its subscription, timer, AbortController, and write queue. The creating scope still releases the Store, AtomStore, collection, and backend. Each persistKeyed call manages one Definition and id and cannot enumerate an entire family.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Hydration and startup races', path: 'hydration-and-startup-races' },
+        { label: 'persistUnit API', path: 'docs/store-persist/persistUnit' }
+      ]
+    }
+  },
+  'store-persist:hydration-and-startup-races': {
+    zh: {
+      title: '处理 Hydration 与启动期本地写入竞态',
+      lede: '异步读取开始时会记录内存基线；恢复时不能用旧存档覆盖读取期间已经发生的同字段新写。',
+      document: {
+        sections: [
+          {
+            id: 'merge',
+            heading: 'Plain object 使用启动快照三向合并',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['字段状态', '恢复结果'],
+                rows: [
+                  ['读取期间本地未改', '接受持久化字段'],
+                  ['读取期间本地已改', '保留当前内存值'],
+                  ['存档没有该字段', '保留当前内存值'],
+                  ['数组、Map 或 Set', '默认整体替换，需要自定义 merge 才能部分合并']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'failure',
+            heading: '失败恢复必须闸住后续写入',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '损坏 envelope、版本不匹配或 decode/migrate 失败会令 ready reject。',
+                  '失败后自动写入、flush 与 clear 不得越过未知旧状态。',
+                  'retryHydrate 成功后才重新打开有序写入。',
+                  '集合 restore 使用原子 replace，不暴露部分 hydrate 状态。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Partialize、Merge 与迁移', path: 'partialize-merge-and-migrations' },
+        { label: 'PersistState API', path: 'docs/store-persist/PersistState' }
+      ]
+    },
+    en: {
+      title: 'Handle Hydration races with local startup writes',
+      lede: 'An asynchronous read records an in-memory baseline. Restoration must not let an old archive overwrite a newer local write made while reading.',
+      document: {
+        sections: [
+          {
+            id: 'merge',
+            heading: 'Plain objects use a three-way startup snapshot merge',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Field state', 'Restore result'],
+                rows: [
+                  ['Not changed locally while reading', 'Accept persisted field'],
+                  ['Changed locally while reading', 'Keep current in-memory value'],
+                  ['Absent from archive', 'Keep current in-memory value'],
+                  [
+                    'Array, Map, or Set',
+                    'Replace as a whole unless a custom merge defines partial behavior'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'failure',
+            heading: 'Failed restoration must gate later writes',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'A corrupt envelope, version mismatch, or decode or migrate failure rejects ready.',
+                  'Automatic writes, flush, and clear cannot pass an unknown old state after failure.',
+                  'Only a successful retryHydrate reopens ordered writing.',
+                  'Collection restore uses atomic replace and never exposes partially hydrated state.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Partialize, merge, and migration', path: 'partialize-merge-and-migrations' },
+        { label: 'PersistState API', path: 'docs/store-persist/PersistState' }
+      ]
+    }
+  },
+  'store-persist:partialize-merge-and-migrations': {
+    zh: {
+      title: '组合 Partialize、Merge 与版本迁移',
+      lede: 'partialize 决定写什么，migrate 解释旧 schema，merge 决定恢复值如何进入当前内存；三者不能互相替代。',
+      document: {
+        sections: [
+          {
+            id: 'roles',
+            heading: '让每个函数只承担一个方向',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['函数', '输入时机', '职责'],
+                rows: [
+                  ['partialize', '写入前', '裁剪不应持久化的字段'],
+                  ['migrate', '读到旧 version 后', '把旧状态转成当前 schema'],
+                  ['merge', '恢复到内存前', '合并持久化部分与当前值']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: '部分持久化必须配套恢复语义',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "persistCollection(sessionCache, {\n  key: 'sessions',\n  storage,\n  version: 2,\n  partialize: (value) => ({ refreshToken: value.refreshToken }),\n  migrate: (old, from) => from === 1 ? migrateSessionV1(old) : old,\n  merge: (persisted, current) => ({ ...current, ...persisted })\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'version 必须是安全非负整数。',
+                  '版本不一致且没有 migrate 时拒绝恢复。',
+                  'Store Light 的 $hydrate 天然做部分写回，因此没有独立 merge 选项。',
+                  '集合或 keyed value 含嵌套容器时，浅对象展开通常不足，应定义领域 merge。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '写队列、Debounce 与 Flush', path: 'write-queue-debounce-and-flush' },
+        { label: 'persistKeyed API', path: 'docs/store-persist/keyed/persistKeyed' }
+      ]
+    },
+    en: {
+      title: 'Compose Partialize, Merge, and version migration',
+      lede: 'partialize chooses what to write, migrate interprets an old schema, and merge decides how restored data enters current memory. None replaces another.',
+      document: {
+        sections: [
+          {
+            id: 'roles',
+            heading: 'Give each function one direction',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Function', 'When it runs', 'Responsibility'],
+                rows: [
+                  ['partialize', 'Before writing', 'Remove fields that should not persist'],
+                  [
+                    'migrate',
+                    'After reading an old version',
+                    'Convert old state into current schema'
+                  ],
+                  [
+                    'merge',
+                    'Before restoring into memory',
+                    'Combine persisted partial data with current value'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: 'Partial persistence needs matching restore semantics',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "persistCollection(sessionCache, {\n  key: 'sessions',\n  storage,\n  version: 2,\n  partialize: (value) => ({ refreshToken: value.refreshToken }),\n  migrate: (old, from) => from === 1 ? migrateSessionV1(old) : old,\n  merge: (persisted, current) => ({ ...current, ...persisted })\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'version must be a non-negative safe integer.',
+                  'A version mismatch without migrate rejects restoration.',
+                  'Store Light $hydrate already performs partial writes, so persist has no separate merge option.',
+                  'For collections or keyed values containing nested containers, shallow object spreading is usually insufficient; define a domain merge.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Write queue, debounce, and flush', path: 'write-queue-debounce-and-flush' },
+        { label: 'persistKeyed API', path: 'docs/store-persist/keyed/persistKeyed' }
+      ]
+    }
+  },
+  'store-persist:write-queue-debounce-and-flush': {
+    zh: {
+      title: '理解写队列、Debounce、Flush 与 Clear',
+      lede: '状态通知、排队、编码和 backend 写入是四个不同阶段；只有等待对应 Promise 才能声称操作完成。',
+      document: {
+        sections: [
+          {
+            id: 'operations',
+            heading: '选择符合调用意图的操作',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['动作', '队列语义', '内存状态'],
+                rows: [
+                  ['自动写入', '变化后按 debounce 合并并串行写', '不变'],
+                  ['flush()', '取消当前 debounce，立即快照并等待写', '不变'],
+                  ['clear()', '在同一队列中删除存档', '不重置'],
+                  ['dispose()', '退订、清 timer、abort 在途 I/O', '不重置底层 Store']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ordering',
+            heading: '所有 backend 变更保持调用顺序',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '不会并发覆盖同一个 key；后一写等待前一操作结算。',
+                  'debounceMs 默认 0，但仍经队列调度，不代表同步落盘。',
+                  'flush 失败会 reject 并更新 writeError；调用方决定 retry 或提示用户。',
+                  'clear 之后内存再次变化会重新创建存档。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Codec 与存储能力', path: 'codecs-and-storage-capabilities' },
+        { label: 'writeEnvelope API', path: 'docs/store-persist/writeEnvelope' }
+      ]
+    },
+    en: {
+      title: 'Understand the write queue, Debounce, Flush, and Clear',
+      lede: 'State notification, enqueueing, encoding, and backend writing are four distinct stages. Completion exists only after awaiting the corresponding Promise.',
+      document: {
+        sections: [
+          {
+            id: 'operations',
+            heading: 'Choose the operation that matches caller intent',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Action', 'Queue semantic', 'In-memory state'],
+                rows: [
+                  ['Automatic write', 'Debounces changes and writes serially', 'Unchanged'],
+                  [
+                    'flush()',
+                    'Cancels current debounce, snapshots now, and waits for writing',
+                    'Unchanged'
+                  ],
+                  ['clear()', 'Removes the archive in the same queue', 'Not reset'],
+                  [
+                    'dispose()',
+                    'Unsubscribes, clears timer, and aborts active I/O',
+                    'Underlying Store is not reset'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ordering',
+            heading: 'Every backend mutation preserves call order',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Writes to one key never race; a later operation waits for the earlier one to settle.',
+                  'debounceMs defaults to zero but still schedules through the queue and is not synchronous persistence.',
+                  'A failed flush rejects and updates writeError; the caller chooses retry or user feedback.',
+                  'A later memory change recreates the archive after clear.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Codecs and storage capabilities', path: 'codecs-and-storage-capabilities' },
+        { label: 'writeEnvelope API', path: 'docs/store-persist/writeEnvelope' }
+      ]
+    }
+  },
+  'store-persist:codecs-and-storage-capabilities': {
+    zh: {
+      title: '让 Codec 输出与 Backend 能力精确匹配',
+      lede: '持久化层不会把 binary 静默降级为 base64，也不会把 structured payload 猜成 text；能力不匹配必须尽早失败。',
+      document: {
+        sections: [
+          {
+            id: 'matrix',
+            heading: '按 codec.output 选择存储通道',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['输出', 'Backend 要求', '失败'],
+                rows: [
+                  ['text', 'get/set 字符串通道', 'payload 不符为 CODEC_OUTPUT_MISMATCH'],
+                  ['binary', 'getBytes/setBytes', '缺能力为 BACKEND_CAPABILITY'],
+                  ['structured', '当前最小协议不支持 record 通道', 'CODEC_OUTPUT_MISMATCH']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'collections',
+            heading: '默认 JSON codec 保留 Map 与 Set',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'defaultJsonCodec 使用版本化标记编码集合，并只迁移精确旧标签。原生 JSON.stringify(Map/Set) 会静默得到空对象，因此不要绕开 codec 自行 stringify 集合快照。本模块不提供加密；敏感字段应在 partialize 中排除或使用调用方拥有的加密 codec。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Keyed Family 与 Clear', path: 'keyed-families-and-clear' },
+        { label: 'defaultJsonCodec API', path: 'docs/store-persist/defaultJsonCodec' }
+      ]
+    },
+    en: {
+      title: 'Match Codec output to Backend capability exactly',
+      lede: 'Persistence never silently downgrades binary data to base64 or guesses that a structured payload is text. Capability mismatch fails early.',
+      document: {
+        sections: [
+          {
+            id: 'matrix',
+            heading: 'Select a storage channel from codec.output',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Output', 'Backend requirement', 'Failure'],
+                rows: [
+                  ['text', 'String get/set channel', 'Wrong payload becomes CODEC_OUTPUT_MISMATCH'],
+                  ['binary', 'getBytes/setBytes', 'Missing capability becomes BACKEND_CAPABILITY'],
+                  [
+                    'structured',
+                    'The minimal protocol has no record channel',
+                    'CODEC_OUTPUT_MISMATCH'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'collections',
+            heading: 'The default JSON codec preserves Map and Set',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'defaultJsonCodec uses versioned markers for collections and migrates only exact legacy tags. Native JSON.stringify on Map or Set silently produces an empty object, so never bypass the codec for collection snapshots. This module provides no encryption; exclude sensitive fields in partialize or provide a caller-owned encrypted codec.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Keyed families and clear', path: 'keyed-families-and-clear' },
+        { label: 'defaultJsonCodec API', path: 'docs/store-persist/defaultJsonCodec' }
+      ]
+    }
+  },
+  'store-persist:keyed-families-and-clear': {
+    zh: {
+      title: '管理 Keyed 持久化单位与 Family 清理',
+      lede: 'family 缓存 token，但不公开活跃 key 清单；因此持久化与释放都以一个 id 为单位，批量清理只能扫描 storage namespace。',
+      document: {
+        sections: [
+          {
+            id: 'unit',
+            heading: '每个 id 创建并持有一个 Handle',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const sessionDef = session(userId)\nconst handle = persistKeyed(atomStore, sessionDef, userId, {\n  namespace: 'sessions',\n  storage,\n  partialize: ({ refreshToken }) => ({ refreshToken }),\n  merge: (persisted, current) => ({ ...current, ...persisted })\n})\n\nawait handle.ready\nconst restoredSession = atomStore.get(sessionDef)\nawait handle.flush()\n\n// leaving this user scope\nhandle.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: 'storage key 是 namespace:id。handle 是完整 IPersistHandle，可使用 ready、settled、retryHydrate、flush、clear 与状态信号。handle.value 只是构造时读取的值，不会在异步 hydrate 后自动刷新；await handle.ready 后应从 AtomStore 重读。dispose 只停止这一 id 的订阅和 I/O，不 release AtomStore definition。'
+              }
+            ]
+          },
+          {
+            id: 'clear',
+            heading: 'clearFamily 只删除持久化记录',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '它通过 storage.keys 扫描 namespace: 前缀并逐项 remove。',
+                  '不会清理 AtomStore、family token 或仍活跃 handle。',
+                  '仍活跃 handle 下次变化会重新写回记录。',
+                  '登出流程应先停止对应 handles，再 clearFamily。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '重试、错误与关闭', path: 'retry-errors-and-shutdown' },
+        { label: 'clearFamily API', path: 'docs/store-persist/keyed/clearFamily' }
+      ]
+    },
+    en: {
+      title: 'Manage Keyed persistence units and Family cleanup',
+      lede: 'A family caches tokens without exposing active keys. Persistence and release therefore operate one id at a time, while bulk cleanup can only scan a storage namespace.',
+      document: {
+        sections: [
+          {
+            id: 'unit',
+            heading: 'Create and retain one Handle per id',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const sessionDef = session(userId)\nconst handle = persistKeyed(atomStore, sessionDef, userId, {\n  namespace: 'sessions',\n  storage,\n  partialize: ({ refreshToken }) => ({ refreshToken }),\n  merge: (persisted, current) => ({ ...current, ...persisted })\n})\n\nawait handle.ready\nconst restoredSession = atomStore.get(sessionDef)\nawait handle.flush()\n\n// leaving this user scope\nhandle.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: 'The storage key is namespace:id. The handle is a full IPersistHandle with ready, settled, retryHydrate, flush, clear, and status values. handle.value is only the value read during construction and does not refresh after asynchronous hydration; await handle.ready and read the AtomStore again. dispose stops only this id subscription and I/O and never releases its AtomStore definition.'
+              }
+            ]
+          },
+          {
+            id: 'clear',
+            heading: 'clearFamily deletes persisted records only',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'It scans storage.keys for the namespace: prefix and removes each match.',
+                  'It never clears the AtomStore, family tokens, or active handles.',
+                  'A later change from an active handle recreates its archive.',
+                  'A logout flow stops corresponding handles before clearFamily.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Retry, errors, and shutdown', path: 'retry-errors-and-shutdown' },
+        { label: 'clearFamily API', path: 'docs/store-persist/keyed/clearFamily' }
+      ]
+    }
+  },
+  'store-persist:retry-errors-and-shutdown': {
+    zh: {
+      title: '观察状态、重试恢复并安全关闭',
+      lede: 'hydration 与写入拥有独立状态和错误；总体 error 不能让其中一个失败覆盖另一个，dispose 则以原生 AbortError 收敛在途操作。',
+      document: {
+        sections: [
+          {
+            id: 'status',
+            heading: '分别读取恢复与写入结果',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['成员', '回答的问题'],
+                rows: [
+                  ['hydrationStatus / hydrationError', '首次或重试恢复是否成功'],
+                  ['writeStatus / writeError', '最近一次写入是否成功'],
+                  ['status / error', '整体是否 loading、ready、error 或 disposed'],
+                  ['ready / settled', '调用方等待成功还是只等待结束']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'shutdown',
+            heading: '失败恢复后重试，终态后创建新 Handle',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'retryHydrate 只用于失败恢复；成功后恢复有序写入。',
+                  'hydrate 与写入都失败时用 AggregateError 保留两条原因。',
+                  'dispose 退订、清 timer 并 abort 在途 I/O，且幂等。',
+                  '终态后的 flush/clear 以原生 AbortError 和 ABORTED_BY_DISPOSE 失败；不要复用 handle。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '返回 Store Persist 学习路径', path: 'index' },
+        { label: '错误来源参考', path: 'docs/store-persist/STORE_PERSIST_SOURCE' }
+      ]
+    },
+    en: {
+      title: 'Observe status, retry restoration, and shut down safely',
+      lede: 'Hydration and writing have independent status and errors. Overall error preserves both failures, while disposal converges active operations through native AbortError.',
+      document: {
+        sections: [
+          {
+            id: 'status',
+            heading: 'Read restoration and write results separately',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Member', 'Question answered'],
+                rows: [
+                  [
+                    'hydrationStatus / hydrationError',
+                    'Did initial or retried restoration succeed?'
+                  ],
+                  ['writeStatus / writeError', 'Did the most recent write succeed?'],
+                  ['status / error', 'Is the whole handle loading, ready, error, or disposed?'],
+                  ['ready / settled', 'Should the caller await success or only completion?']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'shutdown',
+            heading: 'Retry failed restoration and create a new Handle after terminal state',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'retryHydrate follows failed restoration and reopens ordered writing only after success.',
+                  'When hydration and writing both fail, AggregateError preserves both reasons.',
+                  'dispose unsubscribes, clears timers, aborts active I/O, and is idempotent.',
+                  'flush and clear after terminal state fail with native AbortError plus ABORTED_BY_DISPOSE; never reuse the handle.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Return to Store Persist learning paths', path: 'index' },
+        { label: 'Error-source reference', path: 'docs/store-persist/STORE_PERSIST_SOURCE' }
+      ]
+    }
+  },
+  'store-middleware:index': {
+    zh: {
+      title: 'Store Middleware 学习路径',
+      lede: '这一层观察和约束 Store，但不拥有字段、持久化或时间旅行历史。先闭合绑定与写入策略，再添加插件和 DevTools。',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: '先判断是否需要 Host',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['需求', '入口', '边界'],
+                rows: [
+                  ['只记录一个 Store 的变化', 'store.$subscribe', '不必引入插件 Host'],
+                  [
+                    '动态安装日志、审计或指标',
+                    'bindStoreMiddleware + plugin',
+                    'Host 只观察 Store 领域事件'
+                  ],
+                  ['禁止 action 外写入', '共享 MutationPolicy', 'Store 与 Host 必须使用同一实例'],
+                  [
+                    'Redux DevTools 命令',
+                    'connectDevTools',
+                    '只回放 $plain，可逆状态不含外部副作用'
+                  ],
+                  ['状态持久化或历史 UI', 'Store Persist / Store Devtools', '不是本模块职责']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'path',
+            heading: '按生产接入顺序阅读',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '创建唯一 MutationPolicy，并同时交给 Store 与 binding。',
+                  '理解 action、state、error 三类事件及同步 pipeline。',
+                  '选择 immutable、diagnostic 或 opaque 快照策略。',
+                  '把 DevTools state command 当作真实 action，而不是无声覆写。',
+                  '释放 binding 后再由上层所有者决定何时释放 Store。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟接入 Store', path: 'getting-started' },
+        { label: '绑定与共享策略', path: 'binding-and-shared-policy' }
+      ]
+    },
+    en: {
+      title: 'Store Middleware learning paths',
+      lede: 'This layer observes and constrains a Store without owning fields, persistence, or time-travel history. Close binding and write policy before adding plugins or DevTools.',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: 'Decide whether a Host is necessary',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Need', 'Entry', 'Boundary'],
+                rows: [
+                  ['Log changes from one Store', 'store.$subscribe', 'No plugin Host needed'],
+                  [
+                    'Install logging, audit, or metrics dynamically',
+                    'bindStoreMiddleware + plugin',
+                    'The Host observes Store-domain events only'
+                  ],
+                  [
+                    'Reject writes outside actions',
+                    'Shared MutationPolicy',
+                    'Store and Host use the same instance'
+                  ],
+                  [
+                    'Redux DevTools commands',
+                    'connectDevTools',
+                    'Replays only $plain; external effects are not reversible'
+                  ],
+                  [
+                    'Persistence or history UI',
+                    'Store Persist / Store Devtools',
+                    'Outside this module'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'path',
+            heading: 'Read in production integration order',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Create one MutationPolicy and pass it to both Store and binding.',
+                  'Understand action, state, and error events plus the synchronous pipeline.',
+                  'Choose immutable, diagnostic, or opaque snapshot behavior.',
+                  'Treat a DevTools state command as a real action, never a silent overwrite.',
+                  'Release the binding, then let the upper owner decide when the Store ends.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Bind a Store in five minutes', path: 'getting-started' },
+        { label: 'Binding and shared policy', path: 'binding-and-shared-policy' }
+      ]
+    }
+  },
+  'store-middleware:getting-started': {
+    zh: {
+      title: '五分钟启用 Actions-only 与日志插件',
+      lede: '同一个 MutationPolicy 同时控制 Store 写入和 Host action 边界；binding 负责桥接状态与 trace，不取得 Store 所有权。',
+      document: {
+        sections: [
+          {
+            id: 'bind',
+            heading: '共享策略实例并显式关闭 Host',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createStore } from '@migaia/store-light'\nimport {\n  bindStoreMiddleware,\n  createMutationPolicy,\n  loggerMiddleware\n} from '@migaia/store-middleware'\n\nconst mutationPolicy = createMutationPolicy('actions-only')\nconst store = createStore({\n  count: 0,\n  increment() { this.count += 1 }\n}, { mutationPolicy })\n\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n})\nawait host.use(loggerMiddleware((event, state) => audit(event, state)))\n\nstore.increment()\nawait host.dispose()\nawait store.$dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  '分别创建两个 actions-only policy 会让 Store 看不到 Host 的 action depth。',
+                  'binding 只观察绑定之后的状态，不回放此前历史。',
+                  'Host dispose 停止订阅并卸载插件，但不会 dispose Store。',
+                  'execution 的两个 timeout 必须显式给出毫秒数或 false。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '绑定与共享策略', path: 'binding-and-shared-policy' },
+        {
+          label: 'bindStoreMiddleware API',
+          path: 'docs/store-middleware/bindStoreMiddleware'
+        }
+      ]
+    },
+    en: {
+      title: 'Enable actions-only writes and a logging plugin in five minutes',
+      lede: 'The same MutationPolicy controls Store writes and Host action boundaries. A binding bridges state and traces without taking Store ownership.',
+      document: {
+        sections: [
+          {
+            id: 'bind',
+            heading: 'Share the policy instance and close the Host explicitly',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createStore } from '@migaia/store-light'\nimport {\n  bindStoreMiddleware,\n  createMutationPolicy,\n  loggerMiddleware\n} from '@migaia/store-middleware'\n\nconst mutationPolicy = createMutationPolicy('actions-only')\nconst store = createStore({\n  count: 0,\n  increment() { this.count += 1 }\n}, { mutationPolicy })\n\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n})\nawait host.use(loggerMiddleware((event, state) => audit(event, state)))\n\nstore.increment()\nawait host.dispose()\nawait store.$dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Two separately created actions-only policies leave the Store unaware of Host action depth.',
+                  'A binding observes state only after binding and never replays earlier history.',
+                  'Host disposal stops subscriptions and unloads plugins without disposing the Store.',
+                  'Both execution timeouts must be an explicit millisecond value or false.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Binding and shared policy', path: 'binding-and-shared-policy' },
+        {
+          label: 'bindStoreMiddleware API',
+          path: 'docs/store-middleware/bindStoreMiddleware'
+        }
+      ]
+    }
+  },
+  'store-middleware:binding-and-shared-policy': {
+    zh: {
+      title: '绑定 Store，并共享唯一 MutationPolicy',
+      lede: '写入闸门真正执行在 Store 内；Host 只复用同一 action depth，并转发 Store 的状态与 Runtime trace。',
+      document: {
+        sections: [
+          {
+            id: 'policy',
+            heading: 'Policy 是同步写入作用域，不跨 await',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'off 永远放行；actions-only 在 action depth 为零时拒绝。',
+                  'runInAction 支持同步嵌套，并在 finally 中恢复 depth。',
+                  'await 后 continuation 已离开同步 action；在每段写入处重新进入。',
+                  'Policy 只准入，不回滚已经绕过它发生的外部写入。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'bridge',
+            heading: 'binding 桥接三条边，而不是复制 Store',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['桥接', '来源', '输出'],
+                rows: [
+                  ['get/apply state', '$plain / $hydrate', 'DevTools 可读写普通字段'],
+                  ['state subscription', '$subscribe', 'store:update previous/next'],
+                  ['action trace', 'Runtime subscribeTrace', '筛选后的 action start/end/error']
+                ]
+              },
+              {
+                type: 'table',
+                headers: ['Binding 选项', '默认值', '生产契约'],
+                rows: [
+                  [
+                    'execution.mutationTimeoutMs',
+                    '无；必须显式设置',
+                    '毫秒数或 false；控制插件 mutation 的 bounded wait'
+                  ],
+                  [
+                    'execution.pipelineDrainTimeoutMs',
+                    '无；必须显式设置',
+                    '毫秒数或 false；控制关闭时 pipeline drain 的 bounded wait'
+                  ],
+                  [
+                    'mutationPolicy',
+                    "新建 mode: 'off' 的独立实例",
+                    'actions-only 场景必须传入 Store 使用的同一实例，不能依赖隐式发现'
+                  ],
+                  ['actionPrefix', '无', '只筛选转发的 Runtime action 名称，不限制 action 执行'],
+                  [
+                    'clone',
+                    'diagnosticClone',
+                    '每次 getState 与 state event 都重新克隆；强一致回放应改用 ClonePolicy.immutable'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '事件与插件', path: 'events-and-plugins' },
+        { label: 'MutationPolicy API', path: 'docs/store-middleware/MutationPolicy' }
+      ]
+    },
+    en: {
+      title: 'Bind a Store and share one MutationPolicy',
+      lede: 'The Store enforces the actual write gate. The Host reuses the same action depth and forwards Store state plus Runtime traces.',
+      document: {
+        sections: [
+          {
+            id: 'policy',
+            heading: 'Policy is a synchronous write scope and does not cross await',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'off always permits; actions-only rejects when action depth is zero.',
+                  'runInAction supports synchronous nesting and restores depth in finally.',
+                  'A continuation after await has left the synchronous action; re-enter at each write segment.',
+                  'Policy admits writes and cannot roll back external mutation that bypassed it.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'bridge',
+            heading: 'A binding bridges three edges instead of copying the Store',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Bridge', 'Source', 'Output'],
+                rows: [
+                  [
+                    'Get/apply state',
+                    '$plain / $hydrate',
+                    'DevTools reads and writes plain fields'
+                  ],
+                  ['State subscription', '$subscribe', 'store:update previous/next'],
+                  ['Action trace', 'Runtime subscribeTrace', 'Filtered action start/end/error']
+                ]
+              },
+              {
+                type: 'table',
+                headers: ['Binding option', 'Default', 'Production contract'],
+                rows: [
+                  [
+                    'execution.mutationTimeoutMs',
+                    'none; explicit value required',
+                    'Milliseconds or false; bounds plugin mutation waiting'
+                  ],
+                  [
+                    'execution.pipelineDrainTimeoutMs',
+                    'none; explicit value required',
+                    'Milliseconds or false; bounds pipeline draining during shutdown'
+                  ],
+                  [
+                    'mutationPolicy',
+                    "a new independent mode: 'off' instance",
+                    'Actions-only use must pass the exact instance owned by the Store; no implicit discovery occurs'
+                  ],
+                  [
+                    'actionPrefix',
+                    'none',
+                    'Filters forwarded Runtime action names only and never restricts action execution'
+                  ],
+                  [
+                    'clone',
+                    'diagnosticClone',
+                    'Clones every getState and state event; strongly consistent replay should select ClonePolicy.immutable'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Events and plugins', path: 'events-and-plugins' },
+        { label: 'MutationPolicy API', path: 'docs/store-middleware/MutationPolicy' }
+      ]
+    }
+  },
+  'store-middleware:events-and-plugins': {
+    zh: {
+      title: '组织 Action、State 与 Error 事件插件',
+      lede: 'Store Middleware 固定使用同步 pipeline；插件观察已发生的领域事件，不能把日志失败变成业务失败。',
+      document: {
+        sections: [
+          {
+            id: 'events',
+            heading: '先按事件所有者分流',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['事件', '来源', '关键字段'],
+                rows: [
+                  [
+                    'action:start/end/error',
+                    'Runtime trace 或 runAction',
+                    'name、durationMs、原始 error'
+                  ],
+                  ['state', 'Store subscription 或 recordState', 'previous、next'],
+                  ['error', 'recordError', 'phase、原始 error']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'plugin',
+            heading: '新插件直接使用 PluginHost core',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const auditPlugin = {\n  name: 'audit',\n  install(core) {\n    core.usePipeline((event, next) => {\n      next(event)\n      if (event.type === 'action' && event.phase === 'end') {\n        audit({ event, state: core.getState() })\n      }\n    })\n    core.onDispose(() => audit.flush())\n    return {}\n  }\n}\n\nawait host.use(auditPlugin)"
+              },
+              {
+                type: 'paragraph',
+                text: 'middlewarePlugin 只适合简单的 (event, context, next) 兼容形状；需要 config、shared 或 disposer 时直接写插件。每个 stage 最多 next 一次；不 next 会截断后续观察，但不会撤销已经发生的 Store 写入。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Action 与写入边界', path: 'actions-and-mutation-boundaries' },
+        { label: 'middlewarePlugin API', path: 'docs/store-middleware/middlewarePlugin' }
+      ]
+    },
+    en: {
+      title: 'Organize Action, State, and Error event plugins',
+      lede: 'Store Middleware always uses a synchronous pipeline. Plugins observe domain events that already occurred and must not turn logging failure into business failure.',
+      document: {
+        sections: [
+          {
+            id: 'events',
+            heading: 'Route events by their owner first',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Event', 'Source', 'Important fields'],
+                rows: [
+                  [
+                    'action:start/end/error',
+                    'Runtime trace or runAction',
+                    'name, durationMs, original error'
+                  ],
+                  ['state', 'Store subscription or recordState', 'previous, next'],
+                  ['error', 'recordError', 'phase, original error']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'plugin',
+            heading: 'Use the PluginHost core directly for new plugins',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const auditPlugin = {\n  name: 'audit',\n  install(core) {\n    core.usePipeline((event, next) => {\n      next(event)\n      if (event.type === 'action' && event.phase === 'end') {\n        audit({ event, state: core.getState() })\n      }\n    })\n    core.onDispose(() => audit.flush())\n    return {}\n  }\n}\n\nawait host.use(auditPlugin)"
+              },
+              {
+                type: 'paragraph',
+                text: 'middlewarePlugin fits only the simple (event, context, next) compatibility shape. Write a plugin directly when config, shared values, or disposal is needed. A stage calls next at most once; omitting next stops later observers but never rolls back a Store write that already happened.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Actions and write boundaries', path: 'actions-and-mutation-boundaries' },
+        { label: 'middlewarePlugin API', path: 'docs/store-middleware/middlewarePlugin' }
+      ]
+    }
+  },
+  'store-middleware:actions-and-mutation-boundaries': {
+    zh: {
+      title: '区分业务 Action 与观察失败',
+      lede: 'runAction 对业务函数保持原始失败 identity；中间件异常走 Runtime reporter，不能改变 action 的结果。',
+      document: {
+        sections: [
+          {
+            id: 'action',
+            heading: '用 runAction 包住非 Store 方法的同步写入',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "host.runAction('preferences:apply', () => {\n  store.$set(nextPreferences)\n  indexedRows.replace(nextRows)\n}, { source: 'settings-form' })"
+              },
+              {
+                type: 'list',
+                items: [
+                  '先派发 start，再在 mutationPolicy.runInAction 与 Runtime batch 中执行 fn。',
+                  '成功派发 end；失败派发 error 后重新抛出 exact original error。',
+                  '中间件自身失败被隔离并报告，不覆盖业务返回值或异常。',
+                  '状态写入不是事务；fn 中途失败不会自动回滚已发生的写。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'trace',
+            heading: 'Store 自己的 Action trace 不重复进入 runAction',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'bindStoreMiddleware 直接转发 Runtime action trace，避免重复 action depth 与重复事件。actionPrefix 只过滤转发名称；它不限制 Store 中哪些 action 可以执行。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '快照克隆策略', path: 'snapshot-clone-policies' },
+        {
+          label: 'StoreMiddlewareHost API',
+          path: 'docs/store-middleware/StoreMiddlewareHost'
+        }
+      ]
+    },
+    en: {
+      title: 'Separate business Actions from observer failure',
+      lede: 'runAction preserves the original business-function failure identity. Middleware errors go to the Runtime reporter and cannot change the action result.',
+      document: {
+        sections: [
+          {
+            id: 'action',
+            heading: 'Wrap synchronous writes outside Store methods in runAction',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "host.runAction('preferences:apply', () => {\n  store.$set(nextPreferences)\n  indexedRows.replace(nextRows)\n}, { source: 'settings-form' })"
+              },
+              {
+                type: 'list',
+                items: [
+                  'start emits first, then fn runs inside mutationPolicy.runInAction and Runtime batch.',
+                  'Success emits end; failure emits error and rethrows the exact original error.',
+                  'Middleware failure is isolated and reported without replacing the business return or error.',
+                  'State writes are not transactional; a mid-function failure does not roll back completed writes.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'trace',
+            heading: 'A Store Action trace does not enter runAction again',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'bindStoreMiddleware forwards Runtime action traces directly, avoiding duplicate action depth and events. actionPrefix filters only forwarded names and never restricts which Store actions may execute.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Snapshot clone policies', path: 'snapshot-clone-policies' },
+        {
+          label: 'StoreMiddlewareHost API',
+          path: 'docs/store-middleware/StoreMiddlewareHost'
+        }
+      ]
+    }
+  },
+  'store-middleware:snapshot-clone-policies': {
+    zh: {
+      title: '为状态快照选择明确的 Clone Policy',
+      lede: '快照是否独立、是否允许共享引用、克隆失败是否可见必须由调用方明确选择；不存在同时零拷贝、完全隔离且永不失败的策略。',
+      document: {
+        sections: [
+          {
+            id: 'policies',
+            heading: '按消费场景选择，而不是统一使用“宽容克隆”',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['策略', '保证', '适合场景'],
+                rows: [
+                  ['ClonePolicy.immutable', '成功即深度独立；失败抛错', '持久状态、可回放命令'],
+                  [
+                    'ClonePolicy.diagnostic',
+                    '尽力深拷贝；不可克隆子树保留引用；永不抛',
+                    '日志、审计与诊断'
+                  ],
+                  [
+                    'ClonePolicy.opaque',
+                    '返回原始引用，零拷贝',
+                    '明确接受 identity 共享的内部工具'
+                  ],
+                  ['tolerantClone', '等同 diagnostic', '仅兼容旧代码，已 deprecated']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'binding',
+            heading: 'binding 默认使用 diagnostic 快照',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'getState 与每次 state event 都重新克隆 $plain。computed、方法、WASM 字段与外部资源不在 $plain 中，因此不会进入 previous/next，也不能被 DevTools 回放。对强一致回放应显式传 immutable clone，并让不支持的值尽早失败。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'DevTools 状态命令', path: 'devtools-and-state-commands' },
+        { label: 'ClonePolicy API', path: 'docs/store-middleware/tolerant-clone/ClonePolicy' }
+      ]
+    },
+    en: {
+      title: 'Choose an explicit Clone Policy for state snapshots',
+      lede: 'Snapshot independence, reference sharing, and clone-failure visibility are caller choices. No policy is simultaneously zero-copy, fully isolated, and unable to fail.',
+      document: {
+        sections: [
+          {
+            id: 'policies',
+            heading: 'Choose by consumer instead of applying one tolerant clone everywhere',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Policy', 'Guarantee', 'Use it for'],
+                rows: [
+                  [
+                    'ClonePolicy.immutable',
+                    'Success is deeply independent; failure throws',
+                    'Persisted state and replayable commands'
+                  ],
+                  [
+                    'ClonePolicy.diagnostic',
+                    'Best effort; uncloneable subtrees retain references; never throws',
+                    'Logging, audit, and diagnostics'
+                  ],
+                  [
+                    'ClonePolicy.opaque',
+                    'Returns the original reference with zero copying',
+                    'Internal tools that explicitly accept shared identity'
+                  ],
+                  ['tolerantClone', 'Same as diagnostic', 'Deprecated compatibility only']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'binding',
+            heading: 'A binding uses diagnostic snapshots by default',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'getState and every state event clone $plain again. Computed values, methods, WASM-backed fields, and external resources are absent from $plain, so they never enter previous/next or DevTools replay. Strongly consistent replay should pass immutable cloning explicitly and fail unsupported values early.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'DevTools state commands', path: 'devtools-and-state-commands' },
+        { label: 'ClonePolicy API', path: 'docs/store-middleware/tolerant-clone/ClonePolicy' }
+      ]
+    }
+  },
+  'store-middleware:devtools-and-state-commands': {
+    zh: {
+      title: '安全接入 Redux DevTools 状态命令',
+      lede: 'adapter 只转换协议；Host 安装插件、发送事件并把 jump/reset 作为可观察的真实 action 应用。',
+      document: {
+        sections: [
+          {
+            id: 'connect',
+            heading: '只有提供 applyState 才能接受状态命令',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const adapter = createReduxDevToolsAdapter(connection)\nawait host.connectDevTools(adapter)\n\n// bindStoreMiddleware 已把 applyState 桥接到 store.$hydrate()\n// 卸载时同时释放 adapter subscription\nawait host.unUse('store-devtools')"
+              },
+              {
+                type: 'list',
+                items: [
+                  '安装时 init 当前状态；事件经过下游后 send 最新状态。',
+                  'commit 重新 init；jump/reset 进入 devtools:<type> action。',
+                  '没有 applyState 时状态命令以 DEVTOOLS_CAPABILITY 失败。',
+                  'JSON 状态解析失败的扩展消息被忽略，不能用半解析数据覆盖 Store。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'limits',
+            heading: '时间旅行只覆盖可 hydrate 的普通字段',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'DevTools 不撤销网络请求、文件写入或其它外部副作用，也不恢复 computed 和资源句柄。需要真正可逆的工作流时，业务层必须设计补偿或事件溯源，而不是依赖 UI jump。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Pipeline 错误与重入', path: 'pipeline-errors-and-reentrancy' },
+        {
+          label: 'createReduxDevToolsAdapter API',
+          path: 'docs/store-middleware/createReduxDevToolsAdapter'
+        }
+      ]
+    },
+    en: {
+      title: 'Integrate Redux DevTools state commands safely',
+      lede: 'The adapter only translates protocol. The Host installs a plugin, sends events, and applies jump or reset as an observable real action.',
+      document: {
+        sections: [
+          {
+            id: 'connect',
+            heading: 'Accept state commands only when applyState exists',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const adapter = createReduxDevToolsAdapter(connection)\nawait host.connectDevTools(adapter)\n\n// bindStoreMiddleware already bridges applyState to store.$hydrate()\n// uninstallation also releases the adapter subscription\nawait host.unUse('store-devtools')"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Installation initializes current state; after downstream observation each event sends the latest state.',
+                  'commit initializes again; jump and reset enter a devtools:<type> action.',
+                  'Without applyState, a state command fails with DEVTOOLS_CAPABILITY.',
+                  'An extension message with invalid JSON state is ignored instead of partially overwriting the Store.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'limits',
+            heading: 'Time travel covers only hydratable plain fields',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'DevTools cannot undo network requests, file writes, or other external effects, and does not restore computed values or resource handles. A truly reversible workflow needs business-level compensation or event sourcing rather than a UI jump.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Pipeline errors and reentrancy', path: 'pipeline-errors-and-reentrancy' },
+        {
+          label: 'createReduxDevToolsAdapter API',
+          path: 'docs/store-middleware/createReduxDevToolsAdapter'
+        }
+      ]
+    }
+  },
+  'store-middleware:pipeline-errors-and-reentrancy': {
+    zh: {
+      title: '隔离 Pipeline 错误，并阻断 Error 重入循环',
+      lede: '事件观察必须 fail-contained：插件不能破坏业务 action；错误观察本身再次失败时不能递归产生无限 error event。',
+      document: {
+        sections: [
+          {
+            id: 'pipeline',
+            heading: '同步 pipeline 仍有明确 next 契约',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Host 强制 sync 模式，异步或 generator stage 以模式不匹配失败。',
+                  '漏掉 next 会报告 MIDDLEWARE_NOT_CHAINED，并截断后续观察者。',
+                  '重复或 stage 返回后的 late next 由 PluginHost 作为 pipeline violation 报告。',
+                  'recordState、recordError 与 emit 隔离 listener failure，不向业务调用方抛。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'reentry',
+            heading: 'Error event 处理期间再次 recordError 直接上报 Runtime',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Host 维护 error-dispatch guard。一个 error middleware 内再次调用 recordError 时，不再重新进入 pipeline，而是以 trace-listener phase 交给 runtime.reportError，避免错误处理器自激循环。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '关闭与所有权', path: 'shutdown-and-ownership' },
+        { label: '错误来源参考', path: 'docs/store-middleware/STORE_MIDDLEWARE_SOURCE' }
+      ]
+    },
+    en: {
+      title: 'Contain Pipeline errors and stop Error reentry loops',
+      lede: 'Event observation is fail-contained: a plugin cannot break a business action, and failure while observing an error cannot recursively create infinite error events.',
+      document: {
+        sections: [
+          {
+            id: 'pipeline',
+            heading: 'The synchronous pipeline still has an explicit next contract',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'The Host forces sync mode; async or generator stages fail with a mode mismatch.',
+                  'Omitting next reports MIDDLEWARE_NOT_CHAINED and stops later observers.',
+                  'Duplicate next or a late next after stage return is reported by PluginHost as a pipeline violation.',
+                  'recordState, recordError, and emit contain listener failures instead of throwing into business callers.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'reentry',
+            heading: 'recordError during Error dispatch reports directly to Runtime',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'The Host maintains an error-dispatch guard. When an error middleware calls recordError again, the new failure goes to runtime.reportError with trace-listener phase instead of re-entering the pipeline and creating a self-exciting loop.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Shutdown and ownership', path: 'shutdown-and-ownership' },
+        {
+          label: 'Error-source reference',
+          path: 'docs/store-middleware/STORE_MIDDLEWARE_SOURCE'
+        }
+      ]
+    }
+  },
+  'store-middleware:shutdown-and-ownership': {
+    zh: {
+      title: '按 Binding、Plugin、Store 的所有权顺序关闭',
+      lede: 'Host 先停止外部订阅，再卸载插件；Store 与 Runtime 由更高层所有者另行释放。重复 dispose 共享同一个 Promise。',
+      document: {
+        sections: [
+          {
+            id: 'order',
+            heading: '从观察边界向状态所有者收缩',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const hostResult = await host.dispose()\n// binding subscriptions and plugins are now closed\nawait store.$dispose()\n// dispose runtime only if this scope owns it'
+              },
+              {
+                type: 'list',
+                items: [
+                  'attachBindingDisposer 登记的订阅按 LIFO 在插件卸载前执行。',
+                  'Host dispose 稳定且幂等；并发调用观察同一完成结果。',
+                  '多项清理失败聚合为 CLEANUP_FAILED，并保留所有原始 errors。',
+                  'Host 不取得 Store 或 Runtime 所有权，不应越界释放。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '返回 Store Middleware 学习路径', path: 'index' },
+        {
+          label: 'createStoreMiddlewareHost API',
+          path: 'docs/store-middleware/createStoreMiddlewareHost'
+        }
+      ]
+    },
+    en: {
+      title: 'Shut down in Binding, Plugin, then Store ownership order',
+      lede: 'The Host stops external subscriptions before uninstalling plugins. A higher owner releases Store and Runtime separately. Repeated disposal shares one Promise.',
+      document: {
+        sections: [
+          {
+            id: 'order',
+            heading: 'Contract from the observation boundary toward the state owner',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const hostResult = await host.dispose()\n// binding subscriptions and plugins are now closed\nawait store.$dispose()\n// dispose runtime only if this scope owns it'
+              },
+              {
+                type: 'list',
+                items: [
+                  'Subscriptions registered through attachBindingDisposer run in LIFO order before plugin uninstallation.',
+                  'Host disposal is stable and idempotent; concurrent calls observe the same completion.',
+                  'Multiple cleanup failures become CLEANUP_FAILED while preserving every original error.',
+                  'The Host never takes Store or Runtime ownership and must not release across that boundary.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Return to Store Middleware learning paths', path: 'index' },
+        {
+          label: 'createStoreMiddlewareHost API',
+          path: 'docs/store-middleware/createStoreMiddlewareHost'
+        }
+      ]
+    }
+  },
+  'store-indexed:index': {
+    zh: {
+      title: 'Store Indexed 学习路径',
+      lede: '四种显式集合把依赖粒度收窄到一个 key、索引或成员；只有真正被追踪的条目才建立响应式 cell。',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: '先从访问模式选择集合',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['数据形状', '入口', '关键语义'],
+                rows: [
+                  ['固定字符串字段', 'ObservableObject', '按字段读取，keys 追踪结构'],
+                  ['位置有意义的序列', 'ObservableArray', '按索引追踪；splice 会移动后续语义'],
+                  ['任意 key 到 value', 'ObservableMap', 'get/has 都可按单 key 追踪'],
+                  ['成员是否存在', 'ObservableSet', 'has 按成员追踪'],
+                  [
+                    '稳定实体 identity',
+                    'Store Keyed / splitDef',
+                    '不要把会移动的数组索引当实体身份'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'path',
+            heading: '沿真实性能与生命周期路径阅读',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '先选择集合与构造形式，注意类和工厂的参数顺序不同。',
+                  '区分追踪读取、peek、结构读取和整体快照。',
+                  '理解数组纯索引语义，再使用 splice、replace 与 prune。',
+                  '批量替换先完整验证，失败时保留旧集合。',
+                  '最后接入 mutation guard、Runtime 隔离与确定性 dispose。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟建立细粒度集合', path: 'getting-started' },
+        { label: '选择集合类型', path: 'choose-a-collection' }
+      ]
+    },
+    en: {
+      title: 'Store Indexed learning paths',
+      lede: 'Four explicit collections narrow dependencies to one key, index, or member. A reactive cell exists only for an entry that is actually tracked.',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: 'Choose a collection from the access pattern',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Data shape', 'Entry', 'Defining semantic'],
+                rows: [
+                  ['Fixed string fields', 'ObservableObject', 'Field reads; keys tracks structure'],
+                  [
+                    'Position-oriented sequence',
+                    'ObservableArray',
+                    'Index tracking; splice shifts later meaning'
+                  ],
+                  ['Arbitrary key to value', 'ObservableMap', 'Both get and has track one key'],
+                  ['Membership', 'ObservableSet', 'has tracks one member'],
+                  [
+                    'Stable entity identity',
+                    'Store Keyed / splitDef',
+                    'Do not treat a movable array index as entity identity'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'path',
+            heading: 'Follow the real performance and lifecycle path',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Choose the collection and construction form; class and factory argument order differs.',
+                  'Separate tracked reads, peek, structural reads, and whole snapshots.',
+                  'Understand pure index semantics before splice, replace, and prune.',
+                  'Bulk replacement validates completely before preserving or replacing old state.',
+                  'Finally add mutation guards, Runtime isolation, and deterministic disposal.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Build a fine-grained collection in five minutes', path: 'getting-started' },
+        { label: 'Choose a collection type', path: 'choose-a-collection' }
+      ]
+    }
+  },
+  'store-indexed:getting-started': {
+    zh: {
+      title: '五分钟订阅一个大集合中的单个 key',
+      lede: '追踪读取只为访问过的 key 建 cell；写入另一个 key 不应让当前计算重新运行。',
+      document: {
+        sections: [
+          {
+            id: 'track',
+            heading: '在同一个 Runtime 中创建集合和 Effect',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Effect, createRuntime } from '@migaia/reactive'\nimport { ObservableMap } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst users = new ObservableMap<string, User>([], runtime, { debugName: 'users' })\nusers.set('ada', { name: 'Ada' })\nusers.set('grace', { name: 'Grace' })\n\nconst view = new Effect(() => render(users.get('ada')), runtime)\nusers.set('grace', { name: 'Grace Hopper' }) // 不重跑 view\nusers.set('ada', { name: 'Ada Lovelace' }) // 重跑 view\n\nview.dispose()\nusers.dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  '构造后写入不会自动为 key 建 cell；只有追踪读取才需要它。',
+                  'Effect 和集合必须属于同一个 Runtime。',
+                  '集合创建者负责 dispose；Effect 也由其订阅所有者释放。',
+                  '批量导出时用 peek 或 snapshot，避免逐 key 建立依赖。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '选择集合类型', path: 'choose-a-collection' },
+        { label: 'ObservableMap API', path: 'docs/store-indexed/ObservableMap-class' }
+      ]
+    },
+    en: {
+      title: 'Subscribe to one key in a large collection in five minutes',
+      lede: 'A tracked read creates a cell only for the accessed key. Writing another key should not rerun the current computation.',
+      document: {
+        sections: [
+          {
+            id: 'track',
+            heading: 'Create the collection and Effect in one Runtime',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Effect, createRuntime } from '@migaia/reactive'\nimport { ObservableMap } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst users = new ObservableMap<string, User>([], runtime, { debugName: 'users' })\nusers.set('ada', { name: 'Ada' })\nusers.set('grace', { name: 'Grace' })\n\nconst view = new Effect(() => render(users.get('ada')), runtime)\nusers.set('grace', { name: 'Grace Hopper' }) // does not rerun view\nusers.set('ada', { name: 'Ada Lovelace' }) // reruns view\n\nview.dispose()\nusers.dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Writing after construction does not create a key cell; only a tracked read needs one.',
+                  'The Effect and collection must belong to the same Runtime.',
+                  'The collection creator owns disposal; the subscription owner also releases the Effect.',
+                  'Use peek or a snapshot for bulk export instead of creating a dependency per key.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Choose a collection type', path: 'choose-a-collection' },
+        { label: 'ObservableMap API', path: 'docs/store-indexed/ObservableMap-class' }
+      ]
+    }
+  },
+  'store-indexed:choose-a-collection': {
+    zh: {
+      title: '选择 Object、Array、Map 或 Set',
+      lede: '四个容器共享 Runtime、mutation guard 和生命周期，但它们的结构信号与单项依赖语义不同。',
+      document: {
+        sections: [
+          {
+            id: 'matrix',
+            heading: '按读取问题选择，不按熟悉程度选择',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['容器', '单项追踪', '整体追踪'],
+                rows: [
+                  ['ObservableObject', 'get(key)', 'keys/has 走结构；snapshot 走 revision'],
+                  ['ObservableArray', 'at(index)', 'length 走结构；snapshot 走 revision'],
+                  [
+                    'ObservableMap',
+                    'get(key) 与 has(key)',
+                    'size/keys 走结构；values/entries/snapshot 走 iteration'
+                  ],
+                  ['ObservableSet', 'has(value)', 'size/values/snapshot 共用结构']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'construct',
+            heading: '类与工厂函数的参数顺序不同',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const byClass = new ObservableArray(items, runtime, { debugName: 'rows' })\nconst byFactory = observableArray(items, { debugName: 'rows' }, runtime)"
+              },
+              {
+                type: 'paragraph',
+                text: '类是 (initial, runtime, options)，工厂是 (initial, options, runtime)。不要用宽泛类型或 undefined 掩盖参数错位。Object 必须有 initial；Array、Map 与 Set 默认空集合。'
+              },
+              {
+                type: 'table',
+                headers: ['输入/选项', '默认值', '作用与边界'],
+                rows: [
+                  [
+                    'initial',
+                    'Object 必填；其余为空 iterable',
+                    '在集合取得 Runtime ownership 前完整读取并验证；失败不产生半构造集合'
+                  ],
+                  [
+                    'runtime',
+                    'defaultRuntime',
+                    '永久决定依赖图和 Signal ownership；不能在另一 Runtime 的追踪上下文中读取'
+                  ],
+                  [
+                    'options.mutationGuard',
+                    '无',
+                    '每次写入前调用 assertMutationAllowed；拒绝时 updater、迭代器提交和信号通知都不会发生'
+                  ],
+                  [
+                    'options.debugName',
+                    'ObservableObject / ObservableArray / ObservableMap / ObservableSet',
+                    '只作为 Signal 与错误诊断前缀，不参与集合或条目 identity'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '追踪与 Cell 生命周期', path: 'tracking-and-cell-lifecycle' },
+        { label: 'observableArray API', path: 'docs/store-indexed/observableArray-function' }
+      ]
+    },
+    en: {
+      title: 'Choose Object, Array, Map, or Set',
+      lede: 'All four containers share Runtime, mutation guards, and lifecycle, but their structural signals and per-entry dependency semantics differ.',
+      document: {
+        sections: [
+          {
+            id: 'matrix',
+            heading: 'Choose by the read question, not familiarity',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Container', 'Per-entry tracking', 'Whole-collection tracking'],
+                rows: [
+                  [
+                    'ObservableObject',
+                    'get(key)',
+                    'keys/has use structure; snapshot uses revision'
+                  ],
+                  ['ObservableArray', 'at(index)', 'length uses structure; snapshot uses revision'],
+                  [
+                    'ObservableMap',
+                    'get(key) and has(key)',
+                    'size/keys use structure; values/entries/snapshot use iteration'
+                  ],
+                  ['ObservableSet', 'has(value)', 'size/values/snapshot share structure']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'construct',
+            heading: 'Classes and factory functions use different argument order',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const byClass = new ObservableArray(items, runtime, { debugName: 'rows' })\nconst byFactory = observableArray(items, { debugName: 'rows' }, runtime)"
+              },
+              {
+                type: 'paragraph',
+                text: 'A class takes (initial, runtime, options); a factory takes (initial, options, runtime). Do not let broad types or undefined hide swapped arguments. Object requires initial data; Array, Map, and Set default to empty.'
+              },
+              {
+                type: 'table',
+                headers: ['Input or option', 'Default', 'Effect and boundary'],
+                rows: [
+                  [
+                    'initial',
+                    'required for Object; empty iterable otherwise',
+                    'Read and validated completely before Runtime ownership is claimed; failure leaves no half-constructed collection'
+                  ],
+                  [
+                    'runtime',
+                    'defaultRuntime',
+                    'Permanently selects dependency graph and Signal ownership; tracked reads from another Runtime fail'
+                  ],
+                  [
+                    'options.mutationGuard',
+                    'none',
+                    'Runs assertMutationAllowed before every write; rejection prevents updater work, iterable commit, and signal notification'
+                  ],
+                  [
+                    'options.debugName',
+                    'ObservableObject / ObservableArray / ObservableMap / ObservableSet',
+                    'Prefixes Signal and error diagnostics only; never participates in collection or entry identity'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Tracking and cell lifecycle', path: 'tracking-and-cell-lifecycle' },
+        { label: 'observableArray API', path: 'docs/store-indexed/observableArray-function' }
+      ]
+    }
+  },
+  'store-indexed:tracking-and-cell-lifecycle': {
+    zh: {
+      title: '控制追踪读取与 Cell 生命周期',
+      lede: 'cell 是惰性 Signal，不是集合容量的镜像；一次非追踪读取不应把十万个条目永久响应式化。',
+      document: {
+        sections: [
+          {
+            id: 'reads',
+            heading: '区分单项、结构和整体读取',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['读取', '建立的依赖', '适合场景'],
+                rows: [
+                  ['get/at/Map.has/Set.has', '单 key、索引或成员 cell', '局部 UI 与精确 computed'],
+                  ['keys/size/length', '结构信号', '集合形状变化'],
+                  ['snapshot/valuesArray/entries', 'revision 或 iteration', '整体视图'],
+                  ['peek', '无依赖、无 cell', '事件处理、导出与命令式检查']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'collection',
+            heading: '无人观察的 cell 自动回收',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '最后一个订阅者退出时，cell 尝试立即回收。',
+                  '追踪读取后始终无人订阅的 cell 在当前微任务末尾回收。',
+                  '被删除但仍有人观察的 key 保留缺失状态，直到订阅退出。',
+                  'prune 是显式内存整理，不会影响仍有订阅者的 cell。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '数组索引语义', path: 'array-index-semantics' },
+        { label: 'ObservableObject API', path: 'docs/store-indexed/ObservableObject-class' }
+      ]
+    },
+    en: {
+      title: 'Control tracked reads and cell lifecycle',
+      lede: 'A cell is a lazy Signal, not a mirror of collection capacity. One non-tracked read must not make one hundred thousand entries permanently reactive.',
+      document: {
+        sections: [
+          {
+            id: 'reads',
+            heading: 'Separate entry, structural, and whole reads',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Read', 'Dependency', 'Use it for'],
+                rows: [
+                  [
+                    'get/at/Map.has/Set.has',
+                    'One key, index, or member cell',
+                    'Local UI and precise computed values'
+                  ],
+                  ['keys/size/length', 'Structure signal', 'Collection-shape changes'],
+                  ['snapshot/valuesArray/entries', 'Revision or iteration signal', 'Whole views'],
+                  ['peek', 'No dependency and no cell', 'Events, export, and imperative inspection']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'collection',
+            heading: 'An unobserved cell is collected automatically',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'A cell attempts immediate collection after its final subscriber leaves.',
+                  'A tracked read that gains no subscriber is collected at the end of the current microtask.',
+                  'A deleted but still observed key retains an explicit missing state until observation ends.',
+                  'prune is explicit memory housekeeping and never removes a cell with active subscribers.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Array index semantics', path: 'array-index-semantics' },
+        { label: 'ObservableObject API', path: 'docs/store-indexed/ObservableObject-class' }
+      ]
+    }
+  },
+  'store-indexed:array-index-semantics': {
+    zh: {
+      title: '正确使用 ObservableArray 的纯索引语义',
+      lede: '订阅的是位置，不是实体。插入、删除和替换会让后续索引指向不同值，因此高频实体列表应使用稳定 key 模型。',
+      document: {
+        sections: [
+          {
+            id: 'operations',
+            heading: '先理解每个写操作影响哪些依赖',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['操作', '行为', '边界'],
+                rows: [
+                  ['set(index, value)', '只改合法既有索引', '非整数或越界失败'],
+                  ['push/pop', '更新长度和受影响 cell', '空操作不通知'],
+                  [
+                    'splice',
+                    '按原生参数规则生成新数组后 replace',
+                    '省略 deleteCount 表示删除到末尾'
+                  ],
+                  [
+                    'replace',
+                    '更新已物化 cell，并按需通知结构/revision',
+                    '不会为未观察索引建 cell'
+                  ],
+                  ['clear', 'replace([])', '进入空数组而非 dispose']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'identity',
+            heading: '不要把移动后的索引当稳定实体',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'at(-1) 支持从末尾读取，但越界读取还依赖结构，以便元素出现时重算。splice、pop 或整体 replace 后，旧索引 cell 的业务含义可能改变；释放订阅并调用 prune 回收无观察 cell。需要按 id 保持身份时改用 keyed split。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '批量替换与 Prune', path: 'bulk-replacement-and-pruning' },
+        { label: 'ObservableArray API', path: 'docs/store-indexed/ObservableArray-class' }
+      ]
+    },
+    en: {
+      title: 'Use ObservableArray pure index semantics correctly',
+      lede: 'A subscriber observes a position, not an entity. Insert, deletion, and replacement can make later indexes point to other values, so high-churn entity lists need stable keys.',
+      document: {
+        sections: [
+          {
+            id: 'operations',
+            heading: 'Understand which dependencies each write affects',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Operation', 'Behavior', 'Boundary'],
+                rows: [
+                  [
+                    'set(index, value)',
+                    'Changes one valid existing index',
+                    'Non-integer or out-of-range input fails'
+                  ],
+                  [
+                    'push/pop',
+                    'Updates length and affected cells',
+                    'An empty operation does not notify'
+                  ],
+                  [
+                    'splice',
+                    'Applies native argument semantics, then replaces',
+                    'Omitted deleteCount removes through the end'
+                  ],
+                  [
+                    'replace',
+                    'Updates materialized cells and notifies structure/revision as needed',
+                    'Never creates cells for unobserved indexes'
+                  ],
+                  ['clear', 'replace([])', 'Becomes empty without disposal']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'identity',
+            heading: 'Do not treat a shifted index as stable entity identity',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'at(-1) reads from the end, and an out-of-range read also tracks structure so it can rerun when an element appears. After splice, pop, or replacement, an old index cell may describe another business value. Release subscriptions and prune unobserved cells; use keyed split when identity follows an id.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Bulk replacement and prune', path: 'bulk-replacement-and-pruning' },
+        { label: 'ObservableArray API', path: 'docs/store-indexed/ObservableArray-class' }
+      ]
+    }
+  },
+  'store-indexed:bulk-replacement-and-pruning': {
+    zh: {
+      title: '原子替换集合并主动整理 Cell',
+      lede: 'replace 先物化和验证完整输入，再一次提交；迭代器失败、非法 entry 或 getter 抛错时旧集合保持不变。',
+      document: {
+        sections: [
+          {
+            id: 'replace',
+            heading: '把外部 iterable 当作不可信输入',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'try {\n  users.replace(loadUserEntries())\n} catch (error) {\n  diagnostics.report(error) // users 仍保留旧内容\n}\n\nconst removedCells = users.prune()'
+              },
+              {
+                type: 'list',
+                items: [
+                  'Map 输入必须是二元 entry；字符串不能冒充 entry iterable。',
+                  'Object replace 只接受自有可枚举字符串字段，并以 null-prototype snapshot 输出。',
+                  '批量替换最多按信号类别各通知一次；内容相同则不通知。',
+                  '实现只遍历已物化 cell，不对全部大集合做响应式 diff。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'prune',
+            heading: '按容器语义理解 prune',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Object、Map 与 Set 主要整理已删除 key/member 的 cell；Array 因为索引会在 splice、pop 和 replace 后整体移动，会对所有已物化 cell 尝试 tombstone。仍有订阅的 cell 始终保留。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Mutation Guard 与 Runtime', path: 'mutation-guards-and-runtime' },
+        { label: 'ObservableSet API', path: 'docs/store-indexed/ObservableSet-class' }
+      ]
+    },
+    en: {
+      title: 'Replace collections atomically and compact cells explicitly',
+      lede: 'replace materializes and validates complete input before one commit. If an iterator, entry, or getter fails, the old collection remains intact.',
+      document: {
+        sections: [
+          {
+            id: 'replace',
+            heading: 'Treat an external iterable as untrusted input',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'try {\n  users.replace(loadUserEntries())\n} catch (error) {\n  diagnostics.report(error) // users still contains the old data\n}\n\nconst removedCells = users.prune()'
+              },
+              {
+                type: 'list',
+                items: [
+                  'Map input must contain two-item entries; a string is not an entry iterable.',
+                  'Object replacement accepts own enumerable string fields and snapshots into a null-prototype object.',
+                  'Bulk replacement notifies at most once per signal category and emits nothing for equal content.',
+                  'The implementation visits only materialized cells instead of reactively diffing every entry in a large collection.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'prune',
+            heading: 'Interpret prune by container semantics',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Object, Map, and Set primarily compact cells for removed keys or members. Because Array indexes can shift globally after splice, pop, or replace, Array attempts to tombstone every materialized cell. A cell with an active subscriber always remains.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Mutation guards and Runtime', path: 'mutation-guards-and-runtime' },
+        { label: 'ObservableSet API', path: 'docs/store-indexed/ObservableSet-class' }
+      ]
+    }
+  },
+  'store-indexed:mutation-guards-and-runtime': {
+    zh: {
+      title: '接入 Mutation Guard，并隔离 Runtime',
+      lede: '所有集合写入口先检查 active 状态与同一个 mutation guard；响应式读取只能连接到集合所属 Runtime。',
+      document: {
+        sections: [
+          {
+            id: 'guard',
+            heading: '让策略观察真实操作名',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const rows = new ObservableArray([], runtime, {\n  debugName: 'rows',\n  mutationGuard\n})\n\nmutationGuard.runInAction(() => {\n  rows.push(nextRow)\n  rows.set(0, patchedRow)\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  '每个写方法把包含 debugName 的稳定操作描述交给 assertMutationAllowed。',
+                  'guard 拒绝时写入尚未发生；不要在调用层先修改共享对象再交给集合。',
+                  'IndexedOperation 是消费方的分类词表，不是集合内部 mutation hook。',
+                  'debugName 只服务诊断，不参与集合 identity。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'runtime',
+            heading: '跨 Runtime 追踪必须失败',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '集合在构造时永久绑定 Runtime。在 runtimeB 的 Effect 中追踪读取 runtimeA 集合会以 CROSS_RUNTIME 失败，避免两张依赖图暗中连接。命令式非追踪读取不建立图边，但作用域所有者仍应传递正确集合。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '释放与错误处理', path: 'disposal-and-errors' },
+        { label: 'IndexedOperation API', path: 'docs/store-indexed/IndexedOperation' }
+      ]
+    },
+    en: {
+      title: 'Integrate a Mutation Guard and isolate Runtime',
+      lede: 'Every collection write checks active state and the same mutation guard first. A reactive read can connect only to the Runtime that owns the collection.',
+      document: {
+        sections: [
+          {
+            id: 'guard',
+            heading: 'Let policy observe the actual operation name',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const rows = new ObservableArray([], runtime, {\n  debugName: 'rows',\n  mutationGuard\n})\n\nmutationGuard.runInAction(() => {\n  rows.push(nextRow)\n  rows.set(0, patchedRow)\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Each write method passes assertMutationAllowed a stable operation description containing debugName.',
+                  'A guard rejection occurs before mutation; do not modify a shared object first and then hand it to the collection.',
+                  'IndexedOperation is a consumer-facing classification vocabulary, not the collection mutation hook.',
+                  'debugName serves diagnostics and never collection identity.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'runtime',
+            heading: 'Cross-Runtime tracking must fail',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A collection binds permanently to its construction Runtime. Tracking a runtimeA collection inside a runtimeB Effect fails with CROSS_RUNTIME instead of secretly joining two dependency graphs. An imperative non-tracked read creates no graph edge, but the scope owner should still pass the correct collection.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Disposal and errors', path: 'disposal-and-errors' },
+        { label: 'IndexedOperation API', path: 'docs/store-indexed/IndexedOperation' }
+      ]
+    }
+  },
+  'store-indexed:disposal-and-errors': {
+    zh: {
+      title: '终止集合并按错误身份恢复',
+      lede: 'dispose 释放结构、修订、迭代与所有 entry cell；终态不可复活，调用方按 source 与 code 判断失败。',
+      document: {
+        sections: [
+          {
+            id: 'terminal',
+            heading: '把 dispose 放在集合所有者边界',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'dispose 幂等，并释放集合拥有的全部 Signal。',
+                  '终态后的读取、写入、快照和 prune 统一以 COLLECTION_DISPOSED 失败。',
+                  'clear 只是变成空集合；它不会释放响应式基础设施。',
+                  '新页面、请求或测试需要新集合实例，而不是复活旧实例。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'errors',
+            heading: '保留原生错误类型与稳定 code',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Code', '典型触发', '调用方动作'],
+                rows: [
+                  ['INVALID_OPTION', '非法 iterable、key 或 option', '修正输入'],
+                  ['INVALID_INDEX', '数组索引不是有限整数', '规范化索引'],
+                  ['INDEX_OUT_OF_RANGE', 'set 指向不存在的位置', '检查 length 或改用 push'],
+                  ['CROSS_RUNTIME', '在另一 Runtime 追踪读取', '修正作用域所有权'],
+                  ['COLLECTION_DISPOSED', '终态后继续使用', '创建新集合']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '返回 Store Indexed 学习路径', path: 'index' },
+        { label: '错误码参考', path: 'docs/store-indexed/STORE_INDEXED_SOURCE' }
+      ]
+    },
+    en: {
+      title: 'Terminate a collection and recover by error identity',
+      lede: 'dispose releases structure, revision, iteration, and every entry cell. Terminal state cannot revive, and callers branch on source and code.',
+      document: {
+        sections: [
+          {
+            id: 'terminal',
+            heading: 'Place dispose at the collection owner boundary',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'dispose is idempotent and releases every Signal owned by the collection.',
+                  'Reads, writes, snapshots, and prune after terminal state fail with COLLECTION_DISPOSED.',
+                  'clear only makes the collection empty; it does not release reactive infrastructure.',
+                  'A new page, request, or test creates a new collection rather than reviving the old one.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'errors',
+            heading: 'Preserve native error type and stable code',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Code', 'Typical trigger', 'Caller action'],
+                rows: [
+                  ['INVALID_OPTION', 'Invalid iterable, key, or option', 'Correct the input'],
+                  ['INVALID_INDEX', 'Array index is not a finite integer', 'Normalize the index'],
+                  [
+                    'INDEX_OUT_OF_RANGE',
+                    'set targets an absent position',
+                    'Check length or use push'
+                  ],
+                  ['CROSS_RUNTIME', 'Tracked read from another Runtime', 'Fix scope ownership'],
+                  ['COLLECTION_DISPOSED', 'Use after terminal state', 'Create a new collection']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Return to Store Indexed learning paths', path: 'index' },
+        { label: 'Error-code reference', path: 'docs/store-indexed/STORE_INDEXED_SOURCE' }
+      ]
+    }
+  },
+  'store-keyed:index': {
+    zh: {
+      title: 'Store Keyed 学习路径',
+      lede: '同一份状态定义可以在每个 Provider、SSR 请求、测试或会话作用域中拥有独立实例。先理解 Definition 与 AtomStore，再进入 optics、family 和生命周期。',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: '先判断是否真的需要键控定义',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['需求', '入口', '边界'],
+                rows: [
+                  ['一个固定对象的轻量状态', 'Store Light', '不需要 Definition 与 Store 两层'],
+                  [
+                    '同一蓝图在多个作用域各有一份值',
+                    'atomDef + createAtomStore',
+                    'Definition 无状态，实例归 Store'
+                  ],
+                  ['从对象或列表聚焦子状态', 'focusDef / splitDef', '写入仍回到唯一源定义'],
+                  ['按业务 key 惰性产生状态定义', 'familyDef', '缓存 token，不缓存跨作用域值'],
+                  ['React Provider 与 Hook', 'Store React', '本模块不依赖 React 或 DOM']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'path',
+            heading: '按生产决策顺序阅读',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Definition 与 scope：蓝图、实例和 Runtime 分别由谁拥有。',
+                  '派生与写入：只读投影、可写派生和批量写语义。',
+                  'Optics 与列表：保持子定义 identity，同时避免缓存无限增长。',
+                  'Family：强 LRU、弱 canonical identity 与显式 forget。',
+                  '并发预览、override、release 与 Store 终态。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟建立隔离作用域', path: 'getting-started' },
+        { label: 'Definition 与作用域', path: 'definitions-and-scopes' }
+      ]
+    },
+    en: {
+      title: 'Store Keyed learning paths',
+      lede: 'One state definition can own an independent instance in every Provider, SSR request, test, or conversation scope. Learn Definition and AtomStore before optics, families, and lifecycle.',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: 'Decide whether keyed definitions are necessary',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Need', 'Entry', 'Boundary'],
+                rows: [
+                  [
+                    'One fixed lightweight object state',
+                    'Store Light',
+                    'No Definition and Store indirection needed'
+                  ],
+                  [
+                    'One blueprint with a value per scope',
+                    'atomDef + createAtomStore',
+                    'A Definition is stateless; the Store owns instances'
+                  ],
+                  [
+                    'Focused object or list child state',
+                    'focusDef / splitDef',
+                    'Writes still return to one source definition'
+                  ],
+                  [
+                    'Lazy state definitions by business key',
+                    'familyDef',
+                    'Caches tokens, never values across scopes'
+                  ],
+                  [
+                    'React Provider and Hooks',
+                    'Store React',
+                    'This module has no React or DOM dependency'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'path',
+            heading: 'Read in production decision order',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Definitions and scopes: ownership of blueprints, instances, and Runtime.',
+                  'Derivation and writes: readonly projections, writable derivations, and batched writes.',
+                  'Optics and lists: stable child-definition identity without unbounded cache growth.',
+                  'Families: strong LRU, weak canonical identity, and explicit forget.',
+                  'Concurrent preview, overrides, release, and Store terminal state.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Build an isolated scope in five minutes', path: 'getting-started' },
+        { label: 'Definitions and scopes', path: 'definitions-and-scopes' }
+      ]
+    }
+  },
+  'store-keyed:getting-started': {
+    zh: {
+      title: '五分钟建立两个互不串状态的作用域',
+      lede: 'Definition 只描述状态，AtomStore 才把它落到指定 Runtime；同一个 token 在两个 Store 中拥有两份值。',
+      document: {
+        sections: [
+          {
+            id: 'create',
+            heading: '模块顶层定义，作用域边界实例化',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, derivedDef } from '@migaia/store-keyed'\n\nconst countDef = atomDef(0, 'count')\nconst doubledDef = derivedDef((get) => get(countDef) * 2, 'doubled')\n\nconst requestA = createAtomStore(createRuntime())\nconst requestB = createAtomStore(createRuntime())\n\nrequestA.set(countDef, 2)\nconsole.log(requestA.get(doubledDef)) // 4\nconsole.log(requestB.get(doubledDef)) // 0\n\nrequestA.dispose()\nrequestB.dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Definition 可以安全复用；不要为每次 render 重建 token。',
+                  '每个 SSR 请求、测试或独立 root 创建自己的 Runtime 与 AtomStore。',
+                  'get 会追踪依赖；事件处理或快照读取使用 peek。',
+                  '创建 Store 的所有者也负责 dispose。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Definition 与作用域', path: 'definitions-and-scopes' },
+        { label: 'createAtomStore API', path: 'docs/store-keyed/atom-store/createAtomStore' }
+      ]
+    },
+    en: {
+      title: 'Build two state-isolated scopes in five minutes',
+      lede: 'A Definition only describes state. AtomStore realizes it in one Runtime, so the same token owns two independent values in two Stores.',
+      document: {
+        sections: [
+          {
+            id: 'create',
+            heading: 'Define at module scope and instantiate at the scope boundary',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, derivedDef } from '@migaia/store-keyed'\n\nconst countDef = atomDef(0, 'count')\nconst doubledDef = derivedDef((get) => get(countDef) * 2, 'doubled')\n\nconst requestA = createAtomStore(createRuntime())\nconst requestB = createAtomStore(createRuntime())\n\nrequestA.set(countDef, 2)\nconsole.log(requestA.get(doubledDef)) // 4\nconsole.log(requestB.get(doubledDef)) // 0\n\nrequestA.dispose()\nrequestB.dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Definitions are reusable tokens; do not recreate them during every render.',
+                  'Give each SSR request, test, or independent root its own Runtime and AtomStore.',
+                  'get tracks dependencies; use peek for event handlers or snapshot reads.',
+                  'The Store creator also owns disposal.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Definitions and scopes', path: 'definitions-and-scopes' },
+        { label: 'createAtomStore API', path: 'docs/store-keyed/atom-store/createAtomStore' }
+      ]
+    }
+  },
+  'store-keyed:definitions-and-scopes': {
+    zh: {
+      title: '选择 Definition，并明确实例作用域',
+      lede: '静态初值、工厂初值、派生读取和可写派生是四种不同契约；异步值不属于这些同步 Definition。',
+      document: {
+        sections: [
+          {
+            id: 'definitions',
+            heading: '按初值与写入契约选择构造器',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['构造器', '作用', '关键限制'],
+                rows: [
+                  [
+                    'atomDef(init)',
+                    '每个 Store 一份源值',
+                    'thenable 立即拒绝；对象初值按 scope 克隆'
+                  ],
+                  [
+                    'atomDefFactory(create)',
+                    '首次使用时为每个 Store 创建值',
+                    '默认不可用于 speculative preview'
+                  ],
+                  [
+                    'previewSafeAtomDefFactory(create)',
+                    '允许并发渲染预览的工厂',
+                    'create 必须纯、确定且无副作用'
+                  ],
+                  ['derivedDef(read)', '同 Store 内只读派生', '只能通过 get 读取其它 Definition'],
+                  ['writableDef(read, write)', '自定义读写契约', 'write 的参数与返回类型是公开契约']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'store',
+            heading: 'createAtomStore 与 defaultAtomStore 不是同一种所有权',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Provider、SSR 请求和测试应使用 createAtomStore 明确建立隔离边界。defaultAtomStore 按 Runtime 用 WeakMap 复用默认实例，只适合不经过 Provider 的旧式实例 API；旧默认 Store dispose 后，下次读取会创建新实例。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '派生与可写状态', path: 'derived-and-writable-state' },
+        { label: 'atomDef API', path: 'docs/store-keyed/atom-definition/atomDef' }
+      ]
+    },
+    en: {
+      title: 'Choose a Definition and name its instance scope',
+      lede: 'Static initial values, factory values, derived reads, and writable derivations are four distinct contracts. Asynchronous values do not belong in these synchronous Definitions.',
+      document: {
+        sections: [
+          {
+            id: 'definitions',
+            heading: 'Choose a constructor by initialization and write contract',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Constructor', 'Purpose', 'Important limit'],
+                rows: [
+                  [
+                    'atomDef(init)',
+                    'One source value per Store',
+                    'Rejects thenables; clones object initial values per scope'
+                  ],
+                  [
+                    'atomDefFactory(create)',
+                    'Creates a value on first use in each Store',
+                    'Unsafe for speculative preview by default'
+                  ],
+                  [
+                    'previewSafeAtomDefFactory(create)',
+                    'Factory permitted during concurrent preview',
+                    'create must be pure, deterministic, and effect-free'
+                  ],
+                  [
+                    'derivedDef(read)',
+                    'Readonly derivation inside one Store',
+                    'Reads other Definitions only through get'
+                  ],
+                  [
+                    'writableDef(read, write)',
+                    'Custom read and write contract',
+                    'Write arguments and return type are public behavior'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'store',
+            heading: 'createAtomStore and defaultAtomStore express different ownership',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A Provider, SSR request, or test uses createAtomStore for an explicit isolation boundary. defaultAtomStore reuses one default instance per Runtime through a WeakMap and exists for instance-style APIs outside a Provider. After that default Store is disposed, the next lookup creates another.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Derived and writable state', path: 'derived-and-writable-state' },
+        { label: 'atomDef API', path: 'docs/store-keyed/atom-definition/atomDef' }
+      ]
+    }
+  },
+  'store-keyed:derived-and-writable-state': {
+    zh: {
+      title: '组合派生读取、写入与订阅',
+      lede: '依赖只在同一个 AtomStore 内建立；set 保持原 Definition 的写契约，并在 Runtime batch 与 untracked 中执行。',
+      document: {
+        sections: [
+          {
+            id: 'compose',
+            heading: '把业务写操作放进 writableDef',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const profileDef = atomDef({ first: 'Ada', last: 'Lovelace' })\nconst fullNameDef = derivedDef(\n  (get) => `${get(profileDef).first} ${get(profileDef).last}`\n)\nconst renameDef = writableDef(\n  (get) => get(fullNameDef),\n  (get, set, first: string, last: string) => {\n    if (get(fullNameDef) === `${first} ${last}`) return false\n    set(profileDef, { first, last })\n    return true\n  }\n)\n\nstore.set(renameDef, 'Grace', 'Hopper')"
+              },
+              {
+                type: 'list',
+                items: [
+                  'derivedDef 的 equals 默认 Object.is；稳定值语义可传自定义比较器。',
+                  '对只读 derivedDef 调用 set 会立即拒绝，不会偷偷修改依赖。',
+                  'sub 首次只建依赖、不调用 listener；后续异常交给 Runtime reporter。',
+                  'unsubscribe 幂等；isObserved 查询不会为 Definition 建实例。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Optics 与列表拆分', path: 'optics-and-split-lists' },
+        { label: 'writableDef API', path: 'docs/store-keyed/atom-definition/writableDef' }
+      ]
+    },
+    en: {
+      title: 'Compose derived reads, writes, and subscriptions',
+      lede: 'Dependencies exist only inside one AtomStore. set preserves the original Definition write contract and runs through Runtime batch and untracked.',
+      document: {
+        sections: [
+          {
+            id: 'compose',
+            heading: 'Place a business write operation in writableDef',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const profileDef = atomDef({ first: 'Ada', last: 'Lovelace' })\nconst fullNameDef = derivedDef(\n  (get) => `${get(profileDef).first} ${get(profileDef).last}`\n)\nconst renameDef = writableDef(\n  (get) => get(fullNameDef),\n  (get, set, first: string, last: string) => {\n    if (get(fullNameDef) === `${first} ${last}`) return false\n    set(profileDef, { first, last })\n    return true\n  }\n)\n\nstore.set(renameDef, 'Grace', 'Hopper')"
+              },
+              {
+                type: 'list',
+                items: [
+                  'derivedDef uses Object.is by default; pass a comparator for stable value semantics.',
+                  'Calling set on a readonly derivedDef fails immediately instead of mutating dependencies implicitly.',
+                  'sub establishes dependencies without invoking the listener initially; later listener errors go to the Runtime reporter.',
+                  'unsubscribe is idempotent, and isObserved never instantiates a Definition merely to answer.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Optics and split lists', path: 'optics-and-split-lists' },
+        { label: 'writableDef API', path: 'docs/store-keyed/atom-definition/writableDef' }
+      ]
+    }
+  },
+  'store-keyed:optics-and-split-lists': {
+    zh: {
+      title: '用 Optics 聚焦对象并按稳定 key 拆分列表',
+      lede: '子 Definition 是对唯一源状态的视图，不是复制品；读取和写入都回到 source，重排时业务 key identity 保持稳定。',
+      document: {
+        sections: [
+          {
+            id: 'optics',
+            heading: '选择只读投影或可写聚焦',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['入口', '结果', '适用场景'],
+                rows: [
+                  ['selectDef', '只读 derivedDef', '选择一段值并用 equals 抑制无关通知'],
+                  ['focusDef', '路径上的可写 Definition', '一至三层类型安全对象字段'],
+                  [
+                    'opticDef',
+                    '自定义 lens 的可写 Definition',
+                    '非简单 property path 的不可变读写'
+                  ],
+                  ['splitDef', 'items + of/insert/remove/prune', '列表按业务 key 独立订阅与写入']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'split',
+            heading: '长期列表必须同时管理源项与 token 缓存',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const todosDef = atomDef<readonly Todo[]>([])\nconst todos = splitDef(todosDef, (todo) => todo.id)\n\nconst todo42Def = todos.of('42')\ntodos.insert(store, { id: '42', title: 'Ship docs' })\nstore.set(todo42Def, (todo) => ({ ...todo, done: true }))\n\ntodos.remove(store, '42')\nstore.release(todo42Def)\ntodos.prune(store)"
+              },
+              {
+                type: 'list',
+                items: [
+                  '重复 key 在 items 求值时失败；不要用数组 index 代表会重排的业务实体。',
+                  '删除源项后，旧 item Definition 的读写失败，不能返回陈旧值。',
+                  'prune 只清理 split token cache；已实例节点仍需 store.release 或整体 dispose。',
+                  '路径写入执行不可变浅拷贝，并专门阻断 __proto__ 污染。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Family 与缓存 identity', path: 'families-and-cache-identity' },
+        { label: 'splitDef API', path: 'docs/store-keyed/splitDef' }
+      ]
+    },
+    en: {
+      title: 'Focus objects with Optics and split lists by stable key',
+      lede: 'A child Definition is a view over one source state, not a copy. Reads and writes return to the source while business-key identity survives reordering.',
+      document: {
+        sections: [
+          {
+            id: 'optics',
+            heading: 'Choose a readonly projection or writable focus',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Entry', 'Result', 'Use it for'],
+                rows: [
+                  [
+                    'selectDef',
+                    'Readonly derivedDef',
+                    'Select a value and suppress unrelated notifications with equals'
+                  ],
+                  [
+                    'focusDef',
+                    'Writable Definition at a path',
+                    'Type-safe object fields one to three levels deep'
+                  ],
+                  [
+                    'opticDef',
+                    'Writable Definition through a custom lens',
+                    'Immutable reads and writes beyond a simple property path'
+                  ],
+                  [
+                    'splitDef',
+                    'items plus of/insert/remove/prune',
+                    'Independent list-item subscription and writes by business key'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'split',
+            heading: 'A long-lived list owns source items and token cache separately',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const todosDef = atomDef<readonly Todo[]>([])\nconst todos = splitDef(todosDef, (todo) => todo.id)\n\nconst todo42Def = todos.of('42')\ntodos.insert(store, { id: '42', title: 'Ship docs' })\nstore.set(todo42Def, (todo) => ({ ...todo, done: true }))\n\ntodos.remove(store, '42')\nstore.release(todo42Def)\ntodos.prune(store)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Duplicate keys fail when items evaluates; do not use array indexes for reorderable business entities.',
+                  'After removing a source item, reads and writes through its old item Definition fail instead of returning stale state.',
+                  'prune clears only the split token cache; instantiated nodes still need store.release or whole-Store disposal.',
+                  'Path writes perform immutable shallow copies and explicitly block __proto__ pollution.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Families and cache identity', path: 'families-and-cache-identity' },
+        { label: 'splitDef API', path: 'docs/store-keyed/splitDef' }
+      ]
+    }
+  },
+  'store-keyed:families-and-cache-identity': {
+    zh: {
+      title: '按业务 key 建立 Family，并控制缓存 identity',
+      lede: 'Family 缓存无状态 Definition token；同一个 token 在每个 AtomStore 仍有独立值。maxSize 限制强引用，不代表立即破坏 canonical identity。',
+      document: {
+        sections: [
+          {
+            id: 'family',
+            heading: '让 key 选择 Definition，而不是共享实例',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const draftByConversation = familyDef(\n  (conversationId: string) => ({ conversationId, text: '' }),\n  { maxSize: 512, debugLabel: 'draft' }\n)\nconst lengthByConversation = derivedFamilyDef(\n  (conversationId: string) => (get) => get(draftByConversation(conversationId)).text.length,\n  { maxSize: 512, debugLabel: 'draft-length' }\n)\n\nconst draftDef = draftByConversation('conv-42')\nstore.set(draftDef, (draft) => ({ ...draft, text: 'hello' }))"
+              },
+              {
+                type: 'list',
+                items: [
+                  'maxSize 默认 4096，必须是大于零的安全整数。',
+                  '强 LRU 超限后降为 WeakRef；只要 Store 或组件仍持有 token，同 key 仍返回同一 identity。',
+                  'forget 明确破坏某个 key 的 canonical identity；调用前必须停用旧 token。',
+                  'clear 清空 family 缓存，但不会替你 dispose 已实例化的 Store 节点。'
+                ]
+              },
+              {
+                type: 'table',
+                headers: ['输入/选项', '默认值', '契约'],
+                rows: [
+                  [
+                    'key',
+                    '无',
+                    '只接受 string、number、symbol；同 key 在 family 生命周期内解析为 canonical token'
+                  ],
+                  [
+                    'maxSize',
+                    '4096',
+                    '强 LRU 上限；必须是大于零的安全整数，溢出项降为弱 canonical 引用'
+                  ],
+                  [
+                    'debugLabel',
+                    'family / derived-family',
+                    '拼接 key 形成 Definition 诊断名，不参与 identity'
+                  ],
+                  [
+                    'WeakRef + FinalizationRegistry',
+                    '宿主能力',
+                    '缺失时创建 family 以 ENV_UNSUPPORTED 失败，不退化为无界强缓存'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'family.size 只统计当前强 LRU，不代表所有仍被 Store 持有的 token 数。forget/clear 只改变后续 lookup 的 token 缓存；旧 token 已经实例化的值仍由各自 AtomStore 拥有，必须通过 store.release 或 store.dispose 清理。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '并发 Preview 与 Override', path: 'preview-and-overrides' },
+        { label: 'familyDef API', path: 'docs/store-keyed/familyDef' }
+      ]
+    },
+    en: {
+      title: 'Build a family by business key and control cache identity',
+      lede: 'A family caches stateless Definition tokens. The same token still owns an independent value in every AtomStore. maxSize bounds strong retention without immediately breaking canonical identity.',
+      document: {
+        sections: [
+          {
+            id: 'family',
+            heading: 'Let the key choose a Definition, not a shared instance',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const draftByConversation = familyDef(\n  (conversationId: string) => ({ conversationId, text: '' }),\n  { maxSize: 512, debugLabel: 'draft' }\n)\nconst lengthByConversation = derivedFamilyDef(\n  (conversationId: string) => (get) => get(draftByConversation(conversationId)).text.length,\n  { maxSize: 512, debugLabel: 'draft-length' }\n)\n\nconst draftDef = draftByConversation('conv-42')\nstore.set(draftDef, (draft) => ({ ...draft, text: 'hello' }))"
+              },
+              {
+                type: 'list',
+                items: [
+                  'maxSize defaults to 4096 and must be a positive safe integer.',
+                  'Strong LRU overflow falls back to WeakRef; while a Store or component retains a token, the same key still resolves to that identity.',
+                  'forget deliberately breaks canonical identity for one key, so stop using the old token first.',
+                  'clear empties family caches but does not dispose nodes already instantiated by a Store.'
+                ]
+              },
+              {
+                type: 'table',
+                headers: ['Input or option', 'Default', 'Contract'],
+                rows: [
+                  [
+                    'key',
+                    'none',
+                    'Accepts string, number, or symbol; one key resolves to its canonical token during the family lifetime'
+                  ],
+                  [
+                    'maxSize',
+                    '4096',
+                    'Strong LRU bound; a positive safe integer, with overflow demoted to weak canonical references'
+                  ],
+                  [
+                    'debugLabel',
+                    'family / derived-family',
+                    'Combines with the key for Definition diagnostics and never participates in identity'
+                  ],
+                  [
+                    'WeakRef + FinalizationRegistry',
+                    'host capability',
+                    'Missing support fails creation with ENV_UNSUPPORTED instead of degrading to an unbounded strong cache'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'family.size counts only the current strong LRU and not every token still retained by a Store. forget and clear change the token cache used by later lookups. Values already instantiated from an old token remain owned by each AtomStore and require store.release or store.dispose.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Concurrent preview and overrides', path: 'preview-and-overrides' },
+        { label: 'familyDef API', path: 'docs/store-keyed/familyDef' }
+      ]
+    }
+  },
+  'store-keyed:preview-and-overrides': {
+    zh: {
+      title: '在并发预览和测试替换中保持契约',
+      lede: 'preview 是指定 Runtime version 内的临时读取；override 只重路由 Definition，不改变原调用点承诺的写契约。',
+      document: {
+        sections: [
+          {
+            id: 'preview',
+            heading: '只有纯工厂才能在 speculative preview 中执行',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '已有实例时 preview 等价于非追踪 peek。',
+                  '未实例化值只在当前 Runtime version 内缓存；未提交时一个 microtask 后丢弃。',
+                  '普通 atomDefFactory 默认拒绝 preview，避免被放弃的渲染产生真实副作用。',
+                  '循环预览立即失败，不返回半计算值。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'override',
+            heading: '替换实现而不改变写能力',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const undo = store.override(\n  remoteUserDef,\n  atomDef({ id: 'test-user', role: 'admin' })\n)\n\ntry {\n  runScenario(store)\n} finally {\n  undo()\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  '只读 Definition 可路由到任意同值 Definition。',
+                  'primitive 只能替换为 primitive；writable-derived 必须保持 Args 与 Result 契约。',
+                  'override 可分层叠加，撤销只移除自己那一层并清空 preview cache。',
+                  '循环 override 失败；撤销不会删除替换期间积累的实例状态。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '释放与终态', path: 'release-and-disposal' },
+        {
+          label: 'preview-safe factory API',
+          path: 'docs/store-keyed/atom-definition/previewSafeAtomDefFactory'
+        }
+      ]
+    },
+    en: {
+      title: 'Preserve contracts during concurrent preview and test replacement',
+      lede: 'preview is a provisional read within one Runtime version. override reroutes a Definition without changing the write contract promised by the original call site.',
+      document: {
+        sections: [
+          {
+            id: 'preview',
+            heading: 'Only a pure factory may run during speculative preview',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'When an instance exists, preview behaves like untracked peek.',
+                  'A not-yet-instantiated value is cached only in the current Runtime version and discarded after one microtask if never committed.',
+                  'A regular atomDefFactory rejects preview so abandoned rendering cannot perform real effects.',
+                  'Circular preview fails immediately instead of exposing a partial value.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'override',
+            heading: 'Replace an implementation without changing write capability',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const undo = store.override(\n  remoteUserDef,\n  atomDef({ id: 'test-user', role: 'admin' })\n)\n\ntry {\n  runScenario(store)\n} finally {\n  undo()\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'A readonly Definition may route to any same-value Definition.',
+                  'A primitive replaces only a primitive; a writable-derived replacement preserves Args and Result.',
+                  'Overrides stack, and undo removes only its layer while clearing provisional preview cache.',
+                  'A cyclic override fails, while undo leaves state instantiated during replacement intact.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Release and terminal state', path: 'release-and-disposal' },
+        {
+          label: 'preview-safe factory API',
+          path: 'docs/store-keyed/atom-definition/previewSafeAtomDefFactory'
+        }
+      ]
+    }
+  },
+  'store-keyed:release-and-disposal': {
+    zh: {
+      title: '释放单个 Definition 或终止整个 AtomStore',
+      lede: 'release 是局部缓存回收，dispose 是作用域终态。两者不能代替 family 或 split 自己的 token-cache 清理。',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: '按所有权层级选择清理动作',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['动作', '清理对象', '不会做什么'],
+                rows: [
+                  [
+                    'store.release(def)',
+                    '该 Store 中原始与 override 目标实例',
+                    '不删除 Definition token'
+                  ],
+                  ['split.prune(store)', '已不在源列表中的 item token cache', '不释放 Store 实例'],
+                  ['family.forget/clear', 'family 的 canonical token cache', '不释放任何 Store'],
+                  ['store.dispose()', '整个作用域全部实例与依赖边', '不可复活同一个 Store']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'terminal',
+            heading: 'dispose 逆序释放并保持错误可见',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'dispose 幂等，并按实例创建的逆序释放。',
+                  '多项释放失败聚合为 AggregateError，而不是只保留最后一个。',
+                  'disposed 后 get、peek、preview、set、sub、override、release 都拒绝。',
+                  '要开始新请求或新 root，创建新的 Runtime 与 AtomStore。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '返回 Store Keyed 学习路径', path: 'index' },
+        { label: 'AtomStore 参考', path: 'docs/store-keyed/atom-store' }
+      ]
+    },
+    en: {
+      title: 'Release one Definition or terminate the whole AtomStore',
+      lede: 'release is local instance-cache collection, while dispose is scope terminal state. Neither replaces the token-cache cleanup owned by a family or split list.',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: 'Choose cleanup at the owning layer',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Action', 'What it cleans', 'What it does not do'],
+                rows: [
+                  [
+                    'store.release(def)',
+                    'Original and override-target instances in this Store',
+                    'Does not delete a Definition token'
+                  ],
+                  [
+                    'split.prune(store)',
+                    'Item-token cache entries absent from the source list',
+                    'Does not release Store instances'
+                  ],
+                  [
+                    'family.forget/clear',
+                    'Family canonical token cache',
+                    'Does not dispose any Store'
+                  ],
+                  [
+                    'store.dispose()',
+                    'Every instance and dependency edge in the scope',
+                    'Cannot revive the same Store'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'terminal',
+            heading: 'dispose releases in reverse order and keeps failures visible',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'dispose is idempotent and releases instances in reverse creation order.',
+                  'Multiple release failures become an AggregateError instead of retaining only the last one.',
+                  'After disposal, get, peek, preview, set, sub, override, and release all reject.',
+                  'Create a new Runtime and AtomStore for a new request or root.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Return to Store Keyed learning paths', path: 'index' },
+        { label: 'AtomStore reference', path: 'docs/store-keyed/atom-store' }
+      ]
+    }
+  },
+  'store-light:index': {
+    zh: {
+      title: 'Store Light 学习路径',
+      lede: '对象字段、getter 和方法构成轻量响应式 facade；异步值使用独立 StoreResource。先选择状态模型，再组合持久化、UI 或其他适配层。',
+      document: {
+        sections: [
+          {
+            id: 'choose-model',
+            heading: '先判断数据是否适合对象 Store',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['需求', '入口', '边界'],
+                rows: [
+                  ['中小型对象状态', 'createStore', '普通字段、computed getter、action 方法'],
+                  ['含异步 FieldBuilder', 'createAsyncStore', '返回时所有字段已 ready'],
+                  ['Suspense 安全异步值', 'createStoreResource', '独立请求/版本/持有者状态机'],
+                  ['高频列表增删', 'Indexed Store', '不要用对象字段模拟集合索引'],
+                  ['稳定业务 key 寻址', 'Keyed Store', '不要把动态 key 塞进对象 shape']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'flow',
+            heading: '沿一条生产动线阅读',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '对象模型：字段如何映射为 Signal、Computed 与 Action。',
+                  'Readiness：同步、异步与 legacy 创建入口如何选择。',
+                  '快照和 hydration：区分完整读取与可持久化字段。',
+                  '扩展协议：FieldBuilder、runtime 隔离与 mutation policy。',
+                  '异步资源：Suspense、版本 lease、capture 和确定性释放。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟创建对象 Store', path: 'getting-started' },
+        { label: '对象 Store 模型', path: 'object-store-model' }
+      ]
+    },
+    en: {
+      title: 'Store Light learning paths',
+      lede: 'Object fields, getters, and methods form a lightweight reactive facade, while asynchronous values use an independent StoreResource. Choose the state model before adding persistence, UI, or another adapter.',
+      document: {
+        sections: [
+          {
+            id: 'choose-model',
+            heading: 'Decide whether the data fits an object Store',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Need', 'Entry', 'Boundary'],
+                rows: [
+                  [
+                    'Small or medium object state',
+                    'createStore',
+                    'Plain fields, computed getters, and action methods'
+                  ],
+                  [
+                    'Asynchronous FieldBuilder present',
+                    'createAsyncStore',
+                    'All fields are ready when it resolves'
+                  ],
+                  [
+                    'Suspense-safe asynchronous value',
+                    'createStoreResource',
+                    'Independent request, version, and holder state machine'
+                  ],
+                  [
+                    'High-frequency list insertion and removal',
+                    'Indexed Store',
+                    'Do not imitate collection indexes with object fields'
+                  ],
+                  [
+                    'Stable business-key addressing',
+                    'Keyed Store',
+                    'Do not place dynamic keys in an object shape'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'flow',
+            heading: 'Follow one production reading path',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Object model: how fields map to Signal, Computed, and Action.',
+                  'Readiness: choose synchronous, asynchronous, or legacy creation.',
+                  'Snapshots and hydration: separate complete reads from persistable fields.',
+                  'Extension protocol: FieldBuilder, runtime isolation, and mutation policy.',
+                  'Async resources: Suspense, version leases, captures, and deterministic release.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Create an object Store in five minutes', path: 'getting-started' },
+        { label: 'Object Store model', path: 'object-store-model' }
+      ]
+    }
+  },
+  'store-light:getting-started': {
+    zh: {
+      title: '五分钟创建、订阅并释放对象 Store',
+      lede: '普通字段自动响应式，getter 惰性缓存，方法自动 batch；创建者负责订阅 disposer 与 Store 终态。',
+      document: {
+        sections: [
+          {
+            id: 'create',
+            heading: '直接描述业务对象',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createStore } from '@migaia/store-light'\n\nconst counter = createStore({\n  count: 0,\n  get doubled() {\n    return this.count * 2\n  },\n  increment() {\n    this.count += 1\n  }\n})\n\nconst unsubscribe = counter.$subscribe(\n  () => console.log(counter.$snapshot()),\n  { fireImmediately: true }\n)\n\ntry {\n  counter.increment()\n} finally {\n  unsubscribe()\n  await counter.$dispose()\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  '普通 count 是可读写 Signal；doubled 是只读 Computed。',
+                  'increment 是 Action，方法体自动进入 batch 与 untracked。',
+                  '$subscribe 粗粒度追踪可写字段，不为订阅主动求值全部 computed。',
+                  '$dispose 幂等；终态后所有字段和方法统一失败。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '对象 Store 模型', path: 'object-store-model' },
+        { label: 'createStore API', path: 'docs/store-light/createStore' }
+      ]
+    },
+    en: {
+      title: 'Create, subscribe to, and dispose an object Store in five minutes',
+      lede: 'Plain fields become reactive, getters cache lazily, and methods batch automatically. The creator owns the subscription disposer and Store terminal state.',
+      document: {
+        sections: [
+          {
+            id: 'create',
+            heading: 'Describe the business object directly',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createStore } from '@migaia/store-light'\n\nconst counter = createStore({\n  count: 0,\n  get doubled() {\n    return this.count * 2\n  },\n  increment() {\n    this.count += 1\n  }\n})\n\nconst unsubscribe = counter.$subscribe(\n  () => console.log(counter.$snapshot()),\n  { fireImmediately: true }\n)\n\ntry {\n  counter.increment()\n} finally {\n  unsubscribe()\n  await counter.$dispose()\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Plain count is a writable Signal while doubled is a readonly Computed.',
+                  'increment is an Action whose body automatically enters batch and untracked.',
+                  '$subscribe coarsely tracks writable fields without eagerly evaluating every computed value.',
+                  '$dispose is idempotent and every field or method fails consistently after terminal state.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Object Store model', path: 'object-store-model' },
+        { label: 'createStore API', path: 'docs/store-light/createStore' }
+      ]
+    }
+  },
+  'store-light:object-store-model': {
+    zh: {
+      title: '理解字段、Computed、Action 与 raw',
+      lede: 'Store 按 property descriptor 分类 shape；函数默认是 Action，需要把函数作为普通可写值时必须显式 raw。',
+      document: {
+        sections: [
+          {
+            id: 'classification',
+            heading: '每一种输入形状只有一个含义',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['输入', '运行时节点', '公开行为'],
+                rows: [
+                  ['普通值', 'Signal', '可读写并建立依赖'],
+                  ['get accessor', 'Computed', '惰性缓存、自动追踪、只读'],
+                  ['普通方法', 'Action', '绑定 Store this，自动 batch + untracked'],
+                  ['raw(value)', 'Signal-like 原样字段', '函数也作为可替换值保存'],
+                  ['FieldBuilder', '自定义字段', '由 builder 返回具体 field source']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'actions',
+            heading: '异步 Action 只自动覆盖首个 await 之前',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const store = createStore(\n  {\n    status: 'idle',\n    async refresh() {\n      this.status = 'loading'\n      const next = await loadStatus()\n      this.$batch((draft) => {\n        draft.status = next\n      })\n    }\n  },\n  { warnAsyncActions: true }\n)"
+              },
+              {
+                type: 'paragraph',
+                text: 'Action 的同步前半段自动 batch；await 后的新 continuation 不再属于原 action。用 $batch 或另一 action 显式包住后续写入。$batch 不是事务，recipe 抛错不会回滚已经发生的写。'
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: '在创建边界固定 Runtime 与写入策略',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['选项', '默认值', '何时配置'],
+                rows: [
+                  [
+                    'runtime',
+                    'defaultRuntime',
+                    'SSR 请求、测试或独立 root 需要隔离响应式图时传入专用 Runtime'
+                  ],
+                  [
+                    'debugName',
+                    'Store',
+                    '需要在节点诊断与 mutation 错误中定位 Store 时设置稳定名称'
+                  ],
+                  [
+                    'warnAsyncActions',
+                    'false',
+                    '迁移期检查 await 后未重新进入 $batch/action 的写入'
+                  ],
+                  [
+                    'mutationPolicy',
+                    'undefined',
+                    '需要 action-only 或自定义准入时，同时提供 assertMutationAllowed 与 runInAction'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '四个选项在创建时读取一次。runtime 决定全部 Signal、Computed、FieldBuilder 与 owned resource 的归属；不能用 debugName 代替 identity，也不能让 mutationPolicy 绕过 $set、$hydrate 或自定义 field source。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '异步字段与 Readiness', path: 'async-fields-and-readiness' },
+        { label: 'raw API', path: 'docs/store-light/raw' }
+      ]
+    },
+    en: {
+      title: 'Understand fields, Computed values, Actions, and raw',
+      lede: 'The Store classifies a shape by property descriptor. A function is an Action by default, so wrap it in raw when the function itself is an ordinary writable value.',
+      document: {
+        sections: [
+          {
+            id: 'classification',
+            heading: 'Every input shape has one meaning',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Input', 'Runtime node', 'Public behavior'],
+                rows: [
+                  ['Plain value', 'Signal', 'Writable and dependency-tracked'],
+                  ['get accessor', 'Computed', 'Lazy, tracked, cached, and readonly'],
+                  ['Plain method', 'Action', 'Store-bound this with automatic batch and untracked'],
+                  [
+                    'raw(value)',
+                    'Signal-like raw field',
+                    'Stores even a function as a replaceable value'
+                  ],
+                  ['FieldBuilder', 'Custom field', 'Builder returns the concrete field source']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'actions',
+            heading: 'An async Action is automatic only before its first await',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const store = createStore(\n  {\n    status: 'idle',\n    async refresh() {\n      this.status = 'loading'\n      const next = await loadStatus()\n      this.$batch((draft) => {\n        draft.status = next\n      })\n    }\n  },\n  { warnAsyncActions: true }\n)"
+              },
+              {
+                type: 'paragraph',
+                text: 'The synchronous prefix of an Action batches automatically. A continuation after await no longer belongs to the original Action, so wrap later writes in $batch or another Action. $batch is not a transaction and does not roll back writes when its recipe throws.'
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: 'Fix Runtime and write policy at creation',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Option', 'Default', 'Configure it when'],
+                rows: [
+                  [
+                    'runtime',
+                    'defaultRuntime',
+                    'An SSR request, test, or independent root needs an isolated reactive graph'
+                  ],
+                  [
+                    'debugName',
+                    'Store',
+                    'Node diagnostics and mutation failures need a stable Store label'
+                  ],
+                  [
+                    'warnAsyncActions',
+                    'false',
+                    'Migration must reveal writes after await that did not re-enter $batch or an Action'
+                  ],
+                  [
+                    'mutationPolicy',
+                    'undefined',
+                    'Action-only or custom admission is required; provide both assertMutationAllowed and runInAction'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'All four options are read once during creation. runtime owns every Signal, Computed, FieldBuilder, and owned resource. debugName is not identity, and mutationPolicy must also cover $set, $hydrate, and custom field sources.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Async fields and readiness', path: 'async-fields-and-readiness' },
+        { label: 'raw API', path: 'docs/store-light/raw' }
+      ]
+    }
+  },
+  'store-light:async-fields-and-readiness': {
+    zh: {
+      title: '选择同步、异步或 Legacy Store 创建入口',
+      lede: 'FieldBuilder.mode 决定创建路径；新代码应在返回 Store 前关闭 readiness，而不是暴露半初始化对象。',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: '按 Builder 模式选择入口',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['入口', '接受字段', '返回'],
+                rows: [
+                  [
+                    'createStore / createStoreSync',
+                    '普通字段与 mode:sync Builder',
+                    '立即返回 ready Store'
+                  ],
+                  [
+                    'createAsyncStore',
+                    'sync、async 与 legacy Builder',
+                    'Promise resolve 后全部 ready'
+                  ],
+                  ['createLegacyStore', '所有 Builder', '可能返回 pending Store，需 storeReady'],
+                  ['storeReady', '异步 Store', '同一个初始化 Promise']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'failure',
+            heading: '初始化失败必须收敛为终态',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'createStore 在任何 I/O 前拒绝非同步 Builder，错误为 SYNC_FIELD_REQUIRED。',
+                  '异步任一字段失败会 abort 其余初始化并释放已创建资源。',
+                  '初始化与 rollback 同时失败时使用 INIT_AND_CLEANUP_FAILED，主失败仍可达。',
+                  'pending/failed 字段访问为 STORE_NOT_READY，不返回部分值。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '快照与 Hydration', path: 'snapshots-and-hydration' },
+        { label: 'createAsyncStore API', path: 'docs/store-light/createAsyncStore' }
+      ]
+    },
+    en: {
+      title: 'Choose synchronous, asynchronous, or legacy Store creation',
+      lede: 'FieldBuilder.mode determines the creation path. New code closes readiness before returning a Store instead of exposing a partially initialized object.',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: 'Choose an entry from Builder mode',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Entry', 'Accepted fields', 'Return'],
+                rows: [
+                  [
+                    'createStore / createStoreSync',
+                    'Plain fields and mode:sync Builders',
+                    'Ready Store immediately'
+                  ],
+                  [
+                    'createAsyncStore',
+                    'sync, async, and legacy Builders',
+                    'All fields ready when Promise resolves'
+                  ],
+                  ['createLegacyStore', 'Every Builder', 'May return pending; use storeReady'],
+                  ['storeReady', 'Asynchronous Store', 'The same initialization Promise']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'failure',
+            heading: 'Initialization failure must converge to terminal state',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'createStore rejects a non-sync Builder before any I/O with SYNC_FIELD_REQUIRED.',
+                  'Failure of any async field aborts remaining initialization and releases created resources.',
+                  'When initialization and rollback both fail, INIT_AND_CLEANUP_FAILED keeps the primary reachable.',
+                  'Access to pending or failed fields throws STORE_NOT_READY instead of returning a partial value.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Snapshots and hydration', path: 'snapshots-and-hydration' },
+        { label: 'createAsyncStore API', path: 'docs/store-light/createAsyncStore' }
+      ]
+    }
+  },
+  'store-light:snapshots-and-hydration': {
+    zh: {
+      title: '区分完整快照、持久化数据与宽松 Hydration',
+      lede: '$snapshot 读取当前完整公开值，$plain 只输出适合持久化的标量字段，$hydrate 只写回可写 Signal。',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: '不要用一个快照承担所有用途',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['API', '包含', '适用场景'],
+                rows: [
+                  ['$snapshot()', 'Signal、Computed 与自定义字段值', '调试、一次性完整读取'],
+                  ['$plain()', '可持久化标量 Signal', '序列化与缓存'],
+                  ['$set(patch)', '编译期可写字段', '受信任的程序内批量赋值'],
+                  ['$hydrate(data)', '运行期识别的 Signal 字段', '外部持久化恢复']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'hydrate',
+            heading: '显式处理未知字段',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const persisted = JSON.parse(saved)\n\nstore.$hydrate(persisted, {\n  unknown: 'report',\n  onUnknown: (key) => reportMigrationField(key)\n})\n\nconst nextSaved = JSON.stringify(store.$plain())"
+              },
+              {
+                type: 'list',
+                items: [
+                  'ignore 适合向前兼容，report 适合迁移观测，strict 适合强契约。',
+                  '$snapshot 要求异步字段 ready；$plain 不依赖异步字段。',
+                  '$set 和 $hydrate 都按 batch 通知，但不会写 computed、method 或不可写字段。'
+                ]
+              },
+              {
+                type: 'table',
+                headers: ['unknown', 'onUnknown', '结果'],
+                rows: [
+                  ['ignore（默认）', '不调用', '跳过所有未知、computed、method 与自定义字段'],
+                  ['report', '每个未知 key 调用一次', '报告后仍批量写入全部已知 Signal'],
+                  ['strict', '不调用', '首个未知 key 以 INVALID_OPTION 失败，任何字段都不写入']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'FieldBuilder 与 Mutation', path: 'field-builders-and-mutation' },
+        { label: 'createStore API', path: 'docs/store-light/createStore' }
+      ]
+    },
+    en: {
+      title: 'Separate complete snapshots, persisted data, and tolerant hydration',
+      lede: '$snapshot reads the complete public value, $plain emits only persistable scalar fields, and $hydrate writes only recognized writable Signals.',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: 'Do not make one snapshot serve every purpose',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['API', 'Contains', 'Use it for'],
+                rows: [
+                  [
+                    '$snapshot()',
+                    'Signal, Computed, and custom-field values',
+                    'Debugging and one complete read'
+                  ],
+                  ['$plain()', 'Persistable scalar Signals', 'Serialization and cache'],
+                  [
+                    '$set(patch)',
+                    'Compile-time writable fields',
+                    'Trusted in-process bulk assignment'
+                  ],
+                  [
+                    '$hydrate(data)',
+                    'Runtime-recognized Signal fields',
+                    'External persistence restore'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'hydrate',
+            heading: 'Handle unknown fields explicitly',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const persisted = JSON.parse(saved)\n\nstore.$hydrate(persisted, {\n  unknown: 'report',\n  onUnknown: (key) => reportMigrationField(key)\n})\n\nconst nextSaved = JSON.stringify(store.$plain())"
+              },
+              {
+                type: 'list',
+                items: [
+                  'ignore supports forward compatibility, report supports migration observation, and strict enforces a hard contract.',
+                  '$snapshot requires async fields to be ready while $plain does not depend on them.',
+                  '$set and $hydrate batch notifications but never write computed values, methods, or non-writable fields.'
+                ]
+              },
+              {
+                type: 'table',
+                headers: ['unknown', 'onUnknown', 'Result'],
+                rows: [
+                  [
+                    'ignore (default)',
+                    'not called',
+                    'Skips every unknown, computed, method, and custom field'
+                  ],
+                  [
+                    'report',
+                    'called once per unknown key',
+                    'Reports, then batch-writes every recognized Signal'
+                  ],
+                  [
+                    'strict',
+                    'not called',
+                    'Fails on the first unknown key with INVALID_OPTION and writes nothing'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'FieldBuilder and mutation', path: 'field-builders-and-mutation' },
+        { label: 'createStore API', path: 'docs/store-light/createStore' }
+      ]
+    }
+  },
+  'store-light:field-builders-and-mutation': {
+    zh: {
+      title: '扩展 FieldBuilder，并保持 Runtime 与写入边界',
+      lede: 'FieldBuilder 是自定义字段的唯一扩展协议；它必须把节点与资源交给当前 context，而不是建立平行生命周期。',
+      document: {
+        sections: [
+          {
+            id: 'builder',
+            heading: '声明同步或异步构造模式',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const customField = {\n  [FIELD_BUILDER]: true,\n  mode: StoreFieldMode.sync,\n  create(context) {\n    const source = createFieldSource(context.runtime)\n    context.own(source)\n    return source\n  }\n}'
+              },
+              {
+                type: 'list',
+                items: [
+                  'mode:sync 才能进入 createStore；async Builder 使用 createAsyncStore。',
+                  'context.runtime 是节点唯一 Runtime，跨 Runtime 资源在 $own 时拒绝。',
+                  'context.own 绑定清理；Builder 构造失败仍由 Store rollback 已登记资源。',
+                  'FIELD_BUILDER 是品牌，不用于运行时分支之外的业务身份。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'mutation',
+            heading: '用 mutationPolicy 统一写入准入',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'mutationPolicy 可以要求 action-only 或自定义 guard。普通字段写、$set、$hydrate 与自定义 field source 都必须走同一策略；不要在 Builder 中绕过 guard。SSR、测试和多 root 使用独立 runtime，避免响应式节点串状态。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'StoreResource 与 Suspense', path: 'resources-and-suspense' },
+        { label: 'isFieldBuilder API', path: 'docs/store-light/isFieldBuilder' }
+      ]
+    },
+    en: {
+      title: 'Extend FieldBuilder while preserving Runtime and mutation boundaries',
+      lede: 'FieldBuilder is the sole custom-field extension protocol. It hands nodes and resources to the current context instead of creating a parallel lifecycle.',
+      document: {
+        sections: [
+          {
+            id: 'builder',
+            heading: 'Declare synchronous or asynchronous construction mode',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const customField = {\n  [FIELD_BUILDER]: true,\n  mode: StoreFieldMode.sync,\n  create(context) {\n    const source = createFieldSource(context.runtime)\n    context.own(source)\n    return source\n  }\n}'
+              },
+              {
+                type: 'list',
+                items: [
+                  'Only mode:sync enters createStore; an async Builder uses createAsyncStore.',
+                  'context.runtime is the single Runtime for the node, and $own rejects cross-Runtime resources.',
+                  'context.own binds cleanup; Store rollback still releases registered resources when Builder construction fails.',
+                  'FIELD_BUILDER is a brand and not a business identity beyond runtime recognition.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'mutation',
+            heading: 'Use mutationPolicy for one write-admission path',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'mutationPolicy may require action-only writes or a custom guard. Plain-field writes, $set, $hydrate, and a custom field source all follow the same policy; a Builder must not bypass it. Use an isolated runtime for SSR requests, tests, and independent roots to prevent reactive state leakage.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'StoreResource and Suspense', path: 'resources-and-suspense' },
+        { label: 'isFieldBuilder API', path: 'docs/store-light/isFieldBuilder' }
+      ]
+    }
+  },
+  'store-light:resources-and-suspense': {
+    zh: {
+      title: '用 StoreResource 建立 Suspense 安全异步值',
+      lede: 'StoreResource 独立于对象 facade：preload 启动请求，read 在 loading 时抛同一个 Promise，ready 返回值，failed 抛错误。',
+      document: {
+        sections: [
+          {
+            id: 'create',
+            heading: '把请求取消和错误观察放进资源',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const user = createStoreResource(\n  async ({ signal }) => {\n    const response = await fetch('/api/user', { signal })\n    return response.json()\n  },\n  {\n    keepAliveMs: 30_000,\n    onError: (error, phase) => report(error, phase),\n    onTerminal: () => reportTerminal()\n  }\n)\n\nuser.preload()\nconst value = user.read()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'idle 首次 preload/read 启动一次 load；loading 的 read 抛稳定 Promise。',
+                  'dispose callback 存在时，值必须有引用 identity，原始值以 IDENTITY_REQUIRED 拒绝。',
+                  'keepAliveMs 只在没有 lease 或 capture 时开始倒计时。',
+                  'onError 分别观察 load、dispose、listener，不能吞掉失败。'
+                ]
+              },
+              {
+                type: 'table',
+                headers: ['选项', '默认值', '所有权语义'],
+                rows: [
+                  [
+                    'keepAliveMs',
+                    '1000 ms',
+                    '最后一个 lease/capture 释放后保留 ready 版本的缓存 TTL'
+                  ],
+                  [
+                    'dispose',
+                    '自动探测 value.$dispose',
+                    '显式 callback 优先；存在时 value 必须有引用 identity'
+                  ],
+                  [
+                    'onError',
+                    '无回调',
+                    '观察 load、dispose、listener；reporter 自身失败进入 host 诊断，不改变状态'
+                  ],
+                  ['onTerminal', '无回调', '物理清理完成并进入最终 disposed 后调用一次']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'scope',
+            heading: '用 Resource Scope 统一终止',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'createStoreResourceScope.resource 创建并登记资源；scope.dispose 强制释放组内所有资源，不等待持有者，适合请求、页面或测试 root 关闭。它不是普通 cache eviction，应只由 scope owner 调用。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '版本与生命周期', path: 'resource-versions-and-lifecycle' },
+        { label: 'createStoreResource API', path: 'docs/store-light/createStoreResource' }
+      ]
+    },
+    en: {
+      title: 'Build a Suspense-safe asynchronous value with StoreResource',
+      lede: 'StoreResource is independent of the object facade. preload begins work; read throws the same Promise while loading, returns the value when ready, and throws the error when failed.',
+      document: {
+        sections: [
+          {
+            id: 'create',
+            heading: 'Place request cancellation and error observation in the resource',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const user = createStoreResource(\n  async ({ signal }) => {\n    const response = await fetch('/api/user', { signal })\n    return response.json()\n  },\n  {\n    keepAliveMs: 30_000,\n    onError: (error, phase) => report(error, phase),\n    onTerminal: () => reportTerminal()\n  }\n)\n\nuser.preload()\nconst value = user.read()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'The first preload or read in idle starts one load; read throws a stable Promise while loading.',
+                  'When a dispose callback exists, the value needs reference identity; primitives fail with IDENTITY_REQUIRED.',
+                  'keepAliveMs begins only when no lease or capture remains.',
+                  'onError observes load, dispose, and listener phases instead of swallowing failures.'
+                ]
+              },
+              {
+                type: 'table',
+                headers: ['Option', 'Default', 'Ownership semantic'],
+                rows: [
+                  [
+                    'keepAliveMs',
+                    '1000 ms',
+                    'Cache TTL for a ready version after the final lease or capture releases'
+                  ],
+                  [
+                    'dispose',
+                    'auto-detect value.$dispose',
+                    'An explicit callback wins and requires reference identity'
+                  ],
+                  [
+                    'onError',
+                    'no callback',
+                    'Observes load, dispose, and listener; reporter failure reaches host diagnostics without changing state'
+                  ],
+                  [
+                    'onTerminal',
+                    'no callback',
+                    'Runs once after physical cleanup reaches final disposed state'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'scope',
+            heading: 'Terminate a group through Resource Scope',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'createStoreResourceScope.resource creates and registers a resource. scope.dispose force-releases every resource without waiting for holders, fitting request, page, or test-root shutdown. It is not ordinary cache eviction and only the scope owner calls it.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Versions and lifecycle', path: 'resource-versions-and-lifecycle' },
+        { label: 'createStoreResource API', path: 'docs/store-light/createStoreResource' }
+      ]
+    }
+  },
+  'store-light:resource-versions-and-lifecycle': {
+    zh: {
+      title: '管理 Resource 版本、Capture 与终态',
+      lede: 'lease 保护已提交消费者，capture 保护渲染阶段的 provisional 版本；两者都结束后才允许 keep-alive 回收。',
+      document: {
+        sections: [
+          {
+            id: 'holders',
+            heading: '区分稳定持有与 provisional capture',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['机制', '用途', '结束方式'],
+                rows: [
+                  ['retainResource', '持有当前资源语义', '调用 disposer'],
+                  ['retainVersion', '持有指定可见版本', '调用 disposer'],
+                  ['captureVersion', '渲染阶段暂时保护版本', 'commitCapture 或 discard/过期'],
+                  ['commitCapture', '把有效 capture 转为稳定持有', '返回的 lease disposer']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'capture',
+            heading: 'Capture token 只能提交一次',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '未知版本以 UNKNOWN_VERSION 失败，从当前 snapshot 重新取得版本。',
+                  '无效、外来或已消费 token 以 CAPTURE_INVALID 失败。',
+                  'provisional capture 默认约 4 秒未提交即视为放弃，避免渲染中断永久保活。',
+                  '新版本 ready 后旧版本进入 retired/stale，直到其最后持有者释放。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'terminal',
+            heading: 'closing 与 disposed 都不可复活',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'forceDispose/scope.dispose 进入 closing，等待在途 load 与值 disposer 后到 disposed；whenTerminal 提供稳定终态 Promise。终态后的 preload、retry、retain 和 capture 统一以 RESOURCE_DISPOSED 失败，应创建新资源。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '返回 Store Light 学习路径', path: 'index' },
+        { label: 'StoreResourceKind API', path: 'docs/store-light/StoreResourceKind' }
+      ]
+    },
+    en: {
+      title: 'Manage Resource versions, captures, and terminal state',
+      lede: 'A lease protects a committed consumer while a capture protects a provisional render version. Keep-alive collection begins only after both are gone.',
+      document: {
+        sections: [
+          {
+            id: 'holders',
+            heading: 'Separate stable retention from provisional capture',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Mechanism', 'Purpose', 'Completion'],
+                rows: [
+                  ['retainResource', 'Retain current resource semantics', 'Call its disposer'],
+                  ['retainVersion', 'Retain a specific visible version', 'Call its disposer'],
+                  [
+                    'captureVersion',
+                    'Protect a version during render',
+                    'commitCapture, discard, or expiry'
+                  ],
+                  [
+                    'commitCapture',
+                    'Convert a valid capture to stable retention',
+                    'Returned lease disposer'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'capture',
+            heading: 'A capture token commits at most once',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'An unknown version fails with UNKNOWN_VERSION; read a fresh version from the current snapshot.',
+                  'An invalid, foreign, or consumed token fails with CAPTURE_INVALID.',
+                  'A provisional capture uncommitted for about four seconds is abandoned so interrupted rendering cannot retain forever.',
+                  'When a new version becomes ready, the old one remains retired or stale until its final holder releases.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'terminal',
+            heading: 'Neither closing nor disposed can be revived',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'forceDispose or scope.dispose enters closing and reaches disposed after active loading and value disposal settle. whenTerminal exposes a stable terminal Promise. preload, retry, retain, and capture after terminal state fail with RESOURCE_DISPOSED; create a new resource instead.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Return to Store Light learning paths', path: 'index' },
+        { label: 'StoreResourceKind API', path: 'docs/store-light/StoreResourceKind' }
+      ]
+    }
+  },
+  'wasm:index': {
+    zh: {
+      title: 'WASM 学习路径',
+      lede: '从宿主初始化进入，再学习 arena 分配、单操作转码与确定性释放；JavaScript 对象图不会直接跨越 WASM 边界。',
+      document: {
+        sections: [
+          {
+            id: 'choose-path',
+            heading: '按宿主与数据边界进入',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['需求', '入口', '关键约束'],
+                rows: [
+                  ['浏览器按资源异步初始化', 'init()', '默认加载随库发布的 .wasm 资源'],
+                  [
+                    'Node 或已有 Module/bytes',
+                    'init(input)',
+                    '显式传 BufferSource 或 WebAssembly.Module'
+                  ],
+                  ['同步持有 Module/bytes', 'initSync(input)', '不发起 fetch'],
+                  [
+                    'JSON ⇄ MessagePack',
+                    'json_to_msgpack / msgpack_to_json',
+                    '只接受单个完整字节文档'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'rules',
+            heading: '先记住内存规则',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'alloc_bytes 返回稳定 id；ptr 只保证到 dealloc 前有效。',
+                  '任何分配都可能增长 linear memory，旧 memory.buffer 视图必须丢弃。',
+                  '输入与成功输出都由调用者释放；转码不会替你释放输入。',
+                  '每次转码结果独立，不存在全局“上一次结果”。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟完成一次转码', path: 'getting-started' },
+        { label: '初始化与宿主', path: 'initialization-and-hosts' }
+      ]
+    },
+    en: {
+      title: 'WASM learning paths',
+      lede: 'Start with host initialization, then learn arena allocation, per-operation conversion, and deterministic release. JavaScript object graphs never cross the WASM boundary directly.',
+      document: {
+        sections: [
+          {
+            id: 'choose-path',
+            heading: 'Enter by host and data boundary',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Need', 'Entry', 'Important constraint'],
+                rows: [
+                  [
+                    'Browser resource initialization',
+                    'init()',
+                    'Loads the distributed .wasm resource by default'
+                  ],
+                  [
+                    'Node or an existing Module/bytes',
+                    'init(input)',
+                    'Pass a BufferSource or WebAssembly.Module explicitly'
+                  ],
+                  ['Synchronously held Module/bytes', 'initSync(input)', 'Performs no fetch'],
+                  [
+                    'JSON to or from MessagePack',
+                    'json_to_msgpack / msgpack_to_json',
+                    'Accepts one complete byte document only'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'rules',
+            heading: 'Keep the memory rules first',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'alloc_bytes returns a stable id; ptr remains valid only until deallocation.',
+                  'Any allocation may grow linear memory, so discard old memory.buffer views.',
+                  'The caller releases both input and successful output; conversion never releases input for you.',
+                  'Every conversion result is independent, with no global previous-result state.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Complete one conversion in five minutes', path: 'getting-started' },
+        { label: 'Initialization and hosts', path: 'initialization-and-hosts' }
+      ]
+    }
+  },
+  'wasm:getting-started': {
+    zh: {
+      title: '五分钟完成 JSON 到 MessagePack 转码',
+      lede: '初始化一次，分配输入，基于当前 memory.buffer 写入，复制输出到 JavaScript 所有权，最后释放两个 id。',
+      document: {
+        sections: [
+          {
+            id: 'convert',
+            heading: '让每一个分配都有明确释放点',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import init, {\n  alloc_bytes,\n  dealloc_bytes,\n  json_to_msgpack,\n  ptr_of\n} from '@migaia/wasm'\n\nconst wasm = await init()\nconst json = new TextEncoder().encode(JSON.stringify({ role: 'user' }))\nconst inputId = alloc_bytes(json.length)\n\nif (inputId === 0) throw new Error('arena exhausted')\n\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(inputId), json.length).set(json)\n  using result = json_to_msgpack(inputId, json.length)\n\n  if (result.id === 0) throw new Error(result.error)\n\n  try {\n    return new Uint8Array(\n      wasm.memory.buffer,\n      ptr_of(result.id),\n      result.len\n    ).slice()\n  } finally {\n    dealloc_bytes(result.id)\n  }\n} finally {\n  dealloc_bytes(inputId)\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'slice 把输出复制到 JavaScript 所有权，释放 WASM block 后仍可使用。',
+                  '不要保存写入前创建的 view；转码输出分配可能触发 memory growth。',
+                  'result.id === 0 时没有输出 block，只有输入仍需释放。',
+                  'ConversionResult 是 wasm-bindgen wrapper；using 在读取 id、len、error 后调用 Symbol.dispose，不能只释放 arena id。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Arena 内存', path: 'arena-memory' },
+        { label: 'json_to_msgpack API', path: 'docs/wasm/json_to_msgpack' }
+      ]
+    },
+    en: {
+      title: 'Convert JSON to MessagePack in five minutes',
+      lede: 'Initialize once, allocate input, write through the current memory.buffer, copy output into JavaScript ownership, and finally release both ids.',
+      document: {
+        sections: [
+          {
+            id: 'convert',
+            heading: 'Give every allocation an explicit release point',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import init, {\n  alloc_bytes,\n  dealloc_bytes,\n  json_to_msgpack,\n  ptr_of\n} from '@migaia/wasm'\n\nconst wasm = await init()\nconst json = new TextEncoder().encode(JSON.stringify({ role: 'user' }))\nconst inputId = alloc_bytes(json.length)\n\nif (inputId === 0) throw new Error('arena exhausted')\n\ntry {\n  new Uint8Array(wasm.memory.buffer, ptr_of(inputId), json.length).set(json)\n  using result = json_to_msgpack(inputId, json.length)\n\n  if (result.id === 0) throw new Error(result.error)\n\n  try {\n    return new Uint8Array(\n      wasm.memory.buffer,\n      ptr_of(result.id),\n      result.len\n    ).slice()\n  } finally {\n    dealloc_bytes(result.id)\n  }\n} finally {\n  dealloc_bytes(inputId)\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'slice copies output into JavaScript ownership so it survives release of the WASM block.',
+                  'Do not retain the view created before conversion; output allocation may grow memory.',
+                  'When result.id is zero no output block exists, and only the input still needs release.',
+                  'ConversionResult is a wasm-bindgen wrapper. using invokes Symbol.dispose after id, len, and error are read; releasing arena ids alone is insufficient.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Arena memory', path: 'arena-memory' },
+        { label: 'json_to_msgpack API', path: 'docs/wasm/json_to_msgpack' }
+      ]
+    }
+  },
+  'wasm:initialization-and-hosts': {
+    zh: {
+      title: '在浏览器、Node 与预编译宿主中初始化 WASM',
+      lede: '默认 init 适合可相对加载资源的浏览器；不能相对 fetch 的宿主必须显式提供 bytes 或 Module。',
+      document: {
+        sections: [
+          {
+            id: 'choose-init',
+            heading: '按加载权限选择初始化方式',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import init, { initSync } from '@migaia/wasm'\n\nconst browser = await init()\nconst fromBytes = await init(wasmBytes)\nconst fromModule = initSync(compiledModule)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'init() 默认解析随库发布的 wasm_provider_bg.wasm。',
+                  'init(bytesOrModule) 由调用方拥有读取、缓存和 CSP 策略。',
+                  'initSync 只接受已经可用的 Module 或 bytes，不隐式进行网络操作。',
+                  '同一运行时应复用初始化 Promise，避免并行创建不必要实例。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'exports',
+            heading: '从初始化结果取得当前 memory',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '初始化结果暴露 WebAssembly.Memory；arena 函数是同一模块的导出。不要把某次 memory.buffer identity 当作永久稳定，稳定的是分配 id 与释放前的逻辑 block。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Arena 内存', path: 'arena-memory' },
+        { label: 'WASM API reference', path: 'docs/wasm/index' }
+      ]
+    },
+    en: {
+      title: 'Initialize WASM in browsers, Node, and precompiled hosts',
+      lede: 'Default init fits browsers that can resolve a relative resource. A host that cannot use relative fetch must supply bytes or a Module explicitly.',
+      document: {
+        sections: [
+          {
+            id: 'choose-init',
+            heading: 'Choose initialization by loading authority',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import init, { initSync } from '@migaia/wasm'\n\nconst browser = await init()\nconst fromBytes = await init(wasmBytes)\nconst fromModule = initSync(compiledModule)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'init() resolves the distributed wasm_provider_bg.wasm by default.',
+                  'With init(bytesOrModule), the caller owns reading, caching, and CSP policy.',
+                  'initSync accepts an already available Module or bytes and performs no implicit network work.',
+                  'Reuse one initialization Promise within a runtime instead of creating unnecessary concurrent instances.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'exports',
+            heading: 'Read current memory from the initialization result',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'The initialization result exposes WebAssembly.Memory and arena functions come from the same module. Never treat one memory.buffer identity as permanently stable; the stable concepts are allocation ids and logical blocks before release.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Arena memory', path: 'arena-memory' },
+        { label: 'WASM API reference', path: 'docs/wasm/index' }
+      ]
+    }
+  },
+  'wasm:arena-memory': {
+    zh: {
+      title: '正确使用稳定 ID、指针与 8 字节对齐 Arena',
+      lede: 'id 是生命周期身份，ptr 是当前 linear memory 偏移，capacity 是按 8 字节取整的实际 block 大小；三者不能互换。',
+      document: {
+        sections: [
+          {
+            id: 'contract',
+            heading: '读取每个 Arena API 的精确语义',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['API', '成功', '未知/失败'],
+                rows: [
+                  ['alloc_bytes(byteLen)', '返回非零稳定 id', '返回 0'],
+                  ['ptr_of(id)', '当前字节偏移', '返回 0'],
+                  ['byte_len_of(id)', '8 字节对齐容量', '返回 0'],
+                  ['dealloc_bytes(id)', '释放 live block，返回 true', '返回 false']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '0 是保留哨兵。arena 以 Vec<u64> 保持 8 字节对齐，因此指针适合 Float64Array/BigInt64Array；调用者仍必须保证视图长度和字段布局正确。'
+              }
+            ]
+          },
+          {
+            id: 'views',
+            heading: '每次分配后重新创建 view',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const id = alloc_bytes(byteLength)\nconst capacity = byte_len_of(id)\n\nconst writeView = new Uint8Array(memory.buffer, ptr_of(id), capacity)\nwriteView.set(source)\n\nallocateMoreMemory()\n\nconst readView = new Uint8Array(memory.buffer, ptr_of(id), source.length)'
+              },
+              {
+                type: 'paragraph',
+                text: 'memory growth 会替换 ArrayBuffer，使旧 typed array 失效。id 在 block live 期间稳定，但任何后续分配之后都重新读取 memory.buffer 与 ptr。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '转码边界', path: 'conversion-boundaries' },
+        { label: 'alloc_bytes API', path: 'docs/wasm/alloc_bytes' }
+      ]
+    },
+    en: {
+      title: 'Use stable ids, pointers, and the eight-byte-aligned arena correctly',
+      lede: 'An id is lifecycle identity, ptr is the current linear-memory offset, and capacity is the actual block size rounded to eight bytes. They are not interchangeable.',
+      document: {
+        sections: [
+          {
+            id: 'contract',
+            heading: 'Read the exact semantic of every arena API',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['API', 'Success', 'Unknown or failure'],
+                rows: [
+                  ['alloc_bytes(byteLen)', 'Returns a nonzero stable id', 'Returns 0'],
+                  ['ptr_of(id)', 'Current byte offset', 'Returns 0'],
+                  ['byte_len_of(id)', 'Eight-byte-aligned capacity', 'Returns 0'],
+                  ['dealloc_bytes(id)', 'Releases a live block and returns true', 'Returns false']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Zero is reserved. The arena uses Vec<u64> for eight-byte alignment, so pointers suit Float64Array and BigInt64Array; callers still own correct view lengths and field layout.'
+              }
+            ]
+          },
+          {
+            id: 'views',
+            heading: 'Create a fresh view after every allocation',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const id = alloc_bytes(byteLength)\nconst capacity = byte_len_of(id)\n\nconst writeView = new Uint8Array(memory.buffer, ptr_of(id), capacity)\nwriteView.set(source)\n\nallocateMoreMemory()\n\nconst readView = new Uint8Array(memory.buffer, ptr_of(id), source.length)'
+              },
+              {
+                type: 'paragraph',
+                text: 'Memory growth replaces the ArrayBuffer and invalidates old typed arrays. The id remains stable while its block is live, but read memory.buffer and ptr again after any later allocation.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Conversion boundaries', path: 'conversion-boundaries' },
+        { label: 'alloc_bytes API', path: 'docs/wasm/alloc_bytes' }
+      ]
+    }
+  },
+  'wasm:conversion-boundaries': {
+    zh: {
+      title: '保持单文档转码与独立结果语义',
+      lede: '每次调用返回绑定本次操作的 id、len、error；输入长度只读取 allocation 前 len 字节，任何第二个文档都被拒绝。',
+      document: {
+        sections: [
+          {
+            id: 'result',
+            heading: '只从当前 ConversionResult 判断成功',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['状态', 'id', 'len', 'error'],
+                rows: [
+                  ['成功', '非零输出分配', '精确输出字节数', '空字符串'],
+                  ['失败', '0', '0', '当前失败原因']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '结果对象彼此独立，可以交错保存。失败不创建输出 block；输入无论成功失败都仍属于调用者。ConversionResult wrapper 本身也占有 wasm-bindgen 资源：读取字段后用 using/Symbol.dispose 或 finally 中 free() 释放；这与 dealloc_bytes(outputId) 是两种不同所有权。'
+              }
+            ]
+          },
+          {
+            id: 'documents',
+            heading: '拒绝模糊文档边界',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '未知 id、len 超过 capacity、空输入和格式错误均失败。',
+                  'JSON 文档后允许空白，但拒绝尾随第二个非空白文档。',
+                  'MessagePack 必须精确消费全部输入，尾随字节失败。',
+                  'map key 保持字符串，不通过隐式 schema 转换改变含义。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '所有权与清理', path: 'ownership-and-cleanup' },
+        { label: 'msgpack_to_json API', path: 'docs/wasm/msgpack_to_json' }
+      ]
+    },
+    en: {
+      title: 'Preserve single-document conversion and independent result semantics',
+      lede: 'Every call returns id, len, and error bound to that operation. Input reads only the first len bytes of an allocation and rejects any second document.',
+      document: {
+        sections: [
+          {
+            id: 'result',
+            heading: 'Determine success only from the current ConversionResult',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['State', 'id', 'len', 'error'],
+                rows: [
+                  ['Success', 'Nonzero output allocation', 'Exact output bytes', 'Empty string'],
+                  ['Failure', '0', '0', 'Reason for this operation']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Result objects are independent and may be retained across interleaved calls. Failure creates no output block, while the input remains caller-owned after both success and failure. The ConversionResult wrapper also owns a wasm-bindgen resource: release it with using/Symbol.dispose or free() in finally after reading fields. This is separate from dealloc_bytes(outputId).'
+              }
+            ]
+          },
+          {
+            id: 'documents',
+            heading: 'Reject ambiguous document boundaries',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Unknown ids, lengths beyond capacity, empty input, and malformed formats all fail.',
+                  'JSON permits trailing whitespace but rejects a second non-whitespace document.',
+                  'MessagePack must consume the exact input and rejects trailing bytes.',
+                  'Map keys remain strings instead of changing meaning through an implicit schema conversion.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Ownership and cleanup', path: 'ownership-and-cleanup' },
+        { label: 'msgpack_to_json API', path: 'docs/wasm/msgpack_to_json' }
+      ]
+    }
+  },
+  'wasm:ownership-and-cleanup': {
+    zh: {
+      title: '确定性释放 WASM 分配并保留失败事实',
+      lede: 'arena 没有自动所有权转移：创建分配的一方负责释放，FinalizationRegistry 只能作为泄漏兜底，不能替代 finally/dispose。',
+      document: {
+        sections: [
+          {
+            id: 'ownership',
+            heading: '为每种结果写出释放矩阵',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['阶段', '输入 id', '输出 id', 'ConversionResult wrapper'],
+                rows: [
+                  ['输入分配失败', '不存在', '不存在', '不存在'],
+                  ['转码失败', '调用者释放', '不存在', '读取 error 后释放'],
+                  ['转码成功并复制输出', '调用者释放', '复制后调用者释放', '读取 id/len 后释放'],
+                  [
+                    '把输出交给另一个 owner',
+                    '调用者释放',
+                    '接收方明确接管并释放',
+                    '当前调用方仍释放 wrapper'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'failure',
+            heading: '先回滚资源，再传播原始失败',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '任何 JavaScript wrapper 在构造中途失败，都先释放已获得的 live ids，再抛原始错误；清理错误应附加而不是替换主失败。dead id 的 dealloc 返回 false，适合检测重复释放，但不应作为正常控制流。'
+              }
+            ]
+          },
+          {
+            id: 'consumer',
+            heading: '高层消费者仍需显式 dispose',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '数值字段或 store adapter 可以用 FinalizationRegistry 兜底，但正常路径必须显式 dispose 并从当前 memory.buffer 创建 DataView。arena 与转码 ABI 只有一个所有者，不在高层重新实现第二套分配状态机。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '返回 WASM 学习路径', path: 'index' },
+        { label: 'dealloc_bytes API', path: 'docs/wasm/dealloc_bytes' }
+      ]
+    },
+    en: {
+      title: 'Release WASM allocations deterministically and preserve failure facts',
+      lede: 'The arena performs no automatic ownership transfer. The creator of an allocation releases it; FinalizationRegistry is only a leak fallback and never replaces finally or dispose.',
+      document: {
+        sections: [
+          {
+            id: 'ownership',
+            heading: 'Write a release matrix for every outcome',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Stage', 'Input id', 'Output id', 'ConversionResult wrapper'],
+                rows: [
+                  ['Input allocation fails', 'Does not exist', 'Does not exist', 'Does not exist'],
+                  [
+                    'Conversion fails',
+                    'Caller releases',
+                    'Does not exist',
+                    'Release after reading error'
+                  ],
+                  [
+                    'Conversion succeeds and output is copied',
+                    'Caller releases',
+                    'Caller releases after copy',
+                    'Release after reading id and len'
+                  ],
+                  [
+                    'Output transfers to another owner',
+                    'Caller releases',
+                    'Receiver explicitly adopts and releases',
+                    'Current caller still releases wrapper'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'failure',
+            heading: 'Roll resources back before propagating the primary failure',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A JavaScript wrapper that fails during construction first releases every acquired live id, then throws the original error. Cleanup errors attach without replacing the primary. dealloc on a dead id returns false to detect double release, but it should not be normal control flow.'
+              }
+            ]
+          },
+          {
+            id: 'consumer',
+            heading: 'Higher-level consumers still dispose explicitly',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A numeric-field or store adapter may use FinalizationRegistry as a fallback, but the normal path explicitly disposes and creates DataView from the current memory.buffer. The arena and conversion ABI have one owner; upper layers do not rebuild a second allocation state machine.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Return to WASM learning paths', path: 'index' },
+        { label: 'dealloc_bytes API', path: 'docs/wasm/dealloc_bytes' }
+      ]
+    }
+  },
+  'tray:index': {
+    zh: {
+      title: 'Tray 学习路径',
+      lede: '先判断集合是启动前固定还是运行期变化：固定集合使用静态 Tray，动态插件使用托管 Host，两者共享依赖与释放语义但公开面不同。',
+      document: {
+        sections: [
+          {
+            id: 'choose-root',
+            heading: '先选择正确的组合根',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['需求', '入口', '关键边界'],
+                rows: [
+                  ['启动前已知完整集合', '@migaia/tray', '一次 admission，ready 后只读'],
+                  [
+                    '运行期 use、replace、unUse',
+                    '@migaia/tray/host',
+                    'Graph 与 PluginHost 同一发布凭据'
+                  ],
+                  ['跨 Worker 或远端装配', '宿主 adapter', 'Tray core 不负责跨 realm 传输'],
+                  ['UI 通知与交互状态', '应用层', '不要把视图策略塞进组合根']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'reading-order',
+            heading: '沿所有权顺序阅读',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '静态组合：声明 key、requires、start 与 release。',
+                  'Readiness：在启动前关闭外部门，并保留失败身份。',
+                  '资源所有权：主值和辅助资源只释放一次。',
+                  '动态 Host：理解 definition、ready closure 与 mutation 结果。',
+                  '物理清理：区分逻辑提交和真正 quiescence。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟创建静态 Tray', path: 'getting-started' },
+        { label: '静态组合', path: 'static-composition' }
+      ]
+    },
+    en: {
+      title: 'Tray learning paths',
+      lede: 'First decide whether the complete set is fixed before startup or changes at runtime. Use static Tray for the former and managed Host for dynamic plugins; they share dependency and release semantics but expose different surfaces.',
+      document: {
+        sections: [
+          {
+            id: 'choose-root',
+            heading: 'Choose the correct composition root first',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Need', 'Entry', 'Important boundary'],
+                rows: [
+                  [
+                    'Complete set known before startup',
+                    '@migaia/tray',
+                    'One admission and a readonly surface after ready'
+                  ],
+                  [
+                    'Runtime use, replace, and unUse',
+                    '@migaia/tray/host',
+                    'Graph and PluginHost share one publication receipt'
+                  ],
+                  [
+                    'Cross-Worker or remote composition',
+                    'Host adapter',
+                    'Tray core does not transport across realms'
+                  ],
+                  [
+                    'UI notification and interaction state',
+                    'Application layer',
+                    'Keep view policy out of the composition root'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'reading-order',
+            heading: 'Read in ownership order',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Static composition: declare key, requires, start, and release.',
+                  'Readiness: close external gates before startup and preserve failure identity.',
+                  'Resource ownership: release primary values and auxiliary resources exactly once.',
+                  'Dynamic Host: understand definitions, ready closure, and mutation results.',
+                  'Physical cleanup: separate logical commit from actual quiescence.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Create a static Tray in five minutes', path: 'getting-started' },
+        { label: 'Static composition', path: 'static-composition' }
+      ]
+    }
+  },
+  'tray:getting-started': {
+    zh: {
+      title: '五分钟创建可释放的静态 Tray',
+      lede: '集中声明 key 和依赖，等待整图 ready 后读取服务，并由创建者在 finally 中释放。',
+      document: {
+        sections: [
+          {
+            id: 'define',
+            heading: '声明完整集合与显式依赖',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      return { value: createClient(config.baseUrl), release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTray(entries)\nawait tray.ready()\n\ntry {\n  await tray.get<IApiClient>(apiKey).load()\n} finally {\n  await tray.dispose()\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'requires 必须列出 context.get 读取的每个依赖。',
+                  'start 返回完整的 value/release 对；部分构造失败由 entry 自己回滚。',
+                  '未 await ready、未知 key、失败或终态时 get 都显式失败。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '静态组合契约', path: 'static-composition' },
+        { label: 'createTray API', path: 'docs/tray/createTray' }
+      ]
+    },
+    en: {
+      title: 'Create a disposable static Tray in five minutes',
+      lede: 'Declare keys and dependencies centrally, wait until the complete graph is ready, then read services and let the creator release them in finally.',
+      document: {
+        sections: [
+          {
+            id: 'define',
+            heading: 'Declare the complete set and explicit dependencies',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      return { value: createClient(config.baseUrl), release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTray(entries)\nawait tray.ready()\n\ntry {\n  await tray.get<IApiClient>(apiKey).load()\n} finally {\n  await tray.dispose()\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'requires lists every dependency read through context.get.',
+                  'start returns a complete value/release pair; the entry rolls back its own partial construction.',
+                  'get fails explicitly before ready, for an unknown key, after failure, or in terminal state.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Static composition contracts', path: 'static-composition' },
+        { label: 'createTray API', path: 'docs/tray/createTray' }
+      ]
+    }
+  },
+  'tray:static-composition': {
+    zh: {
+      title: '设计静态 Entry 图与 admission 边界',
+      lede: 'createTray 先同步验证并快照整个拓扑，首次 ready 才读取 gate 并启动 Graph；调用方之后修改定义不会改变已接纳结构。',
+      document: {
+        sections: [
+          {
+            id: 'entry',
+            heading: '每个 Entry 只声明自己的边界',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['字段', '作用', '约束'],
+                rows: [
+                  ['key', '稳定身份', 'trim 后非空且全 Tray 唯一'],
+                  ['kind', '诊断和拓扑分类', 'value、computed、resource、service'],
+                  ['requires', '启动与释放顺序', '必须引用同一集合且不能引用自己'],
+                  ['readiness', '启动前外部门', '仅 ready、blocked、failed'],
+                  ['start', '构造 value 与 release', '依赖 ready 后恰好调用一次']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'admission',
+            heading: '所有定义错误都在第一个 start 前失败',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '数组、字段、kind、key、requires 或 readiness 外形非法时抛 TRAY_INVALID_ENTRY；重复 key 抛 TRAY_DUPLICATE_ENTRY。admission 冻结规范化 key/requires，失败不会留下半启动 Graph。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Readiness 与错误', path: 'readiness-and-errors' },
+        { label: 'ITrayEntryDefinition 类型', path: 'docs/tray/index' }
+      ]
+    },
+    en: {
+      title: 'Design a static entry graph and admission boundary',
+      lede: 'createTray synchronously validates and snapshots the complete topology. The first ready call reads gates and starts the Graph; later caller mutations cannot change admitted structure.',
+      document: {
+        sections: [
+          {
+            id: 'entry',
+            heading: 'Each entry declares only its own boundary',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Field', 'Purpose', 'Constraint'],
+                rows: [
+                  ['key', 'Stable identity', 'Non-empty after trim and unique within the Tray'],
+                  [
+                    'kind',
+                    'Diagnostic and topology class',
+                    'value, computed, resource, or service'
+                  ],
+                  [
+                    'requires',
+                    'Startup and release order',
+                    'References the same set and never itself'
+                  ],
+                  ['readiness', 'External gate before startup', 'ready, blocked, or failed only'],
+                  [
+                    'start',
+                    'Construct value and release',
+                    'Called once after dependencies are ready'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'admission',
+            heading: 'Every definition error fails before the first start',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Invalid arrays, fields, kinds, keys, requires, or readiness shapes throw TRAY_INVALID_ENTRY; duplicate keys throw TRAY_DUPLICATE_ENTRY. Admission freezes normalized key and requires snapshots, and failure leaves no partially started Graph.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Readiness and errors', path: 'readiness-and-errors' },
+        { label: 'ITrayEntryDefinition types', path: 'docs/tray/index' }
+      ]
+    }
+  },
+  'tray:readiness-and-errors': {
+    zh: {
+      title: '关闭 Readiness gate，并按错误身份恢复',
+      lede: '首次 ready 读取一次外部门并缓存结果；重复调用返回同一个 Promise，不重读 gate，也不重复启动。',
+      document: {
+        sections: [
+          {
+            id: 'gate',
+            heading: '在启动前解释 blocked 与 failed',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '全部 gate 缺省或 ready 时才启动 Graph。',
+                  'blocked/failed 优先以 snapshot.error 原样 reject；没有原因时使用 TRAY_UNAVAILABLE。',
+                  '非法 state 以 TRAY_INVALID_ENTRY 失败，且不再读取 error getter。',
+                  'getter 抛错保留原始类型，并尽可能附加 TRAY_GATE_READ_FAILED。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'recover',
+            heading: '错误码决定下一步',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Code', '含义', '处理'],
+                rows: [
+                  ['TRAY_INVALID_ENTRY', '静态定义违反契约', '修正定义，不原样重试'],
+                  ['TRAY_DUPLICATE_ENTRY', 'key 重复', '集中管理 key'],
+                  ['TRAY_UNKNOWN_ENTRY', '读取未接纳 key', '使用 tray.keys 或契约常量'],
+                  ['TRAY_UNAVAILABLE', '尚未 ready、失败或终态', '等待 ready 或检查 state/error'],
+                  ['TRAY_GATE_READ_FAILED', 'gate getter 抛错', '沿 cause 修复 readiness source']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '资源所有权', path: 'resource-ownership' },
+        { label: 'TrayErrorCode API', path: 'docs/tray/TrayErrorCode' }
+      ]
+    },
+    en: {
+      title: 'Close readiness gates and recover by error identity',
+      lede: 'The first ready call reads each external gate once and caches the result. Repeated calls return the same Promise without rereading gates or restarting.',
+      document: {
+        sections: [
+          {
+            id: 'gate',
+            heading: 'Explain blocked and failed before startup',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'The Graph starts only when every gate is absent or ready.',
+                  'blocked or failed rejects with snapshot.error unchanged when present, otherwise TRAY_UNAVAILABLE.',
+                  'An invalid state fails with TRAY_INVALID_ENTRY without reading its error getter.',
+                  'A throwing getter preserves its native type and receives TRAY_GATE_READ_FAILED when possible.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'recover',
+            heading: 'The code determines the next action',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Code', 'Meaning', 'Action'],
+                rows: [
+                  [
+                    'TRAY_INVALID_ENTRY',
+                    'Static definition violates the contract',
+                    'Fix the definition; do not retry unchanged'
+                  ],
+                  ['TRAY_DUPLICATE_ENTRY', 'A key is duplicated', 'Centralize key ownership'],
+                  [
+                    'TRAY_UNKNOWN_ENTRY',
+                    'A read uses an unadmitted key',
+                    'Use tray.keys or contract constants'
+                  ],
+                  [
+                    'TRAY_UNAVAILABLE',
+                    'Not ready, failed, or terminal',
+                    'Await ready or inspect state and error'
+                  ],
+                  [
+                    'TRAY_GATE_READ_FAILED',
+                    'A gate getter threw',
+                    'Follow cause and repair the readiness source'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Resource ownership', path: 'resource-ownership' },
+        { label: 'TrayErrorCode API', path: 'docs/tray/TrayErrorCode' }
+      ]
+    }
+  },
+  'tray:resource-ownership': {
+    zh: {
+      title: '让 Graph 唯一拥有 Entry 资源',
+      lede: 'start 返回值的 release 与 context.own 注册的辅助资源都属于当前节点；Tray 外部不得再次清理同一资源。',
+      document: {
+        sections: [
+          {
+            id: 'own',
+            heading: '把辅助资源绑定到节点',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "{\n  key: cacheKey,\n  kind: 'resource',\n  requires: [configKey],\n  async start(context) {\n    const cache = await openCache(context.signal)\n    context.own(cache.metrics, { release: () => cache.metrics.close() })\n\n    return {\n      value: cache,\n      release: () => cache.close()\n    }\n  }\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'context.signal 在 Graph 关闭时中止，长任务必须主动观察。',
+                  '依赖按拓扑启动，释放按 consumer 到 provider 的逆序执行。',
+                  'release 错误不会替换更早的启动失败，原始失败保留在 cause/errors 链。',
+                  'Tray core 不添加 timeout；可能永久 pending 的资源必须自己有界。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '动态 Host', path: 'dynamic-host' },
+        { label: 'createTray API', path: 'docs/tray/createTray' }
+      ]
+    },
+    en: {
+      title: 'Let the Graph own entry resources exactly once',
+      lede: 'The release returned by start and auxiliary resources registered through context.own belong to the current node. Code outside Tray must not clean the same resource again.',
+      document: {
+        sections: [
+          {
+            id: 'own',
+            heading: 'Bind auxiliary resources to the node',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "{\n  key: cacheKey,\n  kind: 'resource',\n  requires: [configKey],\n  async start(context) {\n    const cache = await openCache(context.signal)\n    context.own(cache.metrics, { release: () => cache.metrics.close() })\n\n    return {\n      value: cache,\n      release: () => cache.close()\n    }\n  }\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'context.signal aborts when the Graph closes, and long-running work must observe it.',
+                  'Dependencies start in topology order and release from consumers back to providers.',
+                  'A release error never replaces an earlier startup failure; the primary remains on cause or errors.',
+                  'Tray core adds no timeout; a resource that may remain pending must bound itself.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Dynamic Host', path: 'dynamic-host' },
+        { label: 'createTray API', path: 'docs/tray/createTray' }
+      ]
+    }
+  },
+  'tray:dynamic-host': {
+    zh: {
+      title: '创建唯一身份的托管 Plugin Host',
+      lede: 'createHost 是 Tray 的 Host stage，不创建第二个运行时身份；返回前已完成 factory、admission、Graph 启动和 Host 发布。',
+      document: {
+        sections: [
+          {
+            id: 'create',
+            heading: '一次性声明初始 definitions 与时间边界',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createHost } from '@migaia/tray/host'\n\nawait using host = await createHost({\n  create: () => new AppHost({\n    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 }\n  }),\n  plugins: [provider, consumer] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' },\n  report: reportCleanupFailure\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'create 必须返回一个未被其他托管 session 占用的 PluginHost。',
+                  'plugins 在入口快照 name、requires、config 与 disposer，之后修改原对象无效。',
+                  'strict-drain 等待全部物理释放；bounded 允许逻辑结果先返回并附带 physicalCompletion。',
+                  '任一创建阶段失败都会回滚未发布候选，并在 error.detail 说明 phase 与清理状态。'
+                ]
+              },
+              {
+                type: 'table',
+                headers: ['选项', '是否必填', '生产含义'],
+                rows: [
+                  ['create', '是', '创建唯一且未被托管的 PluginHost；factory 失败不会发布 Host'],
+                  [
+                    'plugins',
+                    '是',
+                    '初始 definitions tuple；按依赖排序，输入顺序用于同层 tie-break'
+                  ],
+                  [
+                    'mutationAdmissionMs',
+                    '是',
+                    '非负有限毫秒；限制 mutation 等待进入串行 Graph 执行'
+                  ],
+                  ['quiescenceMs', '是', '非负有限毫秒；只约束 bounded 物理清理等待'],
+                  ['shutdown.mode', '是', 'bounded 返回可观察句柄；strict-drain 等到物理完成'],
+                  ['report', '否', '接收隔离后的观察者与清理失败；自身抛错不改变已结算状态']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'observe',
+            heading: '从托管面读取同一代状态',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const stop = host.on('mutationFailed', ({ value }) => {\n  report(value.error)\n})\n\ntry {\n  console.log(host.plugins, host.readyPlugins)\n  console.log(host.pluginState('analytics'))\n  const telemetry = host.getShared(telemetryKey)\n  await host.config.update('analytics', (previous) => ({\n    ...previous,\n    sampleRate: 0.25\n  }))\n} finally {\n  stop()\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'plugins 是已接纳 definition；readyPlugins 只含依赖闭合并已发布的节点。',
+                  'pluginState 对未知或缺依赖名称返回 blocked；读取值前用 plugins 判断名称是否存在。',
+                  'extensions、config、getShared 与 pluginState 都经过 publication/ownership 检查，mutation 提交窗口内 fail closed。',
+                  'on 返回同步 unsubscribe；异步 listener 失败进入 createHost.report，不回滚已提交 mutation。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Mutation 与 blocked definition', path: 'mutation-and-blocking' },
+        { label: 'createHost API', path: 'docs/tray/host/createHost' }
+      ]
+    },
+    en: {
+      title: 'Create one managed Plugin Host identity',
+      lede: 'createHost is a Tray Host stage rather than a second runtime identity. It completes factory, admission, Graph startup, and Host publication before returning.',
+      document: {
+        sections: [
+          {
+            id: 'create',
+            heading: 'Declare initial definitions and time boundaries once',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createHost } from '@migaia/tray/host'\n\nawait using host = await createHost({\n  create: () => new AppHost({\n    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 }\n  }),\n  plugins: [provider, consumer] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' },\n  report: reportCleanupFailure\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'create returns a PluginHost not already claimed by another managed session.',
+                  'plugins snapshots name, requires, config, and disposer at entry; later mutations to the input object do not apply.',
+                  'strict-drain awaits every physical release; bounded may return a logical result with physicalCompletion.',
+                  'Any creation-phase failure rolls back unpublished candidates and records phase and cleanup state in error.detail.'
+                ]
+              },
+              {
+                type: 'table',
+                headers: ['Option', 'Required', 'Production meaning'],
+                rows: [
+                  [
+                    'create',
+                    'yes',
+                    'Creates one unclaimed PluginHost; a factory failure publishes no Host'
+                  ],
+                  [
+                    'plugins',
+                    'yes',
+                    'Initial definition tuple; dependency order wins and input order breaks same-layer ties'
+                  ],
+                  [
+                    'mutationAdmissionMs',
+                    'yes',
+                    'Finite non-negative milliseconds bounding admission to serialized Graph execution'
+                  ],
+                  [
+                    'quiescenceMs',
+                    'yes',
+                    'Finite non-negative milliseconds bounding only physical cleanup in bounded mode'
+                  ],
+                  [
+                    'shutdown.mode',
+                    'yes',
+                    'bounded returns an observation handle; strict-drain waits for physical completion'
+                  ],
+                  [
+                    'report',
+                    'no',
+                    'Receives contained observer and cleanup failures; its own throw cannot change settled state'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'observe',
+            heading: 'Read one generation through the managed surface',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const stop = host.on('mutationFailed', ({ value }) => {\n  report(value.error)\n})\n\ntry {\n  console.log(host.plugins, host.readyPlugins)\n  console.log(host.pluginState('analytics'))\n  const telemetry = host.getShared(telemetryKey)\n  await host.config.update('analytics', (previous) => ({\n    ...previous,\n    sampleRate: 0.25\n  }))\n} finally {\n  stop()\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'plugins lists admitted definitions; readyPlugins includes only dependency-closed, published nodes.',
+                  'pluginState returns blocked for an unknown or dependency-missing name; use plugins to distinguish absence before reading a value.',
+                  'extensions, config, getShared, and pluginState all enforce publication and ownership, failing closed during a mutation commit window.',
+                  'on returns a synchronous unsubscribe; an async listener failure goes to createHost.report and never rolls back a committed mutation.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Mutation and blocked definitions', path: 'mutation-and-blocking' },
+        { label: 'createHost API', path: 'docs/tray/host/createHost' }
+      ]
+    }
+  },
+  'tray:mutation-and-blocking': {
+    zh: {
+      title: '解释 use、replace、unUse 与 blocked closure',
+      lede: '动态操作修改 definition Graph，再由 ready closure 投影 Host 可见面；缺依赖的 definition 会保留但不发布。',
+      document: {
+        sections: [
+          {
+            id: 'mutations',
+            heading: '读取结构化 mutation 结果',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const added = await host.use(plugin)\nif (!added.ok) {\n  if (added.committed) observeDynamicView(added.view)\n  else report(added.error)\n}\n\nconst removed = await host.unUse('provider')\nif (removed.removed) {\n  console.log(removed.affected)\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'use 增加 definition；缺 provider 时保留为 blocked，不进入 readyPlugins。',
+                  'replace 只替换 exact 同名 generation；committed 表示 candidate 是否成为当前 binding。',
+                  'unUse 删除 definition 并阻塞 consumer closure；未知名称是成功但 removed:false。',
+                  '同名 replace 与恢复复用 ordering slot；真正删除后 slot 永久退休。'
+                ]
+              },
+              {
+                type: 'table',
+                headers: ['结果', 'Graph 是否改变', '调用方动作'],
+                rows: [
+                  [
+                    'ok:true, committed:true',
+                    '已提交',
+                    '继续使用 result.view，并检查 cleanupComplete'
+                  ],
+                  [
+                    'ok:false, committed:false',
+                    '未提交',
+                    '旧 view 仍有效；按 error 决定修正或重试'
+                  ],
+                  [
+                    'ok:false, committed:true',
+                    '已提交但收尾失败',
+                    '必须切换到 result.view，并观察 cleanupErrors/physicalCompletion'
+                  ],
+                  ['unUse removed:false', '未找到名称', '幂等成功；不要把它当作清理已执行的证据']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'authority',
+            heading: '只通过托管 facade 写入',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '绕过 facade 调用 escaped concrete Host mutation 会让 Graph binding 与 Host receipt 分离；下一次托管操作以 HOST_MUTATION_BYPASS fail closed。读取 plugins、readyPlugins、extensions、config 和 pluginState 均通过返回的托管 Host。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '物理清理', path: 'physical-cleanup' },
+        { label: 'TrayHostState API', path: 'docs/tray/host/TrayHostState' }
+      ]
+    },
+    en: {
+      title: 'Interpret use, replace, unUse, and blocked closure',
+      lede: 'A dynamic operation changes the definition Graph, then projects its ready closure into the Host-visible surface. A definition with missing dependencies remains stored but unpublished.',
+      document: {
+        sections: [
+          {
+            id: 'mutations',
+            heading: 'Read the structured mutation result',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const added = await host.use(plugin)\nif (!added.ok) {\n  if (added.committed) observeDynamicView(added.view)\n  else report(added.error)\n}\n\nconst removed = await host.unUse('provider')\nif (removed.removed) {\n  console.log(removed.affected)\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'use adds a definition; one missing a provider remains blocked and does not enter readyPlugins.',
+                  'replace targets the exact same-name generation; committed says whether the candidate became current binding.',
+                  'unUse deletes a definition and blocks its consumer closure; an unknown name succeeds with removed:false.',
+                  'Same-name replace and recovery reuse the ordering slot; true deletion retires the slot permanently.'
+                ]
+              },
+              {
+                type: 'table',
+                headers: ['Result', 'Graph change', 'Caller action'],
+                rows: [
+                  [
+                    'ok:true, committed:true',
+                    'committed',
+                    'Continue with result.view and inspect cleanupComplete'
+                  ],
+                  [
+                    'ok:false, committed:false',
+                    'not committed',
+                    'The old view remains valid; fix or retry according to error'
+                  ],
+                  [
+                    'ok:false, committed:true',
+                    'committed with finalization failure',
+                    'Switch to result.view and observe cleanupErrors or physicalCompletion'
+                  ],
+                  [
+                    'unUse removed:false',
+                    'name absent',
+                    'Idempotent success; it is not evidence that cleanup ran'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'authority',
+            heading: 'Mutate only through the managed facade',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Calling mutation on an escaped concrete Host separates Graph binding from the Host receipt. The next managed operation fails closed with HOST_MUTATION_BYPASS. Read plugins, readyPlugins, extensions, config, and pluginState through the returned managed Host.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Physical cleanup', path: 'physical-cleanup' },
+        { label: 'TrayHostState API', path: 'docs/tray/host/TrayHostState' }
+      ]
+    }
+  },
+  'tray:physical-cleanup': {
+    zh: {
+      title: '区分逻辑提交与物理清理完成',
+      lede: 'bounded mutation 可以先返回 cleanupComplete:false，但 exact generation 的 lease、pipeline snapshot、disposer 和资源仍必须完整结束。',
+      document: {
+        sections: [
+          {
+            id: 'observe',
+            heading: '始终保留同一个 physicalCompletion',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const result = await host.unUse('analytics')\n\nif (!result.cleanupComplete && result.physicalCompletion) {\n  const physical = await result.physicalCompletion\n  for (const error of physical.cleanupErrors) report(error)\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'cleanupComplete:false 只表示调用方的 bounded wait 结束，不表示清理被取消。',
+                  'Graph 先 seal exact binding lease，再等待 pipeline lease，最后执行 plugin/resource disposer。',
+                  '前一 generation 物理完成前，不启动依赖它的后一 generation。',
+                  'physicalCompletion 是唯一观察句柄，不能通过轮询名称或 state 推测完成。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'dispose',
+            heading: '读取 dispose 的终态事实',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'dispose 返回 terminal、termination、cleanupComplete、cleanupErrors 和可选 physicalCompletion。termination 区分 managed 关闭与外部 concrete Host 先终止；并发 dispose 复用同一 Promise，清理错误通过 report 与结果暴露，不替换更早主失败。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '返回 Tray 学习路径', path: 'index' },
+        { label: 'createHost API', path: 'docs/tray/host/createHost' }
+      ]
+    },
+    en: {
+      title: 'Separate logical commit from physical cleanup completion',
+      lede: 'A bounded mutation may return cleanupComplete:false, but the exact generation’s binding lease, pipeline snapshot, disposer, and resources must still finish completely.',
+      document: {
+        sections: [
+          {
+            id: 'observe',
+            heading: 'Retain and observe the same physicalCompletion',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const result = await host.unUse('analytics')\n\nif (!result.cleanupComplete && result.physicalCompletion) {\n  const physical = await result.physicalCompletion\n  for (const error of physical.cleanupErrors) report(error)\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'cleanupComplete:false means only that the caller’s bounded wait ended, not that cleanup was cancelled.',
+                  'The Graph seals the exact binding lease, waits for pipeline leases, then runs plugin and resource disposers.',
+                  'A later generation depending on the old one does not start before old physical completion.',
+                  'physicalCompletion is the sole observation handle; never infer completion by polling a name or state.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'dispose',
+            heading: 'Read terminal facts from dispose',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'dispose returns terminal state, termination, cleanupComplete, cleanupErrors, and optional physicalCompletion. termination distinguishes managed shutdown from an externally terminated concrete Host. Concurrent disposal reuses one Promise, and cleanup errors are reported and returned without replacing an earlier primary failure.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Return to Tray learning paths', path: 'index' },
+        { label: 'createHost API', path: 'docs/tray/host/createHost' }
+      ]
+    }
+  },
+  'utils:index': {
+    zh: {
+      title: 'Utils 学习路径',
+      lede: '从要固定的语义进入：等待期限、错误身份、字节协议、不可变更新或配置所有权；不要把 utils 当作应用框架。',
+      document: {
+        sections: [
+          {
+            id: 'choose-primitive',
+            heading: '按问题选择最窄入口',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['问题', '子入口', '首选原语'],
+                rows: [
+                  ['等待需要 deadline 或取消', '/promise', 'withTimeout、raceWithAbort'],
+                  ['失败需要稳定身份与因果链', '/error', 'attachErrorIdentity、walkErrorCauses'],
+                  ['协议需要 Base64 或 UTF-8', '/bytes', 'base64ToBytes、splitUtf8'],
+                  ['嵌套值需要不可变读写', '/object', 'get、set、probeObjectPath'],
+                  [
+                    '配置需要快照、只读门面与合并',
+                    '/config',
+                    'ownConfig、readonlyConfig、combineConfig'
+                  ],
+                  [
+                    '入口需要区分空值或只执行一次',
+                    '/value、/function',
+                    'isEmptyValue、once、onceAsync'
+                  ],
+                  [
+                    '界面需要安全插值或本地化数字',
+                    '/string、/number',
+                    'format、createNumberFormatter'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'boundaries',
+            heading: '先记住三条边界',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '取消是协作式通知；忽略 signal 的操作不会被强制停止。',
+                  'identitySnapshot 明确保留引用，不等于不可变快照。',
+                  '配置 profile、限制和 merge 策略是所有权契约，不能在下游静默放宽。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟组合 deadline、retry 与 limiter', path: 'getting-started' },
+        { label: '截止时间与取消', path: 'deadlines-and-abort' }
+      ]
+    },
+    en: {
+      title: 'Utils learning paths',
+      lede: 'Enter through the semantic you must fix: waiting deadlines, error identity, byte protocols, immutable updates, or configuration ownership. Utils is not an application framework.',
+      document: {
+        sections: [
+          {
+            id: 'choose-primitive',
+            heading: 'Choose the narrowest entry for the problem',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Problem', 'Subpath', 'Start with'],
+                rows: [
+                  [
+                    'A wait needs a deadline or cancellation',
+                    '/promise',
+                    'withTimeout, raceWithAbort'
+                  ],
+                  [
+                    'A failure needs stable identity and causes',
+                    '/error',
+                    'attachErrorIdentity, walkErrorCauses'
+                  ],
+                  ['A protocol needs Base64 or UTF-8', '/bytes', 'base64ToBytes, splitUtf8'],
+                  ['A nested value needs immutable access', '/object', 'get, set, probeObjectPath'],
+                  [
+                    'Configuration needs snapshots, readonly views, and merge',
+                    '/config',
+                    'ownConfig, readonlyConfig, combineConfig'
+                  ],
+                  [
+                    'An entry boundary needs absence checks or one-time work',
+                    '/value, /function',
+                    'isEmptyValue, once, onceAsync'
+                  ],
+                  [
+                    'A UI needs safe interpolation or localized numbers',
+                    '/string, /number',
+                    'format, createNumberFormatter'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'boundaries',
+            heading: 'Keep three boundaries in mind',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Cancellation is cooperative notification; an operation that ignores signal cannot be forcibly stopped.',
+                  'identitySnapshot explicitly preserves a reference and is not an immutable snapshot.',
+                  'Configuration profiles, limits, and merge strategies are ownership contracts that downstream code cannot silently widen.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Compose a deadline, retry, and limiter in five minutes',
+          path: 'getting-started'
+        },
+        { label: 'Deadlines and abort', path: 'deadlines-and-abort' }
+      ]
+    }
+  },
+  'utils:getting-started': {
+    zh: {
+      title: '五分钟建立有界、可取消的批处理',
+      lede: '用一个总 deadline、有限重试与并发 limiter 组合批量请求；每层只拥有一种策略。',
+      document: {
+        sections: [
+          {
+            id: 'compose',
+            heading: '把 deadline 放在最外层',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import {\n  createConcurrencyLimiter,\n  retry,\n  withTimeout\n} from '@migaia/utils/promise'\n\nconst limiter = createConcurrencyLimiter({ concurrency: 4 })\n\ntry {\n  return await withTimeout(\n    ({ signal }) =>\n      Promise.all(\n        urls.map((url) =>\n          limiter.run(() =>\n            retry(\n              () => fetch(url, { signal }),\n              {\n                maxAttempts: 3,\n                shouldRetry: (error) => isTransient(error),\n                signal\n              }\n            )\n          )\n        )\n      ),\n    { timeoutMs: 10_000 }\n  )\n} finally {\n  await limiter.dispose()\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'withTimeout 拥有整个批次的最终期限。',
+                  'retry 只拥有单项失败后的再次尝试，shouldRetry 必须按错误分类。',
+                  'limiter 只拥有并发准入；dispose 等待在途任务后进入终态。',
+                  'fetch 读取同一个 signal，取消才会真正传播到底层 I/O。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'observe',
+            heading: '迟到失败必须可观察',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '操作在 timeout 或 abort 后才 reject 时，最终 Promise 已经结算；迟到失败交给 report，默认 hostRethrowReporter，不会被静默吞掉。生产环境通常注入结构化日志 reporter。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '截止时间与取消', path: 'deadlines-and-abort' },
+        { label: '重试与并发', path: 'retry-and-concurrency' }
+      ]
+    },
+    en: {
+      title: 'Build a bounded, cancellable batch in five minutes',
+      lede: 'Compose one total deadline, finite retries, and a concurrency limiter for a request batch. Each layer owns one policy.',
+      document: {
+        sections: [
+          {
+            id: 'compose',
+            heading: 'Put the total deadline at the outside',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import {\n  createConcurrencyLimiter,\n  retry,\n  withTimeout\n} from '@migaia/utils/promise'\n\nconst limiter = createConcurrencyLimiter({ concurrency: 4 })\n\ntry {\n  return await withTimeout(\n    ({ signal }) =>\n      Promise.all(\n        urls.map((url) =>\n          limiter.run(() =>\n            retry(\n              () => fetch(url, { signal }),\n              {\n                maxAttempts: 3,\n                shouldRetry: (error) => isTransient(error),\n                signal\n              }\n            )\n          )\n        )\n      ),\n    { timeoutMs: 10_000 }\n  )\n} finally {\n  await limiter.dispose()\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'withTimeout owns the final deadline for the complete batch.',
+                  'retry owns only another attempt after one item fails; shouldRetry must classify the error.',
+                  'The limiter owns concurrency admission only; dispose waits for active work and becomes terminal.',
+                  'fetch reads the same signal so cancellation actually reaches the underlying I/O.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'observe',
+            heading: 'Late failures must remain observable',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'When an operation rejects after timeout or abort, the returned Promise is already settled. The late failure goes to report, defaulting to hostRethrowReporter, instead of being swallowed. Production code normally supplies a structured logging reporter.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Deadlines and abort', path: 'deadlines-and-abort' },
+        { label: 'Retry and concurrency', path: 'retry-and-concurrency' }
+      ]
+    }
+  },
+  'utils:deadlines-and-abort': {
+    zh: {
+      title: '选择 signal composition、abort race 或 deadline',
+      lede: '三个原语拥有不同的 Promise 结算责任；先确定谁决定最终事实，再选择 API。',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: '按结算所有权选择',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['API', '拥有最终 Promise', '适用场景'],
+                rows: [
+                  [
+                    'createAbortTimeoutSignal',
+                    '否，只组合 signal',
+                    '事务或底层操作自己决定何时真正完成'
+                  ],
+                  ['raceWithAbort', '是，只响应外部 signal', '没有 deadline、但等待可取消'],
+                  [
+                    'withTimeout',
+                    '是，响应 signal 与 deadline',
+                    '调用方必须在固定期限内获得 settlement'
+                  ],
+                  ['sleep', '是，拥有延时等待', '退避、节流和可取消延迟']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'deadline',
+            heading: '让操作协作退出',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const result = await withTimeout(\n  async ({ signal }) => {\n    const response = await fetch(url, { signal })\n    return response.json()\n  },\n  {\n    timeoutMs: 2_000,\n    zeroTimeoutBehavior: 'skip',\n    report: reportLateFailure\n  }\n)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'signal 与 signals 互斥；同时提供会以 TypeError 拒绝。',
+                  'timeoutMs: 0 默认不启动操作；start 表示立即启动且不设置 timeout。',
+                  'cooperativeCancellation: false 只限时等待，不通知操作退出。',
+                  'createAbortTimeoutSignal 返回的 dispose 必须由创建者在 finally 中调用。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'withTimeout API', path: 'docs/utils/promise/withTimeout' },
+        { label: '重试与并发', path: 'retry-and-concurrency' }
+      ]
+    },
+    en: {
+      title: 'Choose signal composition, an abort race, or a deadline',
+      lede: 'The three primitives own different parts of Promise settlement. Decide who owns the final fact before choosing an API.',
+      document: {
+        sections: [
+          {
+            id: 'choose',
+            heading: 'Choose by settlement ownership',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['API', 'Owns final Promise', 'Use it when'],
+                rows: [
+                  [
+                    'createAbortTimeoutSignal',
+                    'No, it only composes a signal',
+                    'A transaction or lower operation decides when work truly completes'
+                  ],
+                  [
+                    'raceWithAbort',
+                    'Yes, for external signals only',
+                    'The wait is cancellable but has no deadline'
+                  ],
+                  [
+                    'withTimeout',
+                    'Yes, for signals and deadline',
+                    'The caller requires settlement within a fixed deadline'
+                  ],
+                  ['sleep', 'Yes, for the delay', 'Backoff, throttling, and cancellable delay']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'deadline',
+            heading: 'Make the operation exit cooperatively',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const result = await withTimeout(\n  async ({ signal }) => {\n    const response = await fetch(url, { signal })\n    return response.json()\n  },\n  {\n    timeoutMs: 2_000,\n    zeroTimeoutBehavior: 'skip',\n    report: reportLateFailure\n  }\n)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'signal and signals are mutually exclusive; supplying both rejects with TypeError.',
+                  'timeoutMs: 0 skips the operation by default; start begins immediately without a timeout.',
+                  'cooperativeCancellation: false only bounds the wait and does not notify the operation to exit.',
+                  'The creator must call the dispose returned by createAbortTimeoutSignal in finally.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'withTimeout API', path: 'docs/utils/promise/withTimeout' },
+        { label: 'Retry and concurrency', path: 'retry-and-concurrency' }
+      ]
+    }
+  },
+  'utils:retry-and-concurrency': {
+    zh: {
+      title: '用有限重试与并发准入保护依赖',
+      lede: '重试扩大请求次数，limiter 限制同时执行数；两者必须同时受取消、deadline 和终态约束。',
+      document: {
+        sections: [
+          {
+            id: 'retry',
+            heading: '明确总预算与单次预算',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const value = await retry(\n  ({ signal }) => loadRecord({ signal }),\n  {\n    maxAttempts: 4,\n    attemptTimeoutMs: 1_000,\n    totalTimeoutMs: 3_500,\n    delay: (_, { attempt }) => attempt * 100,\n    shouldRetry: (error) => isTransient(error)\n  }\n)'
+              },
+              {
+                type: 'list',
+                items: [
+                  'maxAttempts 包含第一次尝试，必须是正安全整数。',
+                  'totalTimeoutMs 包含尝试和退避；不能用次数预算替代时间预算。',
+                  'shouldRetry 返回 false 时保留并抛出当前原始失败。',
+                  '取消立即终止整个序列，不再进入下一次尝试。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'limiter',
+            heading: '区分排队取消与在途取消',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'limiter.run 的 signal 可以移除尚未开始的任务；任务开始后，回调必须读取 context.signal 才能退出。close 停止新准入，dispose 还会等待 activeCount 归零。whenIdle 只等待当前队列为空，不关闭 limiter。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'retry API', path: 'docs/utils/promise/retry' },
+        { label: '错误身份与因果链', path: 'error-identity-and-causes' }
+      ]
+    },
+    en: {
+      title: 'Protect dependencies with finite retry and concurrency admission',
+      lede: 'Retry expands request count while a limiter bounds simultaneous work. Both must remain under cancellation, deadline, and terminal-state control.',
+      document: {
+        sections: [
+          {
+            id: 'retry',
+            heading: 'Define total and per-attempt budgets',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const value = await retry(\n  ({ signal }) => loadRecord({ signal }),\n  {\n    maxAttempts: 4,\n    attemptTimeoutMs: 1_000,\n    totalTimeoutMs: 3_500,\n    delay: (_, { attempt }) => attempt * 100,\n    shouldRetry: (error) => isTransient(error)\n  }\n)'
+              },
+              {
+                type: 'list',
+                items: [
+                  'maxAttempts includes the first attempt and must be a positive safe integer.',
+                  'totalTimeoutMs includes attempts and backoff; an attempt-count budget cannot replace a time budget.',
+                  'When shouldRetry returns false, retry preserves and throws the current original failure.',
+                  'Cancellation ends the complete sequence immediately and prevents another attempt.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'limiter',
+            heading: 'Separate queued cancellation from active cancellation',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A signal passed to limiter.run can remove work that has not started. After admission, the callback must observe context.signal to exit. close stops new admission; dispose additionally waits for activeCount to reach zero. whenIdle waits for an empty current queue without closing the limiter.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'retry API', path: 'docs/utils/promise/retry' },
+        { label: 'Error identity and causes', path: 'error-identity-and-causes' }
+      ]
+    }
+  },
+  'utils:error-identity-and-causes': {
+    zh: {
+      title: '保留错误身份、原始类型与完整因果链',
+      lede: '错误码用于程序分支，message 用于人类诊断；给原对象附加身份，不要重建并丢失类型、stack 或 cause。',
+      document: {
+        sections: [
+          {
+            id: 'identity',
+            heading: '在包边界附加稳定身份',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "try {\n  return await load()\n} catch (value) {\n  const error = toError(value)\n  throw attachErrorIdentity(error, {\n    source: 'catalog',\n    code: 'LOAD_FAILED',\n    phase: 'read'\n  })\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'attachErrorIdentity 修改并返回同一个 Error；同名 identity 字段已有不同值时拒绝覆盖。调用方应按 source/code 分支，而不是解析 message。'
+              }
+            ]
+          },
+          {
+            id: 'causes',
+            heading: '有界遍历 cause 与 AggregateError',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const causes = walkErrorCauses(error, { maxDepth: 32 })\nconst cleanupFailure = combineErrors(cleanupErrors, 'cleanup failed')"
+              },
+              {
+                type: 'list',
+                items: [
+                  'walkErrorCauses 同时遍历 cause 与 AggregateError.errors，并用 maxDepth 限制恶意或循环链。',
+                  'combineErrors 对零项返回 undefined、单项保持 identity、多项才创建 AggregateError。',
+                  'toError 把非 Error throw 值正规化，但无法恢复原本不存在的 stack。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'attachErrorIdentity API', path: 'docs/utils/error/attachErrorIdentity' },
+        { label: '字节与文本', path: 'bytes-and-text' }
+      ]
+    },
+    en: {
+      title: 'Preserve error identity, native type, and the complete cause chain',
+      lede: 'Codes drive program branches while messages support human diagnosis. Attach identity to the original object instead of rebuilding it and losing type, stack, or cause.',
+      document: {
+        sections: [
+          {
+            id: 'identity',
+            heading: 'Attach stable identity at the public boundary',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "try {\n  return await load()\n} catch (value) {\n  const error = toError(value)\n  throw attachErrorIdentity(error, {\n    source: 'catalog',\n    code: 'LOAD_FAILED',\n    phase: 'read'\n  })\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'attachErrorIdentity mutates and returns the same Error. It refuses to overwrite an existing identity field with a different value. Callers branch on source and code instead of parsing message text.'
+              }
+            ]
+          },
+          {
+            id: 'causes',
+            heading: 'Traverse cause and AggregateError with a bound',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const causes = walkErrorCauses(error, { maxDepth: 32 })\nconst cleanupFailure = combineErrors(cleanupErrors, 'cleanup failed')"
+              },
+              {
+                type: 'list',
+                items: [
+                  'walkErrorCauses traverses both cause and AggregateError.errors while maxDepth bounds malicious or cyclic chains.',
+                  'combineErrors returns undefined for zero items, preserves identity for one, and creates AggregateError only for several.',
+                  'toError normalizes a non-Error thrown value but cannot recover a stack that never existed.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'attachErrorIdentity API', path: 'docs/utils/error/attachErrorIdentity' },
+        { label: 'Bytes and text', path: 'bytes-and-text' }
+      ]
+    }
+  },
+  'utils:bytes-and-text': {
+    zh: {
+      title: '在协议边界正确处理 Base64 与 UTF-8',
+      lede: '先确定协议接受字节、文本还是规范 Base64；分块必须保持每片独立有效，并且不能切断 Unicode 码点。',
+      document: {
+        sections: [
+          {
+            id: 'base64',
+            heading: '拒绝非规范 Base64',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const encoded = bytesToBase64(new Uint8Array([1, 2, 3]))\nconst decoded = base64ToBytes(encoded)\n\nfor (const chunk of streamBase64Chunks(largePayload, 32_763)) {\n  send(chunk)\n}'
+              },
+              {
+                type: 'list',
+                items: [
+                  'base64ToBytes 只接受规范 RFC 4648 形式，非规范输入抛 TypeError。',
+                  'streamBase64Chunks 的每片都是独立合法 Base64，不是任意切字符串。',
+                  '跨 realm 品牌检测使用 isUint8Array/isArrayBuffer，不信任 constructor.name。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'utf8',
+            heading: '按字节预算切文本，不切断码点',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const size = utf8ByteLength(text)\nconst chunks = splitUtf8(text, 4_096)\nconst strict = decodeUtf8(encodeUtf8(text), { fatal: true })'
+              },
+              {
+                type: 'paragraph',
+                text: 'splitUtf8 的 maxBytes 至少为 4，保证单个 Unicode 码点总能容纳。fatal: true 在非法序列处失败；默认模式用 U+FFFD 替换，适合展示而不是协议验证。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'base64ToBytes API', path: 'docs/utils/bytes/base64ToBytes' },
+        { label: '不可变对象与路径', path: 'immutable-objects-and-paths' }
+      ]
+    },
+    en: {
+      title: 'Handle Base64 and UTF-8 correctly at protocol boundaries',
+      lede: 'First decide whether the protocol accepts bytes, text, or canonical Base64. Chunking must keep every piece independently valid and never split a Unicode code point.',
+      document: {
+        sections: [
+          {
+            id: 'base64',
+            heading: 'Reject non-canonical Base64',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const encoded = bytesToBase64(new Uint8Array([1, 2, 3]))\nconst decoded = base64ToBytes(encoded)\n\nfor (const chunk of streamBase64Chunks(largePayload, 32_763)) {\n  send(chunk)\n}'
+              },
+              {
+                type: 'list',
+                items: [
+                  'base64ToBytes accepts canonical RFC 4648 input only and throws TypeError for non-canonical forms.',
+                  'Every streamBase64Chunks item is independently valid Base64; it does not split an encoded string arbitrarily.',
+                  'Use isUint8Array and isArrayBuffer for cross-realm branding instead of trusting constructor.name.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'utf8',
+            heading: 'Split text by byte budget without cutting code points',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const size = utf8ByteLength(text)\nconst chunks = splitUtf8(text, 4_096)\nconst strict = decodeUtf8(encodeUtf8(text), { fatal: true })'
+              },
+              {
+                type: 'paragraph',
+                text: 'splitUtf8 requires maxBytes of at least 4 so one Unicode code point always fits. fatal: true fails on an invalid sequence; the default replaces it with U+FFFD and is suitable for display rather than protocol validation.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'base64ToBytes API', path: 'docs/utils/bytes/base64ToBytes' },
+        { label: 'Immutable objects and paths', path: 'immutable-objects-and-paths' }
+      ]
+    }
+  },
+  'utils:immutable-objects-and-paths': {
+    zh: {
+      title: '选择快照语义，并安全更新嵌套路径',
+      lede: '深拷贝、诊断拷贝和引用保留是三种不同所有权；路径读写还必须拒绝原型污染段并保持结构共享。',
+      document: {
+        sections: [
+          {
+            id: 'snapshot',
+            heading: '明确你要哪一种快照',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['API', '语义', '失败方式'],
+                rows: [
+                  ['immutableSnapshot', 'structuredClone 深拷贝', '环境或值不支持时抛错'],
+                  [
+                    'diagnosticSnapshot',
+                    '尽力拷贝并返回 diagnostics',
+                    '把 accessor、读取失败和不支持值逐路径报告'
+                  ],
+                  ['identitySnapshot', '保留原始引用', '不拷贝；调用方明确接受共享所有权']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'paths',
+            heading: '用 probe 解释失败，用 set 保持不可变',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const probe = probeObjectPath(state, 'user.profile.name')\nconst next = set(state, 'user.profile.name', 'Grace')\n\nconst accessor = createPathAccessor(next, {\n  ifBlocked: (result) => report(result),\n  onSet: (event) => audit(event)\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'get 对 missing 或 blocked 返回 undefined；需要区分原因时用 probeObjectPath。',
+                  'set 不修改旧根，只复制变更路径并共享未变分支。',
+                  '__proto__、prototype 和 constructor 路径段始终拒绝。',
+                  '路径总长、段长和段数都有界，不能用路径字符串制造无限工作。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'probeObjectPath API', path: 'docs/utils/object-path/probeObjectPath' },
+        { label: '配置所有权', path: 'configuration-ownership' }
+      ]
+    },
+    en: {
+      title: 'Choose snapshot semantics and update nested paths safely',
+      lede: 'Deep copying, diagnostic copying, and reference retention are distinct ownership choices. Path access must also reject prototype-pollution segments while preserving structural sharing.',
+      document: {
+        sections: [
+          {
+            id: 'snapshot',
+            heading: 'Choose the snapshot you actually mean',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['API', 'Semantic', 'Failure'],
+                rows: [
+                  [
+                    'immutableSnapshot',
+                    'Deep clone through structuredClone',
+                    'Throws when the environment or value is unsupported'
+                  ],
+                  [
+                    'diagnosticSnapshot',
+                    'Best-effort clone plus diagnostics',
+                    'Reports accessors, read failures, and unsupported values by path'
+                  ],
+                  [
+                    'identitySnapshot',
+                    'Retain the original reference',
+                    'No copy; the caller explicitly accepts shared ownership'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'paths',
+            heading: 'Use probes to explain failure and set for immutability',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const probe = probeObjectPath(state, 'user.profile.name')\nconst next = set(state, 'user.profile.name', 'Grace')\n\nconst accessor = createPathAccessor(next, {\n  ifBlocked: (result) => report(result),\n  onSet: (event) => audit(event)\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'get returns undefined for missing or blocked paths; use probeObjectPath when the reason matters.',
+                  'set leaves the old root unchanged, copies only the changed path, and shares unchanged branches.',
+                  '__proto__, prototype, and constructor path segments are always rejected.',
+                  'Total path length, segment length, and segment count are bounded to prevent unbounded path work.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'probeObjectPath API', path: 'docs/utils/object-path/probeObjectPath' },
+        { label: 'Configuration ownership', path: 'configuration-ownership' }
+      ]
+    }
+  },
+  'utils:configuration-ownership': {
+    zh: {
+      title: '建立配置所有权、只读边界与合并策略',
+      lede: '先用 ownConfig 固定 profile 和资源限制，再向消费者提供 readonlyConfig；patch 与 combine 只能保持或收紧契约。',
+      document: {
+        sections: [
+          {
+            id: 'own',
+            heading: '在入口取得配置所有权',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const owned = ownConfig(input, {\n  profile: ConfigProfile.data,\n  limits: { maxDepth: 32, maxNodes: 10_000 }\n})\n\nconst publicConfig = readonlyConfig(owned)'
+              },
+              {
+                type: 'list',
+                items: [
+                  'data profile 拒绝函数；只有明确需要运行时函数时才选择 richRuntime。',
+                  'limits 只能收紧默认值，防止深度、节点、键和路径输入耗尽资源。',
+                  'readonlyConfig 只接受 ownConfig 产物；写入以 CONFIG_READONLY 拒绝。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'update',
+            heading: '区分根级 patch 与多源 merge',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const patched = patchConfig(owned, {\n  retries: 3,\n  debug: CONFIG_DELETE\n})\n\nconst merged = combineConfig([defaults, environment, patched], {\n  strategies: { array: 'replace', record: 'merge' },\n  pathRules: [\n    { prefix: ['features'], strategies: { array: 'concat' } }\n  ]\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'patchConfig 只覆盖根层；嵌套修改先用 object.set 构造完整子树。',
+                  'combineConfig 后者覆盖前者，数组、Map、Set 和 undefined 策略必须显式选择。',
+                  'pathRules 使用最长匹配前缀；onConflict 必须同步返回裁定。',
+                  'profile 或 limits 与已有 owned config 冲突时拒绝，不静默改变所有权。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'ownConfig API', path: 'docs/utils/config/ownConfig' },
+        { label: '值判断与一次性执行', path: 'function-and-value-guards' }
+      ]
+    },
+    en: {
+      title: 'Establish configuration ownership, readonly boundaries, and merge policy',
+      lede: 'Fix the profile and resource limits with ownConfig, then expose readonlyConfig to consumers. Patch and combine may only preserve or tighten that contract.',
+      document: {
+        sections: [
+          {
+            id: 'own',
+            heading: 'Take configuration ownership at the boundary',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const owned = ownConfig(input, {\n  profile: ConfigProfile.data,\n  limits: { maxDepth: 32, maxNodes: 10_000 }\n})\n\nconst publicConfig = readonlyConfig(owned)'
+              },
+              {
+                type: 'list',
+                items: [
+                  'The data profile rejects functions; choose richRuntime only when runtime functions are explicitly required.',
+                  'limits can only tighten defaults, bounding depth, nodes, keys, and path input against resource exhaustion.',
+                  'readonlyConfig accepts only an ownConfig result and rejects writes with CONFIG_READONLY.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'update',
+            heading: 'Separate root patching from multi-source merge',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const patched = patchConfig(owned, {\n  retries: 3,\n  debug: CONFIG_DELETE\n})\n\nconst merged = combineConfig([defaults, environment, patched], {\n  strategies: { array: 'replace', record: 'merge' },\n  pathRules: [\n    { prefix: ['features'], strategies: { array: 'concat' } }\n  ]\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'patchConfig replaces root fields only; build a complete nested subtree with object.set first.',
+                  'Later combineConfig sources override earlier ones; array, Map, Set, and undefined strategies must be explicit.',
+                  'pathRules use the longest matching prefix and onConflict must return a synchronous decision.',
+                  'A profile or limits conflict with an owned config is rejected instead of silently changing ownership.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'ownConfig API', path: 'docs/utils/config/ownConfig' },
+        { label: 'Value guards and one-time work', path: 'function-and-value-guards' }
+      ]
+    }
+  },
+  'utils:function-and-value-guards': {
+    zh: {
+      title: '正确判断空值，并让初始化只执行一次',
+      lede: '入口校验要保留 0、false 与空集合的业务含义；一次性初始化还要明确失败缓存、重入和 Promise identity。',
+      document: {
+        sections: [
+          {
+            id: 'value-guards',
+            heading: '按业务语义选择判断器',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['API', '判定为 true', '明确不包含'],
+                rows: [
+                  ['isNullish', 'null、undefined', '空字符串、0、false、NaN'],
+                  ['isBlankString', '空字符串或纯空白字符串', '非字符串值'],
+                  ['isEmptyValue', 'null、undefined、空白字符串、NaN', '0、0n、false、数组、对象'],
+                  ['isPrimitive', '全部 JavaScript primitive', '函数与对象']
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { isEmptyValue } from '@migaia/utils/value'\n\nfunction parseQuantity(input: unknown): number {\n  if (isEmptyValue(input)) throw new TypeError('quantity is required')\n  if (typeof input !== 'number') throw new TypeError('quantity must be numeric')\n  return input // 0 remains a valid quantity\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'isEmptyValue 不推断数组或对象是否为空，因为集合的空语义属于业务所有者。需要检查集合长度时，在拥有该集合契约的代码中显式判断。'
+              }
+            ]
+          },
+          {
+            id: 'once',
+            heading: '区分同步缓存与异步 single-flight',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { once, onceAsync } from '@migaia/utils/function'\n\nconst readConfig = once(() => parseConfig(rawConfig))\nconst connect = onceAsync(() => openConnection())\n\nconst config = readConfig()\nconst first = connect()\nconst second = connect()\nconsole.assert(first === second)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'once 缓存第一次返回值或第一次抛出的同一个错误；后续调用不再执行函数。',
+                  '同步重入在初始化尚未结束时以 REENTRANT_CALL 拒绝，避免读到半初始化状态。',
+                  'onceAsync 只启动一次并返回同一个 Promise；拒绝也会缓存，不会隐式重试。',
+                  'onceAsync 的工厂必须返回 Promise 或 PromiseLike；普通值以 INVALID_ARGUMENT 拒绝。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'hostile-thenables',
+            heading: '第三方 thenable 只探测一次',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const probe = probeThenable(value)\n\nif (probe.kind === ThenableProbeKind.failed) report(probe.error)\nif (probe.kind === ThenableProbeKind.thenable) {\n  await assimilateCapturedThen(probe.thenFn, value)\n}'
+              },
+              {
+                type: 'paragraph',
+                text: 'probeThenable 把非 thenable、可调用 then 与 getter 失败分开，并保证只读取一次 .then。同步 API 需要观察意外 thenable 的迟到拒绝时，组合 inspectThenable 与 observeThenableRejection。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'once API', path: 'docs/utils/function/once' },
+        { label: '字符串与数字展示', path: 'strings-and-numbers' }
+      ]
+    },
+    en: {
+      title: 'Classify absent values and run initialization exactly once',
+      lede: 'Boundary validation must preserve the business meaning of 0, false, and empty collections. One-time initialization must also define failure caching, reentrancy, and Promise identity.',
+      document: {
+        sections: [
+          {
+            id: 'value-guards',
+            heading: 'Choose a guard by business semantic',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['API', 'Returns true for', 'Explicitly excludes'],
+                rows: [
+                  ['isNullish', 'null and undefined', 'empty strings, 0, false, and NaN'],
+                  ['isBlankString', 'empty or whitespace-only strings', 'non-string values'],
+                  [
+                    'isEmptyValue',
+                    'null, undefined, blank strings, and NaN',
+                    '0, 0n, false, arrays, and objects'
+                  ],
+                  ['isPrimitive', 'all JavaScript primitives', 'functions and objects']
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { isEmptyValue } from '@migaia/utils/value'\n\nfunction parseQuantity(input: unknown): number {\n  if (isEmptyValue(input)) throw new TypeError('quantity is required')\n  if (typeof input !== 'number') throw new TypeError('quantity must be numeric')\n  return input // 0 remains a valid quantity\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'isEmptyValue never infers whether an array or object is empty because collection emptiness belongs to the business owner. Check collection length explicitly where that contract is owned.'
+              }
+            ]
+          },
+          {
+            id: 'once',
+            heading: 'Separate synchronous caching from asynchronous single-flight',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { once, onceAsync } from '@migaia/utils/function'\n\nconst readConfig = once(() => parseConfig(rawConfig))\nconst connect = onceAsync(() => openConnection())\n\nconst config = readConfig()\nconst first = connect()\nconst second = connect()\nconsole.assert(first === second)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'once caches the first return value or the exact first thrown error; later calls do not invoke the function again.',
+                  'Synchronous reentrancy is rejected with REENTRANT_CALL while initialization is still running, preventing partially initialized reads.',
+                  'onceAsync starts once and returns the same Promise; rejection is cached and does not trigger an implicit retry.',
+                  'The onceAsync factory must return a Promise or PromiseLike; a plain value is rejected with INVALID_ARGUMENT.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'hostile-thenables',
+            heading: 'Probe third-party thenables once',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const probe = probeThenable(value)\n\nif (probe.kind === ThenableProbeKind.failed) report(probe.error)\nif (probe.kind === ThenableProbeKind.thenable) {\n  await assimilateCapturedThen(probe.thenFn, value)\n}'
+              },
+              {
+                type: 'paragraph',
+                text: 'probeThenable separates a non-thenable, a callable then method, and a getter failure while reading .then only once. When a synchronous API must observe a late rejection from an accidental thenable, compose inspectThenable with observeThenableRejection.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'once API', path: 'docs/utils/function/once' },
+        { label: 'Strings and numeric display', path: 'strings-and-numbers' }
+      ]
+    }
+  },
+  'utils:strings-and-numbers': {
+    zh: {
+      title: '安全插值文本，并统一本地化数字展示',
+      lede: '模板负责显示插值，不执行表达式；数字辅助函数负责 Intl 策略与复用，但货币、精度和 locale 仍由产品边界决定。',
+      document: {
+        sections: [
+          {
+            id: 'format',
+            heading: '显式决定缺失值和 nullish 策略',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { format } from '@migaia/utils/string'\n\nformat('Hello {user.name}', { user: { name: 'Ada' } })\nformat('Cost: {amount}', {}, { missing: 'throw' })\nformat('[[name]]', { name: 'Ada' }, {\n  placeholder: { open: '[[', close: ']]' },\n  nullish: 'stringify'\n})"
+              },
+              {
+                type: 'table',
+                headers: ['选项', '默认值', '作用'],
+                rows: [
+                  [
+                    'placeholder',
+                    "{ open: '{', close: '}' }",
+                    '设置非空且不同的边界，单边最长 64 字符'
+                  ],
+                  ['missing', 'preserve', '保留占位符；也可选择 empty 或 throw'],
+                  ['nullish', 'empty', '把 null/undefined 显示为空；也可选择 stringify']
+                ]
+              },
+              {
+                type: 'list',
+                items: [
+                  '点路径只访问 own property，不遍历原型链。',
+                  '__proto__、prototype、constructor 始终视为缺失，避免模板变成对象遍历入口。',
+                  '重复起止边界输出字面边界；未闭合占位符原样保留。',
+                  'getter 或字符串转换失败保留为带 cause 的 FORMAT_INVALID，而不是吞掉。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'number',
+            heading: '让产品拥有 locale、货币与精度',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import {\n  createNumberFormatter,\n  formatCompactNumber,\n  formatCurrency,\n  formatPercent\n} from '@migaia/utils/number'\n\nformatCurrency(1299, 'CNY', { locales: 'zh' })\nformatPercent(0.375, { format: { maximumFractionDigits: 1 } })\nformatCompactNumber(12_500, { locales: 'en' })\n\nconst renderQuantity = createNumberFormatter({\n  locales: 'en-SG',\n  format: { maximumFractionDigits: 2 }\n})\nrows.map(({ quantity }) => renderQuantity(quantity))"
+              },
+              {
+                type: 'table',
+                headers: ['API', '内置策略', '调用方必须决定'],
+                rows: [
+                  ['formatNumber', '原样使用 Intl.NumberFormatOptions', 'locale 与完整格式策略'],
+                  ['formatCurrency', "强制 style: 'currency'", 'currency 与舍入策略'],
+                  ['formatPercent', "强制 style: 'percent'", '输入是比例值及精度'],
+                  ['formatInteger', 'maximumFractionDigits 默认 0', '是否覆盖小数策略'],
+                  ['formatCompactNumber', "强制 notation: 'compact'", 'locale 与有效数字']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '一次性 helper 复用最多 64 个 Intl formatter。热循环用 createNumberFormatter 在循环外取得闭包，避免每项重复解析选项和查找缓存；输入只接受 number 或 bigint，不做字符串数值的有损强制转换。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'format API', path: 'docs/utils/string/format' },
+        { label: 'createNumberFormatter API', path: 'docs/utils/number/createNumberFormatter' },
+        { label: '返回 Utils 学习路径', path: 'index' }
+      ]
+    },
+    en: {
+      title: 'Interpolate display text safely and localize numeric output consistently',
+      lede: 'Templates interpolate display values without evaluating expressions. Numeric helpers own Intl policy and reuse, while product boundaries still choose currency, precision, and locale.',
+      document: {
+        sections: [
+          {
+            id: 'format',
+            heading: 'Choose missing-value and nullish policy explicitly',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { format } from '@migaia/utils/string'\n\nformat('Hello {user.name}', { user: { name: 'Ada' } })\nformat('Cost: {amount}', {}, { missing: 'throw' })\nformat('[[name]]', { name: 'Ada' }, {\n  placeholder: { open: '[[', close: ']]' },\n  nullish: 'stringify'\n})"
+              },
+              {
+                type: 'table',
+                headers: ['Option', 'Default', 'Effect'],
+                rows: [
+                  [
+                    'placeholder',
+                    "{ open: '{', close: '}' }",
+                    'Sets distinct non-empty boundaries, each at most 64 characters'
+                  ],
+                  ['missing', 'preserve', 'Keeps the placeholder; empty and throw are available'],
+                  ['nullish', 'empty', 'Renders null/undefined as empty; stringify is available']
+                ]
+              },
+              {
+                type: 'list',
+                items: [
+                  'Dot paths read own properties only and never traverse the prototype chain.',
+                  '__proto__, prototype, and constructor are always missing so a display template cannot become an object traversal surface.',
+                  'Doubled opening or closing boundaries emit literal boundaries; an unclosed placeholder remains unchanged.',
+                  'Getter or string-conversion failures remain reachable as the cause of FORMAT_INVALID instead of being swallowed.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'number',
+            heading: 'Keep locale, currency, and precision product-owned',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import {\n  createNumberFormatter,\n  formatCompactNumber,\n  formatCurrency,\n  formatPercent\n} from '@migaia/utils/number'\n\nformatCurrency(1299, 'CNY', { locales: 'zh' })\nformatPercent(0.375, { format: { maximumFractionDigits: 1 } })\nformatCompactNumber(12_500, { locales: 'en' })\n\nconst renderQuantity = createNumberFormatter({\n  locales: 'en-SG',\n  format: { maximumFractionDigits: 2 }\n})\nrows.map(({ quantity }) => renderQuantity(quantity))"
+              },
+              {
+                type: 'table',
+                headers: ['API', 'Built-in policy', 'Caller must decide'],
+                rows: [
+                  [
+                    'formatNumber',
+                    'Uses Intl.NumberFormatOptions unchanged',
+                    'locale and complete format policy'
+                  ],
+                  ['formatCurrency', "forces style: 'currency'", 'currency and rounding policy'],
+                  ['formatPercent', "forces style: 'percent'", 'ratio input and precision'],
+                  [
+                    'formatInteger',
+                    'defaults maximumFractionDigits to 0',
+                    'whether to override fraction policy'
+                  ],
+                  [
+                    'formatCompactNumber',
+                    "forces notation: 'compact'",
+                    'locale and significant digits'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'One-shot helpers reuse a cache bounded to 64 Intl formatters. In a hot loop, call createNumberFormatter outside the loop so each item avoids option parsing and cache lookup. Inputs accept number or bigint only and never coerce numeric strings lossily.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'format API', path: 'docs/utils/string/format' },
+        { label: 'createNumberFormatter API', path: 'docs/utils/number/createNumberFormatter' },
+        { label: 'Return to Utils learning paths', path: 'index' }
+      ]
+    }
+  },
+  'web-rpc:index': {
+    zh: {
+      title: 'WebRPC 学习路径',
+      lede: '先选择最窄 endpoint 表面与真实 transport，再逐步加入 provider、契约、发现、控制、分片和生命周期策略。',
+      document: {
+        sections: [
+          {
+            id: 'choose-endpoint',
+            heading: '先决定端点需要公开什么',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['需求', '入口', '公开能力'],
+                rows: [
+                  [
+                    '只调用或通知远端',
+                    'createClientEndpoint',
+                    'send、sendAll、dispatch、dispatchAll'
+                  ],
+                  ['暴露方法并可能回调对端', 'createProviderEndpoint', 'outbound + provide'],
+                  [
+                    '明确需要全部能力',
+                    'createFullEndpoint',
+                    'outbound、provider、discovery、control、chunk'
+                  ],
+                  ['严格控制 bundle 与表面', 'createComposedEndpoint', '只投影显式 Feature']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Feature 决定 endpoint 根对象公开的方法；middleware 负责协议、连接、认证、超时和策略。Feature 的私有依赖不会自动扩大公开 API。'
+              }
+            ]
+          },
+          {
+            id: 'choose-transport',
+            heading: '再按拓扑与所有权选择 transport',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'exclusive：Dedicated Worker 或 MessagePort 等唯一对端链路。',
+                  'multiplexed：Shared Worker 等多发送方链路，必须有 peer/source 身份校验。',
+                  'broadcast：BroadcastChannel 等诚实节点路由，不是身份或保密边界。',
+                  'owned transport 由 endpoint dispose；borrowed transport 只解除自身订阅。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'reading-order',
+            heading: '按一条真实调用链继续阅读',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '快速开始：用 Memory transport 跑通一次 request/response。',
+                  'Client 与取消：区分 send、sendAll、dispatch，并处理 timeout 与 AbortSignal。',
+                  'Provider 与契约：校验 params/result，并保留远端错误链。',
+                  'Transport 与安全：确认 topology、origin、sourceProof 与 authentication。',
+                  '分片、重放和生命周期：只在实际需要时加入容量与恢复策略。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟建立第一条 RPC 链路', path: 'getting-started' },
+        { label: '选择 Endpoint 组合方式', path: 'endpoint-composition' },
+        { label: 'Provider 与契约', path: 'providers-and-contracts' }
+      ]
+    },
+    en: {
+      title: 'WebRPC learning paths',
+      lede: 'Choose the narrowest endpoint surface and a truthful transport first, then add providers, contracts, discovery, control, chunking, and lifecycle policies as separate decisions.',
+      document: {
+        sections: [
+          {
+            id: 'choose-endpoint',
+            heading: 'First decide what the endpoint must expose',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Need', 'Entry', 'Public capability'],
+                rows: [
+                  [
+                    'Only call or notify a remote peer',
+                    'createClientEndpoint',
+                    'send, sendAll, dispatch, dispatchAll'
+                  ],
+                  [
+                    'Expose methods and possibly call back',
+                    'createProviderEndpoint',
+                    'outbound + provide'
+                  ],
+                  [
+                    'Explicitly need every capability',
+                    'createFullEndpoint',
+                    'outbound, provider, discovery, control, chunk'
+                  ],
+                  [
+                    'Control bundle and surface precisely',
+                    'createComposedEndpoint',
+                    'Only explicitly selected Features'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Features decide which methods appear on the endpoint root. Middleware owns protocol, connection, authentication, timeout, and policy. A Feature’s private dependency never expands the public API automatically.'
+              }
+            ]
+          },
+          {
+            id: 'choose-transport',
+            heading: 'Then choose a transport by topology and ownership',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'exclusive: one-peer links such as a Dedicated Worker or MessagePort.',
+                  'multiplexed: multi-sender links such as Shared Worker, requiring peer or source identity verification.',
+                  'broadcast: honest-node routing such as BroadcastChannel, not an identity or confidentiality boundary.',
+                  'An owned transport is closed by endpoint disposal; a borrowed transport only loses this endpoint’s subscriptions.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'reading-order',
+            heading: 'Continue along one real call path',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Getting started: complete one request/response through a Memory transport.',
+                  'Client and cancellation: distinguish send, sendAll, and dispatch, then handle timeout and AbortSignal.',
+                  'Provider and contracts: validate params and results while preserving remote error chains.',
+                  'Transport and security: verify topology, origin, sourceProof, and authentication.',
+                  'Chunking, replay, and lifecycle: add capacity and recovery policy only when the workload requires it.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Build the first RPC link in five minutes', path: 'getting-started' },
+        { label: 'Choose an Endpoint composition', path: 'endpoint-composition' },
+        { label: 'Providers and contracts', path: 'providers-and-contracts' }
+      ]
+    }
+  },
+  'web-rpc:getting-started': {
+    zh: {
+      title: '五分钟建立可释放的 WebRPC 调用链',
+      lede: '用一对 Memory transport、最窄 client/provider preset 和同一组基础 middleware 完成请求、响应与释放闭环。',
+      document: {
+        sections: [
+          {
+            id: 'create-pair',
+            heading: '先建立 transport，再分别创建两端',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { connect, contract, protocol, timeout } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createProviderEndpoint } from '@migaia/web-rpc/provider'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst provider = await createProviderEndpoint({\n  id: 'provider',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ] as const\n})\n\nconst client = await createClientEndpoint({\n  id: 'client',\n  targetIds: ['provider'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport }),\n    timeout({ timeoutMs: 5_000 })\n  ] as const\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'id 是拓扑内唯一路由标识，不是身份凭证。',
+                  'transport 在 factory 与 connect() 同时提供时必须是同一对象。',
+                  'middlewares 使用 as const，才能保留条件能力的精确类型。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'factory-options',
+            heading: '逐项决定 Endpoint 构造配置',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['字段', '默认值', '作用'],
+                rows: [
+                  ['id', '必填', '拓扑内稳定路由标签；不是认证身份。'],
+                  ['targetIds', '[]', '已知远端种子；自动 discovery 可在之后发现更多目标。'],
+                  [
+                    'transport',
+                    '由 middleware 提供',
+                    'Endpoint 使用的消息通道；与 connect.transport 同时存在时必须同一引用。'
+                  ],
+                  ['provider', '{}', '构造完成前原子注册的初始 provider 方法。'],
+                  [
+                    'providerLimits',
+                    '256 global / 64 peer',
+                    '限制在途 provider 工作，满载立即返回 OVERLOADED。'
+                  ],
+                  ['replay', '4096 / 310000 ms', '限制 outbound request id 的容量与保留时间。'],
+                  ['middlewares', '必填 tuple', '按序原子安装协议、连接、认证、timeout 等策略。'],
+                  ['construction.signal', 'undefined', '取消构造，但仍逆序回滚已安装 middleware。'],
+                  ['construction.timeoutMs', 'false', '限制完整构造；false 明确关闭 deadline。']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'call',
+            heading: '注册 provider 并发出一次可等待调用',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "provider.provide('sum', (context) => {\n  const values = context.data as readonly number[]\n  return context.success(values.reduce((total, value) => total + value, 0))\n})\n\nconst total = await client.send<number>('provider', 'sum', [1, 2, 3])\nconsole.log(total) // 6"
+              },
+              {
+                type: 'paragraph',
+                text: 'send 等待一次结构化响应；dispatch 是不等待响应的单向通知。不要用 dispatch 模拟需要确认或重试的业务操作。'
+              }
+            ]
+          },
+          {
+            id: 'dispose',
+            heading: '让 endpoint 所有者关闭整棵资源',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'await Promise.all([client.dispose(), provider.dispose()])'
+              },
+              {
+                type: 'paragraph',
+                text: 'dispose 立即结算 pending 请求、关闭 provider admission，并清理 middleware、订阅和 owned transport。重复调用复用第一次结果。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟建立首条调用链', path: 'getting-started' },
+        { label: 'Provider 与契约', path: 'providers-and-contracts' },
+        { label: 'createClientEndpoint API', path: 'docs/web-rpc/client/createClientEndpoint' }
+      ]
+    },
+    en: {
+      title: 'Build a disposable WebRPC call path in five minutes',
+      lede: 'Use a Memory transport pair, narrow client/provider presets, and the same foundational middleware to close the request, response, and disposal loop.',
+      document: {
+        sections: [
+          {
+            id: 'create-pair',
+            heading: 'Create the transport first, then construct both endpoints',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { connect, contract, protocol, timeout } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createProviderEndpoint } from '@migaia/web-rpc/provider'\nimport { createMemoryTransportPair } from '@migaia/web-rpc/adapters/memory'\n\nconst [clientTransport, providerTransport] = createMemoryTransportPair()\n\nconst provider = await createProviderEndpoint({\n  id: 'provider',\n  transport: providerTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: providerTransport })\n  ] as const\n})\n\nconst client = await createClientEndpoint({\n  id: 'client',\n  targetIds: ['provider'],\n  transport: clientTransport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport: clientTransport }),\n    timeout({ timeoutMs: 5_000 })\n  ] as const\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'id is a unique routing label within the topology and is not an identity credential.',
+                  'When transport appears in both the factory and connect(), both references must be the same object.',
+                  'Keep middlewares as const so conditional capabilities remain precisely typed.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'factory-options',
+            heading: 'Choose every Endpoint construction option',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Field', 'Default', 'Purpose'],
+                rows: [
+                  [
+                    'id',
+                    'required',
+                    'Stable routing label within the topology; never an authentication identity.'
+                  ],
+                  [
+                    'targetIds',
+                    '[]',
+                    'Known-peer seed; automatic discovery may find more targets later.'
+                  ],
+                  [
+                    'transport',
+                    'provided by middleware',
+                    'Endpoint message channel; it must be the same reference as connect.transport when both exist.'
+                  ],
+                  [
+                    'provider',
+                    '{}',
+                    'Initial provider methods registered atomically before construction resolves.'
+                  ],
+                  [
+                    'providerLimits',
+                    '256 global / 64 peer',
+                    'Bounds active provider work and returns OVERLOADED immediately at saturation.'
+                  ],
+                  [
+                    'replay',
+                    '4096 / 310000 ms',
+                    'Bounds outbound request-id capacity and retention lifetime.'
+                  ],
+                  [
+                    'middlewares',
+                    'required tuple',
+                    'Installs protocol, connection, authentication, timeout, and policy atomically in order.'
+                  ],
+                  [
+                    'construction.signal',
+                    'undefined',
+                    'Cancels construction while still rolling installed middleware back in reverse order.'
+                  ],
+                  [
+                    'construction.timeoutMs',
+                    'false',
+                    'Bounds complete construction; false explicitly disables its deadline.'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'call',
+            heading: 'Register a provider and issue one awaited call',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "provider.provide('sum', (context) => {\n  const values = context.data as readonly number[]\n  return context.success(values.reduce((total, value) => total + value, 0))\n})\n\nconst total = await client.send<number>('provider', 'sum', [1, 2, 3])\nconsole.log(total) // 6"
+              },
+              {
+                type: 'paragraph',
+                text: 'send awaits one structured response. dispatch is a one-way notification with no response. Do not use dispatch to model a business operation that requires acknowledgement or retry.'
+              }
+            ]
+          },
+          {
+            id: 'dispose',
+            heading: 'Let the endpoint owner close the complete resource tree',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'await Promise.all([client.dispose(), provider.dispose()])'
+              },
+              {
+                type: 'paragraph',
+                text: 'dispose settles pending requests immediately, closes provider admission, and cleans middleware, subscriptions, and owned transports. Repeated calls reuse the first result.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Build the first call path in five minutes', path: 'getting-started' },
+        { label: 'Providers and contracts', path: 'providers-and-contracts' },
+        { label: 'createClientEndpoint API', path: 'docs/web-rpc/client/createClientEndpoint' }
+      ]
+    }
+  },
+  'web-rpc:endpoint-composition': {
+    zh: {
+      title: '选择预设，或组合最小 Endpoint',
+      lede: '先从业务真正需要的根方法反推入口；只有确实需要自定义公开表面时，才使用 Feature 组合器。',
+      document: {
+        sections: [
+          {
+            id: 'presets',
+            heading: '优先选择最窄预设',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['需要', '入口', '根对象方法'],
+                rows: [
+                  [
+                    '只调用或通知远端',
+                    '@migaia/web-rpc/client',
+                    'send、sendAll、dispatch、dispatchAll'
+                  ],
+                  ['同时暴露本地方法', '@migaia/web-rpc/provider', '调用侧方法 + provide'],
+                  ['发现、控制和分片全部需要', '@migaia/web-rpc/full', '完整公开表面'],
+                  ['精确控制能力与 bundle', '@migaia/web-rpc/core', '仅显式 Feature 的公开投影']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '根入口 createEndpoint 与 createFullEndpoint 是同一函数引用。它是兼容性入口，不是所有调用方的最小默认选择。'
+              }
+            ]
+          },
+          {
+            id: 'compose',
+            heading: '把 Feature 与 middleware 分开组合',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { connect, ping } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { control } from '@migaia/web-rpc/features/control'\nimport { discovery } from '@migaia/web-rpc/features/discovery'\nimport { outbound } from '@migaia/web-rpc/features/outbound'\n\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'dashboard',\n    transport,\n    middlewares: [connect({ transport }), ping({ timeoutMs: 2_000 })] as const\n  },\n  [outbound(), discovery(), control()] as const\n)\n\nawait endpoint.send('worker', 'refresh', undefined)\nconst alive = await endpoint.ping('worker')"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Feature 决定根对象公开什么；middleware 配置协议、连接与策略。',
+                  '私有 Feature 依赖会安装并去重，但不会偷偷扩大根对象类型。',
+                  'Feature tuple 不能为空且不能重复；冲突在构造期失败。',
+                  '使用 as const 保留 ping 和手动发现等条件能力的精确类型。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'construction',
+            heading: '把构造当作原子生命周期',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '构造会异步安装 Feature 与 middleware。任何一步失败、取消或超时，已安装项都会逆序回滚；原始错误仍可从 cause 或 AggregateError.errors 到达。不要保存内部安装顺序或 shared key。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '调用与取消', path: 'calls-and-cancellation' },
+        { label: 'createComposedEndpoint API', path: 'docs/web-rpc/core/createComposedEndpoint' }
+      ]
+    },
+    en: {
+      title: 'Choose a preset or compose the smallest endpoint',
+      lede: 'Derive the entry point from the root methods the product actually needs. Use Feature composition only when the public surface must be customized.',
+      document: {
+        sections: [
+          {
+            id: 'presets',
+            heading: 'Prefer the narrowest preset',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Need', 'Entry', 'Root methods'],
+                rows: [
+                  [
+                    'Only call or notify remote peers',
+                    '@migaia/web-rpc/client',
+                    'send, sendAll, dispatch, dispatchAll'
+                  ],
+                  [
+                    'Also expose local methods',
+                    '@migaia/web-rpc/provider',
+                    'Outbound methods plus provide'
+                  ],
+                  [
+                    'Need discovery, control, and chunking',
+                    '@migaia/web-rpc/full',
+                    'Complete public surface'
+                  ],
+                  [
+                    'Control capability and bundle precisely',
+                    '@migaia/web-rpc/core',
+                    'Only selected Feature projections'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'The root createEndpoint export is the same function reference as createFullEndpoint. It is a compatibility entry, not the smallest default for every consumer.'
+              }
+            ]
+          },
+          {
+            id: 'compose',
+            heading: 'Compose Features separately from middleware',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { connect, ping } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { control } from '@migaia/web-rpc/features/control'\nimport { discovery } from '@migaia/web-rpc/features/discovery'\nimport { outbound } from '@migaia/web-rpc/features/outbound'\n\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'dashboard',\n    transport,\n    middlewares: [connect({ transport }), ping({ timeoutMs: 2_000 })] as const\n  },\n  [outbound(), discovery(), control()] as const\n)\n\nawait endpoint.send('worker', 'refresh', undefined)\nconst alive = await endpoint.ping('worker')"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Features decide what appears on the root; middleware configures protocol, connection, and policy.',
+                  'Private Feature dependencies are installed and deduplicated without silently widening the root type.',
+                  'The Feature tuple cannot be empty or contain duplicates; conflicts fail during construction.',
+                  'Keep tuples as const to preserve conditional ping and manual-discovery capabilities.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'construction',
+            heading: 'Treat construction as an atomic lifecycle',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Construction installs Features and middleware asynchronously. Failure, cancellation, or timeout rolls installed items back in reverse order while preserving the primary error through cause or AggregateError.errors. Do not depend on internal install order or shared keys.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Calls and cancellation', path: 'calls-and-cancellation' },
+        { label: 'createComposedEndpoint API', path: 'docs/web-rpc/core/createComposedEndpoint' }
+      ]
+    }
+  },
+  'web-rpc:calls-and-cancellation': {
+    zh: {
+      title: '正确选择调用、广播、通知与取消语义',
+      lede: 'send 系列等待结构化响应，dispatch 系列只确认发送结算；先选择业务语义，再配置 timeout、signal 与 transfer。',
+      document: {
+        sections: [
+          {
+            id: 'choose-operation',
+            heading: '不要用一个方法模拟另一种语义',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['方法', '响应', '适用场景'],
+                rows: [
+                  ['send', '一个目标的一次响应', '命令、查询和需要确认的操作'],
+                  ['sendAll', '多个目标的独立结果', '明确知道目标集合的 fan-out'],
+                  ['dispatch', '无业务响应', '遥测、失效通知等单向事件'],
+                  ['dispatchAll', '无业务响应', '向多个目标广播单向事件']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'dispatch 发送结算后会立即释放自己的 replay id。它无法证明远端业务已执行，因此不能代替需要确认、补偿或重试的命令。'
+              }
+            ]
+          },
+          {
+            id: 'cancel',
+            heading: '让调用方拥有等待期限',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const controller = new AbortController()\n\nconst pending = client.send<User>('provider', 'findUser', { id: 'u-1' }, {\n  signal: controller.signal,\n  timeoutMs: 3_000\n})\n\ncontroller.abort(new Error('route changed'))\nawait pending"
+              },
+              {
+                type: 'list',
+                items: [
+                  'timeoutMs 限制本次等待；signal 允许调用方用自己的原因提前取消。',
+                  '取消会传播到 provider context.signal，但无法撤销已经发生的外部副作用。',
+                  'endpoint.dispose 会立即结算全部 pending 请求，不留下悬挂 Promise。',
+                  'transfer 只用于 transport 支持的可转移对象；转移后发送方不再拥有原缓冲区。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'errors',
+            heading: '按错误来源决定恢复动作',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '协议、schema、连接、超时、取消和远端 provider 失败保持不同错误码与 cause 链。只有幂等且仍满足业务期限的操作才适合上层重试；不要对 INVALID_CONFIG 或 SCHEMA_INVALID 原样重试。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Provider 与契约', path: 'providers-and-contracts' },
+        { label: 'createClientEndpoint API', path: 'docs/web-rpc/client/createClientEndpoint' }
+      ]
+    },
+    en: {
+      title: 'Choose call, fan-out, notification, and cancellation semantics correctly',
+      lede: 'The send family awaits structured responses while dispatch only awaits send settlement. Choose the business semantic before adding timeout, signal, or transfer.',
+      document: {
+        sections: [
+          {
+            id: 'choose-operation',
+            heading: 'Do not use one operation to imitate another',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Method', 'Response', 'Use it for'],
+                rows: [
+                  [
+                    'send',
+                    'One response from one target',
+                    'Commands, queries, and acknowledged work'
+                  ],
+                  [
+                    'sendAll',
+                    'Independent results from several targets',
+                    'Fan-out to a known target set'
+                  ],
+                  ['dispatch', 'No business response', 'Telemetry and invalidation notifications'],
+                  ['dispatchAll', 'No business response', 'One-way notification to several targets']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'dispatch releases its replay id after send settlement. It cannot prove remote business execution, so it cannot replace a command that needs acknowledgement, compensation, or retry.'
+              }
+            ]
+          },
+          {
+            id: 'cancel',
+            heading: 'Let the caller own the waiting deadline',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const controller = new AbortController()\n\nconst pending = client.send<User>('provider', 'findUser', { id: 'u-1' }, {\n  signal: controller.signal,\n  timeoutMs: 3_000\n})\n\ncontroller.abort(new Error('route changed'))\nawait pending"
+              },
+              {
+                type: 'list',
+                items: [
+                  'timeoutMs bounds this wait; signal lets the caller cancel early with its own reason.',
+                  'Cancellation reaches provider context.signal but cannot undo an external side effect that already happened.',
+                  'endpoint.dispose settles every pending request immediately instead of leaving dangling Promises.',
+                  'Use transfer only for transport-supported transferable objects; the sender no longer owns a transferred buffer.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'errors',
+            heading: 'Recover according to error provenance',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Protocol, schema, connection, timeout, cancellation, and remote-provider failures retain distinct codes and cause chains. Retry only idempotent work that still fits the business deadline; never retry INVALID_CONFIG or SCHEMA_INVALID unchanged.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Providers and contracts', path: 'providers-and-contracts' },
+        { label: 'createClientEndpoint API', path: 'docs/web-rpc/client/createClientEndpoint' }
+      ]
+    }
+  },
+  'web-rpc:providers-and-contracts': {
+    zh: {
+      title: '用 Provider 与 Contract 固定网络边界',
+      lede: 'Provider 只接收结构化 context；contract 在参数进入业务代码前、结果离开业务代码前执行 schema 校验。',
+      document: {
+        sections: [
+          {
+            id: 'contract',
+            heading: '为每个公开方法声明参数与结果',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { contract } from '@migaia/web-rpc'\nimport { z } from 'zod'\n\nconst contracts = contract({\n  version: '1',\n  schemas: {\n    add: {\n      params: z.object({ a: z.number(), b: z.number() }),\n      result: z.number()\n    }\n  }\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'version 是协议协商的一部分；不兼容版本应在进入 provider 前拒绝。',
+                  'schema 只需要 parse(value)，可使用 zod、valibot、arktype 或自有实现。',
+                  'params 与 result 都跨越不可信边界，不能只校验请求而信任响应。',
+                  '校验失败是 SCHEMA_INVALID；修复契约或数据，不要原样重试。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'provider',
+            heading: '始终通过 context 返回显式结果',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "endpoint.provide('add', async (context) => {\n  const { a, b } = context.data as { a: number; b: number }\n\n  if (context.signal.aborted) {\n    return context.failed('request cancelled', 'ABORTED')\n  }\n\n  return context.success(a + b)\n})"
+              },
+              {
+                type: 'paragraph',
+                text: 'context.success 与 context.failed 生成协议认识的结果；dispatchTo 用于从 provider 主动发送单向通知。provider 应监听 context.signal，并在不可撤销副作用前再次检查取消。'
+              }
+            ]
+          },
+          {
+            id: 'limits',
+            heading: '用并发上限保护 Provider',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'providerLimits.maxGlobal 默认 256，maxPerPeer 默认 64；达到上限会立即返回 OVERLOADED，而不是无限排队。senderId 只是路由字段，身份与权限必须由 transport sourceProof、identifier 或 authentication 建立。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Transport 与安全', path: 'transports-and-security' },
+        { label: 'contract API', path: 'docs/web-rpc/contract' }
+      ]
+    },
+    en: {
+      title: 'Fix the network boundary with providers and contracts',
+      lede: 'A provider receives only a structured context. contract validates parameters before business code and validates results before they leave it.',
+      document: {
+        sections: [
+          {
+            id: 'contract',
+            heading: 'Declare parameters and results for every public method',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { contract } from '@migaia/web-rpc'\nimport { z } from 'zod'\n\nconst contracts = contract({\n  version: '1',\n  schemas: {\n    add: {\n      params: z.object({ a: z.number(), b: z.number() }),\n      result: z.number()\n    }\n  }\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'version participates in protocol negotiation; reject incompatible versions before provider execution.',
+                  'A schema only needs parse(value), so zod, valibot, arktype, or an internal implementation can be used.',
+                  'Both params and result cross an untrusted boundary; validating requests alone is insufficient.',
+                  'Validation fails with SCHEMA_INVALID; fix the contract or data instead of retrying unchanged.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'provider',
+            heading: 'Return explicit protocol results through the context',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "endpoint.provide('add', async (context) => {\n  const { a, b } = context.data as { a: number; b: number }\n\n  if (context.signal.aborted) {\n    return context.failed('request cancelled', 'ABORTED')\n  }\n\n  return context.success(a + b)\n})"
+              },
+              {
+                type: 'paragraph',
+                text: 'context.success and context.failed produce protocol-aware results; dispatchTo sends a one-way notification from the provider. Observe context.signal and check again before an irreversible side effect.'
+              }
+            ]
+          },
+          {
+            id: 'limits',
+            heading: 'Protect providers with concurrency limits',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'providerLimits.maxGlobal defaults to 256 and maxPerPeer defaults to 64. Saturation returns OVERLOADED immediately instead of creating an unbounded queue. senderId is only a routing field; transport sourceProof, identifier, or authentication must establish identity and authorization.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Transports and security', path: 'transports-and-security' },
+        { label: 'contract API', path: 'docs/web-rpc/contract' }
+      ]
+    }
+  },
+  'web-rpc:transports-and-security': {
+    zh: {
+      title: '按拓扑选择 Transport，并建立真实安全边界',
+      lede: 'Transport 只负责收发消息；topology、ownership、sourceProof 与 authentication 共同决定 endpoint 可以信任什么。',
+      document: {
+        sections: [
+          {
+            id: 'topology',
+            heading: '先声明真实拓扑',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['拓扑', '典型宿主', '信任规则'],
+                rows: [
+                  [
+                    'exclusive',
+                    'Dedicated Worker、MessagePort',
+                    '链路只有唯一对端，可绑定首次观察到的发送方'
+                  ],
+                  [
+                    'multiplexed',
+                    'Shared Worker 多端口',
+                    '必须验证 peer 或 source 身份，不能按独占链路信任'
+                  ],
+                  ['broadcast', 'BroadcastChannel', '只提供诚实节点路由，不提供身份或保密边界']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '把 multiplexed 或 broadcast 伪报为 exclusive 会破坏身份模型。自定义 adapter 必须如实暴露 topology、platform、ownership 与 encodedType。'
+              }
+            ]
+          },
+          {
+            id: 'adapter',
+            heading: '从宿主子路径导入 adapter',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createMessagePortTransport } from '@migaia/web-rpc/adapters/message-port'\n\nconst transport = createMessagePortTransport(port, { ownership: 'borrowed' })\nconst endpoint = await createClientEndpoint({\n  id: 'ui',\n  targetIds: ['worker'],\n  transport,\n  middlewares: [connect({ transport })] as const\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'adapter 不从根入口导出，避免把宿主专属代码带入不需要的 bundle。',
+                  'owned transport 随 endpoint.dispose 关闭；borrowed transport 只解除当前 endpoint 的订阅。',
+                  'origin 和 senderId 都不是单独的凭证；多发送方链路还需要 sourceProof 或 identifier。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'authentication',
+            heading: '需要保密或抗篡改时保护每一帧',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'authentication 必须成对提供 encrypt/decrypt 与 sign/verify，并匹配 transport.encodedType。认证覆盖请求、响应、控制和分片帧；只保护业务 payload 会留下协议控制面未认证。密钥轮换、授权策略与凭证分发属于应用安全层。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '发现与控制', path: 'discovery-and-control' },
+        { label: 'authentication API', path: 'docs/web-rpc/authentication' }
+      ]
+    },
+    en: {
+      title: 'Choose a transport by topology and establish a real security boundary',
+      lede: 'A transport only moves messages. topology, ownership, sourceProof, and authentication jointly determine what an endpoint may trust.',
+      document: {
+        sections: [
+          {
+            id: 'topology',
+            heading: 'Declare the real topology first',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Topology', 'Typical host', 'Trust rule'],
+                rows: [
+                  [
+                    'exclusive',
+                    'Dedicated Worker or MessagePort',
+                    'The link has one peer and may bind the first observed sender'
+                  ],
+                  [
+                    'multiplexed',
+                    'Shared Worker with several ports',
+                    'Verify peer or source identity; never trust it as an exclusive link'
+                  ],
+                  [
+                    'broadcast',
+                    'BroadcastChannel',
+                    'Honest-node routing only, with no identity or confidentiality boundary'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Misreporting a multiplexed or broadcast channel as exclusive breaks the identity model. A custom adapter must truthfully expose topology, platform, ownership, and encodedType.'
+              }
+            ]
+          },
+          {
+            id: 'adapter',
+            heading: 'Import adapters from host-specific subpaths',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createMessagePortTransport } from '@migaia/web-rpc/adapters/message-port'\n\nconst transport = createMessagePortTransport(port, { ownership: 'borrowed' })\nconst endpoint = await createClientEndpoint({\n  id: 'ui',\n  targetIds: ['worker'],\n  transport,\n  middlewares: [connect({ transport })] as const\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Adapters are excluded from the root entry so host-specific code does not enter unrelated bundles.',
+                  'An owned transport closes with endpoint.dispose; a borrowed one only loses this endpoint’s subscriptions.',
+                  'Neither origin nor senderId is a credential by itself; multi-sender links also need sourceProof or identifier.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'authentication',
+            heading: 'Protect every frame when confidentiality or integrity matters',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'authentication requires paired encrypt/decrypt and sign/verify functions matching transport.encodedType. It covers request, response, control, and chunk frames; protecting only the business payload leaves the protocol control plane unauthenticated. Key rotation, authorization, and credential distribution remain application-security responsibilities.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Discovery and control', path: 'discovery-and-control' },
+        { label: 'authentication API', path: 'docs/web-rpc/authentication' }
+      ]
+    }
+  },
+  'web-rpc:discovery-and-control': {
+    zh: {
+      title: '发现远端能力，并显式启用控制面',
+      lede: 'discovery 维护远端快照，control 处理控制帧；两者都不会替代 transport 身份验证或自动公开 outbound。',
+      document: {
+        sections: [
+          {
+            id: 'discovery',
+            heading: '把自动发现与手动发现当成不同策略',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '自动模式：对未知 targetId 的首次 send、dispatch 或 ping 触发懒查询并缓存结果。',
+                  '手动模式：调用方显式 connect 或查询，适合需要准入时机和 UI 状态控制的产品。',
+                  'endpoint.discovery 是远端只读快照，永远不包含 endpoint 自己。',
+                  '发现只回答可见性与能力，不证明 senderId 对应可信身份。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'control',
+            heading: '同时安装 control Feature 与 ping middleware',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { connect, ping } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { control } from '@migaia/web-rpc/features/control'\nimport { discovery } from '@migaia/web-rpc/features/discovery'\n\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'health-checker',\n    transport,\n    middlewares: [connect({ transport }), ping({ timeoutMs: 1_500 })] as const\n  },\n  [discovery(), control()] as const\n)\n\nconst alive = await endpoint.ping('worker')"
+              },
+              {
+                type: 'paragraph',
+                text: 'control Feature 拥有控制帧处理；ping middleware 提供策略和条件类型。缺少任一侧都不应假定 ping 可用。ping 只证明链路在期限内响应，不证明业务方法健康。'
+              }
+            ]
+          },
+          {
+            id: 'replacement',
+            heading: '把远端替换视为新一代状态',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '远端离开、重连或能力变化时读取新 discovery 快照，不保存内部可变记录。旧 pending 请求按其原链路结算；新请求根据最新快照选路，避免跨 generation 复用过期身份。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '分片与背压', path: 'chunking-and-backpressure' },
+        { label: 'ping API', path: 'docs/web-rpc/ping' }
+      ]
+    },
+    en: {
+      title: 'Discover remote capabilities and enable the control plane explicitly',
+      lede: 'discovery maintains remote snapshots while control owns control frames. Neither replaces transport identity verification nor automatically exposes outbound methods.',
+      document: {
+        sections: [
+          {
+            id: 'discovery',
+            heading: 'Treat automatic and manual discovery as different policies',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Automatic mode lazily queries and caches an unknown target on the first send, dispatch, or ping.',
+                  'Manual mode lets the caller connect or query explicitly when admission timing and UI state matter.',
+                  'endpoint.discovery is a readonly remote snapshot and never contains the endpoint itself.',
+                  'Discovery proves visibility and capability, not that senderId is an authenticated identity.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'control',
+            heading: 'Install both the control Feature and ping middleware',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { connect, ping } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { control } from '@migaia/web-rpc/features/control'\nimport { discovery } from '@migaia/web-rpc/features/discovery'\n\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'health-checker',\n    transport,\n    middlewares: [connect({ transport }), ping({ timeoutMs: 1_500 })] as const\n  },\n  [discovery(), control()] as const\n)\n\nconst alive = await endpoint.ping('worker')"
+              },
+              {
+                type: 'paragraph',
+                text: 'The control Feature owns control-frame handling; ping middleware supplies policy and conditional typing. Do not assume ping exists when either side is missing. A successful ping proves a timely link response, not business-method health.'
+              }
+            ]
+          },
+          {
+            id: 'replacement',
+            heading: 'Treat a replaced peer as a new generation of state',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Read a fresh discovery snapshot after a peer leaves, reconnects, or changes capability; never retain an internal mutable record. Old pending calls settle on their original link while new calls route from the latest snapshot, preventing stale identity reuse across generations.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Chunking and backpressure', path: 'chunking-and-backpressure' },
+        { label: 'ping API', path: 'docs/web-rpc/ping' }
+      ]
+    }
+  },
+  'web-rpc:chunking-and-backpressure': {
+    zh: {
+      title: '在明确容量预算下启用分片',
+      lede: '分片解决单帧尺寸限制，不是可靠传输或无限缓冲；所有消息、分片、并发和等待都必须有界。',
+      document: {
+        sections: [
+          {
+            id: 'enable',
+            heading: '同时选择 chunk Feature 与策略 middleware',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { chunk, connect } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { chunk as chunkFeature } from '@migaia/web-rpc/features/chunk'\nimport { outbound } from '@migaia/web-rpc/features/outbound'\n\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'uploader',\n    transport,\n    middlewares: [\n      connect({ transport }),\n      chunk({\n        chunkSize: 64 * 1024,\n        maxMessageBytes: 8 * 1024 * 1024,\n        assemblyTimeoutMs: 10_000\n      })\n    ] as const\n  },\n  [outbound(), chunkFeature()] as const\n)"
+              },
+              {
+                type: 'paragraph',
+                text: 'Feature 安装分片帧所有者；middleware 定义如何拆分、计数与重组。只安装其中一个不会形成完整分片路径。'
+              }
+            ]
+          },
+          {
+            id: 'budgets',
+            heading: '让每一种资源都有独立上限',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['配置', '控制对象', '超限结果'],
+                rows: [
+                  ['maxMessageBytes', '一条逻辑消息总大小', '发送或接收立即拒绝'],
+                  ['maxChunksPerMessage / maxChunkBytes', '分片数量与单片大小', '拒绝畸形帧'],
+                  [
+                    'maxConcurrentMessages / maxConcurrentMessagesPerPeer',
+                    '全局与单 peer 重组槽位',
+                    '不再接纳新重组'
+                  ],
+                  ['maxBufferedBytes', '全部未完成消息缓冲', '拒绝继续占用内存'],
+                  ['assemblyTimeoutMs', '不完整消息寿命', '释放槽位和缓冲']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'semantics',
+            heading: '不要把分片当作重试协议',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '分片是 best-effort：缺片、乱序超限或 assembly timeout 会失败并清理，不会自动重发。需要可靠恢复时，由上层使用幂等业务 id、断点协议或重新发起完整调用。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '重放、重试与生命周期', path: 'replay-retry-and-lifecycle' },
+        { label: 'chunk API', path: 'docs/web-rpc/chunk' }
+      ]
+    },
+    en: {
+      title: 'Enable chunking under explicit capacity budgets',
+      lede: 'Chunking solves frame-size limits; it is not reliable transport or unlimited buffering. Messages, chunks, concurrency, and waiting must all remain bounded.',
+      document: {
+        sections: [
+          {
+            id: 'enable',
+            heading: 'Select both the chunk Feature and policy middleware',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { chunk, connect } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { chunk as chunkFeature } from '@migaia/web-rpc/features/chunk'\nimport { outbound } from '@migaia/web-rpc/features/outbound'\n\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'uploader',\n    transport,\n    middlewares: [\n      connect({ transport }),\n      chunk({\n        chunkSize: 64 * 1024,\n        maxMessageBytes: 8 * 1024 * 1024,\n        assemblyTimeoutMs: 10_000\n      })\n    ] as const\n  },\n  [outbound(), chunkFeature()] as const\n)"
+              },
+              {
+                type: 'paragraph',
+                text: 'The Feature installs the chunk-frame owner while middleware defines splitting, accounting, and assembly. Installing only one side does not create a complete chunk path.'
+              }
+            ]
+          },
+          {
+            id: 'budgets',
+            heading: 'Give every resource an independent limit',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Option', 'Resource', 'Limit result'],
+                rows: [
+                  [
+                    'maxMessageBytes',
+                    'Total logical-message size',
+                    'Reject send or receive immediately'
+                  ],
+                  [
+                    'maxChunksPerMessage / maxChunkBytes',
+                    'Chunk count and individual size',
+                    'Reject malformed frames'
+                  ],
+                  [
+                    'maxConcurrentMessages / maxConcurrentMessagesPerPeer',
+                    'Global and per-peer assembly slots',
+                    'Stop admitting new assemblies'
+                  ],
+                  [
+                    'maxBufferedBytes',
+                    'All incomplete-message buffers',
+                    'Reject further memory occupation'
+                  ],
+                  ['assemblyTimeoutMs', 'Incomplete-message lifetime', 'Release slots and buffers']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'semantics',
+            heading: 'Do not treat chunking as a retry protocol',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Chunking is best-effort: missing chunks, excessive reordering, or assembly timeout fails and cleans the assembly without automatic retransmission. Reliable recovery belongs in an upper layer using idempotency keys, a resume protocol, or a complete new call.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Replay, retry, and lifecycle', path: 'replay-retry-and-lifecycle' },
+        { label: 'chunk API', path: 'docs/web-rpc/chunk' }
+      ]
+    }
+  },
+  'web-rpc:replay-retry-and-lifecycle': {
+    zh: {
+      title: '区分重放保护、业务重试与 Endpoint 终态',
+      lede: 'replay 窗口防止旧消息 id 被重新接受；它不替业务重试、幂等设计或可靠队列，dispose 之后 endpoint 永久终止。',
+      document: {
+        sections: [
+          {
+            id: 'replay',
+            heading: '按双向请求吞吐配置重放窗口',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['配置', '默认值', '作用'],
+                rows: [
+                  ['maxEntries', '4096', '限制窗口内保留的已用消息 id 数量'],
+                  ['ttlMs', '310000 ms', '限制普通请求 id 的防重放寿命']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '普通请求即使已经响应，id 也保留到 TTL 结束，防止晚到重复响应复活旧请求。dispatch-only id 在发送结算后立即释放，因为它没有响应匹配阶段。'
+              }
+            ]
+          },
+          {
+            id: 'retry',
+            heading: '只在业务层重试可安全重复的操作',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '重放保护拒绝重复 id，不会自动用新 id 重发业务操作。',
+                  '重试必须重新检查 deadline、取消状态、幂等性和 provider 是否可能已执行副作用。',
+                  'SCHEMA_INVALID、INVALID_CONFIG 和权限失败需要修正输入或配置，不适合退避重试。',
+                  '需要 exactly-once 结果时使用业务幂等键与持久化事务，不依赖 transport 消息 id。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'dispose',
+            heading: '由创建者拥有 dispose',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "try {\n  await endpoint.send('worker', 'commit', payload, { timeoutMs: 5_000 })\n} finally {\n  await endpoint.dispose()\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'dispose 关闭 provider admission、结算 pending 请求、撤销订阅并清理 owned transport。它可重复调用且复用第一次结果；清理失败会聚合但不替换主失败。终态 endpoint 不可复活，应创建新实例。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '返回 WebRPC 学习路径', path: 'index' },
+        { label: 'dispose API', path: 'docs/web-rpc/core/createComposedEndpoint' }
+      ]
+    },
+    en: {
+      title: 'Separate replay protection, business retry, and endpoint terminal state',
+      lede: 'The replay window prevents an old message id from being accepted again. It is not business retry, idempotency design, or a durable queue, and an endpoint is permanently terminal after disposal.',
+      document: {
+        sections: [
+          {
+            id: 'replay',
+            heading: 'Size the replay window from bidirectional request throughput',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Option', 'Default', 'Purpose'],
+                rows: [
+                  ['maxEntries', '4096', 'Bound the used message ids retained in the window'],
+                  ['ttlMs', '310000 ms', 'Bound replay protection lifetime for ordinary requests']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'An ordinary request id remains until TTL expiry even after its response, preventing a late duplicate response from reviving an old call. A dispatch-only id is released after send settlement because it has no response-matching phase.'
+              }
+            ]
+          },
+          {
+            id: 'retry',
+            heading: 'Retry only safely repeatable work in the business layer',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Replay protection rejects a duplicate id and does not automatically resend the operation under a new id.',
+                  'A retry must recheck deadline, cancellation, idempotency, and whether the provider may already have committed a side effect.',
+                  'SCHEMA_INVALID, INVALID_CONFIG, and authorization failures require corrected input or configuration, not backoff.',
+                  'Use a business idempotency key and durable transaction for exactly-once outcomes; never rely on a transport message id.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'dispose',
+            heading: 'The creator owns disposal',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "try {\n  await endpoint.send('worker', 'commit', payload, { timeoutMs: 5_000 })\n} finally {\n  await endpoint.dispose()\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'dispose closes provider admission, settles pending calls, removes subscriptions, and cleans owned transports. It is idempotent and reuses the first result; cleanup failures aggregate without replacing the primary failure. A terminal endpoint cannot be revived—create a new instance.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Return to WebRPC learning paths', path: 'index' },
+        { label: 'dispose ownership API', path: 'docs/web-rpc/core/createComposedEndpoint' }
+      ]
+    }
+  },
+  'storage-web:index': {
+    zh: {
+      title: 'Storage Web 学习路径',
+      lede: '先按数据形态和一致性要求选择后端，再决定是否需要 entity、schema、reactive 与 Host 组合；不要从浏览器 API 名称反推架构。',
+      document: {
+        sections: [
+          {
+            id: 'choose-backend',
+            heading: '先根据能力选择存储',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['需求', '入口', '关键限制'],
+                rows: [
+                  ['小型同步字符串配置', 'localStorage / sessionStorage', '无事务、记录和二级索引'],
+                  ['页面可见 cookie', 'cookies', '4 KiB、opaque entry、scope 必须一致'],
+                  ['结构化记录、字节、事务或游标', 'indexedDb', '异步；升级和多实例协调由后端管理'],
+                  [
+                    '测试、SSR 或进程内临时数据',
+                    'memoryStorage',
+                    '非持久化；能力接近完整 record store'
+                  ],
+                  [
+                    '按 ID 装配多个后端',
+                    'createStorageHost',
+                    '首次 plugin 安装异步且显式拥有生命周期'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '始终读取 store.capabilities 决定 records、binary、transactions、iteration、secondaryIndexes 与 changeFeed；不要用 backend 字符串猜能力。'
+              }
+            ]
+          },
+          {
+            id: 'choose-layer',
+            heading: '再选择你真正需要的抽象层',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '直接 backend：键值语义已经足够，调用方自己拥有 key 与 value 格式。',
+                  'defineEntity：需要 schema、版本迁移、codec、索引和 repository 语义。',
+                  'Reactive adapter：需要订阅失效或 live query，但仍由 backend 保存真实数据。',
+                  'StorageHost：需要按稳定 ID 安装、替换、查询多个 backend，并统一释放。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟选择并使用后端', path: 'getting-started' },
+        { label: '定义 Entity', path: 'entity-schema-and-codecs' },
+        { label: '构建 Storage Host', path: 'host-and-plugins' }
+      ]
+    },
+    en: {
+      title: 'Storage Web learning paths',
+      lede: 'Choose a backend from data shape and consistency requirements, then decide whether entity, schema, reactive, or Host composition is needed. Do not derive architecture from a browser API name.',
+      document: {
+        sections: [
+          {
+            id: 'choose-backend',
+            heading: 'Choose storage by capability first',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Need', 'Entry', 'Important limit'],
+                rows: [
+                  [
+                    'Small synchronous string settings',
+                    'localStorage / sessionStorage',
+                    'No transactions, records, or secondary indexes'
+                  ],
+                  ['Page-visible cookies', 'cookies', '4 KiB, opaque entries, and a stable scope'],
+                  [
+                    'Structured records, bytes, transactions, or cursors',
+                    'indexedDb',
+                    'Asynchronous; backend owns upgrade and multi-instance coordination'
+                  ],
+                  [
+                    'Tests, SSR, or process-local temporary data',
+                    'memoryStorage',
+                    'Not persistent; near-complete record-store capabilities'
+                  ],
+                  [
+                    'Compose several backends by ID',
+                    'createStorageHost',
+                    'Initial plugin installation is asynchronous and owns lifecycle explicitly'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Always inspect store.capabilities for records, binary, transactions, iteration, secondaryIndexes, and changeFeed. Never infer a capability from the backend string.'
+              }
+            ]
+          },
+          {
+            id: 'choose-layer',
+            heading: 'Then choose only the abstraction layer you need',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Direct backend: key/value semantics are enough and the caller owns key and value formats.',
+                  'defineEntity: schema, version migration, codecs, indexes, and repository semantics are required.',
+                  'Reactive adapter: subscribers need invalidation or live queries while the backend remains the data owner.',
+                  'StorageHost: several backends must be installed, replaced, queried by stable ID, and disposed together.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Choose and use a backend in five minutes', path: 'getting-started' },
+        { label: 'Define an Entity', path: 'entity-schema-and-codecs' },
+        { label: 'Build a Storage Host', path: 'host-and-plugins' }
+      ]
+    }
+  },
+  'storage-web:getting-started': {
+    zh: {
+      title: '五分钟选择并使用 Storage Web 后端',
+      lede: '先用最小后端完成读写与释放，再依据 capabilities 升级到记录、事务或组合层。',
+      document: {
+        sections: [
+          {
+            id: 'direct',
+            heading: '只需要键值时直接使用精确入口',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { localStorage } from '@migaia/storage-web/local-storage'\n\nconst settings = localStorage({ namespace: 'settings' })\nawait settings.set('theme', 'dark')\nconst theme = await settings.get('theme')\n\nif (settings.capabilities.syncRead) {\n  settings.sync.set('density', 'compact')\n}\n\nawait settings.dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'namespace 默认是 default；生产应用应显式设置稳定命名空间以避免逻辑 key 冲突。',
+                  'Web Storage 构造时会真实写入并恢复 probe key，以发现隐私模式和不可用配额。',
+                  'dispose 只终止 store，不删除持久数据；业务清理使用 clearValues。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'records',
+            heading: '需要记录或事务时选择 IndexedDB',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { indexedDb } from '@migaia/storage-web/indexed-db'\n\nconst records = indexedDb<{ id: string; name: string }>({\n  dbName: 'app-data',\n  recordsStoreName: 'users'\n})\n\nawait records.putRecord({ id: 'u-1', name: 'Ada' }, 'u-1')\nconst user = await records.getRecord('u-1')\nawait records.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: 'IndexedDB 是原生支持 records、bytes、transactions 与 iteration 的浏览器后端。若业务还需要 schema、迁移和 repository，请在它之上连接 defineEntity，而不是手写平行 codec。'
+              }
+            ]
+          },
+          {
+            id: 'host',
+            heading: '多个后端由一个 Host 拥有',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createStorageHost } from '@migaia/storage-web/host'\nimport { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'\n\nconst host = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'cache' })] as const\n})\n\nconst cache = host.backend('cache')\nawait cache.set('theme', 'dark')\nawait host.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: '首次安装必须走 createStorageHost({ plugins })，因为构造过程始终异步。host.use() 只用于 Host 已存在后的动态安装。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '后端详细选择', path: 'index' },
+        { label: 'Entity 与 repository', path: 'entity-schema-and-codecs' },
+        { label: '错误与 code', path: 'docs/storage-web/StorageError' }
+      ]
+    },
+    en: {
+      title: 'Choose and use a Storage Web backend in five minutes',
+      lede: 'Close the read, write, and disposal loop with the smallest backend, then move to records, transactions, or composition only when capabilities require it.',
+      document: {
+        sections: [
+          {
+            id: 'direct',
+            heading: 'Use an exact entry directly for key/value work',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { localStorage } from '@migaia/storage-web/local-storage'\n\nconst settings = localStorage({ namespace: 'settings' })\nawait settings.set('theme', 'dark')\nconst theme = await settings.get('theme')\n\nif (settings.capabilities.syncRead) {\n  settings.sync.set('density', 'compact')\n}\n\nawait settings.dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'namespace defaults to default. Production applications should choose a stable explicit namespace to isolate logical keys.',
+                  'Web Storage performs a real write-and-restore probe during construction to detect privacy mode and unavailable quota.',
+                  'dispose terminates the store without deleting persistent data. Use clearValues for business cleanup.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'records',
+            heading: 'Choose IndexedDB for records or transactions',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { indexedDb } from '@migaia/storage-web/indexed-db'\n\nconst records = indexedDb<{ id: string; name: string }>({\n  dbName: 'app-data',\n  recordsStoreName: 'users'\n})\n\nawait records.putRecord({ id: 'u-1', name: 'Ada' }, 'u-1')\nconst user = await records.getRecord('u-1')\nawait records.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: 'IndexedDB is the browser backend with native records, bytes, transactions, and iteration. When the domain also needs schema, migration, and repository semantics, connect defineEntity instead of building a parallel codec layer.'
+              }
+            ]
+          },
+          {
+            id: 'host',
+            heading: 'Let one Host own several backends',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createStorageHost } from '@migaia/storage-web/host'\nimport { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'\n\nconst host = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'cache' })] as const\n})\n\nconst cache = host.backend('cache')\nawait cache.set('theme', 'dark')\nawait host.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: 'Initial installation must use createStorageHost({ plugins }) because construction is always asynchronous. host.use() is only for dynamic installation after a Host already exists.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Detailed backend selection', path: 'index' },
+        { label: 'Entity and repository', path: 'entity-schema-and-codecs' },
+        { label: 'Errors and codes', path: 'docs/storage-web/StorageError' }
+      ]
+    }
+  },
+  'storage-web:indexeddb-and-transactions': {
+    zh: {
+      title: '用 IndexedDB 管理记录与事务',
+      lede: 'IndexedDB 是浏览器中需要 records、bytes、游标和事务时的默认入口；事务采用乐观并发，冲突必须重跑整个回调。',
+      document: {
+        sections: [
+          {
+            id: 'records',
+            heading: '使用 record API，不要把对象塞进字符串通道',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const db = indexedDb<{ id: string; count: number }>({\n  dbName: 'app-data',\n  recordsStoreName: 'counters'\n})\n\nawait db.putRecord({ id: 'orders', count: 1 }, 'orders')\nconst counter = await db.getRecord('orders')\n\nfor await (const [key, value] of db.iterateRecords()) {\n  console.log(key, value)\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'putRecord 使用 structured clone；set 仍是独立字符串 value 通道。',
+                  '同一个 key 跨 value、bytes、record 通道冲突时，默认拒绝而不是覆盖。',
+                  'metadata 是 IndexedDB 专有的恢复检查点通道，业务数据不要写入其中。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: '稳定物理库与 object store 名称',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['字段', '默认值', '用途'],
+                rows: [
+                  ['dbName', 'storage-web', '数据库物理身份；发布后不要随意改名。'],
+                  ['kvStoreName', 'kv', '字符串 value 通道的 object store。'],
+                  ['bytesStoreName', 'bytes', 'Uint8Array / ArrayBuffer 通道的 object store。'],
+                  ['recordsStoreName', 'records', '结构化 record 与索引的主 object store。'],
+                  ['cleanupLegacyRecords', 'false', '确认旧 documents store 已迁移后才显式删除。'],
+                  [
+                    'factory / keyRange',
+                    '浏览器全局对象',
+                    '只用于测试、非浏览器宿主或显式 realm 注入；必须来自同一能力域。'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'transaction',
+            heading: '冲突后重跑完整事务函数',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "try {\n  await db.transaction(async (tx) => {\n    const current = await tx.get('orders')\n    await tx.put({ id: 'orders', count: (current?.count ?? 0) + 1 }, 'orders')\n  })\n} catch (error) {\n  if (error instanceof StorageError &&\n      error.code === StorageErrorCode.transactionConflict) {\n    // re-read and retry the entire transaction\n  }\n}"
+              },
+              {
+                type: 'paragraph',
+                text: '回调阶段只修改内存草稿；提交时比较全局 epoch 与访问过的 key revision。任何变化都以 TRANSACTION_CONFLICT 失败。回调结束后 tx scope 立即失效，不能保存后异步复用。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'IndexedDB API', path: 'docs/storage-web/indexed-db/indexedDb' },
+        { label: 'Entity 与迁移', path: 'entity-schema-and-codecs' }
+      ]
+    },
+    en: {
+      title: 'Manage records and transactions with IndexedDB',
+      lede: 'IndexedDB is the browser entry for records, bytes, cursors, and transactions. Transactions use optimistic concurrency, so a conflict requires rerunning the complete callback.',
+      document: {
+        sections: [
+          {
+            id: 'records',
+            heading: 'Use record APIs instead of placing objects in the string channel',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const db = indexedDb<{ id: string; count: number }>({\n  dbName: 'app-data',\n  recordsStoreName: 'counters'\n})\n\nawait db.putRecord({ id: 'orders', count: 1 }, 'orders')\nconst counter = await db.getRecord('orders')\n\nfor await (const [key, value] of db.iterateRecords()) {\n  console.log(key, value)\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'putRecord uses structured clone. set remains a separate string-value channel.',
+                  'A key collision across value, bytes, and record channels rejects by default instead of overwriting.',
+                  'metadata is an IndexedDB-only recovery-checkpoint channel and is not business storage.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: 'Keep physical database and object-store names stable',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Field', 'Default', 'Purpose'],
+                rows: [
+                  [
+                    'dbName',
+                    'storage-web',
+                    'Physical database identity; do not rename it casually after release.'
+                  ],
+                  ['kvStoreName', 'kv', 'Object store for the string-value channel.'],
+                  [
+                    'bytesStoreName',
+                    'bytes',
+                    'Object store for Uint8Array and ArrayBuffer values.'
+                  ],
+                  [
+                    'recordsStoreName',
+                    'records',
+                    'Primary object store for structured records and indexes.'
+                  ],
+                  [
+                    'cleanupLegacyRecords',
+                    'false',
+                    'Delete the legacy documents store only after migration is confirmed.'
+                  ],
+                  [
+                    'factory / keyRange',
+                    'browser globals',
+                    'Inject only for tests, non-browser hosts, or an explicit realm; both belong to the same capability domain.'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'transaction',
+            heading: 'Rerun the complete transaction function after conflict',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "try {\n  await db.transaction(async (tx) => {\n    const current = await tx.get('orders')\n    await tx.put({ id: 'orders', count: (current?.count ?? 0) + 1 }, 'orders')\n  })\n} catch (error) {\n  if (error instanceof StorageError &&\n      error.code === StorageErrorCode.transactionConflict) {\n    // re-read and retry the entire transaction\n  }\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'The callback changes only an in-memory draft. Commit compares the global epoch and every accessed key revision; any change fails with TRANSACTION_CONFLICT. The tx scope expires as soon as the callback settles and must not be retained.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'IndexedDB API', path: 'docs/storage-web/indexed-db/indexedDb' },
+        { label: 'Entity and migrations', path: 'entity-schema-and-codecs' }
+      ]
+    }
+  },
+  'storage-web:entity-schema-and-codecs': {
+    zh: {
+      title: '组合 Entity、Schema、Codec 与迁移',
+      lede: 'Entity 拥有领域记录契约；Schema 负责领域表示，Codec 负责存储格式，迁移负责版本演进，四者不能互相替代。',
+      document: {
+        sections: [
+          {
+            id: 'entity',
+            heading: '用一个定义产生 repository',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "type IUser = { id: string; name: string }\n\nconst users = defineEntity<IUser>({\n  name: 'users',\n  key: 'id',\n  version: 2,\n  migrations: {\n    2: async (value) => ({ ...(value as IUser), name: String((value as IUser).name) })\n  }\n}).connect(indexedDb({ dbName: 'app-data' }))\n\nawait users.put({ id: 'ada', name: 'Ada' })\nconst ada = await users.get('ada')"
+              },
+              {
+                type: 'list',
+                items: [
+                  '写入顺序是 validate → normalize → schema.encode → codec.encode。',
+                  '读取顺序是 codec.decode → schema.decode → validate；validateOnRead 默认 true。',
+                  'version > 1 时 defineEntity 要求从 2 到目标版本的迁移步骤完整存在。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'codec',
+            heading: '按 backend capabilities 选择存储格式',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Codec', '输出', '能力与退化'],
+                rows: [
+                  ['jsonCodec', 'text', '全后端；无法表达循环引用'],
+                  ['structuredCodec', 'structured', '要求 records；不做有损降级'],
+                  ['binaryCodec', 'binary', 'binary 后端直连，否则 base64 并诊断']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'selectCodec 读取 capabilities 决定选路。structured 能力缺失时抛 UNSUPPORTED_CAPABILITY；binary 缺失时才允许可逆 base64 退化。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'defineEntity API', path: 'docs/storage-web/entity/defineEntity' },
+        { label: 'Schema API', path: 'docs/storage-web/schema' },
+        { label: 'Codec API', path: 'docs/storage-web/serialize' }
+      ]
+    },
+    en: {
+      title: 'Compose Entity, Schema, Codec, and migrations',
+      lede: 'An Entity owns the domain-record contract. Schema owns domain representation, Codec owns storage format, and migrations own version evolution; none substitutes for another.',
+      document: {
+        sections: [
+          {
+            id: 'entity',
+            heading: 'Produce a repository from one definition',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "type IUser = { id: string; name: string }\n\nconst users = defineEntity<IUser>({\n  name: 'users',\n  key: 'id',\n  version: 2,\n  migrations: {\n    2: async (value) => ({ ...(value as IUser), name: String((value as IUser).name) })\n  }\n}).connect(indexedDb({ dbName: 'app-data' }))\n\nawait users.put({ id: 'ada', name: 'Ada' })\nconst ada = await users.get('ada')"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Writes run validate → normalize → schema.encode → codec.encode.',
+                  'Reads run codec.decode → schema.decode → validate; validateOnRead defaults to true.',
+                  'When version exceeds 1, defineEntity requires every migration step from 2 through the target version.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'codec',
+            heading: 'Select storage format from backend capabilities',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Codec', 'Output', 'Capability and fallback'],
+                rows: [
+                  ['jsonCodec', 'text', 'Every backend; cannot express cycles'],
+                  ['structuredCodec', 'structured', 'Requires records and never degrades lossily'],
+                  [
+                    'binaryCodec',
+                    'binary',
+                    'Direct on binary backends; otherwise base64 with a diagnostic'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'selectCodec reads capabilities to choose the path. Missing structured support throws UNSUPPORTED_CAPABILITY; only missing binary support permits reversible base64 fallback.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'defineEntity API', path: 'docs/storage-web/entity/defineEntity' },
+        { label: 'Schema API', path: 'docs/storage-web/schema' },
+        { label: 'Codec API', path: 'docs/storage-web/serialize' }
+      ]
+    }
+  },
+  'storage-web:host-and-plugins': {
+    zh: {
+      title: '用 Storage Host 组合多个后端',
+      lede: 'Host 按稳定 ID 原子安装 backend plugin，并统一拥有 store、adapter、mutation 与清理；它不是另一套存储实现。',
+      document: {
+        sections: [
+          {
+            id: 'install',
+            heading: '首批插件只通过异步 factory 安装',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const host = await createStorageHost({\n  installTimeoutMs: 30_000,\n  plugins: [\n    memoryBackendPlugin({ id: 'cache' }),\n    indexedDbBackendPlugin({ id: 'primary', dbName: 'app-data' })\n  ] as const\n})\n\nconst cache = host.backend('cache')\nconst primary = host.backend('primary')"
+              },
+              {
+                type: 'list',
+                items: [
+                  'literal tuple 保留 ID 到 store 类型的精确映射，并在类型层拒绝重复 ID。',
+                  '整个 batch 成功后才发布 registry；失败回滚已接纳资源，不暴露半安装 backend。',
+                  '安装进行中再次 use() 以 STORAGE_HOST_BUSY 失败。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'dispose',
+            heading: '让 Host 成为唯一释放所有者',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'dispose 同步关闭新 admission，取消安装，等待已接纳 mutation/query quiescence，再释放 adapter、store 与 transport。重复调用幂等；终态后的 backend、use 和 liveQuery 不会复活 Host。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'createStorageHost API', path: 'docs/storage-web/host/createStorageHost' },
+        { label: 'Reactive backend', path: 'reactive-live-queries' }
+      ]
+    },
+    en: {
+      title: 'Compose several backends with Storage Host',
+      lede: 'The Host atomically installs backend plugins by stable ID and owns stores, adapters, mutations, and cleanup together. It is not another storage implementation.',
+      document: {
+        sections: [
+          {
+            id: 'install',
+            heading: 'Install the initial plugin set only through the async factory',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const host = await createStorageHost({\n  installTimeoutMs: 30_000,\n  plugins: [\n    memoryBackendPlugin({ id: 'cache' }),\n    indexedDbBackendPlugin({ id: 'primary', dbName: 'app-data' })\n  ] as const\n})\n\nconst cache = host.backend('cache')\nconst primary = host.backend('primary')"
+              },
+              {
+                type: 'list',
+                items: [
+                  'A literal tuple preserves the exact ID-to-store mapping and rejects duplicate IDs at the type boundary.',
+                  'The registry publishes only after the entire batch succeeds. Failure rolls back admitted resources and exposes no partial backend.',
+                  'Calling use() while installation is active fails with STORAGE_HOST_BUSY.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'dispose',
+            heading: 'Make the Host the only release owner',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'dispose closes new admission synchronously, cancels installation, waits for admitted mutation and query quiescence, then releases adapters, stores, and transports. Repeated calls are idempotent, and backend, use, or liveQuery never revives a terminal Host.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'createStorageHost API', path: 'docs/storage-web/host/createStorageHost' },
+        { label: 'Reactive backend', path: 'reactive-live-queries' }
+      ]
+    }
+  },
+  'storage-web:reactive-live-queries': {
+    zh: {
+      title: '创建可取消的 Reactive live query',
+      lede: 'Reactive plugin 同时安装 backend 与唯一 adapter；live query 用 generation 隔离刷新，变化事件只提供安全失效提示。',
+      document: {
+        sections: [
+          {
+            id: 'query',
+            heading: '从 reactive backend 创建 query',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [indexedDbReactive({ id: 'primary', dbName: 'app-data' })] as const\n})\n\nconst query = host.liveQuery({\n  backendId: 'primary',\n  runtime,\n  scope: 'users',\n  query: ({ store, signal }) => store.getRecord('ada', { signal }),\n  matches: (change) => change.scope === 'users',\n  keepPreviousData: true,\n  timeoutMs: 5_000\n})\n\nawait query.ready\nawait query.refresh()\nawait query.dispose()\nawait host.dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'ready 只表示首个 generation 已成功或失败 settlement，后续刷新不改变其身份。',
+                  '旧 generation 的迟到结果不能覆盖新值；timeoutMs 对每个 generation 生效。',
+                  'matches 只能证明无关时跳过；无法证明时保守 refresh。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'consistency',
+            heading: '读取 adapter 实际一致性承诺',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'memory 是实例内 push；Web Storage 与 cookie 是受上下文边界限制的 eventual visibility；IndexedDB 在本库提交后发 change feed，但跨上下文仍是 eventual，也不承诺发现绕过本库的任意 raw writer。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Reactive adapter API', path: 'docs/storage-web/reactive-adapter' },
+        {
+          label: 'IndexedDB reactive plugin',
+          path: 'docs/storage-web/plugins-reactive-indexed-db/indexedDbReactive'
+        }
+      ]
+    },
+    en: {
+      title: 'Create a cancellable reactive live query',
+      lede: 'A reactive plugin installs both a backend and its unique adapter. A live query isolates refreshes by generation, while change events are safe invalidation hints only.',
+      document: {
+        sections: [
+          {
+            id: 'query',
+            heading: 'Create a query from a reactive backend',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [indexedDbReactive({ id: 'primary', dbName: 'app-data' })] as const\n})\n\nconst query = host.liveQuery({\n  backendId: 'primary',\n  runtime,\n  scope: 'users',\n  query: ({ store, signal }) => store.getRecord('ada', { signal }),\n  matches: (change) => change.scope === 'users',\n  keepPreviousData: true,\n  timeoutMs: 5_000\n})\n\nawait query.ready\nawait query.refresh()\nawait query.dispose()\nawait host.dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'ready means only that the first generation settled successfully or with failure; later refreshes never replace its identity.',
+                  'A late old generation cannot overwrite a newer value, and timeoutMs applies independently to every generation.',
+                  'matches skips only a change proven unrelated; uncertainty refreshes conservatively.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'consistency',
+            heading: 'Read the adapter’s actual consistency promise',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Memory is instance-local push. Web Storage and cookies provide eventual visibility within platform context limits. IndexedDB emits after library-owned commits, but cross-context delivery is still eventual and cannot promise detection of arbitrary raw writers bypassing the library.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Reactive adapter API', path: 'docs/storage-web/reactive-adapter' },
+        {
+          label: 'IndexedDB reactive plugin',
+          path: 'docs/storage-web/plugins-reactive-indexed-db/indexedDbReactive'
+        }
+      ]
+    }
+  },
+  'storage-web:cookies-and-security': {
+    zh: {
+      title: '正确处理 Cookie scope 与安全边界',
+      lede: 'Cookie backend 只管理 JavaScript 可见 cookie；scope 在构造时固定，写入与删除必须使用同一组属性。',
+      document: {
+        sections: [
+          {
+            id: 'scope',
+            heading: '把 scope 当作持久身份的一部分',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const jar = cookies({\n  namespace: 'app',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\n\nawait jar.set('session', 'abc123', { maxAge: 3_600 })\nawait jar.remove('session')"
+              },
+              {
+                type: 'list',
+                items: [
+                  'SameSite=None 与 Partitioned 都要求 secure: true。',
+                  '写入后会回读；被浏览器静默拒绝时以 WRITE_FAILED 失败。',
+                  '同名 cookie 在多个 scope 可见时抛 COOKIE_SCOPE_AMBIGUOUS，不任意选择一个值。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'opaque',
+            heading: '不要把不可见当作不存在',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'capabilities.opaqueEntries 为 true：HttpOnly cookie 对 JavaScript 永远不可见，因此 has() 为 false 不证明服务端 cookie 不存在，remove() 也不能清除 HttpOnly cookie。认证 cookie 应由服务端 Set-Cookie 生命周期拥有。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'cookies API', path: 'docs/storage-web/cookies/cookies' },
+        {
+          label: 'Cookie reactive plugin',
+          path: 'docs/storage-web/plugins-reactive-cookies/cookiesReactive'
+        }
+      ]
+    },
+    en: {
+      title: 'Handle cookie scope and security boundaries correctly',
+      lede: 'The cookie backend manages only JavaScript-visible cookies. Scope is fixed at construction, and writes and removals must use the same attributes.',
+      document: {
+        sections: [
+          {
+            id: 'scope',
+            heading: 'Treat scope as part of persistent identity',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const jar = cookies({\n  namespace: 'app',\n  scope: { path: '/', secure: true, sameSite: 'lax' }\n})\n\nawait jar.set('session', 'abc123', { maxAge: 3_600 })\nawait jar.remove('session')"
+              },
+              {
+                type: 'list',
+                items: [
+                  'SameSite=None and Partitioned both require secure: true.',
+                  'A write is read back; silent browser rejection fails with WRITE_FAILED.',
+                  'When the same cookie name is visible through several scopes, COOKIE_SCOPE_AMBIGUOUS rejects instead of choosing arbitrarily.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'opaque',
+            heading: 'Do not equate invisible with absent',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'capabilities.opaqueEntries is true. HttpOnly cookies are never visible to JavaScript, so has() returning false does not prove that a server cookie is absent, and remove() cannot clear an HttpOnly cookie. Authentication-cookie lifecycle belongs to server Set-Cookie.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'cookies API', path: 'docs/storage-web/cookies/cookies' },
+        {
+          label: 'Cookie reactive plugin',
+          path: 'docs/storage-web/plugins-reactive-cookies/cookiesReactive'
+        }
+      ]
+    }
+  },
+  'storage-web:cancellation-errors-and-shutdown': {
+    zh: {
+      title: '处理取消、错误与 Storage 终态',
+      lede: '取消在 admission 与在途工作中都必须保留 reason；错误按 source/code 分支，释放失败不能覆盖主操作错误。',
+      document: {
+        sections: [
+          {
+            id: 'operations',
+            heading: '为有界操作传 signal 与 timeoutMs',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const controller = new AbortController()\n\ntry {\n  await store.get('session', {\n    signal: controller.signal,\n    timeoutMs: 2_000\n  })\n} catch (error) {\n  if (error instanceof StorageError) {\n    diagnostics.capture(error.source, error.code, error.cause)\n  }\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  '预取消在接触 backend 前失败；在途取消通过协作 signal 终止。',
+                  '原始 DOMException、TypeError 或事务错误保留在 cause 链，不由通用 Error 替换。',
+                  'StorageContractError 表示调用或能力契约错误；StorageError 表示 storage-web 运行时失败。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'terminal',
+            heading: '终止后创建新实例，不复活旧资源',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'store.dispose、query.dispose 与 host.dispose 都关闭新 admission 并等待各自已接纳工作。cleanup 错误可聚合报告，但 logical terminal 不回退；下一请求、页面 owner 或测试必须创建新实例。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'StorageError 与 code', path: 'docs/storage-web/StorageError' },
+        { label: 'Host 生命周期', path: 'host-and-plugins' }
+      ]
+    },
+    en: {
+      title: 'Handle cancellation, errors, and Storage terminal state',
+      lede: 'Cancellation preserves its reason at admission and in-flight boundaries. Branch on source and code, and never let cleanup failure replace the primary operation error.',
+      document: {
+        sections: [
+          {
+            id: 'operations',
+            heading: 'Pass signal and timeoutMs to bounded operations',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const controller = new AbortController()\n\ntry {\n  await store.get('session', {\n    signal: controller.signal,\n    timeoutMs: 2_000\n  })\n} catch (error) {\n  if (error instanceof StorageError) {\n    diagnostics.capture(error.source, error.code, error.cause)\n  }\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Pre-cancellation fails before touching the backend; in-flight cancellation stops through a cooperative signal.',
+                  'The original DOMException, TypeError, or transaction error remains reachable through cause instead of being replaced by a generic Error.',
+                  'StorageContractError represents argument or capability contract failure; StorageError represents a storage-web runtime failure.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'terminal',
+            heading: 'Create a new instance after terminal state instead of reviving one',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'store.dispose, query.dispose, and host.dispose close new admission and await their own admitted work. Cleanup errors may be aggregated, but logical terminal state never rolls back. A new request, page owner, or test creates a new instance.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'StorageError and codes', path: 'docs/storage-web/StorageError' },
+        { label: 'Host lifecycle', path: 'host-and-plugins' }
+      ]
+    }
+  },
+  'logger:index': {
+    zh: {
+      title: 'Logger 学习路径',
+      lede: '先让一条结构化日志可靠到达 sink，再按任务加入过滤、批处理、远程发送、pipeline 与关闭语义。',
+      document: {
+        sections: [
+          {
+            id: 'choose-path',
+            heading: '按你要解决的问题进入',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['任务', '阅读路径', '关键结果'],
+                rows: [
+                  ['输出第一条可观察日志', '快速开始', 'console 与 failure observer 闭环'],
+                  ['控制 entry 经过哪些处理', 'Entry、hook 与 sink', '明确 mutation 与输出边界'],
+                  ['组合 level、color、batch、http', '插件与批处理', '正确顺序和有界队列'],
+                  ['拦截或异步包围日志', 'Pipelines', '选择固定执行模型'],
+                  ['确保退出前完成输出', 'Flush 与 shutdown', '有界 drain 与终态'],
+                  ['跨环境或多 Logger 转发', 'Runtime 与 forwarding', '宿主适配和防环转发']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '快速开始', path: 'getting-started' },
+        { label: '插件与批处理', path: 'plugins-and-batching' },
+        { label: 'Logger API', path: 'docs/logger/Logger' }
+      ]
+    },
+    en: {
+      title: 'Logger learning paths',
+      lede: 'First deliver one structured entry reliably, then add filtering, batching, remote delivery, pipelines, and shutdown behavior by task.',
+      document: {
+        sections: [
+          {
+            id: 'choose-path',
+            heading: 'Enter through the problem you need to solve',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Task', 'Read', 'Outcome'],
+                rows: [
+                  [
+                    'Emit the first observable log',
+                    'Getting started',
+                    'A console and failure-observer loop'
+                  ],
+                  [
+                    'Control how an entry is processed',
+                    'Entries, hooks, and sinks',
+                    'Clear mutation and output boundaries'
+                  ],
+                  [
+                    'Compose level, color, batch, and http',
+                    'Plugins and batching',
+                    'Correct ordering and bounded queues'
+                  ],
+                  [
+                    'Intercept or wrap logging asynchronously',
+                    'Pipelines',
+                    'One explicit execution model'
+                  ],
+                  [
+                    'Complete output before exit',
+                    'Flush and shutdown',
+                    'Bounded drain and terminal state'
+                  ],
+                  [
+                    'Forward across environments or loggers',
+                    'Runtime and forwarding',
+                    'Host adaptation and cycle-safe forwarding'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Getting started', path: 'getting-started' },
+        { label: 'Plugins and batching', path: 'plugins-and-batching' },
+        { label: 'Logger API', path: 'docs/logger/Logger' }
+      ]
+    }
+  },
+  'logger:getting-started': {
+    zh: {
+      title: '五分钟建立可关闭的结构化 Logger',
+      lede: '显式设置执行预算，安装 level 与 color，并从第一天接入异步失败观察和 shutdown。',
+      document: {
+        sections: [
+          {
+            id: 'create',
+            heading: '构造、输出并观察失败',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: {\n    mutationTimeoutMs: 5_000,\n    pipelineDrainTimeoutMs: 5_000\n  },\n  context: ['checkout'],\n  plugins: [level({ level: 'info' }), color()]\n})\n\nlog.onFailure(({ source, error }) => telemetry.capture(source, error))\nlog.info('order accepted', { orderId: '42' })"
+              },
+              {
+                type: 'list',
+                items: [
+                  'execution 两项必须显式决定；false 代表接受无限等待。',
+                  '构造期插件同步安装，任何 thenable install 都会使构造失败，不返回半成品。',
+                  '业务 log 调用不抛异步 sink 失败，因此生产环境必须接 onFailure。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: '理解每个 Logger 构造字段',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['字段', '默认值', '作用'],
+                rows: [
+                  [
+                    'execution',
+                    '必填',
+                    '定义插件 mutation 与 pipeline drain 的等待预算；false 明确选择无限等待。'
+                  ],
+                  ['context', '[]', '写入每条 entry 的稳定上下文路径；子 Logger 或领域边界使用。'],
+                  ['topic', "''", 'extends 转发时进入 topicChain 的当前 Logger 标签。'],
+                  ['on', '{}', '构造期注册命名 hook；适合静态且随 Logger 同生命周期的 hook。'],
+                  [
+                    'plugins',
+                    '[]',
+                    '按 provider → consumer 同步安装，并把 extension 投影到 Logger。'
+                  ],
+                  ['options', '{}', '只读传给插件 core.ctx.options 的业务宿主配置。'],
+                  [
+                    'pipeline.mode',
+                    'sync',
+                    '固定 sync、async、generator 或 async-generator 控制流。'
+                  ],
+                  [
+                    'scheduler',
+                    'systemScheduler',
+                    '统一 flush、shutdown、batch 与 transport deadline 的时间域。'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'close',
+            heading: '所有者结束时等待真实输出',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "await log.flush()\nawait log.shutdown('manual')"
+              },
+              {
+                type: 'paragraph',
+                text: 'shutdown 运行 handler、flush 并卸载插件，之后新日志静默忽略。重入 shutdown 共享同一个进行中的 Promise。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '理解 entry 流程', path: 'entries-hooks-and-sinks' },
+        { label: '配置内置插件', path: 'plugins-and-batching' }
+      ]
+    },
+    en: {
+      title: 'Build a shutdown-safe structured Logger in five minutes',
+      lede: 'Set execution budgets explicitly, install level and color, and connect asynchronous failure observation and shutdown from day one.',
+      document: {
+        sections: [
+          {
+            id: 'create',
+            heading: 'Construct, emit, and observe failures',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: {\n    mutationTimeoutMs: 5_000,\n    pipelineDrainTimeoutMs: 5_000\n  },\n  context: ['checkout'],\n  plugins: [level({ level: 'info' }), color()]\n})\n\nlog.onFailure(({ source, error }) => telemetry.capture(source, error))\nlog.info('order accepted', { orderId: '42' })"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Choose both execution fields explicitly; false means accepting an unbounded wait.',
+                  'Constructor plugins install synchronously. Any thenable install fails construction instead of returning a partial logger.',
+                  'Business log calls do not throw asynchronous sink failures, so production use must subscribe with onFailure.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: 'Understand every Logger constructor field',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Field', 'Default', 'Purpose'],
+                rows: [
+                  [
+                    'execution',
+                    'required',
+                    'Bounds plugin mutations and pipeline drain; false explicitly chooses an unbounded wait.'
+                  ],
+                  [
+                    'context',
+                    '[]',
+                    'Stable context path written into every entry for child or domain boundaries.'
+                  ],
+                  ['topic', "''", 'Current Logger label appended to topicChain during forwarding.'],
+                  [
+                    'on',
+                    '{}',
+                    'Registers named hooks at construction for static Logger-owned behavior.'
+                  ],
+                  [
+                    'plugins',
+                    '[]',
+                    'Installs synchronously in provider → consumer order and projects extensions onto Logger.'
+                  ],
+                  [
+                    'options',
+                    '{}',
+                    'Business host configuration exposed read-only through plugin core.ctx.options.'
+                  ],
+                  [
+                    'pipeline.mode',
+                    'sync',
+                    'Fixes sync, async, generator, or async-generator control flow.'
+                  ],
+                  [
+                    'scheduler',
+                    'systemScheduler',
+                    'One time domain for flush, shutdown, batching, and transport deadlines.'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'close',
+            heading: 'Wait for real output when the owner ends',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "await log.flush()\nawait log.shutdown('manual')"
+              },
+              {
+                type: 'paragraph',
+                text: 'shutdown runs handlers, flushes, and removes plugins. New logs are ignored afterward, and reentrant shutdown calls share the same in-flight Promise.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Understand entry flow', path: 'entries-hooks-and-sinks' },
+        { label: 'Configure built-in plugins', path: 'plugins-and-batching' }
+      ]
+    }
+  },
+  'logger:entries-hooks-and-sinks': {
+    zh: {
+      title: '组织 entry、hook 与 sink',
+      lede: '普通 log 参数、结构化字段、可修改 hook 和隔离 sink 是四个不同边界。',
+      document: {
+        sections: [
+          {
+            id: 'entry',
+            heading: '需要字段语义时使用 dispatchRaw',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "log.dispatchRaw({\n  tag: 'info',\n  message: 'user updated',\n  meta: { userId },\n  data: { requestId },\n  context: ['api', 'users']\n})"
+              },
+              {
+                type: 'paragraph',
+                text: 'log(tag, message, ...args) 保持 console 风格，最后一个对象仍是 args；只有 dispatchRaw 明确区分 meta、data、context、error 与 time。'
+              }
+            ]
+          },
+          {
+            id: 'flow',
+            heading: '按 pipeline → hook → sink 阅读数据流',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'before/after hook 读取可修改的 live entry，用于补充或脱敏。',
+                  '每个 sink 收到独立的顶层快照；嵌套业务对象仍保留原引用，sink 不应修改。',
+                  'raw() 绕过 pipeline 与 sink，只用于逐 token 等明确的原始输出。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '选择 pipeline', path: 'pipelines' },
+        { label: 'Logger API', path: 'docs/logger/Logger' }
+      ]
+    },
+    en: {
+      title: 'Organize entries, hooks, and sinks',
+      lede: 'Console arguments, structured fields, mutable hooks, and isolated sinks are four different boundaries.',
+      document: {
+        sections: [
+          {
+            id: 'entry',
+            heading: 'Use dispatchRaw when fields carry meaning',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "log.dispatchRaw({\n  tag: 'info',\n  message: 'user updated',\n  meta: { userId },\n  data: { requestId },\n  context: ['api', 'users']\n})"
+              },
+              {
+                type: 'paragraph',
+                text: 'log(tag, message, ...args) remains console-like, so a final object is still an argument. Only dispatchRaw separates meta, data, context, error, and time explicitly.'
+              }
+            ]
+          },
+          {
+            id: 'flow',
+            heading: 'Read the flow as pipeline → hook → sink',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'before and after hooks receive a mutable live entry for enrichment or redaction.',
+                  'Each sink receives its own top-level snapshot. Nested business objects retain identity and should not be mutated by a sink.',
+                  'raw() bypasses pipelines and sinks and belongs only to explicit raw-output tasks such as token streaming.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Choose a pipeline', path: 'pipelines' },
+        { label: 'Logger API', path: 'docs/logger/Logger' }
+      ]
+    }
+  },
+  'logger:plugins-and-batching': {
+    zh: {
+      title: '组合内置插件与有界批处理',
+      lede: '插件顺序会改变能力可见性；batch 必须先于 http，每个 Logger 必须获得新的有状态插件实例。',
+      document: {
+        sections: [
+          {
+            id: 'compose',
+            heading: '按 provider → consumer 排列插件',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const log = new Logger({\n  execution,\n  plugins: [\n    level({ level: 'info' }),\n    color({ format: 'pretty' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: '/logs', retries: 2 })\n  ]\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'http 只有在 batch 先安装时才能复用 createBatcher shared 能力。',
+                  '不要把同一个 color()、http() 或 reasoning() 实例安装到多个 Logger。',
+                  'maxPendingBatches 满载时显式 BATCH_OVERFLOW，不静默丢弃。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'choose',
+            heading: '按输出责任选择插件',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['插件', '负责', '不负责'],
+                rows: [
+                  ['level', '级别与 filter', '最终输出'],
+                  ['color', 'console 格式与颜色', '远程发送'],
+                  ['batch', '有界聚合能力', 'transport'],
+                  ['http', '重试和 HTTP 发送', '控制台'],
+                  ['process', '进程关闭边界', '浏览器 lifecycle'],
+                  ['reasoning', '逐 token 与完整 silent entry', '通用结构化字段'],
+                  ['uuid', 'entry 追踪标识', '请求关联策略']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'HTTP 配置参考', path: 'docs/logger/plugins/http' },
+        { label: 'Flush 与关闭', path: 'flush-and-shutdown' }
+      ]
+    },
+    en: {
+      title: 'Compose built-in plugins and bounded batching',
+      lede: 'Plugin order changes capability visibility. batch must precede http, and every Logger needs fresh stateful plugin instances.',
+      document: {
+        sections: [
+          {
+            id: 'compose',
+            heading: 'Order plugins from provider to consumer',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const log = new Logger({\n  execution,\n  plugins: [\n    level({ level: 'info' }),\n    color({ format: 'pretty' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: '/logs', retries: 2 })\n  ]\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'http can reuse the createBatcher shared capability only when batch installs first.',
+                  'Never install the same color(), http(), or reasoning() instance into multiple Loggers.',
+                  'A full maxPendingBatches bound fails explicitly with BATCH_OVERFLOW instead of dropping entries.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'choose',
+            heading: 'Choose a plugin by output responsibility',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Plugin', 'Owns', 'Does not own'],
+                rows: [
+                  ['level', 'Severity and filters', 'Final output'],
+                  ['color', 'Console format and color', 'Remote delivery'],
+                  ['batch', 'Bounded aggregation', 'Transport'],
+                  ['http', 'Retries and HTTP delivery', 'Console output'],
+                  ['process', 'Process shutdown boundaries', 'Browser lifecycle'],
+                  [
+                    'reasoning',
+                    'Token streams and complete silent entries',
+                    'General structured fields'
+                  ],
+                  ['uuid', 'Entry tracking identity', 'Request correlation policy']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'HTTP configuration reference', path: 'docs/logger/plugins/http' },
+        { label: 'Flush and shutdown', path: 'flush-and-shutdown' }
+      ]
+    }
+  },
+  'logger:pipelines': {
+    zh: {
+      title: '为 Logger 选择 pipeline 模式',
+      lede: '模式在构造时固定；自定义 stage 必须使用匹配的注册方法，内置同步插件会自动适配。',
+      document: {
+        sections: [
+          {
+            id: 'modes',
+            heading: '不要把四种控制流混用',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['mode', '注册方法', '语义'],
+                rows: [
+                  ['sync', 'usePipeline', 'stage 返回后进入下游'],
+                  ['async', 'useAsyncPipeline', 'await next() 洋葱模型'],
+                  ['generator', 'useGeneratorPipeline', '同步 generator 终止值'],
+                  ['async-generator', 'useAsyncGeneratorPipeline', '逐 stage 异步耗尽并取终值']
+                ]
+              },
+              {
+                type: 'list',
+                items: [
+                  '不调用 next 表示拦截当前 entry。',
+                  '重复 next 抛 PIPELINE_NEXT_DUPLICATE。',
+                  'stage 返回后迟到 next 产生 PIPELINE_NEXT_LATE diagnostic。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'redact',
+            heading: '在 sink 之前完成结构化脱敏',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const off = log.usePipeline((entry, next) => {\n  const authorization = entry.meta?.authorization\n  if (typeof authorization === 'string') {\n    entry.meta = { ...entry.meta, authorization: '[redacted]' }\n  }\n  next(entry)\n})\n\nlog.info('request accepted', { requestId })\noff()"
+              },
+              {
+                type: 'paragraph',
+                text: '同步 stage 必须在返回前调用 next。需要异步查表或加密时，构造 Logger 时选择 async mode，再用 useAsyncPipeline 并 await next(entry)；不要把 Promise 偷塞进 sync stage。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Entry 与 sink', path: 'entries-hooks-and-sinks' },
+        { label: '关闭与 drain', path: 'flush-and-shutdown' }
+      ]
+    },
+    en: {
+      title: 'Choose a Logger pipeline mode',
+      lede: 'The mode is fixed at construction. Custom stages use the matching registration API, while built-in synchronous plugins adapt automatically.',
+      document: {
+        sections: [
+          {
+            id: 'modes',
+            heading: 'Do not mix the four control flows',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Mode', 'Register with', 'Semantics'],
+                rows: [
+                  ['sync', 'usePipeline', 'Downstream starts after a stage returns'],
+                  ['async', 'useAsyncPipeline', 'await next() forms an onion'],
+                  ['generator', 'useGeneratorPipeline', 'Synchronous generator terminal'],
+                  [
+                    'async-generator',
+                    'useAsyncGeneratorPipeline',
+                    'Drain each async stage and take its terminal'
+                  ]
+                ]
+              },
+              {
+                type: 'list',
+                items: [
+                  'Omitting next intercepts the current entry.',
+                  'Calling next twice throws PIPELINE_NEXT_DUPLICATE.',
+                  'Calling saved next after return emits a PIPELINE_NEXT_LATE diagnostic.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'redact',
+            heading: 'Redact structured data before it reaches a sink',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const off = log.usePipeline((entry, next) => {\n  const authorization = entry.meta?.authorization\n  if (typeof authorization === 'string') {\n    entry.meta = { ...entry.meta, authorization: '[redacted]' }\n  }\n  next(entry)\n})\n\nlog.info('request accepted', { requestId })\noff()"
+              },
+              {
+                type: 'paragraph',
+                text: 'A synchronous stage calls next before returning. For asynchronous lookup or encryption, construct Logger in async mode, register with useAsyncPipeline, and await next(entry). Never hide a Promise inside a sync stage.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Entries and sinks', path: 'entries-hooks-and-sinks' },
+        { label: 'Shutdown and drain', path: 'flush-and-shutdown' }
+      ]
+    }
+  },
+  'logger:flush-and-shutdown': {
+    zh: {
+      title: '正确 flush 并进入终态',
+      lede: 'flush 等待当前可见输出；shutdown 先允许收尾日志，再关闭 admission、drain 并卸载插件。',
+      document: {
+        sections: [
+          {
+            id: 'sequence',
+            heading: '按所有权边界选择操作',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['边界', '调用', '结果'],
+                rows: [
+                  [
+                    '请求或测试检查点',
+                    'await log.flush()',
+                    '等待当前 deferred、sink、batch 与转发下游'
+                  ],
+                  [
+                    '应用正常退出',
+                    "await log.shutdown('manual')",
+                    'handler → flush → 插件清理 → terminal'
+                  ],
+                  ['进程 signal/崩溃', 'process() plugin', '在明确预算内触发同一 shutdown']
+                ]
+              },
+              {
+                type: 'list',
+                items: [
+                  '并发 flush 共享当前 Promise；后续仍可再 flush 新工作。',
+                  '重入 shutdown 共享同一 Promise，不重复运行 handler。',
+                  '失败后 Logger 仍进入终态，不通过重试重新开放。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Process 插件', path: 'docs/logger/plugins/process' },
+        { label: 'Runtime 与 forwarding', path: 'runtime-and-forwarding' }
+      ]
+    },
+    en: {
+      title: 'Flush correctly and enter terminal state',
+      lede: 'flush awaits currently visible output. shutdown permits final handler logs, then closes admission, drains, and removes plugins.',
+      document: {
+        sections: [
+          {
+            id: 'sequence',
+            heading: 'Choose an operation from the ownership boundary',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Boundary', 'Call', 'Result'],
+                rows: [
+                  [
+                    'Request or test checkpoint',
+                    'await log.flush()',
+                    'Await current deferred work, sinks, batches, and forwarding targets'
+                  ],
+                  [
+                    'Normal application exit',
+                    "await log.shutdown('manual')",
+                    'Handlers → flush → plugin cleanup → terminal'
+                  ],
+                  [
+                    'Process signal or crash',
+                    'process() plugin',
+                    'Trigger the same shutdown within an explicit budget'
+                  ]
+                ]
+              },
+              {
+                type: 'list',
+                items: [
+                  'Concurrent flush calls share the current Promise; a later flush can still observe new work.',
+                  'Reentrant shutdown shares one Promise and does not rerun handlers.',
+                  'Failure still leaves the Logger terminal; retry never reopens it.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Process plugin', path: 'docs/logger/plugins/process' },
+        { label: 'Runtime and forwarding', path: 'runtime-and-forwarding' }
+      ]
+    }
+  },
+  'logger:runtime-and-forwarding': {
+    zh: {
+      title: '跨运行时适配并组合多个 Logger',
+      lede: 'Logger 通过 runtime manager 获取时钟、调度、stdout、process 与 fetch；extends 只转发运行时行为，不合并类型。',
+      document: {
+        sections: [
+          {
+            id: 'runtime',
+            heading: '只在平台边界替换 runtime manager',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const previous = getLoggerRuntimeManager()\nconst restore = setLoggerRuntimeManager({\n  ...previous,\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => embeddedConsole.write(text)\n})\n\ntry {\n  const embeddedLog = new Logger({ execution })\n  embeddedLog.info('ready')\n  await embeddedLog.shutdown('manual')\n} finally {\n  restore()\n}"
+              },
+              {
+                type: 'paragraph',
+                text: '浏览器没有 process 时 raw 回退 console，process() 成为 no-op。只有测试、嵌入式宿主或自定义 transport 需要 setLoggerRuntimeManager；在创建任何 Logger 前设置，并在所有 Logger 关闭后调用返回的 restore。'
+              }
+            ]
+          },
+          {
+            id: 'forward',
+            heading: '让每个目标运行自己的 pipeline',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "requestLog.extends(appLog, auditLog)\nrequestLog.info('request complete')\nrequestLog.unextend(auditLog)"
+              },
+              {
+                type: 'list',
+                items: [
+                  '转发目标仍执行自己的 level、filter、hook 与 sink。',
+                  'topic 追加到 topicChain；context id 同时用于注册期与运行期防环。',
+                  'extends 不把目标插件方法合并到源 Logger 的 TypeScript 类型。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Runtime manager API', path: 'docs/logger/setLoggerRuntimeManager' },
+        { label: '返回学习路径', path: 'index' }
+      ]
+    },
+    en: {
+      title: 'Adapt runtimes and compose multiple Loggers',
+      lede: 'Logger obtains time, scheduling, stdout, process, and fetch through its runtime manager. extends forwards runtime behavior and does not merge types.',
+      document: {
+        sections: [
+          {
+            id: 'runtime',
+            heading: 'Replace the runtime manager only at a platform boundary',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const previous = getLoggerRuntimeManager()\nconst restore = setLoggerRuntimeManager({\n  ...previous,\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => embeddedConsole.write(text)\n})\n\ntry {\n  const embeddedLog = new Logger({ execution })\n  embeddedLog.info('ready')\n  await embeddedLog.shutdown('manual')\n} finally {\n  restore()\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'Without process, raw output falls back to console and process() becomes a no-op. Only tests, embedded hosts, or custom transports need setLoggerRuntimeManager. Set it before creating any Logger and call the returned restore after every Logger has shut down.'
+              }
+            ]
+          },
+          {
+            id: 'forward',
+            heading: 'Let every target run its own pipeline',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "requestLog.extends(appLog, auditLog)\nrequestLog.info('request complete')\nrequestLog.unextend(auditLog)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Each target still runs its own level, filters, hooks, and sinks.',
+                  'Topics append to topicChain, while context IDs prevent cycles at registration and runtime.',
+                  'extends does not merge target plugin methods into the source Logger TypeScript type.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Runtime manager API', path: 'docs/logger/setLoggerRuntimeManager' },
+        { label: 'Return to learning paths', path: 'index' }
+      ]
+    }
+  },
+  'plugin-host:index': {
+    zh: {
+      title: 'Plugin Host 学习路径',
+      lede: '从一次可靠安装开始，再理解配置、共享能力、pipeline 与卸载；API 声明放在最后查阅，不替代这些任务指南。',
+      document: {
+        sections: [
+          {
+            id: 'choose-path',
+            heading: '先按任务选择入口',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['你要完成的任务', '阅读路径', '得到的结果'],
+                rows: [
+                  ['创建宿主并安装第一个插件', '快速开始', '可调用且可卸载的 immutable view'],
+                  ['多个插件有先后关系', '安装与组合', '由组合层给出的显式拓扑顺序'],
+                  ['插件交换配置或能力', '配置与 shared', '事务配置与有所有者的共享值'],
+                  ['按顺序拦截领域调用', 'Pipelines', '与执行模型匹配的 stage 链'],
+                  ['安全卸载或处理失败', '卸载、回滚与清理', '逻辑撤销和物理清理分离']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'mental-model',
+            heading: '先建立正确心智模型',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Host 串行化 mutation，并只在完整安装成功后发布新 view。',
+                  'view 是某一代不可变快照；扩展位于 view.extensions，而不是 Host 实例上。',
+                  'PluginHost 不解析依赖图；组合层必须先安装 provider，卸载时先移除 consumer。',
+                  '卸载先撤销新调用能力，再等待在途 pipeline 与资源完成物理清理。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '快速开始', path: 'getting-started' },
+        { label: '安装与组合', path: 'install-and-compose' },
+        { label: 'PluginHost API', path: 'docs/plugin-host/structural/PluginHost' }
+      ]
+    },
+    en: {
+      title: 'Plugin Host learning paths',
+      lede: 'Start with one reliable installation, then learn configuration, shared capabilities, pipelines, and removal. API declarations are the final lookup layer, not a substitute for these tasks.',
+      document: {
+        sections: [
+          {
+            id: 'choose-path',
+            heading: 'Choose an entry by task',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Task', 'Read', 'Outcome'],
+                rows: [
+                  [
+                    'Create a host and install one plugin',
+                    'Getting started',
+                    'An immutable callable and removable view'
+                  ],
+                  [
+                    'Order several related plugins',
+                    'Install and compose',
+                    'An explicit topology owned by the composition layer'
+                  ],
+                  [
+                    'Exchange configuration or capabilities',
+                    'Configuration and shared',
+                    'Transactional config and owned shared values'
+                  ],
+                  [
+                    'Intercept domain calls in order',
+                    'Pipelines',
+                    'A stage chain matching one execution model'
+                  ],
+                  [
+                    'Remove safely or recover from failure',
+                    'Removal, rollback, and cleanup',
+                    'Logical revocation separated from physical cleanup'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'mental-model',
+            heading: 'Build the right mental model first',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'The Host serializes mutations and publishes a new view only after a complete installation succeeds.',
+                  'A view is an immutable generation snapshot; extensions live on view.extensions, not the Host instance.',
+                  'PluginHost does not resolve a dependency graph. The composition layer installs providers first and removes consumers first.',
+                  'Removal revokes new calls before active pipelines and resources finish physical cleanup.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Getting started', path: 'getting-started' },
+        { label: 'Install and compose', path: 'install-and-compose' },
+        { label: 'PluginHost API', path: 'docs/plugin-host/structural/PluginHost' }
+      ]
+    }
+  },
+  'plugin-host:getting-started': {
+    zh: {
+      title: '创建并使用第一个 Plugin Host',
+      lede: '用显式执行预算、领域 core 和一个插件完成安装、调用与清理闭环。',
+      document: {
+        sections: [
+          {
+            id: 'create-host',
+            heading: '定义领域 core，并显式选择等待预算',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { PluginHost } from '@migaia/plugin-host'\n\ntype ICore = { write(message: string): void }\n\nclass AppHost extends PluginHost<ICore> {\n  protected createPluginDomainCore(): ICore {\n    return { write: (message) => console.log(message) }\n  }\n}\n\nconst host = new AppHost({\n  execution: {\n    mutationTimeoutMs: 5_000,\n    pipelineDrainTimeoutMs: 5_000\n  }\n})"
+              },
+              {
+                type: 'paragraph',
+                text: '两个 execution 字段都是必填的产品决策。数字提供有界等待；false 表示明确接受无限等待，而不是默认值。'
+              }
+            ]
+          },
+          {
+            id: 'use-view',
+            heading: '只从成功安装返回的 view 调用能力',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const view = await host.use(greetingPlugin)\nview.extensions.greet('Migaia')\n\nconst removal = await view.unUse('greeting')\nif (removal.physicalCompletion) {\n  await removal.physicalCompletion\n}\n\nawait host.dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'use() 成功后才会发布包含新插件的 view；失败不会留下半安装能力。',
+                  '不要把 extension 当作 host.greet 调用，它只存在于对应 view.extensions 上。',
+                  '应用终止时 await host.dispose()，不要只触发清理后立即退出。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'plugin-contract',
+            heading: '插件同时声明扩展、配置、共享能力与清理责任',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IPlugin } from '@migaia/plugin-host'\n\ntype IAppCore = { write(message: string): void }\ntype IGreetingConfig = { prefix: string }\ntype IGreetingExtension = { greet(name: string): void }\n\nconst greetingPlugin = {\n  name: 'greeting',\n  config: { prefix: 'Hello' },\n  shared: (core) => ({\n    formatGreeting: (name: string) => `${core.config.get('prefix')} ${name}`\n  }),\n  install: (core) => {\n    const greet = (name: string) => {\n      core.write(`${core.config.get('prefix')} ${name}`)\n    }\n    core.onDispose(() => core.write('greeting disposed'))\n    return { greet }\n  },\n  update: (next, core) => {\n    core.write(`prefix changed to ${next.prefix}`)\n  }\n} satisfies IPlugin<IAppCore, IGreetingExtension, IGreetingConfig>"
+              },
+              {
+                type: 'list',
+                items: [
+                  'name 是稳定且无点号的所有者 ID；Host 用它归属 extension、shared、stage 与 disposer。',
+                  'config 在安装前复制；update 接收下一代只读快照，成功后才发布新 view。',
+                  'install 返回运行时 extension；shared 返回供后续插件读取的跨插件能力。',
+                  '用 core.onDispose 登记安装期间创建的资源；不要只依赖进程退出。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'host-options',
+            heading: '逐项选择 Host 配置，而不是复制一组神秘数字',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['字段', '默认值', '作用与选择'],
+                rows: [
+                  [
+                    'execution.mutationTimeoutMs',
+                    '必填',
+                    '安装、更新或卸载 hook 的最长等待；false 明确允许无限等待。'
+                  ],
+                  [
+                    'execution.pipelineDrainTimeoutMs',
+                    '必填',
+                    '卸载时等待在途 pipeline lease；超时后通过 physicalCompletion 继续观察。'
+                  ],
+                  [
+                    'pipeline.mode',
+                    'sync',
+                    '选择 sync、async、generator 或 async-generator；必须匹配 stage 控制流。'
+                  ],
+                  [
+                    'queueAdmissionTimeoutMs',
+                    'undefined',
+                    '默认只诊断排队；number 超时拒绝，false 关闭 admission timer。'
+                  ],
+                  [
+                    'queueAdmissionDiagnosticMs',
+                    '1000 ms',
+                    '排队多久后报告诊断；false 关闭诊断 timer。'
+                  ],
+                  [
+                    'disposeStepTimeoutMs',
+                    '5000 ms',
+                    '单个 disposer 的等待预算；false 表示永久等待。'
+                  ],
+                  [
+                    'diagnostic',
+                    '内部默认处理器',
+                    '接收 queue、pipeline 违规等非致命诊断与错误码。'
+                  ],
+                  [
+                    'scheduler',
+                    'systemScheduler',
+                    '测试或自定义时间域使用；同一 scheduler 驱动 queue 与 dispose deadline。'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '安装多个插件', path: 'install-and-compose' },
+        { label: '理解所有构造配置', path: 'docs/plugin-host/structural/PluginHost' }
+      ]
+    },
+    en: {
+      title: 'Create and use your first Plugin Host',
+      lede: 'Close the installation, invocation, and cleanup loop with explicit execution budgets, a domain core, and one plugin.',
+      document: {
+        sections: [
+          {
+            id: 'create-host',
+            heading: 'Define a domain core and choose wait budgets explicitly',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { PluginHost } from '@migaia/plugin-host'\n\ntype ICore = { write(message: string): void }\n\nclass AppHost extends PluginHost<ICore> {\n  protected createPluginDomainCore(): ICore {\n    return { write: (message) => console.log(message) }\n  }\n}\n\nconst host = new AppHost({\n  execution: {\n    mutationTimeoutMs: 5_000,\n    pipelineDrainTimeoutMs: 5_000\n  }\n})"
+              },
+              {
+                type: 'paragraph',
+                text: 'Both execution fields are required product decisions. A number provides a bounded wait; false explicitly accepts an unbounded wait and is not an implicit default.'
+              }
+            ]
+          },
+          {
+            id: 'use-view',
+            heading: 'Invoke capabilities only through the returned view',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const view = await host.use(greetingPlugin)\nview.extensions.greet('Migaia')\n\nconst removal = await view.unUse('greeting')\nif (removal.physicalCompletion) {\n  await removal.physicalCompletion\n}\n\nawait host.dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'use() publishes the new view only after complete success; failure leaves no half-installed capability.',
+                  'Do not call an extension as host.greet. It exists only on the matching view.extensions object.',
+                  'Await host.dispose() during application shutdown instead of starting cleanup and exiting immediately.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'plugin-contract',
+            heading:
+              'A plugin declares extensions, configuration, shared capabilities, and cleanup ownership',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IPlugin } from '@migaia/plugin-host'\n\ntype IAppCore = { write(message: string): void }\ntype IGreetingConfig = { prefix: string }\ntype IGreetingExtension = { greet(name: string): void }\n\nconst greetingPlugin = {\n  name: 'greeting',\n  config: { prefix: 'Hello' },\n  shared: (core) => ({\n    formatGreeting: (name: string) => `${core.config.get('prefix')} ${name}`\n  }),\n  install: (core) => {\n    const greet = (name: string) => {\n      core.write(`${core.config.get('prefix')} ${name}`)\n    }\n    core.onDispose(() => core.write('greeting disposed'))\n    return { greet }\n  },\n  update: (next, core) => {\n    core.write(`prefix changed to ${next.prefix}`)\n  }\n} satisfies IPlugin<IAppCore, IGreetingExtension, IGreetingConfig>"
+              },
+              {
+                type: 'list',
+                items: [
+                  'name is a stable owner ID without dots. The Host uses it to own extensions, shared values, stages, and disposers.',
+                  'Configuration is copied before installation. update receives the next readonly snapshot, which is published only after success.',
+                  'install returns runtime extensions; shared returns a cross-plugin capability visible to later plugins.',
+                  'Register installation resources with core.onDispose instead of relying on process exit.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'host-options',
+            heading: 'Choose every Host option instead of copying unexplained numbers',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Field', 'Default', 'Purpose and choice'],
+                rows: [
+                  [
+                    'execution.mutationTimeoutMs',
+                    'required',
+                    'Maximum wait for install, update, or removal hooks; false explicitly permits an unbounded wait.'
+                  ],
+                  [
+                    'execution.pipelineDrainTimeoutMs',
+                    'required',
+                    'Wait for active pipeline leases during removal; physicalCompletion observes work that outlives the budget.'
+                  ],
+                  [
+                    'pipeline.mode',
+                    'sync',
+                    'Choose sync, async, generator, or async-generator to match stage control flow.'
+                  ],
+                  [
+                    'queueAdmissionTimeoutMs',
+                    'undefined',
+                    'Diagnose queueing by default; a number rejects on timeout, while false disables the admission timer.'
+                  ],
+                  [
+                    'queueAdmissionDiagnosticMs',
+                    '1000 ms',
+                    'Report a queued mutation after this duration; false disables its diagnostic timer.'
+                  ],
+                  [
+                    'disposeStepTimeoutMs',
+                    '5000 ms',
+                    'Budget for one disposer step; false waits forever.'
+                  ],
+                  [
+                    'diagnostic',
+                    'internal default',
+                    'Receives non-fatal queue and pipeline violations with their error code.'
+                  ],
+                  [
+                    'scheduler',
+                    'systemScheduler',
+                    'Use a custom time domain for tests or hosts; it drives queue and disposal deadlines together.'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Install multiple plugins', path: 'install-and-compose' },
+        { label: 'Understand every constructor option', path: 'docs/plugin-host/structural/PluginHost' }
+      ]
+    }
+  },
+  'plugin-host:install-and-compose': {
+    zh: {
+      title: '安装与组合插件',
+      lede: '把依赖关系留给组合层，把原子提交、所有权登记和不可变 view 留给 PluginHost。',
+      document: {
+        sections: [
+          {
+            id: 'order',
+            heading: '先排序，再交给 Host 安装',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const ordered = [databasePlugin, repositoryPlugin, featurePlugin]\nconst view = await host.use(ordered)\nview.extensions.feature.run()'
+              },
+              {
+                type: 'list',
+                items: [
+                  'provider 必须先于 consumer 安装；PluginHost 不会读取依赖元数据或执行拓扑排序。',
+                  '把相关插件作为一个 batch 交给 use()；任何安装 hook 失败，整批候选状态都不会发布。',
+                  '插件 ID 必须稳定且唯一；重复 ID 会在进入可见状态前被拒绝。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ownership',
+            heading: '安装 hook 只登记自己拥有的资源',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '插件可以登记 extension、shared 值、pipeline stage 与 disposer。Host 记录所有者，以便卸载时先撤销该插件的新调用入口，再执行对应清理；不要让插件偷偷修改另一个插件拥有的对象。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '配置与 shared', path: 'configuration-and-shared' },
+        { label: '卸载顺序与回滚', path: 'removal-and-rollback' }
+      ]
+    },
+    en: {
+      title: 'Install and compose plugins',
+      lede: 'Keep dependency relationships in the composition layer, while PluginHost owns atomic commit, registration, and immutable views.',
+      document: {
+        sections: [
+          {
+            id: 'order',
+            heading: 'Order first, then install through the Host',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const ordered = [databasePlugin, repositoryPlugin, featurePlugin]\nconst view = await host.use(ordered)\nview.extensions.feature.run()'
+              },
+              {
+                type: 'list',
+                items: [
+                  'Install a provider before its consumer. PluginHost does not read dependency metadata or perform topological sorting.',
+                  'Pass related plugins as one batch to use(). If any install hook fails, no candidate state from the batch is published.',
+                  'Plugin IDs must be stable and unique; a duplicate is rejected before becoming visible.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ownership',
+            heading: 'An install hook registers only what it owns',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A plugin may register extensions, shared values, pipeline stages, and disposers. The Host records ownership so removal can revoke new calls first and then clean those resources. A plugin must not mutate an object owned by another plugin behind the Host.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Configuration and shared', path: 'configuration-and-shared' },
+        { label: 'Removal order and rollback', path: 'removal-and-rollback' }
+      ]
+    }
+  },
+  'plugin-host:configuration-and-shared': {
+    zh: {
+      title: '配置与 shared 能力',
+      lede: '配置是事务快照；shared 是按引用发布、按所有者撤销的能力。两者不要混成可随意修改的全局对象。',
+      document: {
+        sections: [
+          {
+            id: 'config',
+            heading: '配置更新成功后才提交',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const installed = await host.use(greetingPlugin)\n\nawait installed.config.update('greeting', (previous) => ({\n  prefix: previous.prefix === 'Hello' ? '你好' : 'Hello'\n}))\n\nconst current = host.getCurrentView()\nconst prefix = current.config.get('greeting.prefix')"
+              },
+              {
+                type: 'list',
+                items: [
+                  '读取 view.config 得到该代不可变配置快照；旧 view 不会被原地改写。',
+                  '更新采用 copy-on-write。所有 update hook 成功后，Host 才发布新 config 与新 view。',
+                  'hook 失败或超时会保留上一代配置，失败 operation 失去迟到提交资格。',
+                  'update 完成后重新取得当前 view；不要假设旧 view 被原地刷新。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'shared',
+            heading: 'shared 保留原始引用，但仍有明确所有者',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'shared 适合连接同一 Host 内已排序的插件。consumer 只能读取安装顺序中已经存在的 provider 值；Host 不会推导依赖，因此组合层仍须保证 provider 先装、consumer 先卸。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const view = await host.use([databasePlugin, repositoryPlugin])\nconst repository = view.shared.get('repository')\nawait repository.findById('42')"
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '构建 pipeline', path: 'pipelines' },
+        { label: 'PluginHost 配置参考', path: 'docs/plugin-host/structural/PluginHost' }
+      ]
+    },
+    en: {
+      title: 'Configuration and shared capabilities',
+      lede: 'Configuration is a transactional snapshot. A shared capability is published by reference and revoked by owner. Neither is an ungoverned global object.',
+      document: {
+        sections: [
+          {
+            id: 'config',
+            heading: 'Commit configuration only after successful updates',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const installed = await host.use(greetingPlugin)\n\nawait installed.config.update('greeting', (previous) => ({\n  prefix: previous.prefix === 'Hello' ? '你好' : 'Hello'\n}))\n\nconst current = host.getCurrentView()\nconst prefix = current.config.get('greeting.prefix')"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Read view.config as the immutable snapshot for that generation. An old view is never rewritten in place.',
+                  'Updates use copy-on-write. The Host publishes the next config and view only after every update hook succeeds.',
+                  'A failed or timed-out hook preserves the previous generation and loses authority to commit late.',
+                  'Acquire the current view again after update; never assume an old view refreshes in place.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'shared',
+            heading: 'Shared values retain identity and still have an owner',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Shared capabilities connect already ordered plugins inside one Host. A consumer sees only provider values installed earlier. Because the Host does not derive dependencies, the composition layer still installs providers first and removes consumers first.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const view = await host.use([databasePlugin, repositoryPlugin])\nconst repository = view.shared.get('repository')\nawait repository.findById('42')"
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Build a pipeline', path: 'pipelines' },
+        { label: 'PluginHost configuration reference', path: 'docs/plugin-host/structural/PluginHost' }
+      ]
+    }
+  },
+  'plugin-host:pipelines': {
+    zh: {
+      title: '选择并运行 pipeline',
+      lede: '构造 Host 时选择唯一执行模型；插件登记与该模型匹配的 stage，调用方只运行已发布 view。',
+      document: {
+        sections: [
+          {
+            id: 'modes',
+            heading: '按控制流选择模式',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['模式', '控制流', '适合场景'],
+                rows: [
+                  ['sync', 'stage 返回后进入下游', '同步校验与变换'],
+                  ['async', 'await next() 形成洋葱模型', '计时、事务与异步拦截'],
+                  ['generator', 'yield 值并使用显式 terminal', '同步流式协议'],
+                  ['async-generator', '异步 yield 与显式 terminal', '异步流和背压边界']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'run-sync',
+            heading: '把领域入口封装在 Host 子类中',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "class MessageHost extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return core\n  }\n\n  dispatch(message: string): string {\n    let output = message\n    this.runPipeline(message, (next) => {\n      output = next\n    })\n    return output\n  }\n}\n\nconst uppercasePlugin = {\n  name: 'uppercase',\n  install(core) {\n    core.usePipeline((value, next) => next(value.toUpperCase()))\n    return {}\n  }\n}\n\nconst view = await host.use(uppercasePlugin)\nview.host.dispatch('hello') // HELLO"
+              },
+              {
+                type: 'list',
+                items: [
+                  'runPipeline 是 protected：由领域 Host 暴露有语义的 dispatch、execute 或 transform，不把底层 runner 泄漏给调用方。',
+                  'sync stage 必须在返回前调用 next；需要 await 时把 Host 配成 async，并登记 useAsyncPipeline。',
+                  '插件通过 install 收到的 core 登记 stage，因此卸载时 Host 能按 owner 撤销并 drain。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'drain',
+            heading: '在途执行持有 lease',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '移除插件时，属于它的 stage 会先从新 pipeline 中消失；已经开始的执行仍持有 lease。Host 最多等待 execution.pipelineDrainTimeoutMs，随后通过 removal result 暴露是否仍有物理清理。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '卸载与 drain', path: 'removal-and-rollback' },
+        { label: 'PluginHost API', path: 'docs/plugin-host/structural/PluginHost' }
+      ]
+    },
+    en: {
+      title: 'Choose and run a pipeline',
+      lede: 'Choose one execution model when constructing the Host. Plugins register matching stages, and callers run only a published view.',
+      document: {
+        sections: [
+          {
+            id: 'modes',
+            heading: 'Choose a mode from control flow',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Mode', 'Control flow', 'Use it for'],
+                rows: [
+                  [
+                    'sync',
+                    'Downstream starts after a stage returns',
+                    'Synchronous validation and transformation'
+                  ],
+                  [
+                    'async',
+                    'await next() forms an onion model',
+                    'Timing, transactions, and asynchronous interception'
+                  ],
+                  [
+                    'generator',
+                    'Yielded values plus an explicit terminal',
+                    'Synchronous streaming protocols'
+                  ],
+                  [
+                    'async-generator',
+                    'Asynchronous yields plus an explicit terminal',
+                    'Async streams and backpressure boundaries'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'run-sync',
+            heading: 'Expose a domain entry point from the Host subclass',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "class MessageHost extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return core\n  }\n\n  dispatch(message: string): string {\n    let output = message\n    this.runPipeline(message, (next) => {\n      output = next\n    })\n    return output\n  }\n}\n\nconst uppercasePlugin = {\n  name: 'uppercase',\n  install(core) {\n    core.usePipeline((value, next) => next(value.toUpperCase()))\n    return {}\n  }\n}\n\nconst view = await host.use(uppercasePlugin)\nview.host.dispatch('hello') // HELLO"
+              },
+              {
+                type: 'list',
+                items: [
+                  'runPipeline is protected. Expose a domain-specific dispatch, execute, or transform method instead of leaking the runner.',
+                  'A sync stage calls next before returning. Configure async mode and register useAsyncPipeline when the stage must await.',
+                  'A stage registered through the installation core retains its plugin owner, so removal can revoke and drain it correctly.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'drain',
+            heading: 'An active run holds a lease',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'During removal, the owned stage disappears from new pipelines first, while an already-started run retains its lease. The Host waits up to execution.pipelineDrainTimeoutMs and then reports whether physical cleanup remains.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Removal and drain', path: 'removal-and-rollback' },
+        { label: 'PluginHost API', path: 'docs/plugin-host/structural/PluginHost' }
+      ]
+    }
+  },
+  'plugin-host:removal-and-rollback': {
+    zh: {
+      title: '卸载、回滚与物理清理',
+      lede: '先阻止新调用，再等待旧调用与资源退出；逻辑终态不能因为清理缓慢或失败而重新开放。',
+      document: {
+        sections: [
+          {
+            id: 'remove',
+            heading: '按依赖反向卸载，并检查结构化结果',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "await view.unUse('feature') // consumer first\nconst result = await host.view().unUse('database') // provider last\n\nif (!result.cleanupComplete && result.physicalCompletion) {\n  await result.physicalCompletion\n}\nfor (const error of result.cleanupErrors) diagnostics.report(error)"
+              },
+              {
+                type: 'list',
+                items: [
+                  '新 view 先失去被移除能力；此前捕获的旧 view 再调用时以 VIEW_REVOKED 失败。',
+                  'cleanupComplete 表示返回时物理清理是否结束；cleanupErrors 保留每个清理失败。',
+                  'physicalCompletion 存在时可在更高层 shutdown 边界继续等待真实完成。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'rollback',
+            heading: '安装失败保留主错误',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'batch 安装的主失败仍是原始 install error，候选状态永远不会成为 live。回滚 disposer 的失败属于二次清理信息，只能进入 cause、聚合错误或 diagnostic，不能覆盖主失败。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '重新查看完整路径', path: 'index' },
+        { label: '错误码参考', path: 'docs/plugin-host/defined/PluginHostErrorCode' }
+      ]
+    },
+    en: {
+      title: 'Removal, rollback, and physical cleanup',
+      lede: 'Stop new calls first, then wait for old calls and resources to leave. Slow or failed cleanup never reopens logical terminal state.',
+      document: {
+        sections: [
+          {
+            id: 'remove',
+            heading: 'Remove in reverse dependency order and inspect the result',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "await view.unUse('feature') // consumer first\nconst result = await host.view().unUse('database') // provider last\n\nif (!result.cleanupComplete && result.physicalCompletion) {\n  await result.physicalCompletion\n}\nfor (const error of result.cleanupErrors) diagnostics.report(error)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'A new view loses the removed capability first. A previously captured stale view fails with VIEW_REVOKED when invoked again.',
+                  'cleanupComplete reports whether physical cleanup ended before return; cleanupErrors preserves each cleanup failure.',
+                  'When physicalCompletion exists, a higher-level shutdown boundary can keep waiting for actual completion.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'rollback',
+            heading: 'Preserve the primary installation failure',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'The original install error remains the primary batch failure, and candidate state never becomes live. A rollback disposer failure is secondary cleanup evidence and belongs in a cause, aggregate, or diagnostic; it never replaces the primary failure.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Review the complete path', path: 'index' },
+        { label: 'Error-code reference', path: 'docs/plugin-host/defined/PluginHostErrorCode' }
+      ]
+    }
+  },
+  'capability:index': {
+    zh: {
+      title: 'Capability 学习路径',
+      lede: '先判断你需要运行时闸门、静态依赖图还是可变组合图；它们共享生命周期纪律，但解决不同问题。',
+      document: {
+        sections: [
+          {
+            id: 'choose-owner',
+            heading: '从变化发生在哪里开始',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['问题', '入口', '不要混淆'],
+                rows: [
+                  ['按租户或灰度启停一个能力', 'createCapabilityHost', '开关不等于依赖图'],
+                  [
+                    '启动前已知完整 required-edge 图',
+                    'createCapabilityGraph',
+                    'ready 后注册表冻结'
+                  ],
+                  [
+                    '运行中注册、替换或移除节点',
+                    'createDynamicCapabilityGraph',
+                    '变更会串行并重启受影响闭包'
+                  ],
+                  ['只需要纯拓扑快照', 'buildCapabilityTopology', '它不拥有启动或释放']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ownership',
+            heading: '每条路径都先确定所有者',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Host 拥有 activate 返回的 handle，并按真实激活完成顺序反向释放。',
+                  'Graph 拥有节点 instance 的 primary release；节点 start 只读取已声明的 direct provider。',
+                  '开关关闭或 generation 过期时，迟到结果必须立即释放，不能重新进入当前状态。',
+                  'diagnostic reporter 只观察失败，不能改变主事务结果。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟建立运行时闸门', path: 'getting-started' },
+        { label: '静态 Capability Graph', path: 'graph' },
+        { label: '动态组合图', path: 'graph-dynamic' }
+      ]
+    },
+    en: {
+      title: 'Capability learning paths',
+      lede: 'Decide whether you need a runtime gate, a static dependency graph, or mutable composition first. They share lifecycle discipline but solve different problems.',
+      document: {
+        sections: [
+          {
+            id: 'choose-owner',
+            heading: 'Start with where change occurs',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Problem', 'Entry', 'Do not confuse it with'],
+                rows: [
+                  [
+                    'Enable or revoke one feature by tenant or rollout',
+                    'createCapabilityHost',
+                    'A flag is not a dependency graph'
+                  ],
+                  [
+                    'The complete required-edge graph is known before startup',
+                    'createCapabilityGraph',
+                    'Registration freezes after ready'
+                  ],
+                  [
+                    'Register, replace, or remove nodes at runtime',
+                    'createDynamicCapabilityGraph',
+                    'Mutations serialize and restart the affected closure'
+                  ],
+                  [
+                    'Only an immutable topology snapshot is needed',
+                    'buildCapabilityTopology',
+                    'It owns no startup or release'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ownership',
+            heading: 'Name the owner on every path',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'A Host owns the handle returned by activate and releases in reverse completion order.',
+                  'A Graph owns each node instance primary release; start reads only declared direct providers.',
+                  'When a gate closes or a generation expires, a late result is released instead of re-entering current state.',
+                  'A diagnostic reporter observes failures and never changes the primary transaction result.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Build a runtime gate in five minutes', path: 'getting-started' },
+        { label: 'Static Capability Graph', path: 'graph' },
+        { label: 'Dynamic composition graph', path: 'graph-dynamic' }
+      ]
+    }
+  },
+  'capability:getting-started': {
+    zh: {
+      title: '五分钟建立可回退的运行时能力',
+      lede: '用动态 import、结构化 enable 结果和明确 handle 完成“未启用不下载、关闭就释放”的最小闭环。',
+      document: {
+        sections: [
+          {
+            id: 'host',
+            heading: '登记惰性能力并保留释放句柄',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { CapabilityEnableStatus, createCapabilityHost } from '@migaia/capability'\n\nconst host = createCapabilityHost({ tenantId }, {\n  flags: { persistence: true },\n  onError: (name, error) => diagnostics.report(name, error)\n})\n\nhost.register({\n  name: 'persistence',\n  async activate(context) {\n    const { openPersistence } = await import('./persistence.js')\n    return openPersistence(context.tenantId) // must expose dispose()\n  }\n})\n\nconst result = await host.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) {\n  host.handle('persistence')\n}\n\nawait host.disable('persistence')"
+              },
+              {
+                type: 'list',
+                items: [
+                  '只有 activate 内的动态 import 才能让关闭的能力不进入初始包；Host 本身不会自动 tree-shake 静态 import。',
+                  'flags 只有自有、可枚举且严格等于 true 的数据属性会放行；缺失键默认拒绝。',
+                  'enable 并发调用共享同一次激活；结果可能是 enabled、gated、cancelled 或 failed。',
+                  '关闭开关会作废在途激活；迟到 handle 会就地释放，不会偷偷重新启用。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'host-options',
+            heading: '明确开关快照与清理边界',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['配置或操作', '默认值或行为', '生产约束'],
+                rows: [
+                  [
+                    'flags',
+                    '空快照；所有能力默认 gated',
+                    '只复制自有、可枚举且值严格为 true 的数据属性；后续修改原对象无效'
+                  ],
+                  [
+                    'onError',
+                    '省略',
+                    '激活、释放与迟到结果失败需要可观察时提供；reporter 抛错不会改写状态机'
+                  ],
+                  [
+                    'setFlag(name, false)',
+                    '原子撤销一个能力',
+                    '同步作废在途激活并启动已有 handle 释放；需要等待物理完成时继续 await disable()'
+                  ],
+                  [
+                    'setFlag(name, true)',
+                    '只打开闸门',
+                    '不会自动 enable，业务所有者仍决定激活时机'
+                  ],
+                  [
+                    'setFlags(next)',
+                    '原子替换整份快照',
+                    '未列出的旧键变为 gated，不会继承上一份 true'
+                  ],
+                  [
+                    'disableNow(name)',
+                    '同步启动释放，不等待 disposer',
+                    '只用于确实不能 await 的退出边界；正常流程使用 await disable()'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Host 在构造时快照 context 与 options receiver。远端配置更新应先验证并构造完整 next flags，再调用 setFlags；不要原地修改初始 flags，也不要把 enable 成功等同于异步 disposer 已完成。'
+              }
+            ]
+          },
+          {
+            id: 'shutdown',
+            heading: '在所有者终止时等待真实清理',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '优先 await disable() 或 dispose()。disableNow() 只触发同步关闭而不等待异步 disposer；只在调用边界明确不能 await 时使用。Host dispose 后永久终止，下一请求或租户必须创建新实例。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'createCapabilityHost API', path: 'docs/capability/createCapabilityHost' },
+        { label: '静态依赖图', path: 'graph' },
+        { label: 'Graph readiness bridge', path: 'docs/capability/snapshotGraphReadiness' }
+      ]
+    },
+    en: {
+      title: 'Build a revocable runtime capability in five minutes',
+      lede: 'Combine dynamic import, structured enable results, and an explicit handle so disabled code stays unloaded and revocation performs real cleanup.',
+      document: {
+        sections: [
+          {
+            id: 'host',
+            heading: 'Register a lazy capability with an owned release handle',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { CapabilityEnableStatus, createCapabilityHost } from '@migaia/capability'\n\nconst host = createCapabilityHost({ tenantId }, {\n  flags: { persistence: true },\n  onError: (name, error) => diagnostics.report(name, error)\n})\n\nhost.register({\n  name: 'persistence',\n  async activate(context) {\n    const { openPersistence } = await import('./persistence.js')\n    return openPersistence(context.tenantId) // must expose dispose()\n  }\n})\n\nconst result = await host.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) {\n  host.handle('persistence')\n}\n\nawait host.disable('persistence')"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Only a dynamic import inside activate keeps disabled code out of the initial bundle. A Host cannot tree-shake a static import for you.',
+                  'Only own enumerable data properties strictly equal to true pass the flag gate; an absent key denies by default.',
+                  'Concurrent enable calls share one activation, whose result is enabled, gated, cancelled, or failed.',
+                  'Closing a flag invalidates in-flight activation, so a late handle is released instead of silently re-enabling itself.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'host-options',
+            heading: 'Make the flag snapshot and cleanup boundary explicit',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Option or operation', 'Default or behavior', 'Production constraint'],
+                rows: [
+                  [
+                    'flags',
+                    'Empty snapshot; every capability is gated',
+                    'Copies only own enumerable data properties strictly equal to true; later mutation of the input object has no effect'
+                  ],
+                  [
+                    'onError',
+                    'Omitted',
+                    'Provide it when activation, release, and late-result failures must be observable; reporter failure cannot rewrite the state machine'
+                  ],
+                  [
+                    'setFlag(name, false)',
+                    'Atomically revokes one capability',
+                    'Invalidates in-flight activation and starts release; follow with await disable() when physical completion matters'
+                  ],
+                  [
+                    'setFlag(name, true)',
+                    'Opens only the gate',
+                    'It never enables automatically; the business owner still chooses activation time'
+                  ],
+                  [
+                    'setFlags(next)',
+                    'Atomically replaces the complete snapshot',
+                    'An old key omitted from next becomes gated instead of retaining true'
+                  ],
+                  [
+                    'disableNow(name)',
+                    'Starts release synchronously without awaiting the disposer',
+                    'Reserve it for an exit boundary that cannot await; normal flow uses await disable()'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'The Host snapshots context and the options receiver at construction. Validate and construct a complete next flag set before calling setFlags for remote configuration; do not mutate the initial flags in place or equate successful enablement with completion of a later asynchronous disposer.'
+              }
+            ]
+          },
+          {
+            id: 'shutdown',
+            heading: 'Wait for physical cleanup when the owner ends',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Prefer await disable() or dispose(). disableNow() starts shutdown without awaiting an asynchronous disposer and belongs only at a boundary that truly cannot await. A disposed Host is terminal; create another for a new request or tenant.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'createCapabilityHost API', path: 'docs/capability/createCapabilityHost' },
+        { label: 'Static dependency graph', path: 'graph' },
+        { label: 'Graph readiness bridge', path: 'docs/capability/snapshotGraphReadiness' }
+      ]
+    }
+  },
+  'capability:graph': {
+    zh: {
+      title: '启动一个封闭的静态 Capability Graph',
+      lede: '在 ready 前登记完整 required-edge 图，让 Graph 负责拓扑启动、失败回滚和逆拓扑释放。',
+      document: {
+        sections: [
+          {
+            id: 'register',
+            heading: '声明直接 provider，而不是在 start 内隐式查找',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'\n\nconst config = 'config' as IGraphNodeId\nconst database = 'database' as IGraphNodeId\nconst graph = createCapabilityGraph({ onError: reportCleanupFailure })\n\ngraph.register({\n  id: config,\n  kind: 'config',\n  dependencies: [],\n  start: () => ({ value: loadConfig(), release: () => undefined })\n})\n\ngraph.register({\n  id: database,\n  kind: 'service',\n  dependencies: [{ provider: config, required: true }],\n  start: (context) => {\n    const connection = connectDatabase(context.get(config))\n    return { value: connection, release: () => connection.close() }\n  }\n})\n\nawait graph.ready()\nconst configValue = graph.get(database, config)\nawait graph.dispose()"
+              }
+            ]
+          },
+          {
+            id: 'closed-world',
+            heading: 'ready 是注册表的封闭世界门禁',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '首次 ready 冻结注册表，并校验 unknown provider、重复边、自环与 cycle。',
+                  'context.get 只能读取当前节点声明的 direct provider；它不会创建 lease。',
+                  'start 失败会回滚已启动节点，Graph 不隐式 retry。',
+                  '节点 primary release 按逆拓扑执行；context.own 登记的辅助资源由 provisional scope 回滚。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'createCapabilityGraph API', path: 'docs/capability/graph/createCapabilityGraph' },
+        { label: '动态变更图', path: 'graph-dynamic' },
+        { label: '纯拓扑构建', path: 'graph-topology' }
+      ]
+    },
+    en: {
+      title: 'Start a closed static Capability Graph',
+      lede: 'Register the complete required-edge graph before ready, then let Graph own topological startup, rollback, and reverse-topology release.',
+      document: {
+        sections: [
+          {
+            id: 'register',
+            heading: 'Declare direct providers instead of discovering them inside start',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'\n\nconst config = 'config' as IGraphNodeId\nconst database = 'database' as IGraphNodeId\nconst graph = createCapabilityGraph({ onError: reportCleanupFailure })\n\ngraph.register({\n  id: config,\n  kind: 'config',\n  dependencies: [],\n  start: () => ({ value: loadConfig(), release: () => undefined })\n})\n\ngraph.register({\n  id: database,\n  kind: 'service',\n  dependencies: [{ provider: config, required: true }],\n  start: (context) => {\n    const connection = connectDatabase(context.get(config))\n    return { value: connection, release: () => connection.close() }\n  }\n})\n\nawait graph.ready()\nconst configValue = graph.get(database, config)\nawait graph.dispose()"
+              }
+            ]
+          },
+          {
+            id: 'closed-world',
+            heading: 'ready is the closed-world gate for registration',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'The first ready freezes registration and rejects unknown providers, duplicate edges, self-edges, and cycles.',
+                  'context.get reads only a declared direct provider and does not create a lease.',
+                  'A start failure rolls back nodes already started; Graph does not retry implicitly.',
+                  'Primary node release follows reverse topology, while context.own resources roll back with the provisional scope.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'createCapabilityGraph API', path: 'docs/capability/graph/createCapabilityGraph' },
+        { label: 'Dynamic mutation graph', path: 'graph-dynamic' },
+        { label: 'Pure topology construction', path: 'graph-topology' }
+      ]
+    }
+  },
+  'capability:graph-dynamic': {
+    zh: {
+      title: '在运行中安全替换 Capability Graph 节点',
+      lede: '动态 Graph 把 register、replace 与 remove 串行化，并只重启目标节点及其传递 consumers。',
+      document: {
+        sections: [
+          {
+            id: 'replace',
+            heading: '把一次变更当作受影响闭包事务',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'\nimport type { IGraphNodeId } from '@migaia/capability/graph'\n\nconst cache = 'cache' as IGraphNodeId\nconst graph = createDynamicCapabilityGraph({\n  mutationAdmissionMs: 1_000,\n  report: reportCleanupFailure\n})\n\nawait graph.register({\n  id: cache,\n  kind: 'cache',\n  dependencies: [],\n  start: () => {\n    const instance = openMemoryCache()\n    return { value: instance, release: () => instance.close() }\n  }\n})\nawait graph.ready()\n\nconst mutation = await graph.replace({\n  id: cache,\n  kind: 'cache',\n  dependencies: [],\n  start: () => {\n    const instance = openDistributedCache()\n    return { value: instance, release: () => instance.close() }\n  }\n})\nconsole.log(mutation.affected, mutation.metrics)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'replace 保留同边节点的稳定 ordinal，并释放、重启它的 consumer 闭包。',
+                  'remove 必须让仍依赖该 provider 的受影响节点 fail-closed，不能留下陈旧 binding。',
+                  'mutationAdmissionMs 限制已接纳变更在串行队列后的等待时间，不是 startBatch 的执行超时。',
+                  'affected 与 metrics 是本次变更的可观测结果，可用于验证没有退化为无界全图扫描。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'dynamic-options',
+            heading: '先界定 mutation 与 composition authority',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['选项', '默认值', '何时设置'],
+                rows: [
+                  ['report', '省略', '启动、释放或迟到失败需要进入诊断系统时'],
+                  [
+                    'mutationAdmissionMs',
+                    '无队列等待截止时间',
+                    '接纳后的 mutation 不能无限等待前序事务时；它不限制 start/release 执行时间'
+                  ],
+                  [
+                    'startBatch',
+                    '逐节点调用 definition.start',
+                    '组合层已经拥有批量物理启动与回滚时'
+                  ],
+                  [
+                    'releaseBatch',
+                    '逐节点调用 instance.release',
+                    '同一组合层同时拥有物理释放、fence 与错误上报时'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'startBatch 与 releaseBatch 是所有权接管点，不是性能回调。只覆盖其中一侧会把启动、回滚与释放拆给不同 owner；除非组合层能证明完整生命周期，否则保持两者省略。'
+              }
+            ]
+          },
+          {
+            id: 'composition',
+            heading: '只有组合所有者才接管 batch 生命周期',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '默认让每个 node.start 与 instance.release 自己工作。只有 Tray 或同等级组合层已经拥有批量物理启动/释放时，才配置 startBatch 与 releaseBatch；两者必须共同保持拓扑顺序、回滚与错误报告。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'createDynamicCapabilityGraph API',
+          path: 'docs/capability/graph-dynamic/createDynamicCapabilityGraph'
+        },
+        { label: '静态 Graph', path: 'graph' },
+        { label: '纯拓扑构建', path: 'graph-topology' }
+      ]
+    },
+    en: {
+      title: 'Replace Capability Graph nodes safely at runtime',
+      lede: 'Dynamic Graph serializes register, replace, and remove, restarting only the target node and its transitive consumers.',
+      document: {
+        sections: [
+          {
+            id: 'replace',
+            heading: 'Treat one mutation as an affected-closure transaction',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'\nimport type { IGraphNodeId } from '@migaia/capability/graph'\n\nconst cache = 'cache' as IGraphNodeId\nconst graph = createDynamicCapabilityGraph({\n  mutationAdmissionMs: 1_000,\n  report: reportCleanupFailure\n})\n\nawait graph.register({\n  id: cache,\n  kind: 'cache',\n  dependencies: [],\n  start: () => {\n    const instance = openMemoryCache()\n    return { value: instance, release: () => instance.close() }\n  }\n})\nawait graph.ready()\n\nconst mutation = await graph.replace({\n  id: cache,\n  kind: 'cache',\n  dependencies: [],\n  start: () => {\n    const instance = openDistributedCache()\n    return { value: instance, release: () => instance.close() }\n  }\n})\nconsole.log(mutation.affected, mutation.metrics)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'replace retains a stable ordinal when edges stay the same, then releases and restarts its consumer closure.',
+                  'remove must fail affected consumers closed instead of leaving a stale binding behind.',
+                  'mutationAdmissionMs bounds queue wait after admission; it is not an execution timeout for startBatch.',
+                  'affected and metrics expose the exact mutation scope and help prove it did not regress to an unbounded full-graph scan.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'dynamic-options',
+            heading: 'Bound mutation and composition authority first',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Option', 'Default', 'Set it when'],
+                rows: [
+                  [
+                    'report',
+                    'Omitted',
+                    'Startup, release, or late failures must enter diagnostics'
+                  ],
+                  [
+                    'mutationAdmissionMs',
+                    'No queue-wait deadline',
+                    'An admitted mutation cannot wait forever behind earlier work; it does not bound start or release execution'
+                  ],
+                  [
+                    'startBatch',
+                    'Calls each definition.start',
+                    'A composition layer already owns physical batch startup and rollback'
+                  ],
+                  [
+                    'releaseBatch',
+                    'Calls each instance.release',
+                    'The same composition layer owns physical release, its fence, and error reporting'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'startBatch and releaseBatch transfer ownership; they are not performance callbacks. Configuring only one side splits startup, rollback, and release across owners. Leave both omitted unless the composition layer can prove the complete lifecycle.'
+              }
+            ]
+          },
+          {
+            id: 'composition',
+            heading: 'Only a composition owner takes over batch lifecycle',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'By default, use each node.start and instance.release directly. Configure startBatch and releaseBatch only when Tray or an equivalent composition layer already owns physical batch startup and release; both hooks must preserve topology, rollback, and error reporting together.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'createDynamicCapabilityGraph API',
+          path: 'docs/capability/graph-dynamic/createDynamicCapabilityGraph'
+        },
+        { label: 'Static Graph', path: 'graph' },
+        { label: 'Pure topology construction', path: 'graph-topology' }
+      ]
+    }
+  },
+  'capability:graph-topology': {
+    zh: {
+      title: '为组合层构建不可变拓扑快照',
+      lede: '这是 Graph 实现与组合所有者使用的纯准入原语；普通应用应选择静态或动态 Graph。',
+      document: {
+        sections: [
+          {
+            id: 'boundary',
+            heading: '只在你已经拥有 lifecycle 时使用',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['它负责', '它不负责'],
+                rows: [
+                  ['快照节点与 required edges', '启动节点'],
+                  ['校验 ID、重复边与连续 ordinal', '释放资源'],
+                  ['生成稳定拓扑顺序、level 与邻接表', '状态机、重试、取消或回滚']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '四个 callback 都是调用方拥有的错误适配器，并且必须抛出 never。节点 ordinal 必须唯一且连续覆盖 [0, nodeCount)，这样稳定调度无需排序猜测。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'buildCapabilityTopology API',
+          path: 'docs/capability/graph-topology/buildCapabilityTopology'
+        },
+        { label: '静态 Graph', path: 'graph' },
+        { label: '动态 Graph', path: 'graph-dynamic' }
+      ]
+    },
+    en: {
+      title: 'Build an immutable topology snapshot for a composition layer',
+      lede: 'This is a pure admission primitive for Graph implementations and composition owners. Applications normally choose the static or dynamic Graph instead.',
+      document: {
+        sections: [
+          {
+            id: 'boundary',
+            heading: 'Use it only when you already own lifecycle',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['It owns', 'It does not own'],
+                rows: [
+                  ['Snapshotting nodes and required edges', 'Starting nodes'],
+                  [
+                    'Validating IDs, duplicate edges, and contiguous ordinals',
+                    'Releasing resources'
+                  ],
+                  [
+                    'Stable topology order, levels, and adjacency',
+                    'State, retry, cancellation, or rollback'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'All four callbacks are caller-owned error adapters and must throw never. Node ordinals are unique and contiguous over [0, nodeCount), allowing stable scheduling without a guessed sort order.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'buildCapabilityTopology API',
+          path: 'docs/capability/graph-topology/buildCapabilityTopology'
+        },
+        { label: 'Static Graph', path: 'graph' },
+        { label: 'Dynamic Graph', path: 'graph-dynamic' }
+      ]
+    }
+  },
+  'middleware-pipeline:index': {
+    zh: {
+      title: 'Middleware Pipeline 学习路径',
+      lede: '先选择执行代数，再明确短路、取消与双失败语义；不要因为函数都叫 stage 就互换 runner。',
+      document: {
+        sections: [
+          {
+            id: 'choose-runner',
+            heading: '按控制流选择 runner',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['需求', '入口', '关键语义'],
+                rows: [
+                  ['同步变换并显式 next', 'runSyncMiddleware', 'stage 返回前未 next 即短路'],
+                  ['异步洋葱调用', 'runAsyncMiddleware', 'await next() 后执行上游收尾'],
+                  [
+                    '同步 generator 状态机',
+                    'runGeneratorMiddleware',
+                    'yield 值与 return signal 分离'
+                  ],
+                  [
+                    '异步 generator 串行步骤',
+                    'runAsyncGeneratorMiddleware',
+                    '等待每个 iterator terminal 后才进入下一 stage'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'invariants',
+            heading: '先接受三个不变量',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '每次调用先快照 stages；运行中修改原数组不会改写当前链。',
+                  '重复 next 与 stage 返回后的 late next 都是 violation，不会变成第二次分发。',
+                  'AbortSignal 只在协作检查点生效，不抢占正在运行的同步代码或永不 settle 的 Promise。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟建立异步洋葱链', path: 'getting-started' },
+        { label: '同步与异步 runner', path: 'sync-and-async' },
+        { label: '取消与错误组合', path: 'cancellation-and-errors' }
+      ]
+    },
+    en: {
+      title: 'Middleware Pipeline learning paths',
+      lede: 'Choose an execution algebra first, then make short-circuit, cancellation, and dual-failure semantics explicit. Stages are not interchangeable merely because they share a name.',
+      document: {
+        sections: [
+          {
+            id: 'choose-runner',
+            heading: 'Choose a runner by control flow',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Requirement', 'Entry', 'Defining semantic'],
+                rows: [
+                  [
+                    'Synchronous transforms with explicit next',
+                    'runSyncMiddleware',
+                    'Returning without next short-circuits'
+                  ],
+                  [
+                    'Asynchronous onion composition',
+                    'runAsyncMiddleware',
+                    'Upstream cleanup runs after awaited next'
+                  ],
+                  [
+                    'Synchronous generator state machines',
+                    'runGeneratorMiddleware',
+                    'Yielded values and return signals are separate'
+                  ],
+                  [
+                    'Serial asynchronous generator steps',
+                    'runAsyncGeneratorMiddleware',
+                    'The next stage starts only after iterator terminal'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'invariants',
+            heading: 'Accept three invariants first',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Every call snapshots stages, so mutating the source array cannot rewrite the current run.',
+                  'A duplicate next or a late next after return is a violation, never a second dispatch.',
+                  'AbortSignal acts only at cooperative checkpoints; it cannot preempt synchronous work or a Promise that never settles.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Build an async onion chain in five minutes', path: 'getting-started' },
+        { label: 'Sync and async runners', path: 'sync-and-async' },
+        { label: 'Cancellation and error composition', path: 'cancellation-and-errors' }
+      ]
+    }
+  },
+  'middleware-pipeline:getting-started': {
+    zh: {
+      title: '五分钟建立异步洋葱 Pipeline',
+      lede: '让每个 stage 明确选择是否进入下游，并在 await next() 两侧组织进入与退出逻辑。',
+      document: {
+        sections: [
+          {
+            id: 'onion',
+            heading: '把下游 Promise 当作当前 stage 的生命周期',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { runAsyncMiddleware } from '@migaia/middleware-pipeline'\n\nawait runAsyncMiddleware(\n  [\n    async (request, next) => {\n      const startedAt = performance.now()\n      try {\n        await next({ ...request, authenticated: true })\n      } finally {\n        metrics.observe(performance.now() - startedAt)\n      }\n    },\n    async (request, next) => {\n      if (!request.authenticated) return\n      await next(request)\n    }\n  ],\n  incomingRequest,\n  async (request) => sendResponse(await handleRequest(request)),\n  { onViolation: (violation) => diagnostics.report(violation) }\n)"
+              },
+              {
+                type: 'list',
+                items: [
+                  '调用并 await next() 会等完整下游结束后再执行 finally。',
+                  '不调用 next() 是正常短路：后续 stage 与 done 都不会执行。',
+                  'onViolation 必填，用于观察 duplicate/late next；不要把它留成无声空函数。',
+                  'stage 或 done 的单一失败保持 exact identity，不额外包装。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'runAsyncMiddleware API',
+          path: 'docs/middleware-pipeline/runAsyncMiddleware'
+        },
+        { label: '同步与异步差异', path: 'sync-and-async' },
+        { label: '取消与错误组合', path: 'cancellation-and-errors' }
+      ]
+    },
+    en: {
+      title: 'Build an asynchronous onion Pipeline in five minutes',
+      lede: 'Let every stage choose whether downstream runs, then place entry and exit behavior around await next().',
+      document: {
+        sections: [
+          {
+            id: 'onion',
+            heading: 'Treat the downstream Promise as the current stage lifetime',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { runAsyncMiddleware } from '@migaia/middleware-pipeline'\n\nawait runAsyncMiddleware(\n  [\n    async (request, next) => {\n      const startedAt = performance.now()\n      try {\n        await next({ ...request, authenticated: true })\n      } finally {\n        metrics.observe(performance.now() - startedAt)\n      }\n    },\n    async (request, next) => {\n      if (!request.authenticated) return\n      await next(request)\n    }\n  ],\n  incomingRequest,\n  async (request) => sendResponse(await handleRequest(request)),\n  { onViolation: (violation) => diagnostics.report(violation) }\n)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Calling and awaiting next waits for the entire downstream lifetime before finally runs.',
+                  'Not calling next is a valid short circuit, so later stages and done never execute.',
+                  'onViolation is required to observe duplicate or late next calls; do not leave it as a silent no-op.',
+                  'A single stage or done failure preserves exact identity without an extra wrapper.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'runAsyncMiddleware API',
+          path: 'docs/middleware-pipeline/runAsyncMiddleware'
+        },
+        { label: 'Sync and async differences', path: 'sync-and-async' },
+        { label: 'Cancellation and error composition', path: 'cancellation-and-errors' }
+      ]
+    }
+  },
+  'middleware-pipeline:sync-and-async': {
+    zh: {
+      title: '在同步链和异步洋葱之间做出明确选择',
+      lede: '两种 runner 都使用 next，但同步 runner 提交下一值，异步 runner 返回完整下游 Promise。',
+      document: {
+        sections: [
+          {
+            id: 'comparison',
+            heading: '不要用 async stage 填进同步 runner',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['行为', 'runSyncMiddleware', 'runAsyncMiddleware'],
+                rows: [
+                  ['next 返回', 'void', 'Promise<void>'],
+                  ['执行形状', '扁平、同步逐项', '递归洋葱'],
+                  [
+                    'stage 返回后 next',
+                    'late violation',
+                    'stage settlement 后 next 为 late violation'
+                  ],
+                  ['stage 与 downstream 同时失败', '不存在双 slot', '组合器或 AggregateError'],
+                  ['取消', '只在同步检查点观察', '不会 Promise.race 抢占 pending stage']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '已有同步 stage 要进入异步链时使用 adaptSyncStageToAsync。适配器保留短路和 violation，但不能把真正异步的 stage 降级为同步执行。'
+              }
+            ]
+          },
+          {
+            id: 'adapters',
+            heading: '只沿能保留控制语义的方向适配',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['已有 stage', '目标 runner', 'Adapter 与约束'],
+                rows: [
+                  [
+                    '同步 next-style',
+                    '异步 next-style',
+                    'adaptSyncStageToAsync；等待已启动 downstream，内部 violation handler 默认静默，生产代码应显式传入'
+                  ],
+                  [
+                    '同步 next-style',
+                    '同步 generator',
+                    'adaptSyncStageToGenerator；onViolation 必填，未调用 next 转为 GENERATOR_HALT'
+                  ],
+                  [
+                    '同步 generator',
+                    '异步 generator',
+                    'adaptGeneratorStageToAsyncGenerator；保留 yield、terminal signal 与 throw identity'
+                  ],
+                  [
+                    '同步 next-style',
+                    '异步 generator',
+                    'adaptSyncStageToAsyncGenerator；复用 sync→generator 规则，onViolation 必填'
+                  ],
+                  [
+                    '异步 next-style',
+                    'generator',
+                    '不支持；递归 next、双失败 channel 与 active control 无法无损变成 stage-local yield'
+                  ]
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const normalized = adaptSyncStageToAsync(\n  (value: string, next) => next(value.trim()),\n  (violation) => diagnostics.report(violation)\n)\n\nawait runAsyncMiddleware([normalized], input, save, {\n  onViolation: (violation) => diagnostics.report(violation)\n})'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'runSyncMiddleware API',
+          path: 'docs/middleware-pipeline/runSyncMiddleware'
+        },
+        { label: '同步转异步适配器', path: 'docs/middleware-pipeline/adaptSyncStageToAsync' },
+        { label: 'Generator runner', path: 'generators' }
+      ]
+    },
+    en: {
+      title: 'Choose explicitly between a synchronous chain and an async onion',
+      lede: 'Both runners expose next, but the synchronous form submits the next value while the asynchronous form returns the complete downstream Promise.',
+      document: {
+        sections: [
+          {
+            id: 'comparison',
+            heading: 'Do not place an async stage in the synchronous runner',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Behavior', 'runSyncMiddleware', 'runAsyncMiddleware'],
+                rows: [
+                  ['next returns', 'void', 'Promise<void>'],
+                  ['Execution shape', 'Flat synchronous sequence', 'Recursive onion'],
+                  ['next after stage return', 'Late violation', 'Late after stage settlement'],
+                  [
+                    'Stage and downstream both fail',
+                    'No dual slots exist',
+                    'Combiner or AggregateError'
+                  ],
+                  [
+                    'Cancellation',
+                    'Observed at synchronous checkpoints',
+                    'Never Promise.races a pending stage'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Use adaptSyncStageToAsync when an existing synchronous stage belongs in an asynchronous chain. The adapter preserves short-circuit and violation behavior but cannot downgrade a truly asynchronous stage into synchronous execution.'
+              }
+            ]
+          },
+          {
+            id: 'adapters',
+            heading: 'Adapt only in directions that preserve control semantics',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Existing stage', 'Target runner', 'Adapter and boundary'],
+                rows: [
+                  [
+                    'Synchronous next-style',
+                    'Asynchronous next-style',
+                    'adaptSyncStageToAsync waits for started downstream work; its inner violation handler defaults to silent, so production code supplies one'
+                  ],
+                  [
+                    'Synchronous next-style',
+                    'Synchronous generator',
+                    'adaptSyncStageToGenerator requires onViolation and maps missing next to GENERATOR_HALT'
+                  ],
+                  [
+                    'Synchronous generator',
+                    'Asynchronous generator',
+                    'adaptGeneratorStageToAsyncGenerator preserves yields, terminal signals, and throw identity'
+                  ],
+                  [
+                    'Synchronous next-style',
+                    'Asynchronous generator',
+                    'adaptSyncStageToAsyncGenerator reuses sync-to-generator rules and requires onViolation'
+                  ],
+                  [
+                    'Asynchronous next-style',
+                    'Generator',
+                    'Unsupported because recursive next, dual-failure channels, and active control cannot become stage-local yields without loss'
+                  ]
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const normalized = adaptSyncStageToAsync(\n  (value: string, next) => next(value.trim()),\n  (violation) => diagnostics.report(violation)\n)\n\nawait runAsyncMiddleware([normalized], input, save, {\n  onViolation: (violation) => diagnostics.report(violation)\n})'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'runSyncMiddleware API',
+          path: 'docs/middleware-pipeline/runSyncMiddleware'
+        },
+        {
+          label: 'Sync-to-async adapter',
+          path: 'docs/middleware-pipeline/adaptSyncStageToAsync'
+        },
+        { label: 'Generator runners', path: 'generators' }
+      ]
+    }
+  },
+  'middleware-pipeline:generators': {
+    zh: {
+      title: '用 generator 明确区分候选值与控制信号',
+      lede: 'yield 只更新本 stage 的候选值，return 决定继续、停止、传播 undefined 或直接提交新值。',
+      document: {
+        sections: [
+          {
+            id: 'signals',
+            heading: '阅读 return，而不是只看 yield',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import {\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  runGeneratorMiddleware\n} from '@migaia/middleware-pipeline'\n\nrunGeneratorMiddleware(\n  [\n    function* normalize(value: string) {\n      yield value.trim()\n      yield value.trim().toLowerCase()\n      return GENERATOR_CONTINUE // 采用最后一次 yield\n    },\n    function* requireValue(value: string) {\n      return value.length === 0 ? GENERATOR_HALT : value\n    }\n  ],\n  input,\n  (value) => save(value)\n)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'GENERATOR_CONTINUE 采用最后一次 yield；零 yield 时保持输入。',
+                  'GENERATOR_HALT 或隐式 return undefined 会短路且不调用 done。',
+                  'GENERATOR_UNDEFINED 才表示显式把 undefined 传给下一 stage。',
+                  'async generator 仍严格串行；yield 不是 streaming fan-out。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'runGeneratorMiddleware API',
+          path: 'docs/middleware-pipeline/runGeneratorMiddleware'
+        },
+        {
+          label: '异步 Generator API',
+          path: 'docs/middleware-pipeline/runAsyncGeneratorMiddleware'
+        },
+        { label: '取消与清理', path: 'cancellation-and-errors' }
+      ]
+    },
+    en: {
+      title: 'Separate candidate values from control signals with generators',
+      lede: 'yield updates only the current stage candidate; return decides whether to continue, halt, propagate undefined, or submit another value.',
+      document: {
+        sections: [
+          {
+            id: 'signals',
+            heading: 'Read the return value, not only each yield',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import {\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  runGeneratorMiddleware\n} from '@migaia/middleware-pipeline'\n\nrunGeneratorMiddleware(\n  [\n    function* normalize(value: string) {\n      yield value.trim()\n      yield value.trim().toLowerCase()\n      return GENERATOR_CONTINUE // use the last yield\n    },\n    function* requireValue(value: string) {\n      return value.length === 0 ? GENERATOR_HALT : value\n    }\n  ],\n  input,\n  (value) => save(value)\n)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'GENERATOR_CONTINUE adopts the last yield and keeps the input when there was no yield.',
+                  'GENERATOR_HALT or an implicit return undefined short-circuits without done.',
+                  'Only GENERATOR_UNDEFINED explicitly passes undefined to the next stage.',
+                  'An async generator remains strictly serial; yielding is not streaming fan-out.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'runGeneratorMiddleware API',
+          path: 'docs/middleware-pipeline/runGeneratorMiddleware'
+        },
+        {
+          label: 'Async Generator API',
+          path: 'docs/middleware-pipeline/runAsyncGeneratorMiddleware'
+        },
+        { label: 'Cancellation and cleanup', path: 'cancellation-and-errors' }
+      ]
+    }
+  },
+  'middleware-pipeline:cancellation-and-errors': {
+    zh: {
+      title: '组合协作取消与双失败，而不丢失原始错误',
+      lede: 'Pipeline 不提供硬终止；它只在边界检查 signal，并在 stage 与 downstream 同时失败时保留两个原因。',
+      document: {
+        sections: [
+          {
+            id: 'abort',
+            heading: '把 signal 当作共享只读上下文',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '预先 aborted 会在第一个 stage 前失败；运行中在 stage-entry 与 transition 检查。',
+                  'Error reason 保持 exact identity；primitive reason 才包装为带 ABORTED code 的 Error。',
+                  'generator 中止时先调用 iterator.return() 并耗尽 cleanup yields；清理也失败则得到 [abort, cleanup] 顺序的 AggregateError。',
+                  '永不 settle 的非协作 stage 仍会卡住调用，signal 不是抢占机制。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'dual-failure',
+            heading: '同时失败时保留两个 failure slot',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'runAsyncMiddleware 中 stage 自身和已经启动的 downstream 都失败时，默认抛 AggregateError。只有宿主已有稳定错误组合契约时才提供 combineStageAndDownstreamError；返回值会被原样抛出。assertActive 属于控制流，不占用普通 failure slot。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'runAsyncMiddleware 配置',
+          path: 'docs/middleware-pipeline/runAsyncMiddleware'
+        },
+        {
+          label: '异步 Generator 取消',
+          path: 'docs/middleware-pipeline/runAsyncGeneratorMiddleware'
+        },
+        { label: 'Runner 选择', path: 'sync-and-async' }
+      ]
+    },
+    en: {
+      title: 'Compose cooperative cancellation and dual failures without losing causes',
+      lede: 'Pipeline provides no hard termination. It checks a signal at boundaries and retains both reasons when a stage and downstream fail together.',
+      document: {
+        sections: [
+          {
+            id: 'abort',
+            heading: 'Treat signal as shared read-only context',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'A pre-aborted signal fails before the first stage; an active run checks at stage entry and transitions.',
+                  'An Error reason preserves exact identity; only a primitive reason is wrapped with an ABORTED code.',
+                  'Generator abort first calls iterator.return() and drains cleanup yields; cleanup failure produces AggregateError ordered [abort, cleanup].',
+                  'A non-cooperative stage that never settles still blocks the call because signal is not preemption.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'dual-failure',
+            heading: 'Keep two failure slots when both paths fail',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'When runAsyncMiddleware sees both the stage and an already-started downstream fail, it throws AggregateError by default. Provide combineStageAndDownstreamError only when the host already owns a stable combination contract; its return value is thrown unchanged. assertActive is control flow and does not consume a normal failure slot.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'runAsyncMiddleware configuration',
+          path: 'docs/middleware-pipeline/runAsyncMiddleware'
+        },
+        {
+          label: 'Async Generator cancellation',
+          path: 'docs/middleware-pipeline/runAsyncGeneratorMiddleware'
+        },
+        { label: 'Choose a runner', path: 'sync-and-async' }
+      ]
+    }
+  },
+  'resource:index': {
+    zh: {
+      title: 'Resource 学习路径',
+      lede: '从一个可取消 fetcher 开始，再分别处理缓存新鲜度、Suspense/SSR、重试和资源终止。',
+      document: {
+        sections: [
+          {
+            id: 'mental-model',
+            heading: '把可见状态与传输状态分开',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['你要回答的问题', '读取入口'],
+                rows: [
+                  ['界面当前应展示 data、error 还是 pending', 'state / read()'],
+                  ['网络或异步工作现在是否在途', 'fetchStatus'],
+                  ['旧 success 是否仍可展示但后台刷新', 'refreshing'],
+                  ['缓存是否超过 ttl', 'isStale'],
+                  ['是否已经永久终止', 'disposed']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'choose-path',
+            heading: '按交付结果进入下一页',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '首次接入：建立 Runtime、Signal 依赖、fetcher 与 dispose 所有权。',
+                  '缓存与刷新：选择 ttl、stale-while-revalidate、invalidate 和 keepAlive。',
+                  'Suspense 与 SSR：理解 read() 抛值和 JSON 安全快照。',
+                  '取消与重试：把 signal 传到真实 I/O，并控制失败退避。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟建立 Resource', path: 'getting-started' },
+        { label: '缓存与刷新', path: 'caching-and-refresh' },
+        { label: 'Suspense 与 SSR', path: 'suspense-and-ssr' }
+      ]
+    },
+    en: {
+      title: 'Resource learning paths',
+      lede: 'Start with a cancellable fetcher, then handle cache freshness, Suspense and SSR, retries, and terminal ownership separately.',
+      document: {
+        sections: [
+          {
+            id: 'mental-model',
+            heading: 'Separate visible state from transport state',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Question', 'Read from'],
+                rows: [
+                  ['Should the UI show data, error, or pending?', 'state / read()'],
+                  ['Is network or asynchronous work currently active?', 'fetchStatus'],
+                  ['Is old success data visible during background refresh?', 'refreshing'],
+                  ['Has the cache exceeded ttl?', 'isStale'],
+                  ['Has the resource terminated permanently?', 'disposed']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'choose-path',
+            heading: 'Choose the next page by delivery outcome',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'First integration: connect Runtime, Signal dependencies, a fetcher, and dispose ownership.',
+                  'Caching and refresh: choose ttl, stale-while-revalidate, invalidate, and keepAlive.',
+                  'Suspense and SSR: understand thrown values from read() and JSON-safe snapshots.',
+                  'Cancellation and retry: forward signal to real I/O and control failure backoff.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Build a Resource in five minutes', path: 'getting-started' },
+        { label: 'Caching and refresh', path: 'caching-and-refresh' },
+        { label: 'Suspense and SSR', path: 'suspense-and-ssr' }
+      ]
+    }
+  },
+  'resource:getting-started': {
+    zh: {
+      title: '五分钟建立响应式异步 Resource',
+      lede: '在首次 await 前读取依赖，把取消 signal 传给真实请求，并由应用所有者最终 dispose。',
+      document: {
+        sections: [
+          {
+            id: 'first-resource',
+            heading: '建立依赖追踪与 latest-wins 请求',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Resource, ResourceStatus } from '@migaia/resource'\nimport { Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst userId = new Signal('user-1', runtime)\nconst user = new Resource(\n  async ({ signal }) => {\n    const id = userId.value // 首次 await 前读取，建立依赖\n    const response = await fetch(`/api/users/${id}`, { signal })\n    if (!response.ok) throw new Error(`request failed: ${response.status}`)\n    return response.json() as Promise<IUser>\n  },\n  runtime,\n  { debugName: 'user', ttl: 30_000 }\n)\n\nif (user.state.status === ResourceStatus.success) renderUser(user.state.data)\nuserId.value = 'user-2' // 使上一代失效并启动新请求\n\nuser.dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  '只有 fetcher 首次 await 之前的响应式读取会成为依赖；之后的读取应提前捕获或放进 Computed。',
+                  'signal 必须转交给 fetch、数据库驱动或其他可取消 I/O，否则 Resource 只能忽略迟到结果，不能停止底层工作。',
+                  '依赖变化、refetch 与 invalidate 都会开启新 generation，只有最新结果可写回。',
+                  'dispose 永久终止实例；下一所有权周期创建新的 Resource。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: '逐项决定构造配置',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['字段', '默认值', '何时修改'],
+                rows: [
+                  ['debugName', 'undefined', '需要在 reactive 诊断与请求错误中识别所有者时设置。'],
+                  ['ttl', 'Infinity', '需要基于时间重新验证成功缓存时设置非负毫秒数。'],
+                  [
+                    'autoStart',
+                    'true',
+                    '需要先完成 hydrate、授权或外部准备时设为 false，再显式 refetch。'
+                  ],
+                  ['staleWhileRevalidate', 'false', '刷新期间允许继续展示旧 success data 时开启。'],
+                  ['retry', '0', '传非负次数，或按 failureCount 与 error 判断是否重试。'],
+                  ['retryDelay', '0 ms', '固定退避毫秒数，或按失败次数和错误计算。'],
+                  ['keepAlive', 'false', '无人观察时仍需保留上游依赖与热缓存时开启。'],
+                  [
+                    'initialSnapshot',
+                    'undefined',
+                    '用服务端或持久化的 version: 1 success 快照启动。'
+                  ],
+                  [
+                    'scheduler',
+                    'systemScheduler',
+                    '测试、虚拟时钟或宿主时间域需要统一 TTL 与 retry deadline 时替换。'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '构造时会一次性读取并校验全部 option；非法 getter、负 ttl、无穷 retryDelay 或无效 snapshot 会在 Resource 建立响应式所有权前失败。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Resource API', path: 'docs/resource/Resource' },
+        { label: '缓存与刷新策略', path: 'caching-and-refresh' },
+        { label: '取消与重试', path: 'cancellation-and-retry' }
+      ]
+    },
+    en: {
+      title: 'Build a reactive asynchronous Resource in five minutes',
+      lede: 'Read dependencies before the first await, forward cancellation to real I/O, and let the application owner dispose the instance.',
+      document: {
+        sections: [
+          {
+            id: 'first-resource',
+            heading: 'Connect dependency tracking to latest-wins requests',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Resource, ResourceStatus } from '@migaia/resource'\nimport { Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst userId = new Signal('user-1', runtime)\nconst user = new Resource(\n  async ({ signal }) => {\n    const id = userId.value // tracked before the first await\n    const response = await fetch(`/api/users/${id}`, { signal })\n    if (!response.ok) throw new Error(`request failed: ${response.status}`)\n    return response.json() as Promise<IUser>\n  },\n  runtime,\n  { debugName: 'user', ttl: 30_000 }\n)\n\nif (user.state.status === ResourceStatus.success) renderUser(user.state.data)\nuserId.value = 'user-2' // invalidates the previous generation\n\nuser.dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Only reactive reads before the fetcher first awaits become dependencies; capture later values earlier or derive them through Computed.',
+                  'Forward signal to fetch, a database driver, or other cancellable I/O. Otherwise Resource can ignore a late value but cannot stop the underlying work.',
+                  'Dependency changes, refetch, and invalidate start a new generation, and only the latest result may commit.',
+                  'dispose terminates this instance permanently; create another for the next ownership cycle.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: 'Choose every constructor option deliberately',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Field', 'Default', 'Change it when'],
+                rows: [
+                  [
+                    'debugName',
+                    'undefined',
+                    'Reactive diagnostics and request errors need an owner label.'
+                  ],
+                  [
+                    'ttl',
+                    'Infinity',
+                    'A successful cache must revalidate after a non-negative duration.'
+                  ],
+                  [
+                    'autoStart',
+                    'true',
+                    'Hydration, authorization, or external preparation must finish before an explicit refetch.'
+                  ],
+                  [
+                    'staleWhileRevalidate',
+                    'false',
+                    'Old successful data may remain visible during refresh.'
+                  ],
+                  ['retry', '0', 'Use a non-negative count or decide from failureCount and error.'],
+                  [
+                    'retryDelay',
+                    '0 ms',
+                    'Use a fixed delay or calculate backoff from attempt and error.'
+                  ],
+                  [
+                    'keepAlive',
+                    'false',
+                    'Upstream dependencies and warm cache must survive without observers.'
+                  ],
+                  [
+                    'initialSnapshot',
+                    'undefined',
+                    'Start from a server or persisted version: 1 success snapshot.'
+                  ],
+                  [
+                    'scheduler',
+                    'systemScheduler',
+                    'Tests, virtual clocks, or hosts need one time domain for TTL and retry deadlines.'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Construction snapshots and validates every option once. A throwing getter, negative ttl, infinite retryDelay, or invalid snapshot fails before the Resource acquires reactive ownership.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Resource API', path: 'docs/resource/Resource' },
+        { label: 'Caching and refresh policies', path: 'caching-and-refresh' },
+        { label: 'Cancellation and retry', path: 'cancellation-and-retry' }
+      ]
+    }
+  },
+  'resource:caching-and-refresh': {
+    zh: {
+      title: '设计 Resource 缓存新鲜度与后台刷新',
+      lede: 'ttl 决定何时过期，staleWhileRevalidate 决定过期后的可见状态；refetch 与 invalidate 则表达主动刷新意图。',
+      document: {
+        sections: [
+          {
+            id: 'freshness',
+            heading: '分别选择时间、展示和保活策略',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['选项或操作', '作用', '默认'],
+                rows: [
+                  ['ttl', '成功值保持新鲜的毫秒数', 'Infinity'],
+                  ['staleWhileRevalidate', '刷新时继续展示旧 success data', 'false'],
+                  ['keepAlive', '无人观察时仍保持依赖与热缓存', 'false'],
+                  ['refetch()', '忽略新鲜度，立即开始新请求', '显式调用'],
+                  ['invalidate()', '先令缓存过期，再开始新请求', '显式调用']
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const products = new Resource(fetchProducts, runtime, {\n  ttl: 10_000,\n  staleWhileRevalidate: true,\n  keepAlive: false\n})\n\nconst state = products.state\nif (state.status === 'success') {\n  renderProducts(state.data, { refreshing: products.refreshing })\n}\n\nawait products.invalidate() // mutation 后立即重新验证"
+              }
+            ]
+          },
+          {
+            id: 'reading',
+            heading: '被动读取不会等于强制刷新',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'state、promise 与 read() 只在 idle 或过期时确保请求存在。peek() 既不建立依赖，也不触发 ensureFresh。业务操作已经知道服务端数据变化时，调用 invalidate()，不要靠重复读取碰运气。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Resource 配置参考', path: 'docs/resource/Resource' },
+        { label: 'SSR 快照', path: 'suspense-and-ssr' },
+        { label: '重试与取消', path: 'cancellation-and-retry' }
+      ]
+    },
+    en: {
+      title: 'Design Resource cache freshness and background refresh',
+      lede: 'ttl decides when data expires, staleWhileRevalidate decides what remains visible after expiry, and refetch or invalidate expresses an active refresh intent.',
+      document: {
+        sections: [
+          {
+            id: 'freshness',
+            heading: 'Choose time, presentation, and retention separately',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Option or operation', 'Effect', 'Default'],
+                rows: [
+                  ['ttl', 'Milliseconds a successful value remains fresh', 'Infinity'],
+                  [
+                    'staleWhileRevalidate',
+                    'Keeps old success data visible during refresh',
+                    'false'
+                  ],
+                  ['keepAlive', 'Retains dependencies and a warm cache without observers', 'false'],
+                  ['refetch()', 'Starts a new request regardless of freshness', 'Explicit'],
+                  ['invalidate()', 'Expires the cache, then starts a new request', 'Explicit']
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const products = new Resource(fetchProducts, runtime, {\n  ttl: 10_000,\n  staleWhileRevalidate: true,\n  keepAlive: false\n})\n\nconst state = products.state\nif (state.status === 'success') {\n  renderProducts(state.data, { refreshing: products.refreshing })\n}\n\nawait products.invalidate() // revalidate after a mutation"
+              }
+            ]
+          },
+          {
+            id: 'reading',
+            heading: 'A passive read is not a forced refresh',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'state, promise, and read() ensure work exists only when idle or stale. peek() neither tracks a dependency nor calls ensureFresh. When a business mutation proves server data changed, call invalidate() instead of hoping repeated reads trigger a refresh.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Resource configuration', path: 'docs/resource/Resource' },
+        { label: 'SSR snapshots', path: 'suspense-and-ssr' },
+        { label: 'Retry and cancellation', path: 'cancellation-and-retry' }
+      ]
+    }
+  },
+  'resource:suspense-and-ssr': {
+    zh: {
+      title: '把 Resource 接入 Suspense 与 SSR 快照',
+      lede: 'read() 使用抛值协议驱动 Suspense；dehydrate/hydrate 使用版本化 JSON 快照跨越服务端与客户端。',
+      document: {
+        sections: [
+          {
+            id: 'suspense',
+            heading: '让 read() 的三种结果进入正确边界',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['状态', 'read() 行为', '接收者'],
+                rows: [
+                  ['success', '返回 data', '组件正文'],
+                  ['idle / pending', '抛当前 Promise', 'Suspense fallback'],
+                  ['error / cancelled', '抛 error', 'Error Boundary 或 AbortError 分支']
+                ]
+              },
+              {
+                type: 'code',
+                language: 'tsx',
+                code: 'function UserProfile({ resource }: { resource: Resource<IUser> }) {\n  const user = resource.read()\n  return <strong>{user.name}</strong>\n}'
+              }
+            ]
+          },
+          {
+            id: 'snapshot',
+            heading: '只传输成功且版本匹配的缓存',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: '// 服务端：等待成功后只传 JSON-safe snapshot\nawait serverResource.promise\nconst snapshot = serverResource.dehydrate()\nconst payload = JSON.stringify(snapshot)\n\n// 客户端：用 snapshot 构造，fresh 时不会重复请求\nconst initialSnapshot = JSON.parse(payload) as IResourceCacheSnapshot<IUser>\nconst clientResource = new Resource(fetchUser, runtime, {\n  initialSnapshot,\n  ttl: 30_000\n})'
+              },
+              {
+                type: 'list',
+                items: [
+                  'dehydrate() 在非 success 时返回 undefined，不序列化 pending 或 error。',
+                  'expiresAt: null 表示内部 Infinity，保持 JSON 安全。',
+                  'hydrate() 会作废当前请求并清空旧依赖，不会同时保留两代结果。',
+                  'version、updatedAt 或 expiresAt 非法时立即抛 INVALID_SNAPSHOT。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Resource API', path: 'docs/resource/Resource' },
+        { label: '缓存策略', path: 'caching-and-refresh' },
+        { label: '错误与取消', path: 'cancellation-and-retry' }
+      ]
+    },
+    en: {
+      title: 'Integrate Resource with Suspense and SSR snapshots',
+      lede: 'read() drives Suspense through the thrown-value protocol, while dehydrate and hydrate move a versioned JSON snapshot between server and client.',
+      document: {
+        sections: [
+          {
+            id: 'suspense',
+            heading: 'Route each read() outcome to the right boundary',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['State', 'read() behavior', 'Receiver'],
+                rows: [
+                  ['success', 'Returns data', 'Component body'],
+                  ['idle / pending', 'Throws the current Promise', 'Suspense fallback'],
+                  ['error / cancelled', 'Throws error', 'Error Boundary or AbortError branch']
+                ]
+              },
+              {
+                type: 'code',
+                language: 'tsx',
+                code: 'function UserProfile({ resource }: { resource: Resource<IUser> }) {\n  const user = resource.read()\n  return <strong>{user.name}</strong>\n}'
+              }
+            ]
+          },
+          {
+            id: 'snapshot',
+            heading: 'Transfer only successful version-compatible cache data',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: '// Server: wait for success and transfer only a JSON-safe snapshot\nawait serverResource.promise\nconst snapshot = serverResource.dehydrate()\nconst payload = JSON.stringify(snapshot)\n\n// Client: construct from the snapshot; a fresh value avoids a duplicate request\nconst initialSnapshot = JSON.parse(payload) as IResourceCacheSnapshot<IUser>\nconst clientResource = new Resource(fetchUser, runtime, {\n  initialSnapshot,\n  ttl: 30_000\n})'
+              },
+              {
+                type: 'list',
+                items: [
+                  'dehydrate() returns undefined outside success and never serializes pending or error state.',
+                  'expiresAt: null represents internal Infinity in a JSON-safe form.',
+                  'hydrate() invalidates current work and clears old dependencies instead of retaining two generations.',
+                  'Invalid version, updatedAt, or expiresAt fails immediately with INVALID_SNAPSHOT.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Resource API', path: 'docs/resource/Resource' },
+        { label: 'Cache policy', path: 'caching-and-refresh' },
+        { label: 'Errors and cancellation', path: 'cancellation-and-retry' }
+      ]
+    }
+  },
+  'resource:cancellation-and-retry': {
+    zh: {
+      title: '控制 Resource 取消、重试与退避',
+      lede: 'cancel 只结束当前 generation，retry 只处理真实失败；两者都必须使用同一个 scheduler 时间域。',
+      document: {
+        sections: [
+          {
+            id: 'retry',
+            heading: '让重试策略受错误和次数约束',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const resource = new Resource(fetchReport, runtime, {\n  retry: (failureCount, error) =>\n    failureCount < 4 && isTransientNetworkFailure(error),\n  retryDelay: (failureCount) => Math.min(250 * 2 ** (failureCount - 1), 5_000),\n  scheduler\n})\n\nconst pending = resource.refetch()\nresource.cancel()\nawait pending.catch((error) => {\n  if (error instanceof DOMException && error.name === 'AbortError') return\n  throw error\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'failureCount 从 1 开始；retry 数字必须是非负整数。',
+                  'retryDelay 必须返回有限非负毫秒数；无效结果以 INVALID_OPTION 结束本次请求。',
+                  'fetcher 抛出的 Suspense thenable 在 settle 后重跑，不计入失败次数。',
+                  'cancel 后 Resource 仍可复用；dispose 才永久关闭。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'identity',
+            heading: '按原生 AbortError 与结构化 code 分类',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '取消值保持 DOMException 与 AbortError 名称，Resource 只附加 source/code。清理失败不会撤销已完成的状态收敛，而是单独以 CANCELLATION_CLEANUP_FAILED 暴露。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Resource 配置参考', path: 'docs/resource/Resource' },
+        { label: '缓存与刷新', path: 'caching-and-refresh' },
+        { label: 'Suspense 与 SSR', path: 'suspense-and-ssr' }
+      ]
+    },
+    en: {
+      title: 'Control Resource cancellation, retries, and backoff',
+      lede: 'cancel ends only the current generation, while retry handles only real failures. Both remain in one scheduler time domain.',
+      document: {
+        sections: [
+          {
+            id: 'retry',
+            heading: 'Bound retry by both error and attempt count',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const resource = new Resource(fetchReport, runtime, {\n  retry: (failureCount, error) =>\n    failureCount < 4 && isTransientNetworkFailure(error),\n  retryDelay: (failureCount) => Math.min(250 * 2 ** (failureCount - 1), 5_000),\n  scheduler\n})\n\nconst pending = resource.refetch()\nresource.cancel()\nawait pending.catch((error) => {\n  if (error instanceof DOMException && error.name === 'AbortError') return\n  throw error\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'failureCount starts at 1, and a numeric retry policy must be a non-negative integer.',
+                  'retryDelay returns finite non-negative milliseconds; an invalid result ends the request with INVALID_OPTION.',
+                  'A Suspense thenable thrown by the fetcher reruns after settlement without consuming a failure attempt.',
+                  'Resource remains reusable after cancel; only dispose closes it permanently.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'identity',
+            heading: 'Classify through native AbortError and structured code',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Cancellation preserves DOMException and the AbortError name while Resource attaches source/code. Cleanup failure does not reverse state convergence and surfaces separately as CANCELLATION_CLEANUP_FAILED.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Resource configuration', path: 'docs/resource/Resource' },
+        { label: 'Caching and refresh', path: 'caching-and-refresh' },
+        { label: 'Suspense and SSR', path: 'suspense-and-ssr' }
+      ]
+    }
+  },
+  'reactive:index': {
+    zh: {
+      title: 'Reactive 学习路径',
+      lede: '先建立一个能运行的响应式图，再按隔离、派生与副作用需求进入对应主题。',
+      document: {
+        sections: [
+          {
+            id: 'mental-model',
+            heading: '先理解三个角色',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Signal 保存可写事实，Computed 从事实推导只读结果，Effect 只负责把结果同步到外部世界。三者必须属于同一个 Runtime 才能组成依赖图。'
+              },
+              {
+                type: 'list',
+                items: [
+                  '需要被直接赋值的状态使用 Signal。',
+                  '能够从现有状态计算得到的值使用 Computed。',
+                  'DOM、网络连接、日志与订阅清理使用 Effect。',
+                  'SSR、测试、Worker 或多个应用根使用各自的 Runtime。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'choose-path',
+            heading: '按结果选择下一页',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['目标', '阅读路径', '完成标志'],
+                rows: [
+                  ['第一次建立响应式状态', 'Getting Started', '状态变化只触发必要的派生与副作用'],
+                  [
+                    '设计 Signal、Computed、Effect',
+                    'Core Reactivity',
+                    '事实、派生和副作用职责分离'
+                  ],
+                  ['隔离 SSR、测试或 Worker', 'Runtime Isolation', '每个所有权域拥有独立 Runtime']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟上手', path: 'getting-started' },
+        { label: '核心响应式模型', path: 'reactive' },
+        { label: 'Runtime 隔离', path: 'runtime' }
+      ]
+    },
+    en: {
+      title: 'Reactive learning paths',
+      lede: 'Build one working reactive graph, then continue by isolation, derivation, or side-effect needs.',
+      document: {
+        sections: [
+          {
+            id: 'mental-model',
+            heading: 'Start with three roles',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Signal stores writable facts, Computed derives read-only results, and Effect synchronizes those results with the outside world. They compose only when owned by the same Runtime.'
+              },
+              {
+                type: 'list',
+                items: [
+                  'Use Signal for state that callers assign directly.',
+                  'Use Computed for values fully derived from existing state.',
+                  'Use Effect for DOM, connections, logging, and subscription cleanup.',
+                  'Give SSR requests, tests, Workers, or separate app roots their own Runtime.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'choose-path',
+            heading: 'Choose the next page by outcome',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Outcome', 'Path', 'Done when'],
+                rows: [
+                  [
+                    'Build reactive state for the first time',
+                    'Getting Started',
+                    'Changes run only necessary derivations and effects'
+                  ],
+                  [
+                    'Design Signal, Computed, and Effect roles',
+                    'Core Reactivity',
+                    'Facts, derivations, and side effects stay separate'
+                  ],
+                  [
+                    'Isolate SSR, tests, or Workers',
+                    'Runtime Isolation',
+                    'Each ownership domain has a dedicated Runtime'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Five-minute start', path: 'getting-started' },
+        { label: 'Core reactivity', path: 'reactive' },
+        { label: 'Runtime isolation', path: 'runtime' }
+      ]
+    }
+  },
+  'reactive:getting-started': {
+    zh: {
+      title: '五分钟建立响应式状态',
+      lede: '用一个隔离 Runtime 完成可写状态、派生值、副作用和清理的最小闭环。',
+      document: {
+        sections: [
+          {
+            id: 'install',
+            heading: '安装与导入',
+            blocks: [
+              { type: 'code', language: 'bash', code: 'pnpm add @migaia/reactive' },
+              {
+                type: 'paragraph',
+                text: '应用代码优先从主入口导入 createRuntime。低层实现入口和具体 class 文件不属于首次接入路径。'
+              }
+            ]
+          },
+          {
+            id: 'first-graph',
+            heading: '建立第一张图',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst price = runtime.signal(12)\nconst quantity = runtime.signal(2)\nconst total = runtime.computed(() => price.value * quantity.value)\n\nconst stop = runtime.effect(() => {\n  console.log(`total: ${total.value}`)\n})\n\nquantity.value = 3\nruntime.flush()\nstop()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'effect 创建时立即执行一次，因此先输出 total: 24。',
+                  'quantity 更新后，total 被标脏；runtime.flush() 同步排空 Effect 队列，重新计算后输出 total: 36。',
+                  'stop() 是 disposer；所有权结束时调用它，避免继续订阅。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'next-decision',
+            heading: '接下来判断什么',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '如果代码运行在 SSR、测试或 Worker 中，先阅读 Runtime 隔离；如果需要自定义 equals、keepAlive 或 cleanup，进入核心响应式模型。精确签名和配置字段留在 Docs API Reference。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '核心响应式模型', path: 'reactive' },
+        { label: 'Runtime 隔离', path: 'runtime' }
+      ]
+    },
+    en: {
+      title: 'Build reactive state in five minutes',
+      lede: 'Complete the smallest writable-state, derivation, effect, and cleanup loop inside one isolated Runtime.',
+      document: {
+        sections: [
+          {
+            id: 'install',
+            heading: 'Install and import',
+            blocks: [
+              { type: 'code', language: 'bash', code: 'pnpm add @migaia/reactive' },
+              {
+                type: 'paragraph',
+                text: 'Application code should start with createRuntime from the main entry. Low-level implementation entry points and concrete class files are outside the first-use path.'
+              }
+            ]
+          },
+          {
+            id: 'first-graph',
+            heading: 'Build the first graph',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst price = runtime.signal(12)\nconst quantity = runtime.signal(2)\nconst total = runtime.computed(() => price.value * quantity.value)\n\nconst stop = runtime.effect(() => {\n  console.log(`total: ${total.value}`)\n})\n\nquantity.value = 3\nruntime.flush()\nstop()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'The effect runs immediately, so the first output is total: 24.',
+                  'Updating quantity dirties total. runtime.flush() drains the Effect queue synchronously, recomputes it, and outputs total: 36.',
+                  'stop() is the disposer. Call it when ownership ends so the subscription cannot continue.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'next-decision',
+            heading: 'Make the next decision',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'For SSR, tests, or Workers, continue with Runtime isolation. For custom equality, keepAlive, or cleanup, continue with core reactivity. Exact signatures and fields stay in the Docs API reference.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Core reactivity', path: 'reactive' },
+        { label: 'Runtime isolation', path: 'runtime' }
+      ]
+    }
+  },
+  'reactive:reactive': {
+    zh: {
+      title: '组合 Signal、Computed 与 Effect',
+      lede: '用职责分离保持依赖图可预测：事实可写、派生只读、副作用可清理。',
+      document: {
+        sections: [
+          {
+            id: 'state-derivation-effect',
+            heading: '不要把三种职责混在一起',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst query = runtime.signal('')\nconst rows = runtime.signal<readonly IRow[]>([])\nconst visibleRows = runtime.computed(\n  () => rows.value.filter((row) => row.name.includes(query.value)),\n  { debugName: 'search.visibleRows' }\n)\n\nconst stop = runtime.effect(() => {\n  renderTable(visibleRows.value)\n  return () => clearTable()\n}, { debugName: 'search.render' })"
+              },
+              {
+                type: 'list',
+                items: [
+                  'query 与 rows 是事实来源，只有它们被直接赋值。',
+                  'visibleRows 是纯派生，不在 effect 中写回另一个 Signal。',
+                  'Effect 只拥有外部资源，并返回下一次重跑或释放前执行的 cleanup。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'reads',
+            heading: '区分 value 与 peek',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '在 Computed 或 Effect 中读取 value 会建立依赖；peek() 会得到当前值但不建立依赖。只有当这次读取不应决定未来重跑时才使用 peek()。'
+              }
+            ]
+          },
+          {
+            id: 'dispose',
+            heading: '让所有权决定释放时机',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Effect disposer、Computed.dispose() 与 Signal.dispose() 都是终态操作。组件卸载、请求结束或领域对象销毁时释放；不要在释放后继续读取旧节点。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Signal API', path: 'docs/reactive/reactive/Signal' },
+        { label: 'Computed API', path: 'docs/reactive/reactive/Computed' },
+        { label: 'Effect API', path: 'docs/reactive/reactive/Effect' }
+      ]
+    },
+    en: {
+      title: 'Compose Signal, Computed, and Effect',
+      lede: 'Keep the graph predictable through role separation: facts are writable, derivations are read-only, and side effects are disposable.',
+      document: {
+        sections: [
+          {
+            id: 'state-derivation-effect',
+            heading: 'Do not mix the three roles',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst query = runtime.signal('')\nconst rows = runtime.signal<readonly IRow[]>([])\nconst visibleRows = runtime.computed(\n  () => rows.value.filter((row) => row.name.includes(query.value)),\n  { debugName: 'search.visibleRows' }\n)\n\nconst stop = runtime.effect(() => {\n  renderTable(visibleRows.value)\n  return () => clearTable()\n}, { debugName: 'search.render' })"
+              },
+              {
+                type: 'list',
+                items: [
+                  'query and rows are facts and are the only values assigned directly.',
+                  'visibleRows is a pure derivation; the effect does not copy it into another Signal.',
+                  'Effect owns only the external resource and returns cleanup for rerun or disposal.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'reads',
+            heading: 'Distinguish value from peek',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Reading value inside a Computed or Effect records a dependency. peek() returns the current value without tracking. Use peek() only when that read must not decide future reruns.'
+              }
+            ]
+          },
+          {
+            id: 'dispose',
+            heading: 'Let ownership decide disposal',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'An Effect disposer, Computed.dispose(), and Signal.dispose() are terminal. Dispose them when a component unmounts, a request ends, or a domain owner is destroyed; never keep reading an old node afterward.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Signal API', path: 'docs/reactive/reactive/Signal' },
+        { label: 'Computed API', path: 'docs/reactive/reactive/Computed' },
+        { label: 'Effect API', path: 'docs/reactive/reactive/Effect' }
+      ]
+    }
+  },
+  'reactive:runtime': {
+    zh: {
+      title: '隔离 Runtime 与宿主能力',
+      lede: '把依赖图、调度、错误和 trace 放进明确的所有权域，避免 SSR、测试与多应用根串线。',
+      document: {
+        sections: [
+          {
+            id: 'ownership',
+            heading: '每个隔离域创建一个 Runtime',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createRuntime } from '@migaia/reactive'\n\nexport function createRequestState(requestId: string) {\n  const runtime = createRuntime({\n    onError: (error, context) => reportRequestError(requestId, error, context)\n  })\n  const user = runtime.signal<IUser | null>(null, { debugName: 'request.user' })\n  return { runtime, user }\n}"
+              },
+              {
+                type: 'paragraph',
+                text: '不要在 SSR 请求或互相隔离的测试中使用 defaultRuntime。不同 Runtime 的节点不能互相建立依赖，这是隔离保证而不是限制。'
+              }
+            ]
+          },
+          {
+            id: 'host-options',
+            heading: '只在宿主边界配置能力',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'adapter：替换微任务、单调时钟、事件时间戳或默认错误出口。',
+                  'onError：集中接收被隔离的异步与诊断失败。',
+                  'onTrace：仅在诊断需要时启用，避免常态 trace 成本。',
+                  'maxFlushPasses：循环保护，默认 100；不要靠提高它掩盖自触发环。',
+                  'scheduleIdle：控制未观察 Computed 的回收时机，不控制 effect flush。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'createRuntime 配置参考', path: 'docs/reactive/runtime/createRuntime' },
+        { label: 'Runtime API', path: 'docs/reactive/runtime/Runtime' }
+      ]
+    },
+    en: {
+      title: 'Isolate Runtime and host capabilities',
+      lede: 'Put graph state, scheduling, errors, and tracing inside an explicit ownership domain so SSR, tests, and app roots cannot leak into each other.',
+      document: {
+        sections: [
+          {
+            id: 'ownership',
+            heading: 'Create one Runtime per isolation domain',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createRuntime } from '@migaia/reactive'\n\nexport function createRequestState(requestId: string) {\n  const runtime = createRuntime({\n    onError: (error, context) => reportRequestError(requestId, error, context)\n  })\n  const user = runtime.signal<IUser | null>(null, { debugName: 'request.user' })\n  return { runtime, user }\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'Do not use defaultRuntime for SSR requests or isolated tests. Nodes from different runtimes cannot form dependencies; that is the isolation guarantee, not an accidental limitation.'
+              }
+            ]
+          },
+          {
+            id: 'host-options',
+            heading: 'Configure capabilities only at the host boundary',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'adapter replaces microtasks, monotonic time, event timestamps, or the default error sink.',
+                  'onError centralizes contained asynchronous and diagnostic failures.',
+                  'onTrace is enabled only when diagnostics justify its steady-state cost.',
+                  'maxFlushPasses is a loop guard and defaults to 100; never raise it to hide a self-triggering cycle.',
+                  'scheduleIdle controls reclamation of unobserved Computed nodes, not Effect flushing.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'createRuntime configuration', path: 'docs/reactive/runtime/createRuntime' },
+        { label: 'Runtime API', path: 'docs/reactive/runtime/Runtime' }
+      ]
+    }
+  },
+  'event-subscriber:index': {
+    zh: {
+      title: 'Event Subscriber 学习路径',
+      lede: '先选择单一 Channel 或按名称路由的 Hub，再根据顺序、失败与订阅生命周期选择具体操作。',
+      document: {
+        sections: [
+          {
+            id: 'choose-boundary',
+            heading: '先选择事件边界',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['需求', '入口', '原因'],
+                rows: [
+                  [
+                    '一种 payload 与一组订阅者',
+                    'createEventChannel',
+                    '最小分发边界，订阅和发布语义直接'
+                  ],
+                  [
+                    '多种具名事件并保留 payload 推导',
+                    'createEventHub',
+                    '按 key 惰性拥有 Channel，统一错误出口'
+                  ],
+                  [
+                    '只执行一次或执行到取消',
+                    'subscribeOnce / subscribeUntil',
+                    '把订阅寿命写进 helper，而不是散落判断'
+                  ],
+                  ['等待异步 listener 结果', 'invoke*', '显式选择并行/串行及 reject/settled 策略']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'invariants',
+            heading: '保持三个不变量',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '订阅返回的 handle/disposer 由创建订阅的所有者释放。',
+                  '需要稳定本轮听众时使用 snapshot 语义；只有明确需要实时遍历时使用 live 语义。',
+                  '业务失败、迟到失败和 report 失败是不同通道，不要互相覆盖。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟建立 Channel', path: 'getting-started' },
+        { label: 'createEventChannel API', path: 'docs/event-subscriber/createEventChannel' },
+        { label: 'createEventHub API', path: 'docs/event-subscriber/createEventHub' }
+      ]
+    },
+    en: {
+      title: 'Event Subscriber learning paths',
+      lede: 'Choose a single Channel or a keyed Hub first, then select ordering, failure, and subscription-lifetime behavior explicitly.',
+      document: {
+        sections: [
+          {
+            id: 'choose-boundary',
+            heading: 'Choose the event boundary first',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Need', 'Entry', 'Why'],
+                rows: [
+                  [
+                    'One payload shape and one subscriber set',
+                    'createEventChannel',
+                    'The smallest boundary with direct subscribe and publish semantics'
+                  ],
+                  [
+                    'Several named events with inferred payloads',
+                    'createEventHub',
+                    'Owns keyed channels lazily with one error outlet'
+                  ],
+                  [
+                    'Run once or until cancellation',
+                    'subscribeOnce / subscribeUntil',
+                    'Keeps subscription lifetime in a helper instead of scattered branches'
+                  ],
+                  [
+                    'Await asynchronous listener results',
+                    'invoke*',
+                    'Makes parallel/serial and reject/settled policy explicit'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'invariants',
+            heading: 'Preserve three invariants',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'The owner that creates a subscription also owns its handle or disposer.',
+                  'Use snapshot semantics for a stable invocation cohort; choose live traversal only when current mutation must be observed.',
+                  'Business failures, late failures, and reporter failures remain separate channels and never replace one another.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Build a Channel in five minutes', path: 'getting-started' },
+        { label: 'createEventChannel API', path: 'docs/event-subscriber/createEventChannel' },
+        { label: 'createEventHub API', path: 'docs/event-subscriber/createEventHub' }
+      ]
+    }
+  },
+  'event-subscriber:getting-started': {
+    zh: {
+      title: '五分钟建立类型安全的 Channel',
+      lede: '完成订阅、发布、取消订阅与错误出口的最小生产闭环。',
+      document: {
+        sections: [
+          {
+            id: 'first-channel',
+            heading: '创建并拥有一个 Channel',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\ntype IUserSaved = { id: string; revision: number }\n\nconst saved = createEventChannel<IUserSaved>({\n  report: (error) => reportLateFailure(error)\n})\n\nconst subscription = saved.subscribe(({ value }) => {\n  console.log(value.id, value.revision)\n})\n\nsaved.publish({ id: 'user-42', revision: 3 })\nsubscription.off()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'subscribe 的回调接收事件上下文，payload 位于 value。',
+                  'publish 同步遍历本轮订阅快照；后续新增或移除订阅不会改写已经开始的快照。',
+                  'off() 幂等；创建订阅的组件、请求或领域对象负责调用。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'choose-next',
+            heading: '从需求选择下一步',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '事件只应消费一次：subscribeOnce。',
+                  'AbortSignal 结束时自动退订：subscribeUntil。',
+                  'listener 返回 Promise 且需要结果：根据顺序与失败策略选择 invokeSerial、invokeParallel 或 settled 版本。',
+                  '事件种类增多：使用 createEventHub，而不是手工维护 Channel 字典。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'style',
+            heading: 'Style 只投影方法名，不建立第二套 Channel',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['style', '订阅 / 发布 / 退订', '适用命名'],
+                rows: [
+                  [
+                    'subscribe-publish（默认）',
+                    'subscribe / publish / unsubscribe',
+                    'canonical API'
+                  ],
+                  ['on-emit', 'on / emit / off', '事件发射器习惯'],
+                  ['on-trigger', 'on / trigger / off', '触发器语义'],
+                  ['listen-fire', 'listen / fire / unlisten', '监听/触发词汇'],
+                  ['defineEventApiStyle({...})', '调用方定义三个互异且非保留的方法名', '领域语言']
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const saved = createEventChannel<IUserSaved>({ style: 'on-emit' })\nconst subscription = saved.on(({ value }) => audit(value))\n\nsaved.emit({ id: 'user-42', revision: 3 })\nsubscription.off()\n\n// Canonical methods remain available on the same Channel.\nconst second = saved.subscribe(({ value }) => audit(value))\nsaved.publish({ id: 'user-43', revision: 1 })\nsecond.unsubscribe()"
+              },
+              {
+                type: 'paragraph',
+                text: 'style 在构造时增加别名；不会改变 snapshot 顺序、dispatchPolicy、publishBudget、错误通道或订阅所有权。自定义名必须互不相同，且不能覆盖 clear、size、subscribeOnce、subscribeUntil 等保留成员。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Channel 完整配置', path: 'docs/event-subscriber/createEventChannel' },
+        { label: '一次订阅', path: 'docs/event-subscriber/subscribeOnce' },
+        { label: '取消驱动订阅', path: 'docs/event-subscriber/subscribeUntil' }
+      ]
+    },
+    en: {
+      title: 'Build a type-safe Channel in five minutes',
+      lede: 'Complete the smallest production loop for subscription, publication, unsubscription, and late-failure reporting.',
+      document: {
+        sections: [
+          {
+            id: 'first-channel',
+            heading: 'Create and own one Channel',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\ntype IUserSaved = { id: string; revision: number }\n\nconst saved = createEventChannel<IUserSaved>({\n  report: (error) => reportLateFailure(error)\n})\n\nconst subscription = saved.subscribe(({ value }) => {\n  console.log(value.id, value.revision)\n})\n\nsaved.publish({ id: 'user-42', revision: 3 })\nsubscription.off()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'The subscribe callback receives an event context whose payload is value.',
+                  'publish synchronously traverses the current subscription snapshot; later mutation cannot rewrite an invocation already in progress.',
+                  'off() is idempotent and belongs to the component, request, or domain owner that created the subscription.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'choose-next',
+            heading: 'Choose the next step from the requirement',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Consume only one event with subscribeOnce.',
+                  'Unsubscribe when an AbortSignal ends with subscribeUntil.',
+                  'For Promise-returning listeners, choose invokeSerial, invokeParallel, or a settled variant by ordering and failure policy.',
+                  'When event kinds multiply, use createEventHub instead of maintaining a Channel dictionary by hand.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'style',
+            heading: 'Style projects method names without creating another Channel',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['style', 'Subscribe / publish / unsubscribe', 'Vocabulary'],
+                rows: [
+                  [
+                    'subscribe-publish (default)',
+                    'subscribe / publish / unsubscribe',
+                    'Canonical API'
+                  ],
+                  ['on-emit', 'on / emit / off', 'Event-emitter vocabulary'],
+                  ['on-trigger', 'on / trigger / off', 'Trigger vocabulary'],
+                  ['listen-fire', 'listen / fire / unlisten', 'Listener/fire vocabulary'],
+                  [
+                    'defineEventApiStyle({...})',
+                    'Three distinct caller-defined non-reserved method names',
+                    'Domain language'
+                  ]
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "const saved = createEventChannel<IUserSaved>({ style: 'on-emit' })\nconst subscription = saved.on(({ value }) => audit(value))\n\nsaved.emit({ id: 'user-42', revision: 3 })\nsubscription.off()\n\n// Canonical methods remain available on the same Channel.\nconst second = saved.subscribe(({ value }) => audit(value))\nsaved.publish({ id: 'user-43', revision: 1 })\nsecond.unsubscribe()"
+              },
+              {
+                type: 'paragraph',
+                text: 'style adds aliases during construction and never changes snapshot order, dispatchPolicy, publishBudget, error channels, or subscription ownership. Custom names must be distinct and cannot shadow reserved members such as clear, size, subscribeOnce, or subscribeUntil.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Complete Channel configuration',
+          path: 'docs/event-subscriber/createEventChannel'
+        },
+        { label: 'One-shot subscription', path: 'docs/event-subscriber/subscribeOnce' },
+        {
+          label: 'Cancellation-owned subscription',
+          path: 'docs/event-subscriber/subscribeUntil'
+        }
+      ]
+    }
+  },
+  'event-subscriber:subscriptions': {
+    zh: {
+      title: '把订阅寿命交给明确的所有者',
+      lede: '普通订阅、一次订阅和取消驱动订阅解决的是三种不同寿命；选择 helper 后，不要再在 listener 内复制状态判断。',
+      document: {
+        sections: [
+          {
+            id: 'choose-lifetime',
+            heading: '先选择订阅何时结束',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['需求', 'API', '释放责任'],
+                rows: [
+                  ['由组件或服务手动停止', 'channel.subscribe', '所有者保存 handle 并调用 off()'],
+                  ['成功接收第一条后立即停止', 'subscribeOnce', 'helper 在首次调用前先解除订阅'],
+                  [
+                    '跟随 AbortSignal 停止',
+                    'subscribeUntil',
+                    'signal 与返回 handle 任一路径都可结束订阅'
+                  ]
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'\n\nconst updates = createEventChannel<IUpdate>()\nconst lifetime = new AbortController()\n\nconst subscription = subscribeUntil(updates, lifetime.signal, ({ value }) => {\n  renderUpdate(value)\n})\n\n// owner 销毁时统一结束；重复结束安全\nlifetime.abort('view disposed')\nsubscription.off()"
+              }
+            ]
+          },
+          {
+            id: 'mutation',
+            heading: '理解快照，而不是依赖遍历副作用',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'publish 使用本轮订阅快照：listener 内新增或移除订阅不会改写已经开始的分发。只有确实需要观察实时集合变化时才使用 invokeEachLive，并把重入与停止条件写成显式规则。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'subscribeOnce API', path: 'docs/event-subscriber/subscribeOnce' },
+        { label: 'subscribeUntil API', path: 'docs/event-subscriber/subscribeUntil' },
+        { label: '异步调用策略', path: 'async-invocation' }
+      ]
+    },
+    en: {
+      title: 'Give every subscription an explicit lifetime owner',
+      lede: 'Manual, one-shot, and cancellation-owned subscriptions solve different lifetimes. Once a helper owns that rule, do not duplicate state checks inside the listener.',
+      document: {
+        sections: [
+          {
+            id: 'choose-lifetime',
+            heading: 'Choose when the subscription ends first',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Requirement', 'API', 'Release responsibility'],
+                rows: [
+                  [
+                    'A component or service stops it manually',
+                    'channel.subscribe',
+                    'The owner retains the handle and calls off()'
+                  ],
+                  [
+                    'Stop immediately after receiving the first event',
+                    'subscribeOnce',
+                    'The helper unsubscribes before the first listener call'
+                  ],
+                  [
+                    'Stop with an AbortSignal',
+                    'subscribeUntil',
+                    'Either the signal or returned handle can end the subscription'
+                  ]
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'\n\nconst updates = createEventChannel<IUpdate>()\nconst lifetime = new AbortController()\n\nconst subscription = subscribeUntil(updates, lifetime.signal, ({ value }) => {\n  renderUpdate(value)\n})\n\n// End everything when the owner is disposed; repeated cleanup is safe.\nlifetime.abort('view disposed')\nsubscription.off()"
+              }
+            ]
+          },
+          {
+            id: 'mutation',
+            heading: 'Rely on snapshot semantics, not traversal side effects',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'publish uses the current subscription snapshot. Adding or removing a listener during a callback cannot rewrite the dispatch already in progress. Use invokeEachLive only when observing live collection mutation is the requirement, with explicit reentrancy and stop rules.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'subscribeOnce API', path: 'docs/event-subscriber/subscribeOnce' },
+        { label: 'subscribeUntil API', path: 'docs/event-subscriber/subscribeUntil' },
+        { label: 'Async invocation policies', path: 'async-invocation' }
+      ]
+    }
+  },
+  'event-subscriber:async-invocation': {
+    zh: {
+      title: '显式选择异步 listener 的顺序与失败结果',
+      lede: '并行/串行决定启动顺序，throwing/settled 决定失败形状；两者是独立选择，不能由 Promise 偶然决定。',
+      document: {
+        sections: [
+          {
+            id: 'matrix',
+            heading: '用两条轴选择 API',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['API', '启动顺序', '失败结果'],
+                rows: [
+                  [
+                    'invokeParallel',
+                    '同时启动全部 snapshot listener',
+                    '全部结束后，任一失败则抛 AggregateError'
+                  ],
+                  ['invokeParallelSettled', '同时启动', '逐项返回 fulfilled / rejected'],
+                  ['invokeSerial', '上一项 settled 后再启动下一项', '全部执行后，失败聚合抛出'],
+                  ['invokeSerialSettled', '严格串行', '逐项返回 settled 结果'],
+                  [
+                    'invokeTask / invokeTaskSettled',
+                    '按 taskId 精确选择一个',
+                    '未找到或不唯一同步失败；执行结果按 variant 返回'
+                  ]
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import {\n  EventSubscriberState,\n  createEventChannel,\n  invokeParallelSettled\n} from '@migaia/event-subscriber'\n\nconst jobs = createEventChannel<IJob, Promise<IReceipt>>()\njobs.subscribe(({ value }) => persistJob(value))\njobs.subscribe(({ value }) => indexJob(value))\n\nconst results = await invokeParallelSettled(jobs, job)\nfor (const result of results) {\n  if (result.status === EventSubscriberState.rejected) {\n    reportJobFailure(result.reason)\n  }\n}"
+              }
+            ]
+          },
+          {
+            id: 'snapshot',
+            heading: '异步等待开始前就封闭目标集合',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '所有 invoke* 先拍摄不可变订阅快照，再开始任何 await。',
+                  'serial 约束 listener 启动顺序，不代表遇到首错就跳过后续 listener。',
+                  'settled 适合逐项补偿或展示；throwing 适合把整轮分发视为一个失败边界。',
+                  'task variant 要求 taskId 恰好匹配一个订阅，不能把重复注册当作广播。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'invokeParallelSettled API',
+          path: 'docs/event-subscriber/invokeParallelSettled'
+        },
+        { label: 'invokeSerial API', path: 'docs/event-subscriber/invokeSerial' },
+        { label: '订阅生命周期', path: 'subscriptions' }
+      ]
+    },
+    en: {
+      title: 'Choose async listener ordering and failure shape explicitly',
+      lede: 'Parallel versus serial controls start order; throwing versus settled controls the result shape. These are independent choices, not accidental Promise behavior.',
+      document: {
+        sections: [
+          {
+            id: 'matrix',
+            heading: 'Choose an API on two axes',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['API', 'Start order', 'Failure result'],
+                rows: [
+                  [
+                    'invokeParallel',
+                    'Starts every snapshot listener together',
+                    'After all settle, any failure throws an AggregateError'
+                  ],
+                  [
+                    'invokeParallelSettled',
+                    'Starts together',
+                    'Returns fulfilled / rejected per listener'
+                  ],
+                  [
+                    'invokeSerial',
+                    'Starts the next only after the previous settles',
+                    'Runs all, then aggregates failures'
+                  ],
+                  ['invokeSerialSettled', 'Strictly serial', 'Returns each settled result'],
+                  [
+                    'invokeTask / invokeTaskSettled',
+                    'Selects exactly one taskId',
+                    'Missing or duplicate selection throws synchronously; execution follows the chosen variant'
+                  ]
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import {\n  EventSubscriberState,\n  createEventChannel,\n  invokeParallelSettled\n} from '@migaia/event-subscriber'\n\nconst jobs = createEventChannel<IJob, Promise<IReceipt>>()\njobs.subscribe(({ value }) => persistJob(value))\njobs.subscribe(({ value }) => indexJob(value))\n\nconst results = await invokeParallelSettled(jobs, job)\nfor (const result of results) {\n  if (result.status === EventSubscriberState.rejected) {\n    reportJobFailure(result.reason)\n  }\n}"
+              }
+            ]
+          },
+          {
+            id: 'snapshot',
+            heading: 'Close the target set before asynchronous waiting begins',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Every invoke* captures an immutable subscription snapshot before the first await.',
+                  'Serial controls listener start order; it does not skip later listeners after the first rejection.',
+                  'Use settled for per-listener compensation or display, and throwing when the whole dispatch is one failure boundary.',
+                  'A task variant requires exactly one taskId match; duplicate registration is not treated as broadcast.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'invokeParallelSettled API',
+          path: 'docs/event-subscriber/invokeParallelSettled'
+        },
+        { label: 'invokeSerial API', path: 'docs/event-subscriber/invokeSerial' },
+        { label: 'Subscription lifetimes', path: 'subscriptions' }
+      ]
+    }
+  },
+  'lifecycle:index': {
+    zh: {
+      title: 'Lifecycle 学习路径',
+      lede: '从资源所有权开始，再按释放、取消、等待、静默追踪和串行变更进入独立能力。',
+      document: {
+        sections: [
+          {
+            id: 'choose-primitive',
+            heading: '按所有权问题选择原语',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['问题', '首选能力', '完成标志'],
+                rows: [
+                  [
+                    '一组资源需要按 LIFO 释放',
+                    'createLifecycleScope',
+                    'close 后不再接受资源，dispose 幂等'
+                  ],
+                  [
+                    '构造中途失败需要回滚',
+                    'createProvisionalScope',
+                    'commit 或 rollback 只有一个终态'
+                  ],
+                  [
+                    '等待引用、任务或 lease 归零',
+                    'createQuiescenceTracker / createPendingTracker',
+                    'seal 后 whenZero 给出 closed-world 证明'
+                  ],
+                  [
+                    '串行化可替换 mutation',
+                    'createMutationQueue',
+                    'FIFO、deadline 与 owner 规则明确'
+                  ],
+                  [
+                    '组合取消或有界等待',
+                    'createAbortController / boundedWait',
+                    'reason 与 timeout 所有权保持可追踪'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'error-policy',
+            heading: '先确定错误策略',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '释放错误不能静默吞掉，也不能覆盖更早的主错误。组合前先决定 throw、collect、report 或 firstError，并确保原始失败仍可通过 cause 或 AggregateError.errors 到达。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟建立 Scope', path: 'getting-started' },
+        { label: 'Scope API', path: 'docs/lifecycle/scope/createLifecycleScope' },
+        { label: '取消与有界等待', path: 'abort' }
+      ]
+    },
+    en: {
+      title: 'Lifecycle learning paths',
+      lede: 'Start from resource ownership, then enter release, cancellation, waiting, quiescence, or serialized mutation as separate capabilities.',
+      document: {
+        sections: [
+          {
+            id: 'choose-primitive',
+            heading: 'Choose a primitive by ownership problem',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Problem', 'Primary capability', 'Done when'],
+                rows: [
+                  [
+                    'Release resources in LIFO order',
+                    'createLifecycleScope',
+                    'Close rejects new ownership and disposal is idempotent'
+                  ],
+                  [
+                    'Roll back partial construction',
+                    'createProvisionalScope',
+                    'Exactly one of commit or rollback owns the terminal state'
+                  ],
+                  [
+                    'Wait for references, tasks, or leases to drain',
+                    'createQuiescenceTracker / createPendingTracker',
+                    'seal plus whenZero proves a closed world'
+                  ],
+                  [
+                    'Serialize replaceable mutations',
+                    'createMutationQueue',
+                    'FIFO, deadline, and owner rules are explicit'
+                  ],
+                  [
+                    'Compose cancellation or bounded waiting',
+                    'createAbortController / boundedWait',
+                    'Reason and timeout ownership stay traceable'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'error-policy',
+            heading: 'Choose the error policy first',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Release failures are neither swallowed nor allowed to replace an earlier primary error. Choose throw, collect, report, or firstError before composition and keep the original reachable through cause or AggregateError.errors.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Build a Scope in five minutes', path: 'getting-started' },
+        { label: 'Scope API', path: 'docs/lifecycle/scope/createLifecycleScope' },
+        { label: 'Cancellation and bounded waiting', path: 'abort' }
+      ]
+    }
+  },
+  'lifecycle:getting-started': {
+    zh: {
+      title: '五分钟建立资源 Scope',
+      lede: '把多个 disposer 收进一个明确所有者，并验证关闭、释放顺序与幂等行为。',
+      document: {
+        sections: [
+          {
+            id: 'first-scope',
+            heading: '登记资源并统一释放',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createLifecycleScope } from '@migaia/lifecycle'\n\nconst scope = createLifecycleScope()\nconst connection = openConnection()\nconst subscription = subscribeToUpdates()\n\nscope.own(connection, { force: () => connection.close() })\nscope.own(subscription, { force: () => subscription.unsubscribe() })\n\n// 停止接收新的资源，然后按 LIFO 释放\nscope.close()\nawait scope.dispose()\nawait scope.dispose() // 幂等"
+              },
+              {
+                type: 'list',
+                items: [
+                  '先登记 connection，再登记 subscription，因此释放时先取消订阅，再关闭连接。',
+                  'close() 封闭所有权边界；之后的 own() 必须失败，不能复活 scope。',
+                  'dispose() 可重复等待同一终态，不会重复执行 disposer。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'failure-choice',
+            heading: '为失败选择可观察策略',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '默认策略适合需要直接失败的调用方。批量释放需要继续执行其余 disposer 时，选择 collect 或 report；任何被吞下的失败都必须到达 reporter。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Scope 完整契约', path: 'docs/lifecycle/scope/createLifecycleScope' },
+        { label: '释放事务', path: 'disposal' },
+        { label: '构造回滚', path: 'docs/lifecycle/createProvisionalScope' }
+      ]
+    },
+    en: {
+      title: 'Build a resource Scope in five minutes',
+      lede: 'Collect several disposers under one explicit owner and verify closure, release order, and idempotency.',
+      document: {
+        sections: [
+          {
+            id: 'first-scope',
+            heading: 'Own resources and release them together',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createLifecycleScope } from '@migaia/lifecycle'\n\nconst scope = createLifecycleScope()\nconst connection = openConnection()\nconst subscription = subscribeToUpdates()\n\nscope.own(connection, { force: () => connection.close() })\nscope.own(subscription, { force: () => subscription.unsubscribe() })\n\n// Stop accepting resources, then release in LIFO order\nscope.close()\nawait scope.dispose()\nawait scope.dispose() // idempotent"
+              },
+              {
+                type: 'list',
+                items: [
+                  'The connection is owned first and the subscription second, so disposal unsubscribes before closing the connection.',
+                  'close() seals the ownership boundary; a later own() must fail instead of reviving the scope.',
+                  'Repeated dispose() calls await the same terminal state and never run a disposer twice.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'failure-choice',
+            heading: 'Choose an observable failure policy',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'The default fits callers that should fail directly. Choose collect or report when bulk release must continue through later disposers; every contained failure still reaches a reporter.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Complete Scope contract', path: 'docs/lifecycle/scope/createLifecycleScope' },
+        { label: 'Disposal transactions', path: 'disposal' },
+        { label: 'Construction rollback', path: 'docs/lifecycle/createProvisionalScope' }
+      ]
+    }
+  },
+  'lifecycle:scope': {
+    zh: {
+      title: '用 Scope 表达资源所有权',
+      lede: '让资源登记、封闭、LIFO 释放和重复等待由同一个所有者负责。',
+      document: {
+        sections: [
+          {
+            id: 'ownership-boundary',
+            heading: 'Scope 是所有权边界，不只是 disposer 数组',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createLifecycleScope } from '@migaia/lifecycle/scope'\n\nconst scope = createLifecycleScope({\n  errorPolicy: 'collect',\n  report: (error) => diagnostics.capture(error)\n})\nconst socket = connect()\nconst stopMessages = socket.subscribe(handleMessage)\n\nscope.own(socket, {\n  order: 0,\n  graceful: () => socket.drain(),\n  gracefulTimeoutMs: 1_000,\n  force: () => socket.close()\n})\nscope.own(stopMessages, { order: 10, force: () => stopMessages() })\n\nscope.close()\nconst failures = await scope.dispose()\nif (failures.length > 0) diagnostics.captureMany(failures)"
+              },
+              {
+                type: 'list',
+                items: [
+                  '资源按登记的逆序释放，因此依赖资源应先登记、消费资源后登记。',
+                  'close() 先封闭所有权；close 后 own() 失败，调用方必须创建新 Scope。',
+                  'dispose() 只启动一次释放事务，后续调用观察同一终态。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'release-options',
+            heading: '配置释放阶段与顺序',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['配置', '默认值或行为', '何时设置'],
+                rows: [
+                  [
+                    'errorPolicy',
+                    "'throw'",
+                    '需要继续释放并统一审计时用 collect；只走诊断通道时用 report'
+                  ],
+                  ['order', '0；数值大者先释放', '依赖关系不能仅靠登记顺序表达时'],
+                  ['graceful', '省略', '资源支持排空、提交或握手式关闭时'],
+                  [
+                    'gracefulTimeoutMs',
+                    '不设单项预算',
+                    '优雅阶段必须有界；超时只停止等待，随后执行 force'
+                  ],
+                  ['force', '必填', '提供无条件终止路径；不能依赖 graceful 成功'],
+                  [
+                    'deadlineAt / scheduler',
+                    '无绝对截止时间 / systemScheduler',
+                    '整批释放需共享同一时间预算或测试时钟时'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '示例把订阅设为 order 10，因此它先于 socket 释放。socket 先尝试 drain，最多等待 1 秒，再执行 force；graceful 超时不会取消 drain。collect 不会替调用方处理失败，必须检查 dispose() 返回值。'
+              }
+            ]
+          },
+          {
+            id: 'choose-scope',
+            heading: '异步与同步 Scope 不可混用',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'createLifecycleScope 接受同步或异步 release descriptor；createSyncLifecycleScope 只接受同步释放，并在 thenable 或异步路径进入边界时立即拒绝。只有整个所有权域确定同步时才选择同步版本。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'createLifecycleScope API', path: 'docs/lifecycle/scope/createLifecycleScope' },
+        { label: '同步 Scope API', path: 'docs/lifecycle/createSyncLifecycleScope' },
+        { label: '释放事务', path: 'disposal' }
+      ]
+    },
+    en: {
+      title: 'Express resource ownership with Scope',
+      lede: 'Keep resource admission, sealing, LIFO release, and repeated terminal observation under one owner.',
+      document: {
+        sections: [
+          {
+            id: 'ownership-boundary',
+            heading: 'A Scope is an ownership boundary, not a disposer array',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createLifecycleScope } from '@migaia/lifecycle/scope'\n\nconst scope = createLifecycleScope({\n  errorPolicy: 'collect',\n  report: (error) => diagnostics.capture(error)\n})\nconst socket = connect()\nconst stopMessages = socket.subscribe(handleMessage)\n\nscope.own(socket, {\n  order: 0,\n  graceful: () => socket.drain(),\n  gracefulTimeoutMs: 1_000,\n  force: () => socket.close()\n})\nscope.own(stopMessages, { order: 10, force: () => stopMessages() })\n\nscope.close()\nconst failures = await scope.dispose()\nif (failures.length > 0) diagnostics.captureMany(failures)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Resources release in reverse registration order, so own dependencies before their consumers.',
+                  'close() seals admission. A later own() fails and the caller must create a new Scope.',
+                  'dispose() starts one release transaction; later calls observe the same terminal state.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'release-options',
+            heading: 'Configure release phases and order',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Option', 'Default or behavior', 'Set it when'],
+                rows: [
+                  [
+                    'errorPolicy',
+                    "'throw'",
+                    'Use collect to finish all releases and audit centrally; use report for diagnostics-only handling'
+                  ],
+                  [
+                    'order',
+                    '0; higher values release first',
+                    'Registration order alone cannot express the dependency'
+                  ],
+                  [
+                    'graceful',
+                    'Omitted',
+                    'The resource can drain, commit, or perform a closing handshake'
+                  ],
+                  [
+                    'gracefulTimeoutMs',
+                    'No per-item budget',
+                    'Graceful shutdown must be bounded; timeout stops waiting and then runs force'
+                  ],
+                  [
+                    'force',
+                    'Required',
+                    'Provide an unconditional terminal path that does not depend on graceful success'
+                  ],
+                  [
+                    'deadlineAt / scheduler',
+                    'No absolute deadline / systemScheduler',
+                    'The whole disposal batch needs one budget or a test clock'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'The subscription has order 10, so it releases before the socket. The socket tries drain for at most one second and then runs force; a graceful timeout does not cancel drain. collect does not handle failures for the caller, so inspect the value returned by dispose().'
+              }
+            ]
+          },
+          {
+            id: 'choose-scope',
+            heading: 'Do not mix asynchronous and synchronous scopes',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'createLifecycleScope accepts synchronous or asynchronous release descriptors. createSyncLifecycleScope accepts only synchronous release and rejects a thenable or async path at the boundary. Choose it only when the complete ownership domain is known to be synchronous.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'createLifecycleScope API', path: 'docs/lifecycle/scope/createLifecycleScope' },
+        { label: 'Synchronous Scope API', path: 'docs/lifecycle/createSyncLifecycleScope' },
+        { label: 'Disposal transactions', path: 'disposal' }
+      ]
+    }
+  },
+  'lifecycle:disposal': {
+    zh: {
+      title: '组合可追踪的释放事务',
+      lede: '统一 descriptor、错误策略和启动状态，避免重复释放或让 cleanup 覆盖主错误。',
+      document: {
+        sections: [
+          {
+            id: 'descriptor',
+            heading: '先归一化释放意图',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createAbortController } from '@migaia/lifecycle/abort'\nimport { executeReleaseDescriptor } from '@migaia/lifecycle/disposal'\n\nconst controller = createAbortController()\nconst errors = await executeReleaseDescriptor({\n  force: () => connection.close()\n}, {\n  signal: controller.signal,\n  deadlineAt: undefined,\n  report: (error) => diagnostics.capture(error)\n})"
+              },
+              {
+                type: 'paragraph',
+                text: '领域层只表达 release descriptor，不自行判断函数、对象方法或 Promise。executeReleaseDescriptor 负责一次执行、thenable 同化、错误打标和策略应用。'
+              }
+            ]
+          },
+          {
+            id: 'transaction-choice',
+            heading: '需要观察启动状态时使用事务',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'createDisposeTransaction：异步释放，重复 start 复用同一 Promise 与终态。',
+                  'createSyncStartedDisposalLedger：同步启动多个释放任务，并在之后统一观察 settle。',
+                  '主操作已经失败时，cleanup 失败必须挂在 cause 或 errors 中，不能替换主错误。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '执行 descriptor', path: 'docs/lifecycle/disposal/executeReleaseDescriptor' },
+        { label: '异步释放事务', path: 'docs/lifecycle/disposal/createDisposeTransaction' },
+        {
+          label: '同步启动 ledger',
+          path: 'docs/lifecycle/disposal/createSyncStartedDisposalLedger'
+        }
+      ]
+    },
+    en: {
+      title: 'Compose traceable disposal transactions',
+      lede: 'Normalize descriptors, error policy, and start state so cleanup cannot run twice or replace a primary failure.',
+      document: {
+        sections: [
+          {
+            id: 'descriptor',
+            heading: 'Normalize release intent first',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createAbortController } from '@migaia/lifecycle/abort'\nimport { executeReleaseDescriptor } from '@migaia/lifecycle/disposal'\n\nconst controller = createAbortController()\nconst errors = await executeReleaseDescriptor({\n  force: () => connection.close()\n}, {\n  signal: controller.signal,\n  deadlineAt: undefined,\n  report: (error) => diagnostics.capture(error)\n})"
+              },
+              {
+                type: 'paragraph',
+                text: 'Domain code expresses a release descriptor instead of branching over functions, object methods, or Promises. executeReleaseDescriptor owns one execution, thenable assimilation, error tagging, and policy application.'
+              }
+            ]
+          },
+          {
+            id: 'transaction-choice',
+            heading: 'Use a transaction when start state is observable',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'createDisposeTransaction owns asynchronous release and reuses one Promise and terminal state across repeated starts.',
+                  'createSyncStartedDisposalLedger starts several releases synchronously and exposes their later settlement together.',
+                  'When the primary operation already failed, cleanup failures remain on cause or errors and never replace it.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Execute a descriptor', path: 'docs/lifecycle/disposal/executeReleaseDescriptor' },
+        {
+          label: 'Async disposal transaction',
+          path: 'docs/lifecycle/disposal/createDisposeTransaction'
+        },
+        {
+          label: 'Synchronously started ledger',
+          path: 'docs/lifecycle/disposal/createSyncStartedDisposalLedger'
+        }
+      ]
+    }
+  },
+  'lifecycle:abort': {
+    zh: {
+      title: '让取消由明确的 owner 驱动',
+      lede: '保留 Abort reason 与订阅清理所有权，避免取消变成不可追踪的布尔状态。',
+      document: {
+        sections: [
+          {
+            id: 'controller',
+            heading: '组合外部 signal 与本地取消',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import {\n  createAbortController,\n  observeAbortSubscription\n} from '@migaia/lifecycle/abort'\n\nconst local = createAbortController()\nconst observed = observeAbortSubscription(\n  request.signal,\n  (reason) => local.abort(reason),\n  (error) => diagnostics.capture(error)\n)\n\ntry {\n  await loadProfile({ signal: local.signal })\n} finally {\n  observed.unsubscribe()\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  '外部 signal 先取消时保留其原始 reason。',
+                  '本地 controller 只负责主动取消；外部 signal 通过可撤销订阅转发。',
+                  '重复 abort 或 unsubscribe 不重复通知，也不改变已确定的 reason。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'subscription',
+            heading: '只需要观察时不要创建第二个 controller',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'observeAbortSubscription 用于把现有 signal 连接到一个清理所有者，并返回可撤销订阅。只有需要合并 signal、主动 abort 或 timeout 时才创建 controller。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'createAbortController API', path: 'docs/lifecycle/abort/createAbortController' },
+        { label: '观察现有 signal', path: 'docs/lifecycle/abort/observeAbortSubscription' },
+        { label: '有界等待', path: 'docs/lifecycle/boundedWait' }
+      ]
+    },
+    en: {
+      title: 'Let one explicit owner drive cancellation',
+      lede: 'Preserve Abort reasons and subscription cleanup ownership instead of reducing cancellation to an untraceable boolean.',
+      document: {
+        sections: [
+          {
+            id: 'controller',
+            heading: 'Compose an external signal with local cancellation',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import {\n  createAbortController,\n  observeAbortSubscription\n} from '@migaia/lifecycle/abort'\n\nconst local = createAbortController()\nconst observed = observeAbortSubscription(\n  request.signal,\n  (reason) => local.abort(reason),\n  (error) => diagnostics.capture(error)\n)\n\ntry {\n  await loadProfile({ signal: local.signal })\n} finally {\n  observed.unsubscribe()\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'When the external signal aborts first, its original reason is preserved.',
+                  'The local controller owns active cancellation while the external signal forwards through a removable subscription.',
+                  'Repeated abort or unsubscribe neither emits twice nor changes an established reason.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'subscription',
+            heading: 'Do not create a second controller only to observe',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'observeAbortSubscription connects an existing signal to a cleanup owner and returns a removable subscription. Create a controller only when signals, active abort, or timeout must be composed.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'createAbortController API', path: 'docs/lifecycle/abort/createAbortController' },
+        {
+          label: 'Observe an existing signal',
+          path: 'docs/lifecycle/abort/observeAbortSubscription'
+        },
+        { label: 'Bounded waiting', path: 'docs/lifecycle/boundedWait' }
+      ]
+    }
+  },
+  'lifecycle:quiescence': {
+    zh: {
+      title: '证明任务与 lease 已经归零',
+      lede: '用 retain/release、seal 和 whenZero 建立 closed-world drain，而不是轮询计数。',
+      document: {
+        sections: [
+          {
+            id: 'retain-release',
+            heading: '先登记，再封闭，最后等待',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createQuiescenceTracker } from '@migaia/lifecycle/quiescence'\n\nconst tracker = createQuiescenceTracker<object>()\nconst key = {}\nconst release = tracker.retain(key)\n\nrunWork().finally(release)\ntracker.seal(key)\nawait tracker.whenZero(key)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'retain 返回幂等 release token；所有启动成功的工作都必须拥有一个。',
+                  'seal 声明不会再接受新的 retain，使 whenZero 成为 closed-world 证明。',
+                  '未 seal 的零计数只代表此刻为空，不能证明之后没有新工作。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'choose-tracker',
+            heading: '按身份和值域选择 tracker',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['数据', '能力'],
+                rows: [
+                  ['对象身份', 'createQuiescenceTracker / createObjectLeaseRegistry'],
+                  ['稳定字符串 key', 'createStringQuiescenceTracker / createStringLeaseRegistry'],
+                  ['Promise 集合', 'createPendingTracker']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '对象 quiescence', path: 'docs/lifecycle/quiescence/createQuiescenceTracker' },
+        {
+          label: '字符串 quiescence',
+          path: 'docs/lifecycle/quiescence/createStringQuiescenceTracker'
+        },
+        { label: 'Promise tracker', path: 'docs/lifecycle/quiescence/createPendingTracker' }
+      ]
+    },
+    en: {
+      title: 'Prove that tasks and leases reached zero',
+      lede: 'Use retain, release, seal, and whenZero for a closed-world drain instead of polling a count.',
+      document: {
+        sections: [
+          {
+            id: 'retain-release',
+            heading: 'Retain first, seal admission, then wait',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createQuiescenceTracker } from '@migaia/lifecycle/quiescence'\n\nconst tracker = createQuiescenceTracker<object>()\nconst key = {}\nconst release = tracker.retain(key)\n\nrunWork().finally(release)\ntracker.seal(key)\nawait tracker.whenZero(key)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'retain returns an idempotent release token, and every successfully admitted operation owns one.',
+                  'seal declares that no new retain will be accepted, turning whenZero into a closed-world proof.',
+                  'A zero count before sealing describes only the present and cannot prove that later work will not arrive.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'choose-tracker',
+            heading: 'Choose a tracker by identity domain',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Data', 'Capability'],
+                rows: [
+                  ['Object identity', 'createQuiescenceTracker / createObjectLeaseRegistry'],
+                  [
+                    'Stable string keys',
+                    'createStringQuiescenceTracker / createStringLeaseRegistry'
+                  ],
+                  ['Promise sets', 'createPendingTracker']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Object quiescence', path: 'docs/lifecycle/quiescence/createQuiescenceTracker' },
+        {
+          label: 'String quiescence',
+          path: 'docs/lifecycle/quiescence/createStringQuiescenceTracker'
+        },
+        { label: 'Promise tracker', path: 'docs/lifecycle/quiescence/createPendingTracker' }
+      ]
+    }
+  },
+  'lifecycle:scheduler': {
+    zh: {
+      title: '统一生命周期时间与调度',
+      lede: '让 deadline、timeout 与测试时间共享一个 scheduler，而不是直接散落 Date.now 和 setTimeout。',
+      document: {
+        sections: [
+          {
+            id: 'choose-scheduler',
+            heading: '生产使用系统时间，测试使用手动时间',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createManualScheduler } from '@migaia/lifecycle/scheduler'\n\nconst scheduler = createManualScheduler()\nlet fired = false\nconst task = scheduler.schedule(() => {\n  fired = true\n}, 250)\n\nscheduler.advance(249) // fired === false\nscheduler.advance(1) // fired === true\ntask.cancel() // 已执行后取消仍安全"
+              },
+              {
+                type: 'list',
+                items: [
+                  'systemScheduler 提供真实单调时钟和可取消 timer，适合生产默认值。',
+                  'createManualScheduler 由测试显式推进，避免 sleep 与真实时间抖动。',
+                  '同一操作的 now、deadline 与 schedule 必须来自同一 scheduler 时间域。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'boundary-validation',
+            heading: '只在公开边界解析未知 scheduler',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'snapshotScheduler 用于探测并快照 duck-typed scheduler；resolveScheduler 与 resolveSchedulerOption 用于必填或带默认值的公开配置。内部已经可信的 scheduler 不要重复快照。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '手动 scheduler', path: 'docs/lifecycle/scheduler/createManualScheduler' },
+        { label: '系统 scheduler', path: 'docs/lifecycle/scheduler/systemScheduler' },
+        { label: '解析配置', path: 'docs/lifecycle/scheduler/resolveSchedulerOption' }
+      ]
+    },
+    en: {
+      title: 'Unify lifecycle time and scheduling',
+      lede: 'Give deadlines, timeouts, and tests one scheduler instead of scattering Date.now and setTimeout through domain code.',
+      document: {
+        sections: [
+          {
+            id: 'choose-scheduler',
+            heading: 'Use system time in production and manual time in tests',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createManualScheduler } from '@migaia/lifecycle/scheduler'\n\nconst scheduler = createManualScheduler()\nlet fired = false\nconst task = scheduler.schedule(() => {\n  fired = true\n}, 250)\n\nscheduler.advance(249) // fired === false\nscheduler.advance(1) // fired === true\ntask.cancel() // safe after execution"
+              },
+              {
+                type: 'list',
+                items: [
+                  'systemScheduler provides real monotonic time and cancellable timers for production defaults.',
+                  'createManualScheduler advances only when a test asks, eliminating sleeps and real-time jitter.',
+                  'now, deadline, and schedule for one operation must come from the same scheduler time domain.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'boundary-validation',
+            heading: 'Resolve unknown schedulers only at a public boundary',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'snapshotScheduler probes and snapshots a duck-typed scheduler. resolveScheduler and resolveSchedulerOption handle required or defaulted public configuration. Do not snapshot an already trusted internal scheduler again.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Manual scheduler', path: 'docs/lifecycle/scheduler/createManualScheduler' },
+        { label: 'System scheduler', path: 'docs/lifecycle/scheduler/systemScheduler' },
+        { label: 'Resolve configuration', path: 'docs/lifecycle/scheduler/resolveSchedulerOption' }
+      ]
+    }
+  },
+  'lifecycle:generation': {
+    zh: {
+      title: '只接纳最新一代异步结果',
+      lede: '为可替换的异步工作建立代际所有权：新请求使旧请求失效，迟到结果先释放再退出，不能覆盖当前状态。',
+      document: {
+        sections: [
+          {
+            id: 'latest-wins',
+            heading: '为每次启动捕获独立 token',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createGenerationController } from '@migaia/lifecycle'\n\nconst requests = createGenerationController({\n  parentSignal: page.signal,\n  onSuperseded: (info) => diagnostics.report(info)\n})\n\nasync function refreshUser(id: string) {\n  const request = requests.begin({ timeoutMs: 5_000 })\n  const user = await loadUser(id, { signal: request.signal })\n\n  if (!requests.adopt(request.token, user, (stale) => stale.dispose(), reportReleaseError)) {\n    return\n  }\n\n  currentUser = user\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'begin() 会先使上一代失效，再返回只属于本代的 token 与 signal。',
+                  'adopt() 返回 true 才能提交结果；false 表示结果已经迟到，并已交给 release 释放。',
+                  '不要只比较递增数字后直接赋值：token 身份和 release 路径共同保证迟到资源不会泄漏。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'cancellation',
+            heading: '把取消来源和计时放在同一所有者内',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['配置或操作', '作用', '何时使用'],
+                rows: [
+                  ['parentSignal', '父级取消时终止当前一代', '页面、会话或 host 已有生命周期'],
+                  ['begin({ timeoutMs })', '只限制本次 generation', '单次请求需要独立 deadline'],
+                  [
+                    'supersede(reason)',
+                    '使当前代失效，但 controller 仍可 begin',
+                    '输入变化、主动刷新或替换操作'
+                  ],
+                  ['dispose(reason)', '永久终止 controller', '所有者销毁且不再接受新工作']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'release 失败不会污染新的 generation；它只进入 onReleaseError。dispose 后再次 begin 必须失败，因此 controller 应与拥有它的页面、服务或领域对象同寿命。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'createGenerationController API',
+          path: 'docs/lifecycle/generation/createGenerationController'
+        },
+        { label: '取消与有界等待', path: 'abort' },
+        { label: '统一调度时间', path: 'scheduler' }
+      ]
+    },
+    en: {
+      title: 'Adopt only the latest asynchronous generation',
+      lede: 'Give replaceable async work generational ownership: a new request invalidates the old one, and a late value is released before it can overwrite current state.',
+      document: {
+        sections: [
+          {
+            id: 'latest-wins',
+            heading: 'Capture a distinct token for every start',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createGenerationController } from '@migaia/lifecycle'\n\nconst requests = createGenerationController({\n  parentSignal: page.signal,\n  onSuperseded: (info) => diagnostics.report(info)\n})\n\nasync function refreshUser(id: string) {\n  const request = requests.begin({ timeoutMs: 5_000 })\n  const user = await loadUser(id, { signal: request.signal })\n\n  if (!requests.adopt(request.token, user, (stale) => stale.dispose(), reportReleaseError)) {\n    return\n  }\n\n  currentUser = user\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  "begin() invalidates the previous generation before returning this generation's token and signal.",
+                  'Commit the result only when adopt() returns true. false means the value arrived late and was handed to release.',
+                  'A numeric comparison alone is insufficient: token identity plus the release path prevents stale resources from leaking.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'cancellation',
+            heading: 'Keep cancellation sources and timing under one owner',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Option or operation', 'Effect', 'Use when'],
+                rows: [
+                  [
+                    'parentSignal',
+                    'Stops the current generation with its parent',
+                    'A page, session, or host already owns the lifetime'
+                  ],
+                  [
+                    'begin({ timeoutMs })',
+                    'Bounds only this generation',
+                    'Each request needs an independent deadline'
+                  ],
+                  [
+                    'supersede(reason)',
+                    'Invalidates now but permits a later begin',
+                    'Input changes, refreshes, or replacement operations'
+                  ],
+                  [
+                    'dispose(reason)',
+                    'Terminates the controller permanently',
+                    'Its owner is gone and no more work is valid'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'A release failure cannot poison the new generation; it only reaches onReleaseError. begin must fail after dispose, so the controller should share the lifetime of its page, service, or domain owner.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'createGenerationController API',
+          path: 'docs/lifecycle/generation/createGenerationController'
+        },
+        { label: 'Cancellation and bounded waiting', path: 'abort' },
+        { label: 'Unify scheduling time', path: 'scheduler' }
+      ]
+    }
+  },
+  'lifecycle:errors': {
+    zh: {
+      title: '选择错误策略，而不是吞掉 cleanup 失败',
+      lede: 'Lifecycle 保留原生错误类型、对象身份与 cause 链；调用方只决定多个失败如何暴露。',
+      document: {
+        sections: [
+          {
+            id: 'policy',
+            heading: '按调用边界选择四种结果',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['策略', '行为', '适用场景'],
+                rows: [
+                  ['throw', '单错原样抛出，多错抛 AggregateError', '释放失败必须使当前操作失败'],
+                  ['collect', '返回带 source 的失败列表', '调用方要展示、审计或统一决策'],
+                  [
+                    'report',
+                    '逐项交给 reporter，finalize 返回空列表',
+                    'cleanup 继续执行且失败走诊断通道'
+                  ],
+                  ['firstError', '抛首错，后续错误仅报告', '只用于迁移既有 first-error-wins 契约']
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createErrorCollector } from '@migaia/lifecycle/errors'\n\nconst errors = createErrorCollector('collect', undefined)\n\nfor (const item of resources) {\n  try {\n    await item.dispose()\n  } catch (error) {\n    errors.add(item.id, error)\n  }\n}\n\nconst failures = errors.finalize('resource disposal failed')"
+              }
+            ]
+          },
+          {
+            id: 'identity',
+            heading: '保留原始错误的可达性',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'tagLifecycleError 在现有 Error 上附加 source/code，不替换原生类型或 stack。',
+                  'createLifecycleFailure 优先保留可扩展 Error 的对象身份；不能标记时才通过 cause 包装。',
+                  'containAsyncRejection 只用于观察不可信 callback 的 thenable rejection，不是忽略失败的借口。',
+                  '业务层不要自行制造 lifecycle code；使用 owning API 返回的错误，并按 source/code 分类。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'createErrorCollector API', path: 'docs/lifecycle/errors/createErrorCollector' },
+        { label: '错误身份契约', path: 'docs/lifecycle/errors/tagLifecycleError' },
+        { label: '释放事务', path: 'disposal' }
+      ]
+    },
+    en: {
+      title: 'Choose an error policy instead of swallowing cleanup failures',
+      lede: 'Lifecycle preserves native error types, object identity, and cause chains; callers choose only how multiple failures are exposed.',
+      document: {
+        sections: [
+          {
+            id: 'policy',
+            heading: 'Choose one of four outcomes at the call boundary',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Policy', 'Behavior', 'Use when'],
+                rows: [
+                  [
+                    'throw',
+                    'Throws one error unchanged or an AggregateError for many',
+                    'Any release failure must fail the operation'
+                  ],
+                  [
+                    'collect',
+                    'Returns source-labelled failures',
+                    'The caller must display, audit, or decide centrally'
+                  ],
+                  [
+                    'report',
+                    'Sends each item to the reporter and finalizes to an empty list',
+                    'Cleanup continues while diagnostics own failures'
+                  ],
+                  [
+                    'firstError',
+                    'Throws the first and reports later failures',
+                    'Only when migrating an existing first-error-wins contract'
+                  ]
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createErrorCollector } from '@migaia/lifecycle/errors'\n\nconst errors = createErrorCollector('collect', undefined)\n\nfor (const item of resources) {\n  try {\n    await item.dispose()\n  } catch (error) {\n    errors.add(item.id, error)\n  }\n}\n\nconst failures = errors.finalize('resource disposal failed')"
+              }
+            ]
+          },
+          {
+            id: 'identity',
+            heading: 'Keep the original failure reachable',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'tagLifecycleError attaches source/code to an existing Error without replacing its native type or stack.',
+                  'createLifecycleFailure preserves an extensible Error object; only an untaggable value is wrapped through cause.',
+                  'containAsyncRejection observes a thenable rejection from an untrusted callback. It is not permission to ignore failures.',
+                  'Application code does not manufacture lifecycle codes; classify errors returned by the owning API through source/code.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'createErrorCollector API', path: 'docs/lifecycle/errors/createErrorCollector' },
+        { label: 'Error identity contract', path: 'docs/lifecycle/errors/tagLifecycleError' },
+        { label: 'Disposal transactions', path: 'disposal' }
+      ]
+    }
+  },
+  'serialize:index': {
+    zh: {
+      title: 'Serialize 学习路径',
+      lede: '先完成一次真实的 JSON 往返，再按需要引入多格式 registry、流式背压以及有界关闭。',
+      document: {
+        sections: [
+          {
+            id: 'mental-model',
+            heading: '先判断数据最终要去哪里',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['交付结果', '优先路径', '不要做什么'],
+                rows: [
+                  [
+                    '单个 JSON 文本或对象',
+                    'registry.encode / decode + jsonPlugin',
+                    '不要先拆流再重新 collect'
+                  ],
+                  ['文件、端口或逐片 sink', 'encodeStream / decodeStream', '不要构造完整中间 blob'],
+                  [
+                    '已有成品对象，只需协议直通',
+                    "['value', value] chunk",
+                    '不要做无意义的 UTF-8 往返'
+                  ],
+                  ['新旧格式并存', '一个 registry 注册多个 type', '不要按格式复制生命周期管理']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'route',
+            heading: '按系统风险进入下一页',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '首次接入：建立 JSON registry，编码、持久化并恢复一个真实值。',
+                  '格式扩展：理解 primaryType、显式 type 选择和自定义 parser 责任。',
+                  '大数据：用时间预算切片，以 maxInFlight 控制背压和峰值内存。',
+                  '关闭与错误：区分 close、dispose、codec failure、取消和清理诊断。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟完成 JSON 往返', path: 'getting-started' },
+        { label: 'Registry 与插件', path: 'registry-and-plugins' },
+        { label: '流式处理与背压', path: 'streaming-and-backpressure' }
+      ]
+    },
+    en: {
+      title: 'Serialize learning paths',
+      lede: 'Complete one real JSON round trip first, then add multi-format registries, streaming backpressure, and bounded shutdown only when the workload needs them.',
+      document: {
+        sections: [
+          {
+            id: 'mental-model',
+            heading: 'Start with the destination of the data',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Delivery result', 'Preferred path', 'Avoid'],
+                rows: [
+                  [
+                    'One JSON text or object',
+                    'registry.encode / decode + jsonPlugin',
+                    'Splitting a stream only to collect it again'
+                  ],
+                  [
+                    'A file, port, or incremental sink',
+                    'encodeStream / decodeStream',
+                    'Building a complete intermediate blob'
+                  ],
+                  [
+                    'An already materialized object',
+                    "a ['value', value] chunk",
+                    'A needless UTF-8 round trip'
+                  ],
+                  [
+                    'Old and new formats together',
+                    'Register multiple types in one registry',
+                    'Duplicating lifecycle ownership per format'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'route',
+            heading: 'Choose the next page by system risk',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'First integration: create a JSON registry, encode, persist, and restore a real value.',
+                  'Format extension: understand primaryType, explicit type selection, and parser responsibilities.',
+                  'Large data: slice by measured time and bound peak memory with maxInFlight.',
+                  'Shutdown and errors: separate close, dispose, codec failures, cancellation, and cleanup diagnostics.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Complete a JSON round trip', path: 'getting-started' },
+        { label: 'Registry and plugins', path: 'registry-and-plugins' },
+        { label: 'Streaming and backpressure', path: 'streaming-and-backpressure' }
+      ]
+    }
+  },
+  'serialize:getting-started': {
+    zh: {
+      title: '五分钟完成一次可诊断的 JSON 往返',
+      lede: '一个 registry 同时拥有格式选择、编解码上下文、取消入口和最终释放；业务代码只保存 chunk 与 type。',
+      document: {
+        sections: [
+          {
+            id: 'round-trip',
+            heading: '编码、保存并按原格式恢复',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize'\n\nconst registry = createSerializeRegistry([jsonPlugin()])\n\nconst chunk = await registry.encode(\n  { id: 'draft-42', updatedAt: 1_725_000_000_000 },\n  { context: 'draft:42' }\n)\nawait storage.set('draft-42', { type: registry.primaryType, chunk })\n\nconst record = await storage.get('draft-42')\nconst draft = await registry.decode(record.chunk, {\n  type: record.type,\n  context: 'draft:42'\n})\n\nawait registry.dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  '插件数组第一项决定 primaryType；省略 options.type 时读写都使用它。',
+                  '持久化时同时保存 type 和 chunk，未来才能继续读取旧格式。',
+                  'context 不参与格式选择，只为失败提供业务定位信息。',
+                  '应用所有者最终 await dispose()；不要在单次 encode 后释放共享 registry。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'chunk',
+            heading: '理解三种 chunk，而不是假定一切都是字符串',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['形态', '数据', '典型接收者'],
+                rows: [
+                  ['text', 'string', 'JSON、HTML、只接受文本的存储'],
+                  ['bytes', 'Uint8Array', 'Worker、IndexedDB、Wasm、二进制协议'],
+                  ['value', 'unknown', '内存直通适配器；必须独占一次输出']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'createSerializeRegistry API',
+          path: 'docs/serialize/registry/createSerializeRegistry'
+        },
+        { label: 'Chunk 与线材转换', path: 'chunk-shapes-and-wire-conversion' },
+        { label: 'Registry 与插件', path: 'registry-and-plugins' },
+        { label: '关闭与错误', path: 'shutdown-and-errors' }
+      ]
+    },
+    en: {
+      title: 'Complete a diagnosable JSON round trip in five minutes',
+      lede: 'One registry owns format selection, codec context, cancellation, and final disposal; application storage keeps only the chunk and its type.',
+      document: {
+        sections: [
+          {
+            id: 'round-trip',
+            heading: 'Encode, persist, and restore with the recorded format',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize'\n\nconst registry = createSerializeRegistry([jsonPlugin()])\n\nconst chunk = await registry.encode(\n  { id: 'draft-42', updatedAt: 1_725_000_000_000 },\n  { context: 'draft:42' }\n)\nawait storage.set('draft-42', { type: registry.primaryType, chunk })\n\nconst record = await storage.get('draft-42')\nconst draft = await registry.decode(record.chunk, {\n  type: record.type,\n  context: 'draft:42'\n})\n\nawait registry.dispose()"
+              },
+              {
+                type: 'list',
+                items: [
+                  'The first plugin determines primaryType; reads and writes use it when options.type is omitted.',
+                  'Persist type beside chunk so future versions can still select the old decoder.',
+                  'context does not select a format; it gives failures a business-level location.',
+                  'The application owner eventually awaits dispose(); do not dispose a shared registry after one encode call.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'chunk',
+            heading: 'Understand all three chunks instead of assuming strings',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Kind', 'Payload', 'Typical receiver'],
+                rows: [
+                  ['text', 'string', 'JSON, HTML, and text-only storage'],
+                  ['bytes', 'Uint8Array', 'Workers, IndexedDB, Wasm, and binary protocols'],
+                  [
+                    'value',
+                    'unknown',
+                    'In-memory pass-through adapters; it must be the sole output chunk'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'createSerializeRegistry API',
+          path: 'docs/serialize/registry/createSerializeRegistry'
+        },
+        { label: 'Chunk and wire conversion', path: 'chunk-shapes-and-wire-conversion' },
+        { label: 'Registry and plugins', path: 'registry-and-plugins' },
+        { label: 'Shutdown and errors', path: 'shutdown-and-errors' }
+      ]
+    }
+  },
+  'serialize:chunk-shapes-and-wire-conversion': {
+    zh: {
+      title: '选择 Chunk 形态，并只在协议边界转换线材',
+      lede: 'text、bytes 与 value 表达不同所有权和传输能力。先保留原生形态，到只接受单一线材的边界再转换。',
+      document: {
+        sections: [
+          {
+            id: 'shape',
+            heading: '按接收方能力选择形态',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Chunk', '适用接收方', '关键边界'],
+                rows: [
+                  ['text', 'HTML、localStorage、文本协议', '字符串可直接复用'],
+                  [
+                    'bytes',
+                    'IndexedDB、Worker、Wasm、二进制协议',
+                    'chunkToBytes 对已有 bytes 返回副本'
+                  ],
+                  ['value', '内存直通或测试适配器', '没有通用文本/字节表示，转换必须失败'],
+                  ['混合输出', '自定义流式 parser', 'Registry 归一化时需要 encoder，不能猜编码']
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { chunkToBytes, chunkToText } from '@migaia/serialize'\n\nconst text = chunkToText(chunk, new TextDecoder())\nconst bytes = chunkToBytes(chunk, new TextEncoder())\n\nawait textSink.write(text)\nawait binarySink.write(bytes)"
+              }
+            ]
+          },
+          {
+            id: 'base64',
+            heading: '只在字符串通道上使用 Base64',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { base64ToBytes, streamBase64Chunks } from '@migaia/serialize'\n\nfor (const textPart of streamBase64Chunks(payload)) {\n  await textSink.append(textPart)\n}\n\nconst restored = base64ToBytes(await textSink.readAll())"
+              },
+              {
+                type: 'list',
+                items: [
+                  '二进制接收方直接保留 Uint8Array；Base64 增加体积，只服务字符串边界。',
+                  'streamBase64Chunks 按可安全拼接的 3 字节倍数分片；接收方必须保持顺序。',
+                  '最终只需要一个字符串时用 bytesToBase64，避免无意义的异步包装。',
+                  'base64ToBytes 拒绝非 canonical 输入并抛 INVALID_OPTION；不要把损坏输入当空数据。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'chunkToBytes API', path: 'docs/serialize/registry/chunkToBytes' },
+        { label: 'streamBase64Chunks API', path: 'docs/serialize/core/streamBase64Chunks' },
+        { label: '流式处理与背压', path: 'streaming-and-backpressure' }
+      ]
+    },
+    en: {
+      title: 'Choose a Chunk shape and convert wire form only at the boundary',
+      lede: 'text, bytes, and value represent different ownership and transport capabilities. Preserve the native shape until a boundary requires one wire form.',
+      document: {
+        sections: [
+          {
+            id: 'shape',
+            heading: 'Choose the shape from the receiver capability',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Chunk', 'Receiver', 'Boundary'],
+                rows: [
+                  [
+                    'text',
+                    'HTML, localStorage, or a text protocol',
+                    'The string is reused directly'
+                  ],
+                  [
+                    'bytes',
+                    'IndexedDB, Worker, Wasm, or a binary protocol',
+                    'chunkToBytes returns a copy for existing bytes'
+                  ],
+                  [
+                    'value',
+                    'In-memory pass-through or test adapters',
+                    'No universal text or byte representation exists, so conversion fails'
+                  ],
+                  [
+                    'mixed output',
+                    'A custom streaming parser',
+                    'Registry normalization needs an encoder and never guesses one'
+                  ]
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { chunkToBytes, chunkToText } from '@migaia/serialize'\n\nconst text = chunkToText(chunk, new TextDecoder())\nconst bytes = chunkToBytes(chunk, new TextEncoder())\n\nawait textSink.write(text)\nawait binarySink.write(bytes)"
+              }
+            ]
+          },
+          {
+            id: 'base64',
+            heading: 'Use Base64 only for a string-only channel',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { base64ToBytes, streamBase64Chunks } from '@migaia/serialize'\n\nfor (const textPart of streamBase64Chunks(payload)) {\n  await textSink.append(textPart)\n}\n\nconst restored = base64ToBytes(await textSink.readAll())"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Keep Uint8Array for binary receivers; Base64 expands payloads and belongs only at a string boundary.',
+                  'streamBase64Chunks uses concatenation-safe multiples of three bytes; the receiver preserves order.',
+                  'Use bytesToBase64 when the result must be one string instead of wrapping the operation in a stream.',
+                  'base64ToBytes rejects non-canonical input with INVALID_OPTION; never reinterpret corruption as empty data.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'chunkToBytes API', path: 'docs/serialize/registry/chunkToBytes' },
+        { label: 'streamBase64Chunks API', path: 'docs/serialize/core/streamBase64Chunks' },
+        { label: 'Streaming and backpressure', path: 'streaming-and-backpressure' }
+      ]
+    }
+  },
+  'serialize:registry-and-plugins': {
+    zh: {
+      title: '用一个 Registry 管理多格式迁移',
+      lede: 'primaryType 负责新写入，记录携带的 type 负责旧读取；parser 只拥有编解码和自身资源，不复制 registry 生命周期。',
+      document: {
+        sections: [
+          {
+            id: 'migration',
+            heading: '新格式写入与旧格式读取可以同时存在',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize'\n\nconst registry = createSerializeRegistry([jsonPlugin(), legacyPlugin])\n\nasync function save(value: unknown) {\n  return {\n    type: registry.primaryType,\n    chunk: await registry.encode(value, { context: 'settings' })\n  }\n}\n\nasync function load(record: IStoredRecord) {\n  return registry.decode(record.chunk, {\n    type: record.type,\n    context: 'settings'\n  })\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  '数组顺序是写入策略：第一项是默认格式，不是能力优先级评分。',
+                  '读取时显式传记录的 type；未知 type 以 CODEC_NOT_FOUND 失败，不能猜测解析器。',
+                  'type 必须匹配 SERIALIZE_TYPE_PATTERN，避免破坏 HTML 属性或存档信封。',
+                  '同一个 parser 可服务多个 type，registry.dispose() 对同一实例只调用一次 dispose。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'plugin',
+            heading: '自定义 parser 必须兑现四项责任',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['责任', '契约'],
+                rows: [
+                  ['encode', '返回一个 chunk、Promise 或可迭代 chunk 流'],
+                  ['decode', '正确处理声明支持的 text / bytes / value'],
+                  ['cancellation', '耗时工作读取 context.signal，并把它传给底层 I/O'],
+                  ['dispose', '释放 parser 自己拥有的 Worker、Wasm 或端口；允许异步']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'json-options',
+            heading: 'JSON 配置只改变 JSON 边界',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['配置', '作用', '生产约束'],
+                rows: [
+                  ['replacer', '写入时裁剪或转换字段', '必须保持确定性，避免隐式泄露敏感字段'],
+                  ['reviver', '读取时还原 Date 等富类型', '只处理可信格式，不执行输入携带的代码'],
+                  ['space', '增加调试缩进', '生产通常省略，避免增大存储与传输'],
+                  ['decoder', '解码 bytes chunk', '无宿主 TextDecoder 时显式注入']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'jsonParser 对 value chunk 直接返回原值，对 text 调用 JSON.parse，对 bytes 先经 decoder。JSON.stringify 返回 undefined 时以 ENCODE_FAILED 失败，不能把它保存成空字符串。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'jsonPlugin 配置', path: 'docs/serialize/plugins/jsonPlugin' },
+        { label: 'Registry API', path: 'docs/serialize/registry/createSerializeRegistry' },
+        { label: '流式处理与背压', path: 'streaming-and-backpressure' }
+      ]
+    },
+    en: {
+      title: 'Manage a multi-format migration with one registry',
+      lede: 'primaryType owns new writes while each stored type selects its old reader; parsers own codec work and their resources, not duplicate registry lifecycles.',
+      document: {
+        sections: [
+          {
+            id: 'migration',
+            heading: 'Write the new format while reading old records',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize'\n\nconst registry = createSerializeRegistry([jsonPlugin(), legacyPlugin])\n\nasync function save(value: unknown) {\n  return {\n    type: registry.primaryType,\n    chunk: await registry.encode(value, { context: 'settings' })\n  }\n}\n\nasync function load(record: IStoredRecord) {\n  return registry.decode(record.chunk, {\n    type: record.type,\n    context: 'settings'\n  })\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Array order is the write policy: the first item is the default format, not a capability ranking.',
+                  'Pass the stored type when reading; an unknown type fails with CODEC_NOT_FOUND instead of guessing a parser.',
+                  'A type must match SERIALIZE_TYPE_PATTERN so it cannot break an HTML attribute or persistence envelope.',
+                  'One parser may serve multiple types; registry.dispose() calls dispose once per parser object.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'plugin',
+            heading: 'A custom parser has four responsibilities',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Responsibility', 'Contract'],
+                rows: [
+                  ['encode', 'Return one chunk, a Promise, or an iterable chunk stream'],
+                  ['decode', 'Handle each declared text, bytes, or value representation correctly'],
+                  [
+                    'cancellation',
+                    'Read context.signal during expensive work and forward it to underlying I/O'
+                  ],
+                  [
+                    'dispose',
+                    'Release owned Workers, Wasm instances, or ports; asynchronous cleanup is allowed'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'json-options',
+            heading: 'JSON options change only the JSON boundary',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Option', 'Effect', 'Production constraint'],
+                rows: [
+                  [
+                    'replacer',
+                    'Filters or transforms fields while writing',
+                    'Keep it deterministic and prevent accidental sensitive-field disclosure'
+                  ],
+                  [
+                    'reviver',
+                    'Restores rich values such as Date while reading',
+                    'Use it only for a trusted format and never execute code supplied by input'
+                  ],
+                  [
+                    'space',
+                    'Adds debugging indentation',
+                    'Usually omit it in production to avoid storage and transfer growth'
+                  ],
+                  ['decoder', 'Decodes a bytes chunk', 'Inject it when the host has no TextDecoder']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'jsonParser returns a value chunk unchanged, parses text directly, and decodes bytes before parsing. When JSON.stringify returns undefined, encoding fails with ENCODE_FAILED instead of saving an empty string.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'jsonPlugin configuration', path: 'docs/serialize/plugins/jsonPlugin' },
+        { label: 'Registry API', path: 'docs/serialize/registry/createSerializeRegistry' },
+        { label: 'Streaming and backpressure', path: 'streaming-and-backpressure' }
+      ]
+    }
+  },
+  'serialize:streaming-and-backpressure': {
+    zh: {
+      title: '按帧预算流式编码，并用背压限制内存',
+      lede: 'encodeStream 适合能逐片消费的 sink；sliceByFrameBudget 用真实处理耗时调整下一片，maxInFlight 则限制预取。',
+      document: {
+        sections: [
+          {
+            id: 'pipeline',
+            heading: '让编码、传输和消费保持一条有界流水线',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createSerializeRegistry, encodeStream, jsonPlugin } from '@migaia/serialize'\nimport { systemScheduler } from '@migaia/lifecycle/scheduler'\n\nconst registry = createSerializeRegistry([jsonPlugin()])\n\nfor await (const chunk of encodeStream(registry, rows, {\n  scheduler: systemScheduler,\n  targetMs: 8,\n  initialItems: 2_048,\n  maxInFlight: 2,\n  signal: controller.signal,\n  context: 'export:orders'\n})) {\n  await sink.write(chunk)\n}"
+              },
+              {
+                type: 'table',
+                headers: ['配置', '控制什么', '默认或约束'],
+                rows: [
+                  ['targetMs', '单片期望处理时间', '8ms，必须为有限正数'],
+                  ['initialItems', '第一片的保守大小', '2048，安全正整数'],
+                  ['minItems / maxItems', '自适应片大小边界', '64 / 250000'],
+                  ['maxInFlight', '同时编码但尚未消费的片数', '1，必须为正整数'],
+                  ['scheduler', '测时与让出的统一时间域', '必填']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'choice',
+            heading: '只在接收者需要完整值时 collect',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'registry.encode() 直接返回一个合并后的 chunk，适合单个 blob。encodeStream() 避免完整中间对象，适合可逐片写入的下游。collectStream() 会重新把全量数据驻留在内存中；如果紧接着就 collect，通常应直接调用 registry.encode()。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'encodeStream API', path: 'docs/serialize/core/encodeStream' },
+        { label: 'sliceByFrameBudget API', path: 'docs/serialize/core/sliceByFrameBudget' },
+        { label: '关闭与错误', path: 'shutdown-and-errors' }
+      ]
+    },
+    en: {
+      title: 'Stream within a frame budget and bound memory with backpressure',
+      lede: 'encodeStream serves sinks that consume incrementally; sliceByFrameBudget adjusts the next slice from measured work, while maxInFlight bounds prefetch.',
+      document: {
+        sections: [
+          {
+            id: 'pipeline',
+            heading: 'Keep encoding, transport, and consumption in one bounded pipeline',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createSerializeRegistry, encodeStream, jsonPlugin } from '@migaia/serialize'\nimport { systemScheduler } from '@migaia/lifecycle/scheduler'\n\nconst registry = createSerializeRegistry([jsonPlugin()])\n\nfor await (const chunk of encodeStream(registry, rows, {\n  scheduler: systemScheduler,\n  targetMs: 8,\n  initialItems: 2_048,\n  maxInFlight: 2,\n  signal: controller.signal,\n  context: 'export:orders'\n})) {\n  await sink.write(chunk)\n}"
+              },
+              {
+                type: 'table',
+                headers: ['Option', 'Controls', 'Default or constraint'],
+                rows: [
+                  ['targetMs', 'Desired work time per slice', '8ms; finite and positive'],
+                  [
+                    'initialItems',
+                    'Conservative first slice size',
+                    '2048; a positive safe integer'
+                  ],
+                  ['minItems / maxItems', 'Adaptive slice-size bounds', '64 / 250000'],
+                  ['maxInFlight', 'Encoded slices not yet consumed', '1; a positive integer'],
+                  ['scheduler', 'One time domain for measurement and yielding', 'Required']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'choice',
+            heading: 'Collect only when the receiver needs one complete value',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'registry.encode() returns one assembled chunk and fits a single-blob destination. encodeStream() avoids a complete intermediate object for incremental sinks. collectStream() puts the complete payload back in memory; when collection immediately follows encoding, registry.encode() is usually the direct path.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'encodeStream API', path: 'docs/serialize/core/encodeStream' },
+        { label: 'sliceByFrameBudget API', path: 'docs/serialize/core/sliceByFrameBudget' },
+        { label: 'Shutdown and errors', path: 'shutdown-and-errors' }
+      ]
+    }
+  },
+  'serialize:shutdown-and-errors': {
+    zh: {
+      title: '关闭 Serialize Registry，并保留失败身份',
+      lede: 'close 立即停止接单并取消在途操作；dispose 再负责排空、deadline、parser 清理和二次错误出口。',
+      document: {
+        sections: [
+          {
+            id: 'shutdown',
+            heading: '两阶段关闭解决两个不同问题',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['操作', '立即效果', '完成语义'],
+                rows: [
+                  ['close()', '同步拒绝新操作并 abort 当前操作', '不调用 parser.dispose()'],
+                  [
+                    'dispose()',
+                    '隐含 close，再等待排空或 deadline',
+                    '逐个 await 唯一 parser 的 dispose()'
+                  ],
+                  [
+                    'dispose({ deadlineAt })',
+                    '使用 registry scheduler 的绝对时间',
+                    '超时后报告 pendingCount 并继续清理'
+                  ],
+                  ['重复 dispose()', '不重新执行关闭流程', '返回第一次调用的同一个 Promise']
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const deadlineAt = scheduler.now() + 500\n\nawait registry.dispose({ deadlineAt }).catch((error) => {\n  reportShutdownFailure(error)\n  throw error\n})'
+              }
+            ]
+          },
+          {
+            id: 'errors',
+            heading: '先按 code 分类，再读取编解码定位字段',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'CODEC_NOT_FOUND、ENCODE_FAILED、DECODE_FAILED 与 INVALID_CHUNK 使用 SerializeCodecError，携带 type、phase、chunkIndex、bytesConsumed。',
+                  'REGISTRY_DISPOSED、INVALID_OPTION 与 ENV_UNSUPPORTED 保留原生 Error、TypeError 或 RangeError 类型并附加 source/code。',
+                  'ABORTED 保留取消原因；迟到 parser rejection 进入 report，不得改写已公开的取消结果。',
+                  'cleanup.policy=throw 让清理失败拒绝 dispose；report 策略把诊断交给回调并允许 dispose 正常完成。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'SerializeCodecError', path: 'docs/serialize/core/SerializeCodecError' },
+        { label: 'Registry 配置', path: 'docs/serialize/registry/createSerializeRegistry' },
+        { label: '返回学习路径', path: 'index' }
+      ]
+    },
+    en: {
+      title: 'Shut down a Serialize registry without losing failure identity',
+      lede: 'close immediately stops admission and cancels active operations; dispose then owns draining, deadlines, parser cleanup, and secondary-error reporting.',
+      document: {
+        sections: [
+          {
+            id: 'shutdown',
+            heading: 'Two shutdown phases solve different problems',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Operation', 'Immediate effect', 'Completion semantics'],
+                rows: [
+                  [
+                    'close()',
+                    'Synchronously rejects new work and aborts active work',
+                    'Does not call parser.dispose()'
+                  ],
+                  [
+                    'dispose()',
+                    'Implied close, then waits for drain or deadline',
+                    'Awaits dispose() once per parser object'
+                  ],
+                  [
+                    'dispose({ deadlineAt })',
+                    'Uses an absolute time in the registry scheduler domain',
+                    'Reports pendingCount and continues cleanup after timeout'
+                  ],
+                  [
+                    'Repeated dispose()',
+                    'Does not run shutdown again',
+                    'Returns the exact Promise from the first call'
+                  ]
+                ]
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'const deadlineAt = scheduler.now() + 500\n\nawait registry.dispose({ deadlineAt }).catch((error) => {\n  reportShutdownFailure(error)\n  throw error\n})'
+              }
+            ]
+          },
+          {
+            id: 'errors',
+            heading: 'Classify by code before reading codec location fields',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'CODEC_NOT_FOUND, ENCODE_FAILED, DECODE_FAILED, and INVALID_CHUNK use SerializeCodecError with type, phase, chunkIndex, and bytesConsumed.',
+                  'REGISTRY_DISPOSED, INVALID_OPTION, and ENV_UNSUPPORTED preserve native Error, TypeError, or RangeError and add source/code.',
+                  'ABORTED preserves the cancellation reason; a late parser rejection goes to report and cannot replace the public cancellation result.',
+                  'cleanup.policy=throw rejects dispose on cleanup failure; report sends diagnostics to the callback and lets dispose complete.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'SerializeCodecError', path: 'docs/serialize/core/SerializeCodecError' },
+        {
+          label: 'Registry configuration',
+          path: 'docs/serialize/registry/createSerializeRegistry'
+        },
+        { label: 'Return to learning paths', path: 'index' }
+      ]
+    }
+  },
+  'storage-contract:index': {
+    zh: {
+      title: 'Storage Contract 学习路径',
+      lede: '这里不创建具体存储后端；它定义后端与功能代码之间可验证、可收窄且运行时中立的共同边界。',
+      document: {
+        sections: [
+          {
+            id: 'boundary',
+            heading: '先确定你正在处理哪一层能力',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['需求', '最低契约', '准入方式'],
+                rows: [
+                  ['字符串键值', 'IKeyValueStore', 'snapshotKeyValueStore / isKeyValueStore'],
+                  ['字节、记录、范围与事务', 'IRecordStore', 'isRecordStore / asRecordStore'],
+                  ['提交后变更通知', 'IChangeFeedStore', 'isChangeFeedStore / asChangeFeedStore'],
+                  [
+                    '二级索引',
+                    'ISecondaryIndexRecordStore',
+                    'isSecondaryIndexRecordStore / asSecondaryIndexRecordStore'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'route',
+            heading: '按业务风险选择下一页',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '首次接入：在不可信适配器进入业务代码前完成一次准入快照。',
+                  '能力分支：只在真实能力和完整方法表同时满足时收窄。',
+                  '操作安全：在 I/O 前冻结 context 与复合 key，避免异步期间被修改。',
+                  '记录与索引：把事务 scope、索引 handle 和订阅 disposer 留在其所有权周期内。',
+                  'Codec 与错误：显式匹配输出形态，并按 source/code 处理永久错误与取消。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '五分钟建立契约边界', path: 'getting-started' },
+        { label: '能力收窄', path: 'capability-narrowing' },
+        { label: '安全操作与键', path: 'safe-operations-and-keys' }
+      ]
+    },
+    en: {
+      title: 'Storage Contract learning paths',
+      lede: 'This library does not create a concrete storage backend; it defines the verifiable, narrowable, runtime-neutral boundary between backends and feature code.',
+      document: {
+        sections: [
+          {
+            id: 'boundary',
+            heading: 'Identify the minimum capability layer first',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Need', 'Minimum contract', 'Admission'],
+                rows: [
+                  [
+                    'String key-value data',
+                    'IKeyValueStore',
+                    'snapshotKeyValueStore / isKeyValueStore'
+                  ],
+                  [
+                    'Bytes, records, ranges, and transactions',
+                    'IRecordStore',
+                    'isRecordStore / asRecordStore'
+                  ],
+                  [
+                    'Post-commit change notifications',
+                    'IChangeFeedStore',
+                    'isChangeFeedStore / asChangeFeedStore'
+                  ],
+                  [
+                    'Secondary indexes',
+                    'ISecondaryIndexRecordStore',
+                    'isSecondaryIndexRecordStore / asSecondaryIndexRecordStore'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'route',
+            heading: 'Choose the next page by business risk',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'First integration: take one admission snapshot before an untrusted adapter reaches feature code.',
+                  'Capability branches: narrow only when both the declared capability and complete method surface exist.',
+                  'Operation safety: freeze context and composite keys before I/O so callers cannot mutate them mid-flight.',
+                  'Records and indexes: keep transaction scopes, index handles, and subscription disposers inside their owner cycle.',
+                  'Codecs and errors: match output shape explicitly and classify permanent failures or cancellation by source/code.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Build a contract boundary in five minutes', path: 'getting-started' },
+        { label: 'Capability narrowing', path: 'capability-narrowing' },
+        { label: 'Safe operations and keys', path: 'safe-operations-and-keys' }
+      ]
+    }
+  },
+  'storage-contract:getting-started': {
+    zh: {
+      title: '五分钟把未知存储适配器接入安全边界',
+      lede: '先准入并固定后端与能力事实，再让业务函数只依赖最低的 IKeyValueStore 契约。',
+      document: {
+        sections: [
+          {
+            id: 'admission',
+            heading: '在入口读取一次形状，不在后续重复触发 getter',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { snapshotKeyValueStore, type IOperationContext } from '@migaia/storage-contract'\n\nexport async function loadPreference(candidate: unknown, ctx?: IOperationContext) {\n  const admission = snapshotKeyValueStore(candidate)\n  if (!admission) return { ok: false as const, reason: 'invalid-store' as const }\n\n  const value = await admission.store.get('theme', ctx)\n  return {\n    ok: true as const,\n    backend: admission.backend,\n    value: value ?? 'system'\n  }\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  '准入同时验证 backend、capabilities 和完整 L0 方法表；缺失键返回 null。',
+                  '快照只确认契约，不调用后端 I/O，也不会替你创建或释放 store。',
+                  '业务函数接受 IKeyValueStore，而不是绑定 local、cookie、IndexedDB 等具体实现。',
+                  'store 的创建者仍拥有 dispose；借用者不得擅自终止共享实例。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'l0',
+            heading: 'L0 只承诺所有后端共有的行为',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['操作', '结果', '边界'],
+                rows: [
+                  ['get', 'Promise<string | null>', '不存在必须是 null'],
+                  ['set / remove', 'Promise<void>', '写选项经 IWriteOptions 传入'],
+                  ['keys', 'Promise<string[]>', '只列出后端可见条目'],
+                  ['clearValues', '只清字符串值通道', '不等于清除记录和元数据'],
+                  [
+                    'clearAll',
+                    '清该契约层公开的全部数据',
+                    'L1 才明确包含 values / bytes / records；metadata 保留'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'snapshotKeyValueStore API',
+          path: 'docs/storage-contract/snapshotKeyValueStore'
+        },
+        { label: '能力收窄', path: 'capability-narrowing' },
+        { label: '操作上下文', path: 'safe-operations-and-keys' }
+      ]
+    },
+    en: {
+      title: 'Admit an unknown storage adapter in five minutes',
+      lede: 'Admit and freeze backend and capability facts first, then let feature code depend only on the minimum IKeyValueStore contract.',
+      document: {
+        sections: [
+          {
+            id: 'admission',
+            heading: 'Read the shape once at the boundary instead of retriggering getters',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { snapshotKeyValueStore, type IOperationContext } from '@migaia/storage-contract'\n\nexport async function loadPreference(candidate: unknown, ctx?: IOperationContext) {\n  const admission = snapshotKeyValueStore(candidate)\n  if (!admission) return { ok: false as const, reason: 'invalid-store' as const }\n\n  const value = await admission.store.get('theme', ctx)\n  return {\n    ok: true as const,\n    backend: admission.backend,\n    value: value ?? 'system'\n  }\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Admission checks backend, capabilities, and the complete L0 method table; a missing key returns null.',
+                  'The snapshot verifies a contract without invoking backend I/O or creating or disposing the store.',
+                  'Feature code accepts IKeyValueStore instead of binding itself to local, cookie, or IndexedDB implementations.',
+                  'The store creator still owns dispose; a borrower must not terminate a shared instance.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'l0',
+            heading: 'L0 promises only behavior common to every backend',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Operation', 'Result', 'Boundary'],
+                rows: [
+                  ['get', 'Promise<string | null>', 'Absence is always null'],
+                  ['set / remove', 'Promise<void>', 'Write options travel through IWriteOptions'],
+                  ['keys', 'Promise<string[]>', 'Lists only entries visible to the backend'],
+                  [
+                    'clearValues',
+                    'Clears only the string-value channel',
+                    'It does not clear records or metadata'
+                  ],
+                  [
+                    'clearAll',
+                    'Clears all data exposed by the admitted contract',
+                    'Only L1 explicitly includes values, bytes, and records; metadata remains'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'snapshotKeyValueStore API',
+          path: 'docs/storage-contract/snapshotKeyValueStore'
+        },
+        { label: 'Capability narrowing', path: 'capability-narrowing' },
+        { label: 'Operation context', path: 'safe-operations-and-keys' }
+      ]
+    }
+  },
+  'storage-contract:capability-narrowing': {
+    zh: {
+      title: '按能力收窄 Store，不做静默降级',
+      lede: '布尔能力声明和方法形状必须同时成立；守卫用于分支，断言函数用于明确要求某项能力的入口。',
+      document: {
+        sections: [
+          {
+            id: 'branch',
+            heading: '先选择 guard 还是 assertion',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { isChangeFeedStore, isRecordStore, type IKeyValueStore } from '@migaia/storage-contract'\n\nexport function connectStore(store: IKeyValueStore) {\n  const unsubscribe = isChangeFeedStore(store)\n    ? store.subscribeChanges((change) => refreshScope(change.scope))\n    : undefined\n\n  if (isRecordStore(store)) {\n    return { mode: 'records' as const, store, unsubscribe }\n  }\n\n  return { mode: 'values' as const, store, unsubscribe }\n}"
+              },
+              {
+                type: 'table',
+                headers: ['入口', '失败结果', '适合场景'],
+                rows: [
+                  ['isRecordStore / isChangeFeedStore', 'false', '功能可选，允许显式分支'],
+                  [
+                    'asRecordStore / asChangeFeedStore',
+                    'UNSUPPORTED_CAPABILITY',
+                    '调用方明确要求能力'
+                  ],
+                  [
+                    'snapshotRecordStore',
+                    'undefined',
+                    '后续需要复用稳定 backend/capabilities 事实'
+                  ],
+                  [
+                    'asSecondaryIndexRecordStore',
+                    'UNSUPPORTED_CAPABILITY',
+                    '索引是该流程不可缺少的前提'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ownership',
+            heading: '能力收窄不会转移所有权',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '收窄返回原 store，不包装、不代理，也不改变 dispose 所有者。',
+                  'change-feed 的退订函数由订阅者持有，并须在观察周期结束时执行。',
+                  '守卫不调用后端方法，因此不能把 guard 通过误解为一次健康检查。',
+                  '能力不足是永久配置差异；不要捕获 UNSUPPORTED_CAPABILITY 后悄悄改用语义不同的通道。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'asRecordStore API', path: 'docs/storage-contract/asRecordStore' },
+        { label: '变更订阅与所有权', path: 'change-feed-and-subscription-ownership' },
+        { label: '二级索引与事务', path: 'records-indexes-and-transactions' },
+        { label: '错误分类', path: 'codecs-and-errors' }
+      ]
+    },
+    en: {
+      title: 'Narrow a store by capability without silent fallback',
+      lede: 'A declared capability and its complete method shape must both exist; use guards for branches and assertions when an entry point requires the capability.',
+      document: {
+        sections: [
+          {
+            id: 'branch',
+            heading: 'Choose between a guard and an assertion first',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { isChangeFeedStore, isRecordStore, type IKeyValueStore } from '@migaia/storage-contract'\n\nexport function connectStore(store: IKeyValueStore) {\n  const unsubscribe = isChangeFeedStore(store)\n    ? store.subscribeChanges((change) => refreshScope(change.scope))\n    : undefined\n\n  if (isRecordStore(store)) {\n    return { mode: 'records' as const, store, unsubscribe }\n  }\n\n  return { mode: 'values' as const, store, unsubscribe }\n}"
+              },
+              {
+                type: 'table',
+                headers: ['Entry point', 'Failure result', 'Use when'],
+                rows: [
+                  [
+                    'isRecordStore / isChangeFeedStore',
+                    'false',
+                    'The feature is optional and branches explicitly'
+                  ],
+                  [
+                    'asRecordStore / asChangeFeedStore',
+                    'UNSUPPORTED_CAPABILITY',
+                    'The caller explicitly requires the capability'
+                  ],
+                  [
+                    'snapshotRecordStore',
+                    'undefined',
+                    'Later work reuses stable backend and capability facts'
+                  ],
+                  [
+                    'asSecondaryIndexRecordStore',
+                    'UNSUPPORTED_CAPABILITY',
+                    'An index is a mandatory prerequisite'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ownership',
+            heading: 'Narrowing does not transfer ownership',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Narrowing returns the original store without wrapping, proxying, or changing the dispose owner.',
+                  'The subscriber owns the change-feed unsubscribe function and runs it when observation ends.',
+                  'A guard invokes no backend operation, so passing it is not a health check.',
+                  'A missing capability is a permanent configuration difference; do not catch UNSUPPORTED_CAPABILITY and silently switch to a semantically different channel.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'asRecordStore API', path: 'docs/storage-contract/asRecordStore' },
+        {
+          label: 'Change feed and subscription ownership',
+          path: 'change-feed-and-subscription-ownership'
+        },
+        { label: 'Secondary indexes and transactions', path: 'records-indexes-and-transactions' },
+        { label: 'Error classification', path: 'codecs-and-errors' }
+      ]
+    }
+  },
+  'storage-contract:safe-operations-and-keys': {
+    zh: {
+      title: '在 I/O 前冻结操作上下文与复合键',
+      lede: 'snapshotOperationContext 固定取消、超时和分页选项；snapshotStorageKey 深拷贝 Date、ArrayBuffer 与数组键，阻止异步期间漂移。',
+      document: {
+        sections: [
+          {
+            id: 'snapshot',
+            heading: '把可变调用参数转成一次性快照',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { snapshotOperationContext, snapshotStorageKey } from '@migaia/storage-contract'\n\nexport async function loadRecord(store: IRecordStore<IOrder>, key: IStorageKey, ctx?: IOperationContext) {\n  const operation = snapshotOperationContext(ctx)\n  const stableKey = snapshotStorageKey(key, store.backend, 'order key')\n  return store.getRecord(stableKey, operation)\n}"
+              },
+              {
+                type: 'table',
+                headers: ['字段', '约束', '意义'],
+                rows: [
+                  ['signal', '结构化 abort signal', '与 timeout 取先触发者'],
+                  ['timeoutMs', '非负安全整数', '便捷超时，不是事务 deadline'],
+                  ['pageSize', '1–4096 的整数', '约束迭代分页内存'],
+                  ['conflictPolicy', 'conflict / replace', '只表达写冲突意图']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'key-domain',
+            heading: '键域是有界协议，不是任意结构化克隆',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '合法键为 string、有限 number、有效 Date、受限 ArrayBuffer 或非空递归数组。',
+                  '数组最大深度 32、节点 4096；二进制键最多 1 MiB，并拒绝循环。',
+                  'L0 value、bytes 与 metadata 通道只接受 string key；使用 assertStringStorageKey。',
+                  '同步写不支持 signal 或 timeoutMs；不要给无法协作取消的调用伪造异步语义。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'snapshotOperationContext API',
+          path: 'docs/storage-contract/snapshotOperationContext'
+        },
+        { label: 'snapshotStorageKey API', path: 'docs/storage-contract/snapshotStorageKey' },
+        { label: '记录与事务', path: 'records-indexes-and-transactions' }
+      ]
+    },
+    en: {
+      title: 'Freeze operation context and composite keys before I/O',
+      lede: 'snapshotOperationContext fixes cancellation, timeout, and pagination options; snapshotStorageKey deep-copies Date, ArrayBuffer, and array keys so they cannot drift during async work.',
+      document: {
+        sections: [
+          {
+            id: 'snapshot',
+            heading: 'Turn mutable call inputs into one-time snapshots',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { snapshotOperationContext, snapshotStorageKey } from '@migaia/storage-contract'\n\nexport async function loadRecord(store: IRecordStore<IOrder>, key: IStorageKey, ctx?: IOperationContext) {\n  const operation = snapshotOperationContext(ctx)\n  const stableKey = snapshotStorageKey(key, store.backend, 'order key')\n  return store.getRecord(stableKey, operation)\n}"
+              },
+              {
+                type: 'table',
+                headers: ['Field', 'Constraint', 'Meaning'],
+                rows: [
+                  ['signal', 'Structural abort signal', 'Races the convenience timeout'],
+                  [
+                    'timeoutMs',
+                    'Non-negative safe integer',
+                    'Convenience timeout, not a transaction deadline'
+                  ],
+                  ['pageSize', 'Integer from 1 through 4096', 'Bounds iterator page memory'],
+                  ['conflictPolicy', 'conflict / replace', 'Expresses only write-conflict intent']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'key-domain',
+            heading: 'The key domain is a bounded protocol, not arbitrary structured clone',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Valid keys are strings, finite numbers, valid Dates, bounded ArrayBuffers, or non-empty recursive arrays.',
+                  'Arrays are limited to depth 32 and 4096 nodes; binary keys are at most 1 MiB and cycles are rejected.',
+                  'L0 value, bytes, and metadata channels accept only string keys; use assertStringStorageKey.',
+                  'Synchronous writes support neither signal nor timeoutMs; do not invent async semantics for a call that cannot cooperate.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'snapshotOperationContext API',
+          path: 'docs/storage-contract/snapshotOperationContext'
+        },
+        { label: 'snapshotStorageKey API', path: 'docs/storage-contract/snapshotStorageKey' },
+        { label: 'Records and transactions', path: 'records-indexes-and-transactions' }
+      ]
+    }
+  },
+  'storage-contract:records-indexes-and-transactions': {
+    zh: {
+      title: '组合记录、二级索引与事务能力',
+      lede: 'IRecordStore 增加记录、字节、范围和事务；二级索引再要求 generation-bound handle，二者都不允许绕过能力准入。',
+      document: {
+        sections: [
+          {
+            id: 'transaction',
+            heading: '把 scope 限制在 transaction 回调中',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { asRecordStore, ConflictPolicy } from '@migaia/storage-contract'\n\nconst records = asRecordStore<IOrder>(store)\n\nawait records.transaction(async (tx) => {\n  const current = await tx.get(order.id)\n  await tx.put(mergeOrder(current, order), order.id, {\n    conflictPolicy: ConflictPolicy.replace\n  })\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'transaction 回调 resolve 后不要保存或继续使用 tx；底层连接与快照可能已经释放。',
+                  'conflict 是默认策略；replace 必须是业务明确选择，不是失败后的隐式重试。',
+                  '隔离级别、提交时机和重试由具体实现定义，契约层不虚构跨后端一致性。',
+                  '原子提交已经完成后发生取消时，结果必须反映提交事实，不能伪报回滚。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'indexes',
+            heading: '索引操作始终携带同一代 handle',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '先通过 asSecondaryIndexRecordStore 收窄，再保存 ensureRecordIndexes() 返回的 generation-bound handle。readiness、indexed put、范围查询和 indexed transaction 都传回这个 handle；只拿索引名字无法证明定义仍属于当前 generation。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'asSecondaryIndexRecordStore API',
+          path: 'docs/storage-contract/asSecondaryIndexRecordStore'
+        },
+        {
+          label: 'readTransactionConflictPolicy API',
+          path: 'docs/storage-contract/readTransactionConflictPolicy'
+        },
+        { label: '提交后变更订阅', path: 'change-feed-and-subscription-ownership' },
+        { label: 'Codec 与错误', path: 'codecs-and-errors' }
+      ]
+    },
+    en: {
+      title: 'Compose records, secondary indexes, and transactions',
+      lede: 'IRecordStore adds records, bytes, ranges, and transactions; secondary indexes additionally require a generation-bound handle, and neither path bypasses capability admission.',
+      document: {
+        sections: [
+          {
+            id: 'transaction',
+            heading: 'Keep the scope inside its transaction callback',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { asRecordStore, ConflictPolicy } from '@migaia/storage-contract'\n\nconst records = asRecordStore<IOrder>(store)\n\nawait records.transaction(async (tx) => {\n  const current = await tx.get(order.id)\n  await tx.put(mergeOrder(current, order), order.id, {\n    conflictPolicy: ConflictPolicy.replace\n  })\n})"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Do not retain or use tx after its callback resolves; the underlying connection and snapshot may already be released.',
+                  'conflict is the default; replace is an explicit business choice, not an implicit retry after failure.',
+                  'Isolation, commit timing, and retry are implementation-defined; the contract does not invent cross-backend consistency.',
+                  'Cancellation after an atomic commit must report the commit fact instead of pretending the write rolled back.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'indexes',
+            heading: 'Carry one generation handle through every index operation',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Narrow through asSecondaryIndexRecordStore, then retain the generation-bound handle returned by ensureRecordIndexes(). Pass that handle to readiness, indexed puts, range queries, and indexed transactions; an index name alone cannot prove the definition still belongs to the current generation.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'asSecondaryIndexRecordStore API',
+          path: 'docs/storage-contract/asSecondaryIndexRecordStore'
+        },
+        {
+          label: 'readTransactionConflictPolicy API',
+          path: 'docs/storage-contract/readTransactionConflictPolicy'
+        },
+        { label: 'Post-commit change feed', path: 'change-feed-and-subscription-ownership' },
+        { label: 'Codecs and errors', path: 'codecs-and-errors' }
+      ]
+    }
+  },
+  'storage-contract:change-feed-and-subscription-ownership': {
+    zh: {
+      title: '订阅提交后变更，并在所有权结束时退订',
+      lede: 'Change feed 描述已经提交的失效事实，不是事务前置钩子。订阅者拥有 disposer，并用 sequence 与 origin 做顺序和回声控制。',
+      document: {
+        sections: [
+          {
+            id: 'subscribe',
+            heading: '只在能力完整时建立订阅',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { isChangeFeedStore, type IKeyValueStore } from '@migaia/storage-contract'\n\nexport function observeOrders(store: IKeyValueStore, refresh: (scope?: string) => void) {\n  if (!isChangeFeedStore(store)) return () => undefined\n\n  let sequence = -1\n  const unsubscribe = store.subscribeChanges((change) => {\n    if (change.sequence <= sequence || change.origin === 'orders-ui') return\n    sequence = change.sequence\n    if (change.channel === 'record' || change.channel === 'all') refresh(change.scope)\n  })\n\n  return unsubscribe\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'isChangeFeedStore 同时验证 L0、capabilities.changeFeed 与 subscribeChanges 方法；不会调用后端。',
+                  '事件发生在提交后；监听器可刷新缓存，但不能阻止或回滚已经完成的写。',
+                  'sequence 用于同一 feed 内检测重复或倒序；origin 用于抑制本地回声，不是认证身份。',
+                  'keys 可缺省，batch、clear 或 migrate 也可能只给 scope；消费者必须允许粗粒度失效。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ownership',
+            heading: '订阅生命周期短于 Store 生命周期',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['资源', '所有者', '结束动作'],
+                rows: [
+                  ['store', '创建后端的装配层', '最终 await dispose()'],
+                  [
+                    'subscription',
+                    '调用 subscribeChanges 的观察者',
+                    '观察周期结束立即 unsubscribe()'
+                  ],
+                  ['change payload', '只读通知', '不要保存成新的事实源'],
+                  ['refresh work', '业务观察者', '自行处理取消、去重与迟到结果']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'isChangeFeedStore API', path: 'docs/storage-contract/isChangeFeedStore' },
+        { label: 'asChangeFeedStore API', path: 'docs/storage-contract/asChangeFeedStore' },
+        { label: '返回能力收窄', path: 'capability-narrowing' }
+      ]
+    },
+    en: {
+      title: 'Observe committed changes and unsubscribe with the owner',
+      lede: 'A change feed reports invalidation facts after commit; it is not a pre-transaction hook. The subscriber owns the disposer and uses sequence and origin for ordering and echo control.',
+      document: {
+        sections: [
+          {
+            id: 'subscribe',
+            heading: 'Subscribe only when the complete capability exists',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { isChangeFeedStore, type IKeyValueStore } from '@migaia/storage-contract'\n\nexport function observeOrders(store: IKeyValueStore, refresh: (scope?: string) => void) {\n  if (!isChangeFeedStore(store)) return () => undefined\n\n  let sequence = -1\n  const unsubscribe = store.subscribeChanges((change) => {\n    if (change.sequence <= sequence || change.origin === 'orders-ui') return\n    sequence = change.sequence\n    if (change.channel === 'record' || change.channel === 'all') refresh(change.scope)\n  })\n\n  return unsubscribe\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'isChangeFeedStore verifies L0, capabilities.changeFeed, and subscribeChanges together without invoking the backend.',
+                  'Events arrive after commit; a listener may invalidate caches but cannot prevent or roll back the completed write.',
+                  'sequence detects duplicates or reordering within one feed; origin suppresses local echoes and is not an authentication identity.',
+                  'keys may be absent, and batch, clear, or migrate may provide only scope; consumers must support coarse invalidation.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'ownership',
+            heading: 'A subscription lives for less time than its Store',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Resource', 'Owner', 'End action'],
+                rows: [
+                  [
+                    'store',
+                    'The assembly layer that created the backend',
+                    'Eventually await dispose()'
+                  ],
+                  [
+                    'subscription',
+                    'The observer that called subscribeChanges',
+                    'Call unsubscribe() as soon as observation ends'
+                  ],
+                  [
+                    'change payload',
+                    'A read-only notification',
+                    'Do not retain it as a new source of truth'
+                  ],
+                  [
+                    'refresh work',
+                    'The feature observer',
+                    'Own cancellation, deduplication, and late-result handling'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'isChangeFeedStore API', path: 'docs/storage-contract/isChangeFeedStore' },
+        { label: 'asChangeFeedStore API', path: 'docs/storage-contract/asChangeFeedStore' },
+        { label: 'Return to capability narrowing', path: 'capability-narrowing' }
+      ]
+    }
+  },
+  'storage-contract:codecs-and-errors': {
+    zh: {
+      title: '匹配 Codec 输出能力，并正确分类契约错误',
+      lede: 'Codec 声明 text、binary 或 structured 输出；契约只验证描述符，是否适配当前后端必须由调用方显式决定。',
+      document: {
+        sections: [
+          {
+            id: 'codec',
+            heading: '先快照 Codec，再依据后端能力选路',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { snapshotCodec, StorageContractErrorCode } from '@migaia/storage-contract'\n\nconst stableCodec = snapshotCodec(codec)\n\nif (stableCodec.output === 'binary' && !store.capabilities.binary) {\n  return { ok: false as const, code: StorageContractErrorCode.unsupported }\n}\n\nconst encoded = await stableCodec.encode(value, operation)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'snapshotCodec 固定 name、output、encode 与 decode，不保留可变描述符引用。',
+                  'binary 遇到 text-only 后端必须显式拒绝或由更高层选择另一 Codec；契约不偷偷转码。',
+                  'collectionsJsonCodec 只对精确版本 tuple 还原 Map/Set，普通数组保持普通数组。',
+                  'Codec 的取消和 timeout 继续使用同一 IOperationContext，不另建平行控制面。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'errors',
+            heading: '错误码决定恢复策略',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Code', '含义', '调用方动作'],
+                rows: [
+                  [
+                    'INVALID_ARGUMENT / INVALID_KEY',
+                    '描述符、选项或键违反契约',
+                    '修正输入；不要原样重试'
+                  ],
+                  [
+                    'UNSUPPORTED_CAPABILITY',
+                    '当前后端缺少明确要求的能力',
+                    '换后端或显式降级产品功能'
+                  ],
+                  ['STORE_DISPOSED', '实例已经终止', '创建新实例，不复活旧实例'],
+                  ['ABORTED', 'signal 或 timeout 结束等待', '按取消处理，并保留提交事实']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'collectionsJsonCodec API',
+          path: 'docs/storage-contract/collectionsJsonCodec'
+        },
+        { label: 'snapshotCodec API', path: 'docs/storage-contract/snapshotCodec' },
+        { label: '返回学习路径', path: 'index' }
+      ]
+    },
+    en: {
+      title: 'Match codec output capability and classify contract errors',
+      lede: 'A codec declares text, binary, or structured output; the contract validates the descriptor while the caller explicitly decides whether it fits the current backend.',
+      document: {
+        sections: [
+          {
+            id: 'codec',
+            heading: 'Snapshot the codec before routing by backend capability',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { snapshotCodec, StorageContractErrorCode } from '@migaia/storage-contract'\n\nconst stableCodec = snapshotCodec(codec)\n\nif (stableCodec.output === 'binary' && !store.capabilities.binary) {\n  return { ok: false as const, code: StorageContractErrorCode.unsupported }\n}\n\nconst encoded = await stableCodec.encode(value, operation)"
+              },
+              {
+                type: 'list',
+                items: [
+                  'snapshotCodec fixes name, output, encode, and decode instead of retaining a mutable descriptor reference.',
+                  'A binary codec on a text-only backend is explicitly rejected or replaced by a higher-level policy; the contract never transcodes silently.',
+                  'collectionsJsonCodec restores Map or Set only from its exact versioned tuple, while ordinary arrays remain arrays.',
+                  'Codec cancellation and timeout reuse the same IOperationContext instead of creating a parallel control plane.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'errors',
+            heading: 'The code determines the recovery strategy',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Code', 'Meaning', 'Caller action'],
+                rows: [
+                  [
+                    'INVALID_ARGUMENT / INVALID_KEY',
+                    'A descriptor, option, or key violates the contract',
+                    'Fix the input; do not retry it unchanged'
+                  ],
+                  [
+                    'UNSUPPORTED_CAPABILITY',
+                    'The backend lacks an explicitly required capability',
+                    'Choose another backend or explicitly reduce the product feature'
+                  ],
+                  [
+                    'STORE_DISPOSED',
+                    'The instance is terminal',
+                    'Create a new instance instead of reviving the old one'
+                  ],
+                  [
+                    'ABORTED',
+                    'A signal or timeout ended the wait',
+                    'Treat it as cancellation while preserving commit facts'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'collectionsJsonCodec API',
+          path: 'docs/storage-contract/collectionsJsonCodec'
+        },
+        { label: 'snapshotCodec API', path: 'docs/storage-contract/snapshotCodec' },
+        { label: 'Return to learning paths', path: 'index' }
+      ]
+    }
+  }
+}
+
+/** Returns an exact task page without silently substituting another topic or language. */
+export function findGuideJourney(
+  library: string,
+  topic: string,
+  locale: ILocale
+): IGuideJourney | undefined {
+  const normalizedTopic = topic === 'overview' ? 'index' : topic
+  return guideJourneys[`${library}:${normalizedTopic}`]?.[locale]
+}

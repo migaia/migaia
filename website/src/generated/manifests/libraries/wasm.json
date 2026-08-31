@@ -1,0 +1,1046 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "wasm",
+    "description": null,
+    "version": "0.1.0",
+    "exports": ["."],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "migaia-wasm",
+            "heading": "@migaia/wasm",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Rust 编译的 WASM 字节暂存区和 JSON ⇄ MessagePack 转码器。它提供 8 字节对齐、地址稳定的 arena 分配，以及只在字节边界工作的同步转码 API；不跨 WASM 边界传递 JavaScript 对象图。"
+              }
+            ]
+          },
+          {
+            "id": "安装",
+            "heading": "安装",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "bash",
+                "code": "pnpm add @migaia/wasm"
+              },
+              {
+                "type": "paragraph",
+                "text": "包内包含 wasm-pack 生成的 ES module 和 `.wasm` 资源。修改 Rust 实现后，用 `pnpm run build` 重新生成 `src/`；不要手工编辑生成文件。"
+              }
+            ]
+          },
+          {
+            "id": "api",
+            "heading": "API",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import init, {\n  alloc_bytes,\n  ptr_of,\n  byte_len_of,\n  dealloc_bytes,\n  json_to_msgpack,\n  msgpack_to_json\n} from '@migaia/wasm';"
+              },
+              {
+                "type": "paragraph",
+                "text": "`alloc_bytes(byteLen)` 返回新分配 id（或 `0`）；`ptr_of(id)` 返回字节指针；`byte_len_of(id)` 返回按 8 字节取整的容量；`dealloc_bytes(id)` 显式释放并返回是否确实存在。死 id 的读操作返回 `0`，释放操作返回 `false`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "转码函数都返回同一次操作绑定的 `ConversionResult`："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "type ConversionResult = {\n  readonly id: number;    // 成功时的新输出分配，失败时为 0\n  readonly len: number;   // 精确输出长度，失败时为 0\n  readonly error: string; // 成功为空串，失败为原因\n};"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "const wasm = await init();\nconst input = alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json);\n\nconst result = json_to_msgpack(input, json.length);\nif (result.id === 0) throw new Error(result.error);\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice();\n\ndealloc_bytes(input);\ndealloc_bytes(result.id);"
+              },
+              {
+                "type": "paragraph",
+                "text": "`msgpack_to_json` 具有对称签名。输入必须是单个完整文档；尾随非空白字节会失败。成功和失败都只通过当前返回值报告，不存在全局“上一次结果”或兼容别名，因此两个调用的结果可以安全地交错保存。输入分配不会由转码自动释放。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`json_to_msgpack` 保持 map key 为字符串并直接从 reader 转到 writer，不先构造 `serde_json::Value`；`msgpack_to_json` 同样保持单文档边界。"
+              }
+            ]
+          },
+          {
+            "id": "内存与生命周期",
+            "heading": "内存与生命周期",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "arena 使用 `Vec<u64>`，保证指针适合 `Float64Array`/`BigInt64Array`。WASM memory 增长会使旧 `ArrayBuffer` 视图失效；每次分配或读取前都从当前 `memory.buffer` 创建视图。所有分配都必须显式释放；`@migaia/store-wasm` 另外提供 FinalizationRegistry 兜底，但不替代确定性 dispose。"
+              }
+            ]
+          },
+          {
+            "id": "构建与测试",
+            "heading": "构建与测试",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "bash",
+                "code": "pnpm run build       # wasm-pack build --target web --release --out-dir ../src\npnpm run test        # cargo test（Rust 单元/host 测试）\npnpm run typecheck   # 生成声明和包配置检查"
+              },
+              {
+                "type": "paragraph",
+                "text": "生成的 `src/` 由 wasm-pack 完整覆盖。发布或验证前应执行一次确定性重复构建，并通过真实 WASM host 和 packed consumer 导入/实例化测试。"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "migaia-wasm-使用手册",
+            "heading": "@migaia/wasm 使用手册",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "本文记录当前单一 WASM ABI。Rust arena 和转码函数由 `@migaia/wasm` 负责；`@migaia/store-wasm` 只负责字段分配、数值视图和生命周期，不复制 arena 或转码状态机。"
+              }
+            ]
+          },
+          {
+            "id": "1-初始化",
+            "heading": "1. 初始化",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import init, { initSync } from '@migaia/wasm';\n\nconst wasm = await init();\n// 或：const wasm = initSync(moduleOrBytes);"
+              },
+              {
+                "type": "paragraph",
+                "text": "默认入口通过包内 `wasm_provider_bg.wasm` 初始化。Node 等不支持相对 fetch 的宿主应传入 `BufferSource` 或 `WebAssembly.Module`。同步入口不发起 fetch。"
+              }
+            ]
+          },
+          {
+            "id": "2-arena-契约",
+            "heading": "2. Arena 契约",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["API", "返回值", "语义"],
+                "rows": [
+                  [
+                    "`alloc_bytes(byteLen)`",
+                    "`number`",
+                    "8 字节对齐、清零的稳定分配 id，失败为 `0`"
+                  ],
+                  ["`ptr_of(id)`", "`number`", "当前线性内存中的字节偏移，未知 id 为 `0`"],
+                  ["`byte_len_of(id)`", "`number`", "实际容量（按 8 字节取整），未知 id 为 `0`"],
+                  ["`dealloc_bytes(id)`", "`boolean`", "是否确实释放了一个 live id"]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "`0` 是保留哨兵。分配使用稳定 id 并避免覆盖仍存活的块；指针只保证到释放前稳定。WASM memory 增长会替换 `memory.buffer`，所以 typed array 不能跨越后续分配调用复用。"
+              }
+            ]
+          },
+          {
+            "id": "3-单操作转码-abi",
+            "heading": "3. 单操作转码 ABI",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "type ConversionResult = {\n  readonly id: number;\n  readonly len: number;\n  readonly error: string;\n};\n\njson_to_msgpack(id: number, len: number): ConversionResult;\nmsgpack_to_json(id: number, len: number): ConversionResult;"
+              },
+              {
+                "type": "paragraph",
+                "text": "每个调用都构造独立 `ConversionResult`，把输出 id、精确输出长度和错误绑定到同一操作；不存在共享的结果寄存器，因此交错调用不会互相覆盖结果。成功为 `{ id: nonzero, len: exactBytes, error: '' }`，失败为 `{ id: 0, len: 0, error: reason }`。输出和输入都由调用者释放。"
+              },
+              {
+                "type": "paragraph",
+                "text": "转码只读取指定分配的前 `len` 个字节，并拒绝未知 id、超过容量的长度、空文档、格式错误和尾随第二个文档。JSON 允许文档后的空白；MessagePack 必须精确消费输入。map key 以字符串保存，避免 schema 依赖。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }));\nconst inputId = wasm.alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json);\n\nconst encoded = wasm.json_to_msgpack(inputId, json.length);\nif (encoded.id === 0) {\n  wasm.dealloc_bytes(inputId);\n  throw new Error(encoded.error);\n}\nconst packed = new Uint8Array(\n  wasm.memory.buffer,\n  wasm.ptr_of(encoded.id),\n  encoded.len\n).slice();\nwasm.dealloc_bytes(inputId);\nwasm.dealloc_bytes(encoded.id);"
+              }
+            ]
+          },
+          {
+            "id": "4-错误与边界",
+            "heading": "4. 错误与边界",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "错误内容保持现有调用方可诊断的前缀：未知分配或超容量为 `unknown allocation id or length past capacity`，arena 无法分配输出为 `arena exhausted`，JSON/MessagePack 解析错误分别带 `json to msgpack failed:` 或 `msgpack to json failed:`。这些文本存在于返回值内，不通过第二个查询 API 读取。"
+              },
+              {
+                "type": "paragraph",
+                "text": "空输入、非法输入、多个连续文档和超出实际容量的长度都会返回 `id: 0`。失败不会创建可供调用者释放的输出块；输入块仍由调用者拥有。"
+              }
+            ]
+          },
+          {
+            "id": "5-store-wasm-接入规则",
+            "heading": "5. store-wasm 接入规则",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "字段 owner 通过 `ensureWasm()` 复用同一个初始化 Promise，并在显式 dispose 时释放自己的分配；构造失败时先完成所有已创建资源的回滚，再保留原始错误。record 字段只接受 number，并使用当前 `memory.buffer` 上的 `DataView`。这些生命周期语义不依赖转码结果 ABI，也不引入第二种 shared-buffer layout。"
+              }
+            ]
+          },
+          {
+            "id": "6-构建与验证",
+            "heading": "6. 构建与验证",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "bash",
+                "code": "pnpm run build\npnpm run test\npnpm run typecheck"
+              },
+              {
+                "type": "paragraph",
+                "text": "`build` 必须从 `rust/` 运行 wasm-pack，并完整生成 `src/wasm_provider.js`、`.d.ts` 和 `.wasm`；生成目录禁止手工修改。验证还应执行真实非零 WASM host runner、两次确定性构建的字节比较，以及 packed 安装、导入和实例化。`@migaia/store-wasm` 另外执行其 `fmt → lint → typecheck → typecheck:test → test` 门禁和真实 WASM consumer 检查。"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "wasm:index",
+      "library": "wasm",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/wasm/getting-started",
+      "architecturePath": "/en/architecture/wasm",
+      "symbols": [
+        {
+          "name": "alloc_bytes",
+          "kind": "function",
+          "signature": "export function alloc_bytes(byte_len: number): number;",
+          "declarationLine": 37,
+          "source": "packages/wasm/src/wasm_provider.d.ts",
+          "purpose": "Allocate an 8-byte-aligned, zeroed buffer of at least `byte_len` bytes. Returns a stable allocation id, or `0` (`NULL_ID`) if the id space is exhausted. The buffer never moves for the lifetime of the id, so a pointer from [`ptr_of`] stays valid until [`dealloc_bytes`] — suitable for exposing as a contiguous numeric typed array on the JS side.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for alloc_bytes.",
+          "advanced": "No additional advanced behavior is declared for alloc_bytes.",
+          "parameters": ["byte_len: number"],
+          "parameterDetails": [
+            {
+              "name": "byte_len",
+              "type": "number",
+              "optional": false
+            }
+          ],
+          "returns": "number",
+          "errors": ["No documented errors are declared for alloc_bytes."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for alloc_bytes.",
+          "examples": [
+            "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }));\nconst inputId = wasm.alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json);\n\nconst encoded = wasm.json_to_msgpack(inputId, json.length);\nif (encoded.id === 0) {\n  wasm.dealloc_bytes(inputId);\n  throw new Error(encoded.error);\n}\nconst packed = new Uint8Array(\n  wasm.memory.buffer,\n  wasm.ptr_of(encoded.id),\n  encoded.len\n).slice();\nwasm.dealloc_bytes(inputId);\nwasm.dealloc_bytes(encoded.id);",
+            "const wasm = await init();\nconst input = alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json);\n\nconst result = json_to_msgpack(input, json.length);\nif (result.id === 0) throw new Error(result.error);\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice();\n\ndealloc_bytes(input);\ndealloc_bytes(result.id);"
+          ],
+          "exportPath": ".",
+          "overloadSignatures": ["export function alloc_bytes(byte_len: number): number;"],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "byte_len",
+                "type": "number",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["number"],
+          "whenToUse": "Use alloc_bytes when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when alloc_bytes does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Allocate an 8-byte-aligned, zeroed buffer of at least `byte_len` bytes. Returns a stable allocation id, or `0` (`NULL_ID`) if the id space is exhausted. The buffer never moves for the lifetime of the id, so a pointer from [`ptr_of`] stays valid until [`dealloc_bytes`] — suitable for exposing as a contiguous numeric typed array on the JS side."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import alloc_bytes from @migaia/wasm, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use alloc_bytes when its function contract and declared inputs match the result you need. Choose a different public symbol when alloc_bytes does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for alloc_bytes."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for alloc_bytes."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/wasm/src/wasm_provider.d.ts:alloc_bytes:export function alloc_bytes(byte_len: number): number;",
+          "guidance": [],
+          "usageScore": 26,
+          "configuration": [],
+          "fragment": "wasm-index--alloc_bytes"
+        },
+        {
+          "name": "byte_len_of",
+          "kind": "function",
+          "signature": "export function byte_len_of(id: number): number;",
+          "declarationLine": 43,
+          "source": "packages/wasm/src/wasm_provider.d.ts",
+          "purpose": "Capacity in bytes actually backing `id` (rounded up to 8), or 0 if unknown. Lets JS size a `Float64Array`/`BigInt64Array` view without guessing.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for byte_len_of.",
+          "advanced": "No additional advanced behavior is declared for byte_len_of.",
+          "parameters": ["id: number"],
+          "parameterDetails": [
+            {
+              "name": "id",
+              "type": "number",
+              "optional": false
+            }
+          ],
+          "returns": "number",
+          "errors": ["No documented errors are declared for byte_len_of."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for byte_len_of.",
+          "examples": [],
+          "exportPath": ".",
+          "overloadSignatures": ["export function byte_len_of(id: number): number;"],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "id",
+                "type": "number",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["number"],
+          "whenToUse": "Use byte_len_of when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when byte_len_of does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Capacity in bytes actually backing `id` (rounded up to 8), or 0 if unknown. Lets JS size a `Float64Array`/`BigInt64Array` view without guessing."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import byte_len_of from @migaia/wasm, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use byte_len_of when its function contract and declared inputs match the result you need. Choose a different public symbol when byte_len_of does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for byte_len_of."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for byte_len_of."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/wasm/src/wasm_provider.d.ts:byte_len_of:export function byte_len_of(id: number): number;",
+          "guidance": [],
+          "usageScore": 14,
+          "configuration": [],
+          "fragment": "wasm-index--byte_len_of"
+        },
+        {
+          "name": "ConversionResult",
+          "kind": "class",
+          "signature": "export class ConversionResult { private constructor(); free(): void; [Symbol.dispose](): void; /** * Empty on success, otherwise the operation-specific failure reason. */ readonly error: string; /** * Allocation id containing the conversion output, or zero on failure. */ readonly id: number; /** * Exact output byte length; zero on failure. */ readonly len: number; }",
+          "declarationLine": 11,
+          "source": "packages/wasm/src/wasm_provider.d.ts",
+          "purpose": "Metadata returned by one conversion operation. Keeping the output id, exact byte length, and error on the same value makes each conversion self-contained. Re-entrant callers cannot observe a later operation's result through global side channels.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ConversionResult.",
+          "advanced": "No additional advanced behavior is declared for ConversionResult.",
+          "parameters": ["This class declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this class.",
+          "errors": ["No documented errors are declared for ConversionResult."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ConversionResult.",
+          "examples": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export class ConversionResult { private constructor(); free(): void; [Symbol.dispose](): void; /** * Empty on success, otherwise the operation-specific failure reason. */ readonly error: string; /** * Allocation id containing the conversion output, or zero on failure. */ readonly id: number; /** * Exact output byte length; zero on failure. */ readonly len: number; }"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ConversionResult when its class contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ConversionResult does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Metadata returned by one conversion operation. Keeping the output id, exact byte length, and error on the same value makes each conversion self-contained. Re-entrant callers cannot observe a later operation's result through global side channels."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ConversionResult from @migaia/wasm, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ConversionResult when its class contract and declared inputs match the result you need. Choose a different public symbol when ConversionResult does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained class example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ConversionResult."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ConversionResult."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/wasm/src/wasm_provider.d.ts:ConversionResult:export class ConversionResult { private constructor(); free(): void; [Symbol.dispose](): void; /** * Empty on success, otherwise the operation-specific failure reason. */ readonly error: string; /** * Allocation id containing the conversion output, or zero on failure. */ readonly id: number; /** * Exact output byte length; zero on failure. */ readonly len: number; }",
+          "guidance": [],
+          "usageScore": 32,
+          "configuration": [],
+          "fragment": "wasm-index--ConversionResult"
+        },
+        {
+          "name": "dealloc_bytes",
+          "kind": "function",
+          "signature": "export function dealloc_bytes(id: number): boolean;",
+          "declarationLine": 48,
+          "source": "packages/wasm/src/wasm_provider.d.ts",
+          "purpose": "Free the allocation. Returns `true` if it existed.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for dealloc_bytes.",
+          "advanced": "No additional advanced behavior is declared for dealloc_bytes.",
+          "parameters": ["id: number"],
+          "parameterDetails": [
+            {
+              "name": "id",
+              "type": "number",
+              "optional": false
+            }
+          ],
+          "returns": "boolean",
+          "errors": ["No documented errors are declared for dealloc_bytes."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for dealloc_bytes.",
+          "examples": [
+            "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }));\nconst inputId = wasm.alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json);\n\nconst encoded = wasm.json_to_msgpack(inputId, json.length);\nif (encoded.id === 0) {\n  wasm.dealloc_bytes(inputId);\n  throw new Error(encoded.error);\n}\nconst packed = new Uint8Array(\n  wasm.memory.buffer,\n  wasm.ptr_of(encoded.id),\n  encoded.len\n).slice();\nwasm.dealloc_bytes(inputId);\nwasm.dealloc_bytes(encoded.id);",
+            "const wasm = await init();\nconst input = alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json);\n\nconst result = json_to_msgpack(input, json.length);\nif (result.id === 0) throw new Error(result.error);\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice();\n\ndealloc_bytes(input);\ndealloc_bytes(result.id);"
+          ],
+          "exportPath": ".",
+          "overloadSignatures": ["export function dealloc_bytes(id: number): boolean;"],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "id",
+                "type": "number",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["boolean"],
+          "whenToUse": "Use dealloc_bytes when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when dealloc_bytes does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Free the allocation. Returns `true` if it existed."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import dealloc_bytes from @migaia/wasm, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use dealloc_bytes when its function contract and declared inputs match the result you need. Choose a different public symbol when dealloc_bytes does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for dealloc_bytes."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for dealloc_bytes."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/wasm/src/wasm_provider.d.ts:dealloc_bytes:export function dealloc_bytes(id: number): boolean;",
+          "guidance": [],
+          "usageScore": 36,
+          "configuration": [],
+          "fragment": "wasm-index--dealloc_bytes"
+        },
+        {
+          "name": "InitInput",
+          "kind": "type",
+          "signature": "export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;",
+          "declarationLine": 77,
+          "source": "packages/wasm/src/wasm_provider.d.ts",
+          "purpose": "InitInput is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for InitInput.",
+          "advanced": "No additional advanced behavior is declared for InitInput.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for InitInput."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for InitInput.",
+          "examples": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use InitInput when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when InitInput does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "InitInput is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import InitInput from @migaia/wasm, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use InitInput when its type contract and declared inputs match the result you need. Choose a different public symbol when InitInput does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for InitInput."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for InitInput."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/wasm/src/wasm_provider.d.ts:InitInput:export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "wasm-index--InitInput"
+        },
+        {
+          "name": "InitOutput",
+          "kind": "interface",
+          "signature": "export interface InitOutput { readonly memory: WebAssembly.Memory; readonly __wbg_conversionresult_free: (a: number, b: number) => void; readonly alloc_bytes: (a: number) => number; readonly byte_len_of: (a: number) => number; readonly conversionresult_error: (a: number) => [number, number]; readonly conversionresult_id: (a: number) => number; readonly conversionresult_len: (a: number) => number; readonly dealloc_bytes: (a: number) => number; readonly json_to_msgpack: (a: number, b: number) => number; readonly msgpack_to_json: (a: number, b: number) => number; readonly ptr_of: (a: number) => number; readonly __wbindgen_externrefs: WebAssembly.Table; readonly __wbindgen_free: (a: number, b: number, c: number) => void; readonly __wbindgen_start: () => void; }",
+          "declarationLine": 79,
+          "source": "packages/wasm/src/wasm_provider.d.ts",
+          "purpose": "InitOutput is part of this module's public interface contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for InitOutput.",
+          "advanced": "No additional advanced behavior is declared for InitOutput.",
+          "parameters": ["This interface declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this interface.",
+          "errors": ["No documented errors are declared for InitOutput."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for InitOutput.",
+          "examples": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export interface InitOutput { readonly memory: WebAssembly.Memory; readonly __wbg_conversionresult_free: (a: number, b: number) => void; readonly alloc_bytes: (a: number) => number; readonly byte_len_of: (a: number) => number; readonly conversionresult_error: (a: number) => [number, number]; readonly conversionresult_id: (a: number) => number; readonly conversionresult_len: (a: number) => number; readonly dealloc_bytes: (a: number) => number; readonly json_to_msgpack: (a: number, b: number) => number; readonly msgpack_to_json: (a: number, b: number) => number; readonly ptr_of: (a: number) => number; readonly __wbindgen_externrefs: WebAssembly.Table; readonly __wbindgen_free: (a: number, b: number, c: number) => void; readonly __wbindgen_start: () => void; }"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use InitOutput when its interface contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when InitOutput does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "InitOutput is part of this module's public interface contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import InitOutput from @migaia/wasm, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use InitOutput when its interface contract and declared inputs match the result you need. Choose a different public symbol when InitOutput does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained interface example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for InitOutput."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for InitOutput."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/wasm/src/wasm_provider.d.ts:InitOutput:export interface InitOutput { readonly memory: WebAssembly.Memory; readonly __wbg_conversionresult_free: (a: number, b: number) => void; readonly alloc_bytes: (a: number) => number; readonly byte_len_of: (a: number) => number; readonly conversionresult_error: (a: number) => [number, number]; readonly conversionresult_id: (a: number) => number; readonly conversionresult_len: (a: number) => number; readonly dealloc_bytes: (a: number) => number; readonly json_to_msgpack: (a: number, b: number) => number; readonly msgpack_to_json: (a: number, b: number) => number; readonly ptr_of: (a: number) => number; readonly __wbindgen_externrefs: WebAssembly.Table; readonly __wbindgen_free: (a: number, b: number, c: number) => void; readonly __wbindgen_start: () => void; }",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "wasm-index--InitOutput"
+        },
+        {
+          "name": "initSync",
+          "kind": "function",
+          "signature": "export function initSync(module: { module: SyncInitInput } | SyncInitInput): InitOutput;",
+          "declarationLine": 106,
+          "source": "packages/wasm/src/wasm_provider.d.ts",
+          "purpose": "Instantiates the given `module`, which can either be bytes or a precompiled `WebAssembly.Module`. @param {{ module: SyncInitInput }} module - Passing `SyncInitInput` directly is deprecated. @returns {InitOutput}",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for initSync.",
+          "advanced": "No additional advanced behavior is declared for initSync.",
+          "parameters": ["module: { module: SyncInitInput } | SyncInitInput"],
+          "parameterDetails": [
+            {
+              "name": "module",
+              "type": "{ module: SyncInitInput } | SyncInitInput",
+              "optional": false
+            }
+          ],
+          "returns": "InitOutput",
+          "errors": ["No documented errors are declared for initSync."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for initSync.",
+          "examples": [
+            "import init, { initSync } from '@migaia/wasm';\n\nconst wasm = await init();\n// 或：const wasm = initSync(moduleOrBytes);"
+          ],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export function initSync(module: { module: SyncInitInput } | SyncInitInput): InitOutput;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "module",
+                "type": "{ module: SyncInitInput } | SyncInitInput",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["InitOutput"],
+          "whenToUse": "Use initSync when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when initSync does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Instantiates the given `module`, which can either be bytes or a precompiled `WebAssembly.Module`. @param {{ module: SyncInitInput }} module - Passing `SyncInitInput` directly is deprecated. @returns {InitOutput}"
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import initSync from @migaia/wasm, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use initSync when its function contract and declared inputs match the result you need. Choose a different public symbol when initSync does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for initSync."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for initSync."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/wasm/src/wasm_provider.d.ts:initSync:export function initSync(module: { module: SyncInitInput } | SyncInitInput): InitOutput;",
+          "guidance": [],
+          "usageScore": 14,
+          "configuration": [],
+          "fragment": "wasm-index--initSync"
+        },
+        {
+          "name": "json_to_msgpack",
+          "kind": "function",
+          "signature": "export function json_to_msgpack(id: number, len: number): ConversionResult;",
+          "declarationLine": 62,
+          "source": "packages/wasm/src/wasm_provider.d.ts",
+          "purpose": "json_to_msgpack is part of this module's public function contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for json_to_msgpack.",
+          "advanced": "No additional advanced behavior is declared for json_to_msgpack.",
+          "parameters": ["id: number", "len: number"],
+          "parameterDetails": [
+            {
+              "name": "id",
+              "type": "number",
+              "optional": false
+            },
+            {
+              "name": "len",
+              "type": "number",
+              "optional": false
+            }
+          ],
+          "returns": "ConversionResult",
+          "errors": ["No documented errors are declared for json_to_msgpack."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for json_to_msgpack.",
+          "examples": [
+            "type ConversionResult = {\n  readonly id: number;\n  readonly len: number;\n  readonly error: string;\n};\n\njson_to_msgpack(id: number, len: number): ConversionResult;\nmsgpack_to_json(id: number, len: number): ConversionResult;",
+            "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }));\nconst inputId = wasm.alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json);\n\nconst encoded = wasm.json_to_msgpack(inputId, json.length);\nif (encoded.id === 0) {\n  wasm.dealloc_bytes(inputId);\n  throw new Error(encoded.error);\n}\nconst packed = new Uint8Array(\n  wasm.memory.buffer,\n  wasm.ptr_of(encoded.id),\n  encoded.len\n).slice();\nwasm.dealloc_bytes(inputId);\nwasm.dealloc_bytes(encoded.id);",
+            "const wasm = await init();\nconst input = alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json);\n\nconst result = json_to_msgpack(input, json.length);\nif (result.id === 0) throw new Error(result.error);\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice();\n\ndealloc_bytes(input);\ndealloc_bytes(result.id);"
+          ],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export function json_to_msgpack(id: number, len: number): ConversionResult;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "id",
+                "type": "number",
+                "optional": false
+              },
+              {
+                "name": "len",
+                "type": "number",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["ConversionResult"],
+          "whenToUse": "Use json_to_msgpack when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when json_to_msgpack does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "json_to_msgpack is part of this module's public function contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import json_to_msgpack from @migaia/wasm, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use json_to_msgpack when its function contract and declared inputs match the result you need. Choose a different public symbol when json_to_msgpack does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for json_to_msgpack."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for json_to_msgpack."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/wasm/src/wasm_provider.d.ts:json_to_msgpack:export function json_to_msgpack(id: number, len: number): ConversionResult;",
+          "guidance": [],
+          "usageScore": 26,
+          "configuration": [],
+          "fragment": "wasm-index--json_to_msgpack"
+        },
+        {
+          "name": "msgpack_to_json",
+          "kind": "function",
+          "signature": "export function msgpack_to_json(id: number, len: number): ConversionResult;",
+          "declarationLine": 67,
+          "source": "packages/wasm/src/wasm_provider.d.ts",
+          "purpose": "MessagePack bytes in, JSON bytes out. Returns operation-bound output metadata.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for msgpack_to_json.",
+          "advanced": "No additional advanced behavior is declared for msgpack_to_json.",
+          "parameters": ["id: number", "len: number"],
+          "parameterDetails": [
+            {
+              "name": "id",
+              "type": "number",
+              "optional": false
+            },
+            {
+              "name": "len",
+              "type": "number",
+              "optional": false
+            }
+          ],
+          "returns": "ConversionResult",
+          "errors": ["No documented errors are declared for msgpack_to_json."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for msgpack_to_json.",
+          "examples": [
+            "type ConversionResult = {\n  readonly id: number;\n  readonly len: number;\n  readonly error: string;\n};\n\njson_to_msgpack(id: number, len: number): ConversionResult;\nmsgpack_to_json(id: number, len: number): ConversionResult;"
+          ],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export function msgpack_to_json(id: number, len: number): ConversionResult;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "id",
+                "type": "number",
+                "optional": false
+              },
+              {
+                "name": "len",
+                "type": "number",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["ConversionResult"],
+          "whenToUse": "Use msgpack_to_json when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when msgpack_to_json does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "MessagePack bytes in, JSON bytes out. Returns operation-bound output metadata."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import msgpack_to_json from @migaia/wasm, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use msgpack_to_json when its function contract and declared inputs match the result you need. Choose a different public symbol when msgpack_to_json does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for msgpack_to_json."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for msgpack_to_json."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/wasm/src/wasm_provider.d.ts:msgpack_to_json:export function msgpack_to_json(id: number, len: number): ConversionResult;",
+          "guidance": [],
+          "usageScore": 22,
+          "configuration": [],
+          "fragment": "wasm-index--msgpack_to_json"
+        },
+        {
+          "name": "ptr_of",
+          "kind": "function",
+          "signature": "export function ptr_of(id: number): number;",
+          "declarationLine": 75,
+          "source": "packages/wasm/src/wasm_provider.d.ts",
+          "purpose": "Byte pointer into wasm linear memory for `id`. Guaranteed 8-byte aligned. Returns `0` for an unknown/dead id instead of trapping, so a stale handle is recoverable on the JS side rather than aborting the module.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ptr_of.",
+          "advanced": "No additional advanced behavior is declared for ptr_of.",
+          "parameters": ["id: number"],
+          "parameterDetails": [
+            {
+              "name": "id",
+              "type": "number",
+              "optional": false
+            }
+          ],
+          "returns": "number",
+          "errors": ["No documented errors are declared for ptr_of."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ptr_of.",
+          "examples": [
+            "const json = new TextEncoder().encode(JSON.stringify({ role: 'user', tokens: 12 }));\nconst inputId = wasm.alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, wasm.ptr_of(inputId), json.length).set(json);\n\nconst encoded = wasm.json_to_msgpack(inputId, json.length);\nif (encoded.id === 0) {\n  wasm.dealloc_bytes(inputId);\n  throw new Error(encoded.error);\n}\nconst packed = new Uint8Array(\n  wasm.memory.buffer,\n  wasm.ptr_of(encoded.id),\n  encoded.len\n).slice();\nwasm.dealloc_bytes(inputId);\nwasm.dealloc_bytes(encoded.id);",
+            "const wasm = await init();\nconst input = alloc_bytes(json.length);\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json);\n\nconst result = json_to_msgpack(input, json.length);\nif (result.id === 0) throw new Error(result.error);\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice();\n\ndealloc_bytes(input);\ndealloc_bytes(result.id);"
+          ],
+          "exportPath": ".",
+          "overloadSignatures": ["export function ptr_of(id: number): number;"],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "id",
+                "type": "number",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["number"],
+          "whenToUse": "Use ptr_of when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ptr_of does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Byte pointer into wasm linear memory for `id`. Guaranteed 8-byte aligned. Returns `0` for an unknown/dead id instead of trapping, so a stale handle is recoverable on the JS side rather than aborting the module."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ptr_of from @migaia/wasm, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ptr_of when its function contract and declared inputs match the result you need. Choose a different public symbol when ptr_of does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ptr_of."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ptr_of."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/wasm/src/wasm_provider.d.ts:ptr_of:export function ptr_of(id: number): number;",
+          "guidance": [],
+          "usageScore": 32,
+          "configuration": [],
+          "fragment": "wasm-index--ptr_of"
+        },
+        {
+          "name": "SyncInitInput",
+          "kind": "type",
+          "signature": "export type SyncInitInput = BufferSource | WebAssembly.Module;",
+          "declarationLine": 96,
+          "source": "packages/wasm/src/wasm_provider.d.ts",
+          "purpose": "SyncInitInput is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for SyncInitInput.",
+          "advanced": "No additional advanced behavior is declared for SyncInitInput.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for SyncInitInput."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for SyncInitInput.",
+          "examples": [],
+          "exportPath": ".",
+          "overloadSignatures": ["export type SyncInitInput = BufferSource | WebAssembly.Module;"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use SyncInitInput when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when SyncInitInput does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "SyncInitInput is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import SyncInitInput from @migaia/wasm, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use SyncInitInput when its type contract and declared inputs match the result you need. Choose a different public symbol when SyncInitInput does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for SyncInitInput."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for SyncInitInput."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/wasm/src/wasm_provider.d.ts:SyncInitInput:export type SyncInitInput = BufferSource | WebAssembly.Module;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "wasm-index--SyncInitInput"
+        }
+      ],
+      "aliases": []
+    }
+  ]
+}

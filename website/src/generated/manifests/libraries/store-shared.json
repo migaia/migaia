@@ -1,0 +1,2485 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "store-shared",
+    "description": "SharedArrayBuffer and Atomics-backed Store state.",
+    "version": "0.0.1",
+    "exports": ["."],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "migaia-store-shared",
+            "heading": "@migaia/store-shared",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "基于 `SharedArrayBuffer` + `Atomics` 的跨线程响应式整数状态：把一段共享内存包装成 `@migaia/reactive` 认识的 `IObservable`（seqlock 保证并发读写正确，脏页 bitmap 保证大数组稀疏同步不掉性能），让主线程与 Worker、或多个独立的 `Runtime`，可以直接共享同一份数据而不必靠 `postMessage` 做结构化克隆。"
+              }
+            ]
+          },
+          {
+            "id": "适用与不适用场景",
+            "heading": "适用与不适用场景",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "适用：主线程与 Worker（或多个 `Runtime`）需要共享少量、定长、`int32` 范围内的数值状态，并希望这份状态像普通 `@migaia/reactive` 的 `Signal` 一样能被 `Effect`/`Computed` 自动追踪、写入自动通知。典型场景：渲染循环里的坐标/计数器/状态标志位、成百上千个下标各自独立变化的大数组（比如批量实体的位置）、需要 `Atomics.waitAsync` 推送而不是轮询的低延迟跨线程通知。"
+              },
+              {
+                "type": "paragraph",
+                "text": "不适用：不要把它当作通用状态管理方案或对象/字符串的跨线程传输通道——它只支持固定布局的 `int32` 数值（单格或定长数组），不能存字符串、对象、嵌套结构；真要跨线程传对象图，用 `structuredClone`/`postMessage` 或专门的序列化协议。两端在同一个线程里、不需要 `SharedArrayBuffer` 时，用普通的 `@migaia/reactive` `Signal` 就够了。跨线程但只是偶尔通知一下、数据量小、延迟不敏感的场景，`postMessage` 往往比上共享内存更简单。"
+              }
+            ]
+          },
+          {
+            "id": "安装",
+            "heading": "安装",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "bash",
+                "code": "pnpm add @migaia/store-shared"
+              },
+              {
+                "type": "paragraph",
+                "text": "依赖 `@migaia/reactive`（随本包一并安装）；使用前需要先有一个 `Runtime`（`@migaia/reactive` 的 `createRuntime()`）。"
+              }
+            ]
+          },
+          {
+            "id": "目录",
+            "heading": "目录",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "共享信号：`SharedInt32Signal` / `sharedInt32`",
+                  "共享数组：`SharedInt32Array` / `sharedInt32Array`",
+                  "等待模式常量：`SharedWaitMode`",
+                  "错误身份：`StoreSharedErrorCode` / `STORE_SHARED_SOURCE` / `createStoreSharedError` / `createStoreSharedRangeError`",
+                  "高阶组合示例",
+                  "构建门禁"
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "完整签名、seqlock/脏页 bitmap 的内部机制、错误一览表，见 USEGUIDE.md。"
+              }
+            ]
+          },
+          {
+            "id": "共享信号-sharedint32signal-sharedint32",
+            "heading": "共享信号：SharedInt32Signal / sharedInt32",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { sharedInt32, SharedInt32Signal } from '@migaia/store-shared';\nimport { createRuntime, Effect } from '@migaia/reactive';"
+              },
+              {
+                "type": "paragraph",
+                "text": "`sharedInt32`｜5 秒上手 —— 新建一个单值共享 int32，像普通 `Signal` 一样在 `Effect` 里被自动追踪："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "const runtime = createRuntime();\nconst counter = sharedInt32(runtime, 0);\n\nconst stop = new Effect(() => console.log('counter =', counter.value), runtime);\ncounter.value = 1; // 本地写入，Effect 自动重跑\n\nstop.dispose();\ncounter.dispose();"
+              },
+              {
+                "type": "paragraph",
+                "text": "全部参数（等价于 `new SharedInt32Signal(runtime, initialValue?, buffer?)`）："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "`runtime: IRuntime`（必填）—— 该信号归属的 `Runtime`；构造时登记归属，同一实例不能改属另一个 `Runtime`",
+                  "`initialValue?: number`（默认 `0`）—— 新建 buffer 时写入的初始值，必须是合法 `int32`；传了 `buffer` 时此参数被忽略（数据已经在那块内存里，不会被覆盖）",
+                  "`buffer?: SharedArrayBuffer`（默认新建一块 8 字节的 buffer）—— 传入已有 buffer 表示\"附着\"到另一个实例正在使用的内存，此后两边读写同一份数据；不是 `SharedArrayBuffer` 抛 `TypeError`（`invalidOption`）；小于所需的 8 字节抛 `RangeError`（`bufferTooSmall`）"
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "`SharedInt32Signal` 实例上的全部成员："
+              },
+              {
+                "type": "table",
+                "headers": ["成员", "签名", "说明"],
+                "rows": [
+                  ["`runtime`", "只读字段 `IRuntime`", "构造时传入的 `Runtime`"],
+                  [
+                    "`buffer`",
+                    "只读字段 `SharedArrayBuffer`",
+                    "底层共享内存，传给另一个线程/`Runtime` 即可共享"
+                  ],
+                  ["`disposed`", "getter `boolean`", "是否已 `dispose()`"],
+                  [
+                    "`version`",
+                    "getter `number`",
+                    "该节点在所属 `Runtime` 响应式图里的版本号（不是共享内存里的 seq）"
+                  ],
+                  [
+                    "`value`",
+                    "getter/setter `number`",
+                    "读：一致读 + 拉取远端更新 + 依赖追踪；写：写入合法 `int32`，值未变则静默跳过、不通知"
+                  ],
+                  [
+                    "`peek()`",
+                    "`() => number`",
+                    "读当前本地已知值，不触发依赖追踪、不主动拉取远端更新"
+                  ],
+                  [
+                    "`sync()`",
+                    "`() => boolean`",
+                    "主动检查远端版本号是否变化，变了则更新本地记录并通知观察者，返回是否发生变化"
+                  ],
+                  [
+                    "`watch()`",
+                    "`() => IDisposer`",
+                    "起一条基于 `Atomics.waitAsync` 的自动唤醒回路；重复调用返回同一个停止函数；环境不支持 `waitAsync` 时抛 `Error`（`envUnsupported`）"
+                  ],
+                  [
+                    "`dispose()`",
+                    "`() => void`",
+                    "停止 `watch()`、从响应式图断开；幂等；之后调用其他成员会抛 `Error`（`signalDisposed`）"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "共享数组-sharedint32array-sharedint32array",
+            "heading": "共享数组：SharedInt32Array / sharedInt32Array",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { sharedInt32Array, SharedInt32Array } from '@migaia/store-shared';\nimport { createRuntime, Effect } from '@migaia/reactive';"
+              },
+              {
+                "type": "paragraph",
+                "text": "`sharedInt32Array`｜10 秒上手 —— 定长共享 int32 数组，每个下标独立追踪、独立通知："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "const runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000, { initialValues: [0, 0] });\n\nconst render = new Effect(() => {\n  drawEntity(positions.get(0), positions.get(1)); // 只追踪被读取的下标\n}, runtime);\n\npositions.set(0, 10); // 只惊动依赖下标 0 的观察者\npositions.update(1, (y) => y + 1); // 读-改-写，内部 CAS 重试\n\nrender.dispose();\npositions.dispose();"
+              },
+              {
+                "type": "paragraph",
+                "text": "全部参数（等价于 `new SharedInt32Array(runtime, length, options?)`）："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "`runtime: IRuntime`（必填）—— 归属的 `Runtime`",
+                  "`length: number`（必填）—— 数组长度，必须是非负整数，否则抛 `RangeError`（`invalidOption`）；换算出的所需 slot 数超过 `Int32Array` 下标空间上限会抛 `RangeError`（`invalidOption`）",
+                  "`options?.buffer?: SharedArrayBuffer`（默认新建一块按 `length` 计算大小的 buffer）—— 附着到已有 buffer；不是 `SharedArrayBuffer` 抛 `TypeError`（`invalidOption`）；小于所需大小抛 `RangeError`（`bufferTooSmall`）；传了此项时 `initialValues` 被忽略",
+                  "`options?.initialValues?: Iterable<number>`（默认无）—— 仅在新建 buffer 时生效，按顺序写入前 N 个下标（超过 `length` 的部分被丢弃），每个值都要求是合法 `int32`",
+                  "`options` 本身必须是对象（`undefined` 会取默认值 `{}`；显式传 `null` 或非对象会抛 `TypeError`，`invalidOption`）"
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "`SharedInt32Array` 实例上的全部成员："
+              },
+              {
+                "type": "table",
+                "headers": ["成员", "签名", "说明"],
+                "rows": [
+                  ["`runtime`", "只读字段 `IRuntime`", "归属的 `Runtime`"],
+                  ["`buffer`", "只读字段 `SharedArrayBuffer`", "底层共享内存"],
+                  ["`length`", "只读字段 `number`", "数组长度，构造后不可变"],
+                  ["`disposed`", "getter `boolean`", "是否已 `dispose()`"],
+                  [
+                    "`get(index)`",
+                    "`(index: number) => number`",
+                    "读取下标；在依赖追踪上下文（`Effect`/`Computed` 内）中会为该下标物化响应式 cell 并登记依赖，上下文外走轻量直读路径"
+                  ],
+                  [
+                    "`set(index, value)`",
+                    "`(index: number, value: number) => void`",
+                    "写入合法 `int32`；值未变则跳过写入与通知"
+                  ],
+                  [
+                    "`update(index, updater)`",
+                    "`(index: number, updater: (current: number) => number) => number`",
+                    "读-改-写：`updater` 在锁外执行、CAS 提交，冲突自动重试；返回写入后的新值"
+                  ],
+                  [
+                    "`sync(index?)`",
+                    "`(index?: number) => number`",
+                    "不传 `index`：批量扫描脏页，返回本轮实际变化的下标个数；传 `index`：只检查该下标，返回 `0`/`1`"
+                  ],
+                  [
+                    "`watch()`",
+                    "`() => IDisposer`",
+                    "起一条覆盖整个数组的 `Atomics.waitAsync` 唤醒回路；重复调用返回同一个停止函数"
+                  ],
+                  [
+                    "`snapshot()`",
+                    "`() => Int32Array`",
+                    "一次性读出全部下标当前值，返回一个新分配的、非共享的 `Int32Array` 拷贝"
+                  ],
+                  [
+                    "`prune()`",
+                    "`() => number`",
+                    "释放当前没有任何观察者的已物化响应式 cell，返回释放个数"
+                  ],
+                  [
+                    "`dispose()`",
+                    "`() => void`",
+                    "停止 `watch()`、断开全部已物化 cell；幂等；之后调用其他成员会抛 `Error`（`arrayDisposed`）"
+                  ],
+                  [
+                    "`assertActive()`",
+                    "`() => void`",
+                    "已释放则抛 `Error`（`arrayDisposed`）；一般不需要业务代码直接调用"
+                  ],
+                  [
+                    "`readCell(index)`",
+                    "`(index: number) => { value: number; version: number }`",
+                    "一致读某一格的原始 value/version，绕过响应式追踪与下标校验；供组合式底层用法使用"
+                  ],
+                  [
+                    "`writeCell(index, value, expected?)`",
+                    "`(index, value, expected?) => number \\",
+                    "undefined`",
+                    "底层写入原语（`set`/`update` 基于它实现），返回新版本或 `undefined`（未写入）"
+                  ],
+                  [
+                    "`notifyWaiters()`",
+                    "`() => void`",
+                    "推进头部 epoch 并唤醒挂起的 `watch()` 回路"
+                  ],
+                  [
+                    "`recordObservedVersion(index, version)`",
+                    "`(index: number, version: number) => void`",
+                    "更新数组级\"已观察版本\"记账，供自定义组合场景对齐本地 cell 与数组级 `sync()` 的状态"
+                  ]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "`get`/`set`/`update`/`sync(index)` 对越界或非整数下标一律抛 `RangeError`（`indexOutOfRange`）。"
+              }
+            ]
+          },
+          {
+            "id": "等待模式常量-sharedwaitmode",
+            "heading": "等待模式常量：SharedWaitMode",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { SharedWaitMode, type ISharedWaitMode } from '@migaia/store-shared';"
+              },
+              {
+                "type": "paragraph",
+                "text": "`SharedWaitMode`｜3 秒上手 —— 稳定的等待模式标识常量，供类型标注/比较使用（单参数，无调用形式，是一个常量对象）："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "function describeWaitMode(mode: ISharedWaitMode): string {\n  return mode === SharedWaitMode.async ? '基于 Atomics.waitAsync 的异步唤醒' : mode;\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "全部取值：`async`(`'async'`) —— 目前是唯一取值，对应 `watch()` 内部使用的 `Atomics.waitAsync` 唤醒策略；不作为任何导出函数的入参/返回值传递，仅供调用方在自己的类型标注、日志或诊断代码里稳定地引用这一模式名。`ISharedWaitMode` 是其取值的联合类型（目前等价于字面量类型 `'async'`）。"
+              }
+            ]
+          },
+          {
+            "id": "错误身份-storesharederrorcode-store-shared-source-createstoresharederror-createstoresharedrangeerror",
+            "heading": "错误身份：StoreSharedErrorCode / STORE_SHARED_SOURCE / createStoreSharedError / createStoreSharedRangeError",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import {\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';"
+              },
+              {
+                "type": "paragraph",
+                "text": "`StoreSharedErrorCode`｜3 秒上手 —— 稳定错误码表，用于 `switch`/比较（无调用形式，是一个常量对象）："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "try {\n  counter.value = 1;\n} catch (error) {\n  if ((error as { code?: string }).code === StoreSharedErrorCode.signalDisposed) {\n    // 信号已释放，需要重新 attach 到同一个 buffer 创建新实例\n  }\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "全部取值（本包内部抛出的每一个错误都会带上其中之一作为 `code` 字段）："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "`arrayDisposed`(`'ARRAY_DISPOSED'`) —— `SharedInt32Array` 已 `dispose()` 后继续读写；调用方应新建数组，不要复用已释放实例",
+                  "`signalDisposed`(`'SIGNAL_DISPOSED'`) —— `SharedInt32Signal` 已 `dispose()` 后继续读写；同上，新建 signal",
+                  "`bufferTooSmall`(`'BUFFER_TOO_SMALL'`) —— 传入的 `SharedArrayBuffer` 太小，放不下要求的 cell 布局；调用方应分配更大的 buffer，这是构造期参数错误，不要重试同一 buffer",
+                  "`indexOutOfRange`(`'INDEX_OUT_OF_RANGE'`) —— `SharedInt32Array` 下标越界；调用方检查下标是否在 `[0, length)`，这是永久性参数错误",
+                  "`contentionLimit`(`'CONTENTION_LIMIT'`) —— Seqlock 在自旋上限内未 settle（cell 未稳定/锁未获取/`update` 持续失败）；通常是某个写者持锁期间崩溃留下的死锁，无法自愈，调用方应重建 buffer",
+                  "`envUnsupported`(`'ENV_UNSUPPORTED'`) —— `Atomics.waitAsync` 在当前环境不可用；调用方改用 `sync()` 自行拉取，或换支持 `waitAsync` 的运行时，库不做静默降级",
+                  "`invalidOption`(`'INVALID_OPTION'`) —— 构造/写入口参非法（长度非负整数、int32 范围等）；调用方修正入参，这是永久性参数错误"
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "`IStoreSharedErrorCode` 是其取值的联合类型。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`STORE_SHARED_SOURCE`｜3 秒上手 —— 本包所有错误统一携带的 `source` 值（字符串常量，无调用形式）："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "STORE_SHARED_SOURCE; // '@migaia/store-shared'"
+              },
+              {
+                "type": "paragraph",
+                "text": "`createStoreSharedError`｜5 秒上手 —— 构造一个带 `(source, code)` 身份标记的 `Error`（用于组合本包之上的自定义封装时，抛出与本包同一套身份契约的错误）："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "throw createStoreSharedError(\n  StoreSharedErrorCode.invalidOption,\n  'entity slot must be preallocated'\n);"
+              },
+              {
+                "type": "paragraph",
+                "text": "全部参数：`code: IStoreSharedErrorCode`（必填）、`message: string`（必填）、`options?: { readonly cause?: unknown }`（可选，透传给 `Error` 构造函数的 `cause`）。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`createStoreSharedRangeError`｜5 秒上手 —— 与上面相同，但构造 `RangeError`（本包自身校验入参失败时用的就是它）："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "throw createStoreSharedRangeError(StoreSharedErrorCode.invalidOption, 'length must be >= 0');"
+              },
+              {
+                "type": "paragraph",
+                "text": "参数与 `createStoreSharedError` 完全一致，唯一区别是返回的运行时类型是 `RangeError`。"
+              }
+            ]
+          },
+          {
+            "id": "1-主线程-worker-共享数组-自动推送-优雅关闭",
+            "heading": "1. 主线程 + Worker：共享数组、自动推送、优雅关闭",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "// main.ts\nimport { createRuntime, Effect } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nconst runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000); // 500 个实体的 x/y\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nworker.postMessage({ buffer: positions.buffer });\n\nconst stopWatch = positions.watch(); // worker 的写入自动推送进来\nconst render = new Effect(() => drawEntity(0, positions.get(0), positions.get(1)), runtime);\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose();\n  stopWatch();\n  positions.dispose();\n  worker.terminate();\n});"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "// worker.ts\nimport { createRuntime } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nself.onmessage = (event: MessageEvent<{ buffer: SharedArrayBuffer }>) => {\n  const runtime = createRuntime();\n  const positions = sharedInt32Array(runtime, 1000, { buffer: event.data.buffer });\n  setInterval(() => positions.update(0, (x) => x + 1), 16);\n};"
+              }
+            ]
+          },
+          {
+            "id": "2-不支持-atomics-waitasync-的环境-手动轮询-错误码分支",
+            "heading": "2. 不支持 Atomics.waitAsync 的环境：手动轮询 + 错误码分支",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { StoreSharedErrorCode, sharedInt32Array } from '@migaia/store-shared';\n\nconst positions = sharedInt32Array(runtime, 1000, { buffer: sharedBuffer });\n\nlet stopWatch: (() => void) | undefined;\ntry {\n  stopWatch = positions.watch();\n} catch (error) {\n  if ((error as { code?: string }).code === StoreSharedErrorCode.envUnsupported) {\n    const timer = setInterval(() => {\n      const changed = positions.sync();\n      if (changed > 0) console.log(`${changed} 个下标发生了远端变化`);\n    }, 100);\n    stopWatch = () => clearInterval(timer);\n  } else {\n    throw error;\n  }\n}"
+              }
+            ]
+          },
+          {
+            "id": "3-单信号跨线程握手-postmessage-只传-buffer-不传对象",
+            "heading": "3. 单信号跨线程握手：postMessage 只传 buffer，不传对象",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createRuntime } from '@migaia/reactive';\nimport { sharedInt32 } from '@migaia/store-shared';\n\nconst mainRuntime = createRuntime();\nconst shared = sharedInt32(mainRuntime, 0);\nworker.postMessage({ buffer: shared.buffer }); // SharedArrayBuffer 可以直接传递，不会被拷贝\n\n// worker 内\nconst workerRuntime = createRuntime();\nconst mirror = sharedInt32(workerRuntime, 0, receivedBuffer); // initialValue 被忽略，附着已有数据\nmirror.watch();"
+              }
+            ]
+          },
+          {
+            "id": "4-高频轮换下标读取-prune-主动回收响应式-cell",
+            "heading": "4. 高频轮换下标读取：prune() 主动回收响应式 cell",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { Effect } from '@migaia/reactive';\n\nconst probe = new Effect(() => {\n  for (let index = 0; index < positions.length; index += 37) {\n    positions.get(index); // 遍历式探测，每次命中不同下标\n  }\n}, runtime);\n\nsetInterval(() => {\n  const removed = positions.prune(); // 清理已无订阅者的 cell，避免累积\n  if (removed > 0) console.log(`released ${removed} idle cells`);\n}, 5000);"
+              }
+            ]
+          },
+          {
+            "id": "5-用-createstoresharedrangeerror-包装上层校验-保持同一套错误身份",
+            "heading": "5. 用 createStoreSharedRangeError 包装上层校验，保持同一套错误身份",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import {\n  StoreSharedErrorCode,\n  createStoreSharedRangeError,\n  sharedInt32Array\n} from '@migaia/store-shared';\n\nfunction createEntityGrid(runtime: IRuntime, entityCount: number) {\n  if (entityCount <= 0) {\n    throw createStoreSharedRangeError(\n      StoreSharedErrorCode.invalidOption,\n      'entityCount must be a positive integer'\n    );\n  }\n  return sharedInt32Array(runtime, entityCount * 2); // 每个实体占 [x, y] 两格\n}"
+              }
+            ]
+          },
+          {
+            "id": "构建门禁",
+            "heading": "构建门禁",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "bash",
+                "code": "pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "migaia-store-shared-使用指南",
+            "heading": "@migaia/store-shared 使用指南",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "本指南逐个导出列出完整签名、边界行为与错误码。包的定位、安装与最小示例见 README.md。"
+              }
+            ]
+          },
+          {
+            "id": "目录",
+            "heading": "目录",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "1. 导入与前置条件 2. `SharedInt32Signal` / `sharedInt32` 完整参考 3. `SharedInt32Array` / `sharedInt32Array` 完整参考 4. `SharedWaitMode` 完整参考 5. 错误身份：`StoreSharedErrorCode` / `STORE_SHARED_SOURCE` / `createStoreSharedError` / `createStoreSharedRangeError` 6. Seqlock：并发读写的正确性保证 7. 跨线程同步：`sync()` 与 `watch()` 8. 脏页 bitmap：`SharedInt32Array` 的稀疏同步 9. 响应式集成细节 10. 错误一览表 11. 生产环境完整示例 12. 常见问题排查 13. 构建、格式化与测试"
+              }
+            ]
+          },
+          {
+            "id": "1-导入与前置条件",
+            "heading": "1. 导入与前置条件",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createRuntime } from '@migaia/reactive';\nimport {\n  sharedInt32,\n  SharedInt32Signal,\n  sharedInt32Array,\n  SharedInt32Array,\n  SharedWaitMode,\n  type ISharedWaitMode,\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';"
+              },
+              {
+                "type": "paragraph",
+                "text": "包只有一个导出入口（`.`），没有子路径划分。`sharedInt32`/`sharedInt32Array` 是推荐的创建方式；`SharedInt32Signal`/`SharedInt32Array` 类本身也导出，供需要 `instanceof` 判断或类型标注的场景使用。"
+              },
+              {
+                "type": "paragraph",
+                "text": "使用前必须先有一个 `@migaia/reactive` 的 `Runtime`（`createRuntime()` 的返回值）——每个共享对象构造时都会向传入的 `Runtime` 登记归属（`claimOwnership`），且构造过程会读取该 `Runtime` 的内部版本时钟（`internalsOf(runtime).clock.next()`）。"
+              },
+              {
+                "type": "paragraph",
+                "text": "运行环境要求：`SharedArrayBuffer` 在浏览器里通常需要页面处于跨源隔离状态（`COOP`/`COEP` 响应头）才可用；Node.js/Bun/Deno 默认可用。`.watch()` 额外要求 `Atomics.waitAsync` 存在，见 §7。"
+              }
+            ]
+          },
+          {
+            "id": "2-1-构造",
+            "heading": "2.1 构造",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "function sharedInt32(\n  runtime: IRuntime,\n  initialValue?: number,\n  buffer?: SharedArrayBuffer\n): SharedInt32Signal;\n\nclass SharedInt32Signal implements IObservable, IDisposable {\n  constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer);\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "`sharedInt32(runtime, initialValue, buffer)` 就是 `new SharedInt32Signal(runtime, initialValue, buffer)` 的薄封装，两者行为完全一致。"
+              },
+              {
+                "type": "table",
+                "headers": ["参数", "类型", "必填性", "默认值", "说明"],
+                "rows": [
+                  [
+                    "`runtime`",
+                    "`IRuntime`",
+                    "必填",
+                    "无",
+                    "该信号归属的 `Runtime`，决定它在哪张响应式图里被追踪、通知"
+                  ],
+                  [
+                    "`initialValue`",
+                    "`number`",
+                    "可选",
+                    "`0`",
+                    "新建 buffer 时写入的初始值，必须是合法 `int32`（见 §6.3）；传了 `buffer` 时此参数被忽略"
+                  ],
+                  [
+                    "`buffer`",
+                    "`SharedArrayBuffer`",
+                    "可选",
+                    "新建一块",
+                    "传入已有 buffer 表示\"附着\"到另一个实例已经在用的那块内存，两边此后读写同一份数据"
+                  ]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "边界行为："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "`buffer` 不是 `undefined` 也不是 `SharedArrayBuffer` 实例 → 抛 `TypeError`（`code: 'INVALID_OPTION'`，消息 `[store] shared buffer must be a SharedArrayBuffer`）。",
+                  "未传 `buffer` 时新建一个大小为 `2 * Int32Array.BYTES_PER_ELEMENT`（8 字节）的 `SharedArrayBuffer`，并把校验过的 `initialValue` 写入其中；传入的 `buffer` 小于这 8 字节 → 抛 `RangeError`（`code: 'BUFFER_TOO_SMALL'`，消息 `[store] shared signal buffer is too small`）。",
+                  "`initialValue` 不是整数或超出 `[-2147483648, 2147483647]` → 抛 `RangeError`（`code: 'INVALID_OPTION'`，消息 `[store] shared signal value must be an int32, received <value>`）。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "2-2-实例成员",
+            "heading": "2.2 实例成员",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "class SharedInt32Signal implements IObservable, IDisposable {\n  readonly runtime: IRuntime;\n  readonly buffer: SharedArrayBuffer;\n  readonly subs: ReadonlySet<IObserver>;\n  get version(): number;\n  get disposed(): boolean;\n  get value(): number;\n  set value(next: number);\n  peek(): number;\n  sync(): boolean;\n  watch(): IDisposer;\n  onObserved(): void;\n  onUnobserved(): void;\n  isStale(): boolean;\n  dispose(): void;\n}"
+              },
+              {
+                "type": "list",
+                "items": [
+                  "`runtime` —— 构造时传入的 `Runtime`，只读字段。",
+                  "`buffer` —— 底层共享内存，只读字段；把它传给另一个线程/`Runtime`（例如 `postMessage`）即可共享同一份数据。",
+                  "`subs` —— 当前观察本节点的 `IObserver` 集合（只读视图），由 `@migaia/reactive` 的追踪系统维护，一般不需要直接读取。",
+                  "`version`（getter）—— 该节点在所属 `Runtime` 响应式图里的版本号（`readVersion(this, initialVersion)`）。不是共享内存里的 seq，是包了一层图内版本记账之后的值,用于响应式系统内部判断\"是否需要重新计算\",业务代码通常不需要直接读它。",
+                  "`disposed`（getter）—— 是否已 `dispose()`。",
+                  "`value`（getter）—— 执行顺序：`#assertActive()` → 一致读一次（不含在 getter 里独立暴露，但 `sync()` 内部会做）→ `sync()`（若共享内存版本号与本地记录不同,更新记录并通知本 `Runtime` 的观察者）→ 向当前 `Runtime` 的依赖追踪器登记依赖（`tracker.track(this)`）→ 返回最新一致读到的 `value`。在 `Effect`/`Computed` 里读 `.value` 会自动追踪,并且会顺带把远端最新写入拉进来,不需要额外调用 `.sync()`。已释放时抛 `Error`（`signalDisposed`）。",
+                  "`value`（setter）—— `#assertActive()` → `asInt32(next, 'shared signal value')` 校验（不合法抛 `RangeError`,`invalidOption`）→ 以无条件写方式 `writeLocked`；若返回 `undefined`（新值与当前值经 `Atomics` 比较相同,未变）则直接返回,不推进版本号、不通知、不唤醒;若返回新版本,则更新本地 `#observedSharedVersion`、调用 `internalsOf(runtime).notify(this)` 通知本地观察者、并 `Atomics.notify` 唤醒可能正在 `watch()` 挂起的其他线程。已释放时抛 `Error`（`signalDisposed`）。",
+                  "`peek(): number` —— `#assertActive()` → 直接一致读并返回 `value`,不调用 `sync()`（不主动拉取远端更新,只读本地视图截至上次已知状态）、不登记依赖追踪。适合诊断/日志等不希望产生响应式依赖或触发通知的读取场景。",
+                  "`sync(): boolean` —— `#assertActive()` → 一致读当前共享内存的 `version`;若与本地记录的 `#observedSharedVersion` 相同返回 `false`（无变化）;否则更新本地记录、调用 `internalsOf(runtime).notify(this)` 通知观察者,返回 `true`。这是\"手动拉取远端写入\"的入口,`watch()` 内部也是靠调它完成同步。",
+                  "`watch(): IDisposer` —— `#assertActive()` → 若已经在 watch,直接返回同一个停止函数(不会叠加第二条回路);否则在 seq slot 上起一条 `Atomics.waitAsync` 唤醒回路:每次被唤醒就调用 `sync()`（如果此时未 disposed）,唤醒回调抛错会经 `reportSharedWatchFailure` 上报（优先 `runtime.reportError`,失败再退回全局 `reportError`/`console.error`,不会让跨线程 Promise 边界吞掉诊断信息）。环境不支持 `Atomics.waitAsync` → 抛 `Error`（`envUnsupported`）。返回的停止函数调用时会 `Atomics.notify` 唤醒挂起中的 `waitAsync`,让它尽快 settle 并释放对共享内存视图的引用,而不是一直等到下一次真正的远端写入。`dispose()` 也会自动调用这个停止函数。",
+                  "`onObserved()` / `onUnobserved()` —— `IObservable` 接口要求的钩子,本类实现为空操作(信号本身没有\"被观察/不再被观察\"时需要额外处理的资源)。",
+                  "`isStale(): boolean` —— 直接比较一致读到的 `version` 与本地记录的 `#observedSharedVersion` 是否不同,不做 `#assertActive()` 校验（即使已经 `dispose()` 之后调用也不会抛错,因为它只读取底层视图,不依赖响应式追踪状态）。",
+                  "`dispose(): void` —— 幂等；置位 `#disposed`、停止 `watch()` 回路（若存在）、从所属 `Runtime` 的追踪器断开（`tracker.disconnectObservable(this, 'dispose')`）。释放之后再调用 `value`/`sync()`/`watch()`/`peek()` 会抛 `Error`（`signalDisposed`）；`isStale()`/`buffer`/`runtime` 字段仍可安全访问。"
+                ]
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "const runtime = createRuntime();\nconst counter = sharedInt32(runtime, 0);\ncounter.value; // 0\ncounter.value = 5;\ncounter.peek(); // 5，不触发追踪\ncounter.dispose();\ncounter.value; // 抛 Error（code: 'SIGNAL_DISPOSED'）"
+              }
+            ]
+          },
+          {
+            "id": "3-1-构造",
+            "heading": "3.1 构造",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "function sharedInt32Array(\n  runtime: IRuntime,\n  length: number,\n  options?: {\n    readonly buffer?: SharedArrayBuffer;\n    readonly initialValues?: Iterable<number>;\n  }\n): SharedInt32Array;\n\nclass SharedInt32Array implements IDisposable {\n  constructor(\n    runtime: IRuntime,\n    length: number,\n    options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number> }\n  );\n}"
+              },
+              {
+                "type": "table",
+                "headers": ["参数", "类型", "必填性", "默认值", "说明"],
+                "rows": [
+                  ["`runtime`", "`IRuntime`", "必填", "无", "归属的 `Runtime`"],
+                  ["`length`", "`number`", "必填", "无", "数组长度,必须是非负整数"],
+                  [
+                    "`options.buffer`",
+                    "`SharedArrayBuffer`",
+                    "可选",
+                    "新建一块",
+                    "附着到已有 buffer;传了此项时 `initialValues` 被忽略"
+                  ],
+                  [
+                    "`options.initialValues`",
+                    "`Iterable<number>`",
+                    "可选",
+                    "无",
+                    "仅新建 buffer 时生效,按顺序写入前 N 个下标(超过 `length` 的部分被丢弃)"
+                  ]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "构造期校验顺序与边界行为："
+              },
+              {
+                "type": "paragraph",
+                "text": "1. `options` 不是 `undefined`（会取默认值 `{}`）也不是对象（例如显式传 `null`）→ 抛 `RangeError`（`invalidOption`，消息 `[store] shared array options must be an object`）。 2. 读取 `options.buffer`/`options.initialValues` 时若访问器抛错（例如恶意/异常的 getter）→ 抛 `RangeError`（`invalidOption`，消息 `[store] shared array options could not be read safely`，`cause` 为原始错误）。 3."
+              },
+              {
+                "type": "paragraph",
+                "text": "`buffer` 不是 `undefined` 也不是 `SharedArrayBuffer` 实例 → 抛 `TypeError`（`invalidOption`，消息 `[store] shared buffer must be a SharedArrayBuffer`）。 4. `length` 不是整数或小于 `0` → 抛 `RangeError`（`invalidOption`，消息 `[store] shared array length must be a non-negative integer`）。 5."
+              },
+              {
+                "type": "paragraph",
+                "text": "未传 `buffer` 且提供了 `initialValues`：遍历该 iterable，逐个用 `asInt32` 校验并收集，达到 `length` 个就停止；遍历或校验中途抛错 → 抛 `RangeError`（`invalidOption`，消息 `[store] shared array initialValues could not be materialized safely`，`cause` 为原始错误）。 6."
+              },
+              {
+                "type": "paragraph",
+                "text": "按 `length` 推算所需 slot 数：`headerSlots = 1(epoch) + ceil(ceil(length / 32) / 32)(脏页 bitmap words)`，`slots = headerSlots + length * 2`；若该结果不是安全整数或超过 `0xffffffff`（`Int32Array` 下标空间上限）→ 抛 `RangeError`（`invalidOption`，消息 `[store] shared array length exceeds the Int32Array capacity`）。 7. `buffer = options.buffer ? new SharedArrayBuffer(slots * Int32Array.BYTES_PER_ELEMENT)`；若提供的 `buffer."
+              },
+              {
+                "type": "paragraph",
+                "text": "byteLength` 小于所需字节数 → 抛 `RangeError`（`bufferTooSmall`，消息 `[store] shared array buffer is too small`）。 8. 若第 5 步收集到了 `initialValues`，逐个 `Atomics.store` 写入对应 value slot（不经过 seqlock 写入路径——全新 buffer 的 seq 天然是偶数 0，构造期直接写值即安全）。 9. 构造函数不扫描任何格子的 seqlock 来建立版本基线——每个下标的响应式基线在该下标第一次被追踪读取时才建立（见 `SharedInt32ArrayCell` 构造逻辑），数组级 `sync()` 依赖 epoch 判断要不要扫描（见 §8）。"
+              }
+            ]
+          },
+          {
+            "id": "3-2-实例成员",
+            "heading": "3.2 实例成员",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "class SharedInt32Array implements IDisposable {\n  readonly runtime: IRuntime;\n  readonly buffer: SharedArrayBuffer;\n  readonly length: number;\n  get disposed(): boolean;\n  get(index: number): number;\n  set(index: number, value: number): void;\n  update(index: number, update: (current: number) => number): number;\n  sync(index?: number): number;\n  watch(): IDisposer;\n  snapshot(): Int32Array;\n  prune(): number;\n  dispose(): void;\n  assertActive(): void;\n  readCell(index: number): { readonly value: number; readonly version: number };\n  writeCell(index: number, value: number, expected?: number): number | undefined;\n  notifyWaiters(): void;\n  recordObservedVersion(index: number, version: number): void;\n}"
+              },
+              {
+                "type": "list",
+                "items": [
+                  "`runtime` / `buffer` / `length` —— 只读字段，含义同构造参数；`length` 构造后不可变。",
+                  "`disposed`（getter）—— 是否已 `dispose()`。",
+                  "`get(index: number): number` —— 先做下标校验（见下）。若当前不处于依赖追踪上下文（`internalsOf(runtime).tracker.isTracking()` 为假），走轻量直读路径：直接 `readCell(index).value`，不物化任何 `SharedInt32ArrayCell`、不产生依赖，即使数组有百万元素，一次性读取开销也是 `O(1)`。若处于追踪上下文（`Effect`/`Computed` 内部），惰性创建（或复用已存在的）该下标对应的响应式 cell 并调用其 `read()`——这会触发该 cell 自己的 `sync()`（只拉取这一格的远端变化）与依赖登记。",
+                  "`set(index, value): void` —— 下标与值校验后：若该下标已有物化的 cell，委托给 `cell.write(value)`（会带上依赖通知与远端唤醒）；否则直接调用底层 `writeCell(index, asInt32(value))`，写入成功（版本非 `undefined`）时更新数组级\"已观察版本\"记账并调用 `notifyWaiters()` 推进 epoch、唤醒可能的远端 `watch()`。值与当前值相同时静默跳过，不推进版本、不通知。",
+                  "`update(index, updater): number` —— `updater` 必须是函数，否则抛 `TypeError`（`invalidOption`，消息 `[store] shared array update callback must be a function`）。执行顺序（详见 §6.2）：一致读当前值 → 锁外调用 `updater(current)` → 校验结果为合法 `int32` → 若与当前值相同直接返回（不写入）→ 否则以 CAS（期望值 = 读到的 `current`）尝试写入，失败则从头重来，最多重试 `1 << 16`（65536）次；超限抛 `Error`（`contentionLimit`，消息 `[store] shared array update at <index> kept losing the race; another writer never settled`）。写入成功后同步更新本地记账、若下标已物化 cell 则调用其 `commitWrite`，否则直接 `notifyWaiters()`。`updater` 必须是纯函数、可安全重复调用——冲突时会被重跑，不要在里面产生不可逆副作用；`updater` 抛错会原样向上抛出，且不会留下任何脏锁状态（回调在锁外执行）。",
+                  "`sync(index?): number`",
+                  "传 `index`：先做下标校验；比较该下标的一致读版本号与本地记录，未变返回 `0`；变了则更新记录、若已物化 cell 则调用其 `sync()`（触发通知），返回 `1`。",
+                  "不传：整体扫描。先比较头部 epoch 与本地记录的 `#observedEpoch`，未变直接返回 `0`（连脏页 bitmap 都不碰）；变了则在 `runtime.batch()` 内逐 word `Atomics.exchange` 读出并清零脏页 bitmap，对每个置位的页逐格重新一致读、与本地记录比较，真正变化的下标才更新记录并调用其已物化 cell 的 `sync()`，最终返回本轮实际变化的下标个数（可能为 `0`，即 epoch 变了但没有格子真正稳定下来变化，理论上不会发生但代码按此语义实现）。整个批处理包在一次 `runtime.batch()` 内，多处变化只会让下游重跑一轮而不是逐个通知。",
+                  "`watch(): IDisposer` —— 语义与 `SharedInt32Signal.watch()` 一致，但监听的是头部 epoch slot 而不是逐格 seq（一格一个 waiter 在长数组上不可行）；唤醒后调用整体 `sync()`（不带 `index`）。已在 watch 时重复调用返回同一停止函数；环境不支持 `waitAsync` 抛 `Error`（`envUnsupported`）。",
+                  "`snapshot(): Int32Array` —— `assertActive()` 后遍历 `[0, length)`，对每个下标 `readCell(i).value`，写入一个新分配的 `Int32Array(length)` 并返回。返回值是普通、非共享的数组，修改它不会影响共享内存。",
+                  "`prune(): number` —— `assertActive()` 后遍历所有已物化的 cell，`subs.size === 0`（没有任何观察者）的从追踪器断开并从内部 `Map` 移除，返回移除个数。用于\"高频轮换访问不同下标\"场景下主动清理，弥补自动回收（见下）的粒度不够及时。",
+                  "`dispose(): void` —— 幂等；停止 `watch()`、把所有已物化 cell 从追踪器断开。释放之后调用 `get`/`set`/`update`/`sync`/`watch`/`snapshot`/`prune` 等会抛 `Error`（`arrayDisposed`）。",
+                  "`assertActive(): void` —— 已释放则抛 `Error`（`arrayDisposed`，消息 `[store] shared array is disposed`）；公开方法，正常业务代码不需要直接调用，供组合式底层用法（如包装类）复用同一校验。",
+                  "`readCell(index): { value; version }` —— 一致读某一格的原始 value/version（复用 seqlock 读协议），不做下标范围校验、不检查是否已释放，是最底层的读原语；`get()`/`sync()` 等内部都基于它实现，调用方若直接使用需自行保证 `index` 合法。",
+                  "`writeCell(index, value, expected?): number | undefined` —— 最底层的写原语（`set`/`update` 都基于它），语义见 §6.2：`expected` 省略即无条件写；提供则是 CAS；成功返回新版本并标记对应脏页，未写入（值未变或 CAS 失败）返回 `undefined`。同样不做下标校验。",
+                  "`notifyWaiters(): void` —— 把头部 epoch 原子 `+1` 并 `Atomics.notify`，用于在绕开 `set`/`update` 自行调用 `writeCell` 之后手动唤醒 `watch()` 回路。",
+                  "`recordObservedVersion(index, version): void` —— 更新数组级\"已观察版本\"记账（`#observedVersions[index]`），供自行组合 `readCell`/`writeCell` 实现自定义写入路径时，保持与内建 `sync()`/`get()` 的记账一致，避免下一次 `sync()` 误判该下标\"仍未变化\"或重复上报。"
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "`get`/`set`/`update`/`sync(index)` 的下标校验规则一致：先 `assertActive()`，再要求 `Number.isInteger(index) && index >= 0 && index < length`，否则抛 `RangeError`（`indexOutOfRange`，消息 `[store] shared array index out of range: <index>`）。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "const runtime = createRuntime();\nconst grid = sharedInt32Array(runtime, 4, { initialValues: [0, 0, 0, 0] });\ngrid.set(0, 10);\ngrid.get(0); // 10\ngrid.update(1, (v) => v + 1); // 1\ngrid.snapshot(); // Int32Array [10, 1, 0, 0]\ngrid.dispose();\ngrid.get(0); // 抛 Error（code: 'ARRAY_DISPOSED'）"
+              }
+            ]
+          },
+          {
+            "id": "4-sharedwaitmode-完整参考",
+            "heading": "4. SharedWaitMode 完整参考",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "const SharedWaitMode: { readonly async: 'async' };\ntype ISharedWaitMode = 'async';"
+              },
+              {
+                "type": "paragraph",
+                "text": "一个稳定的等待模式标识常量（当前只有 `async` 一个取值），来源注释为\"Shared-state wait modes used when Atomics.waitAsync is available\"。它不是任何导出函数/方法的参数或返回值——`watch()` 内部固定使用基于 `Atomics.waitAsync` 的唤醒策略，不需要也不接受调用方传入 `SharedWaitMode` 来选择模式。它的作用是给调用方在自己的类型标注、日志、诊断代码里提供一个稳定、不会打字错误的字符串引用，为将来可能新增的等待模式预留扩展空间。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { SharedWaitMode, type ISharedWaitMode } from '@migaia/store-shared';\n\nconst currentMode: ISharedWaitMode = SharedWaitMode.async;"
+              }
+            ]
+          },
+          {
+            "id": "5-错误身份",
+            "heading": "5. 错误身份",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import {\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';"
+              }
+            ]
+          },
+          {
+            "id": "5-1-storesharederrorcode-istoresharederrorcode",
+            "heading": "5.1 StoreSharedErrorCode / IStoreSharedErrorCode",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "const StoreSharedErrorCode: {\n  readonly arrayDisposed: 'ARRAY_DISPOSED';\n  readonly signalDisposed: 'SIGNAL_DISPOSED';\n  readonly bufferTooSmall: 'BUFFER_TOO_SMALL';\n  readonly indexOutOfRange: 'INDEX_OUT_OF_RANGE';\n  readonly contentionLimit: 'CONTENTION_LIMIT';\n  readonly envUnsupported: 'ENV_UNSUPPORTED';\n  readonly invalidOption: 'INVALID_OPTION';\n};\ntype IStoreSharedErrorCode = (typeof StoreSharedErrorCode)[keyof typeof StoreSharedErrorCode];"
+              },
+              {
+                "type": "paragraph",
+                "text": "错误由 `(source, code)` 二元组唯一定位，`source` 恒为 `@migaia/store-shared`（即 `STORE_SHARED_SOURCE`）。码值是公开 API 的一部分，本包内部所有抛出点都引用这张表，不内联字面量；触发条件与调用方建议见 README 的对应小节与本文 §10 错误一览表。"
+              }
+            ]
+          },
+          {
+            "id": "5-2-store-shared-source",
+            "heading": "5.2 STORE_SHARED_SOURCE",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "const STORE_SHARED_SOURCE: '@migaia/store-shared';"
+              },
+              {
+                "type": "paragraph",
+                "text": "字符串常量，本包所有错误统一携带的 `source` 字段值。通过 `@migaia/utils` 的 `attachErrorIdentity` 挂到每个抛出的 `Error`/`RangeError` 上。"
+              }
+            ]
+          },
+          {
+            "id": "5-3-createstoresharederror-createstoresharedrangeerror",
+            "heading": "5.3 createStoreSharedError / createStoreSharedRangeError",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "function createStoreSharedError(\n  code: IStoreSharedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\n\nfunction createStoreSharedRangeError(\n  code: IStoreSharedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): RangeError;"
+              },
+              {
+                "type": "paragraph",
+                "text": "两者都是本包内部构造错误时使用的工厂：先 `new Error(message, options?cause !== undefined ? { cause } : undefined)`（或 `RangeError`），再用 `attachErrorIdentity(error, { source: STORE_SHARED_SOURCE, code })` 挂上身份字段。两者签名与行为完全一致，唯一区别是构造出的运行时错误类型（`Error` vs `RangeError`）。公开导出是为了让在 `@migaia/store-shared` 之上做薄封装的调用方（例如包装 `SharedInt32Array` 的上层库）可以抛出携带同一套 `(source, code)` 身份契约的错误，而不必自己重新实现 `attachErrorIdentity` 调用。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`options.cause` 省略时不会传 `cause` 给底层 `Error` 构造函数（区别于显式传 `undefined`，两者在 `Error` 构造语义上是等价的，这里只是实现细节）。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "throw createStoreSharedRangeError(\n  StoreSharedErrorCode.invalidOption,\n  'entityCount must be a positive integer'\n);"
+              }
+            ]
+          },
+          {
+            "id": "6-seqlock-并发读写的正确性保证",
+            "heading": "6. Seqlock：并发读写的正确性保证",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "每个共享整数格在内存里占用两个 `int32` slot：`[value, seq]`。`seq` 同时充当版本号与写锁："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "偶数 = 空闲，值稳定，`value` 有效",
+                  "奇数 = 有写者正在写，此刻 `value` 可能处于半写状态，不能读"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "6-1-读-一致性校验-有限自旋",
+            "heading": "6.1 读：一致性校验 + 有限自旋",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "text",
+                "code": "读 before = seq\n若 before 是奇数 → 重试\n读 value\n读 after = seq\n若 before === after → 返回 { value, version: before }\n否则 → 重试"
+              },
+              {
+                "type": "paragraph",
+                "text": "只要 `before === after` 且为偶数，就能保证这次读到的 `value` 和 `version` 出自同一次已完成的写入。自旋次数上限是 65536（`1 << 16`）次；超限说明可能有写者在持锁期间异常终止（线程被杀、页面崩溃），此时无限自旋会把当前线程也拖死，所以到限直接抛 `Error`（`contentionLimit`，消息含 `did not settle before the contention limit`），把\"共享内存可能已经写坏\"暴露出来，而不是静默卡死。"
+              }
+            ]
+          },
+          {
+            "id": "6-2-写-占锁-写值-放锁",
+            "heading": "6.2 写：占锁 → 写值 → 放锁",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "text",
+                "code": "读 seq；若为奇数 → 重试获取\nCAS(seq, seq, seq+1) 成功即获锁，失败重试\n（获锁后）比较 expected（若提供）与当前 value；不符则释放锁、返回 undefined\n若新值等于当前值 → 释放锁、返回 undefined（不推进版本号）\n写入新 value\nseq 推进为 seq+2（committed）"
+              },
+              {
+                "type": "paragraph",
+                "text": "获锁同样有 65536 次自旋上限，超限抛 `Error`（`contentionLimit`，消息含 `lock was not acquired before the contention limit`）。写入过程中不会调用任何用户代码——`update()` 的用户回调在锁外执行，所以持锁期间不存在\"回调抛错导致锁卡在奇数\"的问题。"
+              },
+              {
+                "type": "paragraph",
+                "text": "这一版设计修复的是更早期\"`Atomics.exchange(value)` 然后 `Atomics.add(version)`\"两步式实现的缺陷：两步之间没有互斥，并发写者会导致读者看到\"新值配旧版本号\"，从而误判自己没有变化、漏掉一次通知——这类问题在跨线程共享状态里几乎无法用常规手段排查，因为它不报错，只是\"有一帧数据没更新\"。"
+              }
+            ]
+          },
+          {
+            "id": "6-3-值域校验",
+            "heading": "6.3 值域校验",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "所有写入路径（`SharedInt32Signal.value = x`、`SharedInt32Array.set()`/`update()`、构造期的 `initialValue`/`initialValues`）都会先校验值是合法 `int32`：整数，且落在 `[-2147483648, 2147483647]`。不合法直接抛 `RangeError`（`invalidOption`），消息形如 `[store] <what> must be an int32, received <value>`。这是刻意的设计选择——`value | 0` 之类的位运算会把 `231`、`3.9` 这样的值静默**折成完全不同的数字，写入方永远不会知道，跨线程共享的另一端读到的是一个从未被写过的数，且两边都不会报错。"
+              }
+            ]
+          },
+          {
+            "id": "7-跨线程同步-sync-与-watch",
+            "heading": "7. 跨线程同步：sync() 与 watch()",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "本地写入永远即时通知本地 `Runtime`——`.value = x`、`.set()`、`.update()` 内部在写入成功后会立刻调用 `internalsOf(runtime).notify(.)`，这一步和共享内存、跨线程无关。"
+              },
+              {
+                "type": "paragraph",
+                "text": "跨 `Runtime`（通常也是跨线程）的写入不会自动出现在另一端，因为另一端的 `Runtime` 完全不知道这块内存被改过，必须主动检测："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "手动拉取：调用 `.sync()`（`SharedInt32Signal.sync()`、`SharedInt32Array.sync()` 或 `sync(index)`）。返回值表示是否发生了变化（数组版返回变化的下标数）。适合已经有自己的消息循环、可以定期 pump 的场景，或者不支持 `Atomics.waitAsync` 的环境。",
+                  "自动推送：调用 `.watch()`。内部对 seq（`SharedInt32Signal`）或 epoch（`SharedInt32Array`）发起 `Atomics.waitAsync` 循环——一旦对应 slot 被写者 `Atomics.notify()` 唤醒，就自动跑一次 `sync()`，然后立刻重新挂起等待下一次唤醒。返回一个停止函数；重复调用 `.watch()` 会返回同一个停止函数，不会叠加多条回路；`.dispose()` 会自动停止它。"
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "`Atomics.wait`（同步版本）不能在主线程使用（会阻塞事件循环），所以 `watch()` 固定走 `waitAsync`。环境不支持 `Atomics.waitAsync` 时 `watch()` 直接抛错（`envUnsupported`，消息 `[store] Atomics.waitAsync is unavailable; pump sync() from your own message loop instead`），而不是静默退化成轮询——静默降级会让调用方误以为自己确实拿到了推送能力。"
+              },
+              {
+                "type": "paragraph",
+                "text": "停止 `watch()`（无论是手动调用停止函数还是 `dispose()`）会顺带 `Atomics.notify()` 一次，让挂起中的 `waitAsync` Promise 尽快 settle、释放对共享内存视图的引用，而不是一直等到\"下一次真正的远端写入\"才释放。"
+              }
+            ]
+          },
+          {
+            "id": "8-脏页-bitmap-sharedint32array-的稀疏同步",
+            "heading": "8. 脏页 bitmap：SharedInt32Array 的稀疏同步",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`SharedInt32Array` 的共享内存布局是：`[epoch, .bitmap words, value0, seq0, value1, seq1, .]`，每页 32 格（`DIRTY_PAGE_SIZE = 32`），每个 bitmap word 覆盖 32 页（`DIRTY_BITS_PER_WORD = 32`）。"
+              },
+              {
+                "type": "list",
+                "items": [
+                  "epoch：每次任意下标完成一次落盘写入，写者都会把 epoch 原子 `+1`。`sync()` 不传 `index` 时，第一步就是比较本地记录的 epoch 和共享内存里的当前 epoch——完全没变就直接返回 `0`，连 bitmap 都不用碰。这一步是为了让一条 `watch()` 唤醒回路就能覆盖整个数组，不需要给上万个下标各起一个 waiter。",
+                  "脏页 bitmap：每次写入用 `Atomics.or` 点亮自己所在页的 bit（`Atomics.or` 是无损操作，多个写者并发点同一个 bit 不会互相覆盖或丢失标记）。`sync()` 发现 epoch 变化后，用 `Atomics.exchange` 逐 word 读出 bitmap 并清零（`exchange` 是单次原子读改写，不存在\"清零期间丢失一次并发 `or`\"的时间窗口：并发的 `or` 要么完整发生在 `exchange` 之前，已经反映在读出的旧值里；要么完整发生在之后，作用在刚清零的 0 上，正确地留给下一轮 `sync()` 发现）。",
+                  "逐格确认：命中的每一页仍然要逐格读 seqlock 版本号，和本地记录比较，真正变了才会通知该下标的观察者。也就是说 bitmap/epoch 只是\"可能变了\"的提示，不是正确性来源——即便某个 bit 因为极端时序被提前清零、写入方的 `or` 恰好卡在那之前完成，页内逐格版本比较仍会在下一轮 `sync()` 里补上这次变化，不会真正漏掉。"
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "效果：百万格的数组里只改动几个分散的下标，`sync()` 的开销只和\"变化的页数\"相关，而不是和数组长度 `length` 相关。一次 `sync()` 扫描到的多个变化会被包在同一个 `runtime.batch()` 里，避免下游因为一次同步里的多处变化而被唤醒多轮。"
+              }
+            ]
+          },
+          {
+            "id": "9-响应式集成细节",
+            "heading": "9. 响应式集成细节",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "两者都是 `IObservable`：内部通过 `@migaia/reactive` 的 `internalsOf`/`registerSubs`/`registerVersion`/`claimOwnership` 接入所属 `Runtime` 的依赖图，行为和普通的 `Signal`/`Computed` 节点一致——可以被 `Effect`/`Computed` 追踪，`isStale()` 可查询是否有未同步的远端变化。",
+                  "单一归属：构造时调用 `claimOwnership(this, runtime)` 登记归属；同一个 JS 对象不能被登记到第二个 `Runtime`（会抛 `@migaia/reactive` 所有权系统的错误）。这意味着共享的是 `SharedArrayBuffer`，而不是 JS 对象本身——另一个线程/`Runtime` 要读同一份数据，必须用同一个 `buffer` 单独 `new` 一份自己的实例。",
+                  "`SharedInt32Array` 的按需物化：`get(index)` 只有在检测到当前处于依赖追踪上下文（`internalsOf(runtime).tracker.isTracking()` 为真，即身处 `Effect`/`Computed` 内部）时才会为该下标创建一个内部的响应式 cell 并登记依赖；在追踪上下文之外调用 `get()`（比如普通同步代码里的一次性读取）走直读路径，不产生任何 cell 对象。",
+                  "cell 的自动回收：`Effect`/`Computed` 可能在提交观察之前就放弃一次\"投机读\"（比如 `Computed` 重新计算时依赖发生了变化）。为此新物化的 cell 会在下一个微任务里检查是否仍有订阅者，没有就自动断开并从内部 Map 里移除，不需要手动处理。",
+                  "手动 `prune()`：如果访问模式是\"高频轮换读取不同下标\"（比如遍历式的探测），自动回收的微任务粒度可能不够及时，可以定期调用 `array.prune()` 主动清理当前没有任何订阅者的 cell，返回本次清理掉的个数。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "10-错误一览表",
+            "heading": "10. 错误一览表",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["`code`", "触发条件", "抛出方式"],
+                "rows": [
+                  [
+                    "`SIGNAL_DISPOSED`",
+                    "`SharedInt32Signal` 已 `dispose()` 后继续访问 `value`/`sync()`/`watch()`/`peek()`",
+                    "`Error`"
+                  ],
+                  [
+                    "`ARRAY_DISPOSED`",
+                    "`SharedInt32Array` 已 `dispose()` 后继续访问 `get`/`set`/`update`/`sync`/`watch`/`snapshot`/`prune`/`assertActive`",
+                    "`Error`"
+                  ],
+                  [
+                    "`BUFFER_TOO_SMALL`",
+                    "传入的 `buffer` 小于 `SharedInt32Signal`（8 字节）或按 `SharedInt32Array` 的 `length` 推算出的所需大小",
+                    "`RangeError`，构造时"
+                  ],
+                  [
+                    "`INDEX_OUT_OF_RANGE`",
+                    "`SharedInt32Array` 的 `get`/`set`/`update`/`sync(index)` 下标越界或非整数",
+                    "`RangeError`，调用时"
+                  ],
+                  [
+                    "`CONTENTION_LIMIT`",
+                    "一致读自旋 65536 次未 settle，或获取写锁自旋 65536 次未成功，或 `update()` 的 CAS 重试自旋 65536 次仍未写入",
+                    "`Error`"
+                  ],
+                  [
+                    "`ENV_UNSUPPORTED`",
+                    "当前运行环境不支持 `Atomics.waitAsync`，却调用了 `.watch()`",
+                    "`Error`，`watch()` 调用时"
+                  ],
+                  [
+                    "`INVALID_OPTION`",
+                    "构造/写入口参非法：`buffer` 类型不对、`options` 不是对象、`options` 读取失败、`length` 非法、`initialValues` 物化失败、`length` 换算出的 slot 数超限、写入值不是合法 int32、`update()` 的回调不是函数",
+                    "`TypeError` 或 `RangeError`，构造/调用时"
+                  ]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "所有错误都携带 `source: '@migaia/store-shared'` 与上表对应的 `code`（通过 `attachErrorIdentity` 挂载），可用 `error.code === StoreSharedErrorCode.xxx` 分支处理，见 README 的 错误身份 小节。`CONTENTION_LIMIT` 系列几乎总是意味着另一个持锁的写者异常终止（线程被强制终止、页面崩溃）而没有走到释放锁那一步——共享内存里的 seq 会永远停在奇数。这类错误没有应用层可以自动恢复的办法，通常需要重新创建一块 buffer 并放弃旧的那份共享状态。"
+              }
+            ]
+          },
+          {
+            "id": "11-生产环境完整示例",
+            "heading": "11. 生产环境完整示例",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "主线程创建共享数组，交给 Worker 处理，双方都能响应式地观察对方的写入："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "// main.ts\nimport { createRuntime, Effect } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nconst runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000);\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nworker.postMessage({ buffer: positions.buffer });\n\nconst stopWatch = positions.watch(); // worker 的写入自动推送进来\n\nconst render = new Effect(() => {\n  drawEntity(0, positions.get(0), positions.get(1));\n}, runtime);\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose();\n  stopWatch();\n  positions.dispose();\n  worker.terminate();\n});"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "// worker.ts\nimport { createRuntime } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nself.onmessage = (event: MessageEvent<{ buffer: SharedArrayBuffer }>) => {\n  const runtime = createRuntime();\n  const positions = sharedInt32Array(runtime, 1000, { buffer: event.data.buffer });\n\n  setInterval(() => {\n    positions.update(0, (x) => x + 1); // 每帧推进实体 0 的 x 坐标\n  }, 16);\n};"
+              },
+              {
+                "type": "paragraph",
+                "text": "不支持 `Atomics.waitAsync` 的环境（改用手动 `sync()` 轮询）："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "const positions = sharedInt32Array(runtime, 1000, { buffer: sharedBuffer });\n\nsetInterval(() => {\n  const changed = positions.sync(); // 返回本轮实际变化的下标个数\n  if (changed > 0) console.log(`${changed} 个下标发生了远端变化`);\n}, 100);"
+              }
+            ]
+          },
+          {
+            "id": "12-常见问题排查",
+            "heading": "12. 常见问题排查",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Q：另一个线程明明写了值，我这边读到的还是旧的。 检查是否调用过 `.watch()` 或定期 `.sync()`——跨 `Runtime` 的写入不会自动出现，本地只有主动拉取或订阅了唤醒回路才能看到远端变化。`.peek()` 也不会主动拉取远端更新，只有 `.value`/`.get()`（在追踪上下文中）或显式 `.sync()` 会。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Q：`watch()` 抛出 `Atomics.waitAsync is unavailable`。 当前运行环境不支持该 API（常见于旧版本或某些沙箱环境），错误码是 `ENV_UNSUPPORTED`。改用定时调用 `.sync()`/`.sync(index)` 轮询，见 §11 最后一个例子。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Q：写入抛 `must be an int32`。 说明写入的值不是整数，或超出了 `[-2147483648, 2147483647]` 范围（错误码 `INVALID_OPTION`）——这个包只支持定长 int32 布局，不支持浮点数或更大的整数，需要更大范围可以考虑拆成多个格子自行编码。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Q：读写偶尔抛 `did not settle before the contention limit` 或 `kept losing the race`。 错误码都是 `CONTENTION_LIMIT`，通常意味着另一个写者持锁期间异常终止（线程被杀、崩溃），共享内存的锁位永远停在了\"正在写\"状态。这种情况无法在应用层自动恢复，需要放弃这块 `buffer`，重新创建一份共享状态。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Q：`SharedInt32Array` 里成千上万个下标，`sync()` 会不会很慢？ 不会。`sync()` 先比较头部 epoch，完全没变直接返回；有变化时只扫描被脏页 bitmap 标记过的页，不是整个数组，见 §8。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Q：能不能把 `SharedInt32Signal` 对象直接 `postMessage` 给 Worker？ 不能，且没有必要——`postMessage` 会尝试结构化克隆这个对象，其内部状态无法被克隆出等价实例。应该传 `.buffer`（真正的 `SharedArrayBuffer`，可以被 `postMessage` 直接传递而不拷贝），另一端用同一个 `buffer` 调用 `sharedInt32`/`sharedInt32Array` 各自创建一份实例。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Q：能不能用这个包存对象、字符串这些复杂数据？ 不能。它只支持定长的 `int32` 布局，这是刻意的设计边界——`SharedArrayBuffer` 本身就是定长的原始内存，塞对象图需要自己实现序列化协议，超出了这个包的职责范围。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Q：`SharedWaitMode` 该怎么用？ 它不是任何函数的参数，只是一个稳定的字符串常量/类型，供调用方在自己的日志、诊断代码里引用\"当前使用的是基于 `Atomics.waitAsync` 的等待模式\"这一事实，不需要也无法传给 `watch()` 来切换策略。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Q：`readCell`/`writeCell`/`notifyWaiters`/`recordObservedVersion` 什么时候需要直接用？ 绝大多数场景用 `get`/`set`/`update`/`sync` 就够了。只有在自行组合底层原语（例如实现一个不经过响应式 cell 的批量写入路径、或包装一层自定义脏页策略）时才需要直接调用这些低级方法，且要自行保证下标合法、调用 `writeCell` 成功后同步调用 `recordObservedVersion`/`notifyWaiters` 以保持与内建 `get`/`sync()` 的记账一致。"
+              }
+            ]
+          },
+          {
+            "id": "13-构建-格式化与测试",
+            "heading": "13. 构建、格式化与测试",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "bash",
+                "code": "pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test"
+              },
+              {
+                "type": "paragraph",
+                "text": "测试覆盖 seqlock 一致读、跨 Runtime 同步、`watch()` 生命周期、数组稀疏同步与错误码（`test/shared-state.test.ts`、`test/error-code.test.ts`）。"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "store-shared:index",
+      "library": "store-shared",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/store-shared/getting-started",
+      "architecturePath": "/en/architecture/store-shared",
+      "symbols": [
+        {
+          "name": "createStoreSharedError",
+          "kind": "function",
+          "signature": "export declare function createStoreSharedError(code: IStoreSharedErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
+          "declarationLine": 6,
+          "source": "packages/store-shared/dist/errors.d.ts",
+          "purpose": "Builds a `(source, code)`-tagged `Error` without touching `stack`.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreSharedError.",
+          "advanced": "No additional advanced behavior is declared for createStoreSharedError.",
+          "parameters": [
+            "code: IStoreSharedErrorCode",
+            "message: string",
+            "options: { readonly cause?: unknown; } (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "code",
+              "type": "IStoreSharedErrorCode",
+              "optional": false
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "{ readonly cause?: unknown; }",
+              "optional": true
+            }
+          ],
+          "returns": "Error",
+          "errors": ["No documented errors are declared for createStoreSharedError."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreSharedError.",
+          "examples": [
+            "throw createStoreSharedError(\n  StoreSharedErrorCode.invalidOption,\n  'entity slot must be preallocated'\n);"
+          ],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createStoreSharedError(code: IStoreSharedErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "code",
+                "type": "IStoreSharedErrorCode",
+                "optional": false
+              },
+              {
+                "name": "message",
+                "type": "string",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "{ readonly cause?: unknown; }",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["Error"],
+          "whenToUse": "Use createStoreSharedError when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createStoreSharedError does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Builds a `(source, code)`-tagged `Error` without touching `stack`."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createStoreSharedError from @migaia/store-shared, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createStoreSharedError when its function contract and declared inputs match the result you need. Choose a different public symbol when createStoreSharedError does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreSharedError."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createStoreSharedError."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-shared/dist/errors.d.ts:createStoreSharedError:export declare function createStoreSharedError(code: IStoreSharedErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
+          "guidance": [
+            {
+              "id": "5-错误身份",
+              "heading": "5. 错误身份",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';"
+                }
+              ]
+            },
+            {
+              "id": "5-3-createstoresharederror-createstoresharedrangeerror",
+              "heading": "5.3 createStoreSharedError / createStoreSharedRangeError",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "function createStoreSharedError(\n  code: IStoreSharedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\n\nfunction createStoreSharedRangeError(\n  code: IStoreSharedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): RangeError;"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "两者都是本包内部构造错误时使用的工厂：先 `new Error(message, options?cause !== undefined ? { cause } : undefined)`（或 `RangeError`），再用 `attachErrorIdentity(error, { source: STORE_SHARED_SOURCE, code })` 挂上身份字段。两者签名与行为完全一致，唯一区别是构造出的运行时错误类型（`Error` vs `RangeError`）。公开导出是为了让在 `@migaia/store-shared` 之上做薄封装的调用方（例如包装 `SharedInt32Array` 的上层库）可以抛出携带同一套 `(source, code)` 身份契约的错误，而不必自己重新实现 `attachErrorIdentity` 调用。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`options.cause` 省略时不会传 `cause` 给底层 `Error` 构造函数（区别于显式传 `undefined`，两者在 `Error` 构造语义上是等价的，这里只是实现细节）。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreSharedRangeError(\n  StoreSharedErrorCode.invalidOption,\n  'entityCount must be a positive integer'\n);"
+                }
+              ]
+            },
+            {
+              "id": "错误身份-storesharederrorcode-store-shared-source-createstoresharederror-createstoresharedrangeerror",
+              "heading": "错误身份：StoreSharedErrorCode / STORE_SHARED_SOURCE / createStoreSharedError / createStoreSharedRangeError",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`StoreSharedErrorCode`｜3 秒上手 —— 稳定错误码表，用于 `switch`/比较（无调用形式，是一个常量对象）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "try {\n  counter.value = 1;\n} catch (error) {\n  if ((error as { code?: string }).code === StoreSharedErrorCode.signalDisposed) {\n    // 信号已释放，需要重新 attach 到同一个 buffer 创建新实例\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部取值（本包内部抛出的每一个错误都会带上其中之一作为 `code` 字段）："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`arrayDisposed`(`'ARRAY_DISPOSED'`) —— `SharedInt32Array` 已 `dispose()` 后继续读写；调用方应新建数组，不要复用已释放实例",
+                    "`signalDisposed`(`'SIGNAL_DISPOSED'`) —— `SharedInt32Signal` 已 `dispose()` 后继续读写；同上，新建 signal",
+                    "`bufferTooSmall`(`'BUFFER_TOO_SMALL'`) —— 传入的 `SharedArrayBuffer` 太小，放不下要求的 cell 布局；调用方应分配更大的 buffer，这是构造期参数错误，不要重试同一 buffer",
+                    "`indexOutOfRange`(`'INDEX_OUT_OF_RANGE'`) —— `SharedInt32Array` 下标越界；调用方检查下标是否在 `[0, length)`，这是永久性参数错误",
+                    "`contentionLimit`(`'CONTENTION_LIMIT'`) —— Seqlock 在自旋上限内未 settle（cell 未稳定/锁未获取/`update` 持续失败）；通常是某个写者持锁期间崩溃留下的死锁，无法自愈，调用方应重建 buffer",
+                    "`envUnsupported`(`'ENV_UNSUPPORTED'`) —— `Atomics.waitAsync` 在当前环境不可用；调用方改用 `sync()` 自行拉取，或换支持 `waitAsync` 的运行时，库不做静默降级",
+                    "`invalidOption`(`'INVALID_OPTION'`) —— 构造/写入口参非法（长度非负整数、int32 范围等）；调用方修正入参，这是永久性参数错误"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`IStoreSharedErrorCode` 是其取值的联合类型。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`STORE_SHARED_SOURCE`｜3 秒上手 —— 本包所有错误统一携带的 `source` 值（字符串常量，无调用形式）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "STORE_SHARED_SOURCE; // '@migaia/store-shared'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreSharedError`｜5 秒上手 —— 构造一个带 `(source, code)` 身份标记的 `Error`（用于组合本包之上的自定义封装时，抛出与本包同一套身份契约的错误）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreSharedError(\n  StoreSharedErrorCode.invalidOption,\n  'entity slot must be preallocated'\n);"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部参数：`code: IStoreSharedErrorCode`（必填）、`message: string`（必填）、`options?: { readonly cause?: unknown }`（可选，透传给 `Error` 构造函数的 `cause`）。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreSharedRangeError`｜5 秒上手 —— 与上面相同，但构造 `RangeError`（本包自身校验入参失败时用的就是它）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreSharedRangeError(StoreSharedErrorCode.invalidOption, 'length must be >= 0');"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "参数与 `createStoreSharedError` 完全一致，唯一区别是返回的运行时类型是 `RangeError`。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 72,
+          "configuration": [],
+          "fragment": "store-shared-index--createStoreSharedError"
+        },
+        {
+          "name": "createStoreSharedRangeError",
+          "kind": "function",
+          "signature": "export declare function createStoreSharedRangeError(code: IStoreSharedErrorCode, message: string, options?: { readonly cause?: unknown; }): RangeError;",
+          "declarationLine": 10,
+          "source": "packages/store-shared/dist/errors.d.ts",
+          "purpose": "Builds a `(source, code)`-tagged `RangeError`, preserving the runtime type.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreSharedRangeError.",
+          "advanced": "No additional advanced behavior is declared for createStoreSharedRangeError.",
+          "parameters": [
+            "code: IStoreSharedErrorCode",
+            "message: string",
+            "options: { readonly cause?: unknown; } (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "code",
+              "type": "IStoreSharedErrorCode",
+              "optional": false
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "{ readonly cause?: unknown; }",
+              "optional": true
+            }
+          ],
+          "returns": "RangeError",
+          "errors": ["No documented errors are declared for createStoreSharedRangeError."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreSharedRangeError.",
+          "examples": [
+            "throw createStoreSharedRangeError(\n  StoreSharedErrorCode.invalidOption,\n  'entityCount must be a positive integer'\n);",
+            "throw createStoreSharedRangeError(StoreSharedErrorCode.invalidOption, 'length must be >= 0');",
+            "import {\n  StoreSharedErrorCode,\n  createStoreSharedRangeError,\n  sharedInt32Array\n} from '@migaia/store-shared';\n\nfunction createEntityGrid(runtime: IRuntime, entityCount: number) {\n  if (entityCount <= 0) {\n    throw createStoreSharedRangeError(\n      StoreSharedErrorCode.invalidOption,\n      'entityCount must be a positive integer'\n    );\n  }\n  return sharedInt32Array(runtime, entityCount * 2); // 每个实体占 [x, y] 两格\n}"
+          ],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createStoreSharedRangeError(code: IStoreSharedErrorCode, message: string, options?: { readonly cause?: unknown; }): RangeError;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "code",
+                "type": "IStoreSharedErrorCode",
+                "optional": false
+              },
+              {
+                "name": "message",
+                "type": "string",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "{ readonly cause?: unknown; }",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["RangeError"],
+          "whenToUse": "Use createStoreSharedRangeError when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createStoreSharedRangeError does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Builds a `(source, code)`-tagged `RangeError`, preserving the runtime type."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createStoreSharedRangeError from @migaia/store-shared, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createStoreSharedRangeError when its function contract and declared inputs match the result you need. Choose a different public symbol when createStoreSharedRangeError does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreSharedRangeError."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createStoreSharedRangeError."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-shared/dist/errors.d.ts:createStoreSharedRangeError:export declare function createStoreSharedRangeError(code: IStoreSharedErrorCode, message: string, options?: { readonly cause?: unknown; }): RangeError;",
+          "guidance": [
+            {
+              "id": "5-错误身份",
+              "heading": "5. 错误身份",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';"
+                }
+              ]
+            },
+            {
+              "id": "5-3-createstoresharederror-createstoresharedrangeerror",
+              "heading": "5.3 createStoreSharedError / createStoreSharedRangeError",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "function createStoreSharedError(\n  code: IStoreSharedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\n\nfunction createStoreSharedRangeError(\n  code: IStoreSharedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): RangeError;"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "两者都是本包内部构造错误时使用的工厂：先 `new Error(message, options?cause !== undefined ? { cause } : undefined)`（或 `RangeError`），再用 `attachErrorIdentity(error, { source: STORE_SHARED_SOURCE, code })` 挂上身份字段。两者签名与行为完全一致，唯一区别是构造出的运行时错误类型（`Error` vs `RangeError`）。公开导出是为了让在 `@migaia/store-shared` 之上做薄封装的调用方（例如包装 `SharedInt32Array` 的上层库）可以抛出携带同一套 `(source, code)` 身份契约的错误，而不必自己重新实现 `attachErrorIdentity` 调用。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`options.cause` 省略时不会传 `cause` 给底层 `Error` 构造函数（区别于显式传 `undefined`，两者在 `Error` 构造语义上是等价的，这里只是实现细节）。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreSharedRangeError(\n  StoreSharedErrorCode.invalidOption,\n  'entityCount must be a positive integer'\n);"
+                }
+              ]
+            },
+            {
+              "id": "错误身份-storesharederrorcode-store-shared-source-createstoresharederror-createstoresharedrangeerror",
+              "heading": "错误身份：StoreSharedErrorCode / STORE_SHARED_SOURCE / createStoreSharedError / createStoreSharedRangeError",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`StoreSharedErrorCode`｜3 秒上手 —— 稳定错误码表，用于 `switch`/比较（无调用形式，是一个常量对象）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "try {\n  counter.value = 1;\n} catch (error) {\n  if ((error as { code?: string }).code === StoreSharedErrorCode.signalDisposed) {\n    // 信号已释放，需要重新 attach 到同一个 buffer 创建新实例\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部取值（本包内部抛出的每一个错误都会带上其中之一作为 `code` 字段）："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`arrayDisposed`(`'ARRAY_DISPOSED'`) —— `SharedInt32Array` 已 `dispose()` 后继续读写；调用方应新建数组，不要复用已释放实例",
+                    "`signalDisposed`(`'SIGNAL_DISPOSED'`) —— `SharedInt32Signal` 已 `dispose()` 后继续读写；同上，新建 signal",
+                    "`bufferTooSmall`(`'BUFFER_TOO_SMALL'`) —— 传入的 `SharedArrayBuffer` 太小，放不下要求的 cell 布局；调用方应分配更大的 buffer，这是构造期参数错误，不要重试同一 buffer",
+                    "`indexOutOfRange`(`'INDEX_OUT_OF_RANGE'`) —— `SharedInt32Array` 下标越界；调用方检查下标是否在 `[0, length)`，这是永久性参数错误",
+                    "`contentionLimit`(`'CONTENTION_LIMIT'`) —— Seqlock 在自旋上限内未 settle（cell 未稳定/锁未获取/`update` 持续失败）；通常是某个写者持锁期间崩溃留下的死锁，无法自愈，调用方应重建 buffer",
+                    "`envUnsupported`(`'ENV_UNSUPPORTED'`) —— `Atomics.waitAsync` 在当前环境不可用；调用方改用 `sync()` 自行拉取，或换支持 `waitAsync` 的运行时，库不做静默降级",
+                    "`invalidOption`(`'INVALID_OPTION'`) —— 构造/写入口参非法（长度非负整数、int32 范围等）；调用方修正入参，这是永久性参数错误"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`IStoreSharedErrorCode` 是其取值的联合类型。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`STORE_SHARED_SOURCE`｜3 秒上手 —— 本包所有错误统一携带的 `source` 值（字符串常量，无调用形式）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "STORE_SHARED_SOURCE; // '@migaia/store-shared'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreSharedError`｜5 秒上手 —— 构造一个带 `(source, code)` 身份标记的 `Error`（用于组合本包之上的自定义封装时，抛出与本包同一套身份契约的错误）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreSharedError(\n  StoreSharedErrorCode.invalidOption,\n  'entity slot must be preallocated'\n);"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部参数：`code: IStoreSharedErrorCode`（必填）、`message: string`（必填）、`options?: { readonly cause?: unknown }`（可选，透传给 `Error` 构造函数的 `cause`）。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreSharedRangeError`｜5 秒上手 —— 与上面相同，但构造 `RangeError`（本包自身校验入参失败时用的就是它）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreSharedRangeError(StoreSharedErrorCode.invalidOption, 'length must be >= 0');"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "参数与 `createStoreSharedError` 完全一致，唯一区别是返回的运行时类型是 `RangeError`。"
+                }
+              ]
+            },
+            {
+              "id": "5-用-createstoresharedrangeerror-包装上层校验-保持同一套错误身份",
+              "heading": "5. 用 createStoreSharedRangeError 包装上层校验，保持同一套错误身份",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreSharedErrorCode,\n  createStoreSharedRangeError,\n  sharedInt32Array\n} from '@migaia/store-shared';\n\nfunction createEntityGrid(runtime: IRuntime, entityCount: number) {\n  if (entityCount <= 0) {\n    throw createStoreSharedRangeError(\n      StoreSharedErrorCode.invalidOption,\n      'entityCount must be a positive integer'\n    );\n  }\n  return sharedInt32Array(runtime, entityCount * 2); // 每个实体占 [x, y] 两格\n}"
+                }
+              ]
+            }
+          ],
+          "usageScore": 94,
+          "configuration": [],
+          "fragment": "store-shared-index--createStoreSharedRangeError"
+        },
+        {
+          "name": "ISharedWaitMode",
+          "kind": "type",
+          "signature": "export type ISharedWaitMode = (typeof SharedWaitMode)[keyof typeof SharedWaitMode];",
+          "declarationLine": 5,
+          "source": "packages/store-shared/dist/shared-constants.d.ts",
+          "purpose": "ISharedWaitMode is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISharedWaitMode.",
+          "advanced": "No additional advanced behavior is declared for ISharedWaitMode.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ISharedWaitMode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISharedWaitMode.",
+          "examples": [
+            "import { createRuntime } from '@migaia/reactive';\nimport {\n  sharedInt32,\n  SharedInt32Signal,\n  sharedInt32Array,\n  SharedInt32Array,\n  SharedWaitMode,\n  type ISharedWaitMode,\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';",
+            "const SharedWaitMode: { readonly async: 'async' };\ntype ISharedWaitMode = 'async';",
+            "import { SharedWaitMode, type ISharedWaitMode } from '@migaia/store-shared';\n\nconst currentMode: ISharedWaitMode = SharedWaitMode.async;",
+            "import { SharedWaitMode, type ISharedWaitMode } from '@migaia/store-shared';",
+            "function describeWaitMode(mode: ISharedWaitMode): string {\n  return mode === SharedWaitMode.async ? '基于 Atomics.waitAsync 的异步唤醒' : mode;\n}"
+          ],
+          "aliasOf": "ISharedWaitMode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ISharedWaitMode = (typeof SharedWaitMode)[keyof typeof SharedWaitMode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ISharedWaitMode when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ISharedWaitMode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "ISharedWaitMode is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISharedWaitMode from @migaia/store-shared, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISharedWaitMode when its type contract and declared inputs match the result you need. Choose a different public symbol when ISharedWaitMode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISharedWaitMode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ISharedWaitMode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-shared/dist/shared-constants.d.ts:ISharedWaitMode:export type ISharedWaitMode = (typeof SharedWaitMode)[keyof typeof SharedWaitMode];",
+          "guidance": [],
+          "usageScore": 40,
+          "configuration": [],
+          "fragment": "store-shared-index--ISharedWaitMode"
+        },
+        {
+          "name": "sharedInt32",
+          "kind": "const",
+          "signature": "export declare const sharedInt32: (runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer) => SharedInt32Signal;",
+          "declarationLine": 30,
+          "source": "packages/store-shared/dist/shared-state.d.ts",
+          "purpose": "sharedInt32 is part of this module's public const contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for sharedInt32.",
+          "advanced": "No additional advanced behavior is declared for sharedInt32.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for sharedInt32."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for sharedInt32.",
+          "examples": [
+            "import { createRuntime } from '@migaia/reactive';\nimport {\n  sharedInt32,\n  SharedInt32Signal,\n  sharedInt32Array,\n  SharedInt32Array,\n  SharedWaitMode,\n  type ISharedWaitMode,\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';",
+            "function sharedInt32(\n  runtime: IRuntime,\n  initialValue?: number,\n  buffer?: SharedArrayBuffer\n): SharedInt32Signal;\n\nclass SharedInt32Signal implements IObservable, IDisposable {\n  constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer);\n}",
+            "const runtime = createRuntime();\nconst counter = sharedInt32(runtime, 0);\ncounter.value; // 0\ncounter.value = 5;\ncounter.peek(); // 5，不触发追踪\ncounter.dispose();\ncounter.value; // 抛 Error（code: 'SIGNAL_DISPOSED'）",
+            "import { sharedInt32, SharedInt32Signal } from '@migaia/store-shared';\nimport { createRuntime, Effect } from '@migaia/reactive';",
+            "const runtime = createRuntime();\nconst counter = sharedInt32(runtime, 0);\n\nconst stop = new Effect(() => console.log('counter =', counter.value), runtime);\ncounter.value = 1; // 本地写入，Effect 自动重跑\n\nstop.dispose();\ncounter.dispose();",
+            "import { createRuntime } from '@migaia/reactive';\nimport { sharedInt32 } from '@migaia/store-shared';\n\nconst mainRuntime = createRuntime();\nconst shared = sharedInt32(mainRuntime, 0);\nworker.postMessage({ buffer: shared.buffer }); // SharedArrayBuffer 可以直接传递，不会被拷贝\n\n// worker 内\nconst workerRuntime = createRuntime();\nconst mirror = sharedInt32(workerRuntime, 0, receivedBuffer); // initialValue 被忽略，附着已有数据\nmirror.watch();"
+          ],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const sharedInt32: (runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer) => SharedInt32Signal;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use sharedInt32 when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when sharedInt32 does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "sharedInt32 is part of this module's public const contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import sharedInt32 from @migaia/store-shared, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use sharedInt32 when its const contract and declared inputs match the result you need. Choose a different public symbol when sharedInt32 does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for sharedInt32."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for sharedInt32."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-shared/dist/shared-state.d.ts:sharedInt32:export declare const sharedInt32: (runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer) => SharedInt32Signal;",
+          "guidance": [
+            {
+              "id": "2-不支持-atomics-waitasync-的环境-手动轮询-错误码分支",
+              "heading": "2. 不支持 Atomics.waitAsync 的环境：手动轮询 + 错误码分支",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { StoreSharedErrorCode, sharedInt32Array } from '@migaia/store-shared';\n\nconst positions = sharedInt32Array(runtime, 1000, { buffer: sharedBuffer });\n\nlet stopWatch: (() => void) | undefined;\ntry {\n  stopWatch = positions.watch();\n} catch (error) {\n  if ((error as { code?: string }).code === StoreSharedErrorCode.envUnsupported) {\n    const timer = setInterval(() => {\n      const changed = positions.sync();\n      if (changed > 0) console.log(`${changed} 个下标发生了远端变化`);\n    }, 100);\n    stopWatch = () => clearInterval(timer);\n  } else {\n    throw error;\n  }\n}"
+                }
+              ]
+            },
+            {
+              "id": "5-用-createstoresharedrangeerror-包装上层校验-保持同一套错误身份",
+              "heading": "5. 用 createStoreSharedRangeError 包装上层校验，保持同一套错误身份",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreSharedErrorCode,\n  createStoreSharedRangeError,\n  sharedInt32Array\n} from '@migaia/store-shared';\n\nfunction createEntityGrid(runtime: IRuntime, entityCount: number) {\n  if (entityCount <= 0) {\n    throw createStoreSharedRangeError(\n      StoreSharedErrorCode.invalidOption,\n      'entityCount must be a positive integer'\n    );\n  }\n  return sharedInt32Array(runtime, entityCount * 2); // 每个实体占 [x, y] 两格\n}"
+                }
+              ]
+            }
+          ],
+          "usageScore": 82,
+          "configuration": [],
+          "fragment": "store-shared-index--sharedInt32"
+        },
+        {
+          "name": "sharedInt32Array",
+          "kind": "const",
+          "signature": "export declare const sharedInt32Array: (runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }) => SharedInt32Array;",
+          "declarationLine": 84,
+          "source": "packages/store-shared/dist/shared-state.d.ts",
+          "purpose": "sharedInt32Array is part of this module's public const contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for sharedInt32Array.",
+          "advanced": "No additional advanced behavior is declared for sharedInt32Array.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for sharedInt32Array."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for sharedInt32Array.",
+          "examples": [
+            "import { createRuntime } from '@migaia/reactive';\nimport {\n  sharedInt32,\n  SharedInt32Signal,\n  sharedInt32Array,\n  SharedInt32Array,\n  SharedWaitMode,\n  type ISharedWaitMode,\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';",
+            "function sharedInt32Array(\n  runtime: IRuntime,\n  length: number,\n  options?: {\n    readonly buffer?: SharedArrayBuffer;\n    readonly initialValues?: Iterable<number>;\n  }\n): SharedInt32Array;\n\nclass SharedInt32Array implements IDisposable {\n  constructor(\n    runtime: IRuntime,\n    length: number,\n    options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number> }\n  );\n}",
+            "const runtime = createRuntime();\nconst grid = sharedInt32Array(runtime, 4, { initialValues: [0, 0, 0, 0] });\ngrid.set(0, 10);\ngrid.get(0); // 10\ngrid.update(1, (v) => v + 1); // 1\ngrid.snapshot(); // Int32Array [10, 1, 0, 0]\ngrid.dispose();\ngrid.get(0); // 抛 Error（code: 'ARRAY_DISPOSED'）",
+            "// main.ts\nimport { createRuntime, Effect } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nconst runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000);\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nworker.postMessage({ buffer: positions.buffer });\n\nconst stopWatch = positions.watch(); // worker 的写入自动推送进来\n\nconst render = new Effect(() => {\n  drawEntity(0, positions.get(0), positions.get(1));\n}, runtime);\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose();\n  stopWatch();\n  positions.dispose();\n  worker.terminate();\n});",
+            "// worker.ts\nimport { createRuntime } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nself.onmessage = (event: MessageEvent<{ buffer: SharedArrayBuffer }>) => {\n  const runtime = createRuntime();\n  const positions = sharedInt32Array(runtime, 1000, { buffer: event.data.buffer });\n\n  setInterval(() => {\n    positions.update(0, (x) => x + 1); // 每帧推进实体 0 的 x 坐标\n  }, 16);\n};",
+            "const positions = sharedInt32Array(runtime, 1000, { buffer: sharedBuffer });\n\nsetInterval(() => {\n  const changed = positions.sync(); // 返回本轮实际变化的下标个数\n  if (changed > 0) console.log(`${changed} 个下标发生了远端变化`);\n}, 100);",
+            "import { sharedInt32Array, SharedInt32Array } from '@migaia/store-shared';\nimport { createRuntime, Effect } from '@migaia/reactive';",
+            "const runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000, { initialValues: [0, 0] });\n\nconst render = new Effect(() => {\n  drawEntity(positions.get(0), positions.get(1)); // 只追踪被读取的下标\n}, runtime);\n\npositions.set(0, 10); // 只惊动依赖下标 0 的观察者\npositions.update(1, (y) => y + 1); // 读-改-写，内部 CAS 重试\n\nrender.dispose();\npositions.dispose();",
+            "// main.ts\nimport { createRuntime, Effect } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nconst runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000); // 500 个实体的 x/y\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nworker.postMessage({ buffer: positions.buffer });\n\nconst stopWatch = positions.watch(); // worker 的写入自动推送进来\nconst render = new Effect(() => drawEntity(0, positions.get(0), positions.get(1)), runtime);\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose();\n  stopWatch();\n  positions.dispose();\n  worker.terminate();\n});",
+            "// worker.ts\nimport { createRuntime } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nself.onmessage = (event: MessageEvent<{ buffer: SharedArrayBuffer }>) => {\n  const runtime = createRuntime();\n  const positions = sharedInt32Array(runtime, 1000, { buffer: event.data.buffer });\n  setInterval(() => positions.update(0, (x) => x + 1), 16);\n};",
+            "import { StoreSharedErrorCode, sharedInt32Array } from '@migaia/store-shared';\n\nconst positions = sharedInt32Array(runtime, 1000, { buffer: sharedBuffer });\n\nlet stopWatch: (() => void) | undefined;\ntry {\n  stopWatch = positions.watch();\n} catch (error) {\n  if ((error as { code?: string }).code === StoreSharedErrorCode.envUnsupported) {\n    const timer = setInterval(() => {\n      const changed = positions.sync();\n      if (changed > 0) console.log(`${changed} 个下标发生了远端变化`);\n    }, 100);\n    stopWatch = () => clearInterval(timer);\n  } else {\n    throw error;\n  }\n}",
+            "import {\n  StoreSharedErrorCode,\n  createStoreSharedRangeError,\n  sharedInt32Array\n} from '@migaia/store-shared';\n\nfunction createEntityGrid(runtime: IRuntime, entityCount: number) {\n  if (entityCount <= 0) {\n    throw createStoreSharedRangeError(\n      StoreSharedErrorCode.invalidOption,\n      'entityCount must be a positive integer'\n    );\n  }\n  return sharedInt32Array(runtime, entityCount * 2); // 每个实体占 [x, y] 两格\n}"
+          ],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const sharedInt32Array: (runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }) => SharedInt32Array;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use sharedInt32Array when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when sharedInt32Array does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "sharedInt32Array is part of this module's public const contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import sharedInt32Array from @migaia/store-shared, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use sharedInt32Array when its const contract and declared inputs match the result you need. Choose a different public symbol when sharedInt32Array does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for sharedInt32Array."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for sharedInt32Array."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-shared/dist/shared-state.d.ts:sharedInt32Array:export declare const sharedInt32Array: (runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }) => SharedInt32Array;",
+          "guidance": [
+            {
+              "id": "2-不支持-atomics-waitasync-的环境-手动轮询-错误码分支",
+              "heading": "2. 不支持 Atomics.waitAsync 的环境：手动轮询 + 错误码分支",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { StoreSharedErrorCode, sharedInt32Array } from '@migaia/store-shared';\n\nconst positions = sharedInt32Array(runtime, 1000, { buffer: sharedBuffer });\n\nlet stopWatch: (() => void) | undefined;\ntry {\n  stopWatch = positions.watch();\n} catch (error) {\n  if ((error as { code?: string }).code === StoreSharedErrorCode.envUnsupported) {\n    const timer = setInterval(() => {\n      const changed = positions.sync();\n      if (changed > 0) console.log(`${changed} 个下标发生了远端变化`);\n    }, 100);\n    stopWatch = () => clearInterval(timer);\n  } else {\n    throw error;\n  }\n}"
+                }
+              ]
+            },
+            {
+              "id": "5-用-createstoresharedrangeerror-包装上层校验-保持同一套错误身份",
+              "heading": "5. 用 createStoreSharedRangeError 包装上层校验，保持同一套错误身份",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreSharedErrorCode,\n  createStoreSharedRangeError,\n  sharedInt32Array\n} from '@migaia/store-shared';\n\nfunction createEntityGrid(runtime: IRuntime, entityCount: number) {\n  if (entityCount <= 0) {\n    throw createStoreSharedRangeError(\n      StoreSharedErrorCode.invalidOption,\n      'entityCount must be a positive integer'\n    );\n  }\n  return sharedInt32Array(runtime, entityCount * 2); // 每个实体占 [x, y] 两格\n}"
+                }
+              ]
+            }
+          ],
+          "usageScore": 126,
+          "configuration": [],
+          "fragment": "store-shared-index--sharedInt32Array-const"
+        },
+        {
+          "name": "SharedInt32Array",
+          "kind": "class",
+          "signature": "export declare class SharedInt32Array implements IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly length: number; constructor(runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }); get disposed(): boolean; get(index: number): number; set(index: number, value: number): void; /** * 读-改-写。 * * 用户回调**在锁外**执行：持锁期间调用别人的代码，一旦它抛错就留下一把奇数的 死锁，之后所有读者都会自旋到上限然后抛。所以先一致读、锁外算、再带期望值写， 值被别人改掉就重来。 因此 * `update` 回调必须纯且可重复执行；不要在回调中埋点、发请求或产生不可逆副作用。 */ update(index: number, update: (current: number) => number): number; /** * Scan for remote writes and notify only affected index observers. * * `watch()` 起了回路之后不必手动调；没有 waitAsync 的环境仍可从消息循环 pump。 */ sync(index?: number): number; /** * 起一条 waitAsync 回路覆盖整片。 * * 等的是 epoch 而不是逐格的 seq：一格一个 waiter 在长数组上不可行。醒来后 `sync()` 扫描，只有真正变了的格会通知它自己的观察者。 */ watch(): IDisposer; snapshot(): Int32Array; /** Release cells that no longer have observers after high-churn access. */ prune(): number; dispose(): void; assertActive(): void; /** 一致读某一格：value 与 version 同源。 */ readCell(index: number): { readonly value: number; readonly version: bigint; }; /** 写某一格；返回新版本，或 undefined 表示没写（值未变或期望值不符）。 */ writeCell(index: number, value: number, expected?: number): bigint | undefined; /** Advance the shared 64-bit generation and wake every independent reader cursor. */ notifyWaiters(): void; /** Keep array-level pull bookkeeping aligned with local cell writes. */ recordObservedVersion(index: number, version: bigint): void; }",
+          "declarationLine": 36,
+          "source": "packages/store-shared/dist/shared-state.d.ts",
+          "purpose": "Fixed-layout, index-granular shared state for Workers. Each element owns a value/seq pair in the SharedArrayBuffer, so changing one conversation slot does not invalidate readers of every other slot.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for SharedInt32Array.",
+          "advanced": "No additional advanced behavior is declared for SharedInt32Array.",
+          "parameters": [
+            "runtime: IRuntime",
+            "length: number",
+            "options: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; } (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": false
+            },
+            {
+              "name": "length",
+              "type": "number",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "{ readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }",
+              "optional": true
+            }
+          ],
+          "returns": "No explicit return annotation is declared for this class.",
+          "errors": ["No documented errors are declared for SharedInt32Array."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for SharedInt32Array.",
+          "examples": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare class SharedInt32Array implements IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly length: number; constructor(runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }); get disposed(): boolean; get(index: number): number; set(index: number, value: number): void; /** * 读-改-写。 * * 用户回调**在锁外**执行：持锁期间调用别人的代码，一旦它抛错就留下一把奇数的 死锁，之后所有读者都会自旋到上限然后抛。所以先一致读、锁外算、再带期望值写， 值被别人改掉就重来。 因此 * `update` 回调必须纯且可重复执行；不要在回调中埋点、发请求或产生不可逆副作用。 */ update(index: number, update: (current: number) => number): number; /** * Scan for remote writes and notify only affected index observers. * * `watch()` 起了回路之后不必手动调；没有 waitAsync 的环境仍可从消息循环 pump。 */ sync(index?: number): number; /** * 起一条 waitAsync 回路覆盖整片。 * * 等的是 epoch 而不是逐格的 seq：一格一个 waiter 在长数组上不可行。醒来后 `sync()` 扫描，只有真正变了的格会通知它自己的观察者。 */ watch(): IDisposer; snapshot(): Int32Array; /** Release cells that no longer have observers after high-churn access. */ prune(): number; dispose(): void; assertActive(): void; /** 一致读某一格：value 与 version 同源。 */ readCell(index: number): { readonly value: number; readonly version: bigint; }; /** 写某一格；返回新版本，或 undefined 表示没写（值未变或期望值不符）。 */ writeCell(index: number, value: number, expected?: number): bigint | undefined; /** Advance the shared 64-bit generation and wake every independent reader cursor. */ notifyWaiters(): void; /** Keep array-level pull bookkeeping aligned with local cell writes. */ recordObservedVersion(index: number, version: bigint): void; }"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "runtime",
+                "type": "IRuntime",
+                "optional": false
+              },
+              {
+                "name": "length",
+                "type": "number",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "{ readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": [],
+          "whenToUse": "Use SharedInt32Array when its class contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when SharedInt32Array does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Fixed-layout, index-granular shared state for Workers. Each element owns a value/seq pair in the SharedArrayBuffer, so changing one conversation slot does not invalidate readers of every other slot."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import SharedInt32Array from @migaia/store-shared, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use SharedInt32Array when its class contract and declared inputs match the result you need. Choose a different public symbol when SharedInt32Array does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained class example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for SharedInt32Array."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for SharedInt32Array."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-shared/dist/shared-state.d.ts:SharedInt32Array:export declare class SharedInt32Array implements IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly length: number; constructor(runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }); get disposed(): boolean; get(index: number): number; set(index: number, value: number): void; /** * 读-改-写。 * * 用户回调**在锁外**执行：持锁期间调用别人的代码，一旦它抛错就留下一把奇数的 死锁，之后所有读者都会自旋到上限然后抛。所以先一致读、锁外算、再带期望值写， 值被别人改掉就重来。 因此 * `update` 回调必须纯且可重复执行；不要在回调中埋点、发请求或产生不可逆副作用。 */ update(index: number, update: (current: number) => number): number; /** * Scan for remote writes and notify only affected index observers. * * `watch()` 起了回路之后不必手动调；没有 waitAsync 的环境仍可从消息循环 pump。 */ sync(index?: number): number; /** * 起一条 waitAsync 回路覆盖整片。 * * 等的是 epoch 而不是逐格的 seq：一格一个 waiter 在长数组上不可行。醒来后 `sync()` 扫描，只有真正变了的格会通知它自己的观察者。 */ watch(): IDisposer; snapshot(): Int32Array; /** Release cells that no longer have observers after high-churn access. */ prune(): number; dispose(): void; assertActive(): void; /** 一致读某一格：value 与 version 同源。 */ readCell(index: number): { readonly value: number; readonly version: bigint; }; /** 写某一格；返回新版本，或 undefined 表示没写（值未变或期望值不符）。 */ writeCell(index: number, value: number, expected?: number): bigint | undefined; /** Advance the shared 64-bit generation and wake every independent reader cursor. */ notifyWaiters(): void; /** Keep array-level pull bookkeeping aligned with local cell writes. */ recordObservedVersion(index: number, version: bigint): void; }",
+          "guidance": [
+            {
+              "id": "5-3-createstoresharederror-createstoresharedrangeerror",
+              "heading": "5.3 createStoreSharedError / createStoreSharedRangeError",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "function createStoreSharedError(\n  code: IStoreSharedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\n\nfunction createStoreSharedRangeError(\n  code: IStoreSharedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): RangeError;"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "两者都是本包内部构造错误时使用的工厂：先 `new Error(message, options?cause !== undefined ? { cause } : undefined)`（或 `RangeError`），再用 `attachErrorIdentity(error, { source: STORE_SHARED_SOURCE, code })` 挂上身份字段。两者签名与行为完全一致，唯一区别是构造出的运行时错误类型（`Error` vs `RangeError`）。公开导出是为了让在 `@migaia/store-shared` 之上做薄封装的调用方（例如包装 `SharedInt32Array` 的上层库）可以抛出携带同一套 `(source, code)` 身份契约的错误，而不必自己重新实现 `attachErrorIdentity` 调用。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`options.cause` 省略时不会传 `cause` 给底层 `Error` 构造函数（区别于显式传 `undefined`，两者在 `Error` 构造语义上是等价的，这里只是实现细节）。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreSharedRangeError(\n  StoreSharedErrorCode.invalidOption,\n  'entityCount must be a positive integer'\n);"
+                }
+              ]
+            },
+            {
+              "id": "10-错误一览表",
+              "heading": "10. 错误一览表",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["`code`", "触发条件", "抛出方式"],
+                  "rows": [
+                    [
+                      "`SIGNAL_DISPOSED`",
+                      "`SharedInt32Signal` 已 `dispose()` 后继续访问 `value`/`sync()`/`watch()`/`peek()`",
+                      "`Error`"
+                    ],
+                    [
+                      "`ARRAY_DISPOSED`",
+                      "`SharedInt32Array` 已 `dispose()` 后继续访问 `get`/`set`/`update`/`sync`/`watch`/`snapshot`/`prune`/`assertActive`",
+                      "`Error`"
+                    ],
+                    [
+                      "`BUFFER_TOO_SMALL`",
+                      "传入的 `buffer` 小于 `SharedInt32Signal`（8 字节）或按 `SharedInt32Array` 的 `length` 推算出的所需大小",
+                      "`RangeError`，构造时"
+                    ],
+                    [
+                      "`INDEX_OUT_OF_RANGE`",
+                      "`SharedInt32Array` 的 `get`/`set`/`update`/`sync(index)` 下标越界或非整数",
+                      "`RangeError`，调用时"
+                    ],
+                    [
+                      "`CONTENTION_LIMIT`",
+                      "一致读自旋 65536 次未 settle，或获取写锁自旋 65536 次未成功，或 `update()` 的 CAS 重试自旋 65536 次仍未写入",
+                      "`Error`"
+                    ],
+                    [
+                      "`ENV_UNSUPPORTED`",
+                      "当前运行环境不支持 `Atomics.waitAsync`，却调用了 `.watch()`",
+                      "`Error`，`watch()` 调用时"
+                    ],
+                    [
+                      "`INVALID_OPTION`",
+                      "构造/写入口参非法：`buffer` 类型不对、`options` 不是对象、`options` 读取失败、`length` 非法、`initialValues` 物化失败、`length` 换算出的 slot 数超限、写入值不是合法 int32、`update()` 的回调不是函数",
+                      "`TypeError` 或 `RangeError`，构造/调用时"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "所有错误都携带 `source: '@migaia/store-shared'` 与上表对应的 `code`（通过 `attachErrorIdentity` 挂载），可用 `error.code === StoreSharedErrorCode.xxx` 分支处理，见 README 的 错误身份 小节。`CONTENTION_LIMIT` 系列几乎总是意味着另一个持锁的写者异常终止（线程被强制终止、页面崩溃）而没有走到释放锁那一步——共享内存里的 seq 会永远停在奇数。这类错误没有应用层可以自动恢复的办法，通常需要重新创建一块 buffer 并放弃旧的那份共享状态。"
+                }
+              ]
+            },
+            {
+              "id": "错误身份-storesharederrorcode-store-shared-source-createstoresharederror-createstoresharedrangeerror",
+              "heading": "错误身份：StoreSharedErrorCode / STORE_SHARED_SOURCE / createStoreSharedError / createStoreSharedRangeError",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`StoreSharedErrorCode`｜3 秒上手 —— 稳定错误码表，用于 `switch`/比较（无调用形式，是一个常量对象）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "try {\n  counter.value = 1;\n} catch (error) {\n  if ((error as { code?: string }).code === StoreSharedErrorCode.signalDisposed) {\n    // 信号已释放，需要重新 attach 到同一个 buffer 创建新实例\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部取值（本包内部抛出的每一个错误都会带上其中之一作为 `code` 字段）："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`arrayDisposed`(`'ARRAY_DISPOSED'`) —— `SharedInt32Array` 已 `dispose()` 后继续读写；调用方应新建数组，不要复用已释放实例",
+                    "`signalDisposed`(`'SIGNAL_DISPOSED'`) —— `SharedInt32Signal` 已 `dispose()` 后继续读写；同上，新建 signal",
+                    "`bufferTooSmall`(`'BUFFER_TOO_SMALL'`) —— 传入的 `SharedArrayBuffer` 太小，放不下要求的 cell 布局；调用方应分配更大的 buffer，这是构造期参数错误，不要重试同一 buffer",
+                    "`indexOutOfRange`(`'INDEX_OUT_OF_RANGE'`) —— `SharedInt32Array` 下标越界；调用方检查下标是否在 `[0, length)`，这是永久性参数错误",
+                    "`contentionLimit`(`'CONTENTION_LIMIT'`) —— Seqlock 在自旋上限内未 settle（cell 未稳定/锁未获取/`update` 持续失败）；通常是某个写者持锁期间崩溃留下的死锁，无法自愈，调用方应重建 buffer",
+                    "`envUnsupported`(`'ENV_UNSUPPORTED'`) —— `Atomics.waitAsync` 在当前环境不可用；调用方改用 `sync()` 自行拉取，或换支持 `waitAsync` 的运行时，库不做静默降级",
+                    "`invalidOption`(`'INVALID_OPTION'`) —— 构造/写入口参非法（长度非负整数、int32 范围等）；调用方修正入参，这是永久性参数错误"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`IStoreSharedErrorCode` 是其取值的联合类型。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`STORE_SHARED_SOURCE`｜3 秒上手 —— 本包所有错误统一携带的 `source` 值（字符串常量，无调用形式）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "STORE_SHARED_SOURCE; // '@migaia/store-shared'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreSharedError`｜5 秒上手 —— 构造一个带 `(source, code)` 身份标记的 `Error`（用于组合本包之上的自定义封装时，抛出与本包同一套身份契约的错误）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreSharedError(\n  StoreSharedErrorCode.invalidOption,\n  'entity slot must be preallocated'\n);"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部参数：`code: IStoreSharedErrorCode`（必填）、`message: string`（必填）、`options?: { readonly cause?: unknown }`（可选，透传给 `Error` 构造函数的 `cause`）。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreSharedRangeError`｜5 秒上手 —— 与上面相同，但构造 `RangeError`（本包自身校验入参失败时用的就是它）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreSharedRangeError(StoreSharedErrorCode.invalidOption, 'length must be >= 0');"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "参数与 `createStoreSharedError` 完全一致，唯一区别是返回的运行时类型是 `RangeError`。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 126,
+          "configuration": [],
+          "fragment": "store-shared-index--SharedInt32Array-class"
+        },
+        {
+          "name": "SharedInt32Signal",
+          "kind": "class",
+          "signature": "export declare class SharedInt32Signal implements IObservable, IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly subs: ReadonlySet<IObserver>; get version(): number; constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer); get disposed(): boolean; get value(): number; set value(next: number); /** * Pull remote writes into this Runtime. * * `watch()` 起了回路之后就不必手动调它；没有 waitAsync 的环境仍可从自己的消息 循环里 pump。 */ sync(): boolean; /** * 起一条 waitAsync 回路：远端写入直接推到本 Runtime，不必再 pump `sync()`。 * * 返回停止函数；`dispose()` 也会停。 */ watch(): IDisposer; peek(): number; onObserved(): void; onUnobserved(): void; isStale(): boolean; dispose(): void; }",
+          "declarationLine": 2,
+          "source": "packages/store-shared/dist/shared-state.d.ts",
+          "purpose": "SharedInt32Signal is part of this module's public class contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for SharedInt32Signal.",
+          "advanced": "No additional advanced behavior is declared for SharedInt32Signal.",
+          "parameters": [
+            "runtime: IRuntime",
+            "initialValue: number (optional)",
+            "buffer: SharedArrayBuffer (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": false
+            },
+            {
+              "name": "initialValue",
+              "type": "number",
+              "optional": true
+            },
+            {
+              "name": "buffer",
+              "type": "SharedArrayBuffer",
+              "optional": true
+            }
+          ],
+          "returns": "No explicit return annotation is declared for this class.",
+          "errors": ["No documented errors are declared for SharedInt32Signal."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for SharedInt32Signal.",
+          "examples": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare class SharedInt32Signal implements IObservable, IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly subs: ReadonlySet<IObserver>; get version(): number; constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer); get disposed(): boolean; get value(): number; set value(next: number); /** * Pull remote writes into this Runtime. * * `watch()` 起了回路之后就不必手动调它；没有 waitAsync 的环境仍可从自己的消息 循环里 pump。 */ sync(): boolean; /** * 起一条 waitAsync 回路：远端写入直接推到本 Runtime，不必再 pump `sync()`。 * * 返回停止函数；`dispose()` 也会停。 */ watch(): IDisposer; peek(): number; onObserved(): void; onUnobserved(): void; isStale(): boolean; dispose(): void; }"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "runtime",
+                "type": "IRuntime",
+                "optional": false
+              },
+              {
+                "name": "initialValue",
+                "type": "number",
+                "optional": true
+              },
+              {
+                "name": "buffer",
+                "type": "SharedArrayBuffer",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": [],
+          "whenToUse": "Use SharedInt32Signal when its class contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when SharedInt32Signal does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "SharedInt32Signal is part of this module's public class contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import SharedInt32Signal from @migaia/store-shared, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use SharedInt32Signal when its class contract and declared inputs match the result you need. Choose a different public symbol when SharedInt32Signal does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained class example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for SharedInt32Signal."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for SharedInt32Signal."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-shared/dist/shared-state.d.ts:SharedInt32Signal:export declare class SharedInt32Signal implements IObservable, IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly subs: ReadonlySet<IObserver>; get version(): number; constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer); get disposed(): boolean; get value(): number; set value(next: number); /** * Pull remote writes into this Runtime. * * `watch()` 起了回路之后就不必手动调它；没有 waitAsync 的环境仍可从自己的消息 循环里 pump。 */ sync(): boolean; /** * 起一条 waitAsync 回路：远端写入直接推到本 Runtime，不必再 pump `sync()`。 * * 返回停止函数；`dispose()` 也会停。 */ watch(): IDisposer; peek(): number; onObserved(): void; onUnobserved(): void; isStale(): boolean; dispose(): void; }",
+          "guidance": [
+            {
+              "id": "10-错误一览表",
+              "heading": "10. 错误一览表",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["`code`", "触发条件", "抛出方式"],
+                  "rows": [
+                    [
+                      "`SIGNAL_DISPOSED`",
+                      "`SharedInt32Signal` 已 `dispose()` 后继续访问 `value`/`sync()`/`watch()`/`peek()`",
+                      "`Error`"
+                    ],
+                    [
+                      "`ARRAY_DISPOSED`",
+                      "`SharedInt32Array` 已 `dispose()` 后继续访问 `get`/`set`/`update`/`sync`/`watch`/`snapshot`/`prune`/`assertActive`",
+                      "`Error`"
+                    ],
+                    [
+                      "`BUFFER_TOO_SMALL`",
+                      "传入的 `buffer` 小于 `SharedInt32Signal`（8 字节）或按 `SharedInt32Array` 的 `length` 推算出的所需大小",
+                      "`RangeError`，构造时"
+                    ],
+                    [
+                      "`INDEX_OUT_OF_RANGE`",
+                      "`SharedInt32Array` 的 `get`/`set`/`update`/`sync(index)` 下标越界或非整数",
+                      "`RangeError`，调用时"
+                    ],
+                    [
+                      "`CONTENTION_LIMIT`",
+                      "一致读自旋 65536 次未 settle，或获取写锁自旋 65536 次未成功，或 `update()` 的 CAS 重试自旋 65536 次仍未写入",
+                      "`Error`"
+                    ],
+                    [
+                      "`ENV_UNSUPPORTED`",
+                      "当前运行环境不支持 `Atomics.waitAsync`，却调用了 `.watch()`",
+                      "`Error`，`watch()` 调用时"
+                    ],
+                    [
+                      "`INVALID_OPTION`",
+                      "构造/写入口参非法：`buffer` 类型不对、`options` 不是对象、`options` 读取失败、`length` 非法、`initialValues` 物化失败、`length` 换算出的 slot 数超限、写入值不是合法 int32、`update()` 的回调不是函数",
+                      "`TypeError` 或 `RangeError`，构造/调用时"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "所有错误都携带 `source: '@migaia/store-shared'` 与上表对应的 `code`（通过 `attachErrorIdentity` 挂载），可用 `error.code === StoreSharedErrorCode.xxx` 分支处理，见 README 的 错误身份 小节。`CONTENTION_LIMIT` 系列几乎总是意味着另一个持锁的写者异常终止（线程被强制终止、页面崩溃）而没有走到释放锁那一步——共享内存里的 seq 会永远停在奇数。这类错误没有应用层可以自动恢复的办法，通常需要重新创建一块 buffer 并放弃旧的那份共享状态。"
+                }
+              ]
+            },
+            {
+              "id": "错误身份-storesharederrorcode-store-shared-source-createstoresharederror-createstoresharedrangeerror",
+              "heading": "错误身份：StoreSharedErrorCode / STORE_SHARED_SOURCE / createStoreSharedError / createStoreSharedRangeError",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`StoreSharedErrorCode`｜3 秒上手 —— 稳定错误码表，用于 `switch`/比较（无调用形式，是一个常量对象）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "try {\n  counter.value = 1;\n} catch (error) {\n  if ((error as { code?: string }).code === StoreSharedErrorCode.signalDisposed) {\n    // 信号已释放，需要重新 attach 到同一个 buffer 创建新实例\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部取值（本包内部抛出的每一个错误都会带上其中之一作为 `code` 字段）："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`arrayDisposed`(`'ARRAY_DISPOSED'`) —— `SharedInt32Array` 已 `dispose()` 后继续读写；调用方应新建数组，不要复用已释放实例",
+                    "`signalDisposed`(`'SIGNAL_DISPOSED'`) —— `SharedInt32Signal` 已 `dispose()` 后继续读写；同上，新建 signal",
+                    "`bufferTooSmall`(`'BUFFER_TOO_SMALL'`) —— 传入的 `SharedArrayBuffer` 太小，放不下要求的 cell 布局；调用方应分配更大的 buffer，这是构造期参数错误，不要重试同一 buffer",
+                    "`indexOutOfRange`(`'INDEX_OUT_OF_RANGE'`) —— `SharedInt32Array` 下标越界；调用方检查下标是否在 `[0, length)`，这是永久性参数错误",
+                    "`contentionLimit`(`'CONTENTION_LIMIT'`) —— Seqlock 在自旋上限内未 settle（cell 未稳定/锁未获取/`update` 持续失败）；通常是某个写者持锁期间崩溃留下的死锁，无法自愈，调用方应重建 buffer",
+                    "`envUnsupported`(`'ENV_UNSUPPORTED'`) —— `Atomics.waitAsync` 在当前环境不可用；调用方改用 `sync()` 自行拉取，或换支持 `waitAsync` 的运行时，库不做静默降级",
+                    "`invalidOption`(`'INVALID_OPTION'`) —— 构造/写入口参非法（长度非负整数、int32 范围等）；调用方修正入参，这是永久性参数错误"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`IStoreSharedErrorCode` 是其取值的联合类型。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`STORE_SHARED_SOURCE`｜3 秒上手 —— 本包所有错误统一携带的 `source` 值（字符串常量，无调用形式）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "STORE_SHARED_SOURCE; // '@migaia/store-shared'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreSharedError`｜5 秒上手 —— 构造一个带 `(source, code)` 身份标记的 `Error`（用于组合本包之上的自定义封装时，抛出与本包同一套身份契约的错误）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreSharedError(\n  StoreSharedErrorCode.invalidOption,\n  'entity slot must be preallocated'\n);"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部参数：`code: IStoreSharedErrorCode`（必填）、`message: string`（必填）、`options?: { readonly cause?: unknown }`（可选，透传给 `Error` 构造函数的 `cause`）。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreSharedRangeError`｜5 秒上手 —— 与上面相同，但构造 `RangeError`（本包自身校验入参失败时用的就是它）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreSharedRangeError(StoreSharedErrorCode.invalidOption, 'length must be >= 0');"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "参数与 `createStoreSharedError` 完全一致，唯一区别是返回的运行时类型是 `RangeError`。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 100,
+          "configuration": [],
+          "fragment": "store-shared-index--SharedInt32Signal"
+        },
+        {
+          "name": "SharedWaitMode",
+          "kind": "const",
+          "signature": "export declare const SharedWaitMode: { readonly async: \"async\"; };",
+          "declarationLine": 2,
+          "source": "packages/store-shared/dist/shared-constants.d.ts",
+          "purpose": "Shared-state wait modes used when Atomics.waitAsync is available.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for SharedWaitMode.",
+          "advanced": "No additional advanced behavior is declared for SharedWaitMode.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for SharedWaitMode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for SharedWaitMode.",
+          "examples": [
+            "import { createRuntime } from '@migaia/reactive';\nimport {\n  sharedInt32,\n  SharedInt32Signal,\n  sharedInt32Array,\n  SharedInt32Array,\n  SharedWaitMode,\n  type ISharedWaitMode,\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';",
+            "const SharedWaitMode: { readonly async: 'async' };\ntype ISharedWaitMode = 'async';",
+            "import { SharedWaitMode, type ISharedWaitMode } from '@migaia/store-shared';\n\nconst currentMode: ISharedWaitMode = SharedWaitMode.async;",
+            "import { SharedWaitMode, type ISharedWaitMode } from '@migaia/store-shared';",
+            "function describeWaitMode(mode: ISharedWaitMode): string {\n  return mode === SharedWaitMode.async ? '基于 Atomics.waitAsync 的异步唤醒' : mode;\n}"
+          ],
+          "aliasOf": "SharedWaitMode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const SharedWaitMode: { readonly async: \"async\"; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use SharedWaitMode when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when SharedWaitMode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Shared-state wait modes used when Atomics.waitAsync is available."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import SharedWaitMode from @migaia/store-shared, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use SharedWaitMode when its const contract and declared inputs match the result you need. Choose a different public symbol when SharedWaitMode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for SharedWaitMode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for SharedWaitMode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-shared/dist/shared-constants.d.ts:SharedWaitMode:export declare const SharedWaitMode: { readonly async: \"async\"; };",
+          "guidance": [],
+          "usageScore": 76,
+          "configuration": [],
+          "fragment": "store-shared-index--SharedWaitMode"
+        },
+        {
+          "name": "STORE_SHARED_SOURCE",
+          "kind": "const",
+          "signature": "export declare const STORE_SHARED_SOURCE = \"@migaia/store-shared\";",
+          "declarationLine": 4,
+          "source": "packages/store-shared/dist/errors.d.ts",
+          "purpose": "`source` value stamped onto every error this module throws.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for STORE_SHARED_SOURCE.",
+          "advanced": "No additional advanced behavior is declared for STORE_SHARED_SOURCE.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for STORE_SHARED_SOURCE."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for STORE_SHARED_SOURCE.",
+          "examples": [
+            "import { createRuntime } from '@migaia/reactive';\nimport {\n  sharedInt32,\n  SharedInt32Signal,\n  sharedInt32Array,\n  SharedInt32Array,\n  SharedWaitMode,\n  type ISharedWaitMode,\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';",
+            "import {\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';",
+            "const STORE_SHARED_SOURCE: '@migaia/store-shared';",
+            "STORE_SHARED_SOURCE; // '@migaia/store-shared'"
+          ],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const STORE_SHARED_SOURCE = \"@migaia/store-shared\";"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use STORE_SHARED_SOURCE when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when STORE_SHARED_SOURCE does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "`source` value stamped onto every error this module throws."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import STORE_SHARED_SOURCE from @migaia/store-shared, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use STORE_SHARED_SOURCE when its const contract and declared inputs match the result you need. Choose a different public symbol when STORE_SHARED_SOURCE does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for STORE_SHARED_SOURCE."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for STORE_SHARED_SOURCE."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-shared/dist/errors.d.ts:STORE_SHARED_SOURCE:export declare const STORE_SHARED_SOURCE = \"@migaia/store-shared\";",
+          "guidance": [
+            {
+              "id": "5-错误身份",
+              "heading": "5. 错误身份",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';"
+                }
+              ]
+            },
+            {
+              "id": "5-1-storesharederrorcode-istoresharederrorcode",
+              "heading": "5.1 StoreSharedErrorCode / IStoreSharedErrorCode",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const StoreSharedErrorCode: {\n  readonly arrayDisposed: 'ARRAY_DISPOSED';\n  readonly signalDisposed: 'SIGNAL_DISPOSED';\n  readonly bufferTooSmall: 'BUFFER_TOO_SMALL';\n  readonly indexOutOfRange: 'INDEX_OUT_OF_RANGE';\n  readonly contentionLimit: 'CONTENTION_LIMIT';\n  readonly envUnsupported: 'ENV_UNSUPPORTED';\n  readonly invalidOption: 'INVALID_OPTION';\n};\ntype IStoreSharedErrorCode = (typeof StoreSharedErrorCode)[keyof typeof StoreSharedErrorCode];"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "错误由 `(source, code)` 二元组唯一定位，`source` 恒为 `@migaia/store-shared`（即 `STORE_SHARED_SOURCE`）。码值是公开 API 的一部分，本包内部所有抛出点都引用这张表，不内联字面量；触发条件与调用方建议见 README 的对应小节与本文 §10 错误一览表。"
+                }
+              ]
+            },
+            {
+              "id": "5-3-createstoresharederror-createstoresharedrangeerror",
+              "heading": "5.3 createStoreSharedError / createStoreSharedRangeError",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "function createStoreSharedError(\n  code: IStoreSharedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\n\nfunction createStoreSharedRangeError(\n  code: IStoreSharedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): RangeError;"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "两者都是本包内部构造错误时使用的工厂：先 `new Error(message, options?cause !== undefined ? { cause } : undefined)`（或 `RangeError`），再用 `attachErrorIdentity(error, { source: STORE_SHARED_SOURCE, code })` 挂上身份字段。两者签名与行为完全一致，唯一区别是构造出的运行时错误类型（`Error` vs `RangeError`）。公开导出是为了让在 `@migaia/store-shared` 之上做薄封装的调用方（例如包装 `SharedInt32Array` 的上层库）可以抛出携带同一套 `(source, code)` 身份契约的错误，而不必自己重新实现 `attachErrorIdentity` 调用。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`options.cause` 省略时不会传 `cause` 给底层 `Error` 构造函数（区别于显式传 `undefined`，两者在 `Error` 构造语义上是等价的，这里只是实现细节）。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreSharedRangeError(\n  StoreSharedErrorCode.invalidOption,\n  'entityCount must be a positive integer'\n);"
+                }
+              ]
+            },
+            {
+              "id": "错误身份-storesharederrorcode-store-shared-source-createstoresharederror-createstoresharedrangeerror",
+              "heading": "错误身份：StoreSharedErrorCode / STORE_SHARED_SOURCE / createStoreSharedError / createStoreSharedRangeError",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`StoreSharedErrorCode`｜3 秒上手 —— 稳定错误码表，用于 `switch`/比较（无调用形式，是一个常量对象）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "try {\n  counter.value = 1;\n} catch (error) {\n  if ((error as { code?: string }).code === StoreSharedErrorCode.signalDisposed) {\n    // 信号已释放，需要重新 attach 到同一个 buffer 创建新实例\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部取值（本包内部抛出的每一个错误都会带上其中之一作为 `code` 字段）："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`arrayDisposed`(`'ARRAY_DISPOSED'`) —— `SharedInt32Array` 已 `dispose()` 后继续读写；调用方应新建数组，不要复用已释放实例",
+                    "`signalDisposed`(`'SIGNAL_DISPOSED'`) —— `SharedInt32Signal` 已 `dispose()` 后继续读写；同上，新建 signal",
+                    "`bufferTooSmall`(`'BUFFER_TOO_SMALL'`) —— 传入的 `SharedArrayBuffer` 太小，放不下要求的 cell 布局；调用方应分配更大的 buffer，这是构造期参数错误，不要重试同一 buffer",
+                    "`indexOutOfRange`(`'INDEX_OUT_OF_RANGE'`) —— `SharedInt32Array` 下标越界；调用方检查下标是否在 `[0, length)`，这是永久性参数错误",
+                    "`contentionLimit`(`'CONTENTION_LIMIT'`) —— Seqlock 在自旋上限内未 settle（cell 未稳定/锁未获取/`update` 持续失败）；通常是某个写者持锁期间崩溃留下的死锁，无法自愈，调用方应重建 buffer",
+                    "`envUnsupported`(`'ENV_UNSUPPORTED'`) —— `Atomics.waitAsync` 在当前环境不可用；调用方改用 `sync()` 自行拉取，或换支持 `waitAsync` 的运行时，库不做静默降级",
+                    "`invalidOption`(`'INVALID_OPTION'`) —— 构造/写入口参非法（长度非负整数、int32 范围等）；调用方修正入参，这是永久性参数错误"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`IStoreSharedErrorCode` 是其取值的联合类型。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`STORE_SHARED_SOURCE`｜3 秒上手 —— 本包所有错误统一携带的 `source` 值（字符串常量，无调用形式）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "STORE_SHARED_SOURCE; // '@migaia/store-shared'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreSharedError`｜5 秒上手 —— 构造一个带 `(source, code)` 身份标记的 `Error`（用于组合本包之上的自定义封装时，抛出与本包同一套身份契约的错误）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreSharedError(\n  StoreSharedErrorCode.invalidOption,\n  'entity slot must be preallocated'\n);"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部参数：`code: IStoreSharedErrorCode`（必填）、`message: string`（必填）、`options?: { readonly cause?: unknown }`（可选，透传给 `Error` 构造函数的 `cause`）。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreSharedRangeError`｜5 秒上手 —— 与上面相同，但构造 `RangeError`（本包自身校验入参失败时用的就是它）："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreSharedRangeError(StoreSharedErrorCode.invalidOption, 'length must be >= 0');"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "参数与 `createStoreSharedError` 完全一致，唯一区别是返回的运行时类型是 `RangeError`。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 78,
+          "configuration": [],
+          "fragment": "store-shared-index--STORE_SHARED_SOURCE"
+        }
+      ],
+      "aliases": []
+    }
+  ]
+}

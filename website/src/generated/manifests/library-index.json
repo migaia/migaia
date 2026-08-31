@@ -1,0 +1,237 @@
+{
+  "version": 1,
+  "libraries": [
+    {
+      "slug": "capability",
+      "description": "Store-neutral capability lifecycle and feature gate.",
+      "version": "0.0.1",
+      "exports": [".", "./graph", "./graph/dynamic", "./graph/topology"]
+    },
+    {
+      "slug": "event-subscriber",
+      "description": "Runtime-neutral transient event subscription and fan-out primitives.",
+      "version": "0.0.3",
+      "exports": ["."]
+    },
+    {
+      "slug": "lifecycle",
+      "description": "Runtime-neutral lifecycle primitives: scopes, generations, quiescence tracking and dispose transactions.",
+      "version": "0.0.2",
+      "exports": [
+        ".",
+        "./abort",
+        "./disposal",
+        "./errors",
+        "./generation",
+        "./quiescence",
+        "./scheduler",
+        "./scope"
+      ]
+    },
+    {
+      "slug": "logger",
+      "description": null,
+      "version": "0.0.5",
+      "exports": [".", "./plugins"]
+    },
+    {
+      "slug": "middleware-pipeline",
+      "description": "Runtime-neutral sync, async middleware and generator chain executors.",
+      "version": "0.0.2",
+      "exports": ["."]
+    },
+    {
+      "slug": "plugin-host",
+      "description": "Runtime-neutral plugin lifecycle, extension and pipeline host for Node.js, Bun, browsers and workers.",
+      "version": "0.0.5",
+      "exports": [".", "./defined", "./structural"]
+    },
+    {
+      "slug": "reactive",
+      "description": "Store-neutral reactive runtime, signals, computed values, and effects.",
+      "version": "0.0.2",
+      "exports": [
+        ".",
+        "./copy-check",
+        "./internals",
+        "./node-factories",
+        "./node-internals",
+        "./ownership",
+        "./reactive/*",
+        "./runtime",
+        "./source"
+      ]
+    },
+    {
+      "slug": "resource",
+      "description": "Store-neutral cancellable asynchronous reactive resources.",
+      "version": "0.0.2",
+      "exports": ["."]
+    },
+    {
+      "slug": "serialize",
+      "description": "Store-neutral chunked serialization and codec registry.",
+      "version": "0.0.2",
+      "exports": [".", "./core", "./plugins", "./registry"]
+    },
+    {
+      "slug": "storage-contract",
+      "description": "Runtime-neutral storage contract: key-value store, codec, capability, context, key-domain and contract-level error types.",
+      "version": "0.0.2",
+      "exports": ["."]
+    },
+    {
+      "slug": "storage-web",
+      "description": "Independent web storage library: localStorage, sessionStorage, cookies, IndexedDB CRUD with entity, schema and serialize extension points.",
+      "version": "0.0.3",
+      "exports": [
+        ".",
+        "./cookies",
+        "./entity",
+        "./host",
+        "./indexed-db",
+        "./local-storage",
+        "./memory",
+        "./plugins/cookies",
+        "./plugins/indexed-db",
+        "./plugins/local-storage",
+        "./plugins/memory",
+        "./plugins/reactive",
+        "./plugins/reactive/cookies",
+        "./plugins/reactive/indexed-db",
+        "./plugins/reactive/local-storage",
+        "./plugins/reactive/memory",
+        "./plugins/reactive/session-storage",
+        "./plugins/session-storage",
+        "./reactive-adapter",
+        "./schema",
+        "./serialize",
+        "./session-storage"
+      ]
+    },
+    {
+      "slug": "store-devtools",
+      "description": "Store dependency tracing, snapshots, and time travel diagnostics.",
+      "version": "0.0.1",
+      "exports": ["."]
+    },
+    {
+      "slug": "store-indexed",
+      "description": "Indexed reactive collections with lazy cell materialization.",
+      "version": "0.0.1",
+      "exports": ["."]
+    },
+    {
+      "slug": "store-keyed",
+      "description": "Definition-based keyed Store state, AtomStore, family, and optics.",
+      "version": "0.0.1",
+      "exports": [".", "./atom/definition", "./atom/store", "./reactive/atom"]
+    },
+    {
+      "slug": "store-light",
+      "description": "Minimal object-state Store facade.",
+      "version": "0.0.1",
+      "exports": ["."]
+    },
+    {
+      "slug": "store-middleware",
+      "description": "Store mutation policy and middleware pipeline.",
+      "version": "0.0.1",
+      "exports": [".", "./tolerant-clone"]
+    },
+    {
+      "slug": "store-persist",
+      "description": "Store snapshot persistence and storage adapter protocol.",
+      "version": "0.0.1",
+      "exports": [".", "./indexed", "./keyed", "./light"]
+    },
+    {
+      "slug": "store-react",
+      "description": "React Provider and hooks for the Store runtime.",
+      "version": "0.0.1",
+      "exports": ["."]
+    },
+    {
+      "slug": "store-shared",
+      "description": "SharedArrayBuffer and Atomics-backed Store state.",
+      "version": "0.0.1",
+      "exports": ["."]
+    },
+    {
+      "slug": "store-ssr",
+      "description": "Request-scoped Store SSR dehydration and hydration.",
+      "version": "0.0.1",
+      "exports": ["."]
+    },
+    {
+      "slug": "store-wasm",
+      "description": "Optional WASM-backed fields for Store light.",
+      "version": "0.0.1",
+      "exports": ["."]
+    },
+    {
+      "slug": "store-worker",
+      "description": "Worker adapters and worker-backed Resource/serialization integrations.",
+      "version": "0.0.1",
+      "exports": [".", "./serialize/*"]
+    },
+    {
+      "slug": "tray",
+      "description": null,
+      "version": "0.0.1",
+      "exports": [".", "./host"]
+    },
+    {
+      "slug": "utils",
+      "description": "Runtime-neutral reusable utility primitives.",
+      "version": "0.0.2",
+      "exports": [
+        ".",
+        "./bytes",
+        "./config",
+        "./error",
+        "./function",
+        "./number",
+        "./object",
+        "./object-path",
+        "./promise",
+        "./string",
+        "./typing",
+        "./value"
+      ]
+    },
+    {
+      "slug": "wasm",
+      "description": null,
+      "version": "0.1.0",
+      "exports": ["."]
+    },
+    {
+      "slug": "web-rpc",
+      "description": "Type-safe bidirectional RPC — schema-typed method/params/result with transport-agnostic endpoints. No dependency on Store, React, WASM, or any specific host (DOM/Node).",
+      "version": "0.0.3",
+      "exports": [
+        ".",
+        "./adapters/broadcast-channel",
+        "./adapters/memory",
+        "./adapters/message-port",
+        "./adapters/rtc-data-channel",
+        "./adapters/service-worker",
+        "./adapters/shared-worker",
+        "./adapters/web-transport",
+        "./adapters/web-worker",
+        "./adapters/window",
+        "./client",
+        "./core",
+        "./features/chunk",
+        "./features/control",
+        "./features/discovery",
+        "./features/outbound",
+        "./features/provider",
+        "./full",
+        "./protocol-constants",
+        "./provider"
+      ]
+    }
+  ]
+}

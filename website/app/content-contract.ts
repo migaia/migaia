@@ -1,5 +1,3 @@
-import apiManifest from '../src/generated/manifests/apis.json'
-import libraryManifest from '../src/generated/manifests/libraries.json'
 export { domainPath, type IDomain, type ILocale } from './route-contract.js'
 
 /** Generated library fact used by navigation and page recipes. */
@@ -76,13 +74,11 @@ export type IApiSymbol = {
     readonly optional: boolean
   }[]
   readonly examples: readonly string[]
-  /** Maintained task/configuration guidance directly bound to this public API. */
   readonly guidance: readonly {
     readonly id: string
     readonly heading: string
     readonly blocks: readonly IMaintainedBlock[]
   }[]
-  /** Object configuration fields projected from the maintained API contract. */
   readonly configuration: readonly {
     readonly name: string
     readonly type: string
@@ -100,27 +96,13 @@ export type IApiSymbol = {
     readonly example?: string
   }[]
   readonly exportPath: string
-}
-
-/** Runtime view of generated library facts. */
-export const libraries = libraryManifest.libraries as readonly ILibrary[]
-
-/** Runtime view of generated API facts. */
-export const apis = apiManifest.apis as readonly IApi[]
-
-/** Finds one library by its canonical URL slug. */
-export function findLibrary(slug: string): ILibrary | undefined {
-  return libraries.find((library) => library.slug === slug)
-}
-
-/** Finds APIs belonging to one library, preserving generated export order. */
-export function findLibraryApis(slug: string): readonly IApi[] {
-  return apis.filter((api) => api.library === slug)
+  /** Documentation-derived use frequency used only to order reader navigation. */
+  readonly usageScore: number
 }
 
 /** Converts an export path into a readable module slug without exposing repository terms. */
 export function moduleSlug(exportPath: string): string {
-  return exportPath === '.' ? 'index' : exportPath.replace(/^\.\//, '').replaceAll('/', '-')
+  return exportPath === '.' ? 'index' : exportPath.replace(/^\.\//, '').replace(/\//g, '-')
 }
 
 /** Produces a stable semantic path, adding a readable kind only for case-folding collisions. */
@@ -129,7 +111,18 @@ export function symbolSlug(
   siblings: readonly Pick<IApiSymbol, 'kind' | 'name'>[]
 ): string {
   const collisions = siblings.filter(
-    (candidate) => candidate.name.toLocaleLowerCase('en-US') === symbol.name.toLocaleLowerCase('en-US')
+    (candidate) =>
+      candidate.name.toLocaleLowerCase('en-US') === symbol.name.toLocaleLowerCase('en-US')
   )
   return `${encodeURIComponent(symbol.name)}${collisions.length > 1 ? `-${symbol.kind}` : ''}`
+}
+
+/** Distinguishes callable values from supporting constant objects using the declaration head only. */
+export function isCallableApiSymbol(
+  symbol: Pick<IApiSymbol, 'kind' | 'name' | 'signature'>
+): boolean {
+  if (symbol.kind === 'function' || symbol.kind === 'class') return true
+  if (symbol.kind !== 'const') return false
+  const escapedName = symbol.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`export declare const ${escapedName}:\\s*(?:<|\\()`).test(symbol.signature)
 }

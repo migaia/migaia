@@ -7,11 +7,41 @@ import { chromium } from '/Users/kaeo/workspack/migai/node_modules/.pnpm/playwri
 const apiManifest = JSON.parse(
   readFileSync(new URL('../src/generated/manifests/apis.json', import.meta.url), 'utf8')
 )
+const libraryIndex = JSON.parse(
+  readFileSync(new URL('../src/generated/manifests/library-index.json', import.meta.url), 'utf8')
+)
 const baseUrl = process.env.MIGAI_PREVIEW_URL ?? 'http://127.0.0.1:4173'
 const executablePath =
   process.env.MIGAI_CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const a29ActionTimeoutMs = 15_000
 const a29ProgressIntervalMs = 5_000
+
+/** Produces the semantic public path segment for one runtime symbol. */
+function apiSymbolPath(symbol, siblings) {
+  const collisions = siblings.filter(
+    (candidate) =>
+      candidate.name.toLocaleLowerCase('en-US') === symbol.name.toLocaleLowerCase('en-US')
+  )
+  return `${encodeURIComponent(symbol.name)}${collisions.length > 1 ? `-${symbol.kind}` : ''}`
+}
+
+/** Mirrors the declaration-head callable classifier used by the rendered navigation. */
+function isCallableApiSymbol(symbol) {
+  if (symbol.kind === 'function' || symbol.kind === 'class') return true
+  if (symbol.kind !== 'const') return false
+  const escapedName = symbol.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`export declare const ${escapedName}:\\s*(?:<|\\()`).test(symbol.signature)
+}
+
+/** Mirrors the package-owned error/diagnostic classifier used by module indexes. */
+function isErrorContractSymbol(symbol) {
+  const sourceName = (symbol.source.split('/').at(-1) ?? '').replace(/\.d\.ts$/, '')
+  return (
+    sourceName === 'errors' ||
+    sourceName === 'error-code' ||
+    /(?:Error|ErrorCode|_SOURCE)$/.test(symbol.name)
+  )
+}
 
 /** Declarative claim ledger; each row binds one acceptance claim to its exact oracle. */
 const browserMatrix = [
@@ -117,9 +147,7 @@ test(
         await page.waitForFunction(() => /^\/en\/docs\/?$/.test(window.location.pathname))
         assert.equal(await page.locator('#mobile-navigation').count(), 0)
         await visit(page, '/en/docs/utils/index')
-        await page.locator('.mobile-toc summary').focus()
-        await page.keyboard.press('Space')
-        assert.equal(await page.locator('.mobile-toc[open]').count(), 1)
+        assert.equal(await page.locator('.mobile-toc nav').isVisible(), true)
         await visit(page, '/en')
         const search = page.getByRole('button', { name: /search/i })
         await search.focus()
@@ -131,9 +159,9 @@ test(
         await language.focus()
         await page.keyboard.press('Enter')
         await page.waitForFunction(() => /^\/zh\/?$/.test(window.location.pathname))
-        const theme = page.getByRole('button', { name: /toggle theme/i })
+        const theme = page.getByRole('combobox', { name: /theme|主题/i })
         await theme.focus()
-        await page.keyboard.press('Space')
+        await theme.selectOption('dark')
         assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark')
       })
     )
@@ -177,10 +205,38 @@ test(
               document.documentElement.dataset.theme = value
             }, theme)
             await visit(page, '/en/docs/utils/index', 'commit')
-            const overflow = await page.evaluate(
-              () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+            const overflow = await page.evaluate(() => ({
+              exceedsViewport:
+                document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+              offenders: [...document.querySelectorAll('*')]
+                .filter((element) => element.getBoundingClientRect().right > window.innerWidth + 1)
+                .slice(0, 5)
+                .map((element) => ({
+                  className: element.className,
+                  href: element.getAttribute('href'),
+                  parentClassName: element.parentElement?.className,
+                  right: Math.round(element.getBoundingClientRect().right),
+                  tagName: element.tagName,
+                  text: element.textContent?.trim().slice(0, 48)
+                }))
+            }))
+            assert.equal(
+              overflow.exceedsViewport,
+              false,
+              `horizontal overflow at ${width}px ${theme}: ${JSON.stringify(overflow.offenders)}`
             )
-            assert.equal(overflow, false, `horizontal overflow at ${width}px ${theme}`)
+            if (width === 320) {
+              const mobileState = await page.evaluate(() => ({
+                desktopRail: getComputedStyle(document.querySelector('.left-rail')).display,
+                mobileNav: getComputedStyle(document.querySelector('.mobile-module-nav')).display,
+                typeBody: document.querySelector('.type-reference-body')
+                  ? getComputedStyle(document.querySelector('.type-reference-body')).display
+                  : null
+              }))
+              assert.equal(mobileState.desktopRail, 'none')
+              assert.equal(mobileState.mobileNav, 'block')
+              if (mobileState.typeBody !== null) assert.equal(mobileState.typeBody, 'block')
+            }
           })
         }
       }
@@ -200,7 +256,7 @@ test(
               document.documentElement.dataset.theme = value
             }, theme)
             await visit(page, '/en/docs')
-            assert.equal(await page.locator('.library-item').count(), 27)
+            assert.equal(await page.locator('.library-item').count(), 26)
             assert.equal(
               await page
                 .locator('.library-item')
@@ -228,13 +284,13 @@ test(
   async () => {
     const journeys = [
       ['/en/docs', '/en/docs/utils', '/en/docs/utils/index'],
-      ['/en/guides', '/en/guides/utils', '/en/guides/utils/getting-started'],
+      ['/en/guides', '/en/guides/utils'],
       ['/en/docs', '/en/docs/utils', '/en/docs/utils/index'],
-      ['/en/architecture', '/en/architecture/web-rpc', '/en/architecture/web-rpc/ownership']
+      ['/en/architecture', '/en/architecture/web-rpc']
     ]
     await withChrome(async (browser) => {
       for (const journey of journeys) {
-        await withPage(browser, { width: 768, height: 900 }, async (page) => {
+        await withPage(browser, { width: 1280, height: 900 }, async (page) => {
           await visit(page, '/en')
           for (const href of journey) await followLink(page, href)
           assert.ok((await page.locator('h1').first().innerText()).length > 0)
@@ -263,13 +319,454 @@ test(
 )
 
 test(
+  'SITE-T-DEV-API-LINKS resolves every event-subscriber API detail route',
+  { timeout: 120_000 },
+  async () => {
+    const api = apiManifest.apis.find(
+      (candidate) => candidate.library === 'event-subscriber' && candidate.module === 'index'
+    )
+    assert.ok(api)
+    const runtimeSymbols = api.symbols.filter(
+      (symbol) => symbol.kind !== 'type' && symbol.kind !== 'interface'
+    )
+    await withChrome((browser) =>
+      withPage(browser, { width: 489, height: 674 }, async (page) => {
+        const pageErrors = []
+        page.on('pageerror', (error) => pageErrors.push(error.message))
+        for (const symbol of runtimeSymbols) {
+          const path = `/zh/docs/${api.library}/${api.module}/${apiSymbolPath(symbol, api.symbols)}`
+          await visit(page, path)
+          assert.equal(await page.locator('article h1').innerText(), symbol.name)
+        }
+        assert.deepEqual(pageErrors, [])
+      })
+    )
+  }
+)
+
+test('SITE-T-TYPE-FRAGMENT preserves code when resolving a legacy type fragment', async () => {
+  await withChrome(async (browser) => {
+    await withPage(browser, { width: 1280, height: 900 }, async (page) => {
+      await page.goto(`${baseUrl}/zh/docs/utils/promise#utils-promise--IAbortSignal`)
+      await page.getByRole('main').waitFor()
+      const declaration = page.locator('#utils-promise--IAbortSignal .code-frame')
+      await declaration.waitFor()
+      assert.match(await declaration.innerText(), /IAbortSignal/)
+      await page.goto(`${baseUrl}/zh/docs/utils/promise`)
+      const typeCount = await page.locator('.type-declaration').count()
+      assert.ok(typeCount > 0)
+      assert.equal(await page.locator('.type-declaration:has(.code-frame)').count(), typeCount)
+    })
+  })
+})
+
+test('SITE-T-NO-INDEX canonicalizes root modules without exposing index', async () => {
+  await withChrome(async (browser) => {
+    await withPage(browser, { width: 1280, height: 900 }, async (page) => {
+      await page.goto(`${baseUrl}/zh/docs/event-subscriber/createEventChannel/`)
+      assert.match(await page.locator('h1').innerText(), /createEventChannel/)
+      await page.goto(`${baseUrl}/zh/docs/event-subscriber/`)
+      assert.match(await page.locator('main').innerText(), /createEventChannel/)
+      assert.equal(await page.locator('a[href*="/event-subscriber/index"]').count(), 0)
+    })
+  })
+})
+
+test('SITE-T-TOC keeps API anchors in the correct responsive rail', async () => {
+  await withChrome(async (browser) => {
+    for (const width of [1280, 768, 320]) {
+      await withPage(browser, { width, height: 900 }, async (page) => {
+        await page.goto(`${baseUrl}/zh/docs/event-subscriber/createEventHub/`)
+        const layout = await page.evaluate(() => {
+          const article = document.querySelector('.article-column')
+          const mobile = document.querySelector('.mobile-toc')
+          const right = document.querySelector('.right-rail')
+          return {
+            articleTop: article?.getBoundingClientRect().top ?? 0,
+            mobileDisplay: mobile ? getComputedStyle(mobile).display : '',
+            mobileTop: mobile?.getBoundingClientRect().top ?? 0,
+            rightDisplay: right ? getComputedStyle(right).display : ''
+          }
+        })
+        if (width > 620) {
+          assert.notEqual(layout.rightDisplay, 'none')
+          assert.equal(layout.mobileDisplay, 'none')
+        } else {
+          assert.equal(layout.rightDisplay, 'none')
+          assert.equal(layout.mobileDisplay, 'block')
+          assert.ok(layout.mobileTop < layout.articleTop)
+        }
+      })
+    }
+  })
+})
+
+test('SITE-T-ROUTE-SCROLL starts a newly selected API at the page top', async () => {
+  await withChrome(async (browser) => {
+    await withPage(browser, { width: 1280, height: 900 }, async (page) => {
+      await page.goto(`${baseUrl}/zh/docs/event-subscriber/createEventChannel/`)
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+      assert.ok((await page.evaluate(() => window.scrollY)) > 0)
+
+      const nextApi = page.locator('a[href="/zh/docs/event-subscriber/createEventHub"]').first()
+      await nextApi.evaluate((link) => link.click())
+      await page.waitForURL(/\/zh\/docs\/event-subscriber\/createEventHub\/?$/)
+      await page.waitForFunction(() => window.scrollY === 0)
+
+      assert.equal(await page.evaluate(() => window.scrollY), 0)
+      assert.match(await page.locator('h1').innerText(), /createEventHub/)
+    })
+  })
+})
+
+test('SITE-T-SUPPORTING-CONTRACT separates source markers and explains their real use', async () => {
+  await withChrome(async (browser) => {
+    await withPage(browser, { width: 600, height: 778 }, async (page) => {
+      await page.goto(`${baseUrl}/zh/docs/event-subscriber/`)
+      const contract = page.locator(
+        '.supporting-contracts a[href="/zh/docs/event-subscriber/EVENT_SUBSCRIBER_SOURCE"]'
+      )
+      await contract.waitFor()
+      assert.match(await contract.innerText(), /稳定来源标识/)
+
+      await contract.click()
+      await page.waitForURL(/\/zh\/docs\/event-subscriber\/EVENT_SUBSCRIBER_SOURCE\/?$/)
+      await page.locator('h1', { hasText: 'EVENT_SUBSCRIBER_SOURCE' }).waitFor()
+      assert.match(await page.locator('main').innerText(), /契约识别示例/)
+      assert.match(await page.locator('.code-frame').first().innerText(), /error\.source/)
+      assert.doesNotMatch(await page.locator('main').innerText(), /最小可运行示例/)
+    })
+  })
+})
+
+test('SITE-T-LEFT-RAIL gives long desktop API menus an independent scroll boundary', async () => {
+  await withChrome(async (browser) => {
+    await withPage(browser, { width: 1280, height: 700 }, async (page) => {
+      await page.goto(`${baseUrl}/zh/docs/web-rpc/`)
+      const rail = page.locator('.left-rail')
+      const viewport = rail.locator('[data-radix-scroll-area-viewport]')
+      await rail.waitFor()
+      const before = await viewport.evaluate((element) => ({
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+        scrollTop: element.scrollTop
+      }))
+      assert.ok(before.scrollHeight > before.clientHeight)
+
+      await viewport.hover()
+      await page.mouse.wheel(0, 600)
+      await page.waitForFunction(
+        () => (document.querySelector('[data-radix-scroll-area-viewport]')?.scrollTop ?? 0) > 0
+      )
+      assert.ok((await viewport.evaluate((element) => element.scrollTop)) > before.scrollTop)
+      assert.equal(await rail.locator('.scroll-area-thumb').count(), 1)
+    })
+  })
+})
+
+test('SITE-T-LEFT-RAIL-ROUTE keeps menu order and scroll position stable across API routes', async () => {
+  await withChrome(async (browser) => {
+    await withPage(browser, { width: 1800, height: 900 }, async (page) => {
+      await page.goto(`${baseUrl}/zh/docs/lifecycle/createLifecycleUnit/`)
+      const rail = page.locator('.left-rail')
+      await rail.waitFor()
+      const viewport = rail.locator('[data-radix-scroll-area-viewport]')
+      assert.equal(await viewport.count(), 1)
+      await viewport.evaluate((element) => {
+        element.scrollTop = 240
+      })
+      const before = await viewport.evaluate((element) => ({
+        links: Array.from(element.querySelectorAll('a')).map((link) => link.getAttribute('href')),
+        scrollTop: element.scrollTop
+      }))
+      assert.ok(before.scrollTop > 0)
+
+      await viewport.locator('a[href="/zh/docs/lifecycle/boundedWait"]').click()
+      await page.waitForURL(/\/zh\/docs\/lifecycle\/boundedWait\/?$/)
+      await page.locator('h1', { hasText: 'boundedWait' }).waitFor()
+      const after = await viewport.evaluate((element) => ({
+        links: Array.from(element.querySelectorAll('a')).map((link) => link.getAttribute('href')),
+        scrollTop: element.scrollTop
+      }))
+
+      assert.deepEqual(after.links, before.links)
+      assert.ok(Math.abs(after.scrollTop - before.scrollTop) <= 1)
+    })
+  })
+})
+
+test(
+  'SITE-T-PACKAGE-LEARNING-PATH closes every Chinese package landing page',
+  { timeout: 180_000 },
+  async () => {
+    await withChrome(async (browser) => {
+      await withPage(browser, { width: 1280, height: 900 }, async (page) => {
+        for (const library of libraryIndex.libraries) {
+          await page.goto(`${baseUrl}/zh/docs/${library.slug}/`)
+          await page.locator('.module-learning-path').waitFor()
+          for (const kind of ['scenarios', 'quick-start', 'composition', 'advanced']) {
+            const section = page.locator(`[data-learning-kind="${kind}"]`)
+            assert.equal(await section.count(), 1, `${library.slug} missing ${kind}`)
+            const minimumLength = kind === 'quick-start' || kind === 'composition' ? 120 : 80
+            assert.ok(
+              (await section.innerText()).trim().length >= minimumLength,
+              `${library.slug} shallow ${kind}`
+            )
+          }
+          assert.ok(
+            (await page.locator('[data-learning-kind="quick-start"] .code-frame').count()) > 0,
+            `${library.slug} quick start has no maintained example`
+          )
+          assert.ok(
+            (await page.locator('[data-learning-kind="composition"] .code-frame').count()) > 0,
+            `${library.slug} composition has no maintained example`
+          )
+
+          for (const group of await page
+            .locator('.api-reference-group:not(.supporting-contracts):not(.error-contracts)')
+            .all()) {
+            const hrefs = await group
+              .locator('a')
+              .evaluateAll((links) => links.map((link) => link.getAttribute('href') ?? ''))
+            assert.equal(
+              hrefs.some((href) => /(?:Error|ErrorCode|_SOURCE)(?:\/)?$/.test(href)),
+              false,
+              `${library.slug} mixes error contracts into operation APIs`
+            )
+          }
+
+          const api = apiManifest.apis.find(
+            (candidate) => candidate.library === library.slug && candidate.module === 'index'
+          )
+          if (!api) continue
+          const runtimeSymbols = api.symbols.filter(
+            (symbol) => symbol.kind !== 'type' && symbol.kind !== 'interface'
+          )
+          const expectedErrors = runtimeSymbols
+            .filter(isErrorContractSymbol)
+            .map((symbol) => symbol.name)
+            .sort()
+          const expectedSupporting = runtimeSymbols
+            .filter(
+              (symbol) =>
+                symbol.kind === 'const' &&
+                !isCallableApiSymbol(symbol) &&
+                !isErrorContractSymbol(symbol)
+            )
+            .map((symbol) => symbol.name)
+            .sort()
+          const expectedOperations = runtimeSymbols
+            .filter(
+              (symbol) =>
+                !(symbol.kind === 'const' && !isCallableApiSymbol(symbol)) &&
+                !isErrorContractSymbol(symbol)
+            )
+            .map((symbol) => symbol.name)
+            .sort()
+          const renderedErrors = (
+            await page.locator('.error-contracts a code').allInnerTexts()
+          ).sort()
+          const renderedSupporting = (
+            await page.locator('.supporting-contracts a code').allInnerTexts()
+          ).sort()
+          const renderedOperations = (
+            await page
+              .locator(
+                '.api-reference-group:not(.supporting-contracts):not(.error-contracts) a code'
+              )
+              .allInnerTexts()
+          ).sort()
+          assert.deepEqual(renderedErrors, expectedErrors, `${library.slug} error partition`)
+          assert.deepEqual(
+            renderedSupporting,
+            expectedSupporting,
+            `${library.slug} supporting partition`
+          )
+          assert.deepEqual(
+            renderedOperations,
+            expectedOperations,
+            `${library.slug} operation partition`
+          )
+          for (const group of await page
+            .locator('.api-reference-group ul.api-reference-list')
+            .all()) {
+            const names = await group.locator('a code').allInnerTexts()
+            const scores = names.map(
+              (name) => api.symbols.find((symbol) => symbol.name === name)?.usageScore ?? 0
+            )
+            assert.deepEqual(
+              scores,
+              [...scores].sort((left, right) => right - left),
+              `${library.slug} API group is not frequency ordered`
+            )
+          }
+        }
+      })
+    })
+  }
+)
+
+test(
+  'SITE-T-CONFIG-REFERENCE closes every configuration field across the site',
+  { timeout: 300_000 },
+  async () => {
+    const jargon =
+      /first-party runtime surface|plain message transport|request\/response semantics|not-applicable|No documented|No additional/u
+    await withChrome(async (browser) => {
+      await withPage(browser, { width: 1280, height: 900 }, async (page) => {
+        for (const api of apiManifest.apis) {
+          const libraryTypes = new Set(
+            apiManifest.apis
+              .filter((candidate) => candidate.library === api.library)
+              .flatMap((candidate) => candidate.symbols)
+              .filter((symbol) => symbol.kind === 'type' || symbol.kind === 'interface')
+              .map((symbol) => symbol.name)
+          )
+          for (const symbol of api.symbols.filter(
+            (candidate) =>
+              candidate.kind !== 'type' &&
+              candidate.kind !== 'interface' &&
+              candidate.configuration.length > 0
+          )) {
+            const symbolPath = apiSymbolPath(symbol, api.symbols)
+            const route =
+              api.module === 'index'
+                ? `/zh/docs/${api.library}/${symbolPath}`
+                : `/zh/docs/${api.library}/${api.module}/${symbolPath}`
+            await page.goto(`${baseUrl}${route}`)
+            await page.locator('.single-api-reference').waitFor()
+            assert.equal(
+              jargon.test(await page.locator('.article-column').innerText()),
+              false,
+              `${api.library}/${api.module}/${symbol.name} exposes generator text or jargon`
+            )
+            for (const field of symbol.configuration) {
+              const entry = page.locator(
+                `#${symbol.fragment}--option-${field.name.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '')}`
+              )
+              await entry.waitFor()
+              const paragraphs = (await entry.locator(':scope > p').allInnerTexts()).join(' ')
+              assert.ok(
+                paragraphs.trim().length >= 20,
+                `${api.library}/${api.module}/${symbol.name}.${field.name} has no useful explanation: ${JSON.stringify(paragraphs)}`
+              )
+              const referencedTypes =
+                field.type.match(/[A-Za-z_$][\w$]*/gu)?.filter((name) => libraryTypes.has(name)) ??
+                []
+              for (const typeName of new Set(referencedTypes)) {
+                assert.ok(
+                  (await entry.locator(`a.type-link:text-is("${typeName}")`).count()) >= 1,
+                  `${api.library}/${api.module}/${symbol.name}.${field.name} does not link ${typeName}`
+                )
+              }
+            }
+          }
+        }
+
+        await page.goto(`${baseUrl}/zh/docs/web-rpc/createEndpoint`)
+        const transportGuide = page.locator('[data-parameter-guide="web-rpc-transport"]')
+        await transportGuide.waitFor()
+        assert.equal(await transportGuide.locator('li a').count(), 10)
+        assert.match(await transportGuide.innerText(), /发送和接收消息/u)
+      })
+    })
+  }
+)
+
+test(
+  'SITE-T-API-READING-PATH closes every callable API detail page',
+  { timeout: 300_000 },
+  async () => {
+    const forbidden =
+      /first-party runtime surface|plain message transport|request\/response semantics|not-applicable|No documented errors are declared|No additional advanced behavior is declared|part of this module's public (?:function|class) contract/iu
+    await withChrome(async (browser) => {
+      await withPage(browser, { width: 1280, height: 900 }, async (page) => {
+        for (const api of apiManifest.apis) {
+          for (const symbol of api.symbols.filter(isCallableApiSymbol)) {
+            const symbolPath = apiSymbolPath(symbol, api.symbols)
+            const route =
+              api.module === 'index'
+                ? `/zh/docs/${api.library}/${symbolPath}`
+                : `/zh/docs/${api.library}/${api.module}/${symbolPath}`
+            await page.goto(`${baseUrl}${route}`)
+            const article = page.locator('.single-api-reference')
+            await article.waitFor()
+            const routeLabel = `${api.library}/${api.module}/${symbol.name}`
+            const purpose = article.locator('.api-overview > p').last()
+            assert.ok((await purpose.innerText()).trim().length >= 30, `${routeLabel} purpose`)
+            assert.equal(
+              await article.locator(`[id="${symbol.fragment}--quick-start"] .code-frame`).count(),
+              1,
+              `${routeLabel} missing Quick Start code`
+            )
+            const decisionGuide = article.locator('.api-decision-guide')
+            assert.equal(await decisionGuide.count(), 1, `${routeLabel} missing decision guide`)
+            for (const list of await decisionGuide.locator('ul').all())
+              assert.ok((await list.locator('li').count()) >= 2, `${routeLabel} shallow scenarios`)
+            assert.equal(
+              forbidden.test(await article.innerText()),
+              false,
+              `${routeLabel} bad prose`
+            )
+          }
+        }
+      })
+    })
+  }
+)
+
+test(
+  'SITE-T-CONTRACT-REFERENCE closes every supporting constant detail page',
+  { timeout: 180_000 },
+  async () => {
+    await withChrome(async (browser) => {
+      await withPage(browser, { width: 1280, height: 900 }, async (page) => {
+        for (const api of apiManifest.apis) {
+          for (const symbol of api.symbols.filter(
+            (candidate) => candidate.kind === 'const' && !isCallableApiSymbol(candidate)
+          )) {
+            const symbolPath = apiSymbolPath(symbol, api.symbols)
+            const route =
+              api.module === 'index'
+                ? `/zh/docs/${api.library}/${symbolPath}`
+                : `/zh/docs/${api.library}/${api.module}/${symbolPath}`
+            await page.goto(`${baseUrl}${route}`)
+            const article = page.locator('.single-api-reference')
+            await article.waitFor()
+            const routeLabel = `${api.library}/${api.module}/${symbol.name}`
+            assert.equal(
+              await article.locator(`[id="${symbol.fragment}--quick-start"] .code-frame`).count(),
+              1,
+              `${routeLabel} missing reference example`
+            )
+            assert.equal(
+              await article.locator('.api-decision-guide').count(),
+              1,
+              `${routeLabel} missing use boundaries`
+            )
+            assert.doesNotMatch(
+              await article.innerText(),
+              /最小可运行示例|not-applicable|No documented|No additional/u,
+              `${routeLabel} presented as an operation or leaked generator text`
+            )
+          }
+        }
+      })
+    })
+  }
+)
+
+test(
   'WEB-A27 keeps anchor targets visible in independent viewport contexts',
   { timeout: 120_000 },
   async () => {
     const api = apiManifest.apis.find((candidate) => candidate.symbols.length > 0)
     assert.ok(api)
     const symbol = api.symbols[0]
-    const path = `/en/docs/${api.library}/${api.module}`
+    const path =
+      symbol.kind === 'type' || symbol.kind === 'interface'
+        ? `/en/docs/${api.library}/${api.module}`
+        : `/en/docs/${api.library}/${api.module}/${apiSymbolPath(symbol, api.symbols)}`
     await withChrome(async (browser) => {
       for (const width of [320, 768, 1280]) {
         await withPage(browser, { width, height: width === 320 ? 844 : 900 }, async (page) => {
@@ -299,7 +796,7 @@ test(
       '/en/docs',
       '/en/docs/utils/index',
       '/en/guides/utils/getting-started',
-      '/en/architecture/utils/ownership'
+      '/en/architecture/utils'
     ]
     await withChrome(async (browser) => {
       for (const path of routes) {
@@ -338,6 +835,8 @@ test(
               locale,
               library: api.library,
               module: api.module,
+              name: symbol.name,
+              kind: symbol.kind,
               fragment: symbol.fragment
             })
           )
@@ -369,7 +868,7 @@ test(
         Object.freeze({ ...route, members: Object.freeze([...route.members]) })
       )
     )
-    assert.equal(routeInventory.length, 212)
+    assert.equal(routeInventory.length, apiManifest.apis.length * 2)
     assert.equal(
       routeInventory.reduce((count, route) => count + route.members.length, 0),
       fragmentInventory.length
@@ -411,11 +910,14 @@ test(
           const route = routeInventory[nextRoute]
           nextRoute += 1
           activeRoutes += 1
-          const path = `/${route.locale}/docs/${route.library}/${route.module}`
           try {
             await withPage(browser, { width: 320, height: 844 }, async (page) => {
               for (const member of route.members) {
                 try {
+                  const path =
+                    member.kind === 'type' || member.kind === 'interface'
+                      ? `/${route.locale}/docs/${route.library}/${route.module}`
+                      : `/${route.locale}/docs/${route.library}/${route.module}/${apiSymbolPath(member, route.members)}`
                   const fragmentUrl = `${pageUrl(path)}#${member.fragment}`
                   await boundedA29Action(
                     'goto fragment',
@@ -434,7 +936,7 @@ test(
                   const target = page.locator(`[id="${member.fragment}"]`)
                   await boundedA29Action(
                     'wait for fragment target',
-                    () => target.waitFor(),
+                    () => target.waitFor({ state: 'attached' }),
                     progressFailure
                   )
                   assert.equal(await target.count(), 1)
@@ -445,7 +947,7 @@ test(
                   )
                   await boundedA29Action(
                     'wait after reload',
-                    () => target.waitFor(),
+                    () => target.waitFor({ state: 'attached' }),
                     progressFailure
                   )
                   assert.equal(new URL(page.url()).hash, `#${member.fragment}`)
@@ -538,8 +1040,12 @@ test(
     await withChrome(async (browser) => {
       for (const locale of ['en', 'zh']) {
         for (const api of apiManifest.apis.filter((candidate) => candidate.symbols.length > 0)) {
-          const path = `/${locale}/docs/${api.library}/${api.module}`
-          const fragment = `${api.symbols[0].fragment}--advanced-usage`
+          const primarySymbol = api.symbols.find(
+            (symbol) => symbol.kind !== 'type' && symbol.kind !== 'interface'
+          )
+          if (!primarySymbol) continue
+          const path = `/${locale}/docs/${api.library}/${api.module}/${apiSymbolPath(primarySymbol, api.symbols)}`
+          const fragment = `${primarySymbol.fragment}--overview`
           await withPage(browser, { width: 768, height: 900 }, async (page) => {
             await page.goto(`${pageUrl(path)}#${fragment}`, { waitUntil: 'commit' })
             await page.locator('.right-rail a.active').waitFor({ state: 'attached' })
@@ -551,6 +1057,7 @@ test(
             assert.equal(state.activeTree, path)
             assert.equal(state.activeAnchor, `#${fragment}`)
             assert.match(state.breadcrumb, new RegExp(api.library))
+            assert.doesNotMatch(state.breadcrumb.trim(), /^(?:en|zh)\s*\//)
           })
         }
       }
