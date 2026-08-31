@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { invokeExtension } from '../../src/core/errors'
 import { createStorageOperationRuntime } from '../../src/core/operation-reporter.js'
+import { captureOperationCleanup } from '../helpers/operation-reporter.js'
 
 describe('invokeExtension abort lifecycle', () => {
   it('关闭 check-subscribe race 并阻止扩展结果胜出', async () => {
@@ -58,7 +59,7 @@ describe('invokeExtension abort lifecycle', () => {
         throw new Error('hostile extension listener cleanup')
       }
     } as never
-    await expect(
+    const cleanup = await captureOperationCleanup(() =>
       invokeExtension(
         async () => 'value',
         'memory',
@@ -67,7 +68,11 @@ describe('invokeExtension abort lifecycle', () => {
         cleanupSignal,
         createStorageOperationRuntime()
       )
-    ).resolves.toBe('value')
+    )
+    expect(cleanup.result).toBe('value')
+    expect(cleanup.reports).toEqual([
+      expect.objectContaining({ message: 'hostile extension listener cleanup' })
+    ])
   })
 
   it('将 hostile aborted getter 归一化为输入错误，且不启动扩展', async () => {

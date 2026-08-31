@@ -19,6 +19,7 @@ import {
   repositoryEntityRange
 } from '../../src/entity/key.js'
 import { encodeFlatStorageKey } from '../../src/core/key-domain.js'
+import { captureOperationCleanup } from '../helpers/operation-reporter.js'
 
 const encoder = new TextEncoder()
 
@@ -2781,18 +2782,23 @@ describe('indexedDb backend', () => {
         })
         .next()
     ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
-    const result = await store
-      .iterateRecords(undefined, {
-        signal: {
-          aborted: false,
-          addEventListener: () => {},
-          removeEventListener: () => {
-            throw new Error('hostile cursor listener cleanup')
-          }
-        } as never
-      })
-      .next()
-    expect(result.value?.[1]).toEqual({ v: 1 })
+    const cleanup = await captureOperationCleanup(() =>
+      store
+        .iterateRecords(undefined, {
+          signal: {
+            aborted: false,
+            addEventListener: () => {},
+            removeEventListener: () => {
+              throw new Error('hostile cursor listener cleanup')
+            }
+          } as never
+        })
+        .next()
+    )
+    expect(cleanup.result.value?.[1]).toEqual({ v: 1 })
+    expect(cleanup.reports).toEqual([
+      expect.objectContaining({ message: 'hostile cursor listener cleanup' })
+    ])
   })
 
   it('cursor request.error 统一归一为 TRANSACTION_FAILED 并保留 cause', async () => {
