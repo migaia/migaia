@@ -1,5 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "rootDir": "src", "noEmit": true },
+  "compilerOptions": {
+    "rootDir": "src",
+    "noEmit": true,
+    "lib": ["ES2024", "ESNext.Disposable"]
+  },
   "include": ["src"]
 }

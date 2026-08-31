@@ -30,7 +30,8 @@ export function createTrayError(code: ITrayErrorCode, cause?: unknown): Error {
     [TrayErrorCode.duplicateEntry]: TrayErrorText.duplicateEntry,
     [TrayErrorCode.unknownEntry]: TrayErrorText.unknownEntry,
     [TrayErrorCode.unavailable]: TrayErrorText.unavailable,
-    [TrayErrorCode.gateReadFailed]: TrayErrorText.gateReadFailed
+    [TrayErrorCode.gateReadFailed]: TrayErrorText.gateReadFailed,
+    [TrayErrorCode.hostMutationBypass]: TrayErrorText.hostMutationBypass
   }
   const error = new Error(messages[code], cause === undefined ? undefined : { cause })
   Object.defineProperties(error, {

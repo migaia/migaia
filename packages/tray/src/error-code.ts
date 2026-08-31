@@ -9,7 +9,9 @@ export const TrayErrorCode = {
   /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */
   unavailable: 'TRAY_UNAVAILABLE',
   /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */
-  gateReadFailed: 'TRAY_GATE_READ_FAILED'
+  gateReadFailed: 'TRAY_GATE_READ_FAILED',
+  /** Managed reads detect a mutation made through the escaped concrete Host. */
+  hostMutationBypass: 'HOST_MUTATION_BYPASS'
 } as const
 
 export type ITrayErrorCode = (typeof TrayErrorCode)[keyof typeof TrayErrorCode]

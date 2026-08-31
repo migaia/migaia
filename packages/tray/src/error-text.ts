@@ -4,5 +4,7 @@ export const TrayErrorText = {
   duplicateEntry: 'tray entry is duplicated',
   unknownEntry: 'tray entry is unknown',
   unavailable: 'tray entry is unavailable',
-  gateReadFailed: 'tray readiness gate failed'
+  gateReadFailed: 'tray readiness gate failed',
+  /** Stable diagnostic for raw Host interference detected by the managed session receipt. */
+  hostMutationBypass: 'managed host detected an escaped concrete host mutation'
 } as const

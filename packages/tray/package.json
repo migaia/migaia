@@ -15,6 +15,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./host": {
+      "types": "./dist/host/index.d.ts",
+      "default": "./dist/host/index.js"
     }
   },
   "scripts": {
@@ -22,12 +26,14 @@
     "lint": "oxlint src test",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc -p test/tsconfig.json --noEmit",
-    "test": "vitest run test",
+    "test": "pnpm run build && vitest run test --maxWorkers=1",
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@migaia/capability": "workspace:^",
-    "@migaia/lifecycle": "workspace:^"
+    "@migaia/event-subscriber": "workspace:^",
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/plugin-host": "workspace:^"
   },
   "devDependencies": {
     "typescript": "~6.0.2",

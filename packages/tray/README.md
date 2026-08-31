@@ -14,7 +14,7 @@
 pnpm add @migaia/tray
 ```
 
-包只有根入口 `@migaia/tray`，无子路径导出。
+静态组合根从 `@migaia/tray` 导入；PluginHost 托管组合从 `@migaia/tray/host` 导入。
 
 ## 最小可运行示例
 
@@ -81,3 +81,38 @@ try {
 ```
 
 完整 entry 契约、readiness gate、状态、错误码与生命周期语义见 [USEGUIDE.md](./USEGUIDE.md)。
+
+## 托管 PluginHost：动态加载与卸载
+
+`@migaia/tray/host` 是 Tray 的 Host stage/decorator，不创建第二个运行时身份。`createHost()`
+异步完成 admission、依赖图启动与 Host 发布后才返回；返回值实现异步显式资源管理：
+
+```ts
+import { PluginHost, type IPlugin } from '@migaia/plugin-host';
+import { createHost } from '@migaia/tray/host';
+
+class AppHost extends PluginHost<Record<string, never>, string> {}
+
+const provider = {
+  name: 'provider',
+  install: () => ({ providerValue: 1 })
+} satisfies IPlugin<AppHost, { readonly providerValue: number }>;
+
+await using host = await createHost({
+  create: () =>
+    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),
+  plugins: [provider] as const,
+  mutationAdmissionMs: 100,
+  quiescenceMs: 100,
+  shutdown: { mode: 'bounded' }
+});
+
+await host.use({ name: 'late', requires: ['provider'], install: () => ({ late: true }) });
+await host.unUse('provider'); // `late` 保留为 blocked definition，不再留在 Host 可见面。
+```
+
+同名 `replace()` 与 provider 恢复会复用该 definition 的 Host ordering slot；真正
+`unUse()` 删除 definition 后 slot 永久退休，之后同名 `use()` 获得新的单调 slot。逻辑 bounded
+结果可能先返回 `cleanupComplete: false`，但 `physicalCompletion` 严格等待 Graph binding lease、
+pipeline lease、插件 disposer 与资源 disposer，未完成前不会启动后项。不能使用
+`await using` 的编译目标可用 `try/finally { await host.dispose() }`。

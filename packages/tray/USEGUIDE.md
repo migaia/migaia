@@ -118,6 +118,7 @@ Tray core 不增加 timeout、scheduler 或强制终止策略。可能永久 pen
 | `unknownEntry` | `TRAY_UNKNOWN_ENTRY` | `get()`/`entryState()` 使用未接纳 key | 使用 `tray.keys` 或集中定义的 key 常量 |
 | `unavailable` | `TRAY_UNAVAILABLE` | entry 尚未 ready、gate 失败或 Tray 已终结 | 先等待 `ready()`，并检查 `state`/`error` |
 | `gateReadFailed` | `TRAY_GATE_READ_FAILED` | readiness getter 抛错 | 检查保留的原始错误并修复 readiness source |
+| `hostMutationBypass` | `HOST_MUTATION_BYPASS` | escaped concrete Host 绕过 managed Graph receipt 发生 mutation | 停止使用 raw Host mutation；只通过 `@migaia/tray/host` facade 写入 |
 
 Graph 启动、节点或释放错误仍保留 `@migaia/capability` 的 source/code，不会被 Tray 强行改写。
 
@@ -142,3 +143,40 @@ pnpm --filter @migaia/tray typecheck:test
 pnpm --filter @migaia/tray test
 pnpm --filter @migaia/tray build
 ```
+
+## 10. `@migaia/tray/host` 托管组合
+
+```ts
+import {
+  createHost,
+  type ICreateHostOptions,
+  type ITrayResolvedHost
+} from '@migaia/tray/host';
+```
+
+`await createHost(options)` 的唯一 concrete Host 由 `options.create()` 构造。Tray 随后一次性快照
+plugin、`requires`、config 与 disposer，建立 Dynamic Capability Graph，再通过 PluginHost prepared
+admission 发布 ready definition。任何 factory/admission/setup/commit 失败都会回滚未发布候选；失败的
+duplicate/cycle/replacement candidate 不会成为以后 restart 的隐式来源。
+
+公开 mutation：
+
+- `use(plugin)`：增加 definition；缺 provider 时 definition 为 `blocked`，不会安装进 Host。
+- `replace(plugin)`：替换 exact 同名 generation；失败分支的 `committed` 表示 candidate 是否已成为
+  Graph 当前 binding，不以“这个名字仍存在”猜测。
+- `unUse(name)`：删除 definition 并阻塞其 consumer closure；未知名称返回
+  `{ ok: true, committed: false, removed: false }`。
+- `dispose()`：终止 Graph、移除内部 anchor、关闭 concrete Host；并发调用复用同一 Promise。
+
+`cleanupComplete: false` 表示逻辑 mutation 已提交、物理清理仍在进行。此时必须保留并观察同一个
+`physicalCompletion`。Graph 在释放 exact generation 前 seal binding lease；PluginHost 严格等待该 fence
+与正在执行的 pipeline snapshot，然后按 consumer/provider、plugin/resource 的既定顺序清理。bounded
+只缩短调用方等待，不授权提前启动 disposer，也不取消仍在运行的 Promise。
+
+类型策略以稳定性优先：有限、literal、最多 128 个 definition 时，`ITrayResolvedHost` 推导 exact ready
+closure；widened name、widened `requires` 或超过预算时返回 `ITrayHostDynamic`。dynamic view 仍保留 concrete
+Host 的 constructor baseline extension/config 类型，运行期管理的未知 key 为 `unknown`。
+
+不要绕过 facade 调用 escaped concrete Host mutation。Tray 会以
+`(source: '@migaia/tray', code: 'HOST_MUTATION_BYPASS')` fail closed，因为 Graph 与 Host 已不再拥有同一
+publication receipt。
