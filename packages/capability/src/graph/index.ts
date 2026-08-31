@@ -88,6 +88,16 @@ export type IGraphNodeDiagnostic = {
   readonly state: ICapabilityGraphNodeState
   readonly value: unknown
   readonly error: unknown
+  /** Optional composition binding retained by the dynamic owner. */
+  readonly binding?: unknown
+  /** Monotonic lifecycle generation for this node. */
+  readonly generation?: number
+  /** Stable registration ordinal retained across same-edge replacement. */
+  readonly ordinal?: number
+  /** Deterministic schedule rank retained when topology edges do not change. */
+  readonly rank?: number
+  /** Dependency depth retained when topology edges do not change. */
+  readonly level?: number
 }
 
 /** Public Graph contract. */

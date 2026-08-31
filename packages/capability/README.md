@@ -19,6 +19,7 @@ pnpm add @migaia/capability
 - [宿主创建与生命周期方法](#宿主创建与生命周期方法)
 - [状态与枚举常量](#状态与枚举常量)
 - [静态 Capability Graph](#静态-capability-graph)
+- [Dynamic Graph generation leases](#dynamic-graph-generation-leases)
 - [错误码与错误结构](#错误码与错误结构)
 - [高阶组合示例](#高阶组合示例)
 - [构建门禁](#构建门禁)
@@ -454,3 +455,13 @@ host.error('flaky'); // undefined
 ```bash
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
+## Dynamic Graph generation leases
+
+`@migaia/capability/graph/dynamic` 为运行期 definition 增删提供唯一 Graph authority。composition owner
+通过 `startBatch(entries)` 收到 exact binding；消费者用 `acquireBinding(id)` 取得 generation lease，并在停止
+使用后调用幂等 `release()`。remove/replace/dispose 会先 seal 旧 generation，再把同一个 non-rejecting fence
+交给 `releaseBatch(entries, fence)`；物理 provider 清理不得越过该 fence。
+
+mutation metrics 同时报告 affected-frontier 的 `visitedNodes`、`visitedEdges`、`queueOperations`、
+`queueTimeMs`、`wallTimeMs` 与 `fullScan`。拓扑使用按 admission ordinal 的确定性优先队列，复杂度上界为
+`O((VΔ + EΔ) log VΔ)`，不会在每个输出节点重新 filter/sort 整个 frontier。
