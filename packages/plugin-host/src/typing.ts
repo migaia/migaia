@@ -2,11 +2,13 @@ import { asyncDisposeKey, disposeKey } from './symbols.js'
 import type { IAbortSignal, ILifecycleScheduler } from '@migaia/lifecycle'
 import type { PluginHostError } from './error-text.js'
 
-/** 插件生命周期资源的清理函数。 */
-export type IPluginDisposer = () => void | Promise<void>
+/** Values accepted at every asynchronous plugin lifecycle boundary. */
+export type IPluginAwaitable<T> = T | PromiseLike<T>
+/** Plugin resource cleanup callback; a thenable is assimilated by the owning lifecycle scope. */
+export type IPluginDisposer = () => IPluginAwaitable<void>
 export type IPluginResource =
   | IPluginDisposer
-  | { [asyncDisposeKey](): void | Promise<void> }
+  | { [asyncDisposeKey](): IPluginAwaitable<void> }
   | { [disposeKey](): void }
 
 /** Generic structured detail carried by a PluginHost boundary error. */
@@ -24,6 +26,16 @@ export type IPluginInstallFailureDetail = {
 }
 
 export type IPluginConfig = Record<string, unknown>
+
+/** Functional installer signature carrying the Host pipeline payload axis. */
+export type IPluginInstaller<
+  TCore extends object,
+  TExtension extends Record<string, unknown>,
+  TValue = never,
+  TConfig extends IPluginConfig = IPluginConfig
+> = (
+  core: TCore & IPluginHostCore<TValue, Record<PropertyKey, unknown>, TConfig>
+) => IPluginAwaitable<TExtension>
 
 /** Recursive readonly view exposed by the lazy configuration proxy. */
 export type IReadonlyConfig<T> = T extends (...args: never[]) => unknown
@@ -140,13 +152,13 @@ export type IPlugin<
   readonly config?: TConfig
   /** 声明跨插件共享能力。共享函数优先使用箭头函数，确保它被提取、缓存或传递后 仍绑定当前插件实例；只有明确不访问插件实例状态时才使用普通函数。 */
   shared?: (core: TCore & IPluginLifecycleCore<TConfig>) => TShared
-  install: (core: TCore & IPluginLifecycleCore<TConfig>) => TExt | Promise<TExt>
+  install: (core: TCore & IPluginLifecycleCore<TConfig>) => IPluginAwaitable<TExt>
   update?: (
     next: IReadonlyConfig<TConfig>,
     core: TCore & IPluginLifecycleCore<TConfig>
-  ) => void | Promise<void>
-  dispose?: (context?: IPluginDisposalContext) => void | Promise<void>
-  [asyncDisposeKey]?: () => void | Promise<void>
+  ) => IPluginAwaitable<void>
+  dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>
+  [asyncDisposeKey]?: () => IPluginAwaitable<void>
   [disposeKey]?: () => void
 }
 
@@ -155,14 +167,82 @@ export type IPluginConstraint<TCore> = {
   readonly name: string
   readonly config?: unknown
   shared?: (core: TCore & IPluginLifecycleCore<any>) => object
-  install: (
-    core: TCore & IPluginLifecycleCore<any>
-  ) => Record<string, unknown> | Promise<Record<string, unknown>>
-  update?: (next: never, core: TCore & IPluginLifecycleCore<any>) => void | Promise<void>
-  dispose?: (context?: IPluginDisposalContext) => void | Promise<void>
-  [asyncDisposeKey]?: () => void | Promise<void>
+  install: (core: TCore & IPluginLifecycleCore<any>) => IPluginAwaitable<Record<string, unknown>>
+  update?: (next: never, core: TCore & IPluginLifecycleCore<any>) => IPluginAwaitable<void>
+  dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>
+  [asyncDisposeKey]?: () => IPluginAwaitable<void>
   [disposeKey]?: () => void
 }
+
+/** Opaque compile-time provenance carried by definitions made through `definePlugin`. */
+declare const definedPluginBrand: unique symbol
+export type IDefinedPluginConstraint<
+  TCore extends object = object,
+  TValue = never,
+  TExtension extends Record<string, unknown> = Record<string, unknown>,
+  TConfig extends IPluginConfig = IPluginConfig,
+  TShared extends object = Record<string, never>,
+  TName extends string = string
+> = IPlugin<any, TExtension, TConfig, TShared> &
+  Readonly<{
+    readonly name: TName
+    /** Required only in declarations; runtime authority remains the private WeakMap. */
+    readonly [definedPluginBrand]: { readonly core: TCore; readonly value: TValue }
+  }>
+
+/** Functional setup context supplied only while Core construction is current. */
+export type IHostSetupContext = Readonly<{
+  readonly signal: IAbortSignal
+  readonly deadlineAt: number | undefined
+  onDispose(resource: IPluginResource): void
+}>
+
+/** Public structural view returned by asynchronous setup. */
+export type ISetupHostOptions<
+  TCore extends object,
+  TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[],
+  TValue = never
+> = Readonly<{
+  readonly host: IPluginHostOptions
+  readonly setupTimeoutMs: number | false
+  readonly signal?: IAbortSignal
+  readonly core: (context: IHostSetupContext) => IPluginAwaitable<TCore>
+  readonly plugins?: TPlugins
+}>
+
+/** Structural Host surface exposed by setupHost; concrete runtime class stays private. */
+export type ISetupPluginHost<TCore extends object, TValue = never> = Readonly<{
+  readonly pipelineMode: IPipelineMode
+  readonly revision: number
+  getShared(key: PropertyKey): unknown
+  getCurrentView(): IPluginHostDynamicView<ISetupPluginHost<TCore, TValue>>
+  use<const TPlugins extends readonly IDefinedPluginConstraint<TCore, TValue>[]>(
+    ...plugins: TPlugins
+  ): Promise<IPluginHostView<ISetupPluginHost<TCore, TValue>, TPlugins>>
+  usePipeline(stage: ISyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>
+  useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>
+  useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): ISetupPluginHost<TCore, TValue>
+  useAsyncGeneratorPipeline(
+    stage: IAsyncGeneratorPipelineStage<TValue>
+  ): ISetupPluginHost<TCore, TValue>
+  dispose(): Promise<IPluginHostDisposalResult>
+}>
+
+/** Fully active immutable setup publication with explicit and ERM disposal. */
+export type ISetupHostView<
+  THost,
+  _TCore extends object = object,
+  _TValue = never,
+  TPlugins extends readonly any[] = readonly []
+> = Readonly<{
+  readonly host: THost
+  readonly extensions: Readonly<Record<PropertyKey, unknown>>
+  readonly config: IPluginHostConfigFor<TPlugins>
+  getShared(key: PropertyKey): unknown
+  dispose(): Promise<IPluginHostDisposalResult>
+  [asyncDisposeKey](): Promise<void>
+}> &
+  IPluginHostView<THost, TPlugins & readonly IPluginConstraint<any>[]>
 
 export type IExtractPluginExt<TPlugin> =
   TPlugin extends IPlugin<infer _TCore, infer TExt, infer _TConfig, infer _TShared>
@@ -243,7 +323,15 @@ export interface IPluginHostCore<
 export type IPluginHostOptions = {
   /** Explicit operation and pipeline drain budgets; `false` opts into unbounded waiting. */
   readonly execution: {
+    /**
+     * Maximum time for one admitted install, update, or removal hook; `false` waits without a
+     * deadline.
+     */
     readonly mutationTimeoutMs: number | false
+    /**
+     * Maximum time to drain active pipeline leases before logical removal continues; `false` waits
+     * until zero.
+     */
     readonly pipelineDrainTimeoutMs: number | false
   }
   pipeline?: IPipelineConfig
@@ -297,8 +385,23 @@ export type IPluginHostDynamicView<THost> = Readonly<{
 
 /** Structured result for logical removal and any cleanup errors. */
 export type IPluginRemovalResult<TView> =
-  | Readonly<{ ok: true; removed: boolean; view: TView }>
-  | Readonly<{ ok: false; removed: boolean; view: TView; error: PluginHostError }>
+  | Readonly<{
+      ok: true
+      removed: boolean
+      view: TView
+      cleanupComplete: boolean
+      cleanupErrors: readonly unknown[]
+      physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>
+    }>
+  | Readonly<{
+      ok: false
+      removed: boolean
+      view: TView
+      error: PluginHostError
+      cleanupComplete: boolean
+      cleanupErrors: readonly unknown[]
+      physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>
+    }>
 
 /** Physical completion detail for work that outlives bounded logical disposal. */
 export type IPluginHostPhysicalCleanupResult = Readonly<{
@@ -311,6 +414,80 @@ export type IPluginHostDisposalResult = Readonly<{
   readonly cleanupComplete: boolean
   readonly cleanupErrors: readonly unknown[]
   readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>
+}>
+
+/** Opaque Host-owned ordering slot; callers may retain it but cannot inspect its ordinal. */
+export type IPluginDataOrderSlot = Readonly<{ readonly __pluginDataOrderSlot: unique symbol }>
+
+/** Opaque immutable admission snapshot produced by the PluginHost canonical factory. */
+declare const pluginAdmissionBrand: unique symbol
+export type IPluginAdmission<TPlugin extends IPluginConstraint<any>> = Readonly<{
+  readonly [pluginAdmissionBrand]?: TPlugin
+}>
+
+/** One admission request for the composition integration boundary. */
+export type IPluginAdmissionRequest = Readonly<{
+  readonly admission: IPluginAdmission<IPluginConstraint<any>>
+  readonly slot: IPluginDataOrderSlot
+}>
+
+/** Opaque prepared candidate admission owned by one concrete PluginHost. */
+export type IPluginPreparedAdmissions = object
+
+/** Opaque exact registration receipt returned at prepared admission commit. */
+export type IPluginRegistrationReceipt = object
+
+/** Opaque exact registration batch prepared for logical removal. */
+export type IPluginPreparedRemovalBatch = object
+
+/** Canonical fence supplied by Graph before Host physical cleanup begins. */
+export type IPluginBatchRemovalOptions = Readonly<{ readonly beforeCleanup?: PromiseLike<void> }>
+
+/** Result of one prepared batch removal, preserving the Host dynamic-view contract. */
+export type IPluginBatchRemovalLeaf = Readonly<{
+  readonly receipt: IPluginRegistrationReceipt
+  readonly name: string
+  readonly cleanupComplete: boolean
+  readonly cleanupErrors: readonly unknown[]
+  readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>
+}>
+
+/** Aggregate result for one all-or-nothing prepared removal commit. */
+export type IPluginBatchRemovalResult<TView> = Readonly<{
+  readonly ok: boolean
+  readonly committed: true
+  readonly view: TView
+  readonly leaves: readonly IPluginBatchRemovalLeaf[]
+  readonly cleanupComplete: boolean
+  readonly cleanupErrors: readonly unknown[]
+  readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>
+}>
+
+/** Host-owned integration used by a composition owner to perform total batch publication. */
+export type IPluginHostCompositionIntegration<THost> = Readonly<{
+  readonly revision: number
+  getCurrentView(): IPluginHostDynamicView<THost>
+  createPluginAdmission<TPlugin extends IPluginConstraint<any>>(
+    plugin: TPlugin
+  ): IPluginAdmission<TPlugin>
+  createDataOrderSlot(name: string): IPluginDataOrderSlot
+  prepareAdmissions(
+    requestsInPublicationOrder: readonly IPluginAdmissionRequest[]
+  ): Promise<IPluginPreparedAdmissions>
+  commitPreparedAdmissions(
+    prepared: IPluginPreparedAdmissions
+  ): readonly IPluginRegistrationReceipt[]
+  discardPreparedAdmissions(
+    prepared: IPluginPreparedAdmissions
+  ): Promise<IPluginHostPhysicalCleanupResult>
+  retireDataOrderSlot(slot: IPluginDataOrderSlot): void
+  prepareUnUseBatch(
+    receiptsInCleanupOrder: readonly IPluginRegistrationReceipt[]
+  ): IPluginPreparedRemovalBatch
+  commitPreparedUnUseBatch<TView>(
+    prepared: IPluginPreparedRemovalBatch,
+    options: IPluginBatchRemovalOptions
+  ): Promise<IPluginBatchRemovalResult<TView>>
 }>
 
 type IInstalledPluginName<TInstalled extends readonly IPluginConstraint<any>[]> =

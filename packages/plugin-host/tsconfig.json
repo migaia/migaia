@@ -3,9 +3,11 @@
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2024"],
+    "lib": ["ES2024", "ESNext.Disposable"],
     "rootDir": "src",
     "outDir": "dist",
+    "declaration": true,
+    "declarationMap": true,
     "types": []
   },
   "include": ["src"]

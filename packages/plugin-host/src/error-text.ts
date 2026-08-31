@@ -67,6 +67,66 @@ const ERROR_TEXT = {
   get INVALID_OPTION() {
     return localize('plugin-host 选项读取失败', 'plugin-host option read failed')
   },
+  /** Identifies a lifecycle scheduler whose getters cannot be read during Host construction. */
+  get SCHEDULER_GETTER_FAILED() {
+    return localize('scheduler getter 读取失败', 'scheduler getter failed')
+  },
+  /** Adds disposal-phase context while retaining the original failure through `cause`. */
+  DISPOSER_FAILED: (phase: string, detail: string) =>
+    localize(`${phase}: ${detail}`, `${phase}: ${detail}`),
+  /** Composition admission batches must be concrete arrays before Host preparation starts. */
+  get ADMISSION_REQUESTS_ARRAY() {
+    return localize('admission requests 必须是数组', 'admission requests must be an array')
+  },
+  /** Composition admissions must carry an opaque snapshot produced by this Host. */
+  get ADMISSION_REQUIRED() {
+    return localize(
+      'admission request 缺少 admission',
+      'admission request must provide an admission'
+    )
+  },
+  /** Rejects admission objects that were not created by the receiving Host. */
+  get ADMISSION_FOREIGN() {
+    return localize('admission 不是由当前 Host 创建', 'admission must be created by this Host')
+  },
+  /** Rejects ordering lanes that do not own the exact Host definition being prepared. */
+  get ADMISSION_SLOT_FOREIGN() {
+    return localize(
+      'admission slot 不属于当前 Host definition',
+      'admission slot does not belong to this Host definition'
+    )
+  },
+  /** Retired ordering lanes cannot be revived by a later definition generation. */
+  get ADMISSION_SLOT_RETIRED() {
+    return localize('admission slot 已退休', 'admission slot is retired')
+  },
+  /** A publication batch may bind an opaque definition lane only once. */
+  get ADMISSION_SLOT_DUPLICATE() {
+    return localize(
+      'admission slot 已在当前 batch 中绑定',
+      'admission slot is already bound in this batch'
+    )
+  },
+  /** A live same-name definition lane must be reused instead of allocating a parallel lane. */
+  DATA_ORDER_SLOT_LIVE: (name: string) =>
+    localize(
+      `definition "${name}" 已有 live data-order slot`,
+      `definition "${name}" already has a live data-order slot`
+    ),
+  /** Ordering lanes require the same canonical plugin-name grammar as admissions. */
+  get DATA_ORDER_SLOT_NAME_INVALID() {
+    return localize(
+      'plugin name 必须是非空且不含 "." 的字符串',
+      'plugin name must be a non-empty string without "."'
+    )
+  },
+  /** Prepared publication lost authority because another Host mutation committed first. */
+  get PREPARED_ADMISSION_DRIFT() {
+    return localize(
+      'prepared admission 因 Host revision 变化而失效',
+      'prepared admission lost authority after the Host revision changed'
+    )
+  },
   /** Config callable admission rejects shapes whose function/proxy invariants cannot be preserved. */
   CONFIG_CALLABLE_UNSUPPORTED: (reason: string) =>
     localize(`config callable 不支持：${reason}`, `config callable is unsupported: ${reason}`),
@@ -226,6 +286,29 @@ const ERROR_TEXT = {
   /** Stable text for logical cleanup that still has physical work outstanding. */
   get CLEANUP_INCOMPLETE() {
     return localize('清理尚未物理完成', 'physical cleanup is incomplete')
+  },
+  get HOST_CORE_SETUP_FAILED() {
+    return localize('Core 构造失败', 'Core setup failed')
+  },
+  get HOST_SETUP_TIMEOUT() {
+    return localize('setup 超时', 'setup timed out')
+  },
+  get HOST_SETUP_ABORTED() {
+    return localize('setup 已取消', 'setup was aborted')
+  },
+  get HOST_SETUP_ROLLBACK_FAILED() {
+    return localize('setup 回滚失败', 'setup rollback failed')
+  },
+  /** A composition fence rejection is reported while cleanup still proceeds after settlement. */
+  get CLEANUP_FENCE_REJECTED() {
+    return localize('prepared cleanup fence rejected', 'prepared cleanup fence rejected')
+  },
+  /** Composition cleanup fences accept PromiseLike values from any JavaScript realm. */
+  get BEFORE_CLEANUP_THENABLE() {
+    return localize(
+      'beforeCleanup 必须是可安全读取 then 的 PromiseLike',
+      'beforeCleanup must be a PromiseLike with a readable then method'
+    )
   }
 } as const
 

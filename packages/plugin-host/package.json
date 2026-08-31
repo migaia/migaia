@@ -19,6 +19,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./defined": {
+      "types": "./dist/defined.d.ts",
+      "default": "./dist/defined.js"
+    },
+    "./structural": {
+      "types": "./dist/structural.d.ts",
+      "default": "./dist/structural.js"
     }
   },
   "publishConfig": {
