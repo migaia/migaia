@@ -57,6 +57,23 @@ describe('dynamic capability graph', () => {
     expect(fenceObserved).toBe(true)
   })
 
+  it('releases only the exact removed binding custody after instance cleanup', async () => {
+    const custody: string[] = []
+    const graph = createDynamicCapabilityGraph<INodeBinding>({
+      startBatch: (entries) =>
+        entries.map((entry) => ({ value: entry.binding, release: async () => undefined })),
+      releaseBinding: ({ id, reason }) => {
+        custody.push(`${String(id)}:${reason}`)
+      }
+    })
+    await graph.register(node('provider'), { name: 'provider' })
+    await graph.register(node('consumer', ['provider']), { name: 'consumer' })
+    await graph.remove('provider' as IGraphNodeId)
+    expect(custody).toEqual(['provider:remove'])
+    await graph.dispose()
+    expect(custody).toEqual(['provider:remove', 'consumer:dispose'])
+  })
+
   it('retains missing-provider definitions as blocked and reconciles their frontier', async () => {
     const events: string[] = []
     const graph = createDynamicCapabilityGraph<INodeBinding>()

@@ -46,6 +46,18 @@ export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{
     entries: readonly IGraphReleaseEntry<TBinding>[],
     fence: Promise<void>
   ) => void | PromiseLike<void>
+  /** Releases custody for an exact binding generation after its instance cleanup fence. */
+  readonly releaseBinding?: (entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>
+}>
+
+/** Identifies why one exact graph binding generation left the graph. */
+export type IGraphBindingReleaseReason = 'remove' | 'replace' | 'dispose'
+
+/** Exact binding custody released after graph-owned instance cleanup. */
+export type IGraphBindingReleaseEntry<TBinding> = Readonly<{
+  readonly id: IGraphNodeId
+  readonly binding: TBinding
+  readonly reason: IGraphBindingReleaseReason
 }>
 
 /** Exact binding-generation lease retained by a consumer until it no longer observes the value. */
@@ -321,7 +333,11 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
   }
 
   /** Releases a frontier in inverse dependency order and reports secondary failures. */
-  const release = async (entries: readonly IStoredNode<TBinding>[]): Promise<void> => {
+  const release = async (
+    entries: readonly IStoredNode<TBinding>[],
+    bindingIds: ReadonlySet<string>,
+    reason: IGraphBindingReleaseReason
+  ): Promise<void> => {
     const leasedEntries = entries.filter((entry) => entry.instance !== undefined)
     for (const entry of leasedEntries) bindingLeases.seal(entry.leaseKey)
     const fence = Promise.all(
@@ -345,6 +361,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         entry.state = CapabilityGraphNodeState.registered
         entry.leaseKey = {}
       }
+      await releaseBindings(entries, bindingIds, reason)
       return
     }
     for (const entry of [...entries].reverse()) {
@@ -360,6 +377,28 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
           signal: { aborted: false, reason: undefined } as never,
           nodeId: entry.definition.id,
           report
+        })
+      } catch (error) {
+        report(error)
+      }
+    }
+    await releaseBindings(entries, bindingIds, reason)
+  }
+
+  /** Releases only bindings whose definitions actually leave the graph. */
+  const releaseBindings = async (
+    entries: readonly IStoredNode<TBinding>[],
+    bindingIds: ReadonlySet<string>,
+    reason: IGraphBindingReleaseReason
+  ): Promise<void> => {
+    if (!options.releaseBinding) return
+    for (const entry of entries) {
+      if (!bindingIds.has(entry.definition.id) || entry.binding === undefined) continue
+      try {
+        await options.releaseBinding({
+          id: entry.definition.id as IGraphNodeId,
+          binding: entry.binding,
+          reason
         })
       } catch (error) {
         report(error)
@@ -538,7 +577,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         const target = definitions.get(id)
         if (!target) throw fail(CapabilityGraphErrorCode.unknownNode)
         const affected = closure([id])
-        await release(affected)
+        await release(affected, new Set([id]), 'remove')
         for (const provider of providersByConsumer.get(id) ?? []) {
           const consumers = consumersByProvider.get(provider)
           consumers?.delete(id)
@@ -592,7 +631,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         const affected = topology(
           sameTopology ? oldAffected : new Set([...oldAffected, ...collectClosure([node.id])])
         )
-        await release(affected)
+        await release(affected, new Set([node.id]), 'replace')
         previous.binding = binding
         previous.state = CapabilityGraphNodeState.registered
         previous.error = undefined
@@ -645,7 +684,8 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
       graphState = CapabilityGraphState.quiescing
       disposePromise = schedule(async () => {
         try {
-          await release(topology())
+          const entries = topology()
+          await release(entries, new Set(entries.map((entry) => entry.definition.id)), 'dispose')
         } finally {
           definitions.clear()
           consumersByProvider.clear()

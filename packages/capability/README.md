@@ -37,7 +37,7 @@ import {
   createCapabilityGraph,
   type IGraphNodeId,
   type IGraphNodeDefinition
-} from '@migaia/capability/graph';
+} from '@migaia/capability/graph'
 ```
 
 它只管理静态 required provider-consumer DAG：首次 `ready()` 冻结注册表，检测 unknown provider/重复 edge/cycle，按稳定拓扑顺序启动；启动失败会回滚已启动节点，`dispose()` 按逆拓扑释放。节点的 `start()` 可以通过 `context.get(provider)` 读取 direct ready provider，并用 `context.own(resource, descriptor)` 登记 auxiliary resource；primary `value + release` 只由 Graph 所有一次。
@@ -45,24 +45,24 @@ import {
 无状态拓扑入口 `@migaia/capability/graph/topology` 的公开节点 `ordinal` 是一次性注册位置：对于 `nodeCount` 个节点，必须唯一且连续覆盖 `[0, nodeCount)`。不满足时通过调用方提供的 `onInvalid` 报告 `invalid-node` 或 `duplicate-ordinal`，不会静默排序或重写输入。
 
 ```ts
-const graph = createCapabilityGraph({ onError: (error) => console.error(error) });
-const provider = 'provider' as IGraphNodeId;
+const graph = createCapabilityGraph({ onError: (error) => console.error(error) })
+const provider = 'provider' as IGraphNodeId
 graph.register({
   id: provider,
   kind: 'service',
   dependencies: [],
   start: () => ({ value: { ready: true }, release: () => undefined })
-});
-const consumer = 'consumer' as IGraphNodeId;
+})
+const consumer = 'consumer' as IGraphNodeId
 graph.register({
   id: consumer,
   kind: 'consumer',
   dependencies: [{ provider, required: true }],
   start: ({ get }) => ({ value: get(provider), release: () => undefined })
-});
-await graph.ready();
-const service = graph.get<{ readonly ready: boolean }>(consumer, provider);
-await graph.dispose();
+})
+await graph.ready()
+const service = graph.get<{ readonly ready: boolean }>(consumer, provider)
+await graph.dispose()
 ```
 
 Graph core 不依赖 Tray、Reactive、Resource、PluginHost 或平台适配器；optional/notification、dynamic replacement 与 cross-realm 由独立 SDD 管理。
@@ -82,7 +82,7 @@ import {
   type ICapabilityDefinition,
   type ICapabilityHostOptions,
   type ICapabilityHost
-} from '@migaia/capability';
+} from '@migaia/capability'
 ```
 
 **`createCapabilityHost`｜10 秒上手** —— 创建一个能力容器：
@@ -91,7 +91,7 @@ import {
 const capabilities = createCapabilityHost(
   { userId: 'demo' }, // context：所有 activate() 共享的应用上下文
   { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用
-);
+)
 ```
 
 签名：`createCapabilityHost<Context>(context: Context, options?: ICapabilityHostOptions): ICapabilityHost<Context>`。
@@ -106,7 +106,7 @@ const capabilities = createCapabilityHost(
 **`ICapabilityHandle`｜3 秒上手** —— `activate()` 必须返回的对象形状，唯一约束是有 `dispose()`：
 
 ```ts
-type ICapabilityHandle = { dispose(): void | PromiseLike<void> };
+type ICapabilityHandle = { dispose(): void | PromiseLike<void> }
 ```
 
 **`register`｜5 秒上手** —— 登记一个能力定义：
@@ -115,10 +115,10 @@ type ICapabilityHandle = { dispose(): void | PromiseLike<void> };
 capabilities.register({
   name: 'greeting',
   activate(ctx) {
-    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000);
-    return { dispose: () => clearInterval(timer) };
+    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)
+    return { dispose: () => clearInterval(timer) }
   }
-});
+})
 ```
 
 参数 `ICapabilityDefinition<Context, Handle>` 全部字段：
@@ -131,7 +131,7 @@ capabilities.register({
 **`names`｜3 秒上手** —— 只读属性，当前已登记的全部名字：
 
 ```ts
-capabilities.names; // ['greeting']
+capabilities.names // ['greeting']
 ```
 
 无参数，无选项。
@@ -139,7 +139,7 @@ capabilities.names; // ['greeting']
 **`state`｜3 秒上手** —— 查询某个能力当前状态：
 
 ```ts
-capabilities.state('greeting'); // 'off' | 'gated' | 'activating' | 'on' | 'failed'
+capabilities.state('greeting') // 'off' | 'gated' | 'activating' | 'on' | 'failed'
 ```
 
 参数：`name: string`（必填）。未注册的名字抛 `NOT_REGISTERED`。返回值类型见下方 [`CapabilityState`](#状态与枚举常量)。
@@ -147,7 +147,7 @@ capabilities.state('greeting'); // 'off' | 'gated' | 'activating' | 'on' | 'fail
 **`handle`｜3 秒上手** —— 取已启用能力的 handle：
 
 ```ts
-const h = capabilities.handle<{ dispose(): void }>('greeting'); // 未启用返回 undefined
+const h = capabilities.handle<{ dispose(): void }>('greeting') // 未启用返回 undefined
 ```
 
 参数：`name: string`（必填），泛型 `Handle` 可选指定返回类型。未注册的名字抛 `NOT_REGISTERED`。
@@ -155,7 +155,7 @@ const h = capabilities.handle<{ dispose(): void }>('greeting'); // 未启用返�
 **`error`｜3 秒上手** —— 查上一次激活或释放失败的原因：
 
 ```ts
-capabilities.error('greeting'); // unknown，成功重启或重新配置后会被清空
+capabilities.error('greeting') // unknown，成功重启或重新配置后会被清空
 ```
 
 参数：`name: string`（必填）。未注册的名字抛 `NOT_REGISTERED`。
@@ -163,8 +163,8 @@ capabilities.error('greeting'); // unknown，成功重启或重新配置后会�
 **`setFlag`｜5 秒上手** —— 更新单个开关：
 
 ```ts
-capabilities.setFlag('greeting', false); // 关闭：同步作废在途激活并释放已有 handle
-capabilities.setFlag('greeting', true); // 打开：不会自动启用，仍需调用 enable()
+capabilities.setFlag('greeting', false) // 关闭：同步作废在途激活并释放已有 handle
+capabilities.setFlag('greeting', true) // 打开：不会自动启用，仍需调用 enable()
 ```
 
 参数：`name: string`（必填）、`enabled: boolean`（必填，只有严格等于 `true` 才算允许，非 `true` 一律视为拒绝）。无其他选项。
@@ -172,7 +172,7 @@ capabilities.setFlag('greeting', true); // 打开：不会自动启用，仍需�
 **`setFlags`｜5 秒上手** —— 原子替换整份开关快照：
 
 ```ts
-capabilities.setFlags({ greeting: true, persistence: false });
+capabilities.setFlags({ greeting: true, persistence: false })
 ```
 
 参数：`flags: Readonly<Record<string, boolean>>`（必填）——新快照里没列出的能力一律按拒绝处理，不会保留旧快照里残留的 `true`。无其他选项。
@@ -180,7 +180,7 @@ capabilities.setFlags({ greeting: true, persistence: false });
 **`enable`｜10 秒上手** —— 幂等启用，推荐入口：
 
 ```ts
-const result = await capabilities.enable('greeting');
+const result = await capabilities.enable('greeting')
 // { status: 'enabled' } | { status: 'gated' } | { status: 'cancelled' } | { status: 'failed'; error: unknown }
 ```
 
@@ -189,7 +189,7 @@ const result = await capabilities.enable('greeting');
 **`enableResult`｜3 秒上手** —— `enable()` 的别名，语义完全一致：
 
 ```ts
-await capabilities.enableResult('greeting');
+await capabilities.enableResult('greeting')
 ```
 
 参数与返回值同 `enable`，无其他选项。
@@ -197,7 +197,7 @@ await capabilities.enableResult('greeting');
 **`disable`｜5 秒上手** —— 关闭并等待 `dispose()`（含异步）真正完成：
 
 ```ts
-const changed = await capabilities.disable('greeting'); // boolean：是否确实关掉了一个启用态能力
+const changed = await capabilities.disable('greeting') // boolean：是否确实关掉了一个启用态能力
 ```
 
 参数：`name: string`（必填）。无其他选项。未注册抛 `NOT_REGISTERED`；host 已 disposed 抛 `HOST_DISPOSED`。
@@ -205,7 +205,7 @@ const changed = await capabilities.disable('greeting'); // boolean：是否确�
 **`dispose`｜10 秒上手** —— 整体关闭 host，按真实激活顺序反向（LIFO）：
 
 ```ts
-await capabilities.dispose(); // 之后 host 永久不可用
+await capabilities.dispose() // 之后 host 永久不可用
 ```
 
 无参数，无选项。首次调用返回唯一的 completion Promise；该 Promise 完成前的后续调用立即以 `HOST_TRANSITIONING` 拒绝，完成后才恢复为返回同一个 canonical Promise。
@@ -213,7 +213,7 @@ await capabilities.dispose(); // 之后 host 永久不可用
 **`enableLegacyBoolean`｜5 秒上手** —— 同步/布尔风格兼容适配器：
 
 ```ts
-const ok: boolean = await capabilities.enableLegacyBoolean('greeting');
+const ok: boolean = await capabilities.enableLegacyBoolean('greeting')
 ```
 
 参数：`name: string`（必填），无其他选项。语义与 `enable()` 共享同一次激活，只是把结果压缩成布尔值。
@@ -221,7 +221,7 @@ const ok: boolean = await capabilities.enableLegacyBoolean('greeting');
 **`disableNow`｜5 秒上手** —— 同步触发关闭，不等待异步清理完成：
 
 ```ts
-const changed: boolean = capabilities.disableNow('greeting');
+const changed: boolean = capabilities.disableNow('greeting')
 ```
 
 参数：`name: string`（必填），无其他选项。确定要等清理完成用 `disable()`。
@@ -229,7 +229,7 @@ const changed: boolean = capabilities.disableNow('greeting');
 **`disposed`｜3 秒上手** —— 只读属性，host 是否已整体关闭：
 
 ```ts
-capabilities.disposed; // boolean
+capabilities.disposed // boolean
 ```
 
 无参数。`disposed === true` 之后，`register`/`setFlag`/`setFlags`/`enable` 类方法都会抛错或被拒绝；`names`/`state`/`handle`/`error` 等只读诊断方法仍然可用。
@@ -241,7 +241,7 @@ capabilities.disposed; // boolean
 ## 状态与枚举常量
 
 ```ts
-import { CapabilityState, CapabilityEnableStatus } from '@migaia/capability';
+import { CapabilityState, CapabilityEnableStatus } from '@migaia/capability'
 ```
 
 **`CapabilityState`｜5 秒上手** —— 能力生命周期的五个状态，用于 `switch`/比较：
@@ -265,7 +265,7 @@ if (capabilities.state('greeting') === CapabilityState.on) {
 **`CapabilityEnableStatus`｜5 秒上手** —— `enable()`/`enableResult()` 返回结果的 `status` 取值：
 
 ```ts
-if (result.status === CapabilityEnableStatus.failed) console.error(result.error);
+if (result.status === CapabilityEnableStatus.failed) console.error(result.error)
 ```
 
 全部取值：`enabled`、`gated`、`cancelled`、`failed`。对应的完整返回值类型 `ICapabilityEnableResult` 全部分支：
@@ -286,7 +286,7 @@ import {
   CapabilityErrorCode,
   type ICapabilityErrorCode,
   CAPABILITY_SOURCE
-} from '@migaia/capability';
+} from '@migaia/capability'
 ```
 
 **`CapabilityErrorCode`｜5 秒上手** —— 本包全部错误的稳定 `code`，配合 `error.source === CAPABILITY_SOURCE` 按 `(source, code)` 二元组识别：
@@ -314,7 +314,7 @@ if (error.code === CapabilityErrorCode.hostDisposed) {
 **`CAPABILITY_SOURCE`｜3 秒上手** —— 本包抛出的每个错误上 `source` 字段的固定值：
 
 ```ts
-CAPABILITY_SOURCE; // '@migaia/capability'
+CAPABILITY_SOURCE // '@migaia/capability'
 ```
 
 常量字符串，无调用参数。
@@ -328,7 +328,7 @@ CAPABILITY_SOURCE; // '@migaia/capability'
 ### 1. 按开关懒加载一个持久化能力，附错误上报与优雅收尾
 
 ```ts
-import { createCapabilityHost } from '@migaia/capability';
+import { createCapabilityHost } from '@migaia/capability'
 
 const capabilities = createCapabilityHost(
   { store },
@@ -336,114 +336,114 @@ const capabilities = createCapabilityHost(
     flags: { persistence: true },
     onError: (name, error) => reportError(name, error)
   }
-);
+)
 
 capabilities.register({
   name: 'persistence',
   async activate({ store }) {
     // 只有开关打开、真正 enable() 时才会下载这个 chunk
-    const { persist, memoryStorage } = await import('@migaia/store-persist');
-    const handle = persist(store, { key: 'settings', storage: memoryStorage() });
-    return { dispose: () => handle.dispose() };
+    const { persist, memoryStorage } = await import('@migaia/store-persist')
+    const handle = persist(store, { key: 'settings', storage: memoryStorage() })
+    return { dispose: () => handle.dispose() }
   }
-});
+})
 
-const result = await capabilities.enable('persistence');
-if (result.status === 'enabled') console.log('持久化已启用');
+const result = await capabilities.enable('persistence')
+if (result.status === 'enabled') console.log('持久化已启用')
 
-await capabilities.disable('persistence');
-await capabilities.dispose();
+await capabilities.disable('persistence')
+await capabilities.dispose()
 ```
 
 ### 2. 多租户隔离：每个租户一份独立开关表
 
 ```ts
-import { createCapabilityHost } from '@migaia/capability';
+import { createCapabilityHost } from '@migaia/capability'
 
 function createTenantCapabilities(tenant: string, flags: Record<string, boolean>) {
-  const host = createCapabilityHost({ tenant }, { flags });
+  const host = createCapabilityHost({ tenant }, { flags })
   host.register({
     name: 'experimental-ai',
     activate: async ({ tenant }) => {
-      const controller = await connectAiSidecar(tenant);
-      return { dispose: () => controller.close() };
+      const controller = await connectAiSidecar(tenant)
+      return { dispose: () => controller.close() }
     }
-  });
-  return host;
+  })
+  return host
 }
 
-const acme = createTenantCapabilities('acme', { 'experimental-ai': true });
-const globex = createTenantCapabilities('globex', { 'experimental-ai': false });
+const acme = createTenantCapabilities('acme', { 'experimental-ai': true })
+const globex = createTenantCapabilities('globex', { 'experimental-ai': false })
 
-await acme.enable('experimental-ai'); // { status: 'enabled' }
-await globex.enable('experimental-ai'); // { status: 'gated' }
+await acme.enable('experimental-ai') // { status: 'enabled' }
+await globex.enable('experimental-ai') // { status: 'gated' }
 ```
 
 ### 3. `setFlag(false)` 触发的原子回退：无需再手动调用 `disable()`
 
 ```ts
-import { createCapabilityHost, CapabilityState } from '@migaia/capability';
+import { createCapabilityHost, CapabilityState } from '@migaia/capability'
 
-const host = createCapabilityHost({}, { flags: { worker: true } });
+const host = createCapabilityHost({}, { flags: { worker: true } })
 host.register({
   name: 'worker',
   async activate() {
-    const port = await connectWorkerPort();
-    return { dispose: () => port.close() };
+    const port = await connectWorkerPort()
+    return { dispose: () => port.close() }
   }
-});
+})
 
-await host.enable('worker');
-host.state('worker'); // CapabilityState.on
+await host.enable('worker')
+host.state('worker') // CapabilityState.on
 
-host.setFlag('worker', false); // 同步作废在途激活/释放已有 handle，不需要再调用 disable()
-host.state('worker'); // CapabilityState.gated
+host.setFlag('worker', false) // 同步作废在途激活/释放已有 handle，不需要再调用 disable()
+host.state('worker') // CapabilityState.gated
 ```
 
 ### 4. 并发 `enable()` 幂等共享同一次激活
 
 ```ts
-import { createCapabilityHost } from '@migaia/capability';
+import { createCapabilityHost } from '@migaia/capability'
 
-const host = createCapabilityHost({}, { flags: { search: true } });
-let activateCalls = 0;
+const host = createCapabilityHost({}, { flags: { search: true } })
+let activateCalls = 0
 host.register({
   name: 'search',
   async activate() {
-    activateCalls++;
-    const index = await buildSearchIndex();
-    return { dispose: () => index.close() };
+    activateCalls++
+    const index = await buildSearchIndex()
+    return { dispose: () => index.close() }
   }
-});
+})
 
 const [a, b, c] = await Promise.all([
   host.enable('search'),
   host.enable('search'),
   host.enableLegacyBoolean('search')
-]);
-activateCalls; // 1 —— 三个并发调用共享同一次 activate()
+])
+activateCalls // 1 —— 三个并发调用共享同一次 activate()
 ```
 
 ### 5. 能力启用失败后查询原因，再重新配置恢复
 
 ```ts
-import { createCapabilityHost, CapabilityState } from '@migaia/capability';
+import { createCapabilityHost, CapabilityState } from '@migaia/capability'
 
-const host = createCapabilityHost({}, { flags: { flaky: true } });
+const host = createCapabilityHost({}, { flags: { flaky: true } })
 host.register({
   name: 'flaky',
   activate: async () => {
-    throw new Error('chunk 404');
+    throw new Error('chunk 404')
   }
-});
+})
 
-const result = await host.enable('flaky');
-result; // { status: 'failed', error: Error('chunk 404') }
-host.state('flaky'); // CapabilityState.failed
-String(host.error('flaky')); // 包含 'chunk 404'
+const result = await host.enable('flaky')
+result // { status: 'failed', error: Error('chunk 404') }
+host.state('flaky') // CapabilityState.failed
+String(host.error('flaky')) // 包含 'chunk 404'
 
-host.setFlag('flaky', false); // 重新配置会清空 error(name)
-host.error('flaky'); // undefined
+host.setFlag('flaky', false) // 重新配置会清空 error(name)
+host.error('flaky') // undefined
 ```
 
 ---
@@ -455,6 +455,7 @@ host.error('flaky'); // undefined
 ```bash
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
+
 ## Dynamic Graph generation leases
 
 `@migaia/capability/graph/dynamic` 为运行期 definition 增删提供唯一 Graph authority。composition owner
