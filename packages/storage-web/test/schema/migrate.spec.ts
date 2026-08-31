@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { runMigrations } from '../../src/schema/migrate'
+import { captureOperationCleanup } from '../helpers/operation-reporter.js'
 
 describe('runMigrations', () => {
   it('拒绝非法版本，避免 Infinity 循环与整数精度丢失', async () => {
@@ -149,7 +150,7 @@ describe('runMigrations', () => {
         removeEventListener: () => {}
       } as never)
     ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
-    await expect(
+    const cleanup = await captureOperationCleanup(() =>
       runMigrations({}, 0, 1, { 1: async () => ({ migrated: true }) }, {
         aborted: false,
         addEventListener: () => {},
@@ -157,7 +158,11 @@ describe('runMigrations', () => {
           throw new Error('hostile migration listener cleanup')
         }
       } as never)
-    ).resolves.toEqual({ migrated: true })
+    )
+    expect(cleanup.result).toEqual({ migrated: true })
+    expect(cleanup.reports).toEqual([
+      expect.objectContaining({ message: 'hostile migration listener cleanup' })
+    ])
   })
 
   it('pre-abort 即使没有迁移步骤也返回 ABORTED', async () => {

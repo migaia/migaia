@@ -2,6 +2,7 @@ import { IDBFactory } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
 import { fromIdbRequest, idbTransactionCommit } from '../../src/utils/idb-request'
 import { createStorageOperationRuntime } from '../../src/core/operation-reporter.js'
+import { captureOperationCleanup } from '../helpers/operation-reporter.js'
 
 const openDb = (): Promise<IDBDatabase> => {
   const factory = new IDBFactory()
@@ -107,7 +108,7 @@ describe('fromIdbRequest', () => {
         createStorageOperationRuntime()
       )
     ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
-    await expect(
+    const cleanup = await captureOperationCleanup(() =>
       fromIdbRequest(
         db.transaction('kv').objectStore('kv').get('missing'),
         {
@@ -121,7 +122,11 @@ describe('fromIdbRequest', () => {
         },
         createStorageOperationRuntime()
       )
-    ).resolves.toBeUndefined()
+    )
+    expect(cleanup.result).toBeUndefined()
+    expect(cleanup.reports).toEqual([
+      expect.objectContaining({ message: 'hostile request listener cleanup' })
+    ])
   })
   it('request result/error getter 异常会 reject 而非悬挂', async () => {
     const resultCause = new Error('hostile request result getter')
@@ -291,7 +296,7 @@ describe('idbTransactionCommit', () => {
 
     const cleanupTransaction = db.transaction('kv', 'readwrite')
     cleanupTransaction.objectStore('kv').put('cleanup', 'cleanup')
-    await expect(
+    const cleanup = await captureOperationCleanup(() =>
       idbTransactionCommit(
         cleanupTransaction,
         {
@@ -305,7 +310,11 @@ describe('idbTransactionCommit', () => {
         },
         createStorageOperationRuntime()
       )
-    ).resolves.toBeUndefined()
+    )
+    expect(cleanup.result).toBeUndefined()
+    expect(cleanup.reports).toEqual([
+      expect.objectContaining({ message: 'hostile transaction listener cleanup' })
+    ])
   })
   it('transaction.error getter 异常会 reject 而非逃逸 event callback', async () => {
     const cause = new Error('hostile transaction error getter')

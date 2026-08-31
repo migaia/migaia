@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { captureOperationCleanup } from '../helpers/operation-reporter.js'
 import {
   assertOperationContext,
   mergeSignals,
@@ -308,7 +309,7 @@ describe('mergeSignals', () => {
     clearTimer.mockRestore()
   })
   it('listener cleanup 失败不覆盖已完成 operation 结果', async () => {
-    await expect(
+    const cleanup = await captureOperationCleanup(() =>
       withAbort(
         {
           timeoutMs: 1000,
@@ -322,7 +323,11 @@ describe('mergeSignals', () => {
         },
         async () => 42
       )
-    ).resolves.toBe(42)
+    )
+    expect(cleanup.result).toBe(42)
+    expect(cleanup.reports).toEqual([
+      expect.objectContaining({ message: 'hostile removeEventListener' })
+    ])
   })
   it('timeoutMs 为 0 时立即 abort，不创建延迟操作', () => {
     const { signal, dispose } = mergeSignals({ timeoutMs: 0 }, noopReporter)
