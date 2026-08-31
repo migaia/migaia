@@ -27,7 +27,8 @@ type IProvenance = {
       readonly vite: string
       readonly rolldown: string
       readonly esbuild: string
-      readonly zlib: string
+      readonly typescript: string
+      readonly vitest: string
     }
     readonly resolvedBuildOptions: { readonly root: string; readonly build: object }
     readonly outputOptions: object
@@ -81,6 +82,8 @@ function readCanonicalEnvironment(): NodeJS.ProcessEnv {
 
 describe('WRC-C-B11 retained provenance', () => {
   it('hashes cwd-independent inputs and preserves the installed detached decision', async () => {
+    /** Physical checkout root must never enter the portable signed subject. */
+    const repositoryRoot = resolve(import.meta.dirname, '../../../..')
     const report = readProvenance()
     const repeat = readProvenance()
     const packageInvocation = readProvenance(resolve(import.meta.dirname, '../..'))
@@ -126,12 +129,21 @@ describe('WRC-C-B11 retained provenance', () => {
     expect(report.subject.emitted.modules).toHaveLength(report.subject.emitted.moduleCount)
     expect(report.subject.emitted.modules.every((module) => module.renderedSha256)).toBe(true)
     expect(report.subject.emitted.modules.every((module) => module.sourceSha256)).toBe(true)
-    expect(report.subject.tools.node).toMatch(/^v\d+/)
+    expect(report.subject.tools.node).toBe('24.16.0')
     expect(report.subject.tools.pnpm).toMatch(/^\d+\.\d+\.\d+$/)
     expect(report.subject.tools.vite).not.toBe('unavailable')
     expect(report.subject.tools.rolldown).not.toBe('unavailable')
     expect(report.subject.tools.esbuild).not.toBe('unavailable')
-    expect(report.subject.tools.zlib).toBe(process.versions.zlib)
+    expect(Object.keys(report.subject.tools).sort()).toEqual([
+      'esbuild',
+      'node',
+      'pnpm',
+      'rolldown',
+      'typescript',
+      'vite',
+      'vitest'
+    ])
+    expect(JSON.stringify(report.subject)).not.toContain(repositoryRoot)
     expect(report.subject.resolvedBuildOptions.root).toMatch(/packages\/web-rpc$/)
     expect(repeat.subject.digest).toBe(report.subject.digest)
     expect(repeat.tuple).toEqual(report.tuple)

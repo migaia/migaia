@@ -2,10 +2,10 @@
   "schema": "WRC-C-B11-approval-v2",
   "algorithm": "ed25519",
   "authorityId": "web-rpc-release-coordinator-v1",
-  "keyId": "coordinator-ed25519-a5907cf9ee31549e",
-  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAxzKgGKiY+A4CwDpuTrhAnLdYQTwgwgQl/wHsXhaj8JQ=\n-----END PUBLIC KEY-----\n",
-  "decisionId": "WRC-C-B11-decision-20260831-SHIP-DRY-RUN-R1",
-  "payloadDigest": "a5907cf9ee31549e6c0c9ec3e7cbecb389dd17ee23dda56480970051e5955995",
+  "keyId": "coordinator-ed25519-cf67090f4b18e27a",
+  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAKX3NMrt/FFpd1bUZATtaTbarDiWIAl3osiXgwWrsx4Q=\n-----END PUBLIC KEY-----\n",
+  "decisionId": "WRC-C-B11-decision-20260831-CROSS-HOST-R3",
+  "payloadDigest": "cf67090f4b18e27a189a6deec6303d78a3ba187c8cedd8f1a639bc89c1e14531",
   "status": "approved",
-  "reason": "Ship dry-run custody refresh after two byte-identical canonical builds attributed the current 121-module closure to the admitted managed PluginHost composition; raw and gzip bytes decreased."
+  "reason": "Cross-host custody repair normalizes checkout paths and replaces volatile platform and native-library digest inputs with repository-declared toolchain contracts while preserving exact emitted and retained-input hashes."
 }

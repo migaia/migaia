@@ -88,6 +88,7 @@ function packageVersion(packageName) {
 /** Converts resolved Vite metadata to a complete JSON-safe snapshot. */
 function serializeResolved(value, path = [], seen = new WeakMap()) {
   if (typeof value === 'function') return '[function]'
+  if (typeof value === 'string') return value.replaceAll(repositoryRoot, '[repository-root]')
   if (value === null || typeof value !== 'object') return value
   const previousPath = seen.get(value)
   if (previousPath) return { '[reference]': previousPath }
@@ -163,6 +164,8 @@ const retainedInputs = [...moduleEntries.keys()]
 const lockfilePath = resolve(repositoryRoot, 'pnpm-lock.yaml')
 const packageManifestPath = resolve(packageDirectory, 'package.json')
 const rootManifestPath = resolve(repositoryRoot, 'package.json')
+/** Root manifest owns the declared Node and pnpm toolchain contract. */
+const rootManifest = JSON.parse(readFileSync(rootManifestPath, 'utf8'))
 const boundary = {
   fixture: hashInput(input, 'fixture'),
   lockfile: hashInput(lockfilePath, 'lockfile'),
@@ -173,18 +176,29 @@ const boundary = {
   retainedInputs,
   retainedInputCount: retainedInputs.length
 }
+/** Exact Node version admitted by the repository manifest. */
+const declaredNodeVersion = rootManifest.engines?.node
+/** Exact pnpm version admitted by the repository package-manager field. */
+const declaredPnpmVersion = rootManifest.packageManager?.match(/^pnpm@(.+)$/)?.[1]
+/** Stable failure text for a Node runtime outside the declared toolchain. */
+const nodeVersionMismatchText = 'runtime Node version differs from the repository contract'
+/** Stable failure text for a pnpm runtime outside the declared toolchain. */
+const pnpmVersionMismatchText = 'runtime pnpm version differs from the repository contract'
+if (typeof declaredNodeVersion !== 'string' || process.version !== `v${declaredNodeVersion}`)
+  throw new TypeError(nodeVersionMismatchText)
+if (
+  typeof declaredPnpmVersion !== 'string' ||
+  execFileSync('pnpm', ['--version'], { encoding: 'utf8' }).trim() !== declaredPnpmVersion
+)
+  throw new TypeError(pnpmVersionMismatchText)
 const tools = {
-  node: process.version,
-  pnpm: execFileSync('pnpm', ['--version'], { encoding: 'utf8' }).trim(),
+  node: declaredNodeVersion,
+  pnpm: declaredPnpmVersion,
   vite: packageVersion('vite'),
   rolldown: packageVersion('rolldown'),
   esbuild: packageVersion('esbuild'),
   typescript: packageVersion('typescript'),
-  vitest: packageVersion('vitest'),
-  platform: process.platform,
-  arch: process.arch,
-  zlib: process.versions.zlib,
-  openssl: process.versions.openssl
+  vitest: packageVersion('vitest')
 }
 const resolvedBuildOptions = resolvedConfig
 const outputOptions = {
