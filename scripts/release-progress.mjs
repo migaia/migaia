@@ -3,18 +3,23 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-/** Returns the contiguous dependency-order release prefix already committed at HEAD. */
+/** Returns the dependency-order release prefix already committed for current manifest versions. */
 export function releasePatchPrefix(packageNames, versions, subjectsNewestFirst) {
   const expected = packageNames.map(
     (packageName) => `chore(release): ${packageName} v${versions.get(packageName)}`
   )
-  const limit = Math.min(expected.length, subjectsNewestFirst.length)
-  for (let length = limit; length > 0; length -= 1) {
-    const chronological = subjectsNewestFirst.slice(0, length).toReversed()
-    if (chronological.every((subject, index) => subject === expected[index]))
-      return packageNames.slice(0, length)
-  }
-  return []
+  /** The newest first-package commit anchors this run and excludes older same-version releases. */
+  const runAnchor = subjectsNewestFirst.indexOf(expected[0])
+  if (runAnchor === -1) return []
+  /** Repair commits may sit above a partial release; only this run's release subjects matter. */
+  const releaseSubjects = subjectsNewestFirst
+    .slice(0, runAnchor + 1)
+    .filter((subject) => expected.includes(subject))
+  /** Chronological order must still be the exact dependency prefix, preventing skipped packages. */
+  const chronological = releaseSubjects.toReversed()
+  const prefixLength = chronological.findIndex((subject, index) => subject !== expected[index])
+  const matchedLength = prefixLength === -1 ? chronological.length : prefixLength
+  return packageNames.slice(0, matchedLength)
 }
 
 /** Whether Node invoked this module as the release-progress command. */
@@ -38,8 +43,9 @@ if (isMain) {
       return [packageName, manifest.version]
     })
   )
-  /** Recent subjects are sufficient because a release run owns one contiguous commit per package. */
-  const subjects = execFileSync('git', ['log', `-n${packageNames.length}`, '--format=%s'], {
+  /** Bounded history admits repair commits made while resuming without scanning unbounded history. */
+  const historyLimit = packageNames.length * 4
+  const subjects = execFileSync('git', ['log', `-n${historyLimit}`, '--format=%s'], {
     cwd: repositoryRoot,
     encoding: 'utf8'
   })
