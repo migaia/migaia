@@ -19,6 +19,34 @@
             ]
           },
           {
+            "id": "本文中的-host-是什么",
+            "heading": "本文中的 Host 是什么",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "本文单独写 Host 时，始终指 `createCapabilityHost()` 创建的 Capability Host，不是全仓其他同名概念。它是一个进程内的功能开关与生命周期容器，持有能力注册表、共享 `context`、开关快照和启停状态；调用方通过 `register()` 登记功能，通过 `enable()`/`disable()` 启停功能，最后用 `dispose()` 关闭容器并释放已启用能力。"
+              },
+              {
+                "type": "paragraph",
+                "text": "几个容易混淆的概念职责不同："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "Capability Host（本文的 Host）：回答“这个功能现在是否允许启用，以及启用后如何关闭”；不计算能力之间的依赖顺序。",
+                  "Capability Graph：回答“节点依赖谁、按什么顺序启动和反向释放”；它不是功能开关表。",
+                  "PluginHost：负责插件定义的安装、注册视图、管线阶段与回滚；插件可以在内部使用 Capability Host，但两者不是同一个容器。",
+                  "Storage Host：组合并按 ID 暴露多个 storage backend；它管理存储后端，不管理通用功能开关。",
+                  "Realm Host：若未来发布，用于控制 Worker、线程或子进程的启动、健康、关闭与强制终止；它提供隔离边界，不负责业务能力登记。"
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "因此，下文“Host 不承担依赖图编排”的完整含义是：Capability Host 只管理每项能力自身的准入与启停，不读取 `provider → consumer` 依赖边，也不会替调用方决定跨能力的启动顺序。"
+              }
+            ]
+          },
+          {
             "id": "适用与不适用场景",
             "heading": "适用与不适用场景",
             "blocks": [
@@ -28,7 +56,40 @@
               },
               {
                 "type": "paragraph",
-                "text": "不适用：Host 不承担依赖图编排；需要静态 required provider DAG 时使用下方的 `@migaia/capability/graph`，只需纯准入时可使用 `@migaia/capability/graph/topology`。Graph 不提供 optional/notification、dynamic replacement 或 cross-realm adapter。Host 也不能让一个静态 import 进来的能力变免费——体积只有 `activate()` 内部真正用 `await import()` 时才省下来，闸门只是把这个写法变成一等公民，省体积的是打包器本身。"
+                "text": "这里的“静态 required provider DAG”可以拆开理解："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "provider 是提供能力的节点，例如配置服务、数据库连接或日志服务；consumer 是使用该能力的节点。",
+                  "required 表示这是硬依赖：provider 未注册或启动失败时，consumer 不能启动；它不是“有则使用”的 optional 依赖。",
+                  "DAG 是“有向无环图”（Directed Acyclic Graph）：依赖有明确方向，并且不允许 A 依赖 B、B 又间接依赖 A 的循环。",
+                  "静态 表示所有节点和依赖边必须在首次 `ready()` 前登记完成；`ready()` 会冻结注册表。运行期间不能增加、删除或替换节点。"
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "例如“配置服务 → 用户服务 → 结算面板”表示用户服务必须等配置服务就绪，结算面板又必须等用户服务就绪。Graph 会按这个方向启动，关闭时反向释放：先释放结算面板，再释放用户服务，最后释放配置服务。若你的需求只是独立功能开关，不存在这种跨能力启动顺序，就不需要 Graph。"
+              },
+              {
+                "type": "paragraph",
+                "text": "不适用：Host 不承担上述依赖图编排；需要静态 required provider DAG 时使用下方的 `@migaia/capability/graph`。如果只想检查“一组节点及其 required 依赖是否合法”并计算确定的启动顺序，不需要创建服务、不执行节点的 `start()`、也不管理 `release()`，则直接使用 `@migaia/capability/graph/topology`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "这里提到的其他能力边界分别是："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "optional dependency（可选依赖）与 notification（变化通知）：consumer 可以在 provider 缺失时继续运行，并在 provider 后来可用、失败、恢复或被替换时收到通知，再按策略选择继续、刷新快照或重启。例如“订单服务可以没有推荐引擎照常下单；推荐引擎上线后再启用推荐”。静态 Graph 当前只接受 `required: true`，不提供这套可选绑定与通知策略。",
+                  "dynamic replacement（运行时替换）：Graph 已经运行后，仍可增加、删除或替换节点及依赖边，并只暂停、释放和重启受影响的 consumer。例如不重启整个应用就把支付插件 v1 换成 v2。静态 `@migaia/capability/graph` 会在 `ready()` 后冻结拓扑；确实需要这种能力时使用独立的 `@migaia/capability/graph/dynamic`，并由组合层负责被替换资源的物理释放。",
+                  "cross-realm adapter（跨运行域适配器）：让能力实际运行在另一个 Worker、线程或子进程中，同时把启动、健康检查、关闭、强制终止和错误链映射回当前 Graph。它适合需要隔离同步死循环、重型任务或进程故障的场景，不等同于普通的 RPC。当前包没有发布这种 adapter；浏览器默认仍在同一 realm，不能用 Promise 超时冒充真正终止。"
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "Host 也不能让一个静态 import 进来的能力变免费——体积只有 `activate()` 内部真正用 `await import()` 时才省下来，闸门只是把这个写法变成一等公民，省体积的是打包器本身。"
               }
             ]
           },
@@ -93,7 +154,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "Graph core 不依赖 Tray、Reactive、Resource、PluginHost 或平台适配器；optional/notification、dynamic replacement 与 cross-realm 由独立 SDD 管理。"
+                "text": "静态 Graph core 只拥有 required 拓扑、启动顺序与生命周期协调，不反向依赖上层组合框架或平台适配器。optional/notification 与 cross-realm 仍是独立的未发布边界，dynamic replacement 则由 `@migaia/capability/graph/dynamic` 单独提供，避免把运行时 mutation 混入静态 Graph。"
               }
             ]
           },
@@ -113,7 +174,15 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
+                "code": "import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'\n\ntype INotificationCenter = ICapabilityHandle & {\n  show(message: string): void\n}\n\nconst mount = document.querySelector<HTMLElement>('#notification-center')!\nconst capabilities = createCapabilityHost(\n  { mount },\n  { flags: { notificationCenter: true } }\n)\n\ncapabilities.register<INotificationCenter>({\n  name: 'notificationCenter',\n  activate({ mount }) {\n    const panel = document.createElement('output')\n    mount.append(panel)\n    return {\n      show(message) {\n        panel.textContent = message\n      },\n      dispose() {\n        panel.remove()\n      }\n    }\n  }\n})\n\nasync function openNotificationCenter(message: string) {\n  const result = await capabilities.enable('notificationCenter')\n  if (result.status !== 'enabled') return\n\n  const notifications = capabilities.handle<INotificationCenter>('notificationCenter')\n  notifications?.show(message)\n}\n\nasync function closeNotificationCenter() {\n  await capabilities.disable('notificationCenter')\n}\n\nasync function shutdownApplication() {\n  await capabilities.dispose()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "这里把“通知中心”当作一个按需能力：用户打开通知抽屉时调用 `openNotificationCenter()`，此时才创建 DOM 资源；启用成功后，`enable()` 返回的是状态而不是业务对象，再通过 `handle<INotificationCenter>()` 取得能力并调用 `show()`。用户关闭抽屉时调用 `disable()`，它会等待 handle 的 `dispose()` 删除面板；整个应用退出时调用 Host 的 `dispose()`，兜底关闭所有仍启用的能力。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`flags.notificationCenter` 是远端配置或权限开关：为 `false` 时 `enable()` 返回 `gated`，不会创建面板。临时离开页面但以后还允许再次打开，用 `disable()`；配置或权限被撤回时用 `setFlag('notificationCenter', false)`，它会立即作废在途启用并释放现有 handle。"
               },
               {
                 "type": "paragraph",
@@ -136,12 +205,16 @@
               },
               {
                 "type": "paragraph",
-                "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一约束是有 `dispose()`："
+                "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一公共约束是有 `dispose()`；业务方法由具体能力自行扩展："
               },
               {
                 "type": "code",
                 "language": "ts",
                 "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
+              },
+              {
+                "type": "paragraph",
+                "text": "例如上面的 `INotificationCenter` 在此基础上增加了 `show(message)`。Host 只负责保存和释放 handle，不会包装或代理业务方法；调用方在 `enable()` 返回 `enabled` 后，通过 `handle<INotificationCenter>('notificationCenter')` 取回同一个对象并调用它。"
               },
               {
                 "type": "paragraph",
@@ -544,6 +617,10 @@
               {
                 "type": "paragraph",
                 "text": "本指南覆盖面向应用与适配器的公开运行时 API、关键契约类型、边界行为与错误码。仅参与条件推导的 type-only 辅助类型以发布的 `.d.ts` 和编辑器提示为准，不在正文逐项抄录；包的定位与安装方式、最小上手示例见 README。"
+              },
+              {
+                "type": "paragraph",
+                "text": "本文单独写 Host 时，专指 `createCapabilityHost()` 创建的 Capability Host：它管理能力注册、共享 context、功能开关和启停生命周期。它不是负责插件安装的 PluginHost、组合存储后端的 Storage Host、控制 Worker/进程的 Realm Host，也不是负责 provider-consumer 启动顺序的 Capability Graph。"
               }
             ]
           },
@@ -581,7 +658,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`exports` 提供包根（`.`）、静态 Graph 子路径（`./graph`）与无状态拓扑子路径（`./graph/topology`）。Host 符号从包根导入，Graph 符号从 `@migaia/capability/graph` 导入；只需纯 required-edge 准入时从 `@migaia/capability/graph/topology` 导入。本包复用 `@migaia/lifecycle` 的竞态/所有权原语与 `@migaia/utils/error` 的 `attachErrorIdentity`；不依赖 Store、React 或任何运行时全局对象，可在任意支持 ESM 的 JS 环境中使用。"
+                "text": "`exports` 提供包根（`.`）、静态 Graph 子路径（`./graph`）与无状态拓扑子路径（`./graph/topology`）。Host 符号从包根导入，Graph 符号从 `@migaia/capability/graph` 导入；如果只需验证节点与 required 依赖是否合法并计算启动顺序，而不需要创建、启动或释放节点，则从 `@migaia/capability/graph/topology` 导入。本包复用 `@migaia/lifecycle` 的竞态/所有权原语与 `@migaia/utils/error` 的 `attachErrorIdentity`；不依赖 Store、React 或任何运行时全局对象，可在任意支持 ESM 的 JS 环境中使用。"
               }
             ]
           },
@@ -747,6 +824,14 @@
               {
                 "type": "paragraph",
                 "text": "`setFlag(name, false)` 本身就是一次原子回退：它会同步作废该能力的在途激活并释放已有 handle，调用方不需要再额外调用一次 `disable()`。`setFlag(name, true)` 只是把开关打开，不会自动启用——启用仍然由调用方决定时机，调用 `enable(name)`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "一个完整消费流程是：进入需要该功能的页面时调用 `enable(name)`；结果为 `enabled` 后，用 `handle<具体句柄类型>(name)` 取得 `activate()` 返回的同一个对象并调用其业务方法；离开该页面时 `await disable(name)`，等待该 handle 的 `dispose()` 完成；应用整体关闭时 `await host.dispose()` 兜底释放仍处于启用态的能力。`enable()` 本身只返回结构化状态，不直接返回业务 handle。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`disable()` 适合“当前不用，但开关仍允许以后再次启用”的页面离开或功能收起场景。权限、远端配置或实验分组被撤回时应调用 `setFlag(name, false)`：它除了关闭闸门，还会作废正在进行的激活并释放已经启用的 handle。"
               }
             ]
           },
@@ -1792,7 +1877,15 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
+                  "code": "import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'\n\ntype INotificationCenter = ICapabilityHandle & {\n  show(message: string): void\n}\n\nconst mount = document.querySelector<HTMLElement>('#notification-center')!\nconst capabilities = createCapabilityHost(\n  { mount },\n  { flags: { notificationCenter: true } }\n)\n\ncapabilities.register<INotificationCenter>({\n  name: 'notificationCenter',\n  activate({ mount }) {\n    const panel = document.createElement('output')\n    mount.append(panel)\n    return {\n      show(message) {\n        panel.textContent = message\n      },\n      dispose() {\n        panel.remove()\n      }\n    }\n  }\n})\n\nasync function openNotificationCenter(message: string) {\n  const result = await capabilities.enable('notificationCenter')\n  if (result.status !== 'enabled') return\n\n  const notifications = capabilities.handle<INotificationCenter>('notificationCenter')\n  notifications?.show(message)\n}\n\nasync function closeNotificationCenter() {\n  await capabilities.disable('notificationCenter')\n}\n\nasync function shutdownApplication() {\n  await capabilities.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这里把“通知中心”当作一个按需能力：用户打开通知抽屉时调用 `openNotificationCenter()`，此时才创建 DOM 资源；启用成功后，`enable()` 返回的是状态而不是业务对象，再通过 `handle<INotificationCenter>()` 取得能力并调用 `show()`。用户关闭抽屉时调用 `disable()`，它会等待 handle 的 `dispose()` 删除面板；整个应用退出时调用 Host 的 `dispose()`，兜底关闭所有仍启用的能力。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`flags.notificationCenter` 是远端配置或权限开关：为 `false` 时 `enable()` 返回 `gated`，不会创建面板。临时离开页面但以后还允许再次打开，用 `disable()`；配置或权限被撤回时用 `setFlag('notificationCenter', false)`，它会立即作废在途启用并释放现有 handle。"
                 },
                 {
                   "type": "paragraph",
@@ -1815,12 +1908,16 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一约束是有 `dispose()`："
+                  "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一公共约束是有 `dispose()`；业务方法由具体能力自行扩展："
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "例如上面的 `INotificationCenter` 在此基础上增加了 `show(message)`。Host 只负责保存和释放 handle，不会包装或代理业务方法；调用方在 `enable()` 返回 `enabled` 后，通过 `handle<INotificationCenter>('notificationCenter')` 取回同一个对象并调用它。"
                 },
                 {
                   "type": "paragraph",
@@ -2060,7 +2157,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createCapabilityHost.",
           "examples": [
             "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用",
-            "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)",
+            "import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'\n\ntype INotificationCenter = ICapabilityHandle & {\n  show(message: string): void\n}\n\nconst mount = document.querySelector<HTMLElement>('#notification-center')!\nconst capabilities = createCapabilityHost(\n  { mount },\n  { flags: { notificationCenter: true } }\n)\n\ncapabilities.register<INotificationCenter>({\n  name: 'notificationCenter',\n  activate({ mount }) {\n    const panel = document.createElement('output')\n    mount.append(panel)\n    return {\n      show(message) {\n        panel.textContent = message\n      },\n      dispose() {\n        panel.remove()\n      }\n    }\n  }\n})\n\nasync function openNotificationCenter(message: string) {\n  const result = await capabilities.enable('notificationCenter')\n  if (result.status !== 'enabled') return\n\n  const notifications = capabilities.handle<INotificationCenter>('notificationCenter')\n  notifications?.show(message)\n}\n\nasync function closeNotificationCenter() {\n  await capabilities.disable('notificationCenter')\n}\n\nasync function shutdownApplication() {\n  await capabilities.dispose()\n}",
             "import { createCapabilityHost } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    // 只有开关打开、真正 enable() 时才会下载这个 chunk\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === 'enabled') console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose()",
             "import { createCapabilityHost } from '@migaia/capability'\n\nfunction createTenantCapabilities(tenant: string, flags: Record<string, boolean>) {\n  const host = createCapabilityHost({ tenant }, { flags })\n  host.register({\n    name: 'experimental-ai',\n    activate: async ({ tenant }) => {\n      const controller = await connectAiSidecar(tenant)\n      return { dispose: () => controller.close() }\n    }\n  })\n  return host\n}\n\nconst acme = createTenantCapabilities('acme', { 'experimental-ai': true })\nconst globex = createTenantCapabilities('globex', { 'experimental-ai': false })\n\nawait acme.enable('experimental-ai') // { status: 'enabled' }\nawait globex.enable('experimental-ai') // { status: 'gated' }",
             "import { createCapabilityHost, CapabilityState } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { worker: true } })\nhost.register({\n  name: 'worker',\n  async activate() {\n    const port = await connectWorkerPort()\n    return { dispose: () => port.close() }\n  }\n})\n\nawait host.enable('worker')\nhost.state('worker') // CapabilityState.on\n\nhost.setFlag('worker', false) // 同步作废在途激活/释放已有 handle，不需要再调用 disable()\nhost.state('worker') // CapabilityState.gated",
@@ -2167,7 +2264,15 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
+                  "code": "import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'\n\ntype INotificationCenter = ICapabilityHandle & {\n  show(message: string): void\n}\n\nconst mount = document.querySelector<HTMLElement>('#notification-center')!\nconst capabilities = createCapabilityHost(\n  { mount },\n  { flags: { notificationCenter: true } }\n)\n\ncapabilities.register<INotificationCenter>({\n  name: 'notificationCenter',\n  activate({ mount }) {\n    const panel = document.createElement('output')\n    mount.append(panel)\n    return {\n      show(message) {\n        panel.textContent = message\n      },\n      dispose() {\n        panel.remove()\n      }\n    }\n  }\n})\n\nasync function openNotificationCenter(message: string) {\n  const result = await capabilities.enable('notificationCenter')\n  if (result.status !== 'enabled') return\n\n  const notifications = capabilities.handle<INotificationCenter>('notificationCenter')\n  notifications?.show(message)\n}\n\nasync function closeNotificationCenter() {\n  await capabilities.disable('notificationCenter')\n}\n\nasync function shutdownApplication() {\n  await capabilities.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这里把“通知中心”当作一个按需能力：用户打开通知抽屉时调用 `openNotificationCenter()`，此时才创建 DOM 资源；启用成功后，`enable()` 返回的是状态而不是业务对象，再通过 `handle<INotificationCenter>()` 取得能力并调用 `show()`。用户关闭抽屉时调用 `disable()`，它会等待 handle 的 `dispose()` 删除面板；整个应用退出时调用 Host 的 `dispose()`，兜底关闭所有仍启用的能力。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`flags.notificationCenter` 是远端配置或权限开关：为 `false` 时 `enable()` 返回 `gated`，不会创建面板。临时离开页面但以后还允许再次打开，用 `disable()`；配置或权限被撤回时用 `setFlag('notificationCenter', false)`，它会立即作废在途启用并释放现有 handle。"
                 },
                 {
                   "type": "paragraph",
@@ -2190,12 +2295,16 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一约束是有 `dispose()`："
+                  "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一公共约束是有 `dispose()`；业务方法由具体能力自行扩展："
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "例如上面的 `INotificationCenter` 在此基础上增加了 `show(message)`。Host 只负责保存和释放 handle，不会包装或代理业务方法；调用方在 `enable()` 返回 `enabled` 后，通过 `handle<INotificationCenter>('notificationCenter')` 取回同一个对象并调用它。"
                 },
                 {
                   "type": "paragraph",
@@ -2415,7 +2524,7 @@
               ]
             }
           ],
-          "usageScore": 110,
+          "usageScore": 118,
           "configuration": [
             {
               "name": "flags",
@@ -2514,7 +2623,15 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
+                  "code": "import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'\n\ntype INotificationCenter = ICapabilityHandle & {\n  show(message: string): void\n}\n\nconst mount = document.querySelector<HTMLElement>('#notification-center')!\nconst capabilities = createCapabilityHost(\n  { mount },\n  { flags: { notificationCenter: true } }\n)\n\ncapabilities.register<INotificationCenter>({\n  name: 'notificationCenter',\n  activate({ mount }) {\n    const panel = document.createElement('output')\n    mount.append(panel)\n    return {\n      show(message) {\n        panel.textContent = message\n      },\n      dispose() {\n        panel.remove()\n      }\n    }\n  }\n})\n\nasync function openNotificationCenter(message: string) {\n  const result = await capabilities.enable('notificationCenter')\n  if (result.status !== 'enabled') return\n\n  const notifications = capabilities.handle<INotificationCenter>('notificationCenter')\n  notifications?.show(message)\n}\n\nasync function closeNotificationCenter() {\n  await capabilities.disable('notificationCenter')\n}\n\nasync function shutdownApplication() {\n  await capabilities.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这里把“通知中心”当作一个按需能力：用户打开通知抽屉时调用 `openNotificationCenter()`，此时才创建 DOM 资源；启用成功后，`enable()` 返回的是状态而不是业务对象，再通过 `handle<INotificationCenter>()` 取得能力并调用 `show()`。用户关闭抽屉时调用 `disable()`，它会等待 handle 的 `dispose()` 删除面板；整个应用退出时调用 Host 的 `dispose()`，兜底关闭所有仍启用的能力。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`flags.notificationCenter` 是远端配置或权限开关：为 `false` 时 `enable()` 返回 `gated`，不会创建面板。临时离开页面但以后还允许再次打开，用 `disable()`；配置或权限被撤回时用 `setFlag('notificationCenter', false)`，它会立即作废在途启用并释放现有 handle。"
                 },
                 {
                   "type": "paragraph",
@@ -2537,12 +2654,16 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一约束是有 `dispose()`："
+                  "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一公共约束是有 `dispose()`；业务方法由具体能力自行扩展："
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "例如上面的 `INotificationCenter` 在此基础上增加了 `show(message)`。Host 只负责保存和释放 handle，不会包装或代理业务方法；调用方在 `enable()` 返回 `enabled` 后，通过 `handle<INotificationCenter>('notificationCenter')` 取回同一个对象并调用它。"
                 },
                 {
                   "type": "paragraph",
@@ -2823,7 +2944,15 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
+                  "code": "import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'\n\ntype INotificationCenter = ICapabilityHandle & {\n  show(message: string): void\n}\n\nconst mount = document.querySelector<HTMLElement>('#notification-center')!\nconst capabilities = createCapabilityHost(\n  { mount },\n  { flags: { notificationCenter: true } }\n)\n\ncapabilities.register<INotificationCenter>({\n  name: 'notificationCenter',\n  activate({ mount }) {\n    const panel = document.createElement('output')\n    mount.append(panel)\n    return {\n      show(message) {\n        panel.textContent = message\n      },\n      dispose() {\n        panel.remove()\n      }\n    }\n  }\n})\n\nasync function openNotificationCenter(message: string) {\n  const result = await capabilities.enable('notificationCenter')\n  if (result.status !== 'enabled') return\n\n  const notifications = capabilities.handle<INotificationCenter>('notificationCenter')\n  notifications?.show(message)\n}\n\nasync function closeNotificationCenter() {\n  await capabilities.disable('notificationCenter')\n}\n\nasync function shutdownApplication() {\n  await capabilities.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这里把“通知中心”当作一个按需能力：用户打开通知抽屉时调用 `openNotificationCenter()`，此时才创建 DOM 资源；启用成功后，`enable()` 返回的是状态而不是业务对象，再通过 `handle<INotificationCenter>()` 取得能力并调用 `show()`。用户关闭抽屉时调用 `disable()`，它会等待 handle 的 `dispose()` 删除面板；整个应用退出时调用 Host 的 `dispose()`，兜底关闭所有仍启用的能力。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`flags.notificationCenter` 是远端配置或权限开关：为 `false` 时 `enable()` 返回 `gated`，不会创建面板。临时离开页面但以后还允许再次打开，用 `disable()`；配置或权限被撤回时用 `setFlag('notificationCenter', false)`，它会立即作废在途启用并释放现有 handle。"
                 },
                 {
                   "type": "paragraph",
@@ -2846,12 +2975,16 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一约束是有 `dispose()`："
+                  "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一公共约束是有 `dispose()`；业务方法由具体能力自行扩展："
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "例如上面的 `INotificationCenter` 在此基础上增加了 `show(message)`。Host 只负责保存和释放 handle，不会包装或代理业务方法；调用方在 `enable()` 返回 `enabled` 后，通过 `handle<INotificationCenter>('notificationCenter')` 取回同一个对象并调用它。"
                 },
                 {
                   "type": "paragraph",
@@ -3357,6 +3490,7 @@
             "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'",
             "type ICapabilityHost<Context> = {\n  register<Handle extends ICapabilityHandle>(\n    definition: ICapabilityDefinition<Context, Handle>\n  ): void\n  readonly names: readonly string[]\n  state(name: string): ICapabilityState\n  handle<Handle extends ICapabilityHandle>(name: string): Handle | undefined\n  error(name: string): unknown\n  setFlag(name: string, enabled: boolean): void\n  setFlags(flags: Readonly<Record<string, boolean>>): void\n  enable(name: string): Promise<ICapabilityEnableResult>\n  enableResult(name: string): Promise<ICapabilityEnableResult>\n  disable(name: string): Promise<boolean>\n  dispose(): Promise<void>\n  enableLegacyBoolean(name: string): Promise<boolean>\n  disableNow(name: string): boolean\n  readonly disposed: boolean\n}",
             "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost\n} from '@migaia/capability'",
+            "import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'\n\ntype INotificationCenter = ICapabilityHandle & {\n  show(message: string): void\n}\n\nconst mount = document.querySelector<HTMLElement>('#notification-center')!\nconst capabilities = createCapabilityHost(\n  { mount },\n  { flags: { notificationCenter: true } }\n)\n\ncapabilities.register<INotificationCenter>({\n  name: 'notificationCenter',\n  activate({ mount }) {\n    const panel = document.createElement('output')\n    mount.append(panel)\n    return {\n      show(message) {\n        panel.textContent = message\n      },\n      dispose() {\n        panel.remove()\n      }\n    }\n  }\n})\n\nasync function openNotificationCenter(message: string) {\n  const result = await capabilities.enable('notificationCenter')\n  if (result.status !== 'enabled') return\n\n  const notifications = capabilities.handle<INotificationCenter>('notificationCenter')\n  notifications?.show(message)\n}\n\nasync function closeNotificationCenter() {\n  await capabilities.disable('notificationCenter')\n}\n\nasync function shutdownApplication() {\n  await capabilities.dispose()\n}",
             "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
           ],
           "exportPath": ".",
@@ -3418,7 +3552,15 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
+                  "code": "import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'\n\ntype INotificationCenter = ICapabilityHandle & {\n  show(message: string): void\n}\n\nconst mount = document.querySelector<HTMLElement>('#notification-center')!\nconst capabilities = createCapabilityHost(\n  { mount },\n  { flags: { notificationCenter: true } }\n)\n\ncapabilities.register<INotificationCenter>({\n  name: 'notificationCenter',\n  activate({ mount }) {\n    const panel = document.createElement('output')\n    mount.append(panel)\n    return {\n      show(message) {\n        panel.textContent = message\n      },\n      dispose() {\n        panel.remove()\n      }\n    }\n  }\n})\n\nasync function openNotificationCenter(message: string) {\n  const result = await capabilities.enable('notificationCenter')\n  if (result.status !== 'enabled') return\n\n  const notifications = capabilities.handle<INotificationCenter>('notificationCenter')\n  notifications?.show(message)\n}\n\nasync function closeNotificationCenter() {\n  await capabilities.disable('notificationCenter')\n}\n\nasync function shutdownApplication() {\n  await capabilities.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这里把“通知中心”当作一个按需能力：用户打开通知抽屉时调用 `openNotificationCenter()`，此时才创建 DOM 资源；启用成功后，`enable()` 返回的是状态而不是业务对象，再通过 `handle<INotificationCenter>()` 取得能力并调用 `show()`。用户关闭抽屉时调用 `disable()`，它会等待 handle 的 `dispose()` 删除面板；整个应用退出时调用 Host 的 `dispose()`，兜底关闭所有仍启用的能力。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`flags.notificationCenter` 是远端配置或权限开关：为 `false` 时 `enable()` 返回 `gated`，不会创建面板。临时离开页面但以后还允许再次打开，用 `disable()`；配置或权限被撤回时用 `setFlag('notificationCenter', false)`，它会立即作废在途启用并释放现有 handle。"
                 },
                 {
                   "type": "paragraph",
@@ -3441,12 +3583,16 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一约束是有 `dispose()`："
+                  "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一公共约束是有 `dispose()`；业务方法由具体能力自行扩展："
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "例如上面的 `INotificationCenter` 在此基础上增加了 `show(message)`。Host 只负责保存和释放 handle，不会包装或代理业务方法；调用方在 `enable()` 返回 `enabled` 后，通过 `handle<INotificationCenter>('notificationCenter')` 取回同一个对象并调用它。"
                 },
                 {
                   "type": "paragraph",
@@ -3644,7 +3790,7 @@
               ]
             }
           ],
-          "usageScore": 44,
+          "usageScore": 48,
           "configuration": [],
           "fragment": "capability-index--ICapabilityHandle"
         },
@@ -3727,7 +3873,15 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
+                  "code": "import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'\n\ntype INotificationCenter = ICapabilityHandle & {\n  show(message: string): void\n}\n\nconst mount = document.querySelector<HTMLElement>('#notification-center')!\nconst capabilities = createCapabilityHost(\n  { mount },\n  { flags: { notificationCenter: true } }\n)\n\ncapabilities.register<INotificationCenter>({\n  name: 'notificationCenter',\n  activate({ mount }) {\n    const panel = document.createElement('output')\n    mount.append(panel)\n    return {\n      show(message) {\n        panel.textContent = message\n      },\n      dispose() {\n        panel.remove()\n      }\n    }\n  }\n})\n\nasync function openNotificationCenter(message: string) {\n  const result = await capabilities.enable('notificationCenter')\n  if (result.status !== 'enabled') return\n\n  const notifications = capabilities.handle<INotificationCenter>('notificationCenter')\n  notifications?.show(message)\n}\n\nasync function closeNotificationCenter() {\n  await capabilities.disable('notificationCenter')\n}\n\nasync function shutdownApplication() {\n  await capabilities.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这里把“通知中心”当作一个按需能力：用户打开通知抽屉时调用 `openNotificationCenter()`，此时才创建 DOM 资源；启用成功后，`enable()` 返回的是状态而不是业务对象，再通过 `handle<INotificationCenter>()` 取得能力并调用 `show()`。用户关闭抽屉时调用 `disable()`，它会等待 handle 的 `dispose()` 删除面板；整个应用退出时调用 Host 的 `dispose()`，兜底关闭所有仍启用的能力。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`flags.notificationCenter` 是远端配置或权限开关：为 `false` 时 `enable()` 返回 `gated`，不会创建面板。临时离开页面但以后还允许再次打开，用 `disable()`；配置或权限被撤回时用 `setFlag('notificationCenter', false)`，它会立即作废在途启用并释放现有 handle。"
                 },
                 {
                   "type": "paragraph",
@@ -3750,12 +3904,16 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一约束是有 `dispose()`："
+                  "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一公共约束是有 `dispose()`；业务方法由具体能力自行扩展："
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "例如上面的 `INotificationCenter` 在此基础上增加了 `show(message)`。Host 只负责保存和释放 handle，不会包装或代理业务方法；调用方在 `enable()` 返回 `enabled` 后，通过 `handle<INotificationCenter>('notificationCenter')` 取回同一个对象并调用它。"
                 },
                 {
                   "type": "paragraph",
@@ -4035,7 +4193,15 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
+                  "code": "import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'\n\ntype INotificationCenter = ICapabilityHandle & {\n  show(message: string): void\n}\n\nconst mount = document.querySelector<HTMLElement>('#notification-center')!\nconst capabilities = createCapabilityHost(\n  { mount },\n  { flags: { notificationCenter: true } }\n)\n\ncapabilities.register<INotificationCenter>({\n  name: 'notificationCenter',\n  activate({ mount }) {\n    const panel = document.createElement('output')\n    mount.append(panel)\n    return {\n      show(message) {\n        panel.textContent = message\n      },\n      dispose() {\n        panel.remove()\n      }\n    }\n  }\n})\n\nasync function openNotificationCenter(message: string) {\n  const result = await capabilities.enable('notificationCenter')\n  if (result.status !== 'enabled') return\n\n  const notifications = capabilities.handle<INotificationCenter>('notificationCenter')\n  notifications?.show(message)\n}\n\nasync function closeNotificationCenter() {\n  await capabilities.disable('notificationCenter')\n}\n\nasync function shutdownApplication() {\n  await capabilities.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这里把“通知中心”当作一个按需能力：用户打开通知抽屉时调用 `openNotificationCenter()`，此时才创建 DOM 资源；启用成功后，`enable()` 返回的是状态而不是业务对象，再通过 `handle<INotificationCenter>()` 取得能力并调用 `show()`。用户关闭抽屉时调用 `disable()`，它会等待 handle 的 `dispose()` 删除面板；整个应用退出时调用 Host 的 `dispose()`，兜底关闭所有仍启用的能力。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`flags.notificationCenter` 是远端配置或权限开关：为 `false` 时 `enable()` 返回 `gated`，不会创建面板。临时离开页面但以后还允许再次打开，用 `disable()`；配置或权限被撤回时用 `setFlag('notificationCenter', false)`，它会立即作废在途启用并释放现有 handle。"
                 },
                 {
                   "type": "paragraph",
@@ -4058,12 +4224,16 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一约束是有 `dispose()`："
+                  "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一公共约束是有 `dispose()`；业务方法由具体能力自行扩展："
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "例如上面的 `INotificationCenter` 在此基础上增加了 `show(message)`。Host 只负责保存和释放 handle，不会包装或代理业务方法；调用方在 `enable()` 返回 `enabled` 后，通过 `handle<INotificationCenter>('notificationCenter')` 取回同一个对象并调用它。"
                 },
                 {
                   "type": "paragraph",
@@ -4406,7 +4576,15 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
+                  "code": "import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'\n\ntype INotificationCenter = ICapabilityHandle & {\n  show(message: string): void\n}\n\nconst mount = document.querySelector<HTMLElement>('#notification-center')!\nconst capabilities = createCapabilityHost(\n  { mount },\n  { flags: { notificationCenter: true } }\n)\n\ncapabilities.register<INotificationCenter>({\n  name: 'notificationCenter',\n  activate({ mount }) {\n    const panel = document.createElement('output')\n    mount.append(panel)\n    return {\n      show(message) {\n        panel.textContent = message\n      },\n      dispose() {\n        panel.remove()\n      }\n    }\n  }\n})\n\nasync function openNotificationCenter(message: string) {\n  const result = await capabilities.enable('notificationCenter')\n  if (result.status !== 'enabled') return\n\n  const notifications = capabilities.handle<INotificationCenter>('notificationCenter')\n  notifications?.show(message)\n}\n\nasync function closeNotificationCenter() {\n  await capabilities.disable('notificationCenter')\n}\n\nasync function shutdownApplication() {\n  await capabilities.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这里把“通知中心”当作一个按需能力：用户打开通知抽屉时调用 `openNotificationCenter()`，此时才创建 DOM 资源；启用成功后，`enable()` 返回的是状态而不是业务对象，再通过 `handle<INotificationCenter>()` 取得能力并调用 `show()`。用户关闭抽屉时调用 `disable()`，它会等待 handle 的 `dispose()` 删除面板；整个应用退出时调用 Host 的 `dispose()`，兜底关闭所有仍启用的能力。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`flags.notificationCenter` 是远端配置或权限开关：为 `false` 时 `enable()` 返回 `gated`，不会创建面板。临时离开页面但以后还允许再次打开，用 `disable()`；配置或权限被撤回时用 `setFlag('notificationCenter', false)`，它会立即作废在途启用并释放现有 handle。"
                 },
                 {
                   "type": "paragraph",
@@ -4429,12 +4607,16 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一约束是有 `dispose()`："
+                  "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一公共约束是有 `dispose()`；业务方法由具体能力自行扩展："
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "例如上面的 `INotificationCenter` 在此基础上增加了 `show(message)`。Host 只负责保存和释放 handle，不会包装或代理业务方法；调用方在 `enable()` 返回 `enabled` 后，通过 `handle<INotificationCenter>('notificationCenter')` 取回同一个对象并调用它。"
                 },
                 {
                   "type": "paragraph",

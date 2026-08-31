@@ -37,7 +37,17 @@
       "ITopologyNode": "@migaia/capability/graph/topology",
       "TopologyInvalidReason": "@migaia/capability/graph/topology"
     },
-    "@migaia/event-subscriber": {},
+    "@migaia/event-subscriber": {
+      "IEventAbortSignal": "@migaia/event-subscriber/subscriber",
+      "IEventChannelLike": "@migaia/event-subscriber/subscriber",
+      "IEventContext": "@migaia/event-subscriber/subscriber",
+      "IEventListener": "@migaia/event-subscriber/subscriber",
+      "IEventSubscriber": "@migaia/event-subscriber/subscriber",
+      "IUnsubscribe": "@migaia/event-subscriber/subscriber",
+      "subscribeOnce": "@migaia/event-subscriber/subscriber",
+      "subscribeSubscriber": "@migaia/event-subscriber/subscriber",
+      "subscribeUntil": "@migaia/event-subscriber/subscriber"
+    },
     "@migaia/lifecycle": {
       "addSchedulerTime": "@migaia/lifecycle/scheduler",
       "containAsyncRejection": "@migaia/lifecycle/errors",

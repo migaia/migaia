@@ -64,6 +64,12 @@ doubled.dispose();
 count.dispose();
 ```
 
+这段代码建立的是一张由当前 `runtime` 独占的依赖图。`Effect` 构造时会立即执行一次；执行过程中读取 `doubled.value`，使 `Effect → Computed → Signal` 三层依赖自动登记，所以 `seen` 首先得到 `2`。这不是手工订阅，之后也不需要再次告诉 `Effect` 它依赖了谁。
+
+`count.value = 3` 只会使 `doubled` 失效并把 `effect` 放入待执行队列，不会在 setter 内立刻重跑副作用。`runtime.flush()` 同步排空该 runtime 的队列：`doubled` 在被读取时按需重算为 `6`，随后 `effect` 把它写入 `seen`。生产代码通常让默认微任务自动 flush；测试、SSR 或需要确定提交边界的代码才显式调用 `flush()`。
+
+释放顺序按消费者到数据源执行：先停掉 `effect`，避免清理过程中再次观察数据；再释放派生节点 `doubled`；最后释放源节点 `count`。这里没有持久化数据、连接或计时器，`dispose()` 的实际作用是断开依赖边并禁止继续读取已释放节点。`Runtime` 本身没有 `dispose()`；需要批量管理时，把这些节点交给 `Scope` 持有并统一释放。
+
 不想自己管理 `Runtime` 生命周期时，可以用内置的全局单例 `defaultRuntime`（进程级共享，测试/SSR/Worker 场景不建议用它，见下方注意事项）。
 
 ## 6. 核心概念速览

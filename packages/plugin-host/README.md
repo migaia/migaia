@@ -36,15 +36,15 @@ pnpm add @migaia/plugin-host
 
 ### 与 Tray 托管组合
 
-普通应用继续使用 `use()` / `unUse()`；`@migaia/tray/host` 作为唯一 composition owner 使用
-PluginHost 的 prepared admission、exact receipt 与 opaque data-order slot 协议。候选 setup 完成前不会
-进入 committed view；commit 前 Host revision 漂移会拒绝发布，owner 必须调用
-`discardPreparedAdmissions()`，其回滚 exactly once。slot 属于 exact Host definition：replace/restart
-复用，definition delete/session terminal 退休，不能伪造或跨 Host 使用。
+这一节只给 Tray 的 Host 适配器维护者看。普通应用安装和卸载插件时继续使用 `use()` / `unUse()`，不需要接触下面这些对象。
 
-托管卸载把“逻辑撤销”和“物理完成”分开。extension/shared/stage 先从新读者视图撤销；Graph binding
-fence 和已经取得的 pipeline lease 未归零时，plugin/resource disposer 不会启动。bounded 调用可先得到
-`cleanupComplete: false` 与共享 `physicalCompletion`，但不会用 timeout 破坏严格清理顺序。
+Tray 一次安装多个插件时，先让 PluginHost 完成插件的 `setup`，但暂时不让业务代码看见它们。这个“已经准备好、还没有正式发布”的批次叫 **prepared admission**，可以理解成数据库事务提交前的暂存区：整批都成功才一次性公开；其中一个失败，整批都不公开。
+
+正式公开前，PluginHost 会检查准备期间是否有别人改过 Host。这里的 **Host revision** 就是 Host 的修改版本号；版本号变了，说明这批结果基于旧状态，提交会被拒绝。Tray 随后调用 `discardPreparedAdmissions()`，PluginHost 只清理这批暂存资源一次，不会重复执行插件的释放逻辑。
+
+提交成功后，每个插件都会得到一张只能由当前 Host 签发和识别的“安装凭证”，正式类型名是 **exact receipt**。Tray 卸载或替换插件时拿这张凭证指向那一次具体安装，因此旧插件迟到的清理动作不会误删同名的新插件。**opaque data-order slot** 则是 Host 内部保存的排序位置：Tray 只能原样交还，不能读取或伪造；同一个插件定义重启或替换时沿用位置，定义删除或整个会话结束时才永久作废。
+
+托管卸载分两步。第一步先让新请求看不到待卸载插件，这叫“逻辑撤销”。第二步等待已经拿到旧插件的请求和正在执行的 pipeline 全部结束，再真正调用插件与资源的 `dispose()`，这叫“物理完成”。如果等待时间达到调用方设置的上限，接口会先返回 `cleanupComplete: false`；这不代表资源已经释放，调用方仍须等待返回的 `physicalCompletion` Promise。超时只允许调用方先拿回控制权，不会跳过或打乱清理顺序。
 
 ---
 
@@ -53,7 +53,8 @@ fence 和已经取得的 pipeline lease 未归零时，plugin/resource disposer 
 ## 核心心智模型：五分钟上手
 
 ```ts
-import { PluginHost, type IPlugin } from '@migaia/plugin-host'
+import { definePlugin } from '@migaia/plugin-host/defined'
+import { PluginHost } from '@migaia/plugin-host/structural'
 
 // 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能
 type ICore = { emit(value: string): void }
@@ -64,26 +65,31 @@ class Host extends PluginHost<ICore, string> {
   }
 }
 
-// 第二步：写一个插件——install() 拿到领域 core，返回要挂载到宿主上的方法
-const upper: IPlugin<ICore, { upper(value: string): string }> = {
-  name: 'upper',
-  install: (core) => ({
+// 第二步：definePlugin(name, install) 定义插件；这里只定义，不会立刻安装
+const upper = definePlugin<ICore, { upper(value: string): string }>(
+  'upper',
+  (core) => ({
     upper: (value: string) => {
       const result = value.toUpperCase()
       core.emit(result) // 插件可以调用领域能力
       return result
     }
   })
-}
+)
 
 // 第三步：安装、使用、卸载
-const host = await new Host().use(upper)
-host.upper('migaia') // 类型上直接就有 upper 方法，TypeScript 自动推导出来的
-await host.unUse('upper')
+const host = new Host({
+  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }
+})
+const view = await host.use(upper)
+view.extensions.upper('migaia') // 扩展只出现在成功安装后返回的 committed view 上
+await view.unUse('upper')
 await host.dispose()
 ```
 
-`PluginHost<TDomainCore, TValue>` 子类唯一必须实现的是 `createPluginDomainCore()`——每次插件安装都会调用一次，产出一份独立的领域 core。插件通过 `install(core)` 拿到"领域能力 + 通用 core 能力"，返回要挂到宿主实例上的扩展方法。`use()`/`unUse()`/`dispose()` 管理插件的生命周期。
+`definePlugin()` 有两种写法。上面是短写法 `definePlugin(name, install)`，适合只有名称和安装函数的插件；需要 `config`、`shared`、`update` 或 `dispose` 时使用完整对象写法：`definePlugin({ name, config, install, shared, update, dispose })`。调用 `definePlugin()` 只会校验并保存定义，不会执行 `install()`；真正的安装发生在 `host.use(plugin)`。
+
+`PluginHost<TDomainCore, TValue>` 子类唯一必须实现的是 `createPluginDomainCore()`——每次插件安装都会调用一次，产出一份独立的领域 core。插件通过 `install(core)` 拿到“领域能力 + 通用 core 能力”，返回扩展方法。`use()` 成功后返回不可变 view，业务代码从 `view.extensions` 调用这些方法；`view.unUse()` 卸载插件，`host.dispose()` 关闭整个宿主。
 
 ---
 
@@ -186,10 +192,18 @@ import { GENERATOR_CONTINUE } from '@migaia/plugin-host'
 const host = new Host({ pipeline: { mode: 'async-generator' } })
 host.useAsyncGeneratorPipeline(async function* (value) {
   await Promise.resolve() // 可以在 yield 之间做任意异步工作
-  yield value.trim() // 中间 yield 只用于本 stage 内部观测
-  return GENERATOR_CONTINUE // 采用最后一次 yield 的值，交给下一个 stage
+  yield value.trim()
+  yield value.trim().toUpperCase()
+  return GENERATOR_CONTINUE // 下一 stage 收到最后一次 yield 的大写字符串
+})
+host.useAsyncGeneratorPipeline(async function* (value) {
+  return `[${value}]` // 收到上一个 stage 的最后一次 yield，继续产生最终结果
 })
 ```
+
+`GENERATOR_CONTINUE` 是框架导出的唯一 `Symbol` 控制信号，不是需要下游处理的业务数据。generator 函数的 `return` 只能提供一个终值，而一个 stage 可能先后 `yield` 多个候选值；返回这个信号是在明确告诉 runner：“忽略这个 Symbol 本身，把本 stage **最后一次 `yield`** 的值交给下一 stage。”上例输入 `" migaia "` 时，第二个 stage 收到 `MIGAIA`，最终结果是 `[MIGAIA]`。如果该 stage 一次也没有 `yield`，`GENERATOR_CONTINUE` 会原样转发进入该 stage 时的输入。
+
+它与另外三种返回方式不同：`return transformedValue` 直接把该值交给下一 stage；`return GENERATOR_HALT` 或普通的 `return`（即 `undefined`）终止整条 pipeline；只有业务类型本身允许 `undefined` 时，才用 `return GENERATOR_UNDEFINED` 把真正的 `undefined` 作为数据继续向下传。
 
 | 模式              | stage 形式                    | `next` 规则                                                                                                                                                                                                |
 | ----------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

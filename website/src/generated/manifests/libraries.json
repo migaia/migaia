@@ -20,6 +20,34 @@
               ]
             },
             {
+              "id": "本文中的-host-是什么",
+              "heading": "本文中的 Host 是什么",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "本文单独写 Host 时，始终指 `createCapabilityHost()` 创建的 Capability Host，不是全仓其他同名概念。它是一个进程内的功能开关与生命周期容器，持有能力注册表、共享 `context`、开关快照和启停状态；调用方通过 `register()` 登记功能，通过 `enable()`/`disable()` 启停功能，最后用 `dispose()` 关闭容器并释放已启用能力。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "几个容易混淆的概念职责不同："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "Capability Host（本文的 Host）：回答“这个功能现在是否允许启用，以及启用后如何关闭”；不计算能力之间的依赖顺序。",
+                    "Capability Graph：回答“节点依赖谁、按什么顺序启动和反向释放”；它不是功能开关表。",
+                    "PluginHost：负责插件定义的安装、注册视图、管线阶段与回滚；插件可以在内部使用 Capability Host，但两者不是同一个容器。",
+                    "Storage Host：组合并按 ID 暴露多个 storage backend；它管理存储后端，不管理通用功能开关。",
+                    "Realm Host：若未来发布，用于控制 Worker、线程或子进程的启动、健康、关闭与强制终止；它提供隔离边界，不负责业务能力登记。"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "因此，下文“Host 不承担依赖图编排”的完整含义是：Capability Host 只管理每项能力自身的准入与启停，不读取 `provider → consumer` 依赖边，也不会替调用方决定跨能力的启动顺序。"
+                }
+              ]
+            },
+            {
               "id": "适用与不适用场景",
               "heading": "适用与不适用场景",
               "blocks": [
@@ -29,7 +57,40 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "不适用：Host 不承担依赖图编排；需要静态 required provider DAG 时使用下方的 `@migaia/capability/graph`，只需纯准入时可使用 `@migaia/capability/graph/topology`。Graph 不提供 optional/notification、dynamic replacement 或 cross-realm adapter。Host 也不能让一个静态 import 进来的能力变免费——体积只有 `activate()` 内部真正用 `await import()` 时才省下来，闸门只是把这个写法变成一等公民，省体积的是打包器本身。"
+                  "text": "这里的“静态 required provider DAG”可以拆开理解："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "provider 是提供能力的节点，例如配置服务、数据库连接或日志服务；consumer 是使用该能力的节点。",
+                    "required 表示这是硬依赖：provider 未注册或启动失败时，consumer 不能启动；它不是“有则使用”的 optional 依赖。",
+                    "DAG 是“有向无环图”（Directed Acyclic Graph）：依赖有明确方向，并且不允许 A 依赖 B、B 又间接依赖 A 的循环。",
+                    "静态 表示所有节点和依赖边必须在首次 `ready()` 前登记完成；`ready()` 会冻结注册表。运行期间不能增加、删除或替换节点。"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "例如“配置服务 → 用户服务 → 结算面板”表示用户服务必须等配置服务就绪，结算面板又必须等用户服务就绪。Graph 会按这个方向启动，关闭时反向释放：先释放结算面板，再释放用户服务，最后释放配置服务。若你的需求只是独立功能开关，不存在这种跨能力启动顺序，就不需要 Graph。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "不适用：Host 不承担上述依赖图编排；需要静态 required provider DAG 时使用下方的 `@migaia/capability/graph`。如果只想检查“一组节点及其 required 依赖是否合法”并计算确定的启动顺序，不需要创建服务、不执行节点的 `start()`、也不管理 `release()`，则直接使用 `@migaia/capability/graph/topology`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这里提到的其他能力边界分别是："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "optional dependency（可选依赖）与 notification（变化通知）：consumer 可以在 provider 缺失时继续运行，并在 provider 后来可用、失败、恢复或被替换时收到通知，再按策略选择继续、刷新快照或重启。例如“订单服务可以没有推荐引擎照常下单；推荐引擎上线后再启用推荐”。静态 Graph 当前只接受 `required: true`，不提供这套可选绑定与通知策略。",
+                    "dynamic replacement（运行时替换）：Graph 已经运行后，仍可增加、删除或替换节点及依赖边，并只暂停、释放和重启受影响的 consumer。例如不重启整个应用就把支付插件 v1 换成 v2。静态 `@migaia/capability/graph` 会在 `ready()` 后冻结拓扑；确实需要这种能力时使用独立的 `@migaia/capability/graph/dynamic`，并由组合层负责被替换资源的物理释放。",
+                    "cross-realm adapter（跨运行域适配器）：让能力实际运行在另一个 Worker、线程或子进程中，同时把启动、健康检查、关闭、强制终止和错误链映射回当前 Graph。它适合需要隔离同步死循环、重型任务或进程故障的场景，不等同于普通的 RPC。当前包没有发布这种 adapter；浏览器默认仍在同一 realm，不能用 Promise 超时冒充真正终止。"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Host 也不能让一个静态 import 进来的能力变免费——体积只有 `activate()` 内部真正用 `await import()` 时才省下来，闸门只是把这个写法变成一等公民，省体积的是打包器本身。"
                 }
               ]
             },
@@ -94,7 +155,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Graph core 不依赖 Tray、Reactive、Resource、PluginHost 或平台适配器；optional/notification、dynamic replacement 与 cross-realm 由独立 SDD 管理。"
+                  "text": "静态 Graph core 只拥有 required 拓扑、启动顺序与生命周期协调，不反向依赖上层组合框架或平台适配器。optional/notification 与 cross-realm 仍是独立的未发布边界，dynamic replacement 则由 `@migaia/capability/graph/dynamic` 单独提供，避免把运行时 mutation 混入静态 Graph。"
                 }
               ]
             },
@@ -114,7 +175,15 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const capabilities = createCapabilityHost(\n  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文\n  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用\n)"
+                  "code": "import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'\n\ntype INotificationCenter = ICapabilityHandle & {\n  show(message: string): void\n}\n\nconst mount = document.querySelector<HTMLElement>('#notification-center')!\nconst capabilities = createCapabilityHost(\n  { mount },\n  { flags: { notificationCenter: true } }\n)\n\ncapabilities.register<INotificationCenter>({\n  name: 'notificationCenter',\n  activate({ mount }) {\n    const panel = document.createElement('output')\n    mount.append(panel)\n    return {\n      show(message) {\n        panel.textContent = message\n      },\n      dispose() {\n        panel.remove()\n      }\n    }\n  }\n})\n\nasync function openNotificationCenter(message: string) {\n  const result = await capabilities.enable('notificationCenter')\n  if (result.status !== 'enabled') return\n\n  const notifications = capabilities.handle<INotificationCenter>('notificationCenter')\n  notifications?.show(message)\n}\n\nasync function closeNotificationCenter() {\n  await capabilities.disable('notificationCenter')\n}\n\nasync function shutdownApplication() {\n  await capabilities.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这里把“通知中心”当作一个按需能力：用户打开通知抽屉时调用 `openNotificationCenter()`，此时才创建 DOM 资源；启用成功后，`enable()` 返回的是状态而不是业务对象，再通过 `handle<INotificationCenter>()` 取得能力并调用 `show()`。用户关闭抽屉时调用 `disable()`，它会等待 handle 的 `dispose()` 删除面板；整个应用退出时调用 Host 的 `dispose()`，兜底关闭所有仍启用的能力。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`flags.notificationCenter` 是远端配置或权限开关：为 `false` 时 `enable()` 返回 `gated`，不会创建面板。临时离开页面但以后还允许再次打开，用 `disable()`；配置或权限被撤回时用 `setFlag('notificationCenter', false)`，它会立即作废在途启用并释放现有 handle。"
                 },
                 {
                   "type": "paragraph",
@@ -137,12 +206,16 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一约束是有 `dispose()`："
+                  "text": "`ICapabilityHandle`｜3 秒上手 —— `activate()` 必须返回的对象形状，唯一公共约束是有 `dispose()`；业务方法由具体能力自行扩展："
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "type ICapabilityHandle = { dispose(): void | PromiseLike<void> }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "例如上面的 `INotificationCenter` 在此基础上增加了 `show(message)`。Host 只负责保存和释放 handle，不会包装或代理业务方法；调用方在 `enable()` 返回 `enabled` 后，通过 `handle<INotificationCenter>('notificationCenter')` 取回同一个对象并调用它。"
                 },
                 {
                   "type": "paragraph",
@@ -545,6 +618,10 @@
                 {
                   "type": "paragraph",
                   "text": "本指南覆盖面向应用与适配器的公开运行时 API、关键契约类型、边界行为与错误码。仅参与条件推导的 type-only 辅助类型以发布的 `.d.ts` 和编辑器提示为准，不在正文逐项抄录；包的定位与安装方式、最小上手示例见 README。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本文单独写 Host 时，专指 `createCapabilityHost()` 创建的 Capability Host：它管理能力注册、共享 context、功能开关和启停生命周期。它不是负责插件安装的 PluginHost、组合存储后端的 Storage Host、控制 Worker/进程的 Realm Host，也不是负责 provider-consumer 启动顺序的 Capability Graph。"
                 }
               ]
             },
@@ -582,7 +659,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`exports` 提供包根（`.`）、静态 Graph 子路径（`./graph`）与无状态拓扑子路径（`./graph/topology`）。Host 符号从包根导入，Graph 符号从 `@migaia/capability/graph` 导入；只需纯 required-edge 准入时从 `@migaia/capability/graph/topology` 导入。本包复用 `@migaia/lifecycle` 的竞态/所有权原语与 `@migaia/utils/error` 的 `attachErrorIdentity`；不依赖 Store、React 或任何运行时全局对象，可在任意支持 ESM 的 JS 环境中使用。"
+                  "text": "`exports` 提供包根（`.`）、静态 Graph 子路径（`./graph`）与无状态拓扑子路径（`./graph/topology`）。Host 符号从包根导入，Graph 符号从 `@migaia/capability/graph` 导入；如果只需验证节点与 required 依赖是否合法并计算启动顺序，而不需要创建、启动或释放节点，则从 `@migaia/capability/graph/topology` 导入。本包复用 `@migaia/lifecycle` 的竞态/所有权原语与 `@migaia/utils/error` 的 `attachErrorIdentity`；不依赖 Store、React 或任何运行时全局对象，可在任意支持 ESM 的 JS 环境中使用。"
                 }
               ]
             },
@@ -748,6 +825,14 @@
                 {
                   "type": "paragraph",
                   "text": "`setFlag(name, false)` 本身就是一次原子回退：它会同步作废该能力的在途激活并释放已有 handle，调用方不需要再额外调用一次 `disable()`。`setFlag(name, true)` 只是把开关打开，不会自动启用——启用仍然由调用方决定时机，调用 `enable(name)`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "一个完整消费流程是：进入需要该功能的页面时调用 `enable(name)`；结果为 `enabled` 后，用 `handle<具体句柄类型>(name)` 取得 `activate()` 返回的同一个对象并调用其业务方法；离开该页面时 `await disable(name)`，等待该 handle 的 `dispose()` 完成；应用整体关闭时 `await host.dispose()` 兜底释放仍处于启用态的能力。`enable()` 本身只返回结构化状态，不直接返回业务 handle。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`disable()` 适合“当前不用，但开关仍允许以后再次启用”的页面离开或功能收起场景。权限、远端配置或实验分组被撤回时应调用 `setFlag(name, false)`：它除了关闭闸门，还会作废正在进行的激活并释放已经启用的 handle。"
                 }
               ]
             },
@@ -1169,7 +1254,7 @@
       "slug": "event-subscriber",
       "description": "Runtime-neutral transient event subscription and fan-out primitives.",
       "version": "0.0.5",
-      "exports": ["."],
+      "exports": [".", "./subscriber"],
       "documentation": {
         "readme": {
           "sections": [
@@ -1301,12 +1386,20 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "这段代码选择 `on-emit` 命名风格：`on()` 登记监听器，并返回只属于这次订阅的取消句柄 `stop`；`emit(1)` 同步把值 `1` 交给当前监听器；`stop.off()` 删除这条 registration，之后再次 `emit()` 不会再调用它。这里的 `on`、`emit`、`off` 只是 `subscribe`、`publish`、`unsubscribe` 的别名，不会改变同步交付、错误聚合或退订语义。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "内置 preset：`subscribe-publish`（默认）、`on-emit`、`on-trigger`、`listen-fire`。自定义 style 使用语义到名称的对象映射；预声明变量可用 `defineEventApiStyle()` 保留字面量："
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "const style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "自定义 style 只改变调用者看到的方法名：`observe()` 创建 registration，`dispatch(1)` 同步发布，`handle.dispose()` 只撤销这一次订阅。它适合接入已有代码的命名习惯，不适合用来伪装不同的事件模型；如果需要排队、背压或异步结算，应选择对应的调度或 helper API。"
                 },
                 {
                   "type": "paragraph",
@@ -1325,11 +1418,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  subscribeOnce,\n  subscribeUntil,\n  subscribeSubscriber,\n  type IEventSubscriber\n} from '@migaia/event-subscriber'"
+                  "code": "import {\n  subscribeOnce,\n  subscribeUntil,\n  subscribeSubscriber,\n  type IEventSubscriber\n} from '@migaia/event-subscriber/subscriber'"
                 },
                 {
                   "type": "paragraph",
-                  "text": "这三个 helper 只需要结构化 `IEventChannelLike<T, R>`（有 `subscribe(listener, options?)` 方法即可），因此也能用于兼容结构的第三方 channel。"
+                  "text": "这三个 helper 只调用 canonical `subscribe(listener, options?)`，因此可接收保留该方法的 styled channel，也能用于结构兼容的第三方 channel；但它们不读取 style 配置，函数名固定为 `subscribeOnce` / `subscribeUntil` / `subscribeSubscriber`，返回值固定为 canonical `IUnsubscribe`，不会带上 `off`、`dispose`、`unlisten` 等 style alias。需要 styled handle 时，请直接调用 channel 自己的 `subscribeOnce()` / `subscribeUntil()` 方法。"
                 },
                 {
                   "type": "paragraph",
@@ -1364,11 +1457,19 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "class Counter implements IEventSubscriber<number> {\n  total = 0\n  handle(event: { readonly value: number }) {\n    this.total += event.value\n  }\n}\nsubscribeSubscriber(channel, new Counter())"
+                  "code": "import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeSubscriber, type IEventSubscriber } from '@migaia/event-subscriber/subscriber'\n\nclass Counter implements IEventSubscriber<number> {\n  total = 0\n  handle(event: { readonly value: number }) {\n    this.total += event.value\n  }\n}\nconst channel = createEventChannel<number>()\nsubscribeSubscriber(channel, new Counter())"
                 },
                 {
                   "type": "paragraph",
                   "text": "参数：`channel: IEventChannelLike<T, R>`（必填）、`subscriber: { handle(event): R | PromiseLike<R> }`（必填，必须实现 `handle`）。返回 `IUnsubscribe`。`subscriber` 非对象或缺少可调用 `handle` 抛 `INVALID_SUBSCRIBER`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "如果你用过旧草案里的 `abstract class EventSubscriber`，可能会记得 class 需要声明静态 `EVENT_NAME`，并通过 `onCall()` 接收事件。那套接口没有进入当前公开契约：同一份 payload 会同时由 `EVENT_NAME` 和外部容器的 key 描述，而且 TypeScript 不能要求实现类提供 abstract static 字段。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "当前的 `IEventSubscriber` 只是 `{ handle(event) }` 这一个对象形状，所以 `Counter` 不声明 `EVENT_NAME`（也不是 `EVENTNAME`）。它订阅哪个事件，由传给 `subscribeSubscriber(channel, subscriber)` 的 `channel` 决定。需要在同一容器中按名字区分多种事件时，把名字放在 Hub 的订阅位置：`hub.subscribe('count', listener)`。也就是说，单事件用不同 channel 区分来源，多事件用 Hub key 路由；事件名不再存进 subscriber class。"
                 }
               ]
             },
@@ -1436,7 +1537,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const result = await invokeTaskSettled(tasks, 'email', job)"
+                  "code": "import { createEventChannel, invokeTaskSettled } from '@migaia/event-subscriber'\n\ntype IEmailJob = { readonly recipient: string; readonly template: 'welcome' }\ntype IEmailReceipt = { readonly messageId: string }\n\nconst tasks = createEventChannel<IEmailJob, IEmailReceipt>()\ntasks.subscribe(\n  async ({ value: job }) => {\n    const response = await fetch('/api/email', {\n      method: 'POST',\n      headers: { 'content-type': 'application/json' },\n      body: JSON.stringify(job)\n    })\n    return response.json() as Promise<IEmailReceipt>\n  },\n  { taskId: 'email' }\n)\n\nconst job: IEmailJob = { recipient: 'ada@example.com', template: 'welcome' }\nconst result = await invokeTaskSettled(tasks, 'email', job)\n// result 是 { status: 'fulfilled', value: { messageId } }\n// 或 { status: 'rejected', reason }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这里的 `tasks` 不是特殊类型或全局任务表，而是由 `createEventChannel<IEmailJob, IEmailReceipt>()` 创建的普通 channel。登记 listener 时用 `{ taskId: 'email' }` 给这条 registration 命名；调用时再用同一个 `'email'` 精确找到它。`job` 会成为 listener 收到的 `event.value`，`result` 则明确区分发送成功的 receipt 与发送失败的原因。"
                 },
                 {
                   "type": "paragraph",
@@ -1786,7 +1891,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const events = createEventChannel<number>({ style: 'on-trigger' })\nevents.on((event) => console.log(event.value))\nevents.trigger(1)\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()"
+                  "code": "const events = createEventChannel<number>({ style: 'on-trigger' })\nconst off = events.on((event) => console.log(event.value))\nevents.trigger(1)\noff.off()\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "第一段中，`on()` 创建一条独立 registration，返回值 `off` 只控制这次订阅；`trigger(1)` 同步把 `1` 交给当前监听器；`off.off()` 后再次发布不会再调用它。第二段只是把这三个动作改名为 `observe()`、`dispatch()`、`dispose()`。preset 和自定义 style 都不改变交付顺序、错误处理或资源所有权，也不会增加 queue、drain、backpressure 或跨进程传输能力。"
                 },
                 {
                   "type": "paragraph",
@@ -1820,11 +1929,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  subscribeOnce,\n  subscribeUntil,\n  subscribeSubscriber,\n  type IEventSubscriber\n} from '@migaia/event-subscriber'"
+                  "code": "import {\n  subscribeOnce,\n  subscribeUntil,\n  subscribeSubscriber,\n  type IEventSubscriber\n} from '@migaia/event-subscriber/subscriber'"
                 },
                 {
                   "type": "paragraph",
-                  "text": "这三个 helper 只需要结构化 `IEventChannelLike<T, R>`（有 `subscribe(listener, options?)` 方法即可），因此也能用于兼容结构的第三方 channel，不要求是 `createEventChannel()` 产出的实例。"
+                  "text": "这三个 helper 只调用 canonical `subscribe(listener, options?)`，因此可接收保留该方法的 styled channel，也能用于结构兼容的第三方 channel，不要求是 `createEventChannel()` 产出的实例。但 helper 本身不读取 style 配置：导出名固定，返回值固定为 canonical `IUnsubscribe`，不会投影 `off`、`dispose`、`unlisten` 等 alias。需要 styled handle 时，直接调用 channel 实例上的 `subscribeOnce()` / `subscribeUntil()`。"
                 }
               ]
             },
@@ -1892,11 +2001,19 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "class Counter implements IEventSubscriber<number> {\n  total = 0\n  handle(event: { readonly value: number }) {\n    this.total += event.value\n  }\n}\nsubscribeSubscriber(channel, new Counter())"
+                  "code": "import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeSubscriber, type IEventSubscriber } from '@migaia/event-subscriber/subscriber'\n\nclass Counter implements IEventSubscriber<number> {\n  total = 0\n  handle(event: { readonly value: number }) {\n    this.total += event.value\n  }\n}\nconst channel = createEventChannel<number>()\nsubscribeSubscriber(channel, new Counter())"
                 },
                 {
                   "type": "paragraph",
                   "text": "`channel`、`subscriber` 均必填，`subscriber` 必须是携带可调用 `handle` 方法的对象。`subscriber` 非对象或缺少可调用 `handle` 抛 `INVALID_SUBSCRIBER`。返回 `IUnsubscribe`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "旧草案曾提供 `abstract class EventSubscriber`，要求子类声明静态 `EVENT_NAME`，并实现 `onCall()`。当前版本已经明确移除该设计：它会让 payload 同时受 class 的 `EVENT_NAME` 与容器 key 两套信息约束，而 TypeScript 也不能强制子类实现 abstract static 字段。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "因此当前的 `IEventSubscriber` 只要求一个 `handle(event)` 方法；`Counter` 不声明 `EVENT_NAME`（也不是 `EVENTNAME`）。`subscribeSubscriber(channel, subscriber)` 通过 `channel` 确定事件来源。需要在同一个容器中按名字路由多种事件时，使用 `createEventHub<{ count: number }>()`，并调用 `hub.subscribe('count', listener)`：名称属于 Hub 的订阅 key，不属于 subscriber class。"
                 }
               ]
             },
@@ -2004,7 +2121,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const result = await invokeTaskSettled(tasks, 'email', job)"
+                  "code": "import { createEventChannel, invokeTaskSettled } from '@migaia/event-subscriber'\n\ntype IEmailJob = { readonly recipient: string; readonly template: 'welcome' }\ntype IEmailReceipt = { readonly messageId: string }\n\nconst tasks = createEventChannel<IEmailJob, IEmailReceipt>()\ntasks.subscribe(\n  async ({ value: job }) => {\n    const response = await fetch('/api/email', {\n      method: 'POST',\n      headers: { 'content-type': 'application/json' },\n      body: JSON.stringify(job)\n    })\n    return response.json() as Promise<IEmailReceipt>\n  },\n  { taskId: 'email' }\n)\n\nconst job: IEmailJob = { recipient: 'ada@example.com', template: 'welcome' }\nconst result = await invokeTaskSettled(tasks, 'email', job)\n// result 是 { status: 'fulfilled', value: { messageId } }\n// 或 { status: 'rejected', reason }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`tasks` 是这个示例自己创建的 canonical event channel，不是库内置变量。`tasks.subscribe(., { taskId: 'email' })` 把唯一标识绑在这条 registration 上；`invokeTaskSettled(tasks, 'email', job)` 用相同标识选择它，并把 `job` 作为 `event.value` 传入。这样调用者既能检查成功返回的 `messageId`，也能在 `rejected` 分支读取原始失败原因。"
                 },
                 {
                   "type": "paragraph",
@@ -6798,11 +6919,23 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "普通应用继续使用 `use()` / `unUse()`；`@migaia/tray/host` 作为唯一 composition owner 使用 PluginHost 的 prepared admission、exact receipt 与 opaque data-order slot 协议。候选 setup 完成前不会 进入 committed view；commit 前 Host revision 漂移会拒绝发布，owner 必须调用 `discardPreparedAdmissions()`，其回滚 exactly once。slot 属于 exact Host definition：replace/restart 复用，definition delete/session terminal 退休，不能伪造或跨 Host 使用。"
+                  "text": "这一节只给 Tray 的 Host 适配器维护者看。普通应用安装和卸载插件时继续使用 `use()` / `unUse()`，不需要接触下面这些对象。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "托管卸载把“逻辑撤销”和“物理完成”分开。extension/shared/stage 先从新读者视图撤销；Graph binding fence 和已经取得的 pipeline lease 未归零时，plugin/resource disposer 不会启动。bounded 调用可先得到 `cleanupComplete: false` 与共享 `physicalCompletion`，但不会用 timeout 破坏严格清理顺序。"
+                  "text": "Tray 一次安装多个插件时，先让 PluginHost 完成插件的 `setup`，但暂时不让业务代码看见它们。这个“已经准备好、还没有正式发布”的批次叫 prepared admission，可以理解成数据库事务提交前的暂存区：整批都成功才一次性公开；其中一个失败，整批都不公开。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "正式公开前，PluginHost 会检查准备期间是否有别人改过 Host。这里的 Host revision 就是 Host 的修改版本号；版本号变了，说明这批结果基于旧状态，提交会被拒绝。Tray 随后调用 `discardPreparedAdmissions()`，PluginHost 只清理这批暂存资源一次，不会重复执行插件的释放逻辑。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "提交成功后，每个插件都会得到一张只能由当前 Host 签发和识别的“安装凭证”，正式类型名是 exact receipt。Tray 卸载或替换插件时拿这张凭证指向那一次具体安装，因此旧插件迟到的清理动作不会误删同名的新插件。opaque data-order slot 则是 Host 内部保存的排序位置：Tray 只能原样交还，不能读取或伪造；同一个插件定义重启或替换时沿用位置，定义删除或整个会话结束时才永久作废。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "托管卸载分两步。第一步先让新请求看不到待卸载插件，这叫“逻辑撤销”。第二步等待已经拿到旧插件的请求和正在执行的 pipeline 全部结束，再真正调用插件与资源的 `dispose()`，这叫“物理完成”。如果等待时间达到调用方设置的上限，接口会先返回 `cleanupComplete: false`；这不代表资源已经释放，调用方仍须等待返回的 `physicalCompletion` Promise。超时只允许调用方先拿回控制权，不会跳过或打乱清理顺序。"
                 }
               ]
             },
@@ -6813,11 +6946,15 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost, type IPlugin } from '@migaia/plugin-host'\n\n// 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能\ntype ICore = { emit(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { emit: (value) => console.log(value) }\n  }\n}\n\n// 第二步：写一个插件——install() 拿到领域 core，返回要挂载到宿主上的方法\nconst upper: IPlugin<ICore, { upper(value: string): string }> = {\n  name: 'upper',\n  install: (core) => ({\n    upper: (value: string) => {\n      const result = value.toUpperCase()\n      core.emit(result) // 插件可以调用领域能力\n      return result\n    }\n  })\n}\n\n// 第三步：安装、使用、卸载\nconst host = await new Host().use(upper)\nhost.upper('migaia') // 类型上直接就有 upper 方法，TypeScript 自动推导出来的\nawait host.unUse('upper')\nawait host.dispose()"
+                  "code": "import { definePlugin } from '@migaia/plugin-host/defined'\nimport { PluginHost } from '@migaia/plugin-host/structural'\n\n// 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能\ntype ICore = { emit(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { emit: (value) => console.log(value) }\n  }\n}\n\n// 第二步：definePlugin(name, install) 定义插件；这里只定义，不会立刻安装\nconst upper = definePlugin<ICore, { upper(value: string): string }>(\n  'upper',\n  (core) => ({\n    upper: (value: string) => {\n      const result = value.toUpperCase()\n      core.emit(result) // 插件可以调用领域能力\n      return result\n    }\n  })\n)\n\n// 第三步：安装、使用、卸载\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst view = await host.use(upper)\nview.extensions.upper('migaia') // 扩展只出现在成功安装后返回的 committed view 上\nawait view.unUse('upper')\nawait host.dispose()"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`PluginHost<TDomainCore, TValue>` 子类唯一必须实现的是 `createPluginDomainCore()`——每次插件安装都会调用一次，产出一份独立的领域 core。插件通过 `install(core)` 拿到\"领域能力 + 通用 core 能力\"，返回要挂到宿主实例上的扩展方法。`use()`/`unUse()`/`dispose()` 管理插件的生命周期。"
+                  "text": "`definePlugin()` 有两种写法。上面是短写法 `definePlugin(name, install)`，适合只有名称和安装函数的插件；需要 `config`、`shared`、`update` 或 `dispose` 时使用完整对象写法：`definePlugin({ name, config, install, shared, update, dispose })`。调用 `definePlugin()` 只会校验并保存定义，不会执行 `install()`；真正的安装发生在 `host.use(plugin)`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`PluginHost<TDomainCore, TValue>` 子类唯一必须实现的是 `createPluginDomainCore()`——每次插件安装都会调用一次，产出一份独立的领域 core。插件通过 `install(core)` 拿到“领域能力 + 通用 core 能力”，返回扩展方法。`use()` 成功后返回不可变 view，业务代码从 `view.extensions` 调用这些方法；`view.unUse()` 卸载插件，`host.dispose()` 关闭整个宿主。"
                 }
               ]
             },
@@ -7065,7 +7202,15 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { GENERATOR_CONTINUE } from '@migaia/plugin-host'\n\nconst host = new Host({ pipeline: { mode: 'async-generator' } })\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  await Promise.resolve() // 可以在 yield 之间做任意异步工作\n  yield value.trim() // 中间 yield 只用于本 stage 内部观测\n  return GENERATOR_CONTINUE // 采用最后一次 yield 的值，交给下一个 stage\n})"
+                  "code": "import { GENERATOR_CONTINUE } from '@migaia/plugin-host'\n\nconst host = new Host({ pipeline: { mode: 'async-generator' } })\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  await Promise.resolve() // 可以在 yield 之间做任意异步工作\n  yield value.trim()\n  yield value.trim().toUpperCase()\n  return GENERATOR_CONTINUE // 下一 stage 收到最后一次 yield 的大写字符串\n})\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  return `[${value}]` // 收到上一个 stage 的最后一次 yield，继续产生最终结果\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`GENERATOR_CONTINUE` 是框架导出的唯一 `Symbol` 控制信号，不是需要下游处理的业务数据。generator 函数的 `return` 只能提供一个终值，而一个 stage 可能先后 `yield` 多个候选值；返回这个信号是在明确告诉 runner：“忽略这个 Symbol 本身，把本 stage 最后一次 `yield` 的值交给下一 stage。”上例输入 `\" migaia \"` 时，第二个 stage 收到 `MIGAIA`，最终结果是 `[MIGAIA]`。如果该 stage 一次也没有 `yield`，`GENERATOR_CONTINUE` 会原样转发进入该 stage 时的输入。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "它与另外三种返回方式不同：`return transformedValue` 直接把该值交给下一 stage；`return GENERATOR_HALT` 或普通的 `return`（即 `undefined`）终止整条 pipeline；只有业务类型本身允许 `undefined` 时，才用 `return GENERATOR_UNDEFINED` 把真正的 `undefined` 作为数据继续向下传。"
                 },
                 {
                   "type": "table",
@@ -7633,6 +7778,19 @@
               "blocks": [
                 {
                   "type": "paragraph",
+                  "text": "推荐用 `definePlugin()` 创建插件定义，而不是手写类型断言："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { definePlugin } from '@migaia/plugin-host/defined'\n\nconst health = definePlugin('health', () => ({\n  check: () => ({ ok: true as const })\n}))\n\nconst configurable = definePlugin({\n  name: 'configurable',\n  config: { prefix: '[app]' },\n  install: (core) => ({ readPrefix: () => core.config.get().prefix }),\n  dispose: () => undefined\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "第一种是 `definePlugin(name, install)` 短写法；第二种完整对象写法可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`setupHost()` 只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "安装时获得的 `core` 是一个稳定的 facade（`src/core.ts` 的 `createPluginCore`）。它包含子类提供的领域方法，加上下面的通用能力："
                 },
                 {
@@ -7724,6 +7882,15 @@
                 {
                   "type": "paragraph",
                   "text": "`IPluginHostCompositionIntegration` 面向 Tray 这类唯一 owner，不是业务插件的第二套 Host API："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "prepared admission：插件 setup 已完成、但尚未对业务读取和 pipeline 发布的临时批次；作用类似“事务待提交区”。",
+                    "registration receipt：某一次成功安装的不可伪造凭证；卸载凭证指向的具体安装，不按插件名猜测目标。",
+                    "data-order slot：Host 私有的排序位置；Tray 只能保存并原样传回，不能查看内部序号或自行构造。",
+                    "Host revision：Host 的修改版本号；准备和提交之间版本变化时拒绝提交，避免把基于旧状态的插件批次发布出去。"
+                  ]
                 },
                 {
                   "type": "paragraph",
@@ -7825,6 +7992,14 @@
                       "terminal 语义与 `generator` 完全一致（同一套 `GENERATOR_CONTINUE`/`GENERATOR_HALT`/`GENERATOR_UNDEFINED` 判定）；区别是每个 stage 被完整、串行 `await` 耗尽（`await iterator.next()` 循环），中间 yield 只用于本 stage 内部观测，不会提前进入下一 stage，也不产生流式/fan-out 效果。"
                     ]
                   ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`GENERATOR_CONTINUE` 是 runner 识别的唯一 `Symbol` 控制信号，不是业务数据。一个 generator stage 可以 `yield` 多次，返回该信号表示“采用最后一次 `yield` 的值作为下一 stage 输入”；如果一次也没有 `yield`，则沿用进入当前 stage 的原输入。比如输入 `\" migaia \"`，依次 `yield value.trim()`、`yield value.trim().toUpperCase()` 后返回 `GENERATOR_CONTINUE`，下一 stage 得到的是 `MIGAIA`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "相对地，`return transformedValue` 直接采用返回值，`return GENERATOR_HALT` 或普通 `return` 终止 pipeline，`return GENERATOR_UNDEFINED` 才是把真正的 `undefined` 作为业务值继续传递。"
                 },
                 {
                   "type": "paragraph",
@@ -8319,6 +8494,18 @@
                   "type": "code",
                   "language": "ts",
                   "code": "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\n\nconst count = new Signal(1, runtime);\nconst doubled = new Computed(() => count.value * 2, runtime);\n\nconst seen: number[] = [];\nconst effect = new Effect(() => {\n  seen.push(doubled.value);\n}, runtime); // 构造时立即同步跑一次：seen = [2]\n\ncount.value = 3;\nruntime.flush(); // 手动冲刷待处理的副作用：seen = [2, 6]\n\neffect.dispose();\ndoubled.dispose();\ncount.dispose();"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这段代码建立的是一张由当前 `runtime` 独占的依赖图。`Effect` 构造时会立即执行一次；执行过程中读取 `doubled.value`，使 `Effect → Computed → Signal` 三层依赖自动登记，所以 `seen` 首先得到 `2`。这不是手工订阅，之后也不需要再次告诉 `Effect` 它依赖了谁。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`count.value = 3` 只会使 `doubled` 失效并把 `effect` 放入待执行队列，不会在 setter 内立刻重跑副作用。`runtime.flush()` 同步排空该 runtime 的队列：`doubled` 在被读取时按需重算为 `6`，随后 `effect` 把它写入 `seen`。生产代码通常让默认微任务自动 flush；测试、SSR 或需要确定提交边界的代码才显式调用 `flush()`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "释放顺序按消费者到数据源执行：先停掉 `effect`，避免清理过程中再次观察数据；再释放派生节点 `doubled`；最后释放源节点 `count`。这里没有持久化数据、连接或计时器，`dispose()` 的实际作用是断开依赖边并禁止继续读取已释放节点。`Runtime` 本身没有 `dispose()`；需要批量管理时，把这些节点交给 `Scope` 持有并统一释放。"
                 },
                 {
                   "type": "paragraph",
@@ -9250,7 +9437,19 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Resource } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\n\nconst user = new Resource(\n  ({ signal }) => fetch('/api/user', { signal }).then((r) => r.json()),\n  runtime\n);\n\nswitch (user.state.status) {\n  case 'pending':\n    console.log('loading...');\n    break;\n  case 'success':\n    console.log(user.state.data);\n    break;\n  case 'error':\n    console.error(user.state.error);\n    break;\n}\n\nawait user.refetch(); // 手动触发一次新请求\nuser.dispose(); // 不再使用时释放，中止在途请求并清理订阅"
+                  "code": "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\n\ntype IUser = { id: string; name: string };\n\nclass UserRequestError extends Error {\n  readonly code = 'USER_REQUEST_FAILED';\n\n  constructor(readonly status: number) {\n    super(`GET /api/user failed: ${status}`);\n  }\n}\n\nconst runtime = createRuntime();\n\nconst user = new Resource<IUser>(\n  async ({ signal }) => {\n    const response = await fetch('/api/user', { signal });\n    if (!response.ok) throw new UserRequestError(response.status);\n    return (await response.json()) as IUser;\n  },\n  runtime\n);\n\nswitch (user.state.status) {\n  case ResourceStatus.idle:\n  case ResourceStatus.pending:\n    console.log('loading...');\n    break;\n  case ResourceStatus.success:\n    console.log(user.state.data);\n    break;\n  case ResourceStatus.error:\n  case ResourceStatus.cancelled:\n    console.error(user.state.error);\n    break;\n}\n\ntry {\n  const freshUser = await user.refetch();\n  console.log('refetched user', freshUser);\n} finally {\n  user.dispose();\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "构造函数默认 `autoStart: true`，因此 `new Resource(.)` 会立即创建第一代请求，并把状态从 `idle` 推进到 `pending`。上面的 `switch` 读取的是当前快照；如果界面需要随请求结算自动更新，应在 `Effect` 或框架适配层的订阅回调中读取 `user.state`，而不是只执行一次 `switch`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "传给 fetcher 的 `signal` 只属于当前这一代请求。调用 `refetch()` 会强制创建新一代、取消仍在途的上一代，并返回新一代的 Promise；上一代即使忽略 abort 后仍然成功返回，也没有资格覆盖当前状态。把 `signal` 传给 `fetch` 的意义是同时停止底层网络工作、节省资源；Resource 的 generation 检查才是防止旧结果覆盖新状态的最终保证。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`dispose()` 是终止整个 Resource，不等同于取消一次请求：它会取消当前 generation、清除 fetcher 建立的 Signal/Computed 依赖，并释放内部状态订阅。它不会释放外部传入的 `runtime`。重复调用 `dispose()` 是安全的，但释放后再读 `state`、调用 `refetch()` 或其他公开操作都会抛出 `RESOURCE_DISPOSED`；若只是暂时停止当前请求并计划稍后复用该实例，应调用 `cancel()`。"
                 },
                 {
                   "type": "paragraph",
@@ -9259,7 +9458,19 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Resource } from '@migaia/resource';\nimport { Signal, createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst userId = new Signal(1, runtime);\n\nconst user = new Resource(\n  async ({ signal }) => {\n    const response = await fetch(`/api/users/${userId.value}`, { signal });\n    if (!response.ok) throw new Error('加载用户失败');\n    return response.json();\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nuserId.value = 2; // fetcher 里对 userId.value 的同步读取已被登记为依赖，这行会触发新请求"
+                  "code": "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\nimport { fetchUser } from './user-api.js';\n\nconst runtime = createRuntime();\nconst userId = runtime.signal('1');\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value; // 在返回 Promise 前读取：Runtime 建立 userId → user 依赖边\n    return fetchUser(id, { signal });\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state; // 建立 user.state → 当前渲染任务的依赖边\n  if (state.status === ResourceStatus.pending) console.log('loading user');\n  if (state.status === ResourceStatus.success) console.log('render', state.data);\n  if (state.status === ResourceStatus.error) console.error(state.error);\n});\n\nexport function selectUser(id: string): void {\n  userId.value = id;\n}\n\nselectUser('2'); // 标脏 Resource；当前请求被替换，新请求使用 id = '2'\n\nexport function disposeUserPanel(): void {\n  stopRendering();\n  user.dispose();\n  userId.dispose();\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这里不是两个互不相关的包碰巧共用一个变量。`Resource` 使用同一个 `runtime` 把自己注册成 Reactive 图里的 observer：fetcher 同步读取 `userId.value` 时，Runtime 记录 `userId → user`；渲染 Effect 读取 `user.state` 时，又记录 `user → rendering effect`。因此完整传播路径是 `userId 写入 → Resource 标脏 → 新请求状态写入 → Effect 重跑`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`selectUser('2')` 后，Reactive 会把同一批次内对 `userId` 的多次写入合并，再通过 idle/microtask 通道通知 Resource。Resource 创建新的 request generation，并 abort 被取代 generation 的 `signal`；`fetchUser('2', .)` 的 pending/success/error 状态写入内部 Signal，观察 `user.state` 的 Effect 随之重跑。即使旧请求不支持 AbortSignal 并在稍后返回，generation 校验也会丢弃旧结果。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "依赖收集只覆盖 fetcher 返回 Promise 之前的同步阶段。上例先把 `userId.value` 读进 `id`，再调用异步 API；如果等到 `await` 之后才读取 `userId.value`，JavaScript 的同步追踪上下文已经结束，这次读取不会建立自动刷新关系。`disposeUserPanel()` 则按消费方向反向释放：先停止渲染 Effect，再终止 Resource，最后释放输入 Signal。"
                 }
               ]
             },
@@ -9383,7 +9594,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Resource } from '@migaia/resource';\nimport { Signal, createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst userId = new Signal(1, runtime);\n\nconst user = new Resource(\n  async ({ signal }) => {\n    const response = await fetch(`/api/users/${userId.value}`, { signal });\n    if (!response.ok) throw new Error('加载用户失败');\n    return response.json();\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nuserId.value = 2; // 触发新请求"
+                  "code": "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\nimport { fetchUser } from './user-api.js';\n\nconst runtime = createRuntime();\nconst userId = runtime.signal('1');\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value;\n    return fetchUser(id, { signal });\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state;\n  if (state.status === ResourceStatus.pending) console.log('loading user');\n  if (state.status === ResourceStatus.success) console.log('render', state.data);\n});\n\nuserId.value = '2';\n\nexport function disposeUserPanel(): void {\n  stopRendering();\n  user.dispose();\n  userId.dispose();\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "动态关系是 `userId → Resource → rendering effect`：fetcher 在返回 Promise 前同步读取 `userId.value`，Runtime 因而把 Resource 登记为 `userId` 的 observer；Effect 读取 `user.state`，又成为 Resource 内部状态 Signal 的 observer。`userId` 写入经 Reactive 的 idle/microtask 通道使 Resource 标脏，Resource abort 旧 generation、创建新 generation，状态变化再驱动 Effect 重跑。旧请求即使忽略 abort 并延迟返回，也会被 generation 校验拒绝写回。首次 `await` 之后的响应式读取不在同步追踪窗口内，不会形成这条自动刷新链。"
                 }
               ]
             },
@@ -12787,6 +13002,40 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "四者不是同一种格式的别名，先按要保存的数据和后端能力选择："
+                },
+                {
+                  "type": "table",
+                  "headers": ["Codec", "实际写入值", "什么时候选", "不能做什么"],
+                  "rows": [
+                    [
+                      "`jsonCodec`",
+                      "JSON 字符串",
+                      "数据只含普通 JSON 值，或必须兼容 Local Storage、Cookie 等 text-only 后端",
+                      "不保留 `Date`/`Map`/`Set`/二进制的原类型，也不能表达循环引用"
+                    ],
+                    [
+                      "`structuredCodec`",
+                      "原对象，由 record 后端执行 structured clone",
+                      "IndexedDB/Memory 中要保存 `Date`、`Map`、`Set`、`Blob`、`ArrayBuffer`、typed array 或循环引用",
+                      "不能用于 text-only 后端，也不负责 schema 校验、领域实例重建或函数/DOM 节点持久化"
+                    ],
+                    [
+                      "`binaryCodec`",
+                      "`Uint8Array`；text-only 后端可转 base64",
+                      "数据本来就是字节，且希望支持二进制后端直写",
+                      "不接受 `ArrayBuffer`、字符串或普通数组；base64 回退会增加约 33% 体积"
+                    ],
+                    [
+                      "`selectCodec`",
+                      "由 codec 与 `store.capabilities` 共同决定",
+                      "连接具体后端时确认直写、可逆回退或拒绝",
+                      "不会把 structured 数据偷偷降级为 JSON，因为那会静默丢失类型和引用关系"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
                   "text": "`jsonCodec`｜3 秒上手 —— 默认 codec，零依赖，全后端可用："
                 },
                 {
@@ -12800,16 +13049,16 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`structuredCodec`｜3 秒上手 —— 恒等编解码，交给后端自身的 structured clone："
+                  "text": "`structuredCodec`｜10 秒上手 —— codec 本身原样传值，真正的复制发生在 IndexedDB/Memory 的 structured clone 写入与读取边界："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await structuredCodec.encode({ date: new Date(), blob: myBlob }) // 原样返回"
+                  "code": "import { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { selectCodec, structuredCodec } from '@migaia/storage-web/serialize'\n\nconst db = indexedDb({ dbName: 'app-data', recordsStoreName: 'snapshots' })\nconst codec = selectCodec(structuredCodec, db.capabilities)\n\nconst snapshot: Record<string, unknown> = {\n  createdAt: new Date('2026-01-01T00:00:00Z'),\n  tags: new Set(['stable', 'offline']),\n  counters: new Map([['orders', 3]]),\n  bytes: new Uint8Array([1, 2, 3])\n}\nsnapshot.self = snapshot\n\nconst encoded = await codec.encode(snapshot) // === snapshot：codec 不复制\nawait db.putRecord(encoded, 'latest') // IndexedDB 在这里执行 structured clone\nconst stored = await db.getRecord('latest')\nconst decoded = await codec.decode(stored) // Date/Map/Set/bytes/循环引用仍保留\n\nawait db.dispose()"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`output: 'structured'`。只能用于支持 `records`（`capabilities.records === true`）的后端；可直接存 `Blob`/`File`/`ArrayBuffer`/`Map`/`Set`/`Date`，甚至循环引用。"
+                  "text": "`output: 'structured'`。`encode()`/`decode()` 都是恒等操作，所以单独调用它不会制作快照；对象隔离由 record 后端负责。只能用于 `capabilities.records === true` 的后端；传给 Local Storage、Session Storage 或 Cookie 时，`selectCodec` 立即抛 `UNSUPPORTED_CAPABILITY`，不会改用 JSON。structured clone 能保留上述内建类型和引用图，但不是业务 schema：字段校验、版本迁移以及 class 实例重建仍应由 Schema/Entity 层处理。"
                 },
                 {
                   "type": "paragraph",
@@ -18401,7 +18650,16 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "不适用：列表/高频增删的集合状态用 `@migaia/store-indexed`；需要稳定业务 key 寻址用 `@migaia/store-keyed`；需要持久化用 `@migaia/store-persist`；需要 React hooks 用 `@migaia/store-react`。`store-light` 本身只提供\"对象 facade + 异步资源\"，其余能力都是独立包按需组合，依赖 `@migaia/reactive`（响应式内核）、`@migaia/lifecycle`（所有权与释放）、`@migaia/event-subscriber`（`StoreResource` 内部事件通道）与 `@migaia/utils`。"
+                  "text": "不适用："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "列表或高频增删的集合状态使用 `@migaia/store-indexed`。",
+                    "需要按稳定业务 key 寻址时使用 `@migaia/store-keyed`。",
+                    "需要持久化时使用 `@migaia/store-persist`；需要 React hooks 时使用 `@migaia/store-react`。",
+                    "`store-light` 只负责对象状态和异步资源。响应式内核、资源释放、内部事件与通用工具分别由 `@migaia/reactive`、`@migaia/lifecycle`、`@migaia/event-subscriber` 与 `@migaia/utils` 提供。"
+                  ]
                 }
               ]
             },
@@ -20640,7 +20898,15 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`@migaia/store-persist` 的 production 依赖是 `@migaia/reactive`、`@migaia/storage-contract`、`@migaia/utils`；`@migaia/storage-web` 只在使用其 backend/codec 的 integration 场景作为直接依赖。`@migaia/store-light`/`@migaia/store-keyed`/`@migaia/store-indexed` 是可选 peerDependencies，只用得到哪条路径就只需要装对应的 store 包。"
+                  "text": "依赖关系："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`@migaia/reactive`、`@migaia/storage-contract`、`@migaia/utils` 是运行时必需依赖。",
+                    "`@migaia/storage-web` 仅在接入其 backend 或 codec 时安装。",
+                    "`@migaia/store-light`、`@migaia/store-keyed`、`@migaia/store-indexed` 是可选 peer dependency；只安装当前状态模型使用的包。"
+                  ]
                 }
               ]
             },
@@ -27948,7 +28214,20 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`deferred`｜3 秒上手 —— 拿到可从外部结算的 Promise："
+                  "text": "`deferred`｜兼容性工具 —— 拿到可从外部结算的 Promise："
+                },
+                {
+                  "type": "paragraph",
+                  "text": "如果目标运行环境支持 `Promise.withResolvers()`，优先使用原生 API：语义相同、认知成本更低，也不需要额外引入 `deferred`。只有需要兼容尚未提供 `Promise.withResolvers()` 的运行时，或项目必须统一使用本包返回类型时，才选择 `deferred()`。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const { promise, resolve, reject } = Promise.withResolvers<number>();\nresolve(42);"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "兼容旧运行时："
                 },
                 {
                   "type": "code",
@@ -27974,7 +28253,27 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createManualScheduler`｜5 秒上手 —— 单测里把时间变成确定性的："
+                  "text": "它与 `Promise.resolve().then(() => run())` 的差别在执行时机和 Promise identity："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`toPromise(run)` 在当前调用栈立即执行 `run`，函数返回前副作用已经发生；如果 `run` 返回原生 Promise，会直接返回同一个 Promise。",
+                    "`Promise.resolve().then(run)` 等到下一次 microtask 才执行 `run`，可用于主动打断当前调用栈或避免同步重入；它始终创建一个新的链式 Promise。",
+                    "两者都把 `run` 抛出的异常表现为 rejection。`toPromise` 在当前调用过程中捕获同步异常并返回已拒绝的 Promise；`.then(run)` 则在后续 microtask 执行 `run` 时产生 rejection。"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "需要“现在执行，但统一以 Promise 返回”时选 `toPromise`；需要“稍后执行，让出当前调用栈”时选 `Promise.resolve().then(run)`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createManualScheduler`｜本仓测试专用 —— 单测里把时间变成确定性的："
+                },
+                {
+                  "type": "paragraph",
+                  "text": "该工具为本仓测试与适配器验证提供确定性时钟，不面向外部业务代码。外部项目应优先使用所属测试框架提供的 fake timers；不要在生产流程中依赖 `advance()` 或 `pendingCount`。"
                 },
                 {
                   "type": "code",
@@ -27992,7 +28291,15 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "systemScheduler.now(); // Date.now()"
+                  "code": "const now = systemScheduler.now();"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`systemScheduler.now()` 当前直接读取 `Date.now()`，所以两者返回的都是 Unix 时间戳，数值与精度没有区别。区别在调用边界：`systemScheduler` 把 `now()` 与 `schedule()` 放在同一个 `IUtilsScheduler` 中，使用方可以在测试时把它们一起替换成虚拟时钟。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "只需要读取真实墙上时间的普通业务代码，直接使用 `Date.now()` 即可。正在实现接受 `IUtilsScheduler` 的超时、重试或调度逻辑时，应始终配对使用 `scheduler.now()` 与 `scheduler.schedule()`；如果其中一处改用 `Date.now()`，就会绕过注入的调度器，导致测试同时混用真实时间和虚拟定时器，无法再确定性推进。"
                 },
                 {
                   "type": "paragraph",
@@ -28094,11 +28401,32 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidArgument`(`INVALID_ARGUMENT`)、`nonErrorValue`(`NON_ERROR_VALUE`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`aborted`(`ABORTED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`schedulerRunaway`(`SCHEDULER_RUNAWAY`)、`errorIdentityConflict`(`ERROR_IDENTITY_CONFLICT`)、`cloneUnsupported`(`CLONE_UNSUPPORTED`)、`invalidEncoding`(`INVALID_ENCODING`)、`limiterClosed`(`LIMITER_CLOSED`)、`reentrantCall`(`REENTRANT_CALL`)、"
+                  "text": "全部取值及其含义："
                 },
                 {
-                  "type": "paragraph",
-                  "text": "`configUnsupported`(`CONFIG_UNSUPPORTED`)、`configReadonly`(`CONFIG_READONLY`)、`configConflict`(`CONFIG_CONFLICT`)、`configLimitExceeded`(`CONFIG_LIMIT_EXCEEDED`)、`configPathInvalid`(`CONFIG_PATH_INVALID`)、`objectPathInvalid`(`OBJECT_PATH_INVALID`)、`formatInvalid`(`FORMAT_INVALID`)、`formatValueMissing`(`FORMAT_VALUE_MISSING`)、`numberFormatInvalid`(`NUMBER_FORMAT_INVALID`)。"
+                  "type": "list",
+                  "items": [
+                    "`invalidArgument`（`INVALID_ARGUMENT`）—— 参数类型、范围或组合不符合 API 契约；修正调用参数后重试。",
+                    "`nonErrorValue`（`NON_ERROR_VALUE`）—— `toError()` 收到了字符串等非 `Error` 异常值，并已将它转换为可追踪的 `Error`。",
+                    "`envUnsupported`（`ENV_UNSUPPORTED`）—— 当前宿主缺少所需原生能力，例如 `structuredClone`；改用支持该能力的运行环境或其他实现。",
+                    "`aborted`（`ABORTED`）—— 外部 `AbortSignal` 已请求取消协作式操作；停止后续工作并向上传递取消原因。",
+                    "`deadlineExceeded`（`DEADLINE_EXCEEDED`）—— 操作、单次尝试或整个重试流程超过约定时限；检查 `scope` 与 `timeoutMs` 决定重试或降级。",
+                    "`schedulerRunaway`（`SCHEDULER_RUNAWAY`）—— 手动调度器一次推进执行超过 10000 个任务，通常表示回调在同一时刻递归调度；修复循环，而不是提高阈值。",
+                    "`errorIdentityConflict`（`ERROR_IDENTITY_CONFLICT`）—— 错误已有的 `source` 或 `code` 与准备附加的身份冲突；保留原错误身份，不要重复改写。",
+                    "`cloneUnsupported`（`CLONE_UNSUPPORTED`）—— `structuredClone` 无法复制该值，例如包含不可克隆成员；先转换为可克隆数据再创建不可变快照。",
+                    "`invalidEncoding`（`INVALID_ENCODING`）—— Base64 等输入不符合本包要求的规范编码；根据错误偏移修正输入，不会宽松解码。",
+                    "`limiterClosed`（`LIMITER_CLOSED`）—— 并发限制器已经关闭，不能再接收或继续排队任务；创建新限制器或停止提交任务。",
+                    "`reentrantCall`（`REENTRANT_CALL`）—— 回调尚未结束时又进入禁止重入的函数或 collector；等待当前调用结束，避免从回调内部再次调用同一实例。",
+                    "`configUnsupported`（`CONFIG_UNSUPPORTED`）—— 配置包含不支持的形状、访问器、Symbol key 或函数位置；改成契约允许的普通数据。",
+                    "`configReadonly`（`CONFIG_READONLY`）—— 尝试修改只读配置视图；从可写所有者生成新配置，不要修改只读快照。",
+                    "`configConflict`（`CONFIG_CONFLICT`）—— 合并配置时所有权、profile 或属性描述符互不兼容；统一来源契约后再合并。",
+                    "`configLimitExceeded`（`CONFIG_LIMIT_EXCEEDED`）—— 配置图的键数、深度或其他安全上限被超过；缩小输入或显式调整允许的限制。",
+                    "`configPathInvalid`（`CONFIG_PATH_INVALID`）—— 配置路径为空、过长、含危险键或无效分段；使用经过解析且安全的配置路径。",
+                    "`objectPathInvalid`（`OBJECT_PATH_INVALID`）—— 对象路径字符串或分段元组无法安全定位属性；修正路径语法并移除危险分段。",
+                    "`formatInvalid`（`FORMAT_INVALID`）—— 模板语法、占位符边界或待格式化值不合法；修正模板或值后重新格式化。",
+                    "`formatValueMissing`（`FORMAT_VALUE_MISSING`）—— 严格格式化模式找不到指定占位符路径；补齐数据字段或改用允许缺失值的策略。",
+                    "`numberFormatInvalid`（`NUMBER_FORMAT_INVALID`）—— `Intl.NumberFormat` 拒绝 locale、格式选项、货币代码或数值；修正国际化配置或输入值。"
+                  ]
                 },
                 {
                   "type": "paragraph",
@@ -28119,6 +28447,19 @@
                   "type": "code",
                   "language": "ts",
                   "code": "import {\n  isArrayBuffer,\n  isUint8Array,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  utf8ByteLength,\n  encodeUtf8,\n  decodeUtf8,\n  splitUtf8\n} from '@migaia/utils/bytes';"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "在使用本模块前，先区分底层存储与字节视图："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`ArrayBuffer` 是一段固定长度的原始连续内存，只表示“这些字节存在哪里”。它本身不能按下标读写具体字节，通常来自 `fetch(...).arrayBuffer()`、文件读取、Web Crypto、WebAssembly 或 iframe/Worker 消息传输。",
+                    "`Uint8Array` 是覆盖在 `ArrayBuffer` 上的 8 位无符号整数视图，表示“怎样把这段内存按 0～255 的单字节读写”。编码、Base64、网络协议帧和二进制序列化通常使用它，因为这些操作需要逐字节访问。",
+                    "`new Uint8Array(buffer, byteOffset, length)` 默认不会复制数据；它可以只查看 buffer 的一个窗口，写入视图也会改变同一底层 `ArrayBuffer`。需要独立副本时使用 `slice()`，只需共享窗口时使用 `subarray()`。",
+                    "`ArrayBuffer` 通过 Worker 等边界转移后可能被 detached，原发送方不再拥有可读字节；`SharedArrayBuffer` 则用于多线程共享内存，生命周期和并发语义不同，因此本模块不会把它当作普通 `ArrayBuffer`。"
+                  ]
                 },
                 {
                   "type": "paragraph",
@@ -28208,7 +28549,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  isPlainObject,\n  probeProperty,\n  immutableSnapshot,\n  diagnosticSnapshot,\n  identitySnapshot,\n  get,\n  set,\n  parseObjectPath,\n  probeObjectPath,\n  createPathAccessor\n} from '@migaia/utils/object';"
+                  "code": "import {\n  isPlainObject,\n  probeProperty,\n  immutableSnapshot,\n  diagnosticSnapshot,\n  structuredDiagnosticSnapshot,\n  identitySnapshot,\n  get,\n  set,\n  parseObjectPath,\n  probeObjectPath,\n  createPathAccessor\n} from '@migaia/utils/object';"
                 },
                 {
                   "type": "paragraph",
@@ -28226,20 +28567,46 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const result = probeProperty(obj, 'name'); // { kind: 'missing' | 'value' | 'failed', ... }"
+                  "code": "const profileUnavailable = new Error('profile unavailable');\nlet profileReads = 0;\nconst user = {\n  name: 'Ada',\n  get profile(): never {\n    profileReads += 1;\n    throw profileUnavailable;\n  }\n};\n\nfunction readLabel(value: object, key: PropertyKey): string {\n  const result = probeProperty<string>(value, key);\n  switch (result.kind) {\n    case 'value':\n      return result.value;\n    case 'missing':\n      return 'Anonymous';\n    case 'failed':\n      console.error('property read failed', result.error);\n      return 'Unavailable';\n  }\n}\n\nreadLabel(user, 'name'); // 'Ada'：读取成功，消费 value\nreadLabel(user, 'email'); // 'Anonymous'：字段不存在，走业务默认值\nreadLabel(user, 'profile'); // 'Unavailable'：getter 异常被显式上报\nprofileReads; // 1：probeProperty 没有为了判断结果而重复触发 getter"
                 },
                 {
                   "type": "paragraph",
-                  "text": "参数：`value: object`（必填）、`key: PropertyKey`（必填），无可选项。"
+                  "text": "这里的 `user` 就是第一个参数 `value`：可以是普通对象、class 实例或其他可读取属性的对象；第二参数是要读取的字符串、数字或 Symbol key。`probeProperty()` 把“字段不存在”和“读取字段失败”分开，调用方不会把 getter 异常误当成缺省值；它也只读取属性一次，避免先判断再读取导致 getter 重复执行。参数：`value: object`（必填）、`key: PropertyKey`（必填），无可选项。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`immutableSnapshot`｜3 秒上手 —— 基于 `structuredClone` 的深拷贝（单参数，无选项；不支持时抛 `ENV_UNSUPPORTED`/`CLONE_UNSUPPORTED`）："
+                  "text": "在使用 `immutableSnapshot()` 前，先理解它所说的“快照”："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "它直接调用当前宿主的原生 `globalThis.structuredClone()`，按结构化克隆算法一次复制整张对象图，不经过 JSON 字符串。因此循环引用和“多个字段指向同一对象”的共享关系可以保留，`Date`、`Map`、`Set`、`ArrayBuffer`、TypedArray 等常见结构也能保留对应数据类型。",
+                    "它不会保留自定义 class 的原型方法、getter/setter 或属性描述符；函数、WeakMap 等不可结构化克隆的值会让整个操作失败。这里没有传 transfer list，输入中的 `ArrayBuffer` 会复制，不会因调用而 detached。",
+                    "“快照”表示返回值与源对象断开引用，源对象之后的修改不会回写到副本；它并不调用 `Object.freeze()`，所以返回对象本身仍可修改。需要只读约束时，应在类型或调用边界另行施加。",
+                    "适合隔离配置、消息负载或测试夹具的某一时刻状态；需要保留 class 行为、函数或精确属性描述符时不要使用。"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`immutableSnapshot`｜3 秒上手 —— 基于宿主原生结构化克隆算法的深拷贝（单参数，无选项；不支持时抛 `ENV_UNSUPPORTED`/`CLONE_UNSUPPORTED`）："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const copy = immutableSnapshot({ a: 1, date: new Date() });"
+                  "code": "const shared = { count: 1 };\nconst source = {\n  primary: shared,\n  alias: shared,\n  createdAt: new Date('2026-01-01T00:00:00Z'),\n  labels: new Map([['lang', 'zh']])\n};\nconst copy = immutableSnapshot(source);\n\nsource.primary.count = 2;\ncopy.primary.count; // 1：源对象修改不会回写快照\ncopy.primary === copy.alias; // true：共享引用关系被保留\ncopy.createdAt instanceof Date; // true：不是 JSON 字符串\nObject.isFrozen(copy); // false：独立副本不等于冻结对象"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "三种复制入口的选择规则："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "原生 `structuredClone(value)`：全有或全无。整张对象图都受支持才返回副本；任一成员不可克隆就抛宿主原生异常，不提供失败路径。",
+                    "`immutableSnapshot(value)`：同样全有或全无，内部直接调用原生 `structuredClone`；区别是把环境缺失和克隆失败转换为稳定的 `ENV_UNSUPPORTED` / `CLONE_UNSUPPORTED` 错误契约。",
+                    "`diagnosticSnapshot(value)`：不先克隆整张对象图，而是递归处理普通对象和数组；可克隆的内建子树独立复制，函数、class 实例等不支持的叶子保留原引用，并在 `diagnostics` 中记录具体 `path`。它优先保证“仍返回一个可检查结果”，不保证所有层都与源对象隔离。",
+                    "`structuredDiagnosticSnapshot(value)`：先尝试原生 `structuredClone`；成功时得到完整隔离副本且 `diagnostics` 为空，失败时再退回 `diagnosticSnapshot` 的逐节点策略，并额外记录根级克隆失败。适合既希望完整克隆、又不能因单个坏字段丢失整份遥测数据的边界。"
+                  ]
                 },
                 {
                   "type": "paragraph",
@@ -28248,25 +28615,37 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const { value, diagnostics } = diagnosticSnapshot({ a: 1, fn: () => 1 });\n// diagnostics: [{ path: ['fn'], reason: 'unsupported', cause: fn }]\n// reason 取值：'accessor' | 'read-failed' | 'unsupported'"
+                  "code": "const callback = () => 1;\nconst source = {\n  safe: { count: 1 },\n  callback,\n  get status() {\n    return 'ready';\n  }\n};\nconst { value, diagnostics } = diagnosticSnapshot(source);\n\nvalue.safe !== source.safe; // true：普通对象已复制\nvalue.callback === callback; // true：不支持的函数保留原引用\nvalue.status; // 'ready'：accessor 被读取并投影为普通值\ndiagnostics;\n// [\n//   { path: ['callback'], reason: 'unsupported', cause: callback },\n//   { path: ['status'], reason: 'accessor', cause: 'ready' }\n// ]"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`identitySnapshot`｜3 秒上手 —— 显式表达\"不拷贝，保留引用\"的意图（单参数，无选项）："
+                  "text": "`reason` 取值为 `accessor`、`read-failed` 或 `unsupported`。只要 `diagnostics` 非空，就不能把返回值宣称为完全隔离快照；调用方应根据路径决定删除、替换还是接受相应引用。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`identitySnapshot`｜何时才有用 —— 单独调用它没有运行时收益；它只适合作为可配置 snapshot policy 的“零拷贝”分支，明确表示调用方接受共享引用："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const same = identitySnapshot(value); // === value"
+                  "code": "type ISnapshotPolicy<T> = (value: T) => T;\n\nfunction capture<T>(value: T, snapshot: ISnapshotPolicy<T>): T {\n  return snapshot(value);\n}\n\nconst liveConfig = { retry: 2 };\nconst retained = capture(liveConfig, identitySnapshot);\n\nliveConfig.retry = 3;\nretained.retry; // 3：两者是同一对象，后续修改彼此可见"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`get` / `set`｜10 秒上手 —— 不可变路径读写："
+                  "text": "这个策略适合可信进程内、身份敏感或不可克隆对象，并且调用方明确接受共享所有权的场景。若需要隔离外部输入、保留历史状态或跨边界传输，应使用 `immutableSnapshot`；不要为了“看起来调用过 snapshot”而单独套一层 `identitySnapshot(value)`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`get` / `set`｜10 秒上手 —— 以 immutable update 方式进行路径读写："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "get(data, 'user.name'); // 读；缺失/中途遇到原始值都返回 undefined，getter 抛错则原样抛出\nconst next = set(data, 'user.name', 'Grace'); // 写；结构共享，data 本身不变"
+                  "code": "const data = {\n  user: { name: 'Ada' },\n  settings: { theme: 'dark' }\n};\nget(data, 'user.name'); // 'Ada'：只读，不修改 data\n\nconst next = set(data, 'user.name', 'Grace');\nnext !== data; // true：值发生变化时，每次 set 都返回新根对象\nnext.user !== data.user; // true：路径上的对象被浅拷贝\nnext.settings === data.settings; // true：未修改分支继续共享引用\ndata.user.name; // 'Ada'：原对象保持不变\nObject.isFrozen(next); // false：immutable update 不等于 freeze"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这里的 “immutable” 描述的是更新方式，不是对象状态：`set()` 不会修改传入对象，而是返回可继续修改的新对象；它不会深拷贝整棵树，也不会调用 `Object.freeze()`。唯一例外是新旧值经 `Object.is()` 相等时没有实际变化，此时直接返回原根对象。"
                 },
                 {
                   "type": "paragraph",
@@ -28374,12 +28753,20 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`ownConfig`｜5 秒上手 —— 深拷贝并标记为\"本包管理\"："
+                  "text": "`ownConfig`｜15 秒理解能力 —— 在接收外部配置的边界创建独立、可验证所有权的配置根："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const config = ownConfig({ endpoint: '/v1', retries: 2 });"
+                  "code": "const callerOptions = {\n  endpoint: '/v1',\n  retry: { attempts: 2 },\n  tags: new Set(['stable'])\n};\nconst config = ownConfig(callerOptions);\n\ncallerOptions.retry.attempts = 99;\ncallerOptions.tags.add('caller-mutated');\nconfig.retry.attempts; // 2：接纳后不再受调用方修改影响\nconfig.tags.has('caller-mutated'); // false：Set 也已复制\n\nconst publicView = readonlyConfig(config); // 可公开读取，任何层级的写入都会明确报错\nconst next = patchConfig(config, { retry: { attempts: 3 } }); // 从已拥有配置派生新根\nreadConfigPath(next, 'retry.attempts'); // { kind: 'value', value: 3 }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`ownConfig()` 不只是普通 deep clone。它会验证整张配置图并复制循环引用、共享节点、`Date`、`RegExp`、`Map`、`Set`，再用不可伪造的内部 `WeakMap` 元数据登记 profile 与 limits。后续 `readonlyConfig()`、`patchConfig()`、`readConfigPath()` 和 `combineConfig()` 只接收这种已登记的配置根，因此不会把未经校验的普通对象误当成受管理配置。返回对象没有被冻结；需要向外暴露只读能力时使用 `readonlyConfig()`，需要更新时使用 `patchConfig()` 派生下一份配置。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "默认 `data` profile 面向可移植配置，遇到函数、危险键、Symbol key、非普通根对象或超限图会明确报错。只有配置确实需要携带回调或构造器时才选择 `richRuntime`；它是进程内运行时配置，不应当作可序列化数据。"
                 },
                 {
                   "type": "paragraph",
@@ -28394,12 +28781,16 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`readonlyConfig`｜5 秒上手 —— 拒绝写入的门面（单参数，无选项；入参必须是 `ownConfig` 产物）："
+                  "text": "`readonlyConfig`｜5 秒上手 —— 给已有配置套上只读保护（单参数，无选项；入参必须是 `ownConfig` 产物）："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const view = readonlyConfig(config);\nview.retries = 5; // 抛 TypeError（CONFIG_READONLY）"
+                  "code": "const view = readonlyConfig(config);\nview.endpoint; // 正常读取；没有复制第二份配置\nview.retries = 5; // 抛 TypeError（CONFIG_READONLY）"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "大白话：`view` 仍然读取 `config` 里的数据，但不允许调用方从 `view` 修改任何层级。普通对象赋值/删除、数组修改以及 `Map.set()`、`Set.add()`、`Date.setFullYear()` 都会报错。重复对同一份 `config` 调用会返回同一个只读对象；要修改配置，应对原来的 owned config 调用 `patchConfig()` 生成下一份，而不是写 `view`。"
                 },
                 {
                   "type": "paragraph",
@@ -28455,7 +28846,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const merged = combineConfig([defaults, override], { strategies: { array: 'concat' } });"
+                  "code": "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true },\n});\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 },\n});\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' },\n});\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged;\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs },\n};"
                 },
                 {
                   "type": "paragraph",
@@ -28501,12 +28892,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`once`｜5 秒上手 —— 同步函数只执行一次，结果（含异常）被缓存："
+                  "text": "`once`｜10 秒理解边界 —— 让同一个包装函数实例只执行一次，结果（含异常）被缓存："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const initOnce = once(() => expensiveInit());\ninitOnce(); // 真正执行\ninitOnce(); // 直接返回上次结果"
+                  "code": "// runtime.ts：整个模块只创建并导出这一份包装函数。\nexport const getRuntime = once(() => {\n  const registry = buildCommandRegistry();\n  return { registry, startedAt: Date.now() };\n});\n\nconst first = getRuntime(); // 创建 registry\nconst second = getRuntime(); // 直接返回 first\nfirst === second; // true"
                 },
                 {
                   "type": "paragraph",
@@ -28514,16 +28905,36 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`onceAsync`｜5 秒上手 —— 并发调用共享同一个 Promise，只发起一次："
+                  "text": "适合：模块内昂贵且确定的同步初始化，例如构建只读 registry、编译 schema 或探测一次运行时能力。第一次调用抛出的异常也会永久缓存，因此不适合需要重试、重置、热更新或按请求隔离的初始化。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "它不是全局单例管理器。每调用一次 `once(fn)` 都会创建一份独立缓存；同一包被重复打包，或代码运行在 iframe、Worker、Node `vm` 等不同 realm 时，也会各自初始化。把唯一的包装函数放在模块顶层并导出，只能得到“每个模块实例一份”。若确实需要同一 realm / 进程共享，应由应用入口或依赖注入容器拥有实例；必须挂到全局时，可用 `globalThis[Symbol.for('your-app/runtime')]`，并自行处理版本冲突、测试清理和生命周期。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`Proxy` 可以把首次属性访问转成惰性初始化，或限制对象如何被访问，但它不会自动保证全局唯一；唯一性仍取决于 Proxy 背后那份实例存在哪里、是否只有一个 owner。不要为了“更像单例”而给 `once` 的结果额外套 Proxy。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`onceAsync`｜10 秒理解场景 —— 同一个包装函数实例只启动一次异步任务，所有调用者共享同一个 Promise："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const loadOnce = onceAsync(() => fetch('/config').then((r) => r.json()));\nconst [a, b] = await Promise.all([loadOnce(), loadOnce()]); // 只请求一次"
+                  "code": "// app-config.ts：多个组件启动时都可能读取配置，但网络请求只能发起一次。\nexport const loadAppConfig = onceAsync(async () => {\n  const response = await fetch('/config');\n  if (!response.ok) throw new Error(`config request failed: ${response.status}`);\n  return response.json() as Promise<{ apiBaseUrl: string }>;\n});\n\nconst [routerConfig, telemetryConfig] = await Promise.all([\n  loadAppConfig(),\n  loadAppConfig()\n]); // 两处拿到同一次请求的结果"
                 },
                 {
                   "type": "paragraph",
-                  "text": "单参数 `functionValue: () => Promise<T>`（必填），无其他选项；返回值必须是原生 `Promise`，否则以 `INVALID_ARGUMENT` reject。"
+                  "text": "适合进程或页面生命周期内只应成功或失败一次的异步初始化，例如加载不会刷新的启动配置、初始化一个共享 SDK 客户端、动态导入并编译同一份 WASM 模块。并发调用不会制造竞态：任务尚未完成时共享 pending Promise，完成后继续复用相同的 fulfilled 或 rejected Promise。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "不适合带 key 的请求去重、定时刷新、失败重试、登出后重建、按租户或请求隔离等场景；这些需求需要带失效策略的缓存或由生命周期容器管理。首次失败会一直缓存，`onceAsync` 不会自动重试。所有调用者还共享同一底层任务，因此不要让某个调用者用自己的 `AbortSignal` 随意取消它，否则其他等待者也会受影响。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "作用域与 `once` 相同：每次调用 `onceAsync(fn)` 都会创建独立缓存，模块重复实例化或跨 iframe、Worker、Node `vm` 时不会共享。单参数 `functionValue: () => Promise<T>`（必填），无其他选项；返回值可以是原生 `Promise` 或合法 PromiseLike，否则以 `INVALID_ARGUMENT` reject。"
                 }
               ]
             },
@@ -28554,6 +28965,10 @@
               "id": "高阶组合示例-1-截止时间-重试-只读配置",
               "heading": "高阶组合示例 · 1. 截止时间 + 重试 + 只读配置",
               "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "以下示例用于本仓测试组合验证，不是外部生产代码的推荐写法；外部测试应优先复用测试框架的 fake timers。"
+                },
                 {
                   "type": "code",
                   "language": "ts",
@@ -28682,12 +29097,20 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "基于原生 `setTimeout`/`clearTimeout` 的默认调度器，`schedule()` 返回的句柄在宿主支持时会转发 `unref()`（避免测试/进程因悬挂定时器无法退出）。"
+                  "text": "基于原生 `setTimeout`/`clearTimeout` 的默认调度器，`now()` 当前直接调用 `Date.now()`，因此两者返回的时间戳与精度相同。`systemScheduler.now()` 的价值不是提供另一种计时算法，而是让读取时间的 `now()` 和安排任务的 `schedule()` 共享同一个可注入边界；测试可将两者一起替换为虚拟时钟。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "普通业务只需要读取真实墙上时间时，直接使用 `Date.now()`。实现接受 `IUtilsScheduler` 的超时、重试或调度逻辑时，必须配对使用 `scheduler.now()` 和 `scheduler.schedule()`；直接调用 `Date.now()` 会绕过注入的调度器，造成真实时间与虚拟定时器混用。`schedule()` 返回的句柄在宿主支持时会转发 `unref()`（避免测试/进程因悬挂定时器无法退出）。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "function createManualScheduler(): IManualScheduler;"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本仓测试专用：用于本仓单元测试与适配器验证，不建议外部业务代码使用。外部项目应优先选择测试框架自带的 fake timers，生产代码使用 `systemScheduler` 或默认调度器。"
                 },
                 {
                   "type": "paragraph",
@@ -28714,6 +29137,19 @@
                   "text": "创建一个可从外部结算的原生 Promise。适合把回调式 API 转成 Promise，或在测试中手动控制某个异步操作何时完成/失败。"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "新代码应先选择平台原生的 `Promise.withResolvers()`。`deferred()` 主要服务于尚未支持该 API 的旧运行时，或必须统一依赖 `IDeferred<T>` 的项目边界："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const { promise, resolve, reject } = Promise.withResolvers<number>();\nresolve(42);"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "兼容旧运行时："
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "const { promise, resolve } = deferred<number>();\nsetTimeout(() => resolve(42), 0);\nawait promise; // 42"
@@ -28737,6 +29173,22 @@
                   "type": "code",
                   "language": "ts",
                   "code": "const found = await toPromise(() => cache.get('key'));\nconst pending = toPromise(() => {\n  throw new Error('read failed');\n});\nawait pending; // 异步观察 rejection"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "与 `Promise.resolve().then(() => run())` 对比："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`toPromise(run)` 立即调用 `run`；返回前已经发生读取、写入或其他同步副作用。`run` 返回原生 Promise 时，返回值保持同一个 Promise identity。",
+                    "`Promise.resolve().then(run)` 把调用推迟到下一次 microtask，并返回新的链式 Promise。它适合主动让出当前调用栈、避免同步重入，不适合依赖“调用后立即生效”的逻辑。",
+                    "两者都会把异常变成 rejection，但产生 rejection 的时点不同：前者在当前调用过程中捕获同步异常，后者等 microtask 真正执行 `run` 时才捕获。"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "因此，需要同步启动工作并统一返回 Promise 时使用 `toPromise`；需要延迟启动工作时使用 `Promise.resolve().then(run)`。"
                 }
               ]
             },
@@ -29003,11 +29455,40 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const UtilsErrorCode = {\n  invalidArgument: 'INVALID_ARGUMENT',\n  nonErrorValue: 'NON_ERROR_VALUE',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  aborted: 'ABORTED',\n  deadlineExceeded: 'DEADLINE_EXCEEDED',\n  schedulerRunaway: 'SCHEDULER_RUNAWAY',\n  errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT',\n  cloneUnsupported: 'CLONE_UNSUPPORTED',\n  invalidEncoding: 'INVALID_ENCODING',\n  limiterClosed: 'LIMITER_CLOSED',\n  reentrantCall: 'REENTRANT_CALL',\n  configUnsupported: 'CONFIG_UNSUPPORTED',\n  configReadonly: 'CONFIG_READONLY',\n  configConflict: 'CONFIG_CONFLICT',\n  configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED',\n  configPathInvalid: 'CONFIG_PATH_INVALID',\n  objectPathInvalid: 'OBJECT_PATH_INVALID'\n} as const;"
+                  "code": "const UtilsErrorCode = {\n  invalidArgument: 'INVALID_ARGUMENT',\n  nonErrorValue: 'NON_ERROR_VALUE',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  aborted: 'ABORTED',\n  deadlineExceeded: 'DEADLINE_EXCEEDED',\n  schedulerRunaway: 'SCHEDULER_RUNAWAY',\n  errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT',\n  cloneUnsupported: 'CLONE_UNSUPPORTED',\n  invalidEncoding: 'INVALID_ENCODING',\n  limiterClosed: 'LIMITER_CLOSED',\n  reentrantCall: 'REENTRANT_CALL',\n  configUnsupported: 'CONFIG_UNSUPPORTED',\n  configReadonly: 'CONFIG_READONLY',\n  configConflict: 'CONFIG_CONFLICT',\n  configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED',\n  configPathInvalid: 'CONFIG_PATH_INVALID',\n  objectPathInvalid: 'OBJECT_PATH_INVALID',\n  formatInvalid: 'FORMAT_INVALID',\n  formatValueMissing: 'FORMAT_VALUE_MISSING',\n  numberFormatInvalid: 'NUMBER_FORMAT_INVALID'\n} as const;"
                 },
                 {
                   "type": "paragraph",
                   "text": "全包统一使用的稳定语义码，`IUtilsErrorCode` 是其取值的联合类型。除 `UtilsError` 子类外，`base64ToBytes`/`object-path`/`config` 等模块抛出的原生 `TypeError`/`RangeError` 也会通过 `Object.defineProperty` 挂上对应的 `code`（与 `source: '@migaia/utils'`），可用同一套判断逻辑识别。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "按用途理解全部错误码："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`INVALID_ARGUMENT`：参数类型、范围或互斥组合错误；修正调用参数。",
+                    "`NON_ERROR_VALUE`：非 `Error` 异常值已被 `toError()` 转换；从 `cause` 读取原始值。",
+                    "`ENV_UNSUPPORTED`：宿主缺少 `structuredClone` 等必要能力；更换环境或实现。",
+                    "`ABORTED`：外部信号请求取消；停止协作式工作并传播取消原因。",
+                    "`DEADLINE_EXCEEDED`：操作、尝试或总流程超时；结合 `scope`、`timeoutMs` 选择重试或降级。",
+                    "`SCHEDULER_RUNAWAY`：虚拟时钟一次推进超过 10000 个任务；排查同刻递归调度。",
+                    "`ERROR_IDENTITY_CONFLICT`：已有错误身份与新 `source`/`code` 冲突；保留原身份。",
+                    "`CLONE_UNSUPPORTED`：值不能被 `structuredClone` 复制；先转换为可克隆数据。",
+                    "`INVALID_ENCODING`：编码输入不是规范形式；按错误偏移修正输入。",
+                    "`LIMITER_CLOSED`：并发限制器已关闭；停止提交或创建新实例。",
+                    "`REENTRANT_CALL`：同一实例发生禁止的重入；等待当前回调结束。",
+                    "`CONFIG_UNSUPPORTED`：配置含不支持的数据形状或属性；改用普通数据。",
+                    "`CONFIG_READONLY`：尝试修改只读配置；从所有者侧创建新配置。",
+                    "`CONFIG_CONFLICT`：配置来源的所有权、profile 或描述符冲突；统一契约再合并。",
+                    "`CONFIG_LIMIT_EXCEEDED`：配置键数、深度等超过安全上限；缩小输入或调整明确限制。",
+                    "`CONFIG_PATH_INVALID`：配置路径为空、危险或分段无效；改用安全路径。",
+                    "`OBJECT_PATH_INVALID`：对象路径无法安全解析；修正字符串或分段元组。",
+                    "`FORMAT_INVALID`：模板、占位符或值不能安全格式化；修正模板或输入。",
+                    "`FORMAT_VALUE_MISSING`：严格格式化缺少占位符值；补齐字段或调整策略。",
+                    "`NUMBER_FORMAT_INVALID`：`Intl.NumberFormat` 拒绝 locale、选项、货币或数值；修正格式配置。"
+                  ]
                 }
               ]
             },
@@ -29018,6 +29499,21 @@
                 {
                   "type": "paragraph",
                   "text": "不依赖 Node `Buffer` 或 DOM 的字节/文本编解码，纯 ECMAScript 实现。"
+                }
+              ]
+            },
+            {
+              "id": "arraybuffer-与-uint8array-的关系",
+              "heading": "ArrayBuffer 与 Uint8Array 的关系",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "`ArrayBuffer` 是固定长度的原始连续内存，只负责保存字节；不能直接用下标读写。它常见于 `fetch(...).arrayBuffer()`、文件、Web Crypto、WebAssembly 和 Worker 传输边界。",
+                    "`Uint8Array` 是该内存上的 8 位无符号整数视图，每个元素对应一个 0～255 的字节。Base64、UTF-8、网络协议与二进制序列化需要逐字节操作，因此本模块以它作为主要输入输出。",
+                    "`new Uint8Array(buffer, byteOffset, length)` 创建共享底层内存的窗口，不复制数据；视图写入会反映到原 buffer。`subarray()` 继续共享内存，`slice()` 才创建独立副本。",
+                    "普通 `ArrayBuffer` 跨 Worker 转移后可能 detached；`SharedArrayBuffer` 是并发共享内存，具有不同的所有权和同步要求，所以 `isArrayBuffer()` 明确拒绝它。"
+                  ]
                 },
                 {
                   "type": "code",
@@ -29123,11 +29619,29 @@
                 {
                   "type": "code",
                   "language": "ts",
+                  "code": "const profileUnavailable = new Error('profile unavailable');\nlet profileReads = 0;\nconst user = {\n  name: 'Ada',\n  get profile(): never {\n    profileReads += 1;\n    throw profileUnavailable;\n  }\n};\n\nfunction readLabel(value: object, key: PropertyKey): string {\n  const result = probeProperty<string>(value, key);\n  switch (result.kind) {\n    case 'value':\n      return result.value;\n    case 'missing':\n      return 'Anonymous';\n    case 'failed':\n      console.error('property read failed', result.error);\n      return 'Unavailable';\n  }\n}\n\nreadLabel(user, 'name'); // 'Ada'\nreadLabel(user, 'email'); // 'Anonymous'\nreadLabel(user, 'profile'); // 'Unavailable'\nprofileReads; // 1：getter 只被读取一次"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "第一个参数可以是普通对象、class 实例或其他可读取属性的对象；第二参数接受字符串、数字或 Symbol key。它把缺失字段与读取失败拆成不同分支，避免 `try/catch` 后错误地使用默认值；返回 `failed` 时不会重建错误，`error` 就是 getter 原样抛出的实例。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
                   "code": "function immutableSnapshot<T>(value: T): T;"
                 },
                 {
                   "type": "paragraph",
-                  "text": "基于宿主原生 `structuredClone` 做深拷贝。宿主不提供 `structuredClone` 时抛出 `code: 'ENV_UNSUPPORTED'` 的 `TypeError`；值本身不可结构化克隆（例如包含函数）时抛出 `code: 'CLONE_UNSUPPORTED'` 的 `TypeError`。"
+                  "text": "实现直接调用宿主原生 `globalThis.structuredClone(value)`，不是 JSON 序列化或手写递归：它一次复制完整对象图，保留循环引用、共享引用关系以及 `Date`、`Map`、`Set`、`ArrayBuffer`、TypedArray 等结构化克隆支持的数据类型。本 API 不接受 transfer list，因此 `ArrayBuffer` 会复制而不会转移所有权。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "结构化克隆不会保留自定义 class 的原型方法、getter/setter 与属性描述符；函数、WeakMap 等不支持的成员会让整个克隆失败。“immutable”表示快照不再共享源对象引用，不表示返回值经过 `Object.freeze()`；需要运行时冻结或递归只读时由调用方另行处理。宿主不提供 `structuredClone` 时抛出 `code: 'ENV_UNSUPPORTED'` 的 `TypeError`；值本身不可结构化克隆时抛出 `code: 'CLONE_UNSUPPORTED'` 的 `TypeError`。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const shared = { count: 1 };\nconst source = {\n  primary: shared,\n  alias: shared,\n  createdAt: new Date('2026-01-01T00:00:00Z')\n};\nconst copy = immutableSnapshot(source);\n\nsource.primary.count = 2;\ncopy.primary.count; // 1\ncopy.primary === copy.alias; // true\ncopy.createdAt instanceof Date; // true\nObject.isFrozen(copy); // false"
                 },
                 {
                   "type": "code",
@@ -29136,11 +29650,15 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "比 `immutableSnapshot` 更宽容的尽力而为深拷贝：只递归普通对象与数组；遇到函数、class 实例等不支持的类型时保留原值原样放入快照（不报错），同时在 `diagnostics` 里记一条 `reason: 'unsupported'`；访问器属性会记 `reason: 'accessor'` 并克隆其读取到的值；读取失败记 `reason: 'read-failed'` 并回退保留原始属性描述符。用循环引用检测（`WeakMap`）保证成环的输入也能安全返回。适合\"尽量拷贝，同时如实报告哪些部分没能安全拷贝\"的诊断场景。"
+                  "text": "与原生 `structuredClone` / `immutableSnapshot` 的关键区别是失败粒度：前两者是整图“全有或全无”，任何不支持成员都会让调用抛错；`diagnosticSnapshot` 始终尝试返回 `{ value, diagnostics }`。它递归复制普通对象与数组，可克隆的内建子树独立调用 `structuredClone`；函数、class 实例等不支持类型则保留原引用并记录 `unsupported`。访问器会被读取一次、投影为普通值并记录 `accessor`；读取或反射失败记录 `read-failed`。循环引用通过 `WeakMap` 保持安全。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`structuredDiagnosticSnapshot` 优先尝试原生 `structuredClone`，成功时 diagnostics 为空；宿主不支持或克隆失败时自动退回上述尽力快照，并在根路径追加 `unsupported` 或携带原始 cause 的 `read-failed` 诊断。需要“能克隆就完整克隆、否则仍返回可观测降级结果”的遥测边界优先使用它。"
+                  "text": "因此，`diagnosticSnapshot` 的返回值可能只有部分隔离：`diagnostics` 非空时，调用方必须检查对应 `path`，不能把结果当作完整深拷贝。它适合日志、遥测、调试面板等“数据不能整份丢失，但降级必须可见”的场景；安全边界或配置隔离仍应优先用 `immutableSnapshot` 并让失败显式中止。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`structuredDiagnosticSnapshot` 是两种策略的组合：优先尝试原生 `structuredClone`，成功时 diagnostics 为空；宿主不支持或克隆失败时自动退回上述尽力快照，并在根路径追加 `unsupported` 或携带原始 cause 的 `read-failed` 诊断。需要“能完整克隆就完整克隆，否则仍返回可观测降级结果”的遥测边界优先使用它。"
                 },
                 {
                   "type": "code",
@@ -29149,7 +29667,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "原样返回入参——用于在需要\"显式选择不做拷贝、保留引用同一性\"的调用点表达意图（比对 `immutableSnapshot`/`diagnosticSnapshot` 使代码可读，而不是漏写了拷贝调用）。"
+                  "text": "原样返回入参。单独调用没有运行时收益；它用于 `snapshot` / `clone` 这类可配置策略槽的零拷贝分支，明确表示调用方接受共享引用、后续修改双方可见。本仓的 clone policy 正是用它实现 `opaque` 分支，服务于身份敏感或不可克隆、且允许共享所有权的可信进程内数据。需要外部输入隔离、历史快照或跨边界传输时不要使用它，应选择 `immutableSnapshot`。"
                 }
               ]
             },
@@ -29219,12 +29737,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "不可变路径写入：返回一个新的根对象，只有路径上真正发生变化的节点被浅拷贝（结构共享，未涉及的兄弟节点保持同一引用）。路径中间缺失的容器会按下一段键的类型自动创建（数字键 → `[]`，其他 → `{}`）。若路径中途遇到非空的原始值（字符串、数字等，无法继续深入）会抛出 `code: 'OBJECT_PATH_INVALID'` 的 `TypeError`。若新值与旧值经 `Object.is` 相等，则直接复用原对象，不做任何拷贝。"
+                  "text": "不可变路径写入：每次值真正变化的 `set()` 都返回一个新根对象，传入对象保持不变。只有路径上的节点被浅拷贝（结构共享，未涉及的兄弟节点保持同一引用）。这里的 immutable 描述更新方式，不表示返回对象经过深拷贝或 `Object.freeze()`；返回值本身仍可修改。路径中间缺失的容器会按下一段键的类型自动创建（数字键 → `[]`，其他 → `{}`）。若路径中途遇到非空的原始值（字符串、数字等，无法继续深入）会抛出 `code: 'OBJECT_PATH_INVALID'` 的 `TypeError`。若新值与旧值经 `Object.is` 相等，则没有发生更新，直接复用原对象，不做任何拷贝。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const before = { user: { name: 'Ada', tags: ['a'] } };\nconst after = set(before, 'user.name', 'Grace');\nafter.user.name; // 'Grace'\nafter.user.tags === before.user.tags; // true（未涉及的分支保持引用不变）\nbefore.user.name; // 'Ada'（原对象未被修改）"
+                  "code": "const before = { user: { name: 'Ada', tags: ['a'] } };\nconst after = set(before, 'user.name', 'Grace');\nafter.user.name; // 'Grace'\nafter !== before; // true（发生更新时返回新根对象）\nafter.user !== before.user; // true（更新路径上的节点被复制）\nafter.user.tags === before.user.tags; // true（未涉及的分支保持引用不变）\nbefore.user.name; // 'Ada'（原对象未被修改）\nObject.isFrozen(after); // false（immutable update 不等于冻结）"
                 },
                 {
                   "type": "code",
@@ -29378,6 +29896,10 @@
                   "text": "若 `value` 已经是某次 `ownConfig` 的返回值（元数据匹配同一 `profile`/`limits`），直接原样返回（幂等）；若元数据不匹配（例如同一对象先后用不同 `profile` 调用），抛出 `code: 'CONFIG_CONFLICT'` 的 `TypeError`。"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "调用方拿到结果后有三种明确路径：内部继续把它作为稳定配置根；通过 `readonlyConfig()` 暴露可读但不可写的递归 Proxy；通过 `patchConfig()` 或 `combineConfig()` 派生下一份已拥有配置。不要直接把原始外部对象交给这些 API，也不要把“已拥有”误解为冻结——所有权保证来自独立图与内部登记，运行时写保护由 `readonlyConfig()` 单独提供。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "type IConfigLimits = {\n  readonly maxDepth: number; // 默认 256\n  readonly maxNodes: number; // 默认 100_000\n  readonly maxKeys: number; // 默认 1_000_000\n  readonly maxPathLength: number; // 默认 4096\n  readonly maxSegmentLength: number; // 默认 512\n};"
@@ -29393,7 +29915,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "返回一个带缓存的只读 `Proxy` 门面（同一输入对象重复调用返回同一个 Proxy）。任何写操作（`set`/`defineProperty`/`deleteProperty`/`setPrototypeOf`/`preventExtensions`，以及 `Map`/`Set`/`Date` 上的变更方法如 `.set()`/`.add()`/`.setFullYear()`）都会抛出 `code: 'CONFIG_READONLY'` 的 `TypeError`。嵌套的对象/`Map`/`Set`/函数字段访问时会被递归包装成同样的只读 Proxy。`value` 必须是 `ownConfig` 的产物，否则抛 `code: 'CONFIG_UNSUPPORTED'`。"
+                  "text": "返回一个带缓存的只读对象，内部通过 `Proxy` 拦截修改；同一输入对象重复调用会返回同一个只读对象。读取时仍然访问原配置，没有再复制一份数据。任何写操作（`set`/`defineProperty`/`deleteProperty`/`setPrototypeOf`/`preventExtensions`，以及 `Map`/`Set`/`Date` 上的变更方法如 `.set()`/`.add()`/`.setFullYear()`）都会抛出 `code: 'CONFIG_READONLY'` 的 `TypeError`。嵌套对象、`Map`、`Set` 和函数字段也会受到同样的写入保护。`value` 必须是 `ownConfig` 的产物，否则抛 `code: 'CONFIG_UNSUPPORTED'`。"
                 },
                 {
                   "type": "code",
@@ -29456,7 +29978,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const defaults = ownConfig({ retries: 1, tags: ['default'] });\nconst override = ownConfig({ retries: 3, tags: ['custom'] });\nconst merged = combineConfig([defaults, override], { strategies: { array: 'concat' } });\nmerged.retries; // 3（右侧覆盖左侧）\nmerged.tags; // ['default', 'custom']（数组按 concat 合并）"
+                  "code": "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true },\n});\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 },\n});\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' },\n});\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged;\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs },\n};"
                 }
               ]
             },
@@ -29485,7 +30007,19 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const initOnce = once(() => {\n  console.log('init');\n  return 1;\n});\ninitOnce(); // 打印 'init'，返回 1\ninitOnce(); // 不再打印，直接返回 1"
+                  "code": "// runtime.ts：整个模块只创建并导出这一份包装函数。\nexport const getRuntime = once(() => {\n  const registry = buildCommandRegistry();\n  return { registry, startedAt: Date.now() };\n});\n\nconst first = getRuntime(); // 创建 registry\nconst second = getRuntime(); // 直接返回 first\nfirst === second; // true"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "适合模块内昂贵且确定的同步初始化，例如构建只读 registry、编译 schema 或探测一次运行时能力。首次异常也会永久缓存，所以需要 retry、reset、热更新或按请求隔离时不要使用。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "边界必须明确：每次调用 `once(fn)` 都产生新的包装函数和独立缓存。模块顶层只创建、只导出一个包装函数，可以实现“每个模块实例一份”；但重复 bundle、iframe、Worker 与 Node `vm` 会拥有不同模块实例，因此它不是跨 realm 的全局单例工具。真正需要同一 realm / 进程共享时，让应用入口或依赖注入容器持有实例；必须使用全局表时，可选 `globalThis[Symbol.for('your-app/runtime')]`，同时处理版本冲突、生命周期与测试清理。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`Proxy` 适合把首次属性访问变成惰性初始化，或限制访问方式；它本身不提供唯一性。是否是单例仍由 Proxy 后面的实例存储位置和 owner 数量决定，因此无需为了“真实单例”给 `once` 结果额外套 Proxy。"
                 },
                 {
                   "type": "code",
@@ -29494,12 +30028,24 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "记忆化一次异步调用：首次调用时执行 `functionValue()` 并保留其返回的同一个原生 Promise 引用；后续调用直接返回这同一个 Promise（无论它当时是 pending / fulfilled / rejected）。若 `functionValue()` 返回值不是原生 `Promise` 实例，内部会以 `code: 'INVALID_ARGUMENT'` 的 `TypeError` reject。"
+                  "text": "记忆化一次异步调用：首次调用时启动 `functionValue()`，包装函数会保留并返回同一个 Promise；后续调用无论发生在 pending、fulfilled 还是 rejected 阶段，都直接拿到这个 Promise。`functionValue()` 可以返回原生 `Promise` 或合法 PromiseLike；其他值会让共享 Promise 以 `code: 'INVALID_ARGUMENT'` 的 `TypeError` reject。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const loadOnce = onceAsync(() => fetch('/config').then((r) => r.json()));\nconst [a, b] = await Promise.all([loadOnce(), loadOnce()]); // 只发起一次网络请求"
+                  "code": "// app-config.ts：路由和埋点会同时读取启动配置，但网络请求只能发起一次。\nexport const loadAppConfig = onceAsync(async () => {\n  const response = await fetch('/config');\n  if (!response.ok) throw new Error(`config request failed: ${response.status}`);\n  return response.json() as Promise<{ apiBaseUrl: string }>;\n});\n\nconst [routerConfig, telemetryConfig] = await Promise.all([\n  loadAppConfig(),\n  loadAppConfig()\n]); // 两处共享同一次请求"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "适合页面或进程生命周期内只应执行一次的异步初始化，例如加载不会刷新的启动配置、初始化共享 SDK 客户端、动态导入并编译同一份 WASM 模块。它同时解决“并发时别重复启动”和“完成后继续复用结果”两个问题。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "不适合按 key 去重、定时刷新、失败重试、登出后重建、按租户或请求隔离。首次 rejection 会一直缓存，API 没有 reset；若底层任务使用某个调用者的 `AbortSignal`，该调用者取消任务也会影响所有共享 Promise 的等待者。此类需求应交给带失效策略的缓存或生命周期容器。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "每次调用 `onceAsync(fn)` 都会创建独立缓存；模块被重复实例化，或代码分布在 iframe、Worker、Node `vm` 时不会共享，因此它也不是跨 realm 的全局任务协调器。"
                 }
               ]
             },
@@ -29559,13 +30105,17 @@
               "heading": "组合工作流示例：截止时间 + 配置",
               "blocks": [
                 {
+                  "type": "paragraph",
+                  "text": "该组合用于本仓测试验证，不是外部生产代码示例。外部测试应优先使用测试框架的 fake timers。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "import { createManualScheduler, retry, withTimeout } from '@migaia/utils/promise';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst initial = ownConfig({ endpoint: '/v1', retries: 2, debug: true });\nconst next = patchConfig(initial, { debug: CONFIG_DELETE });\nconst publicConfig = readonlyConfig(next);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return publicConfig.endpoint;\n      },\n      { maxAttempts: publicConfig.retries, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\n\nscheduler.advance(100);\nawait request.catch(() => undefined);"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createManualScheduler()` 让时间变为确定性，便于在单测中精确断言超时/重试行为。超时中止是协作式的：`retry`/业务代码必须读取传入的 `signal` 才能提前退出。`ownConfig` 拷贝并标记入参；`readonlyConfig` 是带缓存、拒绝写入的门面；`patchConfig` 返回一个新的所有权根，`CONFIG_DELETE` 只在根一层的补丁里生效。"
+                  "text": "`createManualScheduler()` 让时间变为确定性，便于在单测中精确断言超时/重试行为。超时中止是协作式的：`retry`/业务代码必须读取传入的 `signal` 才能提前退出。`ownConfig` 拷贝并登记入参；`readonlyConfig` 返回带缓存、只能读取不能修改的对象；`patchConfig` 返回一份新的受管理配置，`CONFIG_DELETE` 只在根一层的补丁里生效。"
                 }
               ]
             },
@@ -29596,7 +30146,7 @@
                   "items": [
                     "超时没能真正打断 I/O：符合预期——协作式取消要求操作函数自己读取并响应传入的 `signal`；把 `signal` 透传给底层 I/O（例如 `fetch(url, { signal })`）并让其遵守中止。",
                     "`base64ToBytes` 拒绝了输入：把产出方规范化为标准补齐的 RFC 4648 文本；URL-safe（`-`/`_`）或无补齐的变体不被接受，需要先转换成标准形式。",
-                    "写只读配置抛错：这是刻意的行为——`readonlyConfig` 就是用来防止意外修改的；需要变更时对拥有所有权的原始值调用 `patchConfig`，而不是修改只读门面。",
+                    "写只读配置抛错：这是刻意的行为——`readonlyConfig` 就是用来防止意外修改的；需要变更时对原来的 owned config 调用 `patchConfig`，而不是修改只读对象。",
                     "`once` 报重入错误：说明首次调用尚未返回时，函数体内部又调用了同一个被包装的函数；把递归逻辑挪到包装函数之外，或改用普通函数自身递归。",
                     "需要\"当前值订阅/重放\"或资源释放生命周期：`@migaia/utils` 不提供响应式状态或资源所有权模型，应使用专门的响应式/生命周期管理包，而不是在这里找替代品。",
                     "`ownConfig`/`patchConfig` 抛 `CONFIG_LIMIT_EXCEEDED`：说明配置图的深度/节点数/键数超过了限制；确认是否存在非预期的深层嵌套或循环膨胀，必要时通过 `limits` 选项显式收紧或（在确认安全的前提下）放宽默认值。"

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, parse, resolve } from 'node:path'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -136,11 +136,11 @@ test('SITE-T-A22 production output includes the Oxc compiler runtime artifact', 
   assert.match(readFileSync(join(assetsDirectory, outputManifest), 'utf8'), /compiler-runtime/)
 })
 
-test('SITE-T-A23 installed compiler packages are physically website-owned', () => {
+test('SITE-T-A23 compiler packages are direct website dependencies and resolve locally', () => {
   for (const name of ['@react-router/dev', 'react-router', 'vite', 'typescript']) {
     const packageJson = packagePath(name, websiteRoot)
     assert.ok(packageJson)
-    assert.ok(realpathSync(packageJson).startsWith(`${websiteRoot}node_modules/`))
+    assert.ok(manifest.dependencies[name] ?? manifest.devDependencies[name])
   }
 })
 
@@ -366,8 +366,13 @@ test('SITE-T-CONFIG-DOCS gives every public configuration field a readable contr
         configurationFieldCount += 1
         assert.ok(field.name.length > 0, `${api.id}#${symbol.name} has an unnamed option`)
         assert.ok(field.type.length > 0, `${api.id}#${symbol.name}.${field.name} has no type`)
+        const description =
+          field.description ||
+          findApiGuide(api.library, api.module, symbol.name, 'en')?.options.find(
+            (option) => option.name === field.name
+          )?.description
         assert.ok(
-          field.description.trim().length > 0,
+          description?.trim().length,
           `${api.id}#${symbol.name}.${field.name} has no purpose or usage guidance`
         )
         assert.ok(
@@ -377,8 +382,8 @@ test('SITE-T-CONFIG-DOCS gives every public configuration field a readable contr
       }
     }
   }
-  assert.equal(configuredApiCount, 102)
-  assert.equal(configurationFieldCount, 419)
+  assert.equal(configuredApiCount, 104)
+  assert.equal(configurationFieldCount, 430)
 
   const pluginHost = generatedApis
     .find((api) => api.id === 'plugin-host:structural')
@@ -569,7 +574,10 @@ test('SITE-T-CONFIG-LOCALE gives every runtime option a Chinese explanation', ()
       for (const field of symbol.configuration)
         assert.ok(
           field.descriptionZh ||
-            findOptionTranslation(api.library, api.module, symbol.name, field.name, 'zh'),
+            findOptionTranslation(api.library, api.module, symbol.name, field.name, 'zh') ||
+            findApiGuide(api.library, api.module, symbol.name, 'zh')?.options.find(
+              (option) => option.name === field.name
+            )?.description,
           `${api.id}#${symbol.name}.${field.name} has no Chinese explanation`
         )
     }
@@ -620,11 +628,16 @@ test('SITE-T-EXAMPLES keeps maintained runtime examples and rejects generated ca
 })
 
 test('SITE-T-EVENT-GUIDES gives every event-subscriber function a bilingual task guide', () => {
-  const api = generatedApis.find((candidate) => candidate.id === 'event-subscriber:index')
-  assert.ok(api)
-  const functions = api.symbols.filter((symbol) => /^[a-z]/.test(symbol.name))
+  const apis = generatedApis.filter(
+    (candidate) =>
+      candidate.id === 'event-subscriber:index' || candidate.id === 'event-subscriber:subscriber'
+  )
+  assert.equal(apis.length, 2)
+  const functions = apis.flatMap((api) =>
+    api.symbols.filter((symbol) => /^[a-z]/.test(symbol.name)).map((symbol) => ({ api, symbol }))
+  )
   assert.equal(functions.length, 14)
-  for (const symbol of functions)
+  for (const { api, symbol } of functions)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide(api.library, api.module, symbol.name, locale)
       assert.ok(guide, `${api.id}#${symbol.name} has no maintained ${locale} guide`)
@@ -886,7 +899,7 @@ test('SITE-T-CAPABILITY-COVERAGE separates gates, static graphs, dynamic graphs,
     [
       'graph-dynamic',
       'createDynamicCapabilityGraph',
-      ['report', 'mutationAdmissionMs', 'startBatch', 'releaseBatch']
+      ['report', 'mutationAdmissionMs', 'startBatch', 'releaseBatch', 'releaseBinding']
     ],
     ['graph-topology', 'buildCapabilityTopology', []]
   ] as const

@@ -7810,6 +7810,16 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
           whenToUse:
             'Set together with startBatch when one composition layer can await the fence before disposing old bindings.',
           example: 'createDynamicCapabilityGraph({ releaseBatch: async (entries, fence) => { await fence; await owner.release(entries) } })'
+        },
+        {
+          name: 'releaseBinding',
+          description:
+            'Releases custody for one exact binding generation only after that instance cleanup fence has settled. It is separate from node release so escaped generation leases remain valid.',
+          defaultValue: 'undefined (the graph owns binding custody)',
+          type: '(entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>',
+          whenToUse:
+            'Set it only when an external composition owner tracks physical binding custody by generation and can release the exact entry it receives.',
+          example: 'createDynamicCapabilityGraph({ releaseBinding: (entry) => owner.releaseBinding(entry) })'
         }
       ]
     },
@@ -7862,6 +7872,15 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
           type: '(entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>',
           whenToUse: '与 startBatch 一起设置，并保证旧 binding 在 fence 前不会 dispose。',
           example: 'createDynamicCapabilityGraph({ releaseBatch: async (entries, fence) => { await fence; await owner.release(entries) } })'
+        },
+        {
+          name: 'releaseBinding',
+          description:
+            '只在对应实例的清理栅栏结束后，释放某一个精确绑定代次的保管责任。它与节点释放分开，确保已经交给外部的旧代次租约仍然有效。',
+          defaultValue: 'undefined（由 Graph 保管 binding）',
+          type: '(entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>',
+          whenToUse: '仅当外部组合层按代次跟踪物理绑定，并能准确释放传入的 entry 时设置。',
+          example: 'createDynamicCapabilityGraph({ releaseBinding: (entry) => owner.releaseBinding(entry) })'
         }
       ]
     }
@@ -8208,6 +8227,496 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
           type: '(error: unknown) => void',
           whenToUse: '生产环境提供不抛异常的诊断 sink。',
           example: 'report: (error) => diagnostics.capture(error)'
+        }
+      ]
+    }
+  },
+  'tray:adapter:defineAdapter': {
+    en: {
+      purpose:
+        'Defines a one-shot conversion from a loaded artifact into a canonical PluginHost plugin descriptor. The adapter may inspect cancellation and deadline context, but it does not own the artifact, Host, Graph, or cleanup; loadIntoHost owns that transaction.',
+      quickStart: `import { defineAdapter } from '@migaia/tray/adapter'
+
+type IRemoteManifest = {
+  readonly name: string
+  readonly endpoint: string
+}
+
+const adapter = defineAdapter({
+  adapt: (manifest: IRemoteManifest, { signal, deadlineAt }) => {
+    if (signal.aborted) throw signal.reason
+    if (deadlineAt !== undefined && Date.now() >= deadlineAt)
+      throw new Error('adapter deadline exceeded')
+
+    return {
+      name: manifest.name,
+      install: () => ({ endpoint: manifest.endpoint })
+    }
+  }
+})
+
+const plugin = await adapter.adapt(
+  { name: 'search', endpoint: '/api/search' },
+  { signal: new AbortController().signal, deadlineAt: undefined }
+)
+console.log(plugin.name)`,
+      scenarios: [
+        'A Loader produces a transport or storage artifact that must become a PluginHost plugin descriptor.',
+        'Conversion needs cooperative cancellation or an absolute deadline without receiving Host mutation authority.',
+        'The same artifact format must map to one stable plugin name and installation contract.'
+      ],
+      avoidWhen: [
+        'The operation must load bytes, own temporary resources, or release an artifact; use a Loader for acquisition.',
+        'The operation must commit, replace, or roll back a Host definition; use loadIntoHost as transaction owner.',
+        'Conversion has hidden global registration or long-lived listeners; an adapter is deliberately one-shot and ownership-free.'
+      ],
+      options: [
+        {
+          name: 'adapter.adapt',
+          description:
+            'Runs exactly once per adaptation and returns a canonical plugin descriptor or PromiseLike. The input object is snapshotted by defineAdapter so later replacement of adapt has no effect.',
+          defaultValue: 'required',
+          optional: false,
+          type: '(artifact: TArtifact, context: IAdapterContext) => TPlugin | PromiseLike<TPlugin>',
+          whenToUse: 'Convert an already acquired artifact without mutating the Host.',
+          example: 'defineAdapter({ adapt: (artifact) => ({ name: artifact.name, install }) })'
+        }
+      ]
+    },
+    zh: {
+      purpose:
+        '定义一次性的 artifact 到 PluginHost 插件描述子转换。Adapter 可以读取取消信号和截止时间，但不拥有 artifact、Host、Graph 或清理工作；整个事务由 loadIntoHost 负责。',
+      quickStart: `import { defineAdapter } from '@migaia/tray/adapter'
+
+type IRemoteManifest = {
+  readonly name: string
+  readonly endpoint: string
+}
+
+const adapter = defineAdapter({
+  adapt: (manifest: IRemoteManifest, { signal, deadlineAt }) => {
+    if (signal.aborted) throw signal.reason
+    if (deadlineAt !== undefined && Date.now() >= deadlineAt)
+      throw new Error('adapter deadline exceeded')
+
+    return {
+      name: manifest.name,
+      install: () => ({ endpoint: manifest.endpoint })
+    }
+  }
+})
+
+const plugin = await adapter.adapt(
+  { name: 'search', endpoint: '/api/search' },
+  { signal: new AbortController().signal, deadlineAt: undefined }
+)
+console.log(plugin.name)`,
+      scenarios: [
+        'Loader 产出了传输或存储 artifact，需要把它转换成 PluginHost 接受的插件描述子。',
+        '转换需要协作式取消或绝对截止时间，但不应获得 Host mutation 权限。',
+        '同一种 artifact 格式必须稳定映射到插件名称与安装契约。'
+      ],
+      avoidWhen: [
+        '操作需要加载字节、拥有临时资源或释放 artifact；资源取得应交给 Loader。',
+        '操作需要提交、替换或回滚 Host definition；事务应交给 loadIntoHost。',
+        '转换过程会暗中注册全局状态或创建长期监听；Adapter 必须保持一次性且不拥有资源。'
+      ],
+      options: [
+        {
+          name: 'adapter.adapt',
+          description:
+            '每次转换只执行一次，返回规范插件描述子或 PromiseLike。defineAdapter 会快照输入对象，之后替换 adapt 函数不会改变已定义 Adapter。',
+          defaultValue: '必填',
+          optional: false,
+          type: '(artifact: TArtifact, context: IAdapterContext) => TPlugin | PromiseLike<TPlugin>',
+          whenToUse: '把已经取得的 artifact 转成插件描述子，不在这里修改 Host。',
+          example: 'defineAdapter({ adapt: (artifact) => ({ name: artifact.name, install }) })'
+        }
+      ]
+    }
+  },
+  'tray:loader:defineLoader': {
+    en: {
+      purpose:
+        'Defines one source-to-artifact acquisition function. A successful load returns both the artifact value and its explicit release descriptor, allowing loadIntoHost to roll back temporary ownership or transfer it to the committed plugin generation.',
+      quickStart: `import { defineLoader } from '@migaia/tray/loader'
+
+const manifestLoader = defineLoader({
+  load: async (url: URL, { signal, report }) => {
+    const response = await fetch(url, { signal })
+    if (!response.ok) {
+      const error = new Error(\`manifest request failed: \${response.status}\`)
+      report(error)
+      throw error
+    }
+
+    return {
+      value: await response.json(),
+      release: { force: () => undefined }
+    }
+  }
+})
+
+const loaded = await manifestLoader.load(new URL('/plugin.json', location.href), {
+  signal: new AbortController().signal,
+  deadlineAt: undefined,
+  report: console.error
+})
+console.log(loaded.value)`,
+      scenarios: [
+        'A URL, file key, registry coordinate, or other source must be acquired before it can become a plugin.',
+        'Temporary resources need an explicit release descriptor so a later adaptation or Host mutation failure can roll them back.',
+        'Loading must observe cooperative cancellation and report secondary failures without owning Host mutation.'
+      ],
+      avoidWhen: [
+        'The value is already loaded and only needs conversion into a plugin descriptor; use defineAdapter.',
+        'The operation must commit into a managed Host; loadIntoHost is the transaction owner.',
+        'The loader cannot describe cleanup for the value it acquires; returning an implicit resource violates the contract.'
+      ],
+      options: [
+        {
+          name: 'loader.load',
+          description:
+            'Acquires one artifact and returns value plus a callable release descriptor. defineLoader snapshots this function once and safely assimilates native or foreign thenables.',
+          defaultValue: 'required',
+          optional: false,
+          type: '(source: TSource, context: ILoaderContext) => ILoadedArtifact<TArtifact> | PromiseLike<ILoadedArtifact<TArtifact>>',
+          whenToUse: 'Own acquisition and rollback semantics, but not adaptation or Host mutation.',
+          example: 'defineLoader({ load: async (source, { signal }) => ({ value: await fetchArtifact(source, signal), release }) })'
+        }
+      ]
+    },
+    zh: {
+      purpose:
+        '定义一次 source 到 artifact 的取得过程。加载成功必须同时返回 artifact value 与明确的 release descriptor，让 loadIntoHost 能在提交前失败时回滚临时资源，或在提交成功后把所有权交给插件 generation。',
+      quickStart: `import { defineLoader } from '@migaia/tray/loader'
+
+const manifestLoader = defineLoader({
+  load: async (url: URL, { signal, report }) => {
+    const response = await fetch(url, { signal })
+    if (!response.ok) {
+      const error = new Error(\`manifest request failed: \${response.status}\`)
+      report(error)
+      throw error
+    }
+
+    return {
+      value: await response.json(),
+      release: { force: () => undefined }
+    }
+  }
+})
+
+const loaded = await manifestLoader.load(new URL('/plugin.json', location.href), {
+  signal: new AbortController().signal,
+  deadlineAt: undefined,
+  report: console.error
+})
+console.log(loaded.value)`,
+      scenarios: [
+        'URL、文件 key、registry coordinate 或其他 source 必须先取得，之后才能转换成插件。',
+        '临时资源需要明确的 release descriptor，确保后续适配或 Host mutation 失败时能够回滚。',
+        '加载过程需要响应协作式取消并上报次要失败，但不应拥有 Host mutation。'
+      ],
+      avoidWhen: [
+        'value 已经加载，只需要转换成插件描述子；应使用 defineAdapter。',
+        '操作必须提交到托管 Host；完整事务应交给 loadIntoHost。',
+        '无法描述已取得 value 的清理方式；隐式持有资源不符合 Loader 契约。'
+      ],
+      options: [
+        {
+          name: 'loader.load',
+          description:
+            '取得一个 artifact，并返回 value 与可调用的 release descriptor。defineLoader 只快照一次该函数，并安全接纳原生 Promise 或 foreign thenable。',
+          defaultValue: '必填',
+          optional: false,
+          type: '(source: TSource, context: ILoaderContext) => ILoadedArtifact<TArtifact> | PromiseLike<ILoadedArtifact<TArtifact>>',
+          whenToUse: '负责取得与回滚语义，不在这里适配插件或修改 Host。',
+          example: 'defineLoader({ load: async (source, { signal }) => ({ value: await fetchArtifact(source, signal), release }) })'
+        }
+      ]
+    }
+  },
+  'tray:loader:loadIntoHost': {
+    en: {
+      purpose:
+        'Runs the complete load → adapt → managed Host mutation transaction. It owns temporary artifact custody until commit, rolls it back after loader, adapter, or mutation failure, and transfers cleanup to the committed definition generation only after a successful use or replace.',
+      quickStart: `import type { ITrayHostDynamic } from '@migaia/tray/host'
+import { defineAdapter } from '@migaia/tray/adapter'
+import { defineLoader, loadIntoHost } from '@migaia/tray/loader'
+
+const loader = defineLoader({
+  load: async (url: URL, { signal }) => ({
+    value: await (await fetch(url, { signal })).json() as { name: string; endpoint: string },
+    release: { force: () => undefined }
+  })
+})
+const adapter = defineAdapter({
+  adapt: (manifest: { name: string; endpoint: string }) => ({
+    name: manifest.name,
+    install: () => ({ endpoint: manifest.endpoint })
+  })
+})
+
+export async function installRemotePlugin(host: ITrayHostDynamic, source: URL) {
+  await loadIntoHost({
+    host,
+    source,
+    loader,
+    adapter,
+    mutation: 'use',
+    timeoutMs: 5_000,
+    report: (error) => console.error('plugin load cleanup failed', error)
+  })
+}`,
+      scenarios: [
+        'A remote or persisted artifact must become one managed plugin without leaking temporary custody on any failure path.',
+        'The caller must choose use versus replace while preserving the Host queue, receipt, and generation ownership rules.',
+        'One timeout and cancellation boundary should cover acquisition, adaptation, and mutation admission.'
+      ],
+      avoidWhen: [
+        'Only loading or conversion is needed; call the independently defined Loader or Adapter.',
+        'The target is an escaped concrete PluginHost rather than the facade returned by createHost().',
+        'The artifact release contract is missing or cleanup failure may be silently swallowed.'
+      ],
+      options: [
+        { name: 'host', description: 'Managed Tray Host that receives the committed plugin mutation; temporary artifact ownership transfers to it only after commit.', whenToUse: 'Pass the Host that should own the resulting plugin generation.' },
+        { name: 'source', description: 'Source consumed once by the Loader, such as a URL, registry coordinate, or persisted artifact reference.', whenToUse: 'Pass the external location or descriptor the Loader understands.' },
+        { name: 'loader', description: 'Acquires the source and returns both the artifact and its provisional release contract.', whenToUse: 'Choose the Loader for the source format and transport.' },
+        { name: 'adapter', description: 'Validates the loaded artifact and converts it into a plugin definition accepted by the target Host.', whenToUse: 'Choose the Adapter for the artifact schema and Host contract.' },
+        { name: 'mutation', description: 'Selects whether commit installs a new plugin with use or atomically replaces an existing generation.', whenToUse: 'Use replace only when the named plugin is already installed and replacement is intended.' },
+        { name: 'signal', description: 'Caller cancellation observed across loading, adaptation, and mutation admission; cancellation rolls back provisional custody.', whenToUse: 'Pass the owning request or shutdown signal when the transaction must be cancellable.' },
+        { name: 'timeoutMs', description: 'End-to-end deadline in milliseconds, or false to opt out explicitly; it covers load, adapt, and mutation admission.', whenToUse: 'Set a bounded deadline unless the caller intentionally accepts an unbounded transaction.' },
+        { name: 'report', description: 'Receives secondary rollback or cleanup failures without replacing the primary transaction failure.', whenToUse: 'Connect the diagnostic sink whenever cleanup failure must remain observable.' }
+      ]
+    },
+    zh: {
+      purpose:
+        '执行完整的 load → adapt → 托管 Host mutation 事务。提交前由它保管临时 artifact；Loader、Adapter 或 mutation 任一步失败都会回滚。只有 use 或 replace 成功提交后，清理责任才转交给对应 definition generation。',
+      quickStart: `import type { ITrayHostDynamic } from '@migaia/tray/host'
+import { defineAdapter } from '@migaia/tray/adapter'
+import { defineLoader, loadIntoHost } from '@migaia/tray/loader'
+
+const loader = defineLoader({
+  load: async (url: URL, { signal }) => ({
+    value: await (await fetch(url, { signal })).json() as { name: string; endpoint: string },
+    release: { force: () => undefined }
+  })
+})
+const adapter = defineAdapter({
+  adapt: (manifest: { name: string; endpoint: string }) => ({
+    name: manifest.name,
+    install: () => ({ endpoint: manifest.endpoint })
+  })
+})
+
+export async function installRemotePlugin(host: ITrayHostDynamic, source: URL) {
+  await loadIntoHost({
+    host,
+    source,
+    loader,
+    adapter,
+    mutation: 'use',
+    timeoutMs: 5_000,
+    report: (error) => console.error('plugin load cleanup failed', error)
+  })
+}`,
+      scenarios: [
+        '远端或持久化 artifact 必须转换成一个托管插件，并保证任何失败路径都不泄漏临时资源。',
+        '调用方需要选择 use 或 replace，同时保留 Host queue、receipt 与 generation 所有权规则。',
+        '需要用同一个超时和取消边界覆盖加载、适配与 mutation admission。'
+      ],
+      avoidWhen: [
+        '只需要加载或转换；应直接调用独立定义的 Loader 或 Adapter。',
+        '目标是逃逸的 concrete PluginHost，而不是 createHost() 返回的托管对象。',
+        'artifact 没有 release 契约，或清理失败会被静默吞掉。'
+      ],
+      options: [
+        { name: 'host', description: '接收最终插件变更的托管 Tray Host；只有提交成功后，临时 artifact 的清理责任才转交给它。', whenToUse: '传入应当持有新插件代次的 Host。' },
+        { name: 'source', description: '由 Loader 消费一次的来源值，例如 URL、注册表坐标或持久化 artifact 引用。', whenToUse: '传入当前 Loader 能识别的外部位置或描述符。' },
+        { name: 'loader', description: '负责取得来源，并同时返回 artifact 与临时释放契约。', whenToUse: '按来源格式和传输方式选择 Loader。' },
+        { name: 'adapter', description: '校验已加载 artifact，并把它转换成目标 Host 可接纳的插件定义。', whenToUse: '按 artifact 结构与 Host 契约选择 Adapter。' },
+        { name: 'mutation', description: '决定提交时用 use 新增插件，还是用 replace 原子替换已有插件代次。', whenToUse: '仅当同名插件已经安装且确实需要替换时选择 replace。' },
+        { name: 'signal', description: '调用方取消信号，覆盖加载、适配与变更排队；取消时也会回滚临时保管的资源。', whenToUse: '事务隶属于请求或关闭流程并且必须可取消时传入。' },
+        { name: 'timeoutMs', description: '端到端截止时间，单位毫秒；显式传 false 才表示不限制，范围包括加载、适配和变更准入。', whenToUse: '除非调用方明确接受无限等待，否则应设置有限预算。' },
+        { name: 'report', description: '接收回滚或清理产生的次级失败，但不会覆盖事务的主失败。', whenToUse: '清理失败必须可观察时接入组合层诊断入口。' }
+      ]
+    }
+  },
+  'tray:runtime:createRuntime': {
+    en: {
+      purpose:
+        'Creates a run coordinator for one managed Tray Host. Each run leases the exact ready plugin generation, exposes only that plugin extension snapshot, and releases the lease after the callback settles; disposing the Runtime stops admission but never disposes the Host it was given.',
+      quickStart: `import { PluginHost } from '@migaia/plugin-host'
+import { createHost } from '@migaia/tray/host'
+import { createRuntime } from '@migaia/tray/runtime'
+
+class AppHost extends PluginHost<Record<string, never>, string> {}
+
+const host = await createHost({
+  create: () => new AppHost({
+    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 }
+  }),
+  plugins: [{
+    name: 'search',
+    install: () => ({
+      search: async (query: string, _options: { readonly signal: AbortSignal }) => [query]
+    })
+  }] as const,
+  mutationAdmissionMs: 1_000,
+  quiescenceMs: 5_000,
+  shutdown: { mode: 'bounded' }
+})
+const runtime = createRuntime(host)
+
+try {
+  const results = await runtime.run(
+    'search',
+    { timeoutMs: 1_000 },
+    ({ extensions, signal }) => extensions.search('migaia', { signal })
+  )
+  console.log(results)
+} finally {
+  await runtime.dispose()
+  await host.dispose()
+}`,
+      scenarios: [
+        'Application work must use one exact ready plugin generation while replacement or removal may happen concurrently.',
+        'A callback needs the target plugin extensions plus cooperative cancellation without receiving the concrete Host.',
+        'Shutdown must either wait for real callback settlement or return a bounded physical-completion observation.'
+      ],
+      avoidWhen: [
+        'The composition is immutable and callers only need createTray(), ready(), and get().',
+        'Work can ignore cancellation forever; same-realm JavaScript cannot be forcibly terminated by Runtime.',
+        'The caller intends Runtime disposal to dispose the managed Host; those ownership boundaries are separate.'
+      ],
+      options: [
+        {
+          name: 'host',
+          description:
+            'The managed Host whose ready plugin generations are leased. Runtime keeps this identity but does not own or dispose it.',
+          defaultValue: 'required',
+          optional: false,
+          type: 'ITrayHost<THost, TDefinitions, TReady>',
+          whenToUse: 'Pass the exact result returned by createHost(); never pass an escaped concrete PluginHost.',
+          example: 'createRuntime(host)'
+        },
+        {
+          name: 'options.shutdown.mode',
+          description:
+            'strict-drain waits for every active callback to settle; bounded stops waiting after quiescenceMs and reports whether cleanup is still running.',
+          defaultValue: 'bounded',
+          type: "'bounded' | 'strict-drain'",
+          whenToUse: 'Choose strict-drain only when shutdown may wait indefinitely for cooperative callbacks.',
+          example: "{ shutdown: { mode: 'strict-drain' } }"
+        },
+        {
+          name: 'mode',
+          description: 'Chooses bounded shutdown or strict waiting until every active run and physical release actually settles.',
+          type: "'bounded' | 'strict-drain'",
+          whenToUse: 'Use strict-drain only when shutdown may wait indefinitely for cooperative work.'
+        },
+        {
+          name: 'quiescenceMs',
+          description: 'Maximum wait in milliseconds before bounded shutdown returns while physical cleanup may still be running.',
+          type: 'number',
+          whenToUse: 'Set the operational shutdown budget when mode is bounded.'
+        },
+        {
+          name: 'options.report',
+          description: 'Observes cleanup or contract failures that cannot replace the primary run result.',
+          defaultValue: 'host reporter',
+          type: '(error: unknown) => void',
+          whenToUse: 'Route secondary failures to application diagnostics.',
+          example: '{ report: (error) => logger.error(error) }'
+        }
+      ]
+    },
+    zh: {
+      purpose:
+        '为一个 Tray 托管 Host 创建运行协调器。每次 run 都租用目标插件当前已就绪的准确 generation，只向回调开放该插件的 extension 快照，并在回调真正结束后释放租约。释放 Runtime 只停止接收新任务，不会释放传入的 Host。',
+      quickStart: `import { PluginHost } from '@migaia/plugin-host'
+import { createHost } from '@migaia/tray/host'
+import { createRuntime } from '@migaia/tray/runtime'
+
+class AppHost extends PluginHost<Record<string, never>, string> {}
+
+const host = await createHost({
+  create: () => new AppHost({
+    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 }
+  }),
+  plugins: [{
+    name: 'search',
+    install: () => ({
+      search: async (query: string, _options: { readonly signal: AbortSignal }) => [query]
+    })
+  }] as const,
+  mutationAdmissionMs: 1_000,
+  quiescenceMs: 5_000,
+  shutdown: { mode: 'bounded' }
+})
+const runtime = createRuntime(host)
+
+try {
+  const results = await runtime.run(
+    'search',
+    { timeoutMs: 1_000 },
+    ({ extensions, signal }) => extensions.search('migaia', { signal })
+  )
+  console.log(results)
+} finally {
+  await runtime.dispose()
+  await host.dispose()
+}`,
+      scenarios: [
+        '业务任务必须固定使用某个已就绪插件的准确 generation，同时允许外部并发替换或删除插件。',
+        '回调需要目标插件的 extension 与协作式取消信号，但不应拿到 concrete Host。',
+        '关闭时需要等待任务真实结束，或在有界等待后继续观察物理清理结果。'
+      ],
+      avoidWhen: [
+        '组合在启动前已经固定，调用方只需要 createTray()、ready() 与 get()。',
+        '任务会永久忽略取消；Runtime 无法强制终止同一 JavaScript realm 内不合作的代码。',
+        '调用方希望释放 Runtime 时顺便释放 Host；二者的所有权边界彼此独立。'
+      ],
+      options: [
+        {
+          name: 'host',
+          description:
+            '提供已就绪插件 generation 的托管 Host。Runtime 保留这个对象身份，但不拥有、也不会释放它。',
+          defaultValue: '必填',
+          optional: false,
+          type: 'ITrayHost<THost, TDefinitions, TReady>',
+          whenToUse: '传入 createHost() 的准确返回值；不要传逃逸出来的 concrete PluginHost。',
+          example: 'createRuntime(host)'
+        },
+        {
+          name: 'options.shutdown.mode',
+          description:
+            'strict-drain 会等所有在途回调真正结束；bounded 在 quiescenceMs 后停止等待，并报告清理是否仍在继续。',
+          defaultValue: 'bounded',
+          type: "'bounded' | 'strict-drain'",
+          whenToUse: '只有关闭流程允许无限等待协作式任务时才选择 strict-drain。',
+          example: "{ shutdown: { mode: 'strict-drain' } }"
+        },
+        {
+          name: 'mode',
+          description: '选择有界关闭，或严格等待所有在途任务和物理释放真正结束。',
+          type: "'bounded' | 'strict-drain'",
+          whenToUse: '只有关闭流程允许无限等待协作式任务时才选择 strict-drain。'
+        },
+        {
+          name: 'quiescenceMs',
+          description: '有界关闭返回前最多等待的毫秒数；超时返回后，物理清理可能仍在继续。',
+          type: 'number',
+          whenToUse: 'mode 为 bounded 时按运维要求设置关闭预算。'
+        },
+        {
+          name: 'options.report',
+          description: '观察不能覆盖主要 run 结果的清理失败或契约错误。',
+          defaultValue: 'Host reporter',
+          type: '(error: unknown) => void',
+          whenToUse: '把次要失败接入应用诊断系统。',
+          example: '{ report: (error) => logger.error(error) }'
         }
       ]
     }
@@ -11248,7 +11757,12 @@ export function findApiGuide(
   symbolName: string,
   locale: IGuideLocale
 ): IApiGuide | undefined {
-  return apiGuides[`${library}:${moduleName}:${symbolName}`]?.[locale]
+  return (
+    apiGuides[`${library}:${moduleName}:${symbolName}`] ??
+    (library === 'event-subscriber' && moduleName === 'subscriber'
+      ? apiGuides[`event-subscriber:index:${symbolName}`]
+      : undefined)
+  )?.[locale]
 }
 
 /** Builds a reference guide for non-callable public constants from their actual contract shape. */

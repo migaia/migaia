@@ -6,7 +6,12 @@
 
 **适用**：表单/设置/会话信息等中小型对象状态；需要"字段自动响应式"而不想手写 Signal；需要异步派生数据的 Suspense 安全渲染；需要跨 Runtime 隔离（SSR 每请求、单测、多 root 互不串状态）；需要接入自定义字段类型（如 WASM 字段）的扩展点。
 
-**不适用**：列表/高频增删的集合状态用 `@migaia/store-indexed`；需要稳定业务 key 寻址用 `@migaia/store-keyed`；需要持久化用 `@migaia/store-persist`；需要 React hooks 用 `@migaia/store-react`。`store-light` 本身只提供"对象 facade + 异步资源"，其余能力都是独立包按需组合，依赖 `@migaia/reactive`（响应式内核）、`@migaia/lifecycle`（所有权与释放）、`@migaia/event-subscriber`（`StoreResource` 内部事件通道）与 `@migaia/utils`。
+**不适用**：
+
+- 列表或高频增删的集合状态使用 `@migaia/store-indexed`。
+- 需要按稳定业务 key 寻址时使用 `@migaia/store-keyed`。
+- 需要持久化时使用 `@migaia/store-persist`；需要 React hooks 时使用 `@migaia/store-react`。
+- `store-light` 只负责对象状态和异步资源。响应式内核、资源释放、内部事件与通用工具分别由 `@migaia/reactive`、`@migaia/lifecycle`、`@migaia/event-subscriber` 与 `@migaia/utils` 提供。
 
 ## 安装
 

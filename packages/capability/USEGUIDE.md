@@ -2,6 +2,8 @@
 
 本指南覆盖面向应用与适配器的公开运行时 API、关键契约类型、边界行为与错误码。仅参与条件推导的 type-only 辅助类型以发布的 `.d.ts` 和编辑器提示为准，不在正文逐项抄录；包的定位与安装方式、最小上手示例见 [README](./README.md)。
 
+本文单独写 **Host** 时，专指 `createCapabilityHost()` 创建的 **Capability Host**：它管理能力注册、共享 context、功能开关和启停生命周期。它不是负责插件安装的 PluginHost、组合存储后端的 Storage Host、控制 Worker/进程的 Realm Host，也不是负责 provider-consumer 启动顺序的 Capability Graph。
+
 ## 目录
 
 - [导入与运行环境](#导入与运行环境)
@@ -40,7 +42,7 @@ import {
 } from '@migaia/capability'
 ```
 
-`exports` 提供包根（`.`）、静态 Graph 子路径（`./graph`）与无状态拓扑子路径（`./graph/topology`）。Host 符号从包根导入，Graph 符号从 `@migaia/capability/graph` 导入；只需纯 required-edge 准入时从 `@migaia/capability/graph/topology` 导入。本包复用 `@migaia/lifecycle` 的竞态/所有权原语与 `@migaia/utils/error` 的 `attachErrorIdentity`；不依赖 Store、React 或任何运行时全局对象，可在任意支持 ESM 的 JS 环境中使用。
+`exports` 提供包根（`.`）、静态 Graph 子路径（`./graph`）与无状态拓扑子路径（`./graph/topology`）。Host 符号从包根导入，Graph 符号从 `@migaia/capability/graph` 导入；如果只需验证节点与 required 依赖是否合法并计算启动顺序，而不需要创建、启动或释放节点，则从 `@migaia/capability/graph/topology` 导入。本包复用 `@migaia/lifecycle` 的竞态/所有权原语与 `@migaia/utils/error` 的 `attachErrorIdentity`；不依赖 Store、React 或任何运行时全局对象，可在任意支持 ESM 的 JS 环境中使用。
 
 <a id="静态-capability-graph"></a>
 
@@ -173,6 +175,10 @@ type ICapabilityHostOptions = {
 `setFlags(flags)` 是**原子替换整份快照**：新快照里没列出的能力一律按拒绝处理，不会保留旧快照里残留的 `true`——这是为了让"远端配置删掉一个键"能够可靠地收回权限。如果传入的 `flags` 对象本身不可安全读取，host 会**先**整体回退到"全部拒绝"的空快照，**再**把原始错误重新抛给调用方，不会因为配置读取失败就继续沿用上一份允许表。
 
 `setFlag(name, false)` 本身就是一次原子回退：它会同步作废该能力的在途激活并释放已有 handle，调用方不需要再额外调用一次 `disable()`。`setFlag(name, true)` 只是把开关打开，**不会自动启用**——启用仍然由调用方决定时机，调用 `enable(name)`。
+
+一个完整消费流程是：进入需要该功能的页面时调用 `enable(name)`；结果为 `enabled` 后，用 `handle<具体句柄类型>(name)` 取得 `activate()` 返回的同一个对象并调用其业务方法；离开该页面时 `await disable(name)`，等待该 handle 的 `dispose()` 完成；应用整体关闭时 `await host.dispose()` 兜底释放仍处于启用态的能力。`enable()` 本身只返回结构化状态，不直接返回业务 handle。
+
+`disable()` 适合“当前不用，但开关仍允许以后再次启用”的页面离开或功能收起场景。权限、远端配置或实验分组被撤回时应调用 `setFlag(name, false)`：它除了关闭闸门，还会作废正在进行的激活并释放已经启用的 handle。
 
 ---
 

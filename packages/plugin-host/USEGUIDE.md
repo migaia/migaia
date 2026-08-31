@@ -145,6 +145,25 @@ const prefix: IPlugin<IPluginCore, { greet(name: string): void }, IPluginConfig>
 
 ## 4. 插件 core API 参考
 
+推荐用 `definePlugin()` 创建插件定义，而不是手写类型断言：
+
+```ts
+import { definePlugin } from '@migaia/plugin-host/defined'
+
+const health = definePlugin('health', () => ({
+  check: () => ({ ok: true as const })
+}))
+
+const configurable = definePlugin({
+  name: 'configurable',
+  config: { prefix: '[app]' },
+  install: (core) => ({ readPrefix: () => core.config.get().prefix }),
+  dispose: () => undefined
+})
+```
+
+第一种是 `definePlugin(name, install)` 短写法；第二种完整对象写法可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`setupHost()` 只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。
+
 安装时获得的 `core` 是一个稳定的 facade（`src/core.ts` 的 `createPluginCore`）。它包含子类提供的领域方法，加上下面的通用能力：
 
 | API / 签名                              | 参数                                                                 | 必填性          | 返回值               | 同步/异步 | 作用                                                                                 |
@@ -168,6 +187,11 @@ TypeScript 的"已安装插件"类型（`TInstalled` 元组）只会随 `use()` 
 ### Composition owner 协议
 
 `IPluginHostCompositionIntegration` 面向 Tray 这类唯一 owner，不是业务插件的第二套 Host API：
+
+- **prepared admission**：插件 setup 已完成、但尚未对业务读取和 pipeline 发布的临时批次；作用类似“事务待提交区”。
+- **registration receipt**：某一次成功安装的不可伪造凭证；卸载凭证指向的具体安装，不按插件名猜测目标。
+- **data-order slot**：Host 私有的排序位置；Tray 只能保存并原样传回，不能查看内部序号或自行构造。
+- **Host revision**：Host 的修改版本号；准备和提交之间版本变化时拒绝提交，避免把基于旧状态的插件批次发布出去。
 
 1. `createPluginAdmission()` 快照插件；`createDataOrderSlot()` 分配 opaque definition lane。
 2. `prepareAdmissions()` 可执行异步 setup，但 candidate extension/config/shared/stage 仍不可见。
@@ -242,6 +266,8 @@ host.usePipeline((value, next) => next(value.trim()))
 | `async`           | `async (value, next) => void` | `await next(value)`；同一次调用重复 `next()` 抛 `PIPELINE_NEXT_DUPLICATE`。                                                                                                                                                                                                          |
 | `generator`       | `function* (value)`           | `return value` 继续；`return undefined` 终止；`GENERATOR_CONTINUE` 用最后一次 yield 的值；`GENERATOR_HALT` 终止整条链；`GENERATOR_UNDEFINED` 显式表达 `undefined`（仅当 `TValue` 类型允许 `undefined` 时才能使用）。                                                                 |
 | `async-generator` | `async function* (value)`     | terminal 语义与 `generator` 完全一致（同一套 `GENERATOR_CONTINUE`/`GENERATOR_HALT`/`GENERATOR_UNDEFINED` 判定）；区别是每个 stage 被完整、串行 `await` 耗尽（`await iterator.next()` 循环），中间 yield 只用于本 stage 内部观测，不会提前进入下一 stage，也不产生流式/fan-out 效果。 |
+
+`GENERATOR_CONTINUE` 是 runner 识别的唯一 `Symbol` 控制信号，不是业务数据。一个 generator stage 可以 `yield` 多次，返回该信号表示“采用最后一次 `yield` 的值作为下一 stage 输入”；如果一次也没有 `yield`，则沿用进入当前 stage 的原输入。比如输入 `" migaia "`，依次 `yield value.trim()`、`yield value.trim().toUpperCase()` 后返回 `GENERATOR_CONTINUE`，下一 stage 得到的是 `MIGAIA`。相对地，`return transformedValue` 直接采用返回值，`return GENERATOR_HALT` 或普通 `return` 终止 pipeline，`return GENERATOR_UNDEFINED` 才是把真正的 `undefined` 作为业务值继续传递。
 
 **sync 是扁平转换管道**：`next()` 只记录下一个值，下游 stage 在当前 stage 返回**之后**才执行，因此当前 stage 在调用 `next()` 之后无法观察到下游处理结果。**async 是洋葱模型**：`await next(value)` 会等待整个下游链执行完毕才继续，所以当前 stage 可以在 `next()` 之后写"后置逻辑"，且这段逻辑能看到下游已经处理完的效果。这个执行顺序差异是切换 pipeline mode 时最容易让人困惑的地方，务必注意。`async-generator` 既不是洋葱模型也不是流式管道，是纯粹的"stage 顺序执行、每个 stage 各自异步跑完取一个终值"，介于 `async` 与 `generator` 之间。
 

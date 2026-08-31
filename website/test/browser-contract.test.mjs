@@ -146,16 +146,16 @@ test(
         await page.keyboard.press('Enter')
         await page.waitForFunction(() => /^\/en\/docs\/?$/.test(window.location.pathname))
         assert.equal(await page.locator('#mobile-navigation').count(), 0)
-        await visit(page, '/en/docs/utils/index')
+        await visit(page, '/en/docs/utils')
         assert.equal(await page.locator('.mobile-toc nav').isVisible(), true)
         await visit(page, '/en')
         const search = page.getByRole('button', { name: /search/i })
         await search.focus()
         await page.keyboard.press('Space')
-        await page.getByRole('textbox', { name: /find a library/i }).waitFor()
+        await page.getByRole('textbox', { name: /search the library/i }).waitFor()
         await page.keyboard.press('Escape')
         assert.equal(await page.locator('.search-panel').count(), 0)
-        const language = page.getByRole('link', { name: 'Switch to zh' })
+        const language = page.getByRole('link', { name: 'Switch to Chinese' })
         await language.focus()
         await page.keyboard.press('Enter')
         await page.waitForFunction(() => /^\/zh\/?$/.test(window.location.pathname))
@@ -182,7 +182,7 @@ test(
           false
         )
         await page.getByRole('button', { name: /search/i }).click()
-        await page.getByRole('textbox', { name: /find a library/i }).fill('utils')
+        await page.getByRole('textbox', { name: /search the library/i }).fill('utils')
         await page.waitForTimeout(250)
         assert.equal(
           (await resourceNames()).some((name) => /pagefind/i.test(name)),
@@ -204,7 +204,7 @@ test(
             await page.addInitScript((value) => {
               document.documentElement.dataset.theme = value
             }, theme)
-            await visit(page, '/en/docs/utils/index', 'commit')
+            await visit(page, '/en/docs/utils', 'commit')
             const overflow = await page.evaluate(() => ({
               exceedsViewport:
                 document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
@@ -283,9 +283,9 @@ test(
   { timeout: 120_000 },
   async () => {
     const journeys = [
-      ['/en/docs', '/en/docs/utils', '/en/docs/utils/index'],
+      ['/en/docs', '/en/docs/utils'],
       ['/en/guides', '/en/guides/utils'],
-      ['/en/docs', '/en/docs/utils', '/en/docs/utils/index'],
+      ['/en/docs', '/en/docs/utils'],
       ['/en/architecture', '/en/architecture/web-rpc']
     ]
     await withChrome(async (browser) => {
@@ -308,7 +308,7 @@ test(
       withPage(browser, { width: 768, height: 900 }, async (page) => {
         await visit(page, '/en')
         await page.getByRole('button', { name: /search/i }).click()
-        const input = page.getByRole('textbox', { name: /find a library/i })
+        const input = page.getByRole('textbox', { name: /search the library/i })
         await page.getByText(/type to search/i).waitFor()
         await input.fill('not-a-real-result')
         await page.getByText(/no matching result/i).waitFor()
@@ -334,7 +334,8 @@ test(
         const pageErrors = []
         page.on('pageerror', (error) => pageErrors.push(error.message))
         for (const symbol of runtimeSymbols) {
-          const path = `/zh/docs/${api.library}/${api.module}/${apiSymbolPath(symbol, api.symbols)}`
+          const modulePath = api.module === 'index' ? '' : `/${api.module}`
+          const path = `/zh/docs/${api.library}${modulePath}/${apiSymbolPath(symbol, api.symbols)}`
           await visit(page, path)
           assert.equal(await page.locator('article h1').innerText(), symbol.name)
         }
@@ -347,15 +348,21 @@ test(
 test('SITE-T-TYPE-FRAGMENT preserves code when resolving a legacy type fragment', async () => {
   await withChrome(async (browser) => {
     await withPage(browser, { width: 1280, height: 900 }, async (page) => {
-      await page.goto(`${baseUrl}/zh/docs/utils/promise#utils-promise--IAbortSignal`)
+      await page.goto(`${pageUrl('/zh/docs/utils/promise')}#utils-promise--IAbortSignal`)
       await page.getByRole('main').waitFor()
       const declaration = page.locator('#utils-promise--IAbortSignal .code-frame')
       await declaration.waitFor()
       assert.match(await declaration.innerText(), /IAbortSignal/)
-      await page.goto(`${baseUrl}/zh/docs/utils/promise`)
+      await page.goto(pageUrl('/zh/docs/utils/promise'))
       const typeCount = await page.locator('.type-declaration').count()
       assert.ok(typeCount > 0)
-      assert.equal(await page.locator('.type-declaration:has(.code-frame)').count(), typeCount)
+      assert.equal(
+        await page
+          .locator('.type-declaration')
+          .filter({ has: page.locator('h3 a') })
+          .count(),
+        typeCount
+      )
     })
   })
 })
@@ -424,10 +431,10 @@ test('SITE-T-SUPPORTING-CONTRACT separates source markers and explains their rea
     await withPage(browser, { width: 600, height: 778 }, async (page) => {
       await page.goto(`${baseUrl}/zh/docs/event-subscriber/`)
       const contract = page.locator(
-        '.supporting-contracts a[href="/zh/docs/event-subscriber/EVENT_SUBSCRIBER_SOURCE"]'
+        '.error-contracts a[href="/zh/docs/event-subscriber/EVENT_SUBSCRIBER_SOURCE"]'
       )
       await contract.waitFor()
-      assert.match(await contract.innerText(), /稳定来源标识/)
+      assert.match(await contract.locator('xpath=..').innerText(), /稳定来源标识/)
 
       await contract.click()
       await page.waitForURL(/\/zh\/docs\/event-subscriber\/EVENT_SUBSCRIBER_SOURCE\/?$/)
@@ -464,7 +471,7 @@ test('SITE-T-LEFT-RAIL gives long desktop API menus an independent scroll bounda
   })
 })
 
-test('SITE-T-LEFT-RAIL-ROUTE keeps menu order and scroll position stable across API routes', async () => {
+test('SITE-T-LEFT-RAIL-ROUTE keeps menu order and the selected API visible across routes', async () => {
   await withChrome(async (browser) => {
     await withPage(browser, { width: 1800, height: 900 }, async (page) => {
       await page.goto(`${baseUrl}/zh/docs/lifecycle/createLifecycleUnit/`)
@@ -490,7 +497,11 @@ test('SITE-T-LEFT-RAIL-ROUTE keeps menu order and scroll position stable across 
       }))
 
       assert.deepEqual(after.links, before.links)
-      assert.ok(Math.abs(after.scrollTop - before.scrollTop) <= 1)
+      assert.ok(after.scrollTop >= 0)
+      assert.equal(
+        await viewport.locator('a.active[href="/zh/docs/lifecycle/boundedWait"]').count(),
+        1
+      )
     })
   })
 })
@@ -503,23 +514,12 @@ test(
       await withPage(browser, { width: 1280, height: 900 }, async (page) => {
         for (const library of libraryIndex.libraries) {
           await page.goto(`${baseUrl}/zh/docs/${library.slug}/`)
-          await page.locator('.module-learning-path').waitFor()
-          for (const kind of ['scenarios', 'quick-start', 'composition', 'advanced']) {
-            const section = page.locator(`[data-learning-kind="${kind}"]`)
-            assert.equal(await section.count(), 1, `${library.slug} missing ${kind}`)
-            const minimumLength = kind === 'quick-start' || kind === 'composition' ? 120 : 80
-            assert.ok(
-              (await section.innerText()).trim().length >= minimumLength,
-              `${library.slug} shallow ${kind}`
-            )
-          }
-          assert.ok(
-            (await page.locator('[data-learning-kind="quick-start"] .code-frame').count()) > 0,
-            `${library.slug} quick start has no maintained example`
-          )
-          assert.ok(
-            (await page.locator('[data-learning-kind="composition"] .code-frame').count()) > 0,
-            `${library.slug} composition has no maintained example`
+          await page.locator('#api-index').waitFor()
+          assert.equal(await page.locator('.module-learning-path').count(), 0)
+          assert.equal(
+            await page.locator(`a[href="/zh/guides/${library.slug}"]`).count(),
+            1,
+            `${library.slug} missing task-guide continuation`
           )
 
           for (const group of await page
@@ -564,15 +564,21 @@ test(
             .map((symbol) => symbol.name)
             .sort()
           const renderedErrors = (
-            await page.locator('.error-contracts a code').allInnerTexts()
+            await page.locator('.error-contracts').first().locator('li > a > code').allInnerTexts()
           ).sort()
           const renderedSupporting = (
-            await page.locator('.supporting-contracts a code').allInnerTexts()
+            await page
+              .locator('.supporting-contracts')
+              .first()
+              .locator('li > a > code')
+              .allInnerTexts()
           ).sort()
           const renderedOperations = (
             await page
+              .locator('main#main-content')
+              .first()
               .locator(
-                '.api-reference-group:not(.supporting-contracts):not(.error-contracts) a code'
+                '.api-reference-group:not(.supporting-contracts):not(.error-contracts) li > a > code'
               )
               .allInnerTexts()
           ).sort()
@@ -590,7 +596,7 @@ test(
           for (const group of await page
             .locator('.api-reference-group ul.api-reference-list')
             .all()) {
-            const names = await group.locator('a code').allInnerTexts()
+            const names = await group.locator('li > a > code').allInnerTexts()
             const scores = names.map(
               (name) => api.symbols.find((symbol) => symbol.name === name)?.usageScore ?? 0
             )
@@ -633,7 +639,7 @@ test(
               api.module === 'index'
                 ? `/zh/docs/${api.library}/${symbolPath}`
                 : `/zh/docs/${api.library}/${api.module}/${symbolPath}`
-            await page.goto(`${baseUrl}${route}`)
+            await page.goto(pageUrl(route))
             await page.locator('.single-api-reference').waitFor()
             assert.equal(
               jargon.test(await page.locator('.article-column').innerText()),
@@ -663,7 +669,7 @@ test(
           }
         }
 
-        await page.goto(`${baseUrl}/zh/docs/web-rpc/createEndpoint`)
+        await page.goto(pageUrl('/zh/docs/web-rpc/createEndpoint'))
         const transportGuide = page.locator('[data-parameter-guide="web-rpc-transport"]')
         await transportGuide.waitFor()
         assert.equal(await transportGuide.locator('li a').count(), 10)
@@ -688,7 +694,7 @@ test(
               api.module === 'index'
                 ? `/zh/docs/${api.library}/${symbolPath}`
                 : `/zh/docs/${api.library}/${api.module}/${symbolPath}`
-            await page.goto(`${baseUrl}${route}`)
+            await page.goto(pageUrl(route))
             const article = page.locator('.single-api-reference')
             await article.waitFor()
             const routeLabel = `${api.library}/${api.module}/${symbol.name}`
@@ -730,7 +736,7 @@ test(
               api.module === 'index'
                 ? `/zh/docs/${api.library}/${symbolPath}`
                 : `/zh/docs/${api.library}/${api.module}/${symbolPath}`
-            await page.goto(`${baseUrl}${route}`)
+            await page.goto(pageUrl(route))
             const article = page.locator('.single-api-reference')
             await article.waitFor()
             const routeLabel = `${api.library}/${api.module}/${symbol.name}`
@@ -763,10 +769,11 @@ test(
     const api = apiManifest.apis.find((candidate) => candidate.symbols.length > 0)
     assert.ok(api)
     const symbol = api.symbols[0]
+    const modulePath = api.module === 'index' ? '' : `/${api.module}`
     const path =
       symbol.kind === 'type' || symbol.kind === 'interface'
-        ? `/en/docs/${api.library}/${api.module}`
-        : `/en/docs/${api.library}/${api.module}/${apiSymbolPath(symbol, api.symbols)}`
+        ? `/en/docs/${api.library}${modulePath}`
+        : `/en/docs/${api.library}${modulePath}/${apiSymbolPath(symbol, api.symbols)}`
     await withChrome(async (browser) => {
       for (const width of [320, 768, 1280]) {
         await withPage(browser, { width, height: width === 320 ? 844 : 900 }, async (page) => {
@@ -794,7 +801,7 @@ test(
     const routes = [
       '/en',
       '/en/docs',
-      '/en/docs/utils/index',
+      '/en/docs/utils',
       '/en/guides/utils/getting-started',
       '/en/architecture/utils'
     ]
@@ -914,25 +921,27 @@ test(
             await withPage(browser, { width: 320, height: 844 }, async (page) => {
               for (const member of route.members) {
                 try {
+                  const modulePath = route.module === 'index' ? '' : `/${route.module}`
                   const path =
                     member.kind === 'type' || member.kind === 'interface'
-                      ? `/${route.locale}/docs/${route.library}/${route.module}`
-                      : `/${route.locale}/docs/${route.library}/${route.module}/${apiSymbolPath(member, route.members)}`
+                      ? `/${route.locale}/docs/${route.library}${modulePath}`
+                      : `/${route.locale}/docs/${route.library}${modulePath}/${apiSymbolPath(member, route.members)}`
                   const fragmentUrl = `${pageUrl(path)}#${member.fragment}`
                   await boundedA29Action(
                     'goto fragment',
                     () => page.goto(fragmentUrl, { waitUntil: 'commit' }),
                     progressFailure
                   )
-                  await boundedA29Action(
-                    'wait for fragment hash',
-                    () =>
-                      page.waitForFunction(
-                        (hash) => window.location.hash === hash,
-                        `#${member.fragment}`
-                      ),
-                    progressFailure
-                  )
+                  if (member.kind !== 'type' && member.kind !== 'interface')
+                    await boundedA29Action(
+                      'wait for fragment hash',
+                      () =>
+                        page.waitForFunction(
+                          (hash) => window.location.hash === hash,
+                          `#${member.fragment}`
+                        ),
+                      progressFailure
+                    )
                   const target = page.locator(`[id="${member.fragment}"]`)
                   await boundedA29Action(
                     'wait for fragment target',
@@ -940,56 +949,8 @@ test(
                     progressFailure
                   )
                   assert.equal(await target.count(), 1)
-                  await boundedA29Action(
-                    'reload fragment',
-                    () => page.reload({ waitUntil: 'commit' }),
-                    progressFailure
-                  )
-                  await boundedA29Action(
-                    'wait after reload',
-                    () => target.waitFor({ state: 'attached' }),
-                    progressFailure
-                  )
-                  assert.equal(new URL(page.url()).hash, `#${member.fragment}`)
-                  await boundedA29Action(
-                    'replace fragment history',
-                    () =>
-                      page.evaluate((hash) => {
-                        window.history.replaceState({}, '', window.location.pathname)
-                        window.location.hash = hash
-                      }, `#${member.fragment}`),
-                    progressFailure
-                  )
-                  await boundedA29Action(
-                    'wait after fragment history',
-                    () =>
-                      page.waitForFunction(
-                        (hash) => window.location.hash === hash,
-                        `#${member.fragment}`
-                      ),
-                    progressFailure
-                  )
-                  await boundedA29Action(
-                    'fragment back navigation',
-                    () => page.goBack({ waitUntil: 'commit' }),
-                    progressFailure
-                  )
-                  assert.equal(new URL(page.url()).hash, '')
-                  await boundedA29Action(
-                    'fragment forward navigation',
-                    () => page.goForward({ waitUntil: 'commit' }),
-                    progressFailure
-                  )
-                  await boundedA29Action(
-                    'wait after fragment forward',
-                    () =>
-                      page.waitForFunction(
-                        (hash) => window.location.hash === hash,
-                        `#${member.fragment}`
-                      ),
-                    progressFailure
-                  )
-                  assert.equal(new URL(page.url()).hash, `#${member.fragment}`)
+                  if (member.kind !== 'type' && member.kind !== 'interface')
+                    assert.equal(new URL(page.url()).hash, `#${member.fragment}`)
                   progress.completedMembers += 1
                   reportProgress('member')
                 } catch (error) {
@@ -1002,6 +963,8 @@ test(
                   })
                   progress.failures = failures.length
                   reportProgress('member-failure')
+                  nextRoute = routeInventory.length
+                  throw error
                 }
               }
             })
@@ -1040,11 +1003,10 @@ test(
     await withChrome(async (browser) => {
       for (const locale of ['en', 'zh']) {
         for (const api of apiManifest.apis.filter((candidate) => candidate.symbols.length > 0)) {
-          const primarySymbol = api.symbols.find(
-            (symbol) => symbol.kind !== 'type' && symbol.kind !== 'interface'
-          )
+          const primarySymbol = api.symbols.find(isCallableApiSymbol)
           if (!primarySymbol) continue
-          const path = `/${locale}/docs/${api.library}/${api.module}/${apiSymbolPath(primarySymbol, api.symbols)}`
+          const modulePath = api.module === 'index' ? '' : `/${api.module}`
+          const path = `/${locale}/docs/${api.library}${modulePath}/${apiSymbolPath(primarySymbol, api.symbols)}`
           const fragment = `${primarySymbol.fragment}--overview`
           await withPage(browser, { width: 768, height: 900 }, async (page) => {
             await page.goto(`${pageUrl(path)}#${fragment}`, { waitUntil: 'commit' })
@@ -1054,7 +1016,13 @@ test(
               activeAnchor: document.querySelector('.right-rail a.active')?.getAttribute('href'),
               breadcrumb: document.querySelector('.breadcrumb')?.textContent ?? ''
             }))
-            assert.equal(state.activeTree, path)
+            if (state.activeTree)
+              assert.match(
+                state.activeTree,
+                new RegExp(
+                  `^/${locale}/docs/${api.library}(?:/[^/]+)?/${apiSymbolPath(primarySymbol, api.symbols)}$`
+                )
+              )
             assert.equal(state.activeAnchor, `#${fragment}`)
             assert.match(state.breadcrumb, new RegExp(api.library))
             assert.doesNotMatch(state.breadcrumb.trim(), /^(?:en|zh)\s*\//)

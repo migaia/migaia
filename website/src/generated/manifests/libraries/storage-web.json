@@ -330,6 +330,40 @@
               },
               {
                 "type": "paragraph",
+                "text": "四者不是同一种格式的别名，先按要保存的数据和后端能力选择："
+              },
+              {
+                "type": "table",
+                "headers": ["Codec", "实际写入值", "什么时候选", "不能做什么"],
+                "rows": [
+                  [
+                    "`jsonCodec`",
+                    "JSON 字符串",
+                    "数据只含普通 JSON 值，或必须兼容 Local Storage、Cookie 等 text-only 后端",
+                    "不保留 `Date`/`Map`/`Set`/二进制的原类型，也不能表达循环引用"
+                  ],
+                  [
+                    "`structuredCodec`",
+                    "原对象，由 record 后端执行 structured clone",
+                    "IndexedDB/Memory 中要保存 `Date`、`Map`、`Set`、`Blob`、`ArrayBuffer`、typed array 或循环引用",
+                    "不能用于 text-only 后端，也不负责 schema 校验、领域实例重建或函数/DOM 节点持久化"
+                  ],
+                  [
+                    "`binaryCodec`",
+                    "`Uint8Array`；text-only 后端可转 base64",
+                    "数据本来就是字节，且希望支持二进制后端直写",
+                    "不接受 `ArrayBuffer`、字符串或普通数组；base64 回退会增加约 33% 体积"
+                  ],
+                  [
+                    "`selectCodec`",
+                    "由 codec 与 `store.capabilities` 共同决定",
+                    "连接具体后端时确认直写、可逆回退或拒绝",
+                    "不会把 structured 数据偷偷降级为 JSON，因为那会静默丢失类型和引用关系"
+                  ]
+                ]
+              },
+              {
+                "type": "paragraph",
                 "text": "`jsonCodec`｜3 秒上手 —— 默认 codec，零依赖，全后端可用："
               },
               {
@@ -343,16 +377,16 @@
               },
               {
                 "type": "paragraph",
-                "text": "`structuredCodec`｜3 秒上手 —— 恒等编解码，交给后端自身的 structured clone："
+                "text": "`structuredCodec`｜10 秒上手 —— codec 本身原样传值，真正的复制发生在 IndexedDB/Memory 的 structured clone 写入与读取边界："
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "await structuredCodec.encode({ date: new Date(), blob: myBlob }) // 原样返回"
+                "code": "import { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { selectCodec, structuredCodec } from '@migaia/storage-web/serialize'\n\nconst db = indexedDb({ dbName: 'app-data', recordsStoreName: 'snapshots' })\nconst codec = selectCodec(structuredCodec, db.capabilities)\n\nconst snapshot: Record<string, unknown> = {\n  createdAt: new Date('2026-01-01T00:00:00Z'),\n  tags: new Set(['stable', 'offline']),\n  counters: new Map([['orders', 3]]),\n  bytes: new Uint8Array([1, 2, 3])\n}\nsnapshot.self = snapshot\n\nconst encoded = await codec.encode(snapshot) // === snapshot：codec 不复制\nawait db.putRecord(encoded, 'latest') // IndexedDB 在这里执行 structured clone\nconst stored = await db.getRecord('latest')\nconst decoded = await codec.decode(stored) // Date/Map/Set/bytes/循环引用仍保留\n\nawait db.dispose()"
               },
               {
                 "type": "paragraph",
-                "text": "`output: 'structured'`。只能用于支持 `records`（`capabilities.records === true`）的后端；可直接存 `Blob`/`File`/`ArrayBuffer`/`Map`/`Set`/`Date`，甚至循环引用。"
+                "text": "`output: 'structured'`。`encode()`/`decode()` 都是恒等操作，所以单独调用它不会制作快照；对象隔离由 record 后端负责。只能用于 `capabilities.records === true` 的后端；传给 Local Storage、Session Storage 或 Cookie 时，`selectCodec` 立即抛 `UNSUPPORTED_CAPABILITY`，不会改用 JSON。structured clone 能保留上述内建类型和引用图，但不是业务 schema：字段校验、版本迁移以及 class 实例重建仍应由 Schema/Entity 层处理。"
               },
               {
                 "type": "paragraph",
@@ -8138,6 +8172,7 @@
             "import { indexedDb } from '@migaia/storage-web/indexed-db'",
             "const db = indexedDb<{ id: string; name: string }>({ dbName: 'app-data' })\nawait db.putRecord({ id: 'ada', name: 'Ada' }, 'ada')\nawait db.getRecord('ada') // { id: 'ada', name: 'Ada' }\nfor await (const [key, value] of db.iterateRecords()) console.log(key, value)",
             "const store = indexedDb()\nif (isRecordStore(store)) await store.putRecord({ a: 1 }, 'k')\nconst records = asRecordStore(store) // 能力不足时抛 StorageContractError(UNSUPPORTED_CAPABILITY)",
+            "import { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { selectCodec, structuredCodec } from '@migaia/storage-web/serialize'\n\nconst db = indexedDb({ dbName: 'app-data', recordsStoreName: 'snapshots' })\nconst codec = selectCodec(structuredCodec, db.capabilities)\n\nconst snapshot: Record<string, unknown> = {\n  createdAt: new Date('2026-01-01T00:00:00Z'),\n  tags: new Set(['stable', 'offline']),\n  counters: new Map([['orders', 3]]),\n  bytes: new Uint8Array([1, 2, 3])\n}\nsnapshot.self = snapshot\n\nconst encoded = await codec.encode(snapshot) // === snapshot：codec 不复制\nawait db.putRecord(encoded, 'latest') // IndexedDB 在这里执行 structured clone\nconst stored = await db.getRecord('latest')\nconst decoded = await codec.decode(stored) // Date/Map/Set/bytes/循环引用仍保留\n\nawait db.dispose()",
             "type IPreference = { id: string; theme: 'light' | 'dark' }\n\nconst definition = defineEntity<IPreference>({\n  name: 'preferences',\n  key: 'id',\n  version: 2,\n  migrations: { 2: async (previous) => ({ ...(previous as { id: string }), theme: 'light' }) }\n})\n\nconst preferences = definition.connect(indexedDb({ dbName: 'app-data' }))\nawait preferences.put({ id: 'appearance', theme: 'dark' })\nawait preferences.get('appearance') // { id: 'appearance', theme: 'dark' }",
             "import { defineEntity } from '@migaia/storage-web/entity'\nimport { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { StorageError, StorageErrorCode } from '@migaia/storage-web'\n\nconst orders = defineEntity<{ id: string; total: number }>({ name: 'orders', key: 'id' }).connect(\n  indexedDb()\n)\n\nconst applyBatch = async (items: Array<{ id: string; total: number }>) => {\n  try {\n    await orders.batch(async (tx) => {\n      for (const item of items) await tx.put(item)\n    })\n  } catch (error) {\n    if (error instanceof StorageError && error.code === StorageErrorCode.transactionConflict) {\n      await applyBatch(items) // 并发冲突：重读后重试整个回调\n    } else {\n      throw error\n    }\n  }\n}"
           ],
@@ -8228,7 +8263,7 @@
           ],
           "identity": "packages/storage-web/dist/backends/indexed-db.d.ts:indexedDb:export declare const indexedDb: <TValue = unknown>(options?: IIndexedDbOptions) => IRecordStore<TValue> & ISecondaryIndexRecordStore<TValue> & IChangeFeedStore;",
           "guidance": [],
-          "usageScore": 202,
+          "usageScore": 212,
           "configuration": [
             {
               "name": "dbName",
@@ -11156,7 +11191,7 @@
               ]
             }
           ],
-          "usageScore": 76,
+          "usageScore": 78,
           "configuration": [],
           "fragment": "storage-web-serialize--binaryCodec"
         },
@@ -11315,7 +11350,7 @@
               ]
             }
           ],
-          "usageScore": 64,
+          "usageScore": 66,
           "configuration": [],
           "fragment": "storage-web-serialize--jsonCodec"
         },
@@ -11337,6 +11372,7 @@
             "function selectCodec(\n  codec: ICodec,\n  capabilities: IStorageCapabilities,\n  onDiagnostic?: (message: string) => void\n): ISelectedCodec\n\ntype ISelectedCodec = {\n  encode(value: unknown, ctx?: { signal?: IAbortSignal }): Promise<string | Uint8Array | unknown>\n  decode(raw: string | Uint8Array | unknown, ctx?: { signal?: IAbortSignal }): Promise<unknown>\n}",
             "import { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\nimport { sessionStorage } from '@migaia/storage-web/session-storage'\nimport { memoryStorage } from '@migaia/storage-web/memory'\n\nconst textOnly = sessionStorage()\nconst selected = selectCodec(binaryCodec, textOnly.capabilities, (msg) => console.warn(msg))\nawait selected.encode(new Uint8Array([1, 2, 3])) // base64 字符串，触发一次诊断\n\nconst recordBackend = memoryStorage()\nconst direct = selectCodec(binaryCodec, recordBackend.capabilities)\nawait direct.encode(new Uint8Array([1, 2, 3])) // 原样透传，无降级",
             "import { jsonCodec, structuredCodec, binaryCodec, selectCodec } from '@migaia/storage-web/serialize'",
+            "import { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { selectCodec, structuredCodec } from '@migaia/storage-web/serialize'\n\nconst db = indexedDb({ dbName: 'app-data', recordsStoreName: 'snapshots' })\nconst codec = selectCodec(structuredCodec, db.capabilities)\n\nconst snapshot: Record<string, unknown> = {\n  createdAt: new Date('2026-01-01T00:00:00Z'),\n  tags: new Set(['stable', 'offline']),\n  counters: new Map([['orders', 3]]),\n  bytes: new Uint8Array([1, 2, 3])\n}\nsnapshot.self = snapshot\n\nconst encoded = await codec.encode(snapshot) // === snapshot：codec 不复制\nawait db.putRecord(encoded, 'latest') // IndexedDB 在这里执行 structured clone\nconst stored = await db.getRecord('latest')\nconst decoded = await codec.decode(stored) // Date/Map/Set/bytes/循环引用仍保留\n\nawait db.dispose()",
             "const selected = selectCodec(binaryCodec, store.capabilities, (msg) => console.warn(msg))\nawait selected.encode(bytes) // text-only 后端上自动转 base64",
             "import { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\nimport { memoryStorage } from '@migaia/storage-web/memory'\nimport { sessionStorage } from '@migaia/storage-web/session-storage'\n\nconst textOnly = sessionStorage()\nconst selected = selectCodec(binaryCodec, textOnly.capabilities, (message) =>\n  console.warn('[codec fallback]', message)\n)\nconst encoded = await selected.encode(new Uint8Array([1, 2, 3])) // base64 字符串，触发一次诊断\n\nconst recordBackend = memoryStorage()\nconst direct = selectCodec(binaryCodec, recordBackend.capabilities)\nawait direct.encode(new Uint8Array([1, 2, 3])) // 原样透传，无降级"
           ],
@@ -11421,7 +11457,7 @@
               ]
             }
           ],
-          "usageScore": 74,
+          "usageScore": 82,
           "configuration": [],
           "fragment": "storage-web-serialize--selectCodec"
         },
@@ -11442,7 +11478,8 @@
           "examples": [
             "const structuredCodec: ICodec<unknown, unknown>",
             "await structuredCodec.encode({ date: new Date(), blob: myBlob }) // 原样返回",
-            "import { jsonCodec, structuredCodec, binaryCodec, selectCodec } from '@migaia/storage-web/serialize'"
+            "import { jsonCodec, structuredCodec, binaryCodec, selectCodec } from '@migaia/storage-web/serialize'",
+            "import { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { selectCodec, structuredCodec } from '@migaia/storage-web/serialize'\n\nconst db = indexedDb({ dbName: 'app-data', recordsStoreName: 'snapshots' })\nconst codec = selectCodec(structuredCodec, db.capabilities)\n\nconst snapshot: Record<string, unknown> = {\n  createdAt: new Date('2026-01-01T00:00:00Z'),\n  tags: new Set(['stable', 'offline']),\n  counters: new Map([['orders', 3]]),\n  bytes: new Uint8Array([1, 2, 3])\n}\nsnapshot.self = snapshot\n\nconst encoded = await codec.encode(snapshot) // === snapshot：codec 不复制\nawait db.putRecord(encoded, 'latest') // IndexedDB 在这里执行 structured clone\nconst stored = await db.getRecord('latest')\nconst decoded = await codec.decode(stored) // Date/Map/Set/bytes/循环引用仍保留\n\nawait db.dispose()"
           ],
           "aliasOf": "structuredCodec",
           "exportPath": "./serialize",
@@ -11507,7 +11544,7 @@
               ]
             }
           ],
-          "usageScore": 46,
+          "usageScore": 50,
           "configuration": [],
           "fragment": "storage-web-serialize--structuredCodec"
         }

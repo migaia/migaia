@@ -1162,16 +1162,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/event-subscriber/IEventAbortSignal",
-      "to": "/en/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/event-subscriber",
-      "to": "/en/docs/event-subscriber/IEventAbortSignal",
-      "type": "domain-peer"
-    },
-    {
       "from": "/en/docs/event-subscriber/IEventApiStyle",
       "to": "/en/guides/event-subscriber",
       "type": "domain-peer"
@@ -1202,16 +1192,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/event-subscriber/IEventChannelLike",
-      "to": "/en/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/event-subscriber",
-      "to": "/en/docs/event-subscriber/IEventChannelLike",
-      "type": "domain-peer"
-    },
-    {
       "from": "/en/docs/event-subscriber/IEventChannelOptions",
       "to": "/en/guides/event-subscriber",
       "type": "domain-peer"
@@ -1229,16 +1209,6 @@
     {
       "from": "/en/guides/event-subscriber",
       "to": "/en/docs/event-subscriber/IEventChannelSubscription",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/event-subscriber/IEventContext",
-      "to": "/en/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/event-subscriber",
-      "to": "/en/docs/event-subscriber/IEventContext",
       "type": "domain-peer"
     },
     {
@@ -1312,16 +1282,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/event-subscriber/IEventListener",
-      "to": "/en/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/event-subscriber",
-      "to": "/en/docs/event-subscriber/IEventListener",
-      "type": "domain-peer"
-    },
-    {
       "from": "/en/docs/event-subscriber/IEventMap",
       "to": "/en/guides/event-subscriber",
       "type": "domain-peer"
@@ -1339,16 +1299,6 @@
     {
       "from": "/en/guides/event-subscriber",
       "to": "/en/docs/event-subscriber/IEventReport",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/event-subscriber/IEventSubscriber",
-      "to": "/en/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/event-subscriber",
-      "to": "/en/docs/event-subscriber/IEventSubscriber",
       "type": "domain-peer"
     },
     {
@@ -1482,46 +1432,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/event-subscriber/IUnsubscribe",
-      "to": "/en/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/event-subscriber",
-      "to": "/en/docs/event-subscriber/IUnsubscribe",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/event-subscriber/subscribeOnce",
-      "to": "/en/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/event-subscriber",
-      "to": "/en/docs/event-subscriber/subscribeOnce",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/event-subscriber/subscribeSubscriber",
-      "to": "/en/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/event-subscriber",
-      "to": "/en/docs/event-subscriber/subscribeSubscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/event-subscriber/subscribeUntil",
-      "to": "/en/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/event-subscriber",
-      "to": "/en/docs/event-subscriber/subscribeUntil",
-      "type": "domain-peer"
-    },
-    {
       "from": "/en/docs/event-subscriber/withSnapshotEntries",
       "to": "/en/guides/event-subscriber",
       "type": "domain-peer"
@@ -1529,6 +1439,106 @@
     {
       "from": "/en/guides/event-subscriber",
       "to": "/en/docs/event-subscriber/withSnapshotEntries",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber",
+      "to": "/en/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber/IEventAbortSignal",
+      "to": "/en/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber/IEventAbortSignal",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber/IEventChannelLike",
+      "to": "/en/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber/IEventChannelLike",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber/IEventContext",
+      "to": "/en/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber/IEventContext",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber/IEventListener",
+      "to": "/en/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber/IEventListener",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber/IEventSubscriber",
+      "to": "/en/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber/IEventSubscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber/IUnsubscribe",
+      "to": "/en/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber/IUnsubscribe",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber/subscribeOnce",
+      "to": "/en/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber/subscribeOnce",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber/subscribeSubscriber",
+      "to": "/en/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber/subscribeSubscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber/subscribeUntil",
+      "to": "/en/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber/subscribeUntil",
       "type": "domain-peer"
     },
     {
@@ -18592,16 +18602,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/event-subscriber/IEventAbortSignal",
-      "to": "/zh/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/event-subscriber",
-      "to": "/zh/docs/event-subscriber/IEventAbortSignal",
-      "type": "domain-peer"
-    },
-    {
       "from": "/zh/docs/event-subscriber/IEventApiStyle",
       "to": "/zh/guides/event-subscriber",
       "type": "domain-peer"
@@ -18632,16 +18632,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/event-subscriber/IEventChannelLike",
-      "to": "/zh/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/event-subscriber",
-      "to": "/zh/docs/event-subscriber/IEventChannelLike",
-      "type": "domain-peer"
-    },
-    {
       "from": "/zh/docs/event-subscriber/IEventChannelOptions",
       "to": "/zh/guides/event-subscriber",
       "type": "domain-peer"
@@ -18659,16 +18649,6 @@
     {
       "from": "/zh/guides/event-subscriber",
       "to": "/zh/docs/event-subscriber/IEventChannelSubscription",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/event-subscriber/IEventContext",
-      "to": "/zh/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/event-subscriber",
-      "to": "/zh/docs/event-subscriber/IEventContext",
       "type": "domain-peer"
     },
     {
@@ -18742,16 +18722,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/event-subscriber/IEventListener",
-      "to": "/zh/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/event-subscriber",
-      "to": "/zh/docs/event-subscriber/IEventListener",
-      "type": "domain-peer"
-    },
-    {
       "from": "/zh/docs/event-subscriber/IEventMap",
       "to": "/zh/guides/event-subscriber",
       "type": "domain-peer"
@@ -18769,16 +18739,6 @@
     {
       "from": "/zh/guides/event-subscriber",
       "to": "/zh/docs/event-subscriber/IEventReport",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/event-subscriber/IEventSubscriber",
-      "to": "/zh/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/event-subscriber",
-      "to": "/zh/docs/event-subscriber/IEventSubscriber",
       "type": "domain-peer"
     },
     {
@@ -18912,46 +18872,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/event-subscriber/IUnsubscribe",
-      "to": "/zh/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/event-subscriber",
-      "to": "/zh/docs/event-subscriber/IUnsubscribe",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/event-subscriber/subscribeOnce",
-      "to": "/zh/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/event-subscriber",
-      "to": "/zh/docs/event-subscriber/subscribeOnce",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/event-subscriber/subscribeSubscriber",
-      "to": "/zh/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/event-subscriber",
-      "to": "/zh/docs/event-subscriber/subscribeSubscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/event-subscriber/subscribeUntil",
-      "to": "/zh/guides/event-subscriber",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/event-subscriber",
-      "to": "/zh/docs/event-subscriber/subscribeUntil",
-      "type": "domain-peer"
-    },
-    {
       "from": "/zh/docs/event-subscriber/withSnapshotEntries",
       "to": "/zh/guides/event-subscriber",
       "type": "domain-peer"
@@ -18959,6 +18879,106 @@
     {
       "from": "/zh/guides/event-subscriber",
       "to": "/zh/docs/event-subscriber/withSnapshotEntries",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber",
+      "to": "/zh/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber/IEventAbortSignal",
+      "to": "/zh/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber/IEventAbortSignal",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber/IEventChannelLike",
+      "to": "/zh/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber/IEventChannelLike",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber/IEventContext",
+      "to": "/zh/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber/IEventContext",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber/IEventListener",
+      "to": "/zh/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber/IEventListener",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber/IEventSubscriber",
+      "to": "/zh/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber/IEventSubscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber/IUnsubscribe",
+      "to": "/zh/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber/IUnsubscribe",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber/subscribeOnce",
+      "to": "/zh/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber/subscribeOnce",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber/subscribeSubscriber",
+      "to": "/zh/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber/subscribeSubscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber/subscribeUntil",
+      "to": "/zh/guides/event-subscriber",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber/subscribeUntil",
       "type": "domain-peer"
     },
     {
@@ -39033,36 +39053,6 @@
     },
     {
       "from": "/en/docs/event-subscriber",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--IEventAbortSignal",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--IEventAbortSignal",
-      "to": "/en/docs/event-subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--IEventAbortSignal",
-      "to": "/en/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/event-subscriber/getting-started",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--IEventAbortSignal",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--IEventAbortSignal",
-      "to": "/en/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/event-subscriber",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--IEventAbortSignal",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber",
       "to": "/en/docs/event-subscriber#event-subscriber-index--IEventApiStyle",
       "type": "api-symbol"
     },
@@ -39153,36 +39143,6 @@
     },
     {
       "from": "/en/docs/event-subscriber",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--IEventChannelLike",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--IEventChannelLike",
-      "to": "/en/docs/event-subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--IEventChannelLike",
-      "to": "/en/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/event-subscriber/getting-started",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--IEventChannelLike",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--IEventChannelLike",
-      "to": "/en/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/event-subscriber",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--IEventChannelLike",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber",
       "to": "/en/docs/event-subscriber#event-subscriber-index--IEventChannelOptions",
       "type": "api-symbol"
     },
@@ -39239,36 +39199,6 @@
     {
       "from": "/en/architecture/event-subscriber",
       "to": "/en/docs/event-subscriber#event-subscriber-index--IEventChannelSubscription",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--IEventContext",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--IEventContext",
-      "to": "/en/docs/event-subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--IEventContext",
-      "to": "/en/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/event-subscriber/getting-started",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--IEventContext",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--IEventContext",
-      "to": "/en/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/event-subscriber",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--IEventContext",
       "type": "architecture-symbol"
     },
     {
@@ -39483,36 +39413,6 @@
     },
     {
       "from": "/en/docs/event-subscriber",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--IEventListener",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--IEventListener",
-      "to": "/en/docs/event-subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--IEventListener",
-      "to": "/en/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/event-subscriber/getting-started",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--IEventListener",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--IEventListener",
-      "to": "/en/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/event-subscriber",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--IEventListener",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber",
       "to": "/en/docs/event-subscriber#event-subscriber-index--IEventMap",
       "type": "api-symbol"
     },
@@ -39569,36 +39469,6 @@
     {
       "from": "/en/architecture/event-subscriber",
       "to": "/en/docs/event-subscriber#event-subscriber-index--IEventReport",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--IEventSubscriber",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--IEventSubscriber",
-      "to": "/en/docs/event-subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--IEventSubscriber",
-      "to": "/en/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/event-subscriber/getting-started",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--IEventSubscriber",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--IEventSubscriber",
-      "to": "/en/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/event-subscriber",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--IEventSubscriber",
       "type": "architecture-symbol"
     },
     {
@@ -39993,126 +39863,6 @@
     },
     {
       "from": "/en/docs/event-subscriber",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--IUnsubscribe",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--IUnsubscribe",
-      "to": "/en/docs/event-subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--IUnsubscribe",
-      "to": "/en/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/event-subscriber/getting-started",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--IUnsubscribe",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--IUnsubscribe",
-      "to": "/en/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/event-subscriber",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--IUnsubscribe",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--subscribeOnce",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--subscribeOnce",
-      "to": "/en/docs/event-subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--subscribeOnce",
-      "to": "/en/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/event-subscriber/getting-started",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--subscribeOnce",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--subscribeOnce",
-      "to": "/en/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/event-subscriber",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--subscribeOnce",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--subscribeSubscriber",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--subscribeSubscriber",
-      "to": "/en/docs/event-subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--subscribeSubscriber",
-      "to": "/en/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/event-subscriber/getting-started",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--subscribeSubscriber",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--subscribeSubscriber",
-      "to": "/en/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/event-subscriber",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--subscribeSubscriber",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--subscribeUntil",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--subscribeUntil",
-      "to": "/en/docs/event-subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--subscribeUntil",
-      "to": "/en/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/event-subscriber/getting-started",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--subscribeUntil",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber#event-subscriber-index--subscribeUntil",
-      "to": "/en/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/event-subscriber",
-      "to": "/en/docs/event-subscriber#event-subscriber-index--subscribeUntil",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber",
       "to": "/en/docs/event-subscriber#event-subscriber-index--withSnapshotEntries",
       "type": "api-symbol"
     },
@@ -40140,6 +39890,96 @@
       "from": "/en/architecture/event-subscriber",
       "to": "/en/docs/event-subscriber#event-subscriber-index--withSnapshotEntries",
       "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber#IEventAbortSignal",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
+      "to": "/en/docs/event-subscriber#IEventAbortSignal",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber#IEventChannelLike",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
+      "to": "/en/docs/event-subscriber#IEventChannelLike",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber#IEventContext",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventContext",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventContext",
+      "to": "/en/docs/event-subscriber#IEventContext",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber#IEventListener",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventListener",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventListener",
+      "to": "/en/docs/event-subscriber#IEventListener",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber#IEventSubscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventSubscriber",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventSubscriber",
+      "to": "/en/docs/event-subscriber#IEventSubscriber",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber#IUnsubscribe",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IUnsubscribe",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IUnsubscribe",
+      "to": "/en/docs/event-subscriber#IUnsubscribe",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber#subscribeOnce",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeOnce",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeOnce",
+      "to": "/en/docs/event-subscriber#subscribeOnce",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber#subscribeSubscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeSubscriber",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeSubscriber",
+      "to": "/en/docs/event-subscriber#subscribeSubscriber",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber#subscribeUntil",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeUntil",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeUntil",
+      "to": "/en/docs/event-subscriber#subscribeUntil",
+      "type": "alias-symbol"
     },
     {
       "from": "/zh/docs/event-subscriber",
@@ -40433,36 +40273,6 @@
     },
     {
       "from": "/zh/docs/event-subscriber",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventAbortSignal",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--IEventAbortSignal",
-      "to": "/zh/docs/event-subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--IEventAbortSignal",
-      "to": "/zh/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/event-subscriber/getting-started",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventAbortSignal",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--IEventAbortSignal",
-      "to": "/zh/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/event-subscriber",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventAbortSignal",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber",
       "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventApiStyle",
       "type": "api-symbol"
     },
@@ -40553,36 +40363,6 @@
     },
     {
       "from": "/zh/docs/event-subscriber",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventChannelLike",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--IEventChannelLike",
-      "to": "/zh/docs/event-subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--IEventChannelLike",
-      "to": "/zh/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/event-subscriber/getting-started",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventChannelLike",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--IEventChannelLike",
-      "to": "/zh/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/event-subscriber",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventChannelLike",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber",
       "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventChannelOptions",
       "type": "api-symbol"
     },
@@ -40639,36 +40419,6 @@
     {
       "from": "/zh/architecture/event-subscriber",
       "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventChannelSubscription",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventContext",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--IEventContext",
-      "to": "/zh/docs/event-subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--IEventContext",
-      "to": "/zh/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/event-subscriber/getting-started",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventContext",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--IEventContext",
-      "to": "/zh/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/event-subscriber",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventContext",
       "type": "architecture-symbol"
     },
     {
@@ -40883,36 +40633,6 @@
     },
     {
       "from": "/zh/docs/event-subscriber",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventListener",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--IEventListener",
-      "to": "/zh/docs/event-subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--IEventListener",
-      "to": "/zh/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/event-subscriber/getting-started",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventListener",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--IEventListener",
-      "to": "/zh/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/event-subscriber",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventListener",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber",
       "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventMap",
       "type": "api-symbol"
     },
@@ -40969,36 +40689,6 @@
     {
       "from": "/zh/architecture/event-subscriber",
       "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventReport",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventSubscriber",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--IEventSubscriber",
-      "to": "/zh/docs/event-subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--IEventSubscriber",
-      "to": "/zh/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/event-subscriber/getting-started",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventSubscriber",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--IEventSubscriber",
-      "to": "/zh/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/event-subscriber",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--IEventSubscriber",
       "type": "architecture-symbol"
     },
     {
@@ -41393,126 +41083,6 @@
     },
     {
       "from": "/zh/docs/event-subscriber",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--IUnsubscribe",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--IUnsubscribe",
-      "to": "/zh/docs/event-subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--IUnsubscribe",
-      "to": "/zh/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/event-subscriber/getting-started",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--IUnsubscribe",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--IUnsubscribe",
-      "to": "/zh/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/event-subscriber",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--IUnsubscribe",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--subscribeOnce",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--subscribeOnce",
-      "to": "/zh/docs/event-subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--subscribeOnce",
-      "to": "/zh/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/event-subscriber/getting-started",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--subscribeOnce",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--subscribeOnce",
-      "to": "/zh/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/event-subscriber",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--subscribeOnce",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--subscribeSubscriber",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--subscribeSubscriber",
-      "to": "/zh/docs/event-subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--subscribeSubscriber",
-      "to": "/zh/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/event-subscriber/getting-started",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--subscribeSubscriber",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--subscribeSubscriber",
-      "to": "/zh/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/event-subscriber",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--subscribeSubscriber",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--subscribeUntil",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--subscribeUntil",
-      "to": "/zh/docs/event-subscriber",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--subscribeUntil",
-      "to": "/zh/guides/event-subscriber/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/event-subscriber/getting-started",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--subscribeUntil",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber#event-subscriber-index--subscribeUntil",
-      "to": "/zh/architecture/event-subscriber",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/event-subscriber",
-      "to": "/zh/docs/event-subscriber#event-subscriber-index--subscribeUntil",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber",
       "to": "/zh/docs/event-subscriber#event-subscriber-index--withSnapshotEntries",
       "type": "api-symbol"
     },
@@ -41539,6 +41109,676 @@
     {
       "from": "/zh/architecture/event-subscriber",
       "to": "/zh/docs/event-subscriber#event-subscriber-index--withSnapshotEntries",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber#IEventAbortSignal",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
+      "to": "/zh/docs/event-subscriber#IEventAbortSignal",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber#IEventChannelLike",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
+      "to": "/zh/docs/event-subscriber#IEventChannelLike",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber#IEventContext",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventContext",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventContext",
+      "to": "/zh/docs/event-subscriber#IEventContext",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber#IEventListener",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventListener",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventListener",
+      "to": "/zh/docs/event-subscriber#IEventListener",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber#IEventSubscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventSubscriber",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventSubscriber",
+      "to": "/zh/docs/event-subscriber#IEventSubscriber",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber#IUnsubscribe",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IUnsubscribe",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IUnsubscribe",
+      "to": "/zh/docs/event-subscriber#IUnsubscribe",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber#subscribeOnce",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeOnce",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeOnce",
+      "to": "/zh/docs/event-subscriber#subscribeOnce",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber#subscribeSubscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeSubscriber",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeSubscriber",
+      "to": "/zh/docs/event-subscriber#subscribeSubscriber",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber#subscribeUntil",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeUntil",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeUntil",
+      "to": "/zh/docs/event-subscriber#subscribeUntil",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber",
+      "to": "/en/guides/event-subscriber/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/en/guides/event-subscriber/getting-started",
+      "to": "/en/docs/event-subscriber/subscriber",
+      "type": "guide-api"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber",
+      "to": "/en/architecture/event-subscriber",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/en/architecture/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
+      "to": "/en/docs/event-subscriber/subscriber",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
+      "to": "/en/guides/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/event-subscriber/getting-started",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
+      "to": "/en/architecture/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
+      "to": "/en/docs/event-subscriber/subscriber",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
+      "to": "/en/guides/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/event-subscriber/getting-started",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
+      "to": "/en/architecture/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventContext",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventContext",
+      "to": "/en/docs/event-subscriber/subscriber",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventContext",
+      "to": "/en/guides/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/event-subscriber/getting-started",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventContext",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventContext",
+      "to": "/en/architecture/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventContext",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventListener",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventListener",
+      "to": "/en/docs/event-subscriber/subscriber",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventListener",
+      "to": "/en/guides/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/event-subscriber/getting-started",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventListener",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventListener",
+      "to": "/en/architecture/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventListener",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventSubscriber",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventSubscriber",
+      "to": "/en/docs/event-subscriber/subscriber",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventSubscriber",
+      "to": "/en/guides/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/event-subscriber/getting-started",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventSubscriber",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventSubscriber",
+      "to": "/en/architecture/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventSubscriber",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IUnsubscribe",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IUnsubscribe",
+      "to": "/en/docs/event-subscriber/subscriber",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IUnsubscribe",
+      "to": "/en/guides/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/event-subscriber/getting-started",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IUnsubscribe",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IUnsubscribe",
+      "to": "/en/architecture/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--IUnsubscribe",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeOnce",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeOnce",
+      "to": "/en/docs/event-subscriber/subscriber",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeOnce",
+      "to": "/en/guides/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/event-subscriber/getting-started",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeOnce",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeOnce",
+      "to": "/en/architecture/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeOnce",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeSubscriber",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeSubscriber",
+      "to": "/en/docs/event-subscriber/subscriber",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeSubscriber",
+      "to": "/en/guides/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/event-subscriber/getting-started",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeSubscriber",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeSubscriber",
+      "to": "/en/architecture/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeSubscriber",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeUntil",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeUntil",
+      "to": "/en/docs/event-subscriber/subscriber",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeUntil",
+      "to": "/en/guides/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/event-subscriber/getting-started",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeUntil",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeUntil",
+      "to": "/en/architecture/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/event-subscriber",
+      "to": "/en/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeUntil",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber",
+      "to": "/zh/guides/event-subscriber/getting-started",
+      "type": "api-guide"
+    },
+    {
+      "from": "/zh/guides/event-subscriber/getting-started",
+      "to": "/zh/docs/event-subscriber/subscriber",
+      "type": "guide-api"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber",
+      "to": "/zh/architecture/event-subscriber",
+      "type": "api-architecture"
+    },
+    {
+      "from": "/zh/architecture/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber",
+      "type": "architecture-api"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
+      "to": "/zh/docs/event-subscriber/subscriber",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
+      "to": "/zh/guides/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/event-subscriber/getting-started",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
+      "to": "/zh/architecture/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventAbortSignal",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
+      "to": "/zh/docs/event-subscriber/subscriber",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
+      "to": "/zh/guides/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/event-subscriber/getting-started",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
+      "to": "/zh/architecture/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventChannelLike",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventContext",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventContext",
+      "to": "/zh/docs/event-subscriber/subscriber",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventContext",
+      "to": "/zh/guides/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/event-subscriber/getting-started",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventContext",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventContext",
+      "to": "/zh/architecture/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventContext",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventListener",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventListener",
+      "to": "/zh/docs/event-subscriber/subscriber",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventListener",
+      "to": "/zh/guides/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/event-subscriber/getting-started",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventListener",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventListener",
+      "to": "/zh/architecture/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventListener",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventSubscriber",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventSubscriber",
+      "to": "/zh/docs/event-subscriber/subscriber",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventSubscriber",
+      "to": "/zh/guides/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/event-subscriber/getting-started",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventSubscriber",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventSubscriber",
+      "to": "/zh/architecture/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IEventSubscriber",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IUnsubscribe",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IUnsubscribe",
+      "to": "/zh/docs/event-subscriber/subscriber",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IUnsubscribe",
+      "to": "/zh/guides/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/event-subscriber/getting-started",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IUnsubscribe",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IUnsubscribe",
+      "to": "/zh/architecture/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--IUnsubscribe",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeOnce",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeOnce",
+      "to": "/zh/docs/event-subscriber/subscriber",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeOnce",
+      "to": "/zh/guides/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/event-subscriber/getting-started",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeOnce",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeOnce",
+      "to": "/zh/architecture/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeOnce",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeSubscriber",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeSubscriber",
+      "to": "/zh/docs/event-subscriber/subscriber",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeSubscriber",
+      "to": "/zh/guides/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/event-subscriber/getting-started",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeSubscriber",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeSubscriber",
+      "to": "/zh/architecture/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeSubscriber",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeUntil",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeUntil",
+      "to": "/zh/docs/event-subscriber/subscriber",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeUntil",
+      "to": "/zh/guides/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/event-subscriber/getting-started",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeUntil",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeUntil",
+      "to": "/zh/architecture/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/event-subscriber",
+      "to": "/zh/docs/event-subscriber/subscriber#event-subscriber-subscriber--subscribeUntil",
       "type": "architecture-symbol"
     },
     {

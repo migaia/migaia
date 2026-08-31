@@ -28,7 +28,16 @@
               },
               {
                 "type": "paragraph",
-                "text": "不适用：列表/高频增删的集合状态用 `@migaia/store-indexed`；需要稳定业务 key 寻址用 `@migaia/store-keyed`；需要持久化用 `@migaia/store-persist`；需要 React hooks 用 `@migaia/store-react`。`store-light` 本身只提供\"对象 facade + 异步资源\"，其余能力都是独立包按需组合，依赖 `@migaia/reactive`（响应式内核）、`@migaia/lifecycle`（所有权与释放）、`@migaia/event-subscriber`（`StoreResource` 内部事件通道）与 `@migaia/utils`。"
+                "text": "不适用："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "列表或高频增删的集合状态使用 `@migaia/store-indexed`。",
+                  "需要按稳定业务 key 寻址时使用 `@migaia/store-keyed`。",
+                  "需要持久化时使用 `@migaia/store-persist`；需要 React hooks 时使用 `@migaia/store-react`。",
+                  "`store-light` 只负责对象状态和异步资源。响应式内核、资源释放、内部事件与通用工具分别由 `@migaia/reactive`、`@migaia/lifecycle`、`@migaia/event-subscriber` 与 `@migaia/utils` 提供。"
+                ]
               }
             ]
           },

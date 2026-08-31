@@ -207,6 +207,15 @@ lengthPrefixedNamespaceCodec.decode('app', 'sw1:3:app:theme') // 'theme'
 import { jsonCodec, structuredCodec, binaryCodec, selectCodec } from '@migaia/storage-web/serialize'
 ```
 
+四者不是同一种格式的别名，先按要保存的数据和后端能力选择：
+
+| Codec | 实际写入值 | 什么时候选 | 不能做什么 |
+| --- | --- | --- | --- |
+| `jsonCodec` | JSON 字符串 | 数据只含普通 JSON 值，或必须兼容 Local Storage、Cookie 等 text-only 后端 | 不保留 `Date`/`Map`/`Set`/二进制的原类型，也不能表达循环引用 |
+| `structuredCodec` | 原对象，由 record 后端执行 structured clone | IndexedDB/Memory 中要保存 `Date`、`Map`、`Set`、`Blob`、`ArrayBuffer`、typed array 或循环引用 | 不能用于 text-only 后端，也不负责 schema 校验、领域实例重建或函数/DOM 节点持久化 |
+| `binaryCodec` | `Uint8Array`；text-only 后端可转 base64 | 数据本来就是字节，且希望支持二进制后端直写 | 不接受 `ArrayBuffer`、字符串或普通数组；base64 回退会增加约 33% 体积 |
+| `selectCodec` | 由 codec 与 `store.capabilities` 共同决定 | 连接具体后端时确认直写、可逆回退或拒绝 | 不会把 structured 数据偷偷降级为 JSON，因为那会静默丢失类型和引用关系 |
+
 **`jsonCodec`｜3 秒上手** —— 默认 codec，零依赖，全后端可用：
 
 ```ts
@@ -216,13 +225,32 @@ await jsonCodec.decode('{"a":1}') // { a: 1 }
 
 `output: 'text'`。`JSON.stringify` 返回 `undefined`（如输入本身是 `undefined`）时落盘为字符串 `'null'`；`stringify`/`parse` 抛错分别归一化为 `SERIALIZE_FAILED`/`DESERIALIZE_FAILED`。
 
-**`structuredCodec`｜3 秒上手** —— 恒等编解码，交给后端自身的 structured clone：
+**`structuredCodec`｜10 秒上手** —— codec 本身原样传值，真正的复制发生在 IndexedDB/Memory 的 structured clone 写入与读取边界：
 
 ```ts
-await structuredCodec.encode({ date: new Date(), blob: myBlob }) // 原样返回
+import { indexedDb } from '@migaia/storage-web/indexed-db'
+import { selectCodec, structuredCodec } from '@migaia/storage-web/serialize'
+
+const db = indexedDb({ dbName: 'app-data', recordsStoreName: 'snapshots' })
+const codec = selectCodec(structuredCodec, db.capabilities)
+
+const snapshot: Record<string, unknown> = {
+  createdAt: new Date('2026-01-01T00:00:00Z'),
+  tags: new Set(['stable', 'offline']),
+  counters: new Map([['orders', 3]]),
+  bytes: new Uint8Array([1, 2, 3])
+}
+snapshot.self = snapshot
+
+const encoded = await codec.encode(snapshot) // === snapshot：codec 不复制
+await db.putRecord(encoded, 'latest') // IndexedDB 在这里执行 structured clone
+const stored = await db.getRecord('latest')
+const decoded = await codec.decode(stored) // Date/Map/Set/bytes/循环引用仍保留
+
+await db.dispose()
 ```
 
-`output: 'structured'`。只能用于支持 `records`（`capabilities.records === true`）的后端；可直接存 `Blob`/`File`/`ArrayBuffer`/`Map`/`Set`/`Date`，甚至循环引用。
+`output: 'structured'`。`encode()`/`decode()` 都是恒等操作，所以单独调用它不会制作快照；对象隔离由 record 后端负责。只能用于 `capabilities.records === true` 的后端；传给 Local Storage、Session Storage 或 Cookie 时，`selectCodec` 立即抛 `UNSUPPORTED_CAPABILITY`，不会改用 JSON。structured clone 能保留上述内建类型和引用图，但不是业务 schema：字段校验、版本迁移以及 class 实例重建仍应由 Schema/Entity 层处理。
 
 **`binaryCodec`｜5 秒上手**：
 

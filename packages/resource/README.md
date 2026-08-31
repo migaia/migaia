@@ -34,53 +34,102 @@
 ## 4. 五分钟上手
 
 ```ts
-import { Resource } from '@migaia/resource';
+import { Resource, ResourceStatus } from '@migaia/resource';
 import { createRuntime } from '@migaia/reactive';
+
+type IUser = { id: string; name: string };
+
+class UserRequestError extends Error {
+  readonly code = 'USER_REQUEST_FAILED';
+
+  constructor(readonly status: number) {
+    super(`GET /api/user failed: ${status}`);
+  }
+}
 
 const runtime = createRuntime();
 
-const user = new Resource(
-  ({ signal }) => fetch('/api/user', { signal }).then((r) => r.json()),
+const user = new Resource<IUser>(
+  async ({ signal }) => {
+    const response = await fetch('/api/user', { signal });
+    if (!response.ok) throw new UserRequestError(response.status);
+    return (await response.json()) as IUser;
+  },
   runtime
 );
 
 switch (user.state.status) {
-  case 'pending':
+  case ResourceStatus.idle:
+  case ResourceStatus.pending:
     console.log('loading...');
     break;
-  case 'success':
+  case ResourceStatus.success:
     console.log(user.state.data);
     break;
-  case 'error':
+  case ResourceStatus.error:
+  case ResourceStatus.cancelled:
     console.error(user.state.error);
     break;
 }
 
-await user.refetch(); // 手动触发一次新请求
-user.dispose(); // 不再使用时释放，中止在途请求并清理订阅
+try {
+  const freshUser = await user.refetch();
+  console.log('refetched user', freshUser);
+} finally {
+  user.dispose();
+}
 ```
+
+构造函数默认 `autoStart: true`，因此 `new Resource(...)` 会立即创建第一代请求，并把状态从 `idle` 推进到 `pending`。上面的 `switch` 读取的是当前快照；如果界面需要随请求结算自动更新，应在 `Effect` 或框架适配层的订阅回调中读取 `user.state`，而不是只执行一次 `switch`。
+
+传给 fetcher 的 `signal` 只属于当前这一代请求。调用 `refetch()` 会强制创建新一代、取消仍在途的上一代，并返回新一代的 Promise；上一代即使忽略 abort 后仍然成功返回，也没有资格覆盖当前状态。把 `signal` 传给 `fetch` 的意义是同时停止底层网络工作、节省资源；Resource 的 generation 检查才是防止旧结果覆盖新状态的最终保证。
+
+`dispose()` 是终止整个 Resource，不等同于取消一次请求：它会取消当前 generation、清除 fetcher 建立的 Signal/Computed 依赖，并释放内部状态订阅。它不会释放外部传入的 `runtime`。重复调用 `dispose()` 是安全的，但释放后再读 `state`、调用 `refetch()` 或其他公开操作都会抛出 `RESOURCE_DISPOSED`；若只是暂时停止当前请求并计划稍后复用该实例，应调用 `cancel()`。
 
 依赖某个响应式输入、自动刷新的写法：
 
 ```ts
-import { Resource } from '@migaia/resource';
-import { Signal, createRuntime } from '@migaia/reactive';
+import { Resource, ResourceStatus } from '@migaia/resource';
+import { createRuntime } from '@migaia/reactive';
+import { fetchUser } from './user-api.js';
 
 const runtime = createRuntime();
-const userId = new Signal(1, runtime);
+const userId = runtime.signal('1');
 
 const user = new Resource(
-  async ({ signal }) => {
-    const response = await fetch(`/api/users/${userId.value}`, { signal });
-    if (!response.ok) throw new Error('加载用户失败');
-    return response.json();
+  ({ signal }) => {
+    const id = userId.value; // 在返回 Promise 前读取：Runtime 建立 userId → user 依赖边
+    return fetchUser(id, { signal });
   },
   runtime,
   { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }
 );
 
-userId.value = 2; // fetcher 里对 userId.value 的同步读取已被登记为依赖，这行会触发新请求
+const stopRendering = runtime.effect(() => {
+  const state = user.state; // 建立 user.state → 当前渲染任务的依赖边
+  if (state.status === ResourceStatus.pending) console.log('loading user');
+  if (state.status === ResourceStatus.success) console.log('render', state.data);
+  if (state.status === ResourceStatus.error) console.error(state.error);
+});
+
+export function selectUser(id: string): void {
+  userId.value = id;
+}
+
+selectUser('2'); // 标脏 Resource；当前请求被替换，新请求使用 id = '2'
+
+export function disposeUserPanel(): void {
+  stopRendering();
+  user.dispose();
+  userId.dispose();
+}
 ```
+
+这里不是两个互不相关的包碰巧共用一个变量。`Resource` 使用同一个 `runtime` 把自己注册成 Reactive 图里的 observer：fetcher 同步读取 `userId.value` 时，Runtime 记录 `userId → user`；渲染 Effect 读取 `user.state` 时，又记录 `user → rendering effect`。因此完整传播路径是 `userId 写入 → Resource 标脏 → 新请求状态写入 → Effect 重跑`。
+
+`selectUser('2')` 后，Reactive 会把同一批次内对 `userId` 的多次写入合并，再通过 idle/microtask 通道通知 Resource。Resource 创建新的 request generation，并 abort 被取代 generation 的 `signal`；`fetchUser('2', ...)` 的 pending/success/error 状态写入内部 Signal，观察 `user.state` 的 Effect 随之重跑。即使旧请求不支持 AbortSignal 并在稍后返回，generation 校验也会丢弃旧结果。
+
+依赖收集只覆盖 fetcher 返回 Promise 之前的同步阶段。上例先把 `userId.value` 读进 `id`，再调用异步 API；如果等到 `await` 之后才读取 `userId.value`，JavaScript 的同步追踪上下文已经结束，这次读取不会建立自动刷新关系。`disposeUserPanel()` 则按消费方向反向释放：先停止渲染 Effect，再终止 Resource，最后释放输入 Signal。
 
 ## 5. 核心概念一览
 

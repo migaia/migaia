@@ -13,6 +13,16 @@ import './app.css'
 import { DOMAINS, LOCALES, type ILocale } from './route-contract.js'
 import { copyFor } from './copy.js'
 import { loadSearchIndex } from './search.js'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle
+} from './components/ui/dialog.js'
+import { Input } from './components/ui/input.js'
+import { Button } from './components/ui/button.js'
 
 type IThemeMode = 'light' | 'dark' | 'time'
 type ITimePhase = 'sunrise' | 'sunset' | 'night' | 'midnight'
@@ -87,7 +97,14 @@ function ShellHeader() {
   const [searchLoaded, setSearchLoaded] = useState(false)
   const [theme, setTheme] = useState<IThemeChoice>('light')
   const [phase, setPhase] = useState<ITimePhase>(() => timePhase(new Date()))
-  const locale = localeFromPath(useLocation().pathname)
+  const location = useLocation()
+  const locale = localeFromPath(location.pathname)
+  /** Opposite locale exposed as the header's single language-switch destination. */
+  const alternateLocale: ILocale = locale === 'zh' ? 'en' : 'zh'
+  /** Client-routable pathname without the static preview server's file suffix. */
+  const canonicalPathname = location.pathname.replace(/\/index\.html$/, '').replace(/\/$/, '')
+  /** Equivalent localized route, including the active query string and document anchor. */
+  const alternateLocalePath = `${canonicalPathname.replace(/^\/(?:en|zh)(?=\/|$)/, `/${alternateLocale}`)}${location.search}${location.hash}`
   const copy = copyFor(locale)
 
   /** Loads Pagefind only after the user opens search. */
@@ -103,6 +120,17 @@ function ShellHeader() {
       setSearchLoaded(true)
     }
   }
+
+  useEffect(() => {
+    /** Opens search from the Quip-style Option+J shortcut without inserting the Option glyph. */
+    const handleSearchShortcut = (event: KeyboardEvent) => {
+      if (!event.altKey || event.metaKey || event.ctrlKey || event.code !== 'KeyJ') return
+      event.preventDefault()
+      void openSearch()
+    }
+    window.addEventListener('keydown', handleSearchShortcut)
+    return () => window.removeEventListener('keydown', handleSearchShortcut)
+  }, [searchLoaded])
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
@@ -168,28 +196,26 @@ function ShellHeader() {
           ))}
         </nav>
         <div className="header-actions">
-          <button
+          <Button
             type="button"
-            className="button button-quiet mobile-nav-trigger"
+            variant="quiet"
+            className="mobile-nav-trigger"
             aria-expanded={mobileNavOpen}
             aria-controls="mobile-navigation"
             onClick={() => setMobileNavOpen((open) => !open)}
           >
             {copy.menu}
-          </button>
-          <button type="button" className="button button-quiet" onClick={openSearch}>
-            {copy.search} <kbd>⌘K</kbd>
-          </button>
-          {LOCALES.map((candidate) => (
-            <Link
-              key={candidate}
-              className={candidate === locale ? 'language-link active' : 'language-link'}
-              to={`/${candidate}`}
-              aria-label={locale === 'zh' ? `切换至 ${candidate}` : `Switch to ${candidate}`}
-            >
-              {candidate}
-            </Link>
-          ))}
+          </Button>
+          <Button type="button" variant="quiet" aria-keyshortcuts="Alt+J" onClick={openSearch}>
+            {copy.search} <kbd>⌥J</kbd>
+          </Button>
+          <Link
+            className="language-link"
+            to={alternateLocalePath}
+            aria-label={locale === 'zh' ? '切换至英文' : 'Switch to Chinese'}
+          >
+            {locale === 'zh' ? 'En' : '中文'}
+          </Link>
           <select
             className="theme-select"
             value={theme}
@@ -222,13 +248,9 @@ function ShellHeader() {
         >
           <div className="mobile-sheet-header">
             <strong>{copy.navigate}</strong>
-            <button
-              type="button"
-              className="button button-quiet"
-              onClick={() => setMobileNavOpen(false)}
-            >
+            <Button type="button" variant="quiet" onClick={() => setMobileNavOpen(false)}>
               {copy.close}
-            </button>
+            </Button>
           </div>
           <nav aria-label={copy.mobileNavigation}>
             {DOMAINS.map((domain) => (
@@ -247,32 +269,33 @@ function ShellHeader() {
           </nav>
         </dialog>
       ) : null}
-      {searchOpen ? (
-        <section
-          className="search-panel"
-          aria-label={copy.search}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') setSearchOpen(false)
-          }}
-        >
-          <label htmlFor="site-search">{copy.searchLabel}</label>
-          <input
-            id="site-search"
-            autoFocus
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={copy.searchPlaceholder}
-          />
-          <p className="search-state">{query.trim() ? copy.searchUnknown : copy.searchEmpty}</p>
-          <button
-            type="button"
-            className="button button-quiet"
-            onClick={() => setSearchOpen(false)}
+      <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+        <DialogPortal>
+          <DialogOverlay />
+          <DialogContent
+            aria-describedby="site-search-description"
+            onEscapeKeyDown={() => setSearchOpen(false)}
+            onPointerDownOutside={() => setSearchOpen(false)}
           >
-            {copy.close}
-          </button>
-        </section>
-      ) : null}
+            <div className="search-panel-header">
+              <DialogTitle>{copy.searchLabel}</DialogTitle>
+            </div>
+            <div className="search-field">
+              <Input
+                id="site-search"
+                autoFocus
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder=" "
+              />
+              <label htmlFor="site-search">{copy.searchPlaceholder}</label>
+            </div>
+            <DialogDescription id="site-search-description" className="search-state">
+              {query.trim() ? copy.searchUnknown : copy.searchEmpty}
+            </DialogDescription>
+          </DialogContent>
+        </DialogPortal>
+      </Dialog>
     </>
   )
 }
