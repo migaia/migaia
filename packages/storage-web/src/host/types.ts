@@ -202,14 +202,21 @@ type IHasDuplicatePluginIds<
 
 /** Host options captured at construction; scheduler ownership remains lifecycle-owned. */
 export type IStorageHostOptions = {
+  /** Bounds one complete plugin installation batch; defaults to 30 seconds. */
   readonly installTimeoutMs?: number
+  /** Supplies deterministic lifecycle time for installation, rollback, and cleanup. */
   readonly scheduler?: ILifecycleScheduler
+  /**
+   * Receives contained late rejection and cleanup diagnostics without replacing the primary
+   * failure.
+   */
   readonly report?: (error: unknown) => void | PromiseLike<void>
 }
 
 /** Constructor options preserving literal plugin tuples for exact Host capabilities. */
 export type IStorageHostCreateOptions<TPlugins extends readonly IStorageBackendPluginHandle[]> =
   IStorageHostOptions & {
+    /** Initial plugin tuple installed atomically before the host is returned. */
     readonly plugins?: IRejectInstalledOrDuplicateIds<Record<never, never>, TPlugins>
   }
 

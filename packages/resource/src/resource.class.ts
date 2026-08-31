@@ -76,6 +76,7 @@ type IResourceOptionSnapshot<T> = {
 }
 
 export type IResourceOptions<T = unknown> = {
+  /** Human-readable owner label used in reactive diagnostics and request error context. */
   debugName?: string
   /**
    * Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a

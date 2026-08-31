@@ -54,7 +54,7 @@ runSyncMiddleware(
       next(value.toUpperCase());
     }
   ],
-  ' migai ',
+  ' migaia ',
   (value) => console.log(value), // 'MIGAIA'
   (violation) => console.warn(violation) // 'late' | 'duplicate'
 );
@@ -476,8 +476,8 @@ const upperStage: IAsyncMiddlewareStage<string> = async (value, next) => {
 
 await runAsyncMiddleware(
   [trimStage, upperStage],
-  '  migai  ',
-  (value) => console.log(value), // 'MIGAI'
+  '  migaia  ',
+  (value) => console.log(value), // 'MIGAIA'
   { onViolation: (kind) => console.warn('violation:', kind) }
 );
 ```

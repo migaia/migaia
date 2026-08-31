@@ -20,10 +20,15 @@ export type IHttpPluginConfig = {
   requestTimeoutMs?: number
   /** 是否复用 batch 插件的批量能力；未装 batch 插件时自动退化为每条日志单独发送 */
   batch?: {
+    /** Flushes a batch when it reaches this many entries. */
     maxSize?: number
+    /** Flushes a non-empty batch after this many milliseconds. */
     maxWaitMs?: number
+    /** Bounds the number of batch callbacks executing concurrently. */
     maxConcurrentBatches?: number
+    /** Bounds queued plus executing batches so sustained overload cannot grow memory without limit. */
     maxPendingBatches?: number
+    /** Schedules size-triggered output asynchronously instead of running it in the caller stack. */
     asyncOutput?: boolean
   }
   /** Maximum valid Retry-After delay; valid excess is clamped. Defaults to 30000ms. */

@@ -40,6 +40,7 @@ export type IStoreProviderConfig = {
   readonly ready?: readonly IStoreReadyBarrier[]
   /** 屏障未完成时的占位。 */
   readonly fallback?: ReactNode
+  /** 只读业务默认值快照；Provider 不会把这些值自动写入各 Store。 */
   readonly defaults?: IStoreProviderDefaults
 }
 

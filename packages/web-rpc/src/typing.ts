@@ -305,19 +305,30 @@ export type IWebRpcFactoryConfig<
   TTargetId extends string = string,
   TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[]
 > = {
+  /** Stable local endpoint identity included in every routed protocol envelope. */
   readonly id: string
+  /** Optional known-peer seed; automatic discovery may resolve additional target ids lazily. */
   readonly targetIds?: readonly TTargetId[]
+  /** Transport used for all encoded messages owned by this endpoint. */
   readonly transport?: IWebRpcTransport
+  /** Initial provider methods registered before endpoint construction completes. */
   readonly provider?: Readonly<Record<string, IWebRpcProvider>>
+  /** Provider concurrency budgets; defaults to 256 global and 64 per peer. */
   readonly providerLimits?: IWebRpcProviderLimits
   /** Bounds outbound identifier replay reservations for this endpoint. */
   readonly replay?: {
+    /** Maximum retained outbound request identifiers; defaults to 4096. */
     readonly maxEntries?: number
+    /** Retention time for outbound request identifiers; defaults to 310 seconds. */
     readonly ttlMs?: number
   }
+  /** Ordered middleware tuple installed atomically during endpoint construction. */
   readonly middlewares: TMiddlewares
+  /** Cancellation and deadline controls for middleware installation and rollback. */
   readonly construction?: {
+    /** Aborts construction while still rolling back every installed middleware. */
     readonly signal?: IWebRpcAbortSignal
+    /** Bounds endpoint construction, or disables the deadline when explicitly `false`. */
     readonly timeoutMs?: number | false
   }
 }
