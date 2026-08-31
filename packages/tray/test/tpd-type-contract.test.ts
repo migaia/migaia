@@ -10,6 +10,7 @@ import {
   type ITrayPluginMutationResult,
   type ITrayPluginRemovalResult
 } from '../src/host/index.js'
+import type { IRuntime } from '../src/runtime/typing.js'
 
 type ITestCore = Record<string, never>
 type IReadyConfig = Readonly<{ readonly enabled: boolean }>
@@ -45,7 +46,28 @@ const readyPlugin = {
   config: { enabled: true },
   shared: () => ({ readyValue: 42 }),
   install: (_core: TypeHost) => ({ readyExtension: true })
-} satisfies IPlugin<TypeHost, { readonly readyExtension: boolean }, IReadyConfig, IReadyShared>
+} satisfies IPlugin<TypeHost, { readonly readyExtension: boolean }, IReadyConfig, IReadyShared> & {
+  readonly name: 'ready'
+}
+
+const exactRuntime = undefined as unknown as IRuntime<readonly [typeof readyPlugin]>
+if (exactRuntime)
+  exactRuntime.run('ready', { timeoutMs: false }, ({ extensions, self }) => {
+    const exact: boolean = extensions.readyExtension
+    const ticket = self.unUse()
+    const completion: Promise<unknown> = ticket.completion
+    // @ts-expect-error Self tickets are intentionally non-thenable.
+    const thenProperty = ticket.then
+    void completion
+    void thenProperty
+    return exact
+  })
+const dynamicRuntimeName: string = 'ready'
+if (exactRuntime)
+  exactRuntime.run(dynamicRuntimeName, { timeoutMs: false }, ({ extensions }) => {
+    const widened: unknown = extensions.unknownManagedExtension
+    return widened
+  })
 
 const blockedPlugin = {
   name: 'blocked',

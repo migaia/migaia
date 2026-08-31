@@ -26,6 +26,15 @@ export function attachTrayError(error: unknown, code: ITrayErrorCode): unknown {
 /** Creates a new Tray-owned Error for non-Error failures or local diagnostics. */
 export function createTrayError(code: ITrayErrorCode, cause?: unknown): Error {
   const messages: Record<ITrayErrorCode, string> = {
+    [TrayErrorCode.loaderContractInvalid]: TrayErrorText.loaderContractInvalid,
+    [TrayErrorCode.loaderExecutionFailed]: TrayErrorText.loaderExecutionFailed,
+    [TrayErrorCode.adapterContractInvalid]: TrayErrorText.adapterContractInvalid,
+    [TrayErrorCode.adapterExecutionFailed]: TrayErrorText.adapterExecutionFailed,
+    [TrayErrorCode.runtimeContractInvalid]: TrayErrorText.runtimeContractInvalid,
+    [TrayErrorCode.runtimeDisposed]: TrayErrorText.runtimeDisposed,
+    [TrayErrorCode.runtimeExecutionFailed]: TrayErrorText.runtimeExecutionFailed,
+    [TrayErrorCode.runtimeAborted]: TrayErrorText.runtimeAborted,
+    [TrayErrorCode.artifactCleanupFailed]: TrayErrorText.artifactCleanupFailed,
     [TrayErrorCode.invalidEntry]: TrayErrorText.invalidEntry,
     [TrayErrorCode.duplicateEntry]: TrayErrorText.duplicateEntry,
     [TrayErrorCode.unknownEntry]: TrayErrorText.unknownEntry,
@@ -33,7 +42,13 @@ export function createTrayError(code: ITrayErrorCode, cause?: unknown): Error {
     [TrayErrorCode.gateReadFailed]: TrayErrorText.gateReadFailed,
     [TrayErrorCode.hostMutationBypass]: TrayErrorText.hostMutationBypass
   }
-  const error = new Error(messages[code], cause === undefined ? undefined : { cause })
+  const ErrorType =
+    code === TrayErrorCode.loaderContractInvalid ||
+    code === TrayErrorCode.adapterContractInvalid ||
+    code === TrayErrorCode.runtimeContractInvalid
+      ? TypeError
+      : Error
+  const error = new ErrorType(messages[code], cause === undefined ? undefined : { cause })
   Object.defineProperties(error, {
     source: { value: TRAY_SOURCE },
     code: { value: code }

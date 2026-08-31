@@ -32,6 +32,13 @@ import {
   type ITrayResolvedHost,
   type IUnsubscribe
 } from './typing.js'
+import {
+  claimArtifactCustody,
+  readRuntimeBridge,
+  registerRuntimeBridge,
+  type ITrayArtifactCustody
+} from './internal-capability.js'
+import { createView as createRegistrationView } from '@migaia/plugin-host/composition'
 
 type IAnyHost = PluginHost<any, any, any> &
   IPluginHostCompositionIntegration<PluginHost<any, any, any>>
@@ -49,6 +56,7 @@ type IAdmissionRecord = {
   readonly admission: IPluginAdmission<IPluginConstraint<any>>
   readonly slot: IPluginDataOrderSlot
   receipt?: IPluginRegistrationReceipt
+  artifactCustody?: ITrayArtifactCustody
 }
 type IGraph = IDynamicCapabilityGraph<IAdmissionRecord>
 
@@ -68,6 +76,21 @@ export async function createHost<
   let session: object | undefined
   let anchorName: string | undefined
   const cleanup: ICleanupAccumulator = { errors: [], complete: true, physical: [] }
+  /** Counts active Runtime callbacks by plugin name to fence same-run mutation. */
+  const activeRuntimeNames = new Map<string, number>()
+  /** Tracks only the synchronous callback turn for unsupported raw-Host mutation rejection. */
+  const callbackRuntimeNames = new Map<string, number>()
+  /** Resolves deferred physical cleanup when all Runtime generation leases are released. */
+  const runtimeQuiescenceWaiters = new Set<() => void>()
+  const waitForRuntimeQuiescence = (): Promise<void> => {
+    if (activeRuntimeNames.size === 0) return Promise.resolve()
+    return new Promise((resolve) => runtimeQuiescenceWaiters.add(resolve))
+  }
+  const notifyRuntimeQuiescence = (): void => {
+    if (activeRuntimeNames.size !== 0) return
+    for (const resolve of runtimeQuiescenceWaiters) resolve()
+    runtimeQuiescenceWaiters.clear()
+  }
   try {
     concrete = captured.create()
     if (!(concrete instanceof PluginHost) || claims.has(concrete as object))
@@ -188,6 +211,32 @@ export async function createHost<
           } else cleanup.physical.push(removal.physicalCompletion)
         }
         for (const entry of cleanupOrder) receiptsByName.delete(String(entry.id))
+      },
+      releaseBinding: async (entry) => {
+        if (activeRuntimeNames.has(entry.binding?.snapshot.name ?? '')) {
+          cleanup.complete = false
+          const deferred = waitForRuntimeQuiescence().then(async () => {
+            try {
+              await entry.binding?.artifactCustody?.rollback()
+            } catch (error) {
+              const cleanupError = attachTrayError(error, TrayErrorCode.artifactCleanupFailed)
+              cleanup.errors.push(cleanupError)
+              cleanup.complete = false
+              report(cleanupError)
+            }
+            return Object.freeze({ cleanupErrors: Object.freeze([...cleanup.errors]) })
+          })
+          cleanup.physical.push(deferred)
+          return
+        }
+        try {
+          await entry.binding.artifactCustody?.rollback()
+        } catch (error) {
+          const cleanupError = attachTrayError(error, TrayErrorCode.artifactCleanupFailed)
+          cleanup.errors.push(cleanupError)
+          cleanup.complete = false
+          report(cleanupError)
+        }
       }
     })
     const managed = createManagedHost(
@@ -206,13 +255,63 @@ export async function createHost<
       session,
       cleanup,
       anchorName,
-      () => receipt
+      () => receipt,
+      activeRuntimeNames,
+      waitForRuntimeQuiescence
     )
     for (const admission of admissions) {
       const node = toGraphNode(admission)
       await graph.register(node, admission)
     }
     await graph.ready()
+    registerRuntimeBridge(managed as object, {
+      acquire: (name) => {
+        const lease = graph!.acquireBinding(name as IGraphId)
+        const record = lease.value
+        if (!record.receipt) {
+          lease.release()
+          throw createTrayError(TrayErrorCode.unavailable)
+        }
+        const view = createRegistrationView(record.receipt)
+        return Object.freeze({
+          extensions: view.extensions,
+          generation: record as object,
+          release: lease.release
+        })
+      },
+      beginRun: (name) => {
+        activeRuntimeNames.set(name, (activeRuntimeNames.get(name) ?? 0) + 1)
+      },
+      endRun: (name) => {
+        const count = activeRuntimeNames.get(name) ?? 0
+        if (count <= 1) activeRuntimeNames.delete(name)
+        else activeRuntimeNames.set(name, count - 1)
+        notifyRuntimeQuiescence()
+      },
+      enterCallback: (name) => {
+        callbackRuntimeNames.set(name, (callbackRuntimeNames.get(name) ?? 0) + 1)
+      },
+      exitCallback: (name) => {
+        const count = callbackRuntimeNames.get(name) ?? 0
+        if (count <= 1) callbackRuntimeNames.delete(name)
+        else callbackRuntimeNames.set(name, count - 1)
+      },
+      assertMutationAllowed: (name) => {
+        if (callbackRuntimeNames.has(name)) throw createTrayError(TrayErrorCode.unavailable)
+      },
+      selfUnUse: async (name, generation, _runId) => {
+        if (graph!.getBinding<IAdmissionRecord>(name as IGraphId) !== generation)
+          throw createTrayError(TrayErrorCode.unavailable)
+        return managed.unUse(name)
+      },
+      selfReplace: async (name, generation, plugin, _runId) => {
+        if (graph!.getBinding<IAdmissionRecord>(name as IGraphId) !== generation)
+          throw createTrayError(TrayErrorCode.unavailable)
+        if ((plugin as { readonly name?: unknown }).name !== name)
+          throw createTrayError(TrayErrorCode.runtimeContractInvalid)
+        return managed.replace(plugin as IPluginBinding)
+      }
+    })
     return managed as ITrayResolvedHost<THost, TPlugins>
   } catch (error) {
     const cleanupErrors: unknown[] = [...cleanup.errors]
@@ -372,7 +471,9 @@ function createManagedHost(
   session: object,
   cleanup: ICleanupAccumulator,
   anchorName: string,
-  readExpectedRevision: () => number
+  readExpectedRevision: () => number,
+  activeRuntimeNames: ReadonlyMap<string, number>,
+  waitForRuntimeQuiescence: () => Promise<void>
 ): ITrayHost<IAnyHost, readonly IPluginBinding[], readonly IPluginBinding[]> {
   let state: ITrayHostState = TrayHostState.active
   let terminalError: unknown
@@ -472,8 +573,14 @@ function createManagedHost(
         return output
       } catch (error) {
         publicationPending = false
-        const committed = !existedBefore && graph.getBinding(name as IGraphId) === candidate
-        if (candidate && !committed) concrete.retireDataOrderSlot(candidate.slot)
+        const committed =
+          candidate !== undefined &&
+          !existedBefore &&
+          graph.getBinding(name as IGraphId) === candidate
+        if (candidate && !committed) {
+          concrete.retireDataOrderSlot(candidate.slot)
+          await candidate.artifactCustody?.rollback()
+        }
         const failure = mutationFailure('use', name, error, facade, committed)
         hub.publish('mutationFailed', {
           operation: 'use',
@@ -486,6 +593,14 @@ function createManagedHost(
     async unUse(name: string): Promise<ITrayPluginRemovalResult<unknown, unknown>> {
       assertActive()
       assertOwned()
+      const runtimeBridge = readRuntimeBridge(facade)
+      try {
+        runtimeBridge?.assertMutationAllowed?.(name)
+      } catch (error) {
+        const failure = removalFailure(name, error, facade)
+        hub.publish('mutationFailed', { operation: 'unUse', name, error: failure.error })
+        return failure
+      }
       if (!graph.nodes.some((id) => String(id) === name)) return removalMissing(name, facade)
       const target = graph.getBinding<IAdmissionRecord>(name as IGraphId)
       try {
@@ -513,6 +628,14 @@ function createManagedHost(
       assertOwned()
       const snapshot = snapshotTrayPlugin(plugin)
       const name = snapshot.name
+      const runtimeBridge = readRuntimeBridge(facade)
+      try {
+        runtimeBridge?.assertMutationAllowed?.(name)
+      } catch (error) {
+        const failure = mutationFailure('replace', name, error, facade)
+        hub.publish('mutationFailed', { operation: 'replace', name, error: failure.error })
+        return failure
+      }
       const previous = graph.getBinding<IAdmissionRecord>(name as IGraphId)
       let candidate: IAdmissionRecord | undefined
       try {
@@ -554,11 +677,36 @@ function createManagedHost(
         const physical: Promise<ITrayPluginPhysicalCleanupResult>[] = []
         try {
           resetCleanup()
+          /** Defers concrete Host disposal so active Runtime callbacks retain physical custody. */
+          const deferConcreteDisposal = async (): Promise<boolean> => {
+            if (activeRuntimeNames.size === 0) return false
+            const runtimeFence = waitForRuntimeQuiescence()
+            const bounded = await settleWithin(runtimeFence, options.quiescenceMs)
+            if (bounded.complete) return false
+            cleanup.complete = false
+            const delayed = runtimeFence.then(
+              () => concrete!.dispose() as Promise<IPluginHostDisposalResult>
+            )
+            physical.push(observePhysical(delayed))
+            return true
+          }
           const externallyMutated = concrete.revision !== readExpectedRevision()
           if (externallyMutated) {
             await graph.dispose()
             cleanupErrors.push(...cleanup.errors)
             physical.push(...cleanup.physical)
+            if (await deferConcreteDisposal()) {
+              state = TrayHostState.terminal
+              claims.delete(concrete as object)
+              hub.publish('disposed', { state: 'terminal', cleanupComplete: false })
+              return {
+                state: 'terminal' as const,
+                termination: 'external-host' as const,
+                cleanupComplete: false,
+                cleanupErrors: Object.freeze(cleanupErrors),
+                physicalCompletion: settlePhysical(physical)
+              }
+            }
             const externalResult = (await concrete.dispose()) as IPluginHostDisposalResult
             cleanupErrors.push(...externalResult.cleanupErrors)
             if (externalResult.physicalCompletion)
@@ -586,6 +734,18 @@ function createManagedHost(
           cleanupErrors.push(...anchorRemoval.cleanupErrors)
           if (anchorRemoval.physicalCompletion)
             physical.push(observePhysical(anchorRemoval.physicalCompletion))
+          if (await deferConcreteDisposal()) {
+            state = TrayHostState.terminal
+            claims.delete(concrete as object)
+            hub.publish('disposed', { state: 'terminal', cleanupComplete: false })
+            return {
+              state: 'terminal' as const,
+              termination: 'managed' as const,
+              cleanupComplete: false,
+              cleanupErrors: Object.freeze(cleanupErrors),
+              physicalCompletion: settlePhysical(physical)
+            }
+          }
           const result = (await concrete.dispose()) as IPluginHostDisposalResult
           cleanupErrors.push(...result.cleanupErrors)
           if (result.physicalCompletion) physical.push(observePhysical(result.physicalCompletion))
@@ -655,7 +815,8 @@ function createManagedHost(
       admission: concrete.createPluginAdmission<IPluginConstraint<any>>(
         plugin as IPluginConstraint<any>
       ),
-      slot: slot ?? concrete.createDataOrderSlot(snapshot.name)
+      slot: slot ?? concrete.createDataOrderSlot(snapshot.name),
+      artifactCustody: claimArtifactCustody(plugin as object)
     }
     return record
   }

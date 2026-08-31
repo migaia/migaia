@@ -19,11 +19,11 @@ pnpm add @migaia/tray
 ## 最小可运行示例
 
 ```ts
-import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray';
+import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'
 
-const key = (value: string): ITrayKey => value as ITrayKey;
-const configKey = key('config');
-const apiKey = key('api');
+const key = (value: string): ITrayKey => value as ITrayKey
+const configKey = key('config')
+const apiKey = key('api')
 
 const entries: readonly ITrayEntryDefinition<unknown>[] = [
   {
@@ -36,21 +36,21 @@ const entries: readonly ITrayEntryDefinition<unknown>[] = [
     kind: 'service',
     requires: [configKey],
     start: (context) => {
-      const config = context.get<{ baseUrl: string }>(configKey);
-      const client = { baseUrl: config.baseUrl };
-      return { value: client, release: () => undefined };
+      const config = context.get<{ baseUrl: string }>(configKey)
+      const client = { baseUrl: config.baseUrl }
+      return { value: client, release: () => undefined }
     }
   }
-];
+]
 
-const tray = createTray(entries);
-await tray.ready();
-const api = tray.get<{ baseUrl: string }>(apiKey);
+const tray = createTray(entries)
+await tray.ready()
+const api = tray.get<{ baseUrl: string }>(apiKey)
 
 try {
-  console.log(api.baseUrl);
+  console.log(api.baseUrl)
 } finally {
-  await tray.dispose();
+  await tray.dispose()
 }
 ```
 
@@ -66,37 +66,39 @@ try {
 所有 Tray 自有边界错误都带 `source: '@migaia/tray'` 与稳定 `code`。生产代码按 `(source, code)` 分支，不依赖 message：
 
 ```ts
-import { TRAY_SOURCE, TrayErrorCode } from '@migaia/tray';
+import { TRAY_SOURCE, TrayErrorCode } from '@migaia/tray'
 
 try {
-  tray.get(apiKey);
+  tray.get(apiKey)
 } catch (error) {
-  const diagnostic = error as { source?: string; code?: string };
+  const diagnostic = error as { source?: string; code?: string }
   if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {
     // 等待 ready()，或处理启动/就绪门失败。
   } else {
-    throw error;
+    throw error
   }
 }
 ```
 
 完整 entry 契约、readiness gate、状态、错误码与生命周期语义见 [USEGUIDE.md](./USEGUIDE.md)。
 
-## 托管 PluginHost：动态加载与卸载
+## 高阶组合示例
+
+### 托管 PluginHost：动态加载、依赖阻塞与确定性卸载
 
 `@migaia/tray/host` 是 Tray 的 Host stage/decorator，不创建第二个运行时身份。`createHost()`
 异步完成 admission、依赖图启动与 Host 发布后才返回；返回值实现异步显式资源管理：
 
 ```ts
-import { PluginHost, type IPlugin } from '@migaia/plugin-host';
-import { createHost } from '@migaia/tray/host';
+import { PluginHost, type IPlugin } from '@migaia/plugin-host'
+import { createHost } from '@migaia/tray/host'
 
 class AppHost extends PluginHost<Record<string, never>, string> {}
 
 const provider = {
   name: 'provider',
   install: () => ({ providerValue: 1 })
-} satisfies IPlugin<AppHost, { readonly providerValue: number }>;
+} satisfies IPlugin<AppHost, { readonly providerValue: number }>
 
 await using host = await createHost({
   create: () =>
@@ -105,10 +107,10 @@ await using host = await createHost({
   mutationAdmissionMs: 100,
   quiescenceMs: 100,
   shutdown: { mode: 'bounded' }
-});
+})
 
-await host.use({ name: 'late', requires: ['provider'], install: () => ({ late: true }) });
-await host.unUse('provider'); // `late` 保留为 blocked definition，不再留在 Host 可见面。
+await host.use({ name: 'late', requires: ['provider'], install: () => ({ late: true }) })
+await host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。
 ```
 
 同名 `replace()` 与 provider 恢复会复用该 definition 的 Host ordering slot；真正
@@ -116,3 +118,27 @@ await host.unUse('provider'); // `late` 保留为 blocked definition，不再留
 结果可能先返回 `cleanupComplete: false`，但 `physicalCompletion` 严格等待 Graph binding lease、
 pipeline lease、插件 disposer 与资源 disposer，未完成前不会启动后项。不能使用
 `await using` 的编译目标可用 `try/finally { await host.dispose() }`。
+
+### Loader、Adapter 与 Runtime 子路径
+
+三个能力只从显式子路径导入，不由 Tray 根入口聚合：
+
+```ts
+import { defineLoader, loadIntoHost } from '@migaia/tray/loader'
+import { defineAdapter } from '@migaia/tray/adapter'
+import { createRuntime } from '@migaia/tray/runtime'
+```
+
+Loader 只负责 `source → { value, release }`，Adapter 只负责 artifact 到插件描述子的转换；
+`loadIntoHost()` 才拥有 `load → adapt → use/replace` 事务。提交前失败回滚临时 scope，提交后
+artifact 由对应 definition generation 清理。Runtime 从托管 Host 取得 exact generation lease，
+只向 callback 发布目标插件的 extensions；callback settle 前不会释放 lease。`dispose()` 停止
+新 run、abort active signal，并按 `bounded` 或 `strict-drain` 策略观察真实完成，不宣称终止
+不合作的 same-realm callback。
+
+Runtime callback 同时收到只绑定当前 run、插件名称与 generation 的 `context.self`。调用
+`self.unUse()` 或 `self.replace(plugin)` 会同步返回不具 thenable 行为的 ticket；ticket 的
+`completion` 只在 callback settle、lease release 后由 managed Host queue 执行。callback 内
+等待同一 ticket 的 completion 会立即得到 `RUNTIME_CONTRACT_INVALID`，而 callback 返回 ticket
+后可在外层等待 `ticket.completion`。外部 `host.unUse/replace` 继续遵循原有 queue 与 lease
+语义；callback 不应捕获 concrete Host 做 self mutation。

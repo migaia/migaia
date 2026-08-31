@@ -18,33 +18,33 @@ import {
   type ITrayErrorCode,
   type ITrayKey,
   type ITrayState
-} from '@migaia/tray';
+} from '@migaia/tray'
 ```
 
 `ITrayKey` 是带品牌的非空字符串。包不猜测或生成业务 key；应用应在自己的契约文件集中声明并复用：
 
 ```ts
-const trayKey = (value: string): ITrayKey => value as ITrayKey;
+const trayKey = (value: string): ITrayKey => value as ITrayKey
 export const AppTrayKey = {
   config: trayKey('config'),
   api: trayKey('api')
-} as const;
+} as const
 ```
 
 ## 2. Entry 定义
 
 ```ts
-type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service';
+type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'
 
 type ITrayEntryDefinition<T> = {
-  readonly key: ITrayKey;
-  readonly kind: ITrayEntryKind;
-  readonly requires?: readonly ITrayKey[];
-  readonly readiness?: IGraphReadinessSnapshot;
+  readonly key: ITrayKey
+  readonly kind: ITrayEntryKind
+  readonly requires?: readonly ITrayKey[]
+  readonly readiness?: IGraphReadinessSnapshot
   readonly start: (
     context: ITrayEntryContext
-  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>;
-};
+  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>
+}
 ```
 
 - `key`：必填、trim 后非空、全 Tray 唯一。
@@ -62,7 +62,7 @@ type ITrayEntryDefinition<T> = {
 ## 3. `createTray()` 与 admission
 
 ```ts
-function createTray(entries: readonly ITrayEntryDefinition<unknown>[]): ITray;
+function createTray(entries: readonly ITrayEntryDefinition<unknown>[]): ITray
 ```
 
 构造阶段只做同步 admission，不启动 entry。数组、entry 字段、kind、key、requires 与 readiness 外形不合法时立即抛 `TRAY_INVALID_ENTRY`；重复 key 抛 `TRAY_DUPLICATE_ENTRY`。任何 admission 失败都发生在第一个 `start()` 之前，不会留下半启动组合根。
@@ -84,14 +84,14 @@ function createTray(entries: readonly ITrayEntryDefinition<unknown>[]): ITray;
 
 ```ts
 type ITray = {
-  readonly keys: readonly ITrayKey[];
-  readonly state: ITrayState;
-  readonly error: unknown | undefined;
-  ready(): Promise<void>;
-  get<T>(key: ITrayKey): T;
-  entryState(key: ITrayKey): string;
-  dispose(): Promise<void>;
-};
+  readonly keys: readonly ITrayKey[]
+  readonly state: ITrayState
+  readonly error: unknown | undefined
+  ready(): Promise<void>
+  get<T>(key: ITrayKey): T
+  entryState(key: ITrayKey): string
+  dispose(): Promise<void>
+}
 ```
 
 - `keys`：admission 时保存的冻结 key 列表，保持声明顺序。
@@ -111,14 +111,23 @@ Tray core 不增加 timeout、scheduler 或强制终止策略。可能永久 pen
 
 所有 Tray 自有错误的 `source` 都是 `TRAY_SOURCE`（`'@migaia/tray'`）：
 
-| `TrayErrorCode` | 码值 | 触发条件 | 调用方处理 |
-| --- | --- | --- | --- |
-| `invalidEntry` | `TRAY_INVALID_ENTRY` | entry、依赖、kind、readiness 或 start result 不满足契约 | 修正静态定义；同一输入不要盲目重试 |
-| `duplicateEntry` | `TRAY_DUPLICATE_ENTRY` | 同一 Tray 出现重复 key | 在应用契约层保证 key 唯一 |
-| `unknownEntry` | `TRAY_UNKNOWN_ENTRY` | `get()`/`entryState()` 使用未接纳 key | 使用 `tray.keys` 或集中定义的 key 常量 |
-| `unavailable` | `TRAY_UNAVAILABLE` | entry 尚未 ready、gate 失败或 Tray 已终结 | 先等待 `ready()`，并检查 `state`/`error` |
-| `gateReadFailed` | `TRAY_GATE_READ_FAILED` | readiness getter 抛错 | 检查保留的原始错误并修复 readiness source |
-| `hostMutationBypass` | `HOST_MUTATION_BYPASS` | escaped concrete Host 绕过 managed Graph receipt 发生 mutation | 停止使用 raw Host mutation；只通过 `@migaia/tray/host` facade 写入 |
+| `TrayErrorCode`          | 码值                       | 触发条件                                                       | 调用方处理                                                         |
+| ------------------------ | -------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `invalidEntry`           | `TRAY_INVALID_ENTRY`       | entry、依赖、kind、readiness 或 start result 不满足契约        | 修正静态定义；同一输入不要盲目重试                                 |
+| `duplicateEntry`         | `TRAY_DUPLICATE_ENTRY`     | 同一 Tray 出现重复 key                                         | 在应用契约层保证 key 唯一                                          |
+| `unknownEntry`           | `TRAY_UNKNOWN_ENTRY`       | `get()`/`entryState()` 使用未接纳 key                          | 使用 `tray.keys` 或集中定义的 key 常量                             |
+| `unavailable`            | `TRAY_UNAVAILABLE`         | entry 尚未 ready、gate 失败或 Tray 已终结                      | 先等待 `ready()`，并检查 `state`/`error`                           |
+| `gateReadFailed`         | `TRAY_GATE_READ_FAILED`    | readiness getter 抛错                                          | 检查保留的原始错误并修复 readiness source                          |
+| `hostMutationBypass`     | `HOST_MUTATION_BYPASS`     | escaped concrete Host 绕过 managed Graph receipt 发生 mutation | 停止使用 raw Host mutation；只通过 `@migaia/tray/host` facade 写入 |
+| `loaderContractInvalid`  | `LOADER_CONTRACT_INVALID`  | loader/result/release descriptor 外形非法                      | 修正 Loader contract，不重试相同输入                               |
+| `loaderExecutionFailed`  | `LOADER_EXECUTION_FAILED`  | Loader 执行抛错；原错误仍在 cause/identity 链                  | 检查 source 与 cause 后处理                                        |
+| `adapterContractInvalid` | `ADAPTER_CONTRACT_INVALID` | Adapter 或 plugin descriptor 外形非法                          | 修正 Adapter 输出                                                  |
+| `adapterExecutionFailed` | `ADAPTER_EXECUTION_FAILED` | Adapter 执行抛错；原错误保持可达                               | 检查 artifact compatibility                                        |
+| `runtimeContractInvalid` | `RUNTIME_CONTRACT_INVALID` | foreign Host、name/options/execute 外形非法                    | 修正 Runtime 调用契约                                              |
+| `runtimeDisposed`        | `RUNTIME_DISPOSED`         | closing/terminal 后仍 admission                                | 创建新 Runtime 或停止 admission                                    |
+| `runtimeExecutionFailed` | `RUNTIME_EXECUTION_FAILED` | callback 抛错；lease 仍在 finally 释放                         | 检查 callback cause                                                |
+| `runtimeAborted`         | `RUNTIME_ABORTED`          | caller/runtime/deadline cooperative abort                      | 按 cancellation 处理并等待 settlement                              |
+| `artifactCleanupFailed`  | `ARTIFACT_CLEANUP_FAILED`  | artifact secondary cleanup failure                             | 检查 cleanupErrors，不替换 mutation primary                        |
 
 Graph 启动、节点或释放错误仍保留 `@migaia/capability` 的 source/code，不会被 Tray 强行改写。
 
@@ -147,11 +156,7 @@ pnpm --filter @migaia/tray build
 ## 10. `@migaia/tray/host` 托管组合
 
 ```ts
-import {
-  createHost,
-  type ICreateHostOptions,
-  type ITrayResolvedHost
-} from '@migaia/tray/host';
+import { createHost, type ICreateHostOptions, type ITrayResolvedHost } from '@migaia/tray/host'
 ```
 
 `await createHost(options)` 的唯一 concrete Host 由 `options.create()` 构造。Tray 随后一次性快照
@@ -180,3 +185,41 @@ Host 的 constructor baseline extension/config 类型，运行期管理的未知
 不要绕过 facade 调用 escaped concrete Host mutation。Tray 会以
 `(source: '@migaia/tray', code: 'HOST_MUTATION_BYPASS')` fail closed，因为 Graph 与 Host 已不再拥有同一
 publication receipt。
+
+## 11. Loader、Adapter 与 Runtime
+
+能力边界通过显式子路径保持隔离：
+
+```ts
+import { defineLoader, loadIntoHost } from '@migaia/tray/loader'
+import { defineAdapter } from '@migaia/tray/adapter'
+import { createRuntime } from '@migaia/tray/runtime'
+```
+
+`defineLoader()` 快照一次 `load` contract，并兼容同步值、原生 Promise 与 foreign thenable；
+结果必须提供 `value` 与可调用的 lifecycle `release` descriptor。`defineAdapter()` 同样只
+快照并执行一次转换，不拥有 Host、Graph、scope 或 artifact 清理。`loadIntoHost()` 是唯一事务
+owner：提交前的 loader/adapt/mutation failure 回滚 provisional artifact；只有 committed
+definition generation 接管 cleanup。
+
+Runtime 不创建第二个 Host 或 Graph。`runtime.run(name, options, callback)` 取得目标 ready
+plugin 的 exact generation lease，并只发布该 registration 的 extension snapshot。同步返回、
+Promise 与 foreign thenable 都在 callback settle 后释放 lease；caller signal、Runtime dispose
+和 timeout 只 abort cooperative signal，不伪造任务已终止。`strict-drain` 等待真实 settlement，
+`bounded` 可返回未完成的物理观察结果。
+
+callback context 的 `self` 是当前 run/name/generation 专属 mutation capability：
+
+```ts
+const ticket = await runtime.run('search', { timeoutMs: false }, ({ self }) => self.unUse())
+await ticket.completion
+```
+
+ticket 不可 thenable，且只在 callback 已 settle 并释放 generation lease 后才调度 canonical
+managed Host mutation。callback 内等待 `ticket.completion` 会 fail fast 并返回
+`RUNTIME_CONTRACT_INVALID`；外部 `host.unUse/replace` 仍按既有 queue 等待 exact lease。不要
+从 callback 捕获 concrete Host 执行 self mutation。
+
+Loader/Adapter/Runtime 契约错误分别使用 `LOADER_*`、`ADAPTER_*`、`RUNTIME_*` 码；原始 native
+error 保留 identity、type、stack 与 cause。artifact secondary cleanup 使用
+`ARTIFACT_CLEANUP_FAILED` 作为观察码，不能替换更早 mutation primary。
