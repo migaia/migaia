@@ -1,14 +1,14 @@
 {
   "status": "approved",
   "requirement": "PDLC-R06 / T14 / T15",
-  "reason": "Cross-host custody repair normalizes checkout paths and replaces volatile platform and native-library digest inputs with repository-declared toolchain contracts while preserving exact emitted and retained-input hashes.",
+  "reason": "Cross-host custody repair signs only the canonical requested build contract, normalized checkout paths, repository-declared toolchain, exact inputs, emitted output, and retained graph; Vite internal resolved state is diagnostic-only.",
   "approvalRecord": {
     "schema": "WRC-C-B11-approval-v2",
     "authorityId": "web-rpc-release-coordinator-v1",
-    "keyId": "coordinator-ed25519-cf67090f4b18e27a",
-    "decisionId": "WRC-C-B11-decision-20260831-CROSS-HOST-R3",
-    "issuedAt": "2026-08-31T02:45:29.142Z",
-    "rationale": "Cross-host custody repair normalizes checkout paths and replaces volatile platform and native-library digest inputs with repository-declared toolchain contracts while preserving exact emitted and retained-input hashes.",
+    "keyId": "coordinator-ed25519-575e903a0048f2f2",
+    "decisionId": "WRC-C-B11-decision-20260831-CROSS-HOST-R4",
+    "issuedAt": "2026-08-31T02:51:03.596Z",
+    "rationale": "Cross-host custody repair signs only the canonical requested build contract, normalized checkout paths, repository-declared toolchain, exact inputs, emitted output, and retained graph; Vite internal resolved state is diagnostic-only.",
     "oldTuple": {
       "moduleCount": 53,
       "rawBytes": 250129,
@@ -19,15 +19,15 @@
       "rawBytes": 475725,
       "gzipBytes": 113838
     },
-    "digest": "cf67090f4b18e27a189a6deec6303d78a3ba187c8cedd8f1a639bc89c1e14531",
-    "signature": "ckHjEkr6ydptdqjKS65Wi7ovDzn/TJqflkuf+wtZqFfYVuKK4hScJtSHR5WV/kwG7Z7TJExUk8QbTIQ2DBRbCw==",
+    "digest": "575e903a0048f2f28002e5e0285015ac47cd959d6966c91c36705c38b78272b6",
+    "signature": "qTYZbH7hd/75TkkuItO3yozCS4QjD40MiAPjGhXDKqAIDcqFmqhYOA6+OLz8rlpPS07RxF2JMMZgcpP9/4r7CA==",
     "payload": {
       "schema": "WRC-C-B11-approval-v2",
       "authorityId": "web-rpc-release-coordinator-v1",
-      "keyId": "coordinator-ed25519-cf67090f4b18e27a",
-      "decisionId": "WRC-C-B11-decision-20260831-CROSS-HOST-R3",
-      "issuedAt": "2026-08-31T02:45:29.142Z",
-      "rationale": "Cross-host custody repair normalizes checkout paths and replaces volatile platform and native-library digest inputs with repository-declared toolchain contracts while preserving exact emitted and retained-input hashes.",
+      "keyId": "coordinator-ed25519-575e903a0048f2f2",
+      "decisionId": "WRC-C-B11-decision-20260831-CROSS-HOST-R4",
+      "issuedAt": "2026-08-31T02:51:03.596Z",
+      "rationale": "Cross-host custody repair signs only the canonical requested build contract, normalized checkout paths, repository-declared toolchain, exact inputs, emitted output, and retained graph; Vite internal resolved state is diagnostic-only.",
       "oldTuple": {
         "moduleCount": 53,
         "rawBytes": 250129,
@@ -38,7 +38,7 @@
         "rawBytes": 475725,
         "gzipBytes": 113838
       },
-      "digest": "cf67090f4b18e27a189a6deec6303d78a3ba187c8cedd8f1a639bc89c1e14531"
+      "digest": "575e903a0048f2f28002e5e0285015ac47cd959d6966c91c36705c38b78272b6"
     }
   }
 }

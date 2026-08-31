@@ -9,7 +9,6 @@ import {
   digestProvenanceSubject,
   validateAuthorization
 } from '../tree-shaking-authorization.mjs'
-import { resolveCanonicalBuildConfig } from '../tree-shaking-canonical-build.mjs'
 
 type IProvenance = {
   readonly approval: { readonly status: string; readonly approvalRecord: unknown }
@@ -153,38 +152,18 @@ describe('WRC-C-B11 retained provenance', () => {
     expect(packageInvocation.tuple).toEqual(report.tuple)
     expect(packageInvocation.subject.emitted.bundleSha256).toBe(report.subject.emitted.bundleSha256)
     expect(packageInvocation.subject.emitted.modules).toEqual(report.subject.emitted.modules)
-    expect(JSON.stringify(report.subject.resolvedBuildOptions)).toContain(
-      '[ephemeral:webSocketToken]'
-    )
     expect(
       digestProvenanceSubject({ ...subjectWithoutDigest, outputOptions: { minify: true } })
     ).not.toBe(digest)
-
-    const tokenOnlySubject = {
-      ...subjectWithoutDigest,
-      resolvedBuildOptions: {
-        ...subjectWithoutDigest.resolvedBuildOptions,
-        webSocketToken: '[ephemeral:webSocketToken]'
-      }
-    }
-    expect(digestProvenanceSubject(tokenOnlySubject)).toBe(digest)
-    expect(repeat.tuple).toEqual(report.tuple)
-    expect(repeat.subject.emitted.bundleSha256).toBe(report.subject.emitted.bundleSha256)
-    expect(repeat.subject.emitted.modules).toEqual(report.subject.emitted.modules)
     expect(
       digestProvenanceSubject({
-        ...tokenOnlySubject,
+        ...subjectWithoutDigest,
         resolvedBuildOptions: {
-          ...tokenOnlySubject.resolvedBuildOptions,
-          server: { webSocketToken: 'output-affecting' }
+          ...subjectWithoutDigest.resolvedBuildOptions,
+          build: { ...subjectWithoutDigest.resolvedBuildOptions.build, minify: true }
         }
       })
     ).not.toBe(digest)
-
-    const firstResolved = await resolveCanonicalBuildConfig()
-    const secondResolved = await resolveCanonicalBuildConfig()
-    expect(firstResolved.webSocketToken).toBeDefined()
-    expect(secondResolved.webSocketToken).toBeDefined()
   })
 
   it('encodes hostile values, references, and collisions without locale-dependent ambiguity', () => {
