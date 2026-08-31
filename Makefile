@@ -70,9 +70,13 @@ ship-pack-check:
 
 ship-cd:
 	@set -eu; \
+	patched_packages=$$(node scripts/release-progress.mjs $(RELEASE_PACKAGES)); \
 	for package in $(RELEASE_PACKAGES); do \
 		echo "==> CD releasing $$package"; \
-		$(MAKE) "$$package-patch"; \
+		case " $$patched_packages " in \
+			*" $$package "*) echo "==> resuming already patched $$package" ;; \
+			*) $(MAKE) "$$package-patch" ;; \
+		esac; \
 		$(MAKE) "$$package-publish"; \
 	done
 
@@ -165,13 +169,26 @@ publish: check-package git-publish-check auth-check
 	package="$(PACKAGE)"; \
 	version=$$(node -p "require('./packages/$$package/package.json').version"); \
 	tag="$$package-v$$version"; \
-	if git rev-parse "$$tag" >/dev/null 2>&1; then \
-		echo "Git tag already exists: $$tag" >&2; \
-		exit 1; \
-	fi; \
+	release_subject="chore(release): $$package v$$version"; \
+	release_commit=$$(git log --fixed-strings --grep="$$release_subject" -n 1 --format=%H); \
+	[ -n "$$release_commit" ] || { echo "Missing release commit: $$release_subject" >&2; exit 1; }; \
+	[ "$$(git show -s --format=%s "$$release_commit")" = "$$release_subject" ] || { echo "Ambiguous release commit: $$release_subject" >&2; exit 1; }; \
 	branch=$$(git symbolic-ref --quiet --short HEAD); \
 	echo "==> pushing $$branch before registry mutation"; \
 	git push origin "HEAD:$$branch"; \
+	local_tag_commit=$$(git rev-parse "$$tag^{commit}" 2>/dev/null || true); \
+	remote_tag_commit=$$(git ls-remote --tags origin "refs/tags/$$tag" | awk '{print $$1}'); \
+	for tag_commit in $$local_tag_commit $$remote_tag_commit; do \
+		[ "$$tag_commit" = "$$release_commit" ] || { echo "Release tag points at the wrong commit: $$tag" >&2; exit 1; }; \
+	done; \
+	published_version=$$(pnpm view "@migaia/$$package@$$version" version --registry=$(GITHUB_PACKAGES_REGISTRY) 2>/dev/null || true); \
+	if [ "$$published_version" = "$$version" ]; then \
+		echo "==> @migaia/$$package@$$version already published"; \
+	else \
+		if [ -n "$$local_tag_commit$$remote_tag_commit" ]; then \
+			echo "Release tag exists but registry version is missing: $$tag" >&2; \
+			exit 1; \
+		fi; \
 	package_json="packages/$$package/package.json"; \
 	backup=$$(mktemp); \
 	cp "$$package_json" "$$backup"; \
@@ -194,9 +211,15 @@ publish: check-package git-publish-check auth-check
 	pnpm --filter "./packages/$$package" run release:publish; \
 	restore; \
 	trap - EXIT INT TERM; \
-	echo "==> tagging $$tag"; \
-	git tag "$$tag"; \
-	git push origin "$$tag"
+	fi; \
+	if [ -z "$$local_tag_commit" ] && [ -z "$$remote_tag_commit" ]; then \
+		echo "==> tagging $$tag"; \
+		git tag "$$tag" "$$release_commit"; \
+		git push origin "$$tag"; \
+	elif [ -z "$$remote_tag_commit" ]; then \
+		echo "==> resuming tag push $$tag"; \
+		git push origin "$$tag"; \
+	fi
 
 # Compatibility entry points. Each concrete target delegates to the same
 # package-generic owners, so the package inventory has one source of truth.
