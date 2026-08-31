@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react'
-import { Link, Links, Meta, Outlet, Scripts, ScrollRestoration, useLocation } from 'react-router'
+import {
+  Link,
+  Links,
+  Meta,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+  useLocation,
+  useNavigationType
+} from 'react-router'
 import './app.css'
-import { DOMAINS, LOCALES, type ILocale } from './content.js'
+import { DOMAINS, LOCALES, type ILocale } from './route-contract.js'
 import { copyFor } from './copy.js'
 import { loadSearchIndex } from './search.js'
 
@@ -10,7 +19,7 @@ type ITimePhase = 'sunrise' | 'sunset' | 'night' | 'midnight'
 type IThemeChoice = IThemeMode | ITimePhase
 
 /** Persistent browser key for the reader-selected color mode. */
-const THEME_STORAGE_KEY = 'migai-theme'
+const THEME_STORAGE_KEY = 'migaia-theme'
 
 /** Resolves the local-clock phase used by the time-gradient theme. */
 function timePhase(date: Date): ITimePhase {
@@ -19,6 +28,17 @@ function timePhase(date: Date): ITimePhase {
   if (hour >= 12 && hour < 19) return 'sunset'
   if (hour >= 19 && hour < 23) return 'night'
   return 'midnight'
+}
+
+/** Returns the reader-facing label for one fixed local-clock phase. */
+function timePhaseLabel(locale: ILocale, phase: ITimePhase): string {
+  if (locale === 'en') return phase
+  return {
+    sunrise: '日出',
+    sunset: '日落',
+    night: '夜晚',
+    midnight: '午夜'
+  }[phase]
 }
 
 /** Applies one theme contract and its current local-clock phase to the document root. */
@@ -129,13 +149,21 @@ function ShellHeader() {
         {copy.skip}
       </a>
       <header className="site-header">
-        <Link className="brand" to={`/${locale}`} aria-label="Migai library home">
-          migai
+        <Link
+          className="brand"
+          to={`/${locale}`}
+          aria-label={locale === 'zh' ? 'Migaia 文档首页' : 'Migaia library home'}
+        >
+          migaia
         </Link>
         <nav className="global-nav" aria-label={copy.primaryNavigation}>
           {DOMAINS.map((domain) => (
             <Link key={domain} to={`/${locale}/${domain}`}>
-              {domain === 'docs' ? 'Docs' : domain === 'guides' ? 'Guides' : copy.architecture}
+              {domain === 'docs'
+                ? copy.docs
+                : domain === 'guides'
+                  ? copy.guides
+                  : copy.architecture}
             </Link>
           ))}
         </nav>
@@ -157,7 +185,7 @@ function ShellHeader() {
               key={candidate}
               className={candidate === locale ? 'language-link active' : 'language-link'}
               to={`/${candidate}`}
-              aria-label={`Switch to ${candidate}`}
+              aria-label={locale === 'zh' ? `切换至 ${candidate}` : `Switch to ${candidate}`}
             >
               {candidate}
             </Link>
@@ -171,12 +199,14 @@ function ShellHeader() {
             <option value="light">{locale === 'zh' ? '日间' : 'Light'}</option>
             <option value="dark">{locale === 'zh' ? '夜间' : 'Dark'}</option>
             <option value="time">
-              {locale === 'zh' ? `跟随时间 · ${phase}` : `Auto · ${phase}`}
+              {locale === 'zh'
+                ? `跟随时间 · ${timePhaseLabel(locale, phase)}`
+                : `Auto · ${timePhaseLabel(locale, phase)}`}
             </option>
-            <option value="sunrise">Sunrise</option>
-            <option value="sunset">Sunset</option>
-            <option value="night">Night</option>
-            <option value="midnight">Midnight</option>
+            <option value="sunrise">{locale === 'zh' ? '日出' : 'Sunrise'}</option>
+            <option value="sunset">{locale === 'zh' ? '日落' : 'Sunset'}</option>
+            <option value="night">{locale === 'zh' ? '夜晚' : 'Night'}</option>
+            <option value="midnight">{locale === 'zh' ? '午夜' : 'Midnight'}</option>
           </select>
         </div>
       </header>
@@ -207,7 +237,11 @@ function ShellHeader() {
                 onClick={() => setMobileNavOpen(false)}
                 to={`/${locale}/${domain}`}
               >
-                {domain === 'docs' ? 'Docs' : domain === 'guides' ? 'Guides' : copy.architecture}
+                {domain === 'docs'
+                  ? copy.docs
+                  : domain === 'guides'
+                    ? copy.guides
+                    : copy.architecture}
               </Link>
             ))}
           </nav>
@@ -244,14 +278,28 @@ function ShellHeader() {
 }
 
 /** Renders the active route inside the shared orientation shell. */
-export default function App() {
+function App() {
   return (
     <>
       <ShellHeader />
+      <RouteScrollReset />
       <Outlet />
     </>
   )
 }
+
+/** Resets new route visits while preserving hash targets and browser history restoration. */
+function RouteScrollReset() {
+  const { hash, pathname } = useLocation()
+  const navigationType = useNavigationType()
+  useEffect(() => {
+    if (navigationType === 'POP' || hash) return
+    window.scrollTo({ left: 0, top: 0 })
+  }, [hash, navigationType, pathname])
+  return null
+}
+
+export default App
 
 /** Renders a stable fallback while preserving the global recovery actions. */
 export function ErrorBoundary() {

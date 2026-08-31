@@ -1,45 +1,47 @@
 import { Link } from 'react-router'
-import { domainPath, findLibrary, libraries, type ILocale } from '../content.js'
 import { copyFor } from '../copy.js'
+import { domainPath, type ILocale } from '../route-contract.js'
+
+/** Lowest-dependency entry promoted by the first-use journey. */
+const STARTER_LIBRARY = 'utils'
 
 type ILanguageRouteProps = { readonly params: { readonly lang?: string } }
 
 /** Renders the first-use journey: capability map, quickstart, goals, and architecture preview. */
-export default function Language({ params }: ILanguageRouteProps) {
+function Language({ params }: ILanguageRouteProps) {
   const locale = (params.lang === 'zh' ? 'zh' : 'en') as ILocale
-  const starter = findLibrary('utils') ?? libraries[0]
   const chinese = locale === 'zh'
   const copy = copyFor(locale)
   return (
-    <main id="main-content" className="page-shell language-home" lang={locale}>
-      <p className="eyebrow">{chinese ? 'Migai 文档' : 'Migai documentation'}</p>
+    <main id="main-content" className="page-shell language-home" lang={locale} data-pagefind-body>
+      <p className="eyebrow">{chinese ? 'Migaia 文档' : 'Migaia documentation'}</p>
       <h1>
         {chinese
-          ? '用清晰、可组合的 library 构建系统。'
+          ? '用清晰、可组合的类库构建系统。'
           : 'Build with clear, composable libraries.'}
       </h1>
       <p className="lede">
         {chinese
-          ? '从一个目标开始，沿着真实的 library、module 与 API 走到可验证结果。'
+          ? '从一个目标开始，沿着真实的类库、模块与 API 走到可验证结果。'
           : 'Start with a goal and follow a verified path through libraries, modules, and APIs.'}
       </p>
       <div className="actions">
         <Link className="button button-primary" to={domainPath(locale, 'docs')}>
-          {chinese ? '开始查 Docs' : 'Start with Docs'}
+          {chinese ? '开始查文档' : 'Start with Docs'}
         </Link>
         <Link className="button button-secondary" to={domainPath(locale, 'guides')}>
-          {chinese ? '浏览 Guides' : 'Browse Guides'}
+          {chinese ? '浏览指南' : 'Browse Guides'}
         </Link>
       </div>
       <section className="section-block" aria-labelledby="capabilities">
         <p className="eyebrow">{copy.capabilityMap}</p>
         <h2 id="capabilities">{copy.shortestPath}</h2>
         <div className="capability-grid">
-          <Link className="capability-item" to={domainPath(locale, 'docs', starter.slug)}>
+          <Link className="capability-item" to={domainPath(locale, 'docs', STARTER_LIBRARY)}>
             <strong>{copy.foundation}</strong>
             <span>{copy.foundationText}</span>
           </Link>
-          <Link className="capability-item" to={domainPath(locale, 'guides', starter.slug)}>
+          <Link className="capability-item" to={domainPath(locale, 'guides', STARTER_LIBRARY)}>
             <strong>{copy.runtime}</strong>
             <span>{copy.runtimeText}</span>
           </Link>
@@ -59,12 +61,12 @@ export default function Language({ params }: ILanguageRouteProps) {
           <h2 id="quickstart">{copy.smallResult}</h2>
           <p>{copy.quickstartBody}</p>
         </div>
-        <Link className="callout" to={domainPath(locale, 'docs', starter.slug)}>
-          <span>{starter.slug}</span>
+        <Link className="callout" to={domainPath(locale, 'docs', STARTER_LIBRARY)}>
+          <span>{STARTER_LIBRARY}</span>
           <strong>
             {chinese
-              ? `${starter.slug} 的源码契约与公开能力。`
-              : (starter.description ?? 'Open the maintained entry')}
+              ? `${STARTER_LIBRARY} 的源码契约与公开能力。`
+              : 'Runtime-neutral reusable utility primitives.'}
           </strong>
           <span>{copy.readQuickstart}</span>
         </Link>
@@ -89,3 +91,5 @@ export default function Language({ params }: ILanguageRouteProps) {
     </main>
   )
 }
+
+export default Language

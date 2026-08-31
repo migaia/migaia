@@ -1,10 +1,12 @@
-import type { IDomain, ILocale } from './content.js'
+import type { IDomain, ILocale } from './route-contract.js'
 
 /** Stable localized interface copy shared by every website route. */
 export const WebsiteCopy = {
   en: {
     skip: 'Skip to content',
     primaryNavigation: 'Primary navigation',
+    docs: 'Docs',
+    guides: 'Guides',
     menu: 'Menu',
     search: 'Search',
     theme: 'Toggle theme',
@@ -87,6 +89,8 @@ export const WebsiteCopy = {
   zh: {
     skip: '跳到正文',
     primaryNavigation: '主导航',
+    docs: '文档',
+    guides: '指南',
     menu: '菜单',
     search: '搜索',
     theme: '切换主题',

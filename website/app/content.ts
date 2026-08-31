@@ -1,14 +1,6 @@
 import apiManifest from '../src/generated/manifests/apis.json'
 import libraryManifest from '../src/generated/manifests/libraries.json'
-
-/** Supported language prefixes used by every public route. */
-export const LOCALES = ['en', 'zh'] as const
-
-/** Public content domains rendered by the shared route module. */
-export const DOMAINS = ['docs', 'guides', 'architecture'] as const
-
-export type ILocale = (typeof LOCALES)[number]
-export type IDomain = (typeof DOMAINS)[number]
+export { domainPath, type IDomain, type ILocale } from './route-contract.js'
 
 /** Generated library fact used by navigation and page recipes. */
 export type ILibrary = {
@@ -16,6 +8,28 @@ export type ILibrary = {
   readonly description: string | null
   readonly version: string | null
   readonly exports: readonly string[]
+  readonly documentation: {
+    readonly readme: IMaintainedDocument | null
+    readonly guide: IMaintainedDocument | null
+  }
+}
+
+export type IMaintainedBlock =
+  | { readonly type: 'paragraph'; readonly text: string }
+  | { readonly type: 'list'; readonly items: readonly string[] }
+  | { readonly type: 'code'; readonly language: string; readonly code: string }
+  | {
+      readonly type: 'table'
+      readonly headers: readonly string[]
+      readonly rows: readonly (readonly string[])[]
+    }
+
+export type IMaintainedDocument = {
+  readonly sections: readonly {
+    readonly id: string
+    readonly heading: string
+    readonly blocks: readonly IMaintainedBlock[]
+  }[]
 }
 
 /** Generated public API projection with the required documentation sections. */
@@ -62,6 +76,21 @@ export type IApiSymbol = {
     readonly optional: boolean
   }[]
   readonly examples: readonly string[]
+  /** Maintained task/configuration guidance directly bound to this public API. */
+  readonly guidance: readonly {
+    readonly id: string
+    readonly heading: string
+    readonly blocks: readonly IMaintainedBlock[]
+  }[]
+  /** Object configuration fields projected from the maintained API contract. */
+  readonly configuration: readonly {
+    readonly name: string
+    readonly type: string
+    readonly optional: boolean
+    readonly description: string
+    readonly descriptionEn?: string
+    readonly descriptionZh?: string
+  }[]
   readonly whenToUse: string
   readonly notUse: string
   readonly sections: readonly {
@@ -89,12 +118,18 @@ export function findLibraryApis(slug: string): readonly IApi[] {
   return apis.filter((api) => api.library === slug)
 }
 
-/** Builds a locale-preserving URL for a domain/library destination. */
-export function domainPath(locale: ILocale, domain: IDomain, library?: string): string {
-  return `/${locale}/${domain}${library ? `/${library}` : ''}`
-}
-
 /** Converts an export path into a readable module slug without exposing repository terms. */
 export function moduleSlug(exportPath: string): string {
   return exportPath === '.' ? 'index' : exportPath.replace(/^\.\//, '').replaceAll('/', '-')
+}
+
+/** Produces a stable semantic path, adding a readable kind only for case-folding collisions. */
+export function symbolSlug(
+  symbol: Pick<IApiSymbol, 'kind' | 'name'>,
+  siblings: readonly Pick<IApiSymbol, 'kind' | 'name'>[]
+): string {
+  const collisions = siblings.filter(
+    (candidate) => candidate.name.toLocaleLowerCase('en-US') === symbol.name.toLocaleLowerCase('en-US')
+  )
+  return `${encodeURIComponent(symbol.name)}${collisions.length > 1 ? `-${symbol.kind}` : ''}`
 }

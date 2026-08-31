@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "docs",
+    "description": null,
+    "version": null,
+    "exports": [],
+    "documentation": {
+      "readme": null,
+      "guide": null
+    }
+  },
+  "apis": []
+}
