@@ -6,7 +6,9 @@
  * 的既有插件。
  */
 export const disposeKey: unique symbol = Symbol('plugin-host.dispose')
-export const asyncDisposeKey: unique symbol = Symbol('plugin-host.asyncDispose')
+export const asyncDisposeKey: typeof Symbol.asyncDispose =
+  (Symbol as { asyncDispose?: typeof Symbol.asyncDispose }).asyncDispose ??
+  (Symbol('plugin-host.asyncDispose') as typeof Symbol.asyncDispose)
 
 /** 宿主真实的 dispose/asyncDispose symbol（可能 undefined）。 */
 const hostDispose = (Symbol as { dispose?: symbol }).dispose

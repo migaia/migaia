@@ -18,7 +18,11 @@ export default defineConfig({
   build: {
     target: 'es2020',
     lib: {
-      entry: 'src/index.ts',
+      entry: {
+        index: 'src/index.ts',
+        defined: 'src/defined.ts',
+        structural: 'src/structural.ts'
+      },
       formats: ['es'],
       fileName: () => 'index.js'
     },
@@ -29,7 +33,7 @@ export default defineConfig({
       output: {
         preserveModules: true,
         preserveModulesRoot: 'src',
-        entryFileNames: '[name].js'
+      entryFileNames: '[name].js'
       }
     }
   }

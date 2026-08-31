@@ -61,12 +61,3 @@ export const snapshotDisposer = (resource: IPluginResource): IDisposerSnapshot =
 /** Resolve a resource disposer from its one-time admission snapshot. */
 export const resolveDisposer = (resource: IPluginResource): IPluginDisposer | undefined =>
   snapshotDisposer(resource).disposer
-
-export const aggregateErrors = (errors: unknown[], message: string): void => {
-  if (errors.length === 0) return
-  if (errors.length === 1) {
-    const cause = errors[0]
-    throw new Error(message, { cause })
-  }
-  throw new AggregateError(errors, message)
-}

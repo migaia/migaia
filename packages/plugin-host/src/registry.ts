@@ -30,6 +30,12 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   config: IPluginConfig
   extensions: IExtensionOwnership[]
   pipelineDisposers: IPluginDisposer[]
+  /** Exact generation lease key; replacement generations never share a physical drain fence. */
+  readonly pipelineOwnerKey: object
+  /** Captured resource/disposer pairs used by composition's strict physical cleanup chain. */
+  resourceDisposers: Array<
+    Readonly<{ readonly resource: unknown; readonly dispose: IPluginDisposer }>
+  >
   shared: PropertyKey[]
   installed: boolean
   lifecycle: (typeof PluginHostRegistrationLifecycle)[keyof typeof PluginHostRegistrationLifecycle]

@@ -1,10 +1,27 @@
+import { readDefinedPluginDefinition } from './define-plugin.js'
+import { PluginHost as RuntimePluginHost } from './host-runtime.js'
+
+/** Root functional Host configures the canonical runtime with trusted definition admission. */
+export abstract class PluginHost<
+  TDomainCore extends object,
+  TValue = never,
+  TInstalled extends readonly import('./typing.js').IPluginConstraint<any>[] = readonly []
+> extends RuntimePluginHost<TDomainCore, TValue, TInstalled> {
+  /** Installs the trusted reader while preserving the canonical Host runtime implementation. */
+  constructor(options: import('./typing.js').IPluginHostOptions) {
+    super(options, readDefinedPluginDefinition)
+  }
+}
+
 export {
-  PluginHost,
   PluginHostDisposalNodeKind,
   readPluginHostDisposalProvenance,
   type IPluginHostDisposalNodeKind,
   type IPluginHostDisposalProvenance
 } from './host-runtime.js'
+export { definePlugin } from './define-plugin.js'
+export { setupHost } from './setup-host.js'
+export type { IPluginHostInstalledPlugins } from './host-runtime.js'
 export {
   PluginHostStatus,
   PluginHostPipelineMode,
@@ -28,6 +45,13 @@ export type {
   IPluginConfig,
   IPluginConstraint,
   IPluginDisposer,
+  IPluginAwaitable,
+  IPluginInstaller,
+  IDefinedPluginConstraint,
+  IHostSetupContext,
+  ISetupHostOptions,
+  ISetupHostView,
+  ISetupPluginHost,
   IPluginResource,
   IPluginHostConfigFor,
   IPluginLifecycleConfig,
@@ -45,6 +69,16 @@ export type {
   IPluginRemovalResult,
   IPluginHostDisposalResult,
   IPluginHostPhysicalCleanupResult,
+  IPluginDataOrderSlot,
+  IPluginAdmission,
+  IPluginAdmissionRequest,
+  IPluginPreparedAdmissions,
+  IPluginRegistrationReceipt,
+  IPluginPreparedRemovalBatch,
+  IPluginBatchRemovalOptions,
+  IPluginBatchRemovalResult,
+  IPluginBatchRemovalLeaf,
+  IPluginHostCompositionIntegration,
   IPipelineMode,
   IPipelineConfig,
   ISyncPipelineStage,

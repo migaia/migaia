@@ -201,7 +201,15 @@ export const PluginHostErrorCode = {
   pipelineDrainTimeout: 'PIPELINE_DRAIN_TIMEOUT',
 
   /** Logical disposal completed while one or more physical cleanup tasks remain unsettled. */
-  cleanupIncomplete: 'CLEANUP_INCOMPLETE'
+  cleanupIncomplete: 'CLEANUP_INCOMPLETE',
+  /** Core factory rejected or resolved to an invalid value during setup; caller must fix Core. */
+  hostCoreSetupFailed: 'HOST_CORE_SETUP_FAILED',
+  /** Setup wall-clock deadline elapsed; caller must retry with a larger bounded budget. */
+  hostSetupTimeout: 'HOST_SETUP_TIMEOUT',
+  /** Caller-owned setup signal won; caller should inspect the abort reason and retry if desired. */
+  hostSetupAborted: 'HOST_SETUP_ABORTED',
+  /** Setup primary failure and cleanup both failed; inspect AggregateError cause/errors. */
+  hostSetupRollbackFailed: 'HOST_SETUP_ROLLBACK_FAILED'
 } as const
 
 export type IPluginHostErrorCode = (typeof PluginHostErrorCode)[keyof typeof PluginHostErrorCode]
