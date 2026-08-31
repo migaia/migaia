@@ -23,6 +23,7 @@ pnpm add @migaia/utils
 - [`/typing`：跨项目复用类型](#typing-模块)
 - [`/config`：带所有权语义的配置对象](#config-模块)
 - [`/function`：一次性调用](#function-模块)
+- [Collector：惰性字段筛选流水线](#collector)
 - [高阶组合示例](#高阶组合示例)
 - [构建门禁](#构建门禁)
 
@@ -608,6 +609,30 @@ const [a, b] = await Promise.all([loadOnce(), loadOnce()]); // 只请求一次
 ```
 
 单参数 `functionValue: () => Promise<T>`（必填），无其他选项；返回值必须是原生 `Promise`，否则以 `INVALID_ARGUMENT` reject。
+
+---
+
+<a id="collector"></a>
+
+## Collector：惰性字段筛选流水线
+
+`collect` 只从包根入口导出。它借用一个 `readonly` 数组，链式动作立即改变查询语义，首次读取 `result` 时才按调用顺序扫描一次并缓存：
+
+```ts
+import { collect } from '@migaia/utils';
+
+const collector = collect(users)
+  .fieldBy('profile.name-zh', 'profile.name-en')
+  .like(' world ')
+  .where((user) => user.active)
+  .take(20);
+
+const result = collector.result;
+```
+
+`fieldBy` 本身会过滤掉所有候选字段都为 `undefined` 的 source，并启用 `like`、`equals`、`oneOf` 的 typestate；未调用它时，TypeScript 不暴露这些方法。`like` 只匹配字符串，trim 后为空时为 no-op。另有 `distinctBy`、`skip`、`take`，所有动作保留原 source 项的身份与顺序。
+
+Collector 不复制或追踪外部修改：调用方必须在 collector 生命周期内遵守传入数组及对象的只读约定。相同查询 revision 重复读取 `result` 返回同一缓存引用；新增动作后会从原 source 重新求值，但不会修改旧结果快照。
 
 ---
 

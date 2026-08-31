@@ -11,6 +11,7 @@
 - [`/typing` 模块](#typing-模块)
 - [`/config` 模块](#config-模块)
 - [`/function` 模块](#function-模块)
+- [Collector](#collector)
 - [组合工作流示例](#组合工作流示例)
 - [排查与构建门禁](#排查与构建门禁)
 
@@ -960,6 +961,69 @@ function onceAsync<T>(functionValue: () => Promise<T>): () => Promise<T>;
 const loadOnce = onceAsync(() => fetch('/config').then((r) => r.json()));
 const [a, b] = await Promise.all([loadOnce(), loadOnce()]); // 只发起一次网络请求
 ```
+
+---
+
+<a id="collector"></a>
+
+## Collector
+
+Collector 是包根入口提供的、数组专用的惰性查询流水线：
+
+```ts
+type ICollectorActions<T, Self> = {
+  readonly result: readonly T[];
+  fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(
+    ...paths: P
+  ): IFieldCollector<T, P[number]>;
+  where(predicate: (source: T) => boolean): Self;
+  distinctBy<P extends IObjectPathInput<T>>(path: P): Self;
+  skip(count: number): Self;
+  take(count: number): Self;
+};
+
+interface ICollector<T> extends ICollectorActions<T, ICollector<T>> {}
+
+interface IFieldCollector<T, P extends IObjectPathInput<T>>
+  extends ICollectorActions<T, IFieldCollector<T, P>> {
+  like(query: string): IFieldCollector<T, P>;
+  equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>;
+  oneOf(
+    value: IObjectPathValue<T, P>,
+    ...values: IObjectPathValue<T, P>[]
+  ): IFieldCollector<T, P>;
+}
+
+function collect<T>(dataSource: readonly T[]): ICollector<T>;
+```
+
+```ts
+const collector = collect(users)
+  .fieldBy('profile.name-zh', 'profile.name-en')
+  .like(' World ')
+  .distinctBy('id')
+  .skip(10)
+  .take(20);
+
+const result = collector.result;
+```
+
+执行与缓存：
+
+- `collect` 借用原 `readonly` 数组且不复制；无动作或全部 source 通过时，`result` 直接复用原数组。
+- 每个动作立即写入有序语义流水线，但不会扫描 source；首次读取 `result` 时单次遍历并缓存。同 revision 重复读取返回同一引用，新增有效动作后缓存失效。
+- 动作顺序可观察：`take(2).where(predicate)` 与 `where(predicate).take(2)` 不等价。连续链式调用不会生成每步中间数组。
+- 求值失败不缓存；getter、Proxy 与 `where` 抛出的错误保持原始身份。求值回调中重读或修改同一 collector 会抛 `REENTRANT_CALL`。
+
+字段动作：
+
+- `fieldBy` 立即解析路径，并加入“任一字段值非 `undefined`”过滤；missing、blocked 和显式 `undefined` 统一视为无有效值。重复调用会保留前一个过滤动作，同时替换后续字段谓词的活动字段域。
+- `like` 对 query 执行 `trim().toLowerCase()`；trim 后为空是 no-op。只对字符串字段进行忽略大小写的连续子串匹配，多个字段使用 OR。
+- `equals` 与 `oneOf` 使用 `Object.is`；多个字段使用 OR，多个动作按顺序组成 AND。`oneOf` 固定线性扫描候选值，不按数据量升级为索引。
+- `distinctBy` 只去重已定义 key，保留第一次出现；missing、blocked、显式 `undefined` 均不参与去重。
+- `where` 只接收 source，不注入 index。`skip`/`take` 只接受非负安全整数，否则抛出带 `INVALID_ARGUMENT` 的原生 `RangeError`。
+
+输入数组和嵌套 source 由调用方维持只读。Collector 不监听外部 mutation；外部绕过类型修改数据后，已缓存 revision 不会自动失效。
 
 ---
 
