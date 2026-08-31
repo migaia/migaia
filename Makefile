@@ -16,6 +16,7 @@ PUBLISH_TARGETS := $(addsuffix -publish,$(RELEASE_PACKAGES))
 
 .PHONY: $(RELEASE_PACKAGES) $(CHECK_TARGETS) $(PATCH_TARGETS) $(PUBLISH_TARGETS) \
 	ship ship-dry-run ship-preflight ship-check ship-pack-check ship-release release-plan-check \
+	ship-ci ship-cd \
 	dependencies-check check-package release-check git-release-check git-publish-check auth-check patch publish
 
 # Ship has one visible direction: prove the whole plan, prove every package,
@@ -23,8 +24,9 @@ PUBLISH_TARGETS := $(addsuffix -publish,$(RELEASE_PACKAGES))
 # package checks have passed.
 ship:
 	@$(MAKE) ship-preflight
-	@$(MAKE) ship-check
-	@$(MAKE) ship-release
+	@$(MAKE) ship-ci
+	@$(MAKE) ship-pack-check
+	@$(MAKE) ship-cd
 	@echo "==> all release packages shipped"
 
 # Executes every local release gate and previews each package artifact without
@@ -32,7 +34,7 @@ ship:
 ship-dry-run:
 	@$(MAKE) release-plan-check
 	@$(MAKE) dependencies-check
-	@$(MAKE) ship-check
+	@$(MAKE) ship-ci
 	@$(MAKE) ship-pack-check
 	@echo "==> ship dry-run passed; no release mutations performed"
 
@@ -48,12 +50,16 @@ dependencies-check:
 	@test -x node_modules/.bin/tsc || { echo "Missing workspace dependencies; run pnpm install --frozen-lockfile" >&2; exit 1; }
 	@test -x node_modules/.bin/vitest || { echo "Missing workspace dependencies; run pnpm install --frozen-lockfile" >&2; exit 1; }
 
-ship-check:
+ship-ci:
 	@set -eu; \
 	for package in $(RELEASE_PACKAGES); do \
-		echo "==> validating $$package"; \
+		echo "==> CI validating $$package"; \
 		$(MAKE) "$$package-check"; \
 	done
+
+# Backward-compatible name for callers that used the pre-phase terminology.
+ship-check:
+	@$(MAKE) ship-ci
 
 ship-pack-check:
 	@set -eu; \
@@ -62,13 +68,17 @@ ship-pack-check:
 		pnpm --filter "./packages/$$package" pack --dry-run --json >/dev/null; \
 	done
 
-ship-release:
+ship-cd:
 	@set -eu; \
 	for package in $(RELEASE_PACKAGES); do \
-		echo "==> releasing $$package"; \
+		echo "==> CD releasing $$package"; \
 		$(MAKE) "$$package-patch"; \
 		$(MAKE) "$$package-publish"; \
 	done
+
+# Backward-compatible name for callers that used the pre-phase terminology.
+ship-release:
+	@$(MAKE) ship-cd
 
 release-plan-check:
 	@node scripts/release-plan.mjs $(RELEASE_PACKAGES)
@@ -138,7 +148,7 @@ auth-check:
 		exit 1; \
 	fi
 
-patch: check-package
+patch: check-package git-publish-check
 	@set -eu; \
 	package="$(PACKAGE)"; \
 	echo "==> patching @migaia/$$package"; \
