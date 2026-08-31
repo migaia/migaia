@@ -27,7 +27,10 @@
     "typecheck:e2e": "tsc -p tsconfig.e2e.json",
     "lint": "oxlint src test e2e",
     "test": "vitest run test",
-    "test:e2e": "playwright test --config=e2e/playwright.config.ts"
+    "test:e2e": "playwright test --config=e2e/playwright.config.ts",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
   "dependencies": {
     "@migaia/reactive": "workspace:^",

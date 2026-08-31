@@ -20,9 +20,14 @@
     }
   },
   "scripts": {
+    "fmt": "oxfmt README.md USEGUIDE.md",
+    "lint": "cargo clippy --manifest-path rust/Cargo.toml --all-targets",
     "build": "cd rust && wasm-pack build --target web --release --out-dir ../src",
     "test:rust": "cd rust && cargo test",
     "test": "wasm-pack test --node rust",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:pack": "pnpm pack --pack-destination /tmp",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   }
 }
