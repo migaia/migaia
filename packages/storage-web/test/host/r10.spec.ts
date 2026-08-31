@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createStorageHost } from '../../src/host/index.js'
 import { memoryReactive } from '../../src/plugins/reactive/memory.js'
 import { localStorageReactive } from '../../src/plugins/reactive/local-storage.js'
@@ -192,7 +192,16 @@ describe('SWV4-B05 R10 reactive adapters', () => {
       }
     })
     adapter.startSource()
-    await expect(adapter.dispose()).resolves.toBeUndefined()
-    await service.dispose()
+    const fallback = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      await expect(adapter.dispose()).resolves.toBeUndefined()
+      expect(fallback).toHaveBeenCalledWith(
+        '[storage-web] operation reporter failed',
+        expect.objectContaining({ message: 'reporter-failed' })
+      )
+      await service.dispose()
+    } finally {
+      fallback.mockRestore()
+    }
   })
 })
