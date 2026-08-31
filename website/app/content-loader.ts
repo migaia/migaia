@@ -1,5 +1,6 @@
 import libraryIndexManifest from '../src/generated/manifests/library-index.json'
 import {
+  isCallableApiSymbol,
   moduleSlug,
   symbolSlug,
   type IApi,
@@ -12,6 +13,12 @@ export type ILibrarySummary = Omit<ILibrary, 'documentation'>
 export type ILibraryRouteContent = {
   readonly library: ILibrary
   readonly apis: readonly IApi[]
+}
+
+export type IGuideApiLink = {
+  readonly module: string
+  readonly name: string
+  readonly symbolPath: string
 }
 
 type ILibraryRouteContentOptions = {
@@ -28,6 +35,35 @@ export const librarySummaries = libraryIndexManifest.libraries as readonly ILibr
 const libraryShardLoaders = import.meta.glob<{
   readonly default: ILibraryRouteContent & { readonly version: number }
 }>('../src/generated/manifests/libraries/*.json')
+
+/** Keeps task-guide navigation on reader-facing entries; the full Docs index retains internals. */
+function isGuideNavigationSymbol(api: IApi, symbol: IApiSymbol): boolean {
+  if (/^(?:internals|node-internals)$/.test(api.module)) return false
+  return !new Set([
+    'DependencyTracker',
+    'VersionClock',
+    'createManualScheduler',
+    'createMutationQueue',
+    'invokeParallelSettled',
+    'invokeTaskSettled'
+  ]).has(symbol.name)
+}
+
+/** Projects complete lightweight API navigation without serializing documentation bodies. */
+export async function loadLibraryApiLinks(slug: string): Promise<readonly IGuideApiLink[]> {
+  const loader = libraryShardLoaders[`../src/generated/manifests/libraries/${slug}.json`]
+  if (!loader) return []
+  const module = await loader()
+  return module.default.apis.flatMap((api) =>
+    api.symbols
+      .filter((symbol) => isCallableApiSymbol(symbol) && isGuideNavigationSymbol(api, symbol))
+      .map((symbol) => ({
+      module: api.module,
+      name: symbol.name,
+      symbolPath: symbolSlug(symbol, api.symbols)
+      }))
+  )
+}
 
 /** Loads one canonical library payload without importing the all-library manifests. */
 export async function loadLibraryRouteContent(
@@ -51,11 +87,11 @@ export async function loadLibraryRouteContent(
       documentation: {
         readme:
           options.documentation === 'readme' || options.documentation === 'all'
-            ? projectReaderDocument(library.documentation.readme)
+            ? projectReaderDocument(library.documentation.readme, slug)
             : null,
         guide:
           options.documentation === 'guide' || options.documentation === 'all'
-            ? projectReaderDocument(library.documentation.guide)
+            ? projectReaderDocument(library.documentation.guide, slug)
             : null
       }
     },
@@ -69,16 +105,22 @@ export async function loadLibraryRouteContent(
   }
 }
 
-/** Removes repository navigation/install sections that do not teach runtime behavior. */
-function projectReaderDocument(document: ILibrary['documentation']['readme']) {
+/** Removes repository navigation/install sections while retaining reader decision context. */
+function projectReaderDocument(document: ILibrary['documentation']['readme'], library: string) {
   if (!document) return null
   return {
-    sections: document.sections.filter(
-      (section) =>
-        !/^(?:@|使用手册$|(?:\d+(?:\.\d+)?[.、]?\s*)?(?:这是什么|适合什么场景|安装|目录|构建门禁|核心概念一览|用了之后能得到什么|what (?:this is|it is for|you get)|install(?:ation)?|contents?|build gates?|core concepts?)$)/i.test(
-          section.heading.trim()
+    sections: document.sections.filter((section) => {
+      const heading = section.heading.trim()
+      const resourceDecisionContext =
+        library === 'resource' &&
+        /^(?:\d+(?:\.\d+)?[.、]?\s*)?(?:这是什么|适合什么场景|用了之后能得到什么)$/.test(
+          heading
         )
-    )
+      if (resourceDecisionContext) return true
+      return !/^(?:@|使用手册$|(?:\d+(?:\.\d+)?[.、]?\s*)?(?:这是什么|适合什么场景|安装|目录|构建门禁|核心概念一览|用了之后能得到什么|what (?:this is|it is for|you get)|install(?:ation)?|contents?|build gates?|core concepts?)$)/i.test(
+        heading
+      )
+    })
   }
 }
 
@@ -87,7 +129,9 @@ function projectSelectedApi(api: IApi, selectedSymbolPath?: string): IApi {
   const selectedSymbol = selectedSymbolPath
     ? api.symbols.find((symbol) => symbolSlug(symbol, api.symbols) === selectedSymbolPath)
     : undefined
-  const relatedTypeNames = selectedSymbol ? collectReferencedTypeNames(selectedSymbol, api.symbols) : new Set<string>()
+  const relatedTypeNames = selectedSymbol
+    ? collectReferencedTypeNames(selectedSymbol, api.symbols)
+    : new Set<string>()
   return {
     id: api.id,
     library: api.library,
@@ -109,7 +153,8 @@ function projectSelectedApi(api: IApi, selectedSymbolPath?: string): IApi {
       selectedSymbol
         ? symbol === selectedSymbol
           ? projectSelectedSymbol(symbol)
-          : (symbol.kind === 'type' || symbol.kind === 'interface') && relatedTypeNames.has(symbol.name)
+          : (symbol.kind === 'type' || symbol.kind === 'interface') &&
+              relatedTypeNames.has(symbol.name)
             ? projectTypingSymbol(symbol)
             : compactSymbol(symbol)
         : projectModuleIndexSymbol(symbol)
@@ -136,13 +181,18 @@ function collectReferencedTypeNames(
 ): ReadonlySet<string> {
   const typing = symbols.filter((symbol) => symbol.kind === 'type' || symbol.kind === 'interface')
   const names = new Set<string>()
-  const pending = typing.filter((symbol) => new RegExp(`\\b${symbol.name}\\b`).test(selected.signature))
+  const pending = typing.filter((symbol) =>
+    new RegExp(`\\b${symbol.name}\\b`).test(selected.signature)
+  )
   while (pending.length > 0) {
     const symbol = pending.shift()
     if (!symbol || names.has(symbol.name)) continue
     names.add(symbol.name)
     for (const dependency of typing)
-      if (!names.has(dependency.name) && new RegExp(`\\b${dependency.name}\\b`).test(symbol.signature))
+      if (
+        !names.has(dependency.name) &&
+        new RegExp(`\\b${dependency.name}\\b`).test(symbol.signature)
+      )
         pending.push(dependency)
   }
   return names

@@ -165,6 +165,24 @@ export const completionApiGuides: Readonly<
     avoidEn: ['A normal direct function or method call is available.', 'Do not pass an unvalidated arbitrary callable from untrusted input.'],
     avoidZh: ['可以直接调用普通函数或方法。', '不要传入来自不可信输入且尚未校验的任意 callable。']
   }),
+  'plugin-host:index:createRegistrationView': guide({
+    purposeEn: 'Publishes a frozen extension-only view for the exact live registration identified by a receipt. It rejects unknown, revoked, uninstalled, or disposing registrations instead of exposing Host internals or another plugin generation.',
+    purposeZh: '根据注册回执，只公开对应且仍然存活的插件扩展，并返回冻结视图。回执未知、已撤销、尚未安装或正在释放时会直接拒绝；调用方拿不到 Host 内部状态，也不会误读其他插件代次。',
+    quickStart: "import { createRegistrationView, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\ntry {\n  const view = createRegistrationView(receipt)\n  await view.extensions.search('migaia')\n} catch (error) {\n  if (error instanceof PluginHostError && error.code === PluginHostErrorCode.viewRevoked) {\n    refreshRegistration()\n  }\n}",
+    scenariosEn: ['A composition layer holds a registration receipt and must expose only that plugin generation’s extensions.', 'A consumer must fail closed after logical removal instead of retaining stale extension access.'],
+    scenariosZh: ['组合层持有注册回执，只允许使用该插件代次发布的扩展。', '插件被逻辑移除后，读取方必须失败关闭，不能继续使用旧扩展。'],
+    avoidEn: ['Application code has no registration receipt; use the committed Host view intended for consumers.', 'The caller needs lifecycle state, ownership, or mutation methods; this view intentionally exposes none of them.'],
+    avoidZh: ['普通应用没有注册回执；应使用 Host 提供给使用方的已提交视图。', '调用方需要生命周期状态、所有权信息或变更方法；此视图有意不公开这些内容。']
+  }),
+  'plugin-host:composition:createView': guide({
+    purposeEn: 'Converts a typed registration token into the frozen extension-only view for that exact live plugin generation. It is the public typed entry point over createRegistrationView and fails after revocation rather than returning stale extensions.',
+    purposeZh: '把带类型的注册 token 转成该插件精确代次的冻结扩展视图。它是 createRegistrationView 的公开类型安全入口；注册被撤销后会失败，不会继续返回过期扩展。',
+    quickStart: "import { createView } from '@migaia/plugin-host/composition'\n\nconst view = createView(searchRegistration)\nconst results = await view.extensions.search('migaia')",
+    scenariosEn: ['Typed composition code receives a registration token and needs only that plugin’s published extensions.', 'The view must become unusable as soon as its exact registration is revoked.'],
+    scenariosZh: ['带类型的组合代码拿到注册 token，只需要该插件公开的扩展。', '对应注册一旦撤销，这个视图就必须立即失效。'],
+    avoidEn: ['Consumer code already has a committed aggregate Host view.', 'The caller needs to mutate registration state or inspect Host internals.'],
+    avoidZh: ['使用方已经拿到 Host 的已提交聚合视图。', '调用方需要修改注册状态或查看 Host 内部数据。']
+  }),
   'plugin-host:structural:readPluginHostDisposalProvenance': guide({
     purposeEn: 'Reads disposal provenance attached by this exact Plugin Host module instance. It returns undefined for ordinary values and foreign module copies instead of trusting structural lookalikes.',
     purposeZh: '读取由当前 Plugin Host 模块实例附加的 dispose 来源信息。普通值和其他模块副本创建的值返回 undefined，不会信任仅结构相似的对象。',

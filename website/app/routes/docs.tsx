@@ -15,18 +15,24 @@ import {
 } from '../content-contract.js'
 import {
   librarySummaries,
+  loadLibraryApiLinks,
   loadLibraryRouteContent,
+  type IGuideApiLink,
   type ILibraryRouteContent
 } from '../content-loader.js'
 import { copyFor, domainDescription, domainTitle } from '../copy.js'
 import type { IApiGuide } from '../api-guides.js'
-import { findGuideJourney, listGuideJourneys, type IGuideJourney } from '../guide-journeys.js'
+import type { IGuideJourney } from '../guide-journeys.js'
 import { ScrollArea } from '../components/ui/scroll-area.js'
+import { Separator } from '../components/ui/separator.js'
 import { normalizeExampleImports } from '../example-imports.js'
+import { commentExample } from '../example-commentary.js'
 
 type IDocsLoaderData = ILibraryRouteContent & {
+  readonly apiLinks?: readonly IGuideApiLink[]
   readonly guide?: IApiGuide
   readonly journey?: IGuideJourney
+  readonly journeyTopics?: readonly { readonly title: string; readonly topic: string }[]
   readonly optionTranslations?: Readonly<Record<string, string>>
   readonly selectedTypeFragment?: string
 }
@@ -51,13 +57,12 @@ export async function loader({
   const domain = pathname.split('/')[2]
   const locale = pathname.split('/')[1]
   const topic = parts.slice(1).join('/') || 'index'
-  const journeyExists =
-    domain === 'guides' &&
-    Boolean(findGuideJourney(librarySlug, topic, locale === 'zh' ? 'zh' : 'en'))
+  /** Guide registry stays loader-only so the client route does not ship every tutorial body. */
+  const journeyModule = domain === 'guides' ? await import('../guide-journeys.js') : undefined
+  const guideLocale = locale === 'zh' ? 'zh' : 'en'
+  const journeyExists = Boolean(journeyModule?.findGuideJourney(librarySlug, topic, guideLocale))
   const documentation =
-    domain === 'docs' && locale === 'zh' && parts.length === 1
-      ? 'all'
-      : domain === 'architecture' && locale === 'zh'
+    domain === 'architecture' && locale === 'zh'
         ? 'readme'
         : domain === 'guides' && locale === 'zh' && !journeyExists
           ? 'guide'
@@ -117,6 +122,11 @@ export async function loader({
       symbolSlug(symbol, selectedApi.symbols) === selectedSymbolPath &&
       (symbol.kind === 'type' || symbol.kind === 'interface')
   )
+  /** Reader routes receive lightweight navigation facts, never other APIs' documentation bodies. */
+  const apiLinks =
+    domain === 'guides' || domain === 'docs' || domain === 'architecture'
+      ? await loadLibraryApiLinks(librarySlug)
+      : undefined
   let guide: IApiGuide | undefined
   let optionTranslations: Readonly<Record<string, string>> | undefined
   if (domain === 'docs' && selectedApi && selectedSymbol) {
@@ -141,10 +151,12 @@ export async function loader({
   return content
     ? {
         ...content,
+        apiLinks,
         guide,
         journey: journeyExists
-          ? findGuideJourney(librarySlug, topic, locale === 'zh' ? 'zh' : 'en')
+          ? journeyModule?.findGuideJourney(librarySlug, topic, guideLocale)
           : undefined,
+        journeyTopics: journeyModule?.listGuideJourneys(librarySlug, guideLocale),
         optionTranslations,
         selectedTypeFragment: selectedType?.fragment
       }
@@ -184,6 +196,7 @@ function Docs({ params, loaderData }: IDocsRouteProps) {
         guide={loaderData?.guide}
         locale={locale}
         library={library}
+        apiLinks={loaderData?.apiLinks ?? []}
         libraryApis={libraryApis}
         modulePath={modulePath}
         optionTranslations={loaderData?.optionTranslations}
@@ -195,21 +208,142 @@ function Docs({ params, loaderData }: IDocsRouteProps) {
       locale={locale}
       domain={domain}
       library={library}
+      apiLinks={loaderData?.apiLinks ?? []}
       modulePath={modulePath}
       journey={loaderData?.journey}
+      journeyTopics={loaderData?.journeyTopics ?? []}
     />
   )
 }
 
 /** Displays a domain index with one discoverable entry for every current library. */
 function DomainIndex({ locale, domain }: { locale: ILocale; domain: IDomain }) {
+  if (domain === 'guides') return <GuidesIndex locale={locale} />
+  if (domain === 'architecture') return <ArchitectureIndex locale={locale} />
+  return <DocsIndex locale={locale} />
+}
+
+/** Curated outcome-first routes that keep task discovery independent of package inventory. */
+const GUIDE_STARTERS = [
+  {
+    library: 'utils',
+    titleEn: 'Control async work',
+    titleZh: '控制异步工作',
+    bodyEn: 'Choose cancellation, deadlines, retries, concurrency, and error identity.',
+    bodyZh: '选择取消、截止时间、重试、并发与错误身份方案。'
+  },
+  {
+    library: 'lifecycle',
+    titleEn: 'Own and release resources',
+    titleZh: '管理并释放资源',
+    bodyEn: 'Model scopes, cleanup order, quiescence, and terminal shutdown.',
+    bodyZh: '处理作用域、清理顺序、静默期与终态关闭。'
+  },
+  {
+    library: 'capability',
+    titleEn: 'Compose runtime capabilities',
+    titleZh: '组合运行时能力',
+    bodyEn: 'Build gates and graphs that can be inspected, replaced, and rolled back.',
+    bodyZh: '构建可检查、可替换、可回退的能力门与能力图。'
+  },
+  {
+    library: 'plugin-host',
+    titleEn: 'Install and coordinate plugins',
+    titleZh: '安装并协调插件',
+    bodyEn: 'Choose registration, pipeline, rollback, and Host ownership boundaries.',
+    bodyZh: '选择注册、管线、回滚与 Host 所有权边界。'
+  },
+  {
+    library: 'storage-web',
+    titleEn: 'Persist browser data',
+    titleZh: '持久化浏览器数据',
+    bodyEn: 'Select a backend, records, transactions, codecs, and live queries.',
+    bodyZh: '选择后端、记录、事务、编解码与 live query。'
+  },
+  {
+    library: 'web-rpc',
+    titleEn: 'Connect browser runtimes',
+    titleZh: '连接浏览器运行时',
+    bodyEn: 'Create endpoints across windows, workers, channels, and transports.',
+    bodyZh: '跨窗口、Worker、Channel 与 Transport 创建 endpoint。'
+  },
+  {
+    library: 'store-light',
+    titleEn: 'Build reactive application state',
+    titleZh: '构建响应式应用状态',
+    bodyEn: 'Start with local state, then add keyed, persistent, React, or worker layers.',
+    bodyZh: '从本地状态开始，再组合 keyed、持久化、React 或 Worker 层。'
+  },
+  {
+    library: 'wasm',
+    titleEn: 'Cross the WebAssembly boundary',
+    titleZh: '跨越 WebAssembly 边界',
+    bodyEn: 'Choose initialization, memory ownership, conversion, and cleanup patterns.',
+    bodyZh: '选择初始化、内存所有权、转换与清理模式。'
+  }
+] as const
+
+/** Library families group packages by the architectural role readers use to discover them. */
+const ARCHITECTURE_FAMILIES = [
+  {
+    titleEn: 'Store family',
+    titleZh: 'Store 家族',
+    bodyEn: 'Application state, persistence, framework bindings, workers, and diagnostics.',
+    bodyZh: '应用状态、持久化、框架绑定、Worker、WASM 与诊断工具。',
+    libraries: [
+      'store-light',
+      'store-keyed',
+      'store-indexed',
+      'store-middleware',
+      'store-persist',
+      'store-react',
+      'store-ssr',
+      'store-worker',
+      'store-wasm',
+      'store-devtools',
+      'store-shared'
+    ]
+  },
+  {
+    titleEn: 'Pipeline and composition',
+    titleZh: 'Pipeline 与组合',
+    bodyEn: 'Event flow, middleware, capabilities, plugins, reactive derivation, and resource ownership.',
+    bodyZh: '事件流、中间件、能力图、插件、响应式推导与资源所有权。',
+    libraries: [
+      'event-subscriber',
+      'middleware-pipeline',
+      'capability',
+      'plugin-host',
+      'tray',
+      'reactive',
+      'resource',
+      'lifecycle'
+    ]
+  },
+  {
+    titleEn: 'Browser and platform',
+    titleZh: 'Browser 与平台',
+    bodyEn: 'Browser storage, cross-runtime communication, and WebAssembly boundaries.',
+    bodyZh: '浏览器存储、跨运行时通信以及 WebAssembly 边界。',
+    libraries: ['storage-contract', 'storage-web', 'web-rpc', 'wasm']
+  },
+  {
+    titleEn: 'Other foundations',
+    titleZh: '其他基础能力',
+    bodyEn: 'General utilities, serialization contracts, and observability shared across families.',
+    bodyZh: '由多个家族共同复用的通用工具、序列化契约与可观测能力。',
+    libraries: ['utils', 'serialize', 'logger']
+  }
+] as const
+
+/** Renders the source-backed API catalogue and nothing task- or topology-specific. */
+function DocsIndex({ locale }: { locale: ILocale }) {
   const copy = copyFor(locale)
   return (
     <main id="main-content" className="page-shell content-page" lang={locale} data-pagefind-body>
-      <Breadcrumb locale={locale} domain={domain} />
-      <p className="eyebrow">{domain}</p>
-      <h1>{domainTitle(locale, domain)}</h1>
-      <p className="lede">{domainDescription(locale, domain)}</p>
+      <p className="eyebrow">docs</p>
+      <h1>{domainTitle(locale, 'docs')}</h1>
+      <p className="lede">{domainDescription(locale, 'docs')}</p>
       <section className="section-block" aria-labelledby="library-index">
         <h2 id="library-index">{copy.libraryIndex}</h2>
         <div className="library-grid">
@@ -217,14 +351,10 @@ function DomainIndex({ locale, domain }: { locale: ILocale; domain: IDomain }) {
             <Link
               className="library-item"
               key={library.slug}
-              to={domainPath(locale, domain, library.slug)}
+              to={domainPath(locale, 'docs', library.slug)}
             >
               <strong>{library.slug}</strong>
-              <span>
-                {locale === 'zh'
-                  ? `${library.slug} 的源码契约、能力边界与使用入口。`
-                  : (library.description ?? 'Source-backed entry with maintained boundary facts.')}
-              </span>
+              <span>{libraryReferenceDescription(locale, library.slug)}</span>
               <small>
                 {locale === 'zh'
                   ? `${library.exports.length} 个公开模块`
@@ -234,7 +364,86 @@ function DomainIndex({ locale, domain }: { locale: ILocale; domain: IDomain }) {
           ))}
         </div>
       </section>
-      <NextActions locale={locale} domain={domain} />
+      <NextActions locale={locale} domain="docs" />
+    </main>
+  )
+}
+
+/** Renders outcome-first guide choices instead of mirroring the library catalogue. */
+function GuidesIndex({ locale }: { locale: ILocale }) {
+  return (
+    <main id="main-content" className="page-shell content-page" lang={locale} data-pagefind-body>
+      <p className="eyebrow">guides</p>
+      <h1>{domainTitle(locale, 'guides')}</h1>
+      <p className="lede">{domainDescription(locale, 'guides')}</p>
+      <section className="section-block" aria-labelledby="task-index">
+        <h2 id="task-index">
+          {locale === 'zh' ? '你现在想完成什么？' : 'What do you need to accomplish?'}
+        </h2>
+        <p>
+          {locale === 'zh'
+            ? '先选结果，再进入包含步骤、解释、代码与验收方式的任务指南。'
+            : 'Choose an outcome first, then follow a task guide with steps, rationale, code, and verification.'}
+        </p>
+        <div className="journey-grid">
+          {GUIDE_STARTERS.map((guide) => (
+            <Link
+              className="journey-item"
+              key={guide.library}
+              to={domainPath(locale, 'guides', guide.library)}
+            >
+              <small>{guide.library}</small>
+              <strong>{locale === 'zh' ? guide.titleZh : guide.titleEn}</strong>
+              <span>{locale === 'zh' ? guide.bodyZh : guide.bodyEn}</span>
+              <b>{locale === 'zh' ? '开始任务 →' : 'Start task →'}</b>
+            </Link>
+          ))}
+        </div>
+      </section>
+      <NextActions locale={locale} domain="guides" />
+    </main>
+  )
+}
+
+/** Renders architecture-oriented library families instead of a flat package catalogue. */
+function ArchitectureIndex({ locale }: { locale: ILocale }) {
+  return (
+    <main id="main-content" className="page-shell content-page" lang={locale} data-pagefind-body>
+      <p className="eyebrow">architecture</p>
+      <h1>{domainTitle(locale, 'architecture')}</h1>
+      <p className="lede">{domainDescription(locale, 'architecture')}</p>
+      <section className="section-block" aria-labelledby="dependency-map">
+        <h2 id="dependency-map">
+          {locale === 'zh' ? '按架构职责浏览类库' : 'Browse libraries by architectural role'}
+        </h2>
+        <p>
+          {locale === 'zh'
+            ? '同一家族解决相邻问题；选择类库前，先确认它属于状态、组合、平台还是通用基础能力。'
+            : 'Packages in one family solve adjacent problems; identify state, composition, platform, or shared foundation concerns before choosing one.'}
+        </p>
+        <div className="architecture-stack">
+          {ARCHITECTURE_FAMILIES.map((family, index) => (
+            <article className="architecture-layer" key={family.titleEn}>
+              <span className="architecture-layer-number">0{index + 1}</span>
+              <div>
+                <h3>{locale === 'zh' ? family.titleZh : family.titleEn}</h3>
+                <p>{locale === 'zh' ? family.bodyZh : family.bodyEn}</p>
+                <nav
+                  aria-label={
+                    locale === 'zh' ? `${family.titleZh}类库` : `${family.titleEn} libraries`
+                  }
+                >
+                  {family.libraries.map((library) => (
+                    <Link key={library} to={domainPath(locale, 'architecture', library)}>
+                      {library}
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
     </main>
   )
 }
@@ -252,6 +461,7 @@ function docsModulePath(
 
 /** Renders a library documentation root and its source-backed module map. */
 function DocsLibrary({
+  apiLinks,
   guide,
   locale,
   library,
@@ -260,6 +470,7 @@ function DocsLibrary({
   optionTranslations,
   selectedTypeFragment
 }: {
+  apiLinks: readonly IGuideApiLink[]
   guide?: IApiGuide
   locale: ILocale
   library: ILibrary
@@ -280,12 +491,7 @@ function DocsLibrary({
           {locale === 'zh' ? '类库' : 'Library'} · {library.slug}
         </p>
         <h1>{library.slug}</h1>
-        <p className="lede">
-          {locale === 'zh'
-            ? `${library.slug} 提供由源码支撑的公开能力与清晰边界。`
-            : (library.description ??
-              'A source-backed library boundary with explicit public exports.')}
-        </p>
+        <p className="lede">{libraryReferenceDescription(locale, library.slug)}</p>
         <MetaLine locale={locale} library={library} />
         <ApiNav locale={locale} library={library.slug} apis={libraryApis} />
         <section className="section-block" aria-labelledby="responsibility">
@@ -342,6 +548,7 @@ function DocsLibrary({
             <strong>{library.slug}</strong>
             <LibraryModuleLinks
               api={api}
+              apiLinks={apiLinks}
               libraryApis={libraryApis}
               librarySlug={library.slug}
               locale={locale}
@@ -357,6 +564,7 @@ function DocsLibrary({
           <nav aria-label={copy.libraryModules}>
             <LibraryModuleLinks
               api={api}
+              apiLinks={apiLinks}
               libraryApis={libraryApis}
               librarySlug={library.slug}
               locale={locale}
@@ -376,15 +584,13 @@ function DocsLibrary({
                   : `${library.slug} core API`
                 : moduleName)}
           </h1>
-          <p className="lede">
-            {locale === 'zh'
-              ? selectedSymbol
-                ? `${selectedSymbol.name} 的公开契约、最小用法与组合边界。`
-                : `${moduleName} 模块解决什么问题、何时使用，以及可选择的公开 API。`
-              : selectedSymbol
-                ? `Public contract, minimal usage, and composition boundaries for ${selectedSymbol.name}.`
+          {!selectedSymbol ? (
+            <p className="lede">
+              {locale === 'zh'
+                ? `${moduleName} 模块解决什么问题、何时使用，以及可选择的公开 API。`
                 : `What ${moduleName} solves, when to use it, and which public API to choose.`}
-          </p>
+            </p>
+          ) : null}
           {api && selectedSymbol ? (
             <SingleApiReference
               guide={selectedGuide}
@@ -444,12 +650,14 @@ function DocsLibrary({
 /** Renders the same nested module tree in the desktop rail and mobile disclosure. */
 function LibraryModuleLinks({
   api,
+  apiLinks,
   libraryApis,
   librarySlug,
   locale,
   selectedSymbol
 }: {
   readonly api: IApi | undefined
+  readonly apiLinks: readonly IGuideApiLink[]
   readonly libraryApis: readonly IApi[]
   readonly librarySlug: string
   readonly locale: ILocale
@@ -495,9 +703,29 @@ function LibraryModuleLinks({
                 : 'Core API'
               : candidate.module}
           </Link>
-          {candidate === api ? (
+          <div className="left-rail-children">
+            {apiLinks
+              .filter((link) => link.module === candidate.module)
+              .map((link) => (
+                <Link
+                  className={link.name === selectedSymbol?.name ? 'active' : ''}
+                  key={link.symbolPath}
+                  to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
+                >
+                  {link.name}
+                </Link>
+              ))}
+          </div>
+          {candidate === api &&
+          candidate.symbols.some(
+            (symbol) => symbol.kind === 'type' || symbol.kind === 'interface'
+          ) ? (
             <div className="left-rail-children">
-              {runtimeSymbolGroups(candidate.symbols).map((group) => (
+              {runtimeSymbolGroups(
+                candidate.symbols.filter(
+                  (symbol) => symbol.kind === 'type' || symbol.kind === 'interface'
+                )
+              ).map((group) => (
                 <div className="left-rail-symbol-group" key={group.key}>
                   <span>{symbolGroupLabel(locale, group.key)}</span>
                   {group.symbols.map((symbol) => (
@@ -580,14 +808,10 @@ function RightRail({
 
 /** Mirrors the rendered package landing-page learning order in both table-of-contents rails. */
 function moduleReferenceSections(
-  documentation: ILibrary['documentation'],
-  api: IApi
+  _documentation: ILibrary['documentation'],
+  _api: IApi
 ): readonly string[] {
-  return [
-    'module-guidance',
-    ...packageLearningSections(documentation, api).map(({ kind }) => `learning-${kind}`),
-    'api-index'
-  ]
+  return ['api-index']
 }
 
 /** Gives package learning anchors explicit task-oriented labels. */
@@ -633,7 +857,8 @@ function ModuleOverview({
   readonly api: IApi
   readonly selectedTypeFragment?: string
 }) {
-  const runtimeSymbols = api.symbols.filter(
+  const moduleSymbols = Array.from(new Map(api.symbols.map((symbol) => [symbol.fragment, symbol])).values())
+  const runtimeSymbols = moduleSymbols.filter(
     (symbol) => symbol.kind !== 'type' && symbol.kind !== 'interface'
   )
   const operationSymbols = runtimeSymbols.filter(
@@ -649,12 +874,11 @@ function ModuleOverview({
     .sort(
       (left, right) => right.usageScore - left.usageScore || left.name.localeCompare(right.name)
     )
-  const typingSymbols = api.symbols.filter(
+  const typingSymbols = moduleSymbols.filter(
     (symbol) => symbol.kind === 'type' || symbol.kind === 'interface'
   )
   return (
     <>
-      <ModuleGuidance locale={locale} library={library} api={api} />
       <section className="section-block compact" id="api-index">
         <p className="eyebrow">{locale === 'zh' ? 'API 参考' : 'API reference'}</p>
         <h2>{locale === 'zh' ? '选择一个入口' : 'Choose an entry point'}</h2>
@@ -678,8 +902,10 @@ function ModuleOverview({
                     )}
                   >
                     <code>{symbol.name}</code>
-                    <span>{localizedSymbolPurpose(locale, symbol)}</span>
                   </Link>
+                  <span>
+                    <SymbolPurpose library={library.slug} locale={locale} symbol={symbol} />
+                  </span>
                 </li>
               ))}
             </ul>
@@ -705,8 +931,10 @@ function ModuleOverview({
                     )}
                   >
                     <code>{symbol.name}</code>
-                    <span>{localizedSymbolPurpose(locale, symbol)}</span>
                   </Link>
+                  <span>
+                    <SymbolPurpose library={library.slug} locale={locale} symbol={symbol} />
+                  </span>
                 </li>
               ))}
             </ul>
@@ -732,8 +960,10 @@ function ModuleOverview({
                     )}
                   >
                     <code>{symbol.name}</code>
-                    <span>{localizedSymbolPurpose(locale, symbol)}</span>
                   </Link>
+                  <span>
+                    <SymbolPurpose library={library.slug} locale={locale} symbol={symbol} />
+                  </span>
                 </li>
               ))}
             </ul>
@@ -955,10 +1185,13 @@ function SingleApiReference({
   )
   const relatedTypes = collectRelatedTypes(symbol, typingSymbols)
   const coreUsage = symbol.sections.find((section) => section.id === 'core-usage')
-  const quickExample =
+  const rawQuickExample =
     guide?.quickStart ??
     diagnosticSourceExample(symbol, api.library) ??
     runnableExample(symbol.examples)
+  const quickExample = rawQuickExample
+    ? exampleWithPrimaryImport(rawQuickExample, api, symbol)
+    : undefined
   /**
    * Complete rendered option set, including maintained fields the declaration extractor cannot
    * expand.
@@ -976,8 +1209,14 @@ function SingleApiReference({
         descriptionZh: locale === 'zh' ? option.description : undefined
       }))
   ]
+  const purpose = guide?.purpose ?? localizedSymbolPurpose(locale, symbol)
   return (
-    <div className="single-api-reference" id={symbol.fragment}>
+    <div
+      className="single-api-reference"
+      data-api-kind={symbol.kind}
+      data-api-name={symbol.name}
+      id={symbol.fragment}
+    >
       <section className="api-overview" id={`${symbol.fragment}--overview`}>
         <p className="eyebrow">
           {isSupportingContract(symbol)
@@ -988,12 +1227,22 @@ function SingleApiReference({
               ? 'API 参考'
               : 'API reference'}
         </p>
-        <h2>{locale === 'zh' ? '作用' : 'Purpose'}</h2>
-        <p>{guide?.purpose ?? localizedSymbolPurpose(locale, symbol)}</p>
+        {purpose ? (
+          <>
+            <h2>{locale === 'zh' ? '作用' : 'Purpose'}</h2>
+            <p>
+              <InlineText library={library.slug} locale={locale} text={purpose} />
+            </p>
+          </>
+        ) : null}
         {guide ? <ApiDecisionGuide guide={guide} locale={locale} /> : null}
       </section>
       {quickExample ? (
-        <section className="section-block compact" id={`${symbol.fragment}--quick-start`}>
+        <section
+          className="section-block compact"
+          data-primary-api-example={symbol.name}
+          id={`${symbol.fragment}--quick-start`}
+        >
           <p className="eyebrow">
             {isSupportingContract(symbol)
               ? locale === 'zh'
@@ -1023,7 +1272,9 @@ function SingleApiReference({
           </p>
           <CodeBlock
             code={quickExample}
+            explain
             label={locale === 'zh' ? '维护示例' : 'Maintained example'}
+            locale={locale}
           />
         </section>
       ) : null}
@@ -1064,10 +1315,16 @@ function SingleApiReference({
                     </span>
                   </div>
                   <p>
-                    {optionGuide?.description ??
-                      translatedDescription ??
-                      (locale === 'zh' ? field.descriptionZh : field.descriptionEn) ??
-                      field.description}
+                    <InlineText
+                      library={library.slug}
+                      locale={locale}
+                      text={
+                        optionGuide?.description ??
+                        translatedDescription ??
+                        (locale === 'zh' ? field.descriptionZh : field.descriptionEn) ??
+                        field.description
+                      }
+                    />
                   </p>
                   {optionGuide ? (
                     <p className="option-when">
@@ -1100,7 +1357,9 @@ function SingleApiReference({
                   {optionGuide?.example ? (
                     <CodeBlock
                       code={optionGuide.example}
+                      explain
                       label={locale === 'zh' ? `${field.name} 示例` : `${field.name} example`}
+                      locale={locale}
                     />
                   ) : null}
                 </section>
@@ -1111,7 +1370,12 @@ function SingleApiReference({
       ) : null}
       {!guide ? <ApiMaintainedGuidance locale={locale} library={library} symbol={symbol} /> : null}
       {coreUsage ? (
-        <SymbolDetailSection locale={locale} section={coreUsage} symbol={symbol} />
+        <SymbolDetailSection
+          library={api.library}
+          locale={locale}
+          section={coreUsage}
+          symbol={symbol}
+        />
       ) : null}
       <section className="api-signature" id={`${symbol.fragment}--signature`}>
         <h2>{locale === 'zh' ? '完整类型签名' : 'Full type signature'}</h2>
@@ -1125,7 +1389,7 @@ function SingleApiReference({
           label={locale === 'zh' ? '公开类型签名' : 'Public type signature'}
         />
       </section>
-      <RelatedTypes locale={locale} symbols={relatedTypes} />
+      <RelatedTypes api={api} locale={locale} symbols={relatedTypes} />
       <p className="document-next-step">
         <Link className="text-link" to={docsModulePath(locale, api.library, api.module)}>
           {locale === 'zh' ? '← 返回模块 API 索引' : '← Back to the module API index'}
@@ -1159,6 +1423,22 @@ function runnableExample(examples: readonly string[]): string | undefined {
   return examples.find(
     (example) => !/^\s*import\s+[\s\S]+?\s+from\s+['"][^'"]+['"];?\s*$/.test(example)
   )
+}
+
+/** Makes a detail-page example independently copyable by importing its primary public API. */
+function exampleWithPrimaryImport(code: string, api: IApi, symbol: IApiSymbol): string {
+  const escapedName = symbol.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  if (!new RegExp(`\\b${escapedName}\\b`).test(code)) return code
+  const importedBindings = Array.from(code.matchAll(/import\s+(?:type\s+)?\{([^}]*)\}/gu)).flatMap(
+    (match) => match[1].split(',').map((binding) => binding.trim().replace(/^type\s+/u, ''))
+  )
+  if (importedBindings.some((binding) => binding.split(/\s+as\s+/u)[0] === symbol.name)) return code
+  const packagePath =
+    api.exportPath === '.'
+      ? `@migaia/${api.library}`
+      : `@migaia/${api.library}/${api.exportPath.replace(/^\.\//u, '')}`
+  const typeOnly = symbol.kind === 'type' || symbol.kind === 'interface' ? 'type ' : ''
+  return `import ${typeOnly}{ ${symbol.name} } from '${packagePath}'\n\n${code}`
 }
 
 /** Demonstrates the real boundary-checking role of a package source marker. */
@@ -1544,22 +1824,54 @@ function advancedTutorialTitle(heading: string): string {
 /** Renders maintained prose as semantic reading content instead of generated filler. */
 function MaintainedDocument({
   document,
+  domain = 'docs',
   headingLevel = 2,
   idPrefix = 'maintained-',
+  library,
   locale
 }: {
   readonly document: IMaintainedDocument
+  readonly domain?: IDomain
   readonly headingLevel?: 2 | 3
   readonly idPrefix?: string
+  readonly library?: string
   readonly locale: ILocale
 }) {
   return (
     <div className="maintained-document">
       {document.sections.map((section) => (
         <section className="section-block compact" id={`${idPrefix}${section.id}`} key={section.id}>
-          {headingLevel === 2 ? <h2>{section.heading}</h2> : <h3>{section.heading}</h3>}
+          {headingLevel === 2 ? (
+            <h2>
+              <InlineText
+                domain={domain}
+                library={library}
+                locale={locale}
+                text={section.heading}
+              />
+            </h2>
+          ) : (
+            <h3>
+              <InlineText
+                domain={domain}
+                library={library}
+                locale={locale}
+                text={section.heading}
+              />
+            </h3>
+          )}
           {section.blocks.map((block, index) => (
-            <MaintainedBlock block={block} key={`${section.id}:${index}`} locale={locale} />
+            <Fragment key={`${section.id}:${index}`}>
+              {index > 0 && isApiBoundaryBlock(block) ? (
+                <Separator className="contract-separator" />
+              ) : null}
+              <MaintainedBlock
+                block={block}
+                domain={domain}
+                library={library}
+                locale={locale}
+              />
+            </Fragment>
           ))}
         </section>
       ))}
@@ -1570,23 +1882,75 @@ function MaintainedDocument({
 /** Maps one maintained Markdown block to accessible HTML. */
 function MaintainedBlock({
   block,
+  domain = 'docs',
+  library,
   locale
 }: {
   readonly block: IMaintainedBlock
+  readonly domain?: IDomain
+  readonly library?: string
   readonly locale: ILocale
 }) {
-  if (block.type === 'paragraph')
+  if (block.type === 'paragraph') {
+    /** Plain text is used only to select a semantic presentation for maintained prose. */
+    const normalizedText = block.text.replaceAll('`', '').replaceAll('**', '').trim()
+    if (/^(?:签名|Signature)s*[：:]/.test(normalizedText))
+      return (
+        <div className="contract-signature">
+          <span>{locale === 'zh' ? '调用形式' : 'Call shape'}</span>
+          <InlineText domain={domain} library={library} locale={locale} text={block.text} />
+        </div>
+      )
+    if (/(?:全部字段|All fields)/i.test(normalizedText))
+      return (
+        <p className="contract-fields-heading">
+          <InlineText domain={domain} library={library} locale={locale} text={block.text} />
+        </p>
+      )
+    if (/^(?:options?|config|参数|返回值)\b/i.test(normalizedText) && /(?:必须|若提供|must|throws?)/i.test(normalizedText))
+      return (
+        <aside className="contract-validation">
+          <InlineText domain={domain} library={library} locale={locale} text={block.text} />
+        </aside>
+      )
     return (
       <p>
-        <InlineText text={block.text} />
+        <InlineText domain={domain} library={library} locale={locale} text={block.text} />
       </p>
+    )
+  }
+  if (block.type === 'list' && block.items.every((item) => /\s(?:——|—)\s/.test(item)))
+    return (
+      <dl className="contract-field-list">
+        {block.items.map((item, index) => {
+          /** The first dash separates the field declaration from its reader-facing contract. */
+          const [field, ...descriptionParts] = item.split(/\s(?:——|—)\s/)
+          /** Descriptions may contain additional punctuation that must remain untouched. */
+          const description = descriptionParts.join(' —— ')
+          return (
+            <div className="contract-field" key={`${index}:${item}`}>
+              <dt>
+                <InlineText domain={domain} library={library} locale={locale} text={field} />
+              </dt>
+              <dd>
+                <InlineText
+                  domain={domain}
+                  library={library}
+                  locale={locale}
+                  text={description}
+                />
+              </dd>
+            </div>
+          )
+        })}
+      </dl>
     )
   if (block.type === 'list')
     return (
       <ul className="prose-list">
         {block.items.map((item, index) => (
           <li key={`${index}:${item}`}>
-            <InlineText text={item} />
+            <InlineText domain={domain} library={library} locale={locale} text={item} />
           </li>
         ))}
       </ul>
@@ -1599,7 +1963,7 @@ function MaintainedBlock({
             <tr>
               {block.headers.map((header) => (
                 <th key={header} scope="col">
-                  <InlineText text={header} />
+                  <InlineText domain={domain} library={library} locale={locale} text={header} />
                 </th>
               ))}
             </tr>
@@ -1609,7 +1973,7 @@ function MaintainedBlock({
               <tr key={rowIndex}>
                 {row.map((cell, cellIndex) => (
                   <td key={cellIndex}>
-                    <InlineText text={cell} />
+                    <InlineText domain={domain} library={library} locale={locale} text={cell} />
                   </td>
                 ))}
               </tr>
@@ -1621,23 +1985,209 @@ function MaintainedBlock({
   return (
     <CodeBlock
       code={block.code}
+      explain
       label={locale === 'zh' ? '维护示例' : 'Maintained example'}
       language={block.language}
+      locale={locale}
     />
   )
 }
 
-/** Highlights inline code names without accepting raw HTML from maintained prose. */
-function InlineText({ text }: { readonly text: string }) {
+/** Identifies the start of another public API walkthrough inside one maintained section. */
+function isApiBoundaryBlock(block: IMaintainedBlock): boolean {
+  if (block.type !== 'paragraph') return false
+  return /[｜|]\s*\d+\s*(?:秒|分钟)上手|\b(?:second|minute) quick start\b/i.test(
+    block.text.replaceAll('`', '').replaceAll('**', '')
+  )
+}
+
+/** Maps package-owned error-code tokens to the public error reference page. */
+function errorReferencePath(locale: ILocale, library: string | undefined): string | undefined {
+  if (library === 'storage-web') return `/${locale}/docs/storage-web/StorageError`
+  return undefined
+}
+
+/** Chinese role summaries shown wherever prose explicitly references another public library. */
+const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
+  capability: '管理功能开关、能力依赖图及其启动和替换生命周期。',
+  'event-subscriber': '提供事件订阅、发布、取消订阅与监听器错误隔离。',
+  lifecycle: '提供资源所有权、释放顺序、静默期和终态关闭原语。',
+  logger: '提供结构化日志、日志级别以及诊断输出边界。',
+  'middleware-pipeline': '按确定顺序组合中间件阶段，并处理转换和错误传播。',
+  'plugin-host': '负责插件定义、安装、管线组合、回滚与释放。',
+  reactive: '提供响应式依赖追踪、派生值和 effect 调度。',
+  resource: '把异步资源的创建、读取、刷新和释放统一成生命周期契约。',
+  serialize: '提供文本、结构化数据和二进制数据的编解码契约。',
+  'storage-contract': '定义与具体平台无关的存储通道和适配器边界。',
+  'storage-web': '提供浏览器内存、Web Storage、Cookie 与 IndexedDB 后端。',
+  'store-devtools': '为 Store 提供调试快照、检查和诊断集成。',
+  'store-indexed': '提供按索引组织和查询的响应式状态容器。',
+  'store-keyed': '提供按业务键创建、缓存和释放状态实例的 Store 家族。',
+  'store-light': '提供轻量响应式状态、派生值与资源组合入口。',
+  'store-middleware': '把 Store 的读写过程接入可组合中间件。',
+  'store-persist': '负责 Store 状态的持久化、恢复与水合时序。',
+  'store-react': '把 Store 状态和生命周期接入 React。',
+  'store-shared': '提供 Store 家族共同复用的底层类型与运行时原语。',
+  'store-ssr': '处理服务端渲染期间的状态隔离、快照与水合边界。',
+  'store-wasm': '把 Store 状态与 WebAssembly 内存和转换边界连接起来。',
+  'store-worker': '把 Store 操作投射到 Worker，并管理消息与关闭边界。',
+  tray: '组合条目定义、适配器与 Host 安装流程。',
+  utils: '提供取消、并发、错误、集合、字符串等通用基础工具。',
+  wasm: '管理 WebAssembly 初始化、内存所有权、值转换与清理。',
+  'web-rpc': '在窗口、Worker、Channel 等运行时之间建立 RPC endpoint。'
+} as const satisfies Readonly<Record<string, string>>
+
+/** Architecture-page summaries explain the pain, core capability, and governing design up front. */
+const LIBRARY_ARCHITECTURE_LEDES_ZH = {
+  capability:
+    '用于把可选功能从零散的 if 判断提升为可治理的能力：统一处理开关、依赖、启停、替换和资源释放。核心设计是由 Host 持有能力定义与上下文，只有满足 flag 和依赖的能力才能启用，并通过句柄消费和关闭；它不是业务状态容器。',
+  docs: '用于生成和维护仓库的文档清单、公开 API 索引与站点内容，让源码契约能够被稳定检索和校验。核心设计是从包元数据与源码生成结构化清单，再由网站按路由投影；它不承载运行时业务逻辑。',
+  'event-subscriber':
+    '用于进程内的一对多事件通知，以及一次性、截止时间、对象订阅者和并行/串行发布等场景。它用显式订阅句柄管理退订和监听器失败，解决手写 listener 数组容易泄漏、重入和错误相互污染的问题；它不是持久化消息队列或跨进程总线。',
+  lifecycle:
+    '用于一组资源必须随同一 owner 关闭、旧代工作必须失效，或释放过程需要静默期、超时降级和错误聚合的场景。它把“谁拥有资源、何时不再接收工作、按什么顺序释放”建模为 scope、generation、terminal controller 与 dispose transaction，避免散落的 try/finally 在竞态中漏清理；它不负责事件分发、业务排队或依赖图。',
+  logger:
+    '用于生产环境的结构化日志、稳定级别、上下文字段、批量写出和最终 flush。核心设计把日志记录、过滤、传输和故障上报分开，使调用方不依赖具体控制台或后端；它不是指标系统，也不替代业务错误处理。',
+  'middleware-pipeline':
+    '用于多个阶段必须按确定顺序包裹一次调用，并在阶段间传值、短路或传播错误的场景。它分别提供 sync、async、generator 执行契约，约束 next 的调用时机和次数，解决手写嵌套链难以验证顺序与重复调用的问题；插件注册和生命周期由上层 Host 负责。',
+  'plugin-host':
+    '用于插件需要动态安装、扩展宿主能力、参与处理管线，并在失败或卸载时完整回滚的系统。核心设计把定义、admission、setup、commit、使用和 dispose 分阶段，以 revision、owner 和 receipt 防止并发安装发布半成品；它不是通用依赖注入容器。',
+  reactive:
+    '用于状态变化后自动重算派生值并调度副作用，而不是手工维护订阅关系。Signal、Computed 和 Effect 由同一 Runtime 记录依赖、批处理失效并统一释放，解决重复计算、更新顺序和监听泄漏；跨请求、测试或 Worker 应各自持有 Runtime，避免全局状态串扰。',
+  resource:
+    '当异步结果依赖 Signal/Computed，且需要自动刷新、取消、竞态隔离、重试、TTL 或快照时使用；相比直接 await，它把一次请求提升为可观察、可复用的状态机。一次性且没有这些需求的请求仍应直接 await。',
+  serialize:
+    '用于数据必须分块编码、跨边界传输，或按类型选择 codec 的场景。它把格式识别、codec 注册、流式编码和错误语义集中管理，避免各包重复实现不兼容的 JSON/二进制协议；它不负责存储、网络重试或对象生命周期。',
+  'storage-contract':
+    '用于定义不绑定浏览器、Node 或具体数据库的键值存储边界，使业务和适配器共享同一套 key、codec、capability、context 与错误契约。它解决后端替换时接口和语义漂移的问题，只规定协议，不提供具体持久化实现。',
+  'storage-web':
+    '用于浏览器内存、localStorage、sessionStorage、Cookie 和 IndexedDB 的统一访问，并在实体、schema、序列化和事务需求间选择后端。核心设计以共享 storage contract 隔离平台差异，同时保留各后端真实的容量、同步性和事务边界；它不会把所有后端伪装成能力完全相同。',
+  'store-devtools':
+    '用于开发期追踪 Store 依赖、检查快照和回放状态变化，定位“谁触发了更新”和“状态何时偏离”。它通过诊断适配器观察 Store，而不改变生产状态语义；不应把调试记录当作业务持久化。',
+  'store-indexed':
+    '用于需要按索引组织、局部订阅和惰性物化单元格的大型响应式集合。它让读取和更新只触达相关索引，减少整表复制与无关重算；简单的小数组没有索引查询或细粒度订阅需求时无需使用。',
+  'store-keyed':
+    '用于按业务键创建相互隔离、可缓存且可释放的 Store 实例，例如按用户、文档或实体 ID 管理状态。核心设计用 definition、family 与 optics 统一实例身份和局部访问，避免调用方自行维护 Map、缓存和生命周期。',
+  'store-light':
+    '用于需要最小 API 管理对象状态、派生读取和资源组合，但不需要完整索引或跨线程能力的应用。它以轻量 facade 暴露常用 Store 能力，并把响应式与生命周期交给底层规范实现；普通局部变量足够时不必引入。',
+  'store-middleware':
+    '用于写入 Store 前后执行校验、审计、转换或策略控制，并保证中间件顺序和错误传播一致。它把 mutation 作为显式管线处理，避免在每个 action 中复制横切逻辑；它不拥有状态，也不应承担业务队列调度。',
+  'store-persist':
+    '用于 Store 状态需要保存、恢复和水合，同时必须区分初始值、持久化快照与运行中更新的场景。核心设计用快照协议和 storage adapter 隔离具体后端，并明确恢复时序与失败边界；它不替代数据库事务或服务端数据同步。',
+  'store-react':
+    '用于让 React 组件按需订阅 Store，并把实例所有权绑定到 Provider 或组件生命周期。hooks 只重渲染实际读取的状态，Provider 负责隔离应用/请求上下文和释放；它不是新的状态内核，也不应绕过 Store 直接复制状态。',
+  'store-shared':
+    '用于多个 Worker 必须通过 SharedArrayBuffer 与 Atomics 共享低延迟 Store 状态的场景。它围绕内存布局、原子读写和可见性建立协议，避免普通对象跨线程复制；仅在隔离策略、浏览器支持和并发成本都已评估时使用。',
+  'store-ssr':
+    '用于服务端渲染时按请求隔离 Store，并把可序列化快照安全地脱水到客户端再水合。它解决全局单例串请求、重复请求和首屏状态不一致的问题；请求结束必须释放作用域，且快照不是长期缓存。',
+  'store-wasm':
+    '用于 Store 的特定字段需要由 WebAssembly 内存承载或执行高成本转换，同时仍保留 Store 的订阅接口。它通过可选适配层管理 JS/WASM 值边界和内存所有权；普通字段没有测得瓶颈时应继续使用纯 TypeScript。',
+  'store-worker':
+    '用于把 Store 操作、Resource 请求或序列化工作移到 Worker，同时让主线程保留可订阅的调用接口。核心设计以消息协议和适配器管理请求关联、错误、取消与关闭，解决手写 postMessage 容易丢失类型和生命周期的问题。',
+  tray: '当应用启动时必须先准备配置，再用配置创建 logger、API client 或数据库连接，并在退出时按相反顺序关闭它们，可以用 Tray 代替散落的启动脚本。调用方一次声明每个 entry 的 key、依赖、start 和 release；Tray 按依赖顺序启动，只有全部成功后 ready() 才完成，随后通过 get(key) 读取结果，任一步失败都不会暴露半初始化对象，dispose() 会逆序释放已启动项。它适合启动前集合已确定的同进程组合，不是运行期增删服务的 DI 容器，也不负责跨 Worker 传输。',
+  utils:
+    '用于多个包共同需要、且不应绑定 Store、DOM 或具体运行时的基础能力，包括取消、并发、错误、集合、对象路径、字节与字符串处理。每个子路径拥有独立契约和错误语义，调用方应按能力导入；它不是无边界的杂物箱。',
+  wasm: '用于统一 WebAssembly 模块初始化、实例复用、线性内存分配、JS/WASM 值转换和确定性释放。它把平台加载与内存所有权封装在明确边界内，避免每个消费者重复处理指针、视图失效和清理；没有 WASM 模块时无需使用。',
+  'web-rpc':
+    '用于窗口、Worker 或 MessagePort 两端进行类型安全的双向 RPC，并统一请求、响应、错误、取消和端点关闭。schema 定义方法、参数与结果，transport adapter 只负责传输，避免业务协议与 postMessage 细节耦合；单向广播事件应使用事件通道。'
+} as const satisfies Readonly<Record<string, string>>
+
+/** Missing English package descriptions are explicit instead of slogan fallbacks. */
+const LIBRARY_REFERENCE_DESCRIPTIONS_EN = {
+  logger:
+    'Structured logging with stable levels, diagnostic context, sinks, batching, and flush ownership.',
+  tray: 'Composes entry definitions and adapters into explicit Host installation, mutation, and cleanup flows.',
+  wasm: 'Owns WebAssembly initialization, memory allocation, value conversion, and deterministic cleanup.'
+} as const satisfies Readonly<Record<string, string>>
+
+/** Unambiguous public product names that may appear without an npm package path. */
+const LIBRARY_REFERENCE_ALIASES = {
+  'Capability Graph': 'capability',
+  Lifecycle: 'lifecycle',
+  PluginHost: 'plugin-host',
+  Reactive: 'reactive',
+  Resource: 'resource',
+  'Storage Host': 'storage-web',
+  Tray: 'tray',
+  WASM: 'wasm',
+  WebRPC: 'web-rpc'
+} as const satisfies Readonly<Record<string, string>>
+
+/** Resolves an explicit package reference only when it points outside the current library. */
+function crossLibraryReference(value: string, library: string | undefined) {
+  const match = value.match(/^@migai(?:a)?\/([a-z0-9-]+)/)
+  const slug =
+    match?.[1] ??
+    LIBRARY_REFERENCE_ALIASES[value as keyof typeof LIBRARY_REFERENCE_ALIASES]
+  if (!slug || slug === library || !librarySummaries.some((entry) => entry.slug === slug))
+    return undefined
+  return slug
+}
+
+/** Returns reader-facing ownership context for a linked library reference. */
+function libraryReferenceDescription(locale: ILocale, slug: string): string {
+  if (locale === 'zh')
+    return LIBRARY_REFERENCE_DESCRIPTIONS_ZH[
+      slug as keyof typeof LIBRARY_REFERENCE_DESCRIPTIONS_ZH
+    ]
+  return (
+    librarySummaries.find((entry) => entry.slug === slug)?.description ??
+    LIBRARY_REFERENCE_DESCRIPTIONS_EN[
+      slug as keyof typeof LIBRARY_REFERENCE_DESCRIPTIONS_EN
+    ]
+  )
+}
+
+/** Highlights inline code and links public errors and explicit cross-library references. */
+function InlineText({
+  domain = 'docs',
+  library,
+  locale,
+  text
+}: {
+  readonly domain?: IDomain
+  readonly library?: string
+  readonly locale: ILocale
+  readonly text: string
+}) {
+  const errorPath = errorReferencePath(locale, library)
   return text
-    .split(/(`[^`]+`)/g)
-    .map((part, index) =>
-      part.startsWith('`') && part.endsWith('`') ? (
-        <code key={index}>{part.slice(1, -1)}</code>
-      ) : (
-        <Fragment key={index}>{part}</Fragment>
-      )
+    .split(
+      /(`[^`]+`|@migai(?:a)?\/[a-z0-9-]+(?:\/[a-z0-9-]+)*|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|Capability Graph|Lifecycle|PluginHost|Reactive|Resource|Storage Host|Tray|WASM|WebRPC)/g
     )
+    .map((part, index) => {
+    const inlineCode = part.startsWith('`') && part.endsWith('`')
+    const value = inlineCode ? part.slice(1, -1) : part
+    const errorCode = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/.test(value)
+    const referencedLibrary = crossLibraryReference(value, library)
+    if (referencedLibrary) {
+      const description = libraryReferenceDescription(locale, referencedLibrary)
+      return (
+        <Link
+          aria-label={`${value}：${description}`}
+          className="library-reference"
+          key={index}
+          title={description}
+          to={domainPath(locale, domain, referencedLibrary)}
+        >
+          {inlineCode ? <code>{value}</code> : value}
+          <span className="library-reference-popover" role="note">
+            <strong>{referencedLibrary}</strong>
+            <span>{description}</span>
+            <b>{locale === 'zh' ? '查看该类库 →' : 'Open library →'}</b>
+          </span>
+        </Link>
+      )
+    }
+    if (errorCode && errorPath)
+      return (
+        <Link className="text-link" key={index} to={errorPath}>
+          <code>{value}</code>
+        </Link>
+      )
+    if (inlineCode) return <code key={index}>{value}</code>
+    return <Fragment key={index}>{part}</Fragment>
+    })
 }
 
 /** Gives English readers a concise source-derived route while translation remains explicit. */
@@ -1654,9 +2204,79 @@ function EnglishDomainOverview({
       <p>
         {guide
           ? `Start with the outcome you need, then open the ${library.slug} API reference for concrete inputs, outputs, and related types.`
-          : (library.description ??
-            `${library.slug} owns this capability boundary and its public contracts.`)}
+          : libraryReferenceDescription('en', library.slug)}
       </p>
+    </section>
+  )
+}
+
+type IGuideApiGroup = {
+  readonly links: readonly IGuideApiLink[]
+  readonly module: string
+}
+
+/** Groups lightweight API links by their public module while preserving export order. */
+function groupGuideApiLinks(apiLinks: readonly IGuideApiLink[]): readonly IGuideApiGroup[] {
+  /** Ordered module buckets keep generated public export order stable in navigation. */
+  const groups = new Map<string, IGuideApiLink[]>()
+  for (const link of apiLinks) {
+    const links = groups.get(link.module) ?? []
+    links.push(link)
+    groups.set(link.module, links)
+  }
+  return [...groups].map(([module, links]) => ({ links, module }))
+}
+
+/** Renders the first Guide menu: every callable API grouped under its owning public module. */
+function GuideApiNavigation({
+  apiLinks,
+  library,
+  locale,
+  placement
+}: {
+  readonly apiLinks: readonly IGuideApiLink[]
+  readonly library: string
+  readonly locale: ILocale
+  readonly placement: 'desktop' | 'mobile'
+}) {
+  /** One shared projection backs both desktop and mobile navigation surfaces. */
+  const groups = groupGuideApiLinks(apiLinks)
+  return (
+    <section
+      className={`guide-api-menu ${placement}`}
+      aria-label={locale === 'zh' ? 'API 列表' : 'API list'}
+    >
+      <h2>{locale === 'zh' ? 'API 分类与列表' : 'API modules and list'}</h2>
+      <p>
+        {locale === 'zh'
+          ? '先选择公开模块，再直接进入该模块归属的 API。'
+          : 'Choose a public module, then jump directly to one of its APIs.'}
+      </p>
+      <div className="guide-api-groups">
+        {groups.map((group) => (
+          <section className="guide-api-group" key={group.module}>
+            <header>
+              <h3>
+                <code>{group.module === 'index' ? library : group.module}</code>
+              </h3>
+              <span>{group.links.length}</span>
+            </header>
+            <nav aria-label={`${group.module} API`}>
+              {group.links.map((link) => (
+                <Link
+                  key={link.symbolPath}
+                  to={docsModulePath(locale, library, link.module, link.symbolPath)}
+                >
+                  <code>{link.name}</code>
+                </Link>
+              ))}
+            </nav>
+          </section>
+        ))}
+      </div>
+      <Link className="guide-api-all" to={docsModulePath(locale, library, 'index')}>
+        {locale === 'zh' ? '查看全部 API →' : 'Browse all APIs →'}
+      </Link>
     </section>
   )
 }
@@ -1666,20 +2286,24 @@ function DomainLibrary({
   locale,
   domain,
   library,
+  apiLinks,
   modulePath,
-  journey
+  journey,
+  journeyTopics
 }: {
   locale: ILocale
   domain: IDomain
   library: ILibrary
+  apiLinks: readonly IGuideApiLink[]
   modulePath?: string
   journey?: IGuideJourney
+  journeyTopics: readonly { readonly title: string; readonly topic: string }[]
 }) {
   const topic = modulePath ?? 'index'
   const guide = domain === 'guides'
   const document = guide ? library.documentation.guide : library.documentation.readme
-  /** Stable guide inventory makes every task page reachable from the left rail. */
-  const guideTopics = guide ? listGuideJourneys(library.slug, locale) : []
+  /** Loader-provided guide inventory keeps every task reachable without bundling all guide bodies. */
+  const guideTopics = guide ? journeyTopics : []
   /** Visible guide headings back the right-side reading outline. */
   const guideSections = journey?.document.sections ?? []
   const article = (
@@ -1693,16 +2317,23 @@ function DomainLibrary({
         {journey?.lede ??
           (locale === 'zh'
             ? guide
-              ? `使用 ${library.slug} 产出可验证结果的有限任务路径。`
-              : `${library.slug} 的归属与边界模型。`
+              ? `按实际任务学习 ${library.slug}：先完成最小闭环，再处理失败、资源释放与生产边界。`
+              : LIBRARY_ARCHITECTURE_LEDES_ZH[
+                  library.slug as keyof typeof LIBRARY_ARCHITECTURE_LEDES_ZH
+                ] ?? libraryReferenceDescription(locale, library.slug)
             : guide
-              ? `A bounded task path for producing a verifiable result with ${library.slug}.`
-              : `The ownership and boundary model for ${library.slug}.`)}
+              ? `Learn ${library.slug} through concrete tasks, then handle failures, cleanup, and production boundaries.`
+              : libraryReferenceDescription(locale, library.slug))}
       </p>
       {journey ? (
         <GuideJourneyContent journey={journey} library={library.slug} locale={locale} />
       ) : locale === 'zh' && document ? (
-        <MaintainedDocument document={document} locale={locale} />
+        <MaintainedDocument
+          document={document}
+          domain={domain}
+          library={library.slug}
+          locale={locale}
+        />
       ) : (
         <EnglishDomainOverview guide={guide} library={library} />
       )}
@@ -1721,6 +2352,12 @@ function DomainLibrary({
           <ScrollArea className="left-rail">
             <aside className="left-rail-content" aria-label={copyFor(locale).taskGuides}>
               <strong>{library.slug}</strong>
+              <GuideApiNavigation
+                apiLinks={apiLinks}
+                library={library.slug}
+                locale={locale}
+                placement="desktop"
+              />
               <span>{locale === 'zh' ? '任务指南' : 'Task guides'}</span>
               {guideTopics.map((entry) => (
                 <Link
@@ -1738,22 +2375,30 @@ function DomainLibrary({
             </aside>
           </ScrollArea>
           <section className="mobile-module-nav" aria-label={copyFor(locale).taskGuides}>
-            <h2>{locale === 'zh' ? '任务指南' : 'Task guides'}</h2>
-            <nav aria-label={copyFor(locale).taskGuides}>
-              {guideTopics.map((entry) => (
-                <Link
-                  className={entry.topic === topic ? 'active' : ''}
-                  key={entry.topic}
-                  to={
-                    entry.topic === 'index'
-                      ? `/${locale}/guides/${library.slug}`
-                      : `/${locale}/guides/${library.slug}/${entry.topic}`
-                  }
-                >
-                  {entry.title}
-                </Link>
-              ))}
-            </nav>
+            <GuideApiNavigation
+              apiLinks={apiLinks}
+              library={library.slug}
+              locale={locale}
+              placement="mobile"
+            />
+            <section className="mobile-guide-menu">
+              <h2>{locale === 'zh' ? '任务指南' : 'Task guides'}</h2>
+              <nav className="mobile-guide-links" aria-label={copyFor(locale).taskGuides}>
+                {guideTopics.map((entry) => (
+                  <Link
+                    className={entry.topic === topic ? 'active' : ''}
+                    key={entry.topic}
+                    to={
+                      entry.topic === 'index'
+                        ? `/${locale}/guides/${library.slug}`
+                        : `/${locale}/guides/${library.slug}/${entry.topic}`
+                    }
+                  >
+                    {entry.title}
+                  </Link>
+                ))}
+              </nav>
+            </section>
           </section>
           {article}
           <aside className="right-rail" aria-label={copyFor(locale).onPage}>
@@ -1766,7 +2411,27 @@ function DomainLibrary({
           </aside>
         </div>
       ) : (
-        article
+        <div className="architecture-reading-layout">
+          <section className="mobile-module-nav" aria-label={locale === 'zh' ? 'API 列表' : 'API list'}>
+            <GuideApiNavigation
+              apiLinks={apiLinks}
+              library={library.slug}
+              locale={locale}
+              placement="mobile"
+            />
+          </section>
+          {article}
+          <ScrollArea className="architecture-api-rail">
+            <aside className="architecture-api-rail-content">
+              <GuideApiNavigation
+                apiLinks={apiLinks}
+                library={library.slug}
+                locale={locale}
+                placement="desktop"
+              />
+            </aside>
+          </ScrollArea>
+        </div>
       )}
       <NextActions locale={locale} domain={domain} library={library.slug} />
     </main>
@@ -1785,7 +2450,13 @@ function GuideJourneyContent({
 }) {
   return (
     <>
-      <MaintainedDocument document={journey.document} idPrefix="" locale={locale} />
+      <MaintainedDocument
+        document={journey.document}
+        domain="guides"
+        idPrefix=""
+        library={library}
+        locale={locale}
+      />
       <nav className="guide-journey-next" aria-label={copyFor(locale).continueReading}>
         {journey.next.map((next) => (
           <Link
@@ -1871,8 +2542,10 @@ function RelatedTypes({
             : `Related types (${symbols.length})`}
       </h2>
       <div className="type-reference-body">
-        {symbols.map((symbol) => (
-          <section className="type-declaration" id={symbol.fragment} key={symbol.fragment}>
+        {symbols.map((symbol) => {
+          const purpose = localizedSymbolPurpose(locale, symbol)
+          return (
+            <section className="type-declaration" id={symbol.fragment} key={symbol.fragment}>
             <h3>
               {api && !symbol.signature ? (
                 <Link
@@ -1895,9 +2568,14 @@ function RelatedTypes({
                 label={locale === 'zh' ? '类型定义' : 'Type definition'}
               />
             ) : null}
-            <p>{localizedSymbolPurpose(locale, symbol)}</p>
-          </section>
-        ))}
+              {purpose ? (
+                <p>
+                  <InlineText library={api?.library} locale={locale} text={purpose} />
+                </p>
+              ) : null}
+            </section>
+          )
+        })}
       </div>
     </section>
   )
@@ -1905,15 +2583,24 @@ function RelatedTypes({
 
 /** Renders one generated contract section as bounded, reader-oriented content. */
 function SymbolDetailSection({
+  library,
   locale,
   section,
   symbol
 }: {
+  readonly library: string
   readonly locale: ILocale
   readonly section: IApiSymbol['sections'][number]
   readonly symbol: IApiSymbol
 }) {
   const sectionId = `${symbol.fragment}--${section.id}`
+  if (
+    section.id === 'when-to-use' &&
+    /^Use .+ when its .+ contract and declared inputs match the result you need\./.test(
+      section.content
+    )
+  )
+    return null
   if (section.id === 'core-usage') {
     const parameterNames = Array.from(
       new Set(symbol.parameterDetails.map((parameter) => parameter.name))
@@ -1932,7 +2619,11 @@ function SymbolDetailSection({
             <dt>{locale === 'zh' ? '输入' : 'Inputs'}</dt>
             <dd>
               {parameterNames.length > 0
-                ? parameterNames.map((name) => <code key={name}>{name}</code>)
+                ? parameterNames.map((name) => (
+                    <code key={name}>
+                      <InlineText library={library} locale={locale} text={name} />
+                    </code>
+                  ))
                 : locale === 'zh'
                   ? '无需输入。'
                   : 'No inputs.'}
@@ -1963,12 +2654,20 @@ function SymbolDetailSection({
     )
   }
   const content = readableSectionContent(locale, section.id, section.content, symbol)
+  if (!content) return null
   return (
     <section className="api-section symbol-api-section" data-api-part={section.id} id={sectionId}>
       <h2>{localizedSection(locale, section.id)}</h2>
-      <p>{content}</p>
+      <p>
+        <InlineText library={library} locale={locale} text={content} />
+      </p>
       {section.example ? (
-        <CodeBlock code={section.example} label={locale === 'zh' ? '示例' : 'Example'} />
+        <CodeBlock
+          code={section.example}
+          explain
+          label={locale === 'zh' ? '示例' : 'Example'}
+          locale={locale}
+        />
       ) : null}
     </section>
   )
@@ -1980,28 +2679,23 @@ function readableSectionContent(
   sectionId: string,
   content: string,
   symbol: IApiSymbol
-): string {
-  if (sectionId === 'when-to-use')
-    return locale === 'zh'
-      ? `当 ${symbol.name} 的公开契约与所需结果匹配时使用；否则选择更贴合输入与输出的 API。`
-      : `Use ${symbol.name} when its public contract matches the result you need; otherwise choose an API with closer input and output semantics.`
+): string | undefined {
+  if (sectionId === 'when-to-use') return undefined
   const withoutProvenance = content
     .replace(/\s+Declaration:.*$/s, '')
     .replace(/ · [a-f0-9]{8}\b/g, '')
     .trim()
-  if (/\.d\.ts:\d+/.test(withoutProvenance) || withoutProvenance.length > 420)
-    return locale === 'zh'
-      ? `${symbol.name} 是该模块公开 API 的一部分；完整类型约束见上方签名。`
-      : `${symbol.name} is part of this module's public API; see the signature above for its complete type contract.`
+  if (/\.d\.ts:\d+/.test(withoutProvenance) || withoutProvenance.length > 420) return undefined
   return withoutProvenance
 }
 
 /** Keeps prose localized while preserving precise API names and responsibility boundaries. */
-function localizedSymbolPurpose(locale: ILocale, symbol: IApiSymbol): string {
+function localizedSymbolPurpose(locale: ILocale, symbol: IApiSymbol): string | undefined {
   const purpose = readableSectionContent(locale, 'introduction', symbol.purpose, symbol)
+  if (!purpose) return undefined
+  if (/^.+ is part of this module's public (?:type|function|const|class) contract\.$/.test(purpose))
+    return undefined
   if (locale === 'en' || /[\u3400-\u9fff]/.test(purpose)) return purpose
-  if (symbol.kind === 'type' || symbol.kind === 'interface')
-    return `${symbol.name} 定义相关 API 使用的公开类型约束；展开后可查看完整字段与泛型关系。`
   if (symbol.kind === 'const' && symbol.name.endsWith('_SOURCE'))
     return `${symbol.name} 是附加在包边界错误上的稳定来源标识；捕获 unknown 错误时，用它比较 error.source 以确认错误归属。`
   const sourceConcern = symbol.source
@@ -2016,33 +2710,70 @@ function localizedSymbolPurpose(locale: ILocale, symbol: IApiSymbol): string {
     'error-code': '用于识别该能力边界内稳定、可处理的错误语义。',
     'state-constants': '用于比较稳定的状态、结果或分发策略，避免散写协议字符串。'
   }
-  return `${symbol.name} ${descriptions[sourceConcern ?? ''] ?? '提供该模块的公开运行时能力。'}`
+  const description = descriptions[sourceConcern ?? '']
+  return description ? `${symbol.name} ${description}` : undefined
+}
+
+/** Renders a symbol summary only when source or maintained guidance says something concrete. */
+function SymbolPurpose({
+  library,
+  locale,
+  symbol
+}: {
+  readonly library: string
+  readonly locale: ILocale
+  readonly symbol: IApiSymbol
+}) {
+  const purpose = localizedSymbolPurpose(locale, symbol)
+  return purpose ? <InlineText library={library} locale={locale} text={purpose} /> : null
 }
 
 /** Presents source text as a labelled, horizontally scrollable Dracula code surface. */
 function CodeBlock({
   code,
+  explain = false,
   label,
-  language = 'typescript'
+  language = 'typescript',
+  locale = 'en'
 }: {
   readonly code: string
+  readonly explain?: boolean
   readonly label: string
   readonly language?: string
+  readonly locale?: ILocale
 }) {
   const normalizedLanguage = language.toLowerCase()
   const isTypeScript = ['ts', 'tsx', 'typescript'].includes(normalizedLanguage)
   /** Reader-facing source with each public symbol imported from its narrowest owner. */
-  const displayCode = isTypeScript ? normalizeExampleImports(code) : code
+  const normalizedCode = isTypeScript ? normalizeExampleImports(code) : code
+  /** Examples include inline intent plus a walkthrough; signatures stay byte-focused. */
+  const commentary = explain
+    ? commentExample(normalizedCode, language, locale)
+    : { code: normalizedCode, notes: [] }
   return (
-    <figure className="code-frame">
-      <figcaption className="code-toolbar">
-        <span>{isTypeScript ? 'TypeScript' : language}</span>
-        <span>{label}</span>
-      </figcaption>
-      <pre className="code-block">
-        <code>{isTypeScript ? highlightTypeScript(displayCode) : displayCode}</code>
-      </pre>
-    </figure>
+    <div className={explain ? 'explained-code annotated' : 'explained-code'}>
+      <figure className="code-frame">
+        <figcaption className="code-toolbar">
+          <span>{isTypeScript ? 'TypeScript' : language}</span>
+          <span>{label}</span>
+        </figcaption>
+        <pre className="code-block">
+          <code>{isTypeScript ? highlightTypeScript(commentary.code) : commentary.code}</code>
+        </pre>
+      </figure>
+      {commentary.notes.length > 0 ? (
+        <aside
+          className="code-walkthrough"
+          aria-label={locale === 'zh' ? '代码说明' : 'Code explanation'}
+        >
+          <div className="code-walkthrough-notes">
+            {commentary.notes.map((note, index) => (
+              <p key={`${index}-${note}`}>{note}</p>
+            ))}
+          </div>
+        </aside>
+      ) : null}
+    </div>
   )
 }
 
@@ -2072,16 +2803,16 @@ function highlightTypeScript(code: string) {
     'void'
   ])
   const tokens = code.split(
-    /(\/\/[^\n]*|\/\*[\s\S]*?\*\/|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`|\b\d+(?:\.\d+)?\b|\b[A-Za-z_$][\w$]*\b|[{}()[\]<>?:=|&;,\.])/g
+    /(\/\/[^\n]*|\/\*[\s\S]*?\*\/|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`|\b\d+(?:\.\d+)?\b|\b[A-Za-z_$][\w$]*\b|[{}()[\]<>?:=|&;,.])/g
   )
   return tokens.map((token, index) => {
     let tokenClass: string | undefined
-    if (/^\/\//.test(token) || /^\/\*/.test(token)) tokenClass = 'syntax-comment'
+    if (token.startsWith('//') || token.startsWith('/*')) tokenClass = 'syntax-comment'
     else if (/^['"`]/.test(token)) tokenClass = 'syntax-string'
     else if (/^\d/.test(token)) tokenClass = 'syntax-number'
     else if (keywords.has(token)) tokenClass = 'syntax-keyword'
     else if (/^[A-Z]/.test(token)) tokenClass = 'syntax-type'
-    else if (/^[{}()[\]<>?:=|&;,\.]$/.test(token)) tokenClass = 'syntax-punctuation'
+    else if (/^[{}()[\]<>?:=|&;,.]$/.test(token)) tokenClass = 'syntax-punctuation'
     return tokenClass ? (
       <span className={tokenClass} key={index}>
         {token}

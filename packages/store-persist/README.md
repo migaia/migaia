@@ -8,7 +8,11 @@
 
 **不适用**：只是想把一次性数据存进 storage-web、不需要跟内存状态双向同步/不需要迁移，直接用 `@migaia/storage-contract` 的 `IKeyValueStore` 搭配所需 backend 子路径更直接。本包不提供加密——敏感数据不要无加密直接写 `localStorage`，需要的话自己实现一个 `ICodec` 传给 `codec` 选项。
 
-`@migaia/store-persist` 的 production 依赖是 `@migaia/reactive`、`@migaia/storage-contract`、`@migaia/utils`；`@migaia/storage-web` 只在使用其 backend/codec 的 integration 场景作为直接依赖。`@migaia/store-light`/`@migaia/store-keyed`/`@migaia/store-indexed` 是可选 peerDependencies，只用得到哪条路径就只需要装对应的 store 包。
+依赖关系：
+
+- `@migaia/reactive`、`@migaia/storage-contract`、`@migaia/utils` 是运行时必需依赖。
+- `@migaia/storage-web` 仅在接入其 backend 或 codec 时安装。
+- `@migaia/store-light`、`@migaia/store-keyed`、`@migaia/store-indexed` 是可选 peer dependency；只安装当前状态模型使用的包。
 
 ## 安装
 

@@ -58,24 +58,38 @@ class Resource<T> implements IObserver, IDisposable {
 响应式的可取消异步资源：构造时给一个 `fetcher`，它跟踪 `fetcher` 在**首次 `await` 之前**同步读取的响应式值作为依赖；依赖变化时自动发起新请求，只有最新一代请求的结果才会生效。
 
 ```ts
-import { Resource } from '@migaia/resource';
-import { Signal, createRuntime } from '@migaia/reactive';
+import { Resource, ResourceStatus } from '@migaia/resource';
+import { createRuntime } from '@migaia/reactive';
+import { fetchUser } from './user-api.js';
 
 const runtime = createRuntime();
-const userId = new Signal(1, runtime);
+const userId = runtime.signal('1');
 
 const user = new Resource(
-  async ({ signal }) => {
-    const response = await fetch(`/api/users/${userId.value}`, { signal });
-    if (!response.ok) throw new Error('加载用户失败');
-    return response.json();
+  ({ signal }) => {
+    const id = userId.value;
+    return fetchUser(id, { signal });
   },
   runtime,
   { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }
 );
 
-userId.value = 2; // 触发新请求
+const stopRendering = runtime.effect(() => {
+  const state = user.state;
+  if (state.status === ResourceStatus.pending) console.log('loading user');
+  if (state.status === ResourceStatus.success) console.log('render', state.data);
+});
+
+userId.value = '2';
+
+export function disposeUserPanel(): void {
+  stopRendering();
+  user.dispose();
+  userId.dispose();
+}
 ```
+
+动态关系是 `userId → Resource → rendering effect`：fetcher 在返回 Promise 前同步读取 `userId.value`，Runtime 因而把 Resource 登记为 `userId` 的 observer；Effect 读取 `user.state`，又成为 Resource 内部状态 Signal 的 observer。`userId` 写入经 Reactive 的 idle/microtask 通道使 Resource 标脏，Resource abort 旧 generation、创建新 generation，状态变化再驱动 Effect 重跑。旧请求即使忽略 abort 并延迟返回，也会被 generation 校验拒绝写回。首次 `await` 之后的响应式读取不在同步追踪窗口内，不会形成这条自动刷新链。
 
 ### 构造函数
 

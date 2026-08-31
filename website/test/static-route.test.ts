@@ -275,6 +275,57 @@ test('SITE-T-RESOURCE-OPTIONS renders maintained constructor fields omitted by d
   assert.match(resourceHtml, /systemScheduler/)
 })
 
+test('SITE-T-RESOURCE-START explains request generations, observation, and terminal cleanup', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/resource')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /构造函数默认 autoStart: true.*?立即创建第一代请求/s)
+  assert.match(text, /switch 读取的是当前快照/)
+  assert.match(text, /Effect.*?框架适配层.*?读取 user\.state/s)
+  assert.match(text, /refetch\(\).*?创建新一代.*?取消仍在途的上一代/s)
+  assert.match(text, /generation 检查.*?防止旧结果覆盖新状态/s)
+  assert.match(text, /dispose\(\) 是终止整个 Resource，不等同于取消一次请求/)
+  assert.match(text, /不会释放外部传入的 runtime/)
+  assert.match(text, /RESOURCE_DISPOSED/)
+  assert.match(text, /暂时停止当前请求.*?cancel\(\)/s)
+})
+
+test('SITE-T-RESOURCE-REACTIVE shows the complete invalidation and render chain', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/resource')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /const id = userId\.value/)
+  assert.match(text, /const stopRendering = runtime\.effect/)
+  assert.match(text, /const state = user\.state/)
+  assert.match(text, /userId 写入 → Resource 标脏 → 新请求状态写入 → Effect 重跑/)
+  assert.match(text, /同一批次内.*?多次写入合并/s)
+  assert.match(text, /idle\/microtask 通道通知 Resource/)
+  assert.match(text, /abort 被取代 generation 的 signal/)
+  assert.match(text, /generation 校验.*?丢弃旧结果/s)
+  assert.match(text, /返回 Promise 之前的同步阶段/)
+  assert.match(text, /先停止渲染 Effect，再终止 Resource，最后释放输入 Signal/)
+})
+
+test('SITE-T-RESOURCE-DECISION keeps use cases and direct-await tradeoffs above the example', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/resource')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /当异步结果依赖 Signal\/Computed/)
+  assert.match(text, /相比直接 await.*?可观察、可复用的状态机/s)
+  assert.match(text, /一次性.*?请求仍应直接 await/s)
+  assert.match(text, /1\. 这是什么/)
+  assert.match(text, /2\. 适合什么场景/)
+  assert.match(text, /3\. 用了之后能得到什么/)
+  assert.match(text, /旧请求不会覆盖新状态/)
+  assert.match(text, /Suspense 友好的读取原语/)
+  assert.match(text, /缓存与后台刷新/)
+  assert.match(text, /SSR\/持久化快照/)
+
+  const decisionIndex = text.indexOf('2. 适合什么场景')
+  const exampleIndex = text.indexOf('4. 五分钟上手')
+  assert.ok(decisionIndex >= 0 && decisionIndex < exampleIndex)
+})
+
 test('SITE-T-LOGGER-RUNTIME renders the process-wide layer contract and every host capability', () => {
   const loggerHtml = readFileSync(
     join(buildRoot, 'zh/docs/logger/setLoggerRuntimeManager/index.html'),
@@ -516,6 +567,117 @@ test('SITE-T-DOC-FLOW renders maintained guidance without architecture trampolin
   }
 })
 
+test('SITE-T-CROSS-LIBRARY makes maintained cross-library references explainable and navigable', () => {
+  const capability = readFileSync(join(buildRoot, 'zh/architecture/capability/index.html'), 'utf8')
+  assert.match(capability, /class="library-reference"[^>]*href="\/zh\/architecture\/plugin-host"/)
+  assert.match(capability, /负责插件定义、安装、管线组合、回滚与释放/)
+  assert.match(capability, /class="library-reference"[^>]*href="\/zh\/architecture\/storage-web"/)
+
+  for (const path of emittedFiles(buildRoot).filter((file) => file.endsWith('.html'))) {
+    const route = path.match(/\/(?:docs|guides|architecture)\/([^/]+)\//)
+    if (!route) continue
+    const currentLibrary = route[1]
+    const visibleProse = readFileSync(path, 'utf8')
+      .replace(/<script[\s\S]*?<\/script>/g, '')
+      .replace(/<figure class="code-frame"[\s\S]*?<\/figure>/g, '')
+      .replace(/<code[\s\S]*?<\/code>/g, '')
+      .replace(/<a[^>]*class="library-reference"[\s\S]*?<\/a>/g, '')
+    for (const reference of visibleProse.matchAll(/@migai(?:a)?\/([a-z0-9-]+)/g))
+      assert.equal(
+        reference[1],
+        currentLibrary,
+        `${path}: unexplained cross-library reference ${reference[0]}`
+      )
+  }
+})
+
+test('SITE-T-CODE-EXPLANATIONS keeps example guidance plain and label-free', () => {
+  const capabilityArchitecture = readFileSync(
+    join(buildRoot, 'zh/architecture/capability/index.html'),
+    'utf8'
+  )
+
+  assert.doesNotMatch(capabilityArchitecture, /代码旁白/)
+  assert.doesNotMatch(capabilityArchitecture, /最后执行这一项操作/)
+  assert.doesNotMatch(capabilityArchitecture, /finally、组件卸载或任务结束时调用 dispose\(\)/)
+})
+
+test('SITE-T-CONTRACT-LAYOUT separates signatures, fields, validation, and neighboring APIs', () => {
+  const capabilityArchitecture = readFileSync(
+    join(buildRoot, 'zh/architecture/capability/index.html'),
+    'utf8'
+  )
+
+  assert.match(capabilityArchitecture, /class="contract-signature"/)
+  assert.match(capabilityArchitecture, /class="contract-field-list"/)
+  assert.match(capabilityArchitecture, /class="contract-field"/)
+  assert.match(capabilityArchitecture, /class="contract-validation"/)
+  assert.match(capabilityArchitecture, /data-slot="separator"/)
+})
+
+test('SITE-T-CAPABILITY-LIFECYCLE shows when to enable, consume, disable, and dispose', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/capability')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /type INotificationCenter = ICapabilityHandle/)
+  assert.match(text, /capabilities\.register<INotificationCenter>/)
+  assert.match(text, /const result = await capabilities\.enable\('notificationCenter'\)/)
+  assert.match(text, /capabilities\.handle<INotificationCenter>\('notificationCenter'\)/)
+  assert.match(text, /notifications\?\.show\(message\)/)
+  assert.match(text, /await capabilities\.disable\('notificationCenter'\)/)
+  assert.match(text, /await capabilities\.dispose\(\)/)
+  assert.match(text, /enable\(\) 返回的是状态而不是业务对象/)
+  assert.match(text, /用户关闭抽屉时调用 disable\(\)/)
+  assert.match(text, /配置或权限被撤回时用 setFlag\('notificationCenter', false\)/)
+})
+
+test('SITE-T-PLUGIN-HOST-TRAY explains composition terms in reader language', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/plugin-host')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /这一节只给 Tray.*? 的 Host 适配器维护者看/)
+  assert.match(text, /prepared admission.*数据库事务提交前的暂存区/s)
+  assert.match(text, /Host revision 就是 Host 的修改版本号/)
+  assert.match(text, /安装凭证.*exact receipt/s)
+  assert.match(text, /opaque data-order slot.*Host 内部保存的排序位置/s)
+  assert.match(text, /第一步先让新请求看不到待卸载插件/)
+  assert.match(text, /cleanupComplete: false.*不代表资源已经释放/s)
+  assert.match(text, /仍须等待返回的 physicalCompletion Promise/)
+})
+
+test('SITE-T-PLUGIN-HOST-DEFINE uses definePlugin and consumes the committed view', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/plugin-host')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /import \{ definePlugin \} from '@migaia\/plugin-host\/defined'/)
+  assert.match(text, /const upper = definePlugin<ICore, \{ upper\(value: string\): string \}>/)
+  assert.match(text, /const view = await host\.use\(upper\)/)
+  assert.match(text, /view\.extensions\.upper\('migaia'\)/)
+  assert.match(text, /await view\.unUse\('upper'\)/)
+  assert.match(text, /definePlugin\(name, install\).*短写法/s)
+  assert.match(text, /definePlugin\(\{ name, config, install, shared, update, dispose \}\)/)
+  assert.match(text, /只会校验并保存定义，不会执行 install\(\)/)
+  assert.match(text, /use\(\) 成功后返回不可变 view/)
+})
+
+test('SITE-T-PLUGIN-HOST-GENERATOR-CONTINUE explains the control signal and transition', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/plugin-host')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /GENERATOR_CONTINUE 是框架导出的唯一 Symbol 控制信号，不是.*?业务数据/)
+  assert.match(text, /最后一次 yield.*?交给下一 stage/s)
+  assert.match(text, /一次也没有 yield.*?原样转发.*?输入/s)
+  assert.match(text, /第二个 stage 收到 MIGAIA，最终结果是 \[MIGAIA\]/)
+  assert.match(text, /return transformedValue.*?直接把该值交给下一 stage/s)
+  assert.match(text, /GENERATOR_HALT.*?终止整条 pipeline/s)
+  assert.match(text, /GENERATOR_UNDEFINED.*?真正的 undefined.*?继续向下传/s)
+})
+
+test('SITE-T-HEADER-RADIUS softens both lower navigation corners', () => {
+  assert.match(styleSource, /border-radius: 1rem 1rem 1\.5rem 1\.5rem/)
+  assert.match(styleSource, /border-radius: 0 0 1\.25rem 1\.25rem/)
+})
+
 test('SITE-T01 uses one static React Router pipeline without legacy framework leftovers', () => {
   assert.match(routeConfig, /ssr: false/)
   assert.match(routeConfig, /routeManifest\.entries\.map/)
@@ -582,7 +744,8 @@ test('SITE-T-A26/A30 closes emitted chunk and terminology boundaries', () => {
   }
   for (const file of emittedFiles(buildRoot).filter((candidate) => candidate.endsWith('.html'))) {
     const html = readFileSync(file, 'utf8')
-    assert.doesNotMatch(renderedText(html), /\bpackages?\b|\bzh-cn\b|\.\.\/packages/i)
+    const proseHtml = html.replace(/<pre(?:\s[^>]*)?>[\s\S]*?<\/pre>/gi, '')
+    assert.doesNotMatch(renderedText(proseHtml), /\bpackages?\b|\bzh-cn\b|\.\.\/packages/i)
     assert.doesNotMatch(
       html,
       /not-applicable:|No additional advanced behavior is declared|source-backed (?:advanced semantics|signature)|Declared shape:|(?:function|type) signature export (?:declare|type)/i
@@ -632,14 +795,434 @@ test('SITE-T-PERF keeps route code separate from generated library data', () => 
   }
 })
 
-test('SITE-T-A34/A35 closes API ordering and completion action for every page', () => {
+test('SITE-T-A34/A35 closes API ordering and exposes a meaningful next action for every page', () => {
   for (const entry of routeManifest.entries) {
     const html = readFileSync(join(buildRoot, artifactPath(entry.path)), 'utf8')
-    assert.match(html, /class="next-actions"|class="actions"/)
+    assert.match(html, /class="next-actions"|class="actions"|class="architecture-stack"/)
   }
   for (const api of apiManifest.apis) {
     assert.ok(api.sections.indexOf('core-usage') < api.sections.indexOf('advanced-usage'))
   }
+})
+
+test('SITE-T-ARCHITECTURE-INDEX keeps the landing page focused on library families', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture')), 'utf8')
+
+  assert.match(html, /class="architecture-stack"/)
+  assert.doesNotMatch(html, /阅读架构时先回答三个问题/)
+})
+
+test('SITE-T-LIBRARY-DESCRIPTIONS uses concrete responsibilities instead of slogans', () => {
+  const docsIndex = readFileSync(join(buildRoot, artifactPath('/zh/docs')), 'utf8')
+  const utilsArchitecture = readFileSync(
+    join(buildRoot, artifactPath('/zh/architecture/utils')),
+    'utf8'
+  )
+  const loggerEnglish = readFileSync(
+    join(buildRoot, artifactPath('/en/architecture/logger')),
+    'utf8'
+  )
+
+  assert.match(docsIndex, /utils.*提供取消、并发、错误、集合、字符串等通用基础工具/s)
+  assert.match(utilsArchitecture, /多个包共同需要、且不应绑定 Store、DOM 或具体运行时/)
+  assert.match(utilsArchitecture, /不是无边界的杂物箱/)
+  assert.match(loggerEnglish, /Structured logging with stable levels.*flush ownership/s)
+  for (const html of [docsIndex, utilsArchitecture, loggerEnglish]) {
+    assert.doesNotMatch(html, /归属与边界模型/)
+    assert.doesNotMatch(html, /源码契约、能力边界与使用入口/)
+    assert.doesNotMatch(html, /Source-backed entry with maintained boundary facts/)
+    assert.doesNotMatch(html, /owns this capability boundary and its public contracts/)
+  }
+})
+
+test('SITE-T-ARCHITECTURE-LEDES explain capability, pain, and design for every library', () => {
+  const architectureEntries = routeManifest.entries.filter(
+    (entry) => entry.locale === 'zh' && /^\/zh\/architecture\/[^/]+$/.test(entry.path)
+  )
+
+  assert.ok(architectureEntries.length > 20)
+  for (const entry of architectureEntries) {
+    const html = readFileSync(join(buildRoot, artifactPath(entry.path)), 'utf8')
+    const lede = html.match(/<p class="lede">([^<]+)<\/p>/)?.[1] ?? ''
+    assert.ok(lede.length >= 70, `architecture lede is too thin: ${entry.path}`)
+    assert.doesNotMatch(lede, /归属与边界模型|源码契约|使用入口/)
+    assert.match(
+      lede,
+      /用于|当|核心设计|解决|相比|避免|统一|提供/,
+      `architecture lede lacks reader-facing capability context: ${entry.path}`
+    )
+  }
+
+  const lifecycle = readFileSync(
+    join(buildRoot, artifactPath('/zh/architecture/lifecycle')),
+    'utf8'
+  )
+  assert.match(lifecycle, /一组资源必须随同一 owner 关闭/)
+  assert.match(lifecycle, /scope、generation、terminal controller 与 dispose transaction/)
+  assert.match(lifecycle, /不负责事件分发、业务排队或依赖图/)
+
+  const tray = readFileSync(join(buildRoot, artifactPath('/zh/architecture/tray')), 'utf8')
+  assert.match(tray, /先准备配置，再用配置创建 logger、API client 或数据库连接/)
+  assert.match(tray, /任一步失败都不会暴露半初始化对象/)
+  assert.match(tray, /dispose\(\) 会逆序释放已启动项/)
+  assert.match(tray, /不是运行期增删服务的 DI 容器/)
+})
+
+test('SITE-T-ARCHITECTURE-API-NAV exposes library API shortcuts beside architecture content', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+
+  assert.match(html, /class="architecture-reading-layout"/)
+  assert.match(html, /class="architecture-api-rail"/)
+  assert.match(html, /API 分类与列表/)
+  assert.match(html, /href="\/zh\/docs\/utils\/function\/onceAsync"/)
+})
+
+test('SITE-T-CODE-EXPLANATION-PROSE renders explanations without decorative numbering', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+
+  assert.match(html, /class="code-walkthrough-notes"><p>/)
+  assert.doesNotMatch(html, /class="code-walkthrough"><ol>/)
+})
+
+test('SITE-T-CODE-EXPLANATION-QUALITY rejects generated filler across every rendered page', () => {
+  const forbidden = [
+    '先从示例标出的公开路径引入',
+    '这里先把下一步要用的值放进变量',
+    '最后执行这一项操作',
+    '这里真正发起读写或调用',
+    '创建本场景拥有的实例',
+    'Import only the capabilities used by this example',
+    'Prepare values or configuration required by the next stage',
+    'Complete the final step and retain its result',
+    'Perform the section’s core read, write, or call',
+    'Create the scenario-owned instance',
+    '的公开契约与所需结果匹配时使用',
+    'when its public contract matches the result you need',
+    '提供该模块的公开运行时能力',
+    "is part of this module's public type contract",
+    "is part of this module's public function contract",
+    "is part of this module's public const contract",
+    "is part of this module's public class contract"
+  ]
+  const htmlFiles = emittedFiles(buildRoot).filter((path) => path.endsWith('.html'))
+
+  for (const path of htmlFiles) {
+    const html = readFileSync(path, 'utf8')
+    const text = renderedText(html)
+    for (const phrase of forbidden)
+      assert.ok(!text.includes(phrase), `generated filler remains in ${path}: ${phrase}`)
+  }
+})
+
+test('SITE-T-CODE-EXPLANATION-REPETITION rejects site-wide fallback commentary', () => {
+  const occurrences = new Map<string, number>()
+  const chineseHtmlFiles = emittedFiles(join(buildRoot, 'zh')).filter((path) =>
+    path.endsWith('.html')
+  )
+
+  for (const path of chineseHtmlFiles) {
+    const html = readFileSync(path, 'utf8')
+    for (const notes of html.matchAll(/<div class="code-walkthrough-notes">([\s\S]*?)<\/div>/g)) {
+      for (const paragraph of notes[1].matchAll(/<p>([\s\S]*?)<\/p>/g)) {
+        const explanation = renderedText(paragraph[1]).trim()
+        occurrences.set(explanation, (occurrences.get(explanation) ?? 0) + 1)
+      }
+    }
+  }
+
+  for (const [explanation, count] of occurrences)
+    assert.ok(count <= 10, `commentary repeated ${count} times: ${explanation}`)
+})
+
+test('SITE-T-EVENT-STYLE explains the exact subscription, delivery, and removal behavior', () => {
+  const html = readFileSync(
+    join(buildRoot, artifactPath('/zh/architecture/event-subscriber')),
+    'utf8'
+  )
+  const text = renderedText(html)
+
+  assert.match(text, /on\(\) 登记监听器，并返回只属于这次订阅的取消句柄 stop/)
+  assert.match(text, /emit\(1\) 同步把值 1 交给当前监听器/)
+  assert.match(text, /stop\.off\(\) 删除这条 registration/)
+  assert.match(text, /只是 subscribe、publish、unsubscribe 的别名/)
+  assert.doesNotMatch(text, /最后执行这一项操作/)
+})
+
+test('SITE-T-EVENT-SUBSCRIBER uses its subpath and states the style boundary precisely', () => {
+  const html = readFileSync(
+    join(buildRoot, artifactPath('/zh/architecture/event-subscriber')),
+    'utf8'
+  )
+  const text = renderedText(html)
+
+  assert.match(text, /from '@migaia\/event-subscriber\/subscriber'/)
+  assert.match(text, /可接收保留该方法的 styled channel/)
+  assert.match(text, /不读取 style 配置/)
+  assert.match(text, /返回值固定为 canonical IUnsubscribe/)
+  assert.match(text, /不会带上 off、dispose、unlisten 等 style alias/)
+})
+
+test('SITE-T-EVENT-SUBSCRIBER-NAME explains why the legacy class event name was removed', () => {
+  const html = readFileSync(
+    join(buildRoot, artifactPath('/zh/architecture/event-subscriber')),
+    'utf8'
+  )
+  const text = renderedText(html)
+
+  assert.match(text, /const channel = createEventChannel<number>\(\)/)
+  assert.match(text, /旧草案里的 abstract class EventSubscriber/)
+  assert.match(text, /静态 EVENT_NAME/)
+  assert.match(text, /那套接口没有进入当前公开契约/)
+  assert.match(text, /IEventSubscriber 只是 \{ handle\(event\) \}/)
+  assert.match(text, /由传给 subscribeSubscriber\(channel, subscriber\) 的 channel 决定/)
+  assert.match(text, /hub\.subscribe\('count', listener\)/)
+})
+
+test('SITE-T-EVENT-TASK defines the channel, registration, payload, and settled result', () => {
+  const html = readFileSync(
+    join(buildRoot, artifactPath('/zh/architecture/event-subscriber')),
+    'utf8'
+  )
+  const text = renderedText(html)
+
+  assert.match(text, /const tasks = createEventChannel<IEmailJob, IEmailReceipt>\(\)/)
+  assert.match(text, /\{ taskId: 'email' \}/)
+  assert.match(text, /const job: IEmailJob = \{ recipient: 'ada@example\.com'/)
+  assert.match(text, /tasks 不是特殊类型或全局任务表/)
+  assert.match(text, /job 会成为 listener 收到的 event\.value/)
+  assert.match(text, /result 则明确区分发送成功的 receipt 与发送失败的原因/)
+})
+
+test('SITE-T-API-EXAMPLES import the primary API from its public owner', () => {
+  const host = readFileSync(
+    join(buildRoot, 'zh/docs/capability/createCapabilityHost/index.html'),
+    'utf8'
+  )
+  const timeout = readFileSync(
+    join(buildRoot, 'zh/docs/utils/promise/withTimeout/index.html'),
+    'utf8'
+  )
+
+  assert.match(renderedText(host), /import \{ createCapabilityHost \} from '@migaia\/capability'/)
+  assert.match(renderedText(timeout), /import \{ withTimeout \} from '@migaia\/utils\/promise'/)
+})
+
+test('SITE-T-FUNCTION-EXAMPLE-COVERAGE gives every function detail page a copyable example', () => {
+  const detailPages = emittedFiles(join(buildRoot, 'zh/docs')).filter((path) =>
+    path.endsWith('index.html')
+  )
+
+  for (const path of detailPages) {
+    const html = readFileSync(path, 'utf8')
+    const callable = html.match(
+      /class="single-api-reference" data-api-kind="function" data-api-name="([^"]+)"/
+    )
+    if (!callable) continue
+    const apiName = callable[1]
+    const text = renderedText(html)
+    assert.match(html, new RegExp(`data-primary-api-example="${apiName}"`), path)
+    assert.match(
+      text,
+      new RegExp(`import\\s+\\{[^}]*\\b${apiName}\\b[^}]*\\}\\s+from\\s+['"]@migaia/`),
+      `copyable example for ${apiName} does not import its primary API: ${path}`
+    )
+  }
+})
+
+test('SITE-T-CLASS-EXAMPLE-COVERAGE gives every class detail page a maintained example', () => {
+  const detailPages = emittedFiles(join(buildRoot, 'zh/docs')).filter((path) =>
+    path.endsWith('index.html')
+  )
+
+  for (const path of detailPages) {
+    const html = readFileSync(path, 'utf8')
+    const classPage = html.match(
+      /class="single-api-reference" data-api-kind="class" data-api-name="([^"]+)"/
+    )
+    if (!classPage) continue
+    assert.match(html, new RegExp(`data-primary-api-example="${classPage[1]}"`), path)
+  }
+})
+
+test('SITE-T-UTILS-DEFERRED recommends the native Promise.withResolvers API first', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+
+  assert.match(html, /优先使用原生 API/)
+  assert.match(html, /Promise\.withResolvers/)
+  assert.match(html, /兼容旧运行时/)
+})
+
+test('SITE-T-UTILS-TO-PROMISE explains execution timing and identity tradeoffs', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+
+  assert.match(html, /当前调用栈立即执行/)
+  assert.match(html, /下一次 microtask/)
+  assert.match(html, /同一个 Promise/)
+  assert.match(html, /新的链式 Promise/)
+})
+
+test('SITE-T-UTILS-MANUAL-SCHEDULER marks repository-only test infrastructure', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+
+  assert.match(html, /本仓测试专用/)
+  assert.match(html, /不面向外部业务代码/)
+  assert.match(html, /测试框架提供的 fake timers/)
+})
+
+test('SITE-T-UTILS-SYSTEM-SCHEDULER distinguishes the injectable clock from Date.now', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /返回的都是 Unix 时间戳，数值与精度没有区别/)
+  assert.match(text, /now\(\).*schedule\(\).*同一个 IUtilsScheduler/s)
+  assert.match(text, /绕过注入的调度器/)
+  assert.match(text, /真实时间和虚拟定时器/)
+})
+
+test('SITE-T-UTILS-ERROR-CODES renders every code as a described list item', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(html, /<li><code>invalidArgument<\/code>/)
+  assert.match(html, /<li><code>numberFormatInvalid<\/code>/)
+  assert.match(text, /ERROR_IDENTITY_CONFLICT.*保留原错误身份/s)
+  assert.match(text, /DEADLINE_EXCEEDED.*scope.*timeoutMs/s)
+  assert.match(text, /NUMBER_FORMAT_INVALID.*Intl\.NumberFormat/s)
+})
+
+test('SITE-T-UTILS-BYTE-CONTEXT explains ArrayBuffer storage and Uint8Array views', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /ArrayBuffer.*原始连续内存.*不能按下标读写/s)
+  assert.match(text, /Uint8Array.*8 位无符号整数视图.*0～255/s)
+  assert.match(text, /byteOffset.*不会复制数据.*同一底层 ArrayBuffer/s)
+  assert.match(text, /独立副本.*slice\(\).*共享窗口.*subarray\(\)/s)
+  assert.match(text, /SharedArrayBuffer.*并发语义不同/s)
+})
+
+test('SITE-T-UTILS-PROBE-PROPERTY shows its input object and all result branches', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /const user = \{.*name: 'Ada'.*get profile\(\): never/s)
+  assert.match(text, /switch \(result.kind\).*case 'value'.*case 'missing'.*case 'failed'/s)
+  assert.match(text, /readLabel\(user, 'name'\).*读取成功，消费 value/s)
+  assert.match(text, /readLabel\(user, 'email'\).*字段不存在，走业务默认值/s)
+  assert.match(text, /readLabel\(user, 'profile'\).*getter 异常被显式上报/s)
+  assert.match(text, /profileReads.*1.*没有为了判断结果而重复触发 getter/s)
+  assert.match(text, /user.*第一个参数 value.*普通对象、class 实例/s)
+  assert.match(text, /字段不存在.*读取字段失败.*分开/s)
+})
+
+test('SITE-T-UTILS-IMMUTABLE-SNAPSHOT explains structured clone mechanics and limits', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /globalThis\.structuredClone\(\).*不经过 JSON 字符串/s)
+  assert.match(text, /循环引用.*共享关系.*Date.*Map.*Set.*ArrayBuffer.*TypedArray/s)
+  assert.match(text, /不会保留自定义 class 的原型方法.*getter\/setter.*属性描述符/s)
+  assert.match(text, /没有传 transfer list.*ArrayBuffer.*复制.*不会.*detached/s)
+  assert.match(text, /不调用 Object\.freeze\(\).*返回对象本身仍可修改/s)
+  assert.match(text, /copy\.primary === copy\.alias.*true.*共享引用关系被保留/s)
+})
+
+test('SITE-T-UTILS-DIAGNOSTIC-SNAPSHOT contrasts strict and best-effort cloning', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /原生 structuredClone\(value\).*全有或全无/s)
+  assert.match(text, /immutableSnapshot\(value\).*ENV_UNSUPPORTED.*CLONE_UNSUPPORTED/s)
+  assert.match(text, /diagnosticSnapshot\(value\).*不先克隆整张对象图.*保留原引用/s)
+  assert.match(text, /structuredDiagnosticSnapshot\(value\).*先尝试原生 structuredClone.*退回/s)
+  assert.match(text, /value\.callback === callback.*true.*不支持的函数保留原引用/s)
+  assert.match(text, /diagnostics 非空.*不能把返回值宣称为完全隔离快照/s)
+})
+
+test('SITE-T-UTILS-IDENTITY-SNAPSHOT documents its only meaningful policy use', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /identitySnapshot.*单独调用它没有运行时收益/s)
+  assert.match(text, /可配置 snapshot policy.*零拷贝.*接受共享引用/s)
+  assert.match(text, /liveConfig\.retry = 3.*retained\.retry.*3.*同一对象/s)
+  assert.match(text, /可信进程内.*身份敏感或不可克隆对象.*共享所有权/s)
+  assert.match(text, /外部输入.*历史状态.*跨边界传输.*immutableSnapshot/s)
+})
+
+test('SITE-T-UTILS-SET explains immutable updates and structural sharing precisely', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /每次 set 都返回新根对象/s)
+  assert.match(text, /next\.user !== data\.user.*路径上的对象被浅拷贝/s)
+  assert.match(text, /next\.settings === data\.settings.*未修改分支继续共享引用/s)
+  assert.match(text, /immutable.*更新方式.*不会深拷贝整棵树.*不会调用 Object\.freeze/s)
+  assert.match(text, /Object\.is\(\).*相等.*直接返回原根对象/s)
+})
+
+test('SITE-T-UTILS-OWN-CONFIG demonstrates admission, isolation, and managed successors', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /ownConfig.*接收外部配置的边界.*独立、可验证所有权/s)
+  assert.match(text, /callerOptions\.retry\.attempts = 99.*config\.retry\.attempts.*2/s)
+  assert.match(text, /Set 也已复制/s)
+  assert.match(text, /WeakMap.*profile 与 limits/s)
+  assert.match(text, /readonlyConfig.*公开读取.*patchConfig.*派生新根.*readConfigPath/s)
+  assert.match(text, /返回对象没有被冻结.*运行时配置.*不应当作可序列化数据/s)
+})
+
+test('SITE-T-UTILS-COMBINE-CONFIG shows both inputs, merged output, and an explicit diff', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /const defaults = ownConfig\(\{\s*retries: 1/)
+  assert.match(text, /const override = ownConfig\(\{\s*retries: 3/)
+  assert.match(text, /strategies: \{ record: 'merge', array: 'concat' \}/)
+  assert.match(text, /transport: \{ timeoutMs: 2500, keepAlive: true \}/)
+  assert.match(text, /const diff = \{/)
+  assert.match(text, /before: defaults\.retries, after: merged\.retries/)
+  assert.match(text, /diff 只是把结果变化写明，不是 combineConfig 的额外返回值/)
+})
+
+test('SITE-T-UTILS-ONCE explains module scope, singleton limits, and Proxy responsibility', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /export const getRuntime = once/)
+  assert.match(text, /first === second; \/\/ true/)
+  assert.match(text, /每调用一次 once\(fn\) 都会创建一份独立缓存/)
+  assert.match(text, /iframe、Worker、Node vm 等不同 realm/)
+  assert.match(text, /globalThis\[Symbol\.for\('your-app\/runtime'\)\]/)
+  assert.match(text, /Proxy 可以把首次属性访问转成惰性初始化/)
+  assert.match(text, /它不会自动保证全局唯一/)
+  assert.match(text, /不适合需要重试、重置、热更新或按请求隔离的初始化/)
+})
+
+test('SITE-T-UTILS-ONCE-ASYNC explains concrete use cases and shared-failure boundaries', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+
+  assert.match(html, /export const loadAppConfig = onceAsync/)
+  assert.match(html, /加载不会刷新的启动配置/)
+  assert.match(html, /初始化一个共享 SDK 客户端/)
+  assert.match(html, /动态导入并编译同一份 WASM 模块/)
+  assert.match(html, /首次失败会一直缓存/)
+  assert.match(html, /按租户或请求隔离/)
+  assert.match(html, /其他等待者也会受影响/)
+  assert.match(html, /模块重复实例化或跨 iframe、Worker、Node <code>vm<\/code> 时不会共享/)
+})
+
+test('SITE-T-UTILS-READONLY-CONFIG explains read-only behavior in plain language', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /readonlyConfig.*给已有配置套上只读保护/s)
+  assert.match(text, /正常读取.*没有复制第二份配置/s)
+  assert.match(text, /不允许调用方.*修改任何层级/s)
+  assert.match(text, /Map\.set\(\).*Set\.add\(\).*Date\.setFullYear\(\).*都会报错/s)
+  assert.match(text, /patchConfig\(\).*生成下一份.*不是写 view/s)
+  assert.doesNotMatch(text, /门面/)
 })
 
 test('SITE-T-API-TYPING keeps runtime APIs primary and typing subordinate', () => {
@@ -1438,22 +2021,22 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
     [
       '/zh/guides/storage-web/getting-started',
       '五分钟选择并使用 Storage Web 后端',
-      '只需要键值时直接使用精确入口'
+      'Local Storage 异步契约：保持调用模型可替换'
     ],
     [
       '/en/guides/storage-web/getting-started',
       'Choose and use a Storage Web backend in five minutes',
-      'Use an exact entry directly for key/value work'
+      'Local Storage async contract for a replaceable call model'
     ],
     [
       '/zh/guides/storage-web/indexeddb-and-transactions',
       '用 IndexedDB 管理记录与事务',
-      '使用 record API'
+      '完成一条 record 的创建、读取、更新、删除与遍历'
     ],
     [
       '/en/guides/storage-web/indexeddb-and-transactions',
       'Manage records and transactions with IndexedDB',
-      'Use record APIs'
+      'Create, read, update, delete, and iterate one record'
     ],
     [
       '/zh/guides/storage-web/entity-schema-and-codecs',
@@ -1468,42 +2051,42 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
     [
       '/zh/guides/storage-web/host-and-plugins',
       '用 Storage Host 组合多个后端',
-      '首批插件只通过异步 factory 安装'
+      '整个 plugins 数组全部成功后'
     ],
     [
       '/en/guides/storage-web/host-and-plugins',
       'Compose several backends with Storage Host',
-      'Install the initial plugin set only through the async factory'
+      'The Host exposes backends only after the whole plugin array succeeds'
     ],
     [
       '/zh/guides/storage-web/reactive-live-queries',
       '创建可取消的 Reactive live query',
-      '从 reactive backend 创建 query'
+      'Live Query 解决“数据变了，读取结果何时重算”'
     ],
     [
       '/en/guides/storage-web/reactive-live-queries',
       'Create a cancellable reactive live query',
-      'Create a query from a reactive backend'
+      'Live Query answers when a read must rerun after data changes'
     ],
     [
       '/zh/guides/storage-web/cookies-and-security',
       '正确处理 Cookie scope 与安全边界',
-      '把 scope 当作持久身份的一部分'
+      '把 scope 当作 Cookie 持久身份的一部分'
     ],
     [
       '/en/guides/storage-web/cookies-and-security',
       'Handle cookie scope and security boundaries correctly',
-      'Treat scope as part of persistent identity'
+      'Treat scope as part of persistent Cookie identity'
     ],
     [
       '/zh/guides/storage-web/cancellation-errors-and-shutdown',
       '处理取消、错误与 Storage 终态',
-      '为有界操作传 signal'
+      '用户不再需要结果时，用 AbortController 主动取消'
     ],
     [
       '/en/guides/storage-web/cancellation-errors-and-shutdown',
       'Handle cancellation, errors, and Storage terminal state',
-      'Pass signal and timeoutMs'
+      'Use AbortController when the user no longer needs a result'
     ],
     ['/zh/guides/logger', 'Logger 学习路径', '按你要解决的问题进入'],
     ['/en/guides/logger', 'Logger learning paths', 'Enter through the problem you need to solve'],
@@ -2055,7 +2638,7 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
   assert.match(storageWebText, /COOKIE_SCOPE_AMBIGUOUS/)
   assert.match(storageWebText, /StorageContractError/)
   assert.match(guideSource, /await db\.transaction\(async \(tx\)/)
-  assert.match(guideSource, /plugins: \[indexedDbReactive\(\{ id: 'primary'/)
+  assert.match(guideSource, /plugins: \[indexedDbReactive\(\{[\s\S]*?id: 'primary'/)
 
   const webRpcStart = readFileSync(
     join(buildRoot, artifactPath('/en/guides/web-rpc/getting-started')),
@@ -2143,6 +2726,19 @@ test('SITE-T-REACTIVE-START flushes the queued rerun before disposing the Effect
     assert.ok(stop > flush, `/${locale}/guides/reactive/getting-started disposes before flush`)
     assert.ok(page.includes('total: 36'))
   }
+})
+
+test('SITE-T-REACTIVE-START explains graph tracking, scheduling, and exact cleanup', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/reactive')), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /Effect → Computed → Signal.*?依赖自动登记/s)
+  assert.match(text, /count\.value = 3.*?不会在 setter 内立刻重跑副作用/s)
+  assert.match(text, /runtime\.flush\(\).*?同步排空.*?队列/s)
+  assert.match(text, /测试、SSR.*?才显式调用 flush\(\)/s)
+  assert.match(text, /释放顺序按消费者到数据源执行/)
+  assert.match(text, /Runtime 本身没有 dispose\(\)/)
+  assert.match(text, /Scope.*?统一释放/s)
 })
 
 test('SITE-T-MIDDLEWARE-ADAPTERS documents every supported conversion and the forbidden direction', () => {
@@ -3081,4 +3677,15 @@ test('SITE-T-STORAGE-WEB-LINKS keeps every maintained Storage Web continuation r
       }
     }
   }
+})
+
+test('SITE-T-STORAGE-WEB-STRUCTURED-CODEC explains selection and the real clone boundary', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/storage-web')), 'utf8')
+
+  assert.match(html, /四者不是同一种格式的别名/)
+  assert.match(html, /真正的复制发生在 IndexedDB\/Memory 的 structured clone/)
+  assert.match(html, /codec 不复制/)
+  assert.match(html, /Date\/Map\/Set\/bytes\/循环引用仍保留/)
+  assert.match(html, /UNSUPPORTED_CAPABILITY/)
+  assert.match(html, /字段校验、版本迁移以及 class 实例重建仍应由 Schema\/Entity 层处理/)
 })

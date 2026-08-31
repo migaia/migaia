@@ -2,11 +2,42 @@
 
 能力的运行时闸门：给每个可选功能一个统一的懒加载 + 启停生命周期 + 按租户隔离的开关表，登记一次，之后启用/关闭都走同一套状态机，不用每个调用点各写一遍资源释放的模板代码。
 
+## 本文中的 Host 是什么
+
+本文单独写 **Host** 时，始终指 `createCapabilityHost()` 创建的 **Capability Host**，不是全仓其他同名概念。它是一个进程内的功能开关与生命周期容器，持有能力注册表、共享 `context`、开关快照和启停状态；调用方通过 `register()` 登记功能，通过 `enable()`/`disable()` 启停功能，最后用 `dispose()` 关闭容器并释放已启用能力。
+
+几个容易混淆的概念职责不同：
+
+- **Capability Host（本文的 Host）**：回答“这个功能现在是否允许启用，以及启用后如何关闭”；不计算能力之间的依赖顺序。
+- **Capability Graph**：回答“节点依赖谁、按什么顺序启动和反向释放”；它不是功能开关表。
+- **PluginHost**：负责插件定义的安装、注册视图、管线阶段与回滚；插件可以在内部使用 Capability Host，但两者不是同一个容器。
+- **Storage Host**：组合并按 ID 暴露多个 storage backend；它管理存储后端，不管理通用功能开关。
+- **Realm Host**：若未来发布，用于控制 Worker、线程或子进程的启动、健康、关闭与强制终止；它提供隔离边界，不负责业务能力登记。
+
+因此，下文“Host 不承担依赖图编排”的完整含义是：**Capability Host 只管理每项能力自身的准入与启停，不读取 `provider → consumer` 依赖边，也不会替调用方决定跨能力的启动顺序。**
+
 ## 适用与不适用场景
 
 **适用**：某个功能需要"开关关着时代码不下载"（配合 `activate()` 内部 `await import()`）、需要启停生命周期（启用给 handle，关闭必须真释放 I/O 连接/订阅/端口等资源）、或者需要按租户/按开关表隔离哪些能力当前允许启用——比如灰度发布、按租户开关实验性面板、线上不重新部署就能回退的功能开关。
 
-**不适用**：Host 不承担依赖图编排；需要静态 required provider DAG 时使用下方的 `@migaia/capability/graph`，只需纯准入时可使用 `@migaia/capability/graph/topology`。Graph 不提供 optional/notification、dynamic replacement 或 cross-realm adapter。Host 也**不能**让一个静态 import 进来的能力变免费——体积只有 `activate()` 内部真正用 `await import()` 时才省下来，闸门只是把这个写法变成一等公民，省体积的是打包器本身。
+这里的“静态 required provider DAG”可以拆开理解：
+
+- **provider** 是提供能力的节点，例如配置服务、数据库连接或日志服务；**consumer** 是使用该能力的节点。
+- **required** 表示这是硬依赖：provider 未注册或启动失败时，consumer 不能启动；它不是“有则使用”的 optional 依赖。
+- **DAG** 是“有向无环图”（Directed Acyclic Graph）：依赖有明确方向，并且不允许 A 依赖 B、B 又间接依赖 A 的循环。
+- **静态** 表示所有节点和依赖边必须在首次 `ready()` 前登记完成；`ready()` 会冻结注册表。运行期间不能增加、删除或替换节点。
+
+例如“配置服务 → 用户服务 → 结算面板”表示用户服务必须等配置服务就绪，结算面板又必须等用户服务就绪。Graph 会按这个方向启动，关闭时反向释放：先释放结算面板，再释放用户服务，最后释放配置服务。若你的需求只是独立功能开关，不存在这种跨能力启动顺序，就不需要 Graph。
+
+**不适用**：Host 不承担上述依赖图编排；需要静态 required provider DAG 时使用下方的 `@migaia/capability/graph`。如果只想检查“一组节点及其 required 依赖是否合法”并计算确定的启动顺序，不需要创建服务、不执行节点的 `start()`、也不管理 `release()`，则直接使用 `@migaia/capability/graph/topology`。
+
+这里提到的其他能力边界分别是：
+
+- **optional dependency（可选依赖）与 notification（变化通知）**：consumer 可以在 provider 缺失时继续运行，并在 provider 后来可用、失败、恢复或被替换时收到通知，再按策略选择继续、刷新快照或重启。例如“订单服务可以没有推荐引擎照常下单；推荐引擎上线后再启用推荐”。静态 Graph 当前只接受 `required: true`，不提供这套可选绑定与通知策略。
+- **dynamic replacement（运行时替换）**：Graph 已经运行后，仍可增加、删除或替换节点及依赖边，并只暂停、释放和重启受影响的 consumer。例如不重启整个应用就把支付插件 v1 换成 v2。静态 `@migaia/capability/graph` 会在 `ready()` 后冻结拓扑；确实需要这种能力时使用独立的 `@migaia/capability/graph/dynamic`，并由组合层负责被替换资源的物理释放。
+- **cross-realm adapter（跨运行域适配器）**：让能力实际运行在另一个 Worker、线程或子进程中，同时把启动、健康检查、关闭、强制终止和错误链映射回当前 Graph。它适合需要隔离同步死循环、重型任务或进程故障的场景，不等同于普通的 RPC。当前包没有发布这种 adapter；浏览器默认仍在同一 realm，不能用 Promise 超时冒充真正终止。
+
+Host 也**不能**让一个静态 import 进来的能力变免费——体积只有 `activate()` 内部真正用 `await import()` 时才省下来，闸门只是把这个写法变成一等公民，省体积的是打包器本身。
 
 ## 安装
 
@@ -65,7 +96,7 @@ const service = graph.get<{ readonly ready: boolean }>(consumer, provider)
 await graph.dispose()
 ```
 
-Graph core 不依赖 Tray、Reactive、Resource、PluginHost 或平台适配器；optional/notification、dynamic replacement 与 cross-realm 由独立 SDD 管理。
+静态 Graph core 只拥有 required 拓扑、启动顺序与生命周期协调，不反向依赖上层组合框架或平台适配器。optional/notification 与 cross-realm 仍是独立的未发布边界，dynamic replacement 则由 `@migaia/capability/graph/dynamic` 单独提供，避免把运行时 mutation 混入静态 Graph。
 
 ---
 
@@ -88,11 +119,54 @@ import {
 **`createCapabilityHost`｜10 秒上手** —— 创建一个能力容器：
 
 ```ts
+import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'
+
+type INotificationCenter = ICapabilityHandle & {
+  show(message: string): void
+}
+
+const mount = document.querySelector<HTMLElement>('#notification-center')!
 const capabilities = createCapabilityHost(
-  { userId: 'demo' }, // context：所有 activate() 共享的应用上下文
-  { flags: { greeting: true } } // 开关表：只有列出且严格等于 true 的能力可被启用
+  { mount },
+  { flags: { notificationCenter: true } }
 )
+
+capabilities.register<INotificationCenter>({
+  name: 'notificationCenter',
+  activate({ mount }) {
+    const panel = document.createElement('output')
+    mount.append(panel)
+    return {
+      show(message) {
+        panel.textContent = message
+      },
+      dispose() {
+        panel.remove()
+      }
+    }
+  }
+})
+
+async function openNotificationCenter(message: string) {
+  const result = await capabilities.enable('notificationCenter')
+  if (result.status !== 'enabled') return
+
+  const notifications = capabilities.handle<INotificationCenter>('notificationCenter')
+  notifications?.show(message)
+}
+
+async function closeNotificationCenter() {
+  await capabilities.disable('notificationCenter')
+}
+
+async function shutdownApplication() {
+  await capabilities.dispose()
+}
 ```
+
+这里把“通知中心”当作一个按需能力：用户打开通知抽屉时调用 `openNotificationCenter()`，此时才创建 DOM 资源；启用成功后，`enable()` 返回的是状态而不是业务对象，再通过 `handle<INotificationCenter>()` 取得能力并调用 `show()`。用户关闭抽屉时调用 `disable()`，它会等待 handle 的 `dispose()` 删除面板；整个应用退出时调用 Host 的 `dispose()`，兜底关闭所有仍启用的能力。
+
+`flags.notificationCenter` 是远端配置或权限开关：为 `false` 时 `enable()` 返回 `gated`，不会创建面板。临时离开页面但以后还允许再次打开，用 `disable()`；配置或权限被撤回时用 `setFlag('notificationCenter', false)`，它会立即作废在途启用并释放现有 handle。
 
 签名：`createCapabilityHost<Context>(context: Context, options?: ICapabilityHostOptions): ICapabilityHost<Context>`。
 
@@ -103,11 +177,13 @@ const capabilities = createCapabilityHost(
 
 `options` 本身必须是对象或函数（`null`/原始值会抛 `INVALID_OPTION` 的 `TypeError`）；`onError` 若提供必须是函数。
 
-**`ICapabilityHandle`｜3 秒上手** —— `activate()` 必须返回的对象形状，唯一约束是有 `dispose()`：
+**`ICapabilityHandle`｜3 秒上手** —— `activate()` 必须返回的对象形状，唯一公共约束是有 `dispose()`；业务方法由具体能力自行扩展：
 
 ```ts
 type ICapabilityHandle = { dispose(): void | PromiseLike<void> }
 ```
+
+例如上面的 `INotificationCenter` 在此基础上增加了 `show(message)`。Host 只负责保存和释放 handle，不会包装或代理业务方法；调用方在 `enable()` 返回 `enabled` 后，通过 `handle<INotificationCenter>('notificationCenter')` 取回同一个对象并调用它。
 
 **`register`｜5 秒上手** —— 登记一个能力定义：
 

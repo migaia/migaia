@@ -44,11 +44,15 @@ type IManualScheduler = IUtilsScheduler & {
 export const systemScheduler: IUtilsScheduler;
 ```
 
-基于原生 `setTimeout`/`clearTimeout` 的默认调度器，`schedule()` 返回的句柄在宿主支持时会转发 `unref()`（避免测试/进程因悬挂定时器无法退出）。
+基于原生 `setTimeout`/`clearTimeout` 的默认调度器，`now()` 当前直接调用 `Date.now()`，因此两者返回的时间戳与精度相同。`systemScheduler.now()` 的价值不是提供另一种计时算法，而是让读取时间的 `now()` 和安排任务的 `schedule()` 共享同一个可注入边界；测试可将两者一起替换为虚拟时钟。
+
+普通业务只需要读取真实墙上时间时，直接使用 `Date.now()`。实现接受 `IUtilsScheduler` 的超时、重试或调度逻辑时，必须配对使用 `scheduler.now()` 和 `scheduler.schedule()`；直接调用 `Date.now()` 会绕过注入的调度器，造成真实时间与虚拟定时器混用。`schedule()` 返回的句柄在宿主支持时会转发 `unref()`（避免测试/进程因悬挂定时器无法退出）。
 
 ```ts
 function createManualScheduler(): IManualScheduler;
 ```
+
+> 本仓测试专用：用于本仓单元测试与适配器验证，不建议外部业务代码使用。外部项目应优先选择测试框架自带的 fake timers，生产代码使用 `systemScheduler` 或默认调度器。
 
 创建一个 FIFO 虚拟时钟调度器：`schedule()` 按 `到期时间 → 注册顺序` 排队；调用 `advance(ms)` 会一次性执行所有到期回调（回调内部再 `schedule` 的新任务，只要到期时间 `<= 目标时刻` 也会在同一次 `advance` 内继续触发）。`advance` 单次循环超过 10000 次会抛 `RangeError`（防止回调间互相递归调度导致死循环）。`delayMs`/`ms` 必须是有限的非负数，否则抛 `RangeError`。
 
@@ -72,6 +76,15 @@ function deferred<T>(): IDeferred<T>;
 
 创建一个可从外部结算的原生 Promise。适合把回调式 API 转成 Promise，或在测试中手动控制某个异步操作何时完成/失败。
 
+新代码应先选择平台原生的 `Promise.withResolvers()`。`deferred()` 主要服务于尚未支持该 API 的旧运行时，或必须统一依赖 `IDeferred<T>` 的项目边界：
+
+```ts
+const { promise, resolve, reject } = Promise.withResolvers<number>();
+resolve(42);
+```
+
+兼容旧运行时：
+
 ```ts
 const { promise, resolve } = deferred<number>();
 setTimeout(() => resolve(42), 0);
@@ -93,6 +106,14 @@ const pending = toPromise(() => {
 });
 await pending; // 异步观察 rejection
 ```
+
+与 `Promise.resolve().then(() => run())` 对比：
+
+- `toPromise(run)` 立即调用 `run`；返回前已经发生读取、写入或其他同步副作用。`run` 返回原生 Promise 时，返回值保持同一个 Promise identity。
+- `Promise.resolve().then(run)` 把调用推迟到下一次 microtask，并返回新的链式 Promise。它适合主动让出当前调用栈、避免同步重入，不适合依赖“调用后立即生效”的逻辑。
+- 两者都会把异常变成 rejection，但产生 rejection 的时点不同：前者在当前调用过程中捕获同步异常，后者等 microtask 真正执行 `run` 时才捕获。
+
+因此，需要同步启动工作并统一返回 Promise 时使用 `toPromise`；需要延迟启动工作时使用 `Promise.resolve().then(run)`。
 
 ### `sleep`
 
@@ -418,11 +439,37 @@ const UtilsErrorCode = {
   configConflict: 'CONFIG_CONFLICT',
   configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED',
   configPathInvalid: 'CONFIG_PATH_INVALID',
-  objectPathInvalid: 'OBJECT_PATH_INVALID'
+  objectPathInvalid: 'OBJECT_PATH_INVALID',
+  formatInvalid: 'FORMAT_INVALID',
+  formatValueMissing: 'FORMAT_VALUE_MISSING',
+  numberFormatInvalid: 'NUMBER_FORMAT_INVALID'
 } as const;
 ```
 
 全包统一使用的稳定语义码，`IUtilsErrorCode` 是其取值的联合类型。除 `UtilsError` 子类外，`base64ToBytes`/`object-path`/`config` 等模块抛出的原生 `TypeError`/`RangeError` 也会通过 `Object.defineProperty` 挂上对应的 `code`（与 `source: '@migaia/utils'`），可用同一套判断逻辑识别。
+
+按用途理解全部错误码：
+
+- `INVALID_ARGUMENT`：参数类型、范围或互斥组合错误；修正调用参数。
+- `NON_ERROR_VALUE`：非 `Error` 异常值已被 `toError()` 转换；从 `cause` 读取原始值。
+- `ENV_UNSUPPORTED`：宿主缺少 `structuredClone` 等必要能力；更换环境或实现。
+- `ABORTED`：外部信号请求取消；停止协作式工作并传播取消原因。
+- `DEADLINE_EXCEEDED`：操作、尝试或总流程超时；结合 `scope`、`timeoutMs` 选择重试或降级。
+- `SCHEDULER_RUNAWAY`：虚拟时钟一次推进超过 10000 个任务；排查同刻递归调度。
+- `ERROR_IDENTITY_CONFLICT`：已有错误身份与新 `source`/`code` 冲突；保留原身份。
+- `CLONE_UNSUPPORTED`：值不能被 `structuredClone` 复制；先转换为可克隆数据。
+- `INVALID_ENCODING`：编码输入不是规范形式；按错误偏移修正输入。
+- `LIMITER_CLOSED`：并发限制器已关闭；停止提交或创建新实例。
+- `REENTRANT_CALL`：同一实例发生禁止的重入；等待当前回调结束。
+- `CONFIG_UNSUPPORTED`：配置含不支持的数据形状或属性；改用普通数据。
+- `CONFIG_READONLY`：尝试修改只读配置；从所有者侧创建新配置。
+- `CONFIG_CONFLICT`：配置来源的所有权、profile 或描述符冲突；统一契约再合并。
+- `CONFIG_LIMIT_EXCEEDED`：配置键数、深度等超过安全上限；缩小输入或调整明确限制。
+- `CONFIG_PATH_INVALID`：配置路径为空、危险或分段无效；改用安全路径。
+- `OBJECT_PATH_INVALID`：对象路径无法安全解析；修正字符串或分段元组。
+- `FORMAT_INVALID`：模板、占位符或值不能安全格式化；修正模板或输入。
+- `FORMAT_VALUE_MISSING`：严格格式化缺少占位符值；补齐字段或调整策略。
+- `NUMBER_FORMAT_INVALID`：`Intl.NumberFormat` 拒绝 locale、选项、货币或数值；修正格式配置。
 
 ---
 
@@ -431,6 +478,13 @@ const UtilsErrorCode = {
 ## `/bytes` 模块
 
 不依赖 Node `Buffer` 或 DOM 的字节/文本编解码，纯 ECMAScript 实现。
+
+### `ArrayBuffer` 与 `Uint8Array` 的关系
+
+- `ArrayBuffer` 是固定长度的原始连续内存，只负责保存字节；不能直接用下标读写。它常见于 `fetch(...).arrayBuffer()`、文件、Web Crypto、WebAssembly 和 Worker 传输边界。
+- `Uint8Array` 是该内存上的 8 位无符号整数视图，每个元素对应一个 0～255 的字节。Base64、UTF-8、网络协议与二进制序列化需要逐字节操作，因此本模块以它作为主要输入输出。
+- `new Uint8Array(buffer, byteOffset, length)` 创建共享底层内存的窗口，不复制数据；视图写入会反映到原 buffer。`subarray()` 继续共享内存，`slice()` 才创建独立副本。
+- 普通 `ArrayBuffer` 跨 Worker 转移后可能 detached；`SharedArrayBuffer` 是并发共享内存，具有不同的所有权和同步要求，所以 `isArrayBuffer()` 明确拒绝它。
 
 ```ts
 function isUint8Array(value: unknown): value is Uint8Array;
@@ -513,10 +567,60 @@ function probeProperty<T>(value: object, key: PropertyKey): IProbePropertyResult
 读取单个属性且只读取一次（避免 getter 被调用两次产生副作用）：属性不存在返回 `missing`；读取（包括触发 getter）抛错返回 `failed` 并携带原始错误；否则返回 `value`。
 
 ```ts
+const profileUnavailable = new Error('profile unavailable');
+let profileReads = 0;
+const user = {
+  name: 'Ada',
+  get profile(): never {
+    profileReads += 1;
+    throw profileUnavailable;
+  }
+};
+
+function readLabel(value: object, key: PropertyKey): string {
+  const result = probeProperty<string>(value, key);
+  switch (result.kind) {
+    case 'value':
+      return result.value;
+    case 'missing':
+      return 'Anonymous';
+    case 'failed':
+      console.error('property read failed', result.error);
+      return 'Unavailable';
+  }
+}
+
+readLabel(user, 'name'); // 'Ada'
+readLabel(user, 'email'); // 'Anonymous'
+readLabel(user, 'profile'); // 'Unavailable'
+profileReads; // 1：getter 只被读取一次
+```
+
+第一个参数可以是普通对象、class 实例或其他可读取属性的对象；第二参数接受字符串、数字或 Symbol key。它把缺失字段与读取失败拆成不同分支，避免 `try/catch` 后错误地使用默认值；返回 `failed` 时不会重建错误，`error` 就是 getter 原样抛出的实例。
+
+```ts
 function immutableSnapshot<T>(value: T): T;
 ```
 
-基于宿主原生 `structuredClone` 做深拷贝。宿主不提供 `structuredClone` 时抛出 `code: 'ENV_UNSUPPORTED'` 的 `TypeError`；值本身不可结构化克隆（例如包含函数）时抛出 `code: 'CLONE_UNSUPPORTED'` 的 `TypeError`。
+实现直接调用宿主原生 `globalThis.structuredClone(value)`，不是 JSON 序列化或手写递归：它一次复制完整对象图，保留循环引用、共享引用关系以及 `Date`、`Map`、`Set`、`ArrayBuffer`、TypedArray 等结构化克隆支持的数据类型。本 API 不接受 transfer list，因此 `ArrayBuffer` 会复制而不会转移所有权。
+
+结构化克隆不会保留自定义 class 的原型方法、getter/setter 与属性描述符；函数、WeakMap 等不支持的成员会让整个克隆失败。“immutable”表示快照不再共享源对象引用，不表示返回值经过 `Object.freeze()`；需要运行时冻结或递归只读时由调用方另行处理。宿主不提供 `structuredClone` 时抛出 `code: 'ENV_UNSUPPORTED'` 的 `TypeError`；值本身不可结构化克隆时抛出 `code: 'CLONE_UNSUPPORTED'` 的 `TypeError`。
+
+```ts
+const shared = { count: 1 };
+const source = {
+  primary: shared,
+  alias: shared,
+  createdAt: new Date('2026-01-01T00:00:00Z')
+};
+const copy = immutableSnapshot(source);
+
+source.primary.count = 2;
+copy.primary.count; // 1
+copy.primary === copy.alias; // true
+copy.createdAt instanceof Date; // true
+Object.isFrozen(copy); // false
+```
 
 ```ts
 type ISnapshotDiagnostic = {
@@ -532,15 +636,17 @@ function diagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;
 function structuredDiagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;
 ```
 
-比 `immutableSnapshot` 更宽容的尽力而为深拷贝：只递归普通对象与数组；遇到函数、class 实例等不支持的类型时**保留原值原样放入快照**（不报错），同时在 `diagnostics` 里记一条 `reason: 'unsupported'`；访问器属性会记 `reason: 'accessor'` 并克隆其读取到的值；读取失败记 `reason: 'read-failed'` 并回退保留原始属性描述符。用循环引用检测（`WeakMap`）保证成环的输入也能安全返回。适合"尽量拷贝，同时如实报告哪些部分没能安全拷贝"的诊断场景。
+与原生 `structuredClone` / `immutableSnapshot` 的关键区别是失败粒度：前两者是整图“全有或全无”，任何不支持成员都会让调用抛错；`diagnosticSnapshot` 始终尝试返回 `{ value, diagnostics }`。它递归复制普通对象与数组，可克隆的内建子树独立调用 `structuredClone`；函数、class 实例等不支持类型则**保留原引用**并记录 `unsupported`。访问器会被读取一次、投影为普通值并记录 `accessor`；读取或反射失败记录 `read-failed`。循环引用通过 `WeakMap` 保持安全。
 
-`structuredDiagnosticSnapshot` 优先尝试原生 `structuredClone`，成功时 diagnostics 为空；宿主不支持或克隆失败时自动退回上述尽力快照，并在根路径追加 `unsupported` 或携带原始 cause 的 `read-failed` 诊断。需要“能克隆就完整克隆、否则仍返回可观测降级结果”的遥测边界优先使用它。
+因此，`diagnosticSnapshot` 的返回值可能只有部分隔离：`diagnostics` 非空时，调用方必须检查对应 `path`，不能把结果当作完整深拷贝。它适合日志、遥测、调试面板等“数据不能整份丢失，但降级必须可见”的场景；安全边界或配置隔离仍应优先用 `immutableSnapshot` 并让失败显式中止。
+
+`structuredDiagnosticSnapshot` 是两种策略的组合：优先尝试原生 `structuredClone`，成功时 diagnostics 为空；宿主不支持或克隆失败时自动退回上述尽力快照，并在根路径追加 `unsupported` 或携带原始 cause 的 `read-failed` 诊断。需要“能完整克隆就完整克隆，否则仍返回可观测降级结果”的遥测边界优先使用它。
 
 ```ts
 function identitySnapshot<T>(value: T): T;
 ```
 
-原样返回入参——用于在需要"显式选择不做拷贝、保留引用同一性"的调用点表达意图（比对 `immutableSnapshot`/`diagnosticSnapshot` 使代码可读，而不是漏写了拷贝调用）。
+原样返回入参。单独调用没有运行时收益；它用于 `snapshot` / `clone` 这类可配置策略槽的零拷贝分支，明确表示调用方接受共享引用、后续修改双方可见。本仓的 clone policy 正是用它实现 `opaque` 分支，服务于身份敏感或不可克隆、且允许共享所有权的可信进程内数据。需要外部输入隔离、历史快照或跨边界传输时不要使用它，应选择 `immutableSnapshot`。
 
 ### 对象路径（`parseObjectPath` / `probeObjectPath` / `get` / `set` / `createPathAccessor`）
 
@@ -635,14 +741,17 @@ function set<T, P extends IObjectPathInput<T>>(
 ): T;
 ```
 
-不可变路径写入：返回一个新的根对象，只有路径上真正发生变化的节点被浅拷贝（结构共享，未涉及的兄弟节点保持同一引用）。路径中间缺失的容器会按下一段键的类型自动创建（数字键 → `[]`，其他 → `{}`）。若路径中途遇到非空的原始值（字符串、数字等，无法继续深入）会抛出 `code: 'OBJECT_PATH_INVALID'` 的 `TypeError`。若新值与旧值经 `Object.is` 相等，则直接复用原对象，不做任何拷贝。
+不可变路径写入：每次值真正变化的 `set()` 都返回一个新根对象，传入对象保持不变。只有路径上的节点被浅拷贝（结构共享，未涉及的兄弟节点保持同一引用）。这里的 immutable 描述更新方式，不表示返回对象经过深拷贝或 `Object.freeze()`；返回值本身仍可修改。路径中间缺失的容器会按下一段键的类型自动创建（数字键 → `[]`，其他 → `{}`）。若路径中途遇到非空的原始值（字符串、数字等，无法继续深入）会抛出 `code: 'OBJECT_PATH_INVALID'` 的 `TypeError`。若新值与旧值经 `Object.is` 相等，则没有发生更新，直接复用原对象，不做任何拷贝。
 
 ```ts
 const before = { user: { name: 'Ada', tags: ['a'] } };
 const after = set(before, 'user.name', 'Grace');
 after.user.name; // 'Grace'
+after !== before; // true（发生更新时返回新根对象）
+after.user !== before.user; // true（更新路径上的节点被复制）
 after.user.tags === before.user.tags; // true（未涉及的分支保持引用不变）
 before.user.name; // 'Ada'（原对象未被修改）
+Object.isFrozen(after); // false（immutable update 不等于冻结）
 ```
 
 ```ts
@@ -812,6 +921,8 @@ function ownConfig<T extends IConfigRecord>(
 
 若 `value` **已经**是某次 `ownConfig` 的返回值（元数据匹配同一 `profile`/`limits`），直接原样返回（幂等）；若元数据不匹配（例如同一对象先后用不同 `profile` 调用），抛出 `code: 'CONFIG_CONFLICT'` 的 `TypeError`。
 
+调用方拿到结果后有三种明确路径：内部继续把它作为稳定配置根；通过 `readonlyConfig()` 暴露可读但不可写的递归 Proxy；通过 `patchConfig()` 或 `combineConfig()` 派生下一份已拥有配置。不要直接把原始外部对象交给这些 API，也不要把“已拥有”误解为冻结——所有权保证来自独立图与内部登记，运行时写保护由 `readonlyConfig()` 单独提供。
+
 ```ts
 type IConfigLimits = {
   readonly maxDepth: number; // 默认 256
@@ -828,7 +939,7 @@ type IConfigLimits = {
 function readonlyConfig<T extends IConfigRecord>(value: IOwnedConfig<T>): T;
 ```
 
-返回一个**带缓存**的只读 `Proxy` 门面（同一输入对象重复调用返回同一个 Proxy）。任何写操作（`set`/`defineProperty`/`deleteProperty`/`setPrototypeOf`/`preventExtensions`，以及 `Map`/`Set`/`Date` 上的变更方法如 `.set()`/`.add()`/`.setFullYear()`）都会抛出 `code: 'CONFIG_READONLY'` 的 `TypeError`。嵌套的对象/`Map`/`Set`/函数字段访问时会被递归包装成同样的只读 Proxy。`value` 必须是 `ownConfig` 的产物，否则抛 `code: 'CONFIG_UNSUPPORTED'`。
+返回一个**带缓存的只读对象**，内部通过 `Proxy` 拦截修改；同一输入对象重复调用会返回同一个只读对象。读取时仍然访问原配置，没有再复制一份数据。任何写操作（`set`/`defineProperty`/`deleteProperty`/`setPrototypeOf`/`preventExtensions`，以及 `Map`/`Set`/`Date` 上的变更方法如 `.set()`/`.add()`/`.setFullYear()`）都会抛出 `code: 'CONFIG_READONLY'` 的 `TypeError`。嵌套对象、`Map`、`Set` 和函数字段也会受到同样的写入保护。`value` 必须是 `ownConfig` 的产物，否则抛 `code: 'CONFIG_UNSUPPORTED'`。
 
 ```ts
 function patchConfig<T extends IConfigRecord>(
@@ -917,11 +1028,35 @@ type IConfigConflictDecision =
 当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须**同步**返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。
 
 ```ts
-const defaults = ownConfig({ retries: 1, tags: ['default'] });
-const override = ownConfig({ retries: 3, tags: ['custom'] });
-const merged = combineConfig([defaults, override], { strategies: { array: 'concat' } });
-merged.retries; // 3（右侧覆盖左侧）
-merged.tags; // ['default', 'custom']（数组按 concat 合并）
+const defaults = ownConfig({
+  retries: 1,
+  tags: ['default'],
+  transport: { timeoutMs: 1_000, keepAlive: true },
+});
+const override = ownConfig({
+  retries: 3,
+  tags: ['custom'],
+  transport: { timeoutMs: 2_500 },
+});
+
+const merged = combineConfig([defaults, override], {
+  strategies: { record: 'merge', array: 'concat' },
+});
+
+// merged 是新配置；defaults 和 override 都不会被修改。
+merged;
+// {
+//   retries: 3,
+//   tags: ['default', 'custom'],
+//   transport: { timeoutMs: 2500, keepAlive: true },
+// }
+
+// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。
+const diff = {
+  retries: { before: defaults.retries, after: merged.retries },
+  tags: { before: defaults.tags, after: merged.tags },
+  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs },
+};
 ```
 
 ---
@@ -943,24 +1078,48 @@ function once<T extends (...args: never[]) => unknown>(functionValue: T): T;
 记忆化一个**同步**函数：只在首次调用时真正执行，之后的调用直接返回首次的结果（或重新抛出首次的异常——包括异常也被缓存，不会在第二次调用时重新执行函数体）。若在首次调用**尚未完成**时发生重入（函数体内部再次调用了被包装后的自身），会抛出 `code: 'REENTRANT_CALL'` 的 `TypeError`，防止意外的递归自调用绕过缓存语义。
 
 ```ts
-const initOnce = once(() => {
-  console.log('init');
-  return 1;
+// runtime.ts：整个模块只创建并导出这一份包装函数。
+export const getRuntime = once(() => {
+  const registry = buildCommandRegistry();
+  return { registry, startedAt: Date.now() };
 });
-initOnce(); // 打印 'init'，返回 1
-initOnce(); // 不再打印，直接返回 1
+
+const first = getRuntime(); // 创建 registry
+const second = getRuntime(); // 直接返回 first
+first === second; // true
 ```
+
+适合模块内昂贵且确定的同步初始化，例如构建只读 registry、编译 schema 或探测一次运行时能力。首次异常也会永久缓存，所以需要 retry、reset、热更新或按请求隔离时不要使用。
+
+边界必须明确：每次调用 `once(fn)` 都产生新的包装函数和独立缓存。模块顶层只创建、只导出一个包装函数，可以实现“每个模块实例一份”；但重复 bundle、iframe、Worker 与 Node `vm` 会拥有不同模块实例，因此它不是跨 realm 的全局单例工具。真正需要同一 realm / 进程共享时，让应用入口或依赖注入容器持有实例；必须使用全局表时，可选 `globalThis[Symbol.for('your-app/runtime')]`，同时处理版本冲突、生命周期与测试清理。
+
+`Proxy` 适合把首次属性访问变成惰性初始化，或限制访问方式；它本身不提供唯一性。是否是单例仍由 Proxy 后面的实例存储位置和 owner 数量决定，因此无需为了“真实单例”给 `once` 结果额外套 Proxy。
 
 ```ts
 function onceAsync<T>(functionValue: () => Promise<T>): () => Promise<T>;
 ```
 
-记忆化一次**异步**调用：首次调用时执行 `functionValue()` 并保留其返回的**同一个原生 Promise 引用**；后续调用直接返回这同一个 Promise（无论它当时是 pending / fulfilled / rejected）。若 `functionValue()` 返回值不是原生 `Promise` 实例，内部会以 `code: 'INVALID_ARGUMENT'` 的 `TypeError` reject。
+记忆化一次**异步**调用：首次调用时启动 `functionValue()`，包装函数会保留并返回同一个 Promise；后续调用无论发生在 pending、fulfilled 还是 rejected 阶段，都直接拿到这个 Promise。`functionValue()` 可以返回原生 `Promise` 或合法 PromiseLike；其他值会让共享 Promise 以 `code: 'INVALID_ARGUMENT'` 的 `TypeError` reject。
 
 ```ts
-const loadOnce = onceAsync(() => fetch('/config').then((r) => r.json()));
-const [a, b] = await Promise.all([loadOnce(), loadOnce()]); // 只发起一次网络请求
+// app-config.ts：路由和埋点会同时读取启动配置，但网络请求只能发起一次。
+export const loadAppConfig = onceAsync(async () => {
+  const response = await fetch('/config');
+  if (!response.ok) throw new Error(`config request failed: ${response.status}`);
+  return response.json() as Promise<{ apiBaseUrl: string }>;
+});
+
+const [routerConfig, telemetryConfig] = await Promise.all([
+  loadAppConfig(),
+  loadAppConfig()
+]); // 两处共享同一次请求
 ```
+
+适合页面或进程生命周期内只应执行一次的异步初始化，例如加载不会刷新的启动配置、初始化共享 SDK 客户端、动态导入并编译同一份 WASM 模块。它同时解决“并发时别重复启动”和“完成后继续复用结果”两个问题。
+
+不适合按 key 去重、定时刷新、失败重试、登出后重建、按租户或请求隔离。首次 rejection 会一直缓存，API 没有 reset；若底层任务使用某个调用者的 `AbortSignal`，该调用者取消任务也会影响所有共享 Promise 的等待者。此类需求应交给带失效策略的缓存或生命周期容器。
+
+每次调用 `onceAsync(fn)` 都会创建独立缓存；模块被重复实例化，或代码分布在 iframe、Worker、Node `vm` 时不会共享，因此它也不是跨 realm 的全局任务协调器。
 
 ---
 
@@ -1031,6 +1190,8 @@ const result = collector.result;
 
 ## 组合工作流示例：截止时间 + 配置
 
+> 该组合用于本仓测试验证，不是外部生产代码示例。外部测试应优先使用测试框架的 fake timers。
+
 ```ts
 import { createManualScheduler, retry, withTimeout } from '@migaia/utils/promise';
 import { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';
@@ -1056,7 +1217,7 @@ scheduler.advance(100);
 await request.catch(() => undefined);
 ```
 
-`createManualScheduler()` 让时间变为确定性，便于在单测中精确断言超时/重试行为。超时中止是协作式的：`retry`/业务代码必须读取传入的 `signal` 才能提前退出。`ownConfig` 拷贝并标记入参；`readonlyConfig` 是带缓存、拒绝写入的门面；`patchConfig` 返回一个新的所有权根，`CONFIG_DELETE` 只在根一层的补丁里生效。
+`createManualScheduler()` 让时间变为确定性，便于在单测中精确断言超时/重试行为。超时中止是协作式的：`retry`/业务代码必须读取传入的 `signal` 才能提前退出。`ownConfig` 拷贝并登记入参；`readonlyConfig` 返回带缓存、只能读取不能修改的对象；`patchConfig` 返回一份新的受管理配置，`CONFIG_DELETE` 只在根一层的补丁里生效。
 
 ---
 
@@ -1076,7 +1237,7 @@ await request.catch(() => undefined);
 
 - **超时没能真正打断 I/O**：符合预期——协作式取消要求操作函数自己读取并响应传入的 `signal`；把 `signal` 透传给底层 I/O（例如 `fetch(url, { signal })`）并让其遵守中止。
 - **`base64ToBytes` 拒绝了输入**：把产出方规范化为标准补齐的 RFC 4648 文本；URL-safe（`-`/`_`）或无补齐的变体不被接受，需要先转换成标准形式。
-- **写只读配置抛错**：这是刻意的行为——`readonlyConfig` 就是用来防止意外修改的；需要变更时对拥有所有权的原始值调用 `patchConfig`，而不是修改只读门面。
+- **写只读配置抛错**：这是刻意的行为——`readonlyConfig` 就是用来防止意外修改的；需要变更时对原来的 owned config 调用 `patchConfig`，而不是修改只读对象。
 - **`once` 报重入错误**：说明首次调用尚未返回时，函数体内部又调用了同一个被包装的函数；把递归逻辑挪到包装函数之外，或改用普通函数自身递归。
 - **需要"当前值订阅/重放"或资源释放生命周期**：`@migaia/utils` 不提供响应式状态或资源所有权模型，应使用专门的响应式/生命周期管理包，而不是在这里找替代品。
 - **`ownConfig`/`patchConfig` 抛 `CONFIG_LIMIT_EXCEEDED`**：说明配置图的深度/节点数/键数超过了限制；确认是否存在非预期的深层嵌套或循环膨胀，必要时通过 `limits` 选项显式收紧或（在确认安全的前提下）放宽默认值。

@@ -11,7 +11,7 @@
       "slug": "event-subscriber",
       "description": "Runtime-neutral transient event subscription and fan-out primitives.",
       "version": "0.0.5",
-      "exports": ["."]
+      "exports": [".", "./subscriber"]
     },
     {
       "slug": "lifecycle",

@@ -94,7 +94,19 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { Resource } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\n\nconst user = new Resource(\n  ({ signal }) => fetch('/api/user', { signal }).then((r) => r.json()),\n  runtime\n);\n\nswitch (user.state.status) {\n  case 'pending':\n    console.log('loading...');\n    break;\n  case 'success':\n    console.log(user.state.data);\n    break;\n  case 'error':\n    console.error(user.state.error);\n    break;\n}\n\nawait user.refetch(); // 手动触发一次新请求\nuser.dispose(); // 不再使用时释放，中止在途请求并清理订阅"
+                "code": "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\n\ntype IUser = { id: string; name: string };\n\nclass UserRequestError extends Error {\n  readonly code = 'USER_REQUEST_FAILED';\n\n  constructor(readonly status: number) {\n    super(`GET /api/user failed: ${status}`);\n  }\n}\n\nconst runtime = createRuntime();\n\nconst user = new Resource<IUser>(\n  async ({ signal }) => {\n    const response = await fetch('/api/user', { signal });\n    if (!response.ok) throw new UserRequestError(response.status);\n    return (await response.json()) as IUser;\n  },\n  runtime\n);\n\nswitch (user.state.status) {\n  case ResourceStatus.idle:\n  case ResourceStatus.pending:\n    console.log('loading...');\n    break;\n  case ResourceStatus.success:\n    console.log(user.state.data);\n    break;\n  case ResourceStatus.error:\n  case ResourceStatus.cancelled:\n    console.error(user.state.error);\n    break;\n}\n\ntry {\n  const freshUser = await user.refetch();\n  console.log('refetched user', freshUser);\n} finally {\n  user.dispose();\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "构造函数默认 `autoStart: true`，因此 `new Resource(.)` 会立即创建第一代请求，并把状态从 `idle` 推进到 `pending`。上面的 `switch` 读取的是当前快照；如果界面需要随请求结算自动更新，应在 `Effect` 或框架适配层的订阅回调中读取 `user.state`，而不是只执行一次 `switch`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "传给 fetcher 的 `signal` 只属于当前这一代请求。调用 `refetch()` 会强制创建新一代、取消仍在途的上一代，并返回新一代的 Promise；上一代即使忽略 abort 后仍然成功返回，也没有资格覆盖当前状态。把 `signal` 传给 `fetch` 的意义是同时停止底层网络工作、节省资源；Resource 的 generation 检查才是防止旧结果覆盖新状态的最终保证。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`dispose()` 是终止整个 Resource，不等同于取消一次请求：它会取消当前 generation、清除 fetcher 建立的 Signal/Computed 依赖，并释放内部状态订阅。它不会释放外部传入的 `runtime`。重复调用 `dispose()` 是安全的，但释放后再读 `state`、调用 `refetch()` 或其他公开操作都会抛出 `RESOURCE_DISPOSED`；若只是暂时停止当前请求并计划稍后复用该实例，应调用 `cancel()`。"
               },
               {
                 "type": "paragraph",
@@ -103,7 +115,19 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { Resource } from '@migaia/resource';\nimport { Signal, createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst userId = new Signal(1, runtime);\n\nconst user = new Resource(\n  async ({ signal }) => {\n    const response = await fetch(`/api/users/${userId.value}`, { signal });\n    if (!response.ok) throw new Error('加载用户失败');\n    return response.json();\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nuserId.value = 2; // fetcher 里对 userId.value 的同步读取已被登记为依赖，这行会触发新请求"
+                "code": "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\nimport { fetchUser } from './user-api.js';\n\nconst runtime = createRuntime();\nconst userId = runtime.signal('1');\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value; // 在返回 Promise 前读取：Runtime 建立 userId → user 依赖边\n    return fetchUser(id, { signal });\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state; // 建立 user.state → 当前渲染任务的依赖边\n  if (state.status === ResourceStatus.pending) console.log('loading user');\n  if (state.status === ResourceStatus.success) console.log('render', state.data);\n  if (state.status === ResourceStatus.error) console.error(state.error);\n});\n\nexport function selectUser(id: string): void {\n  userId.value = id;\n}\n\nselectUser('2'); // 标脏 Resource；当前请求被替换，新请求使用 id = '2'\n\nexport function disposeUserPanel(): void {\n  stopRendering();\n  user.dispose();\n  userId.dispose();\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "这里不是两个互不相关的包碰巧共用一个变量。`Resource` 使用同一个 `runtime` 把自己注册成 Reactive 图里的 observer：fetcher 同步读取 `userId.value` 时，Runtime 记录 `userId → user`；渲染 Effect 读取 `user.state` 时，又记录 `user → rendering effect`。因此完整传播路径是 `userId 写入 → Resource 标脏 → 新请求状态写入 → Effect 重跑`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`selectUser('2')` 后，Reactive 会把同一批次内对 `userId` 的多次写入合并，再通过 idle/microtask 通道通知 Resource。Resource 创建新的 request generation，并 abort 被取代 generation 的 `signal`；`fetchUser('2', .)` 的 pending/success/error 状态写入内部 Signal，观察 `user.state` 的 Effect 随之重跑。即使旧请求不支持 AbortSignal 并在稍后返回，generation 校验也会丢弃旧结果。"
+              },
+              {
+                "type": "paragraph",
+                "text": "依赖收集只覆盖 fetcher 返回 Promise 之前的同步阶段。上例先把 `userId.value` 读进 `id`，再调用异步 API；如果等到 `await` 之后才读取 `userId.value`，JavaScript 的同步追踪上下文已经结束，这次读取不会建立自动刷新关系。`disposeUserPanel()` 则按消费方向反向释放：先停止渲染 Effect，再终止 Resource，最后释放输入 Signal。"
               }
             ]
           },
@@ -227,7 +251,11 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { Resource } from '@migaia/resource';\nimport { Signal, createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst userId = new Signal(1, runtime);\n\nconst user = new Resource(\n  async ({ signal }) => {\n    const response = await fetch(`/api/users/${userId.value}`, { signal });\n    if (!response.ok) throw new Error('加载用户失败');\n    return response.json();\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nuserId.value = 2; // 触发新请求"
+                "code": "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\nimport { fetchUser } from './user-api.js';\n\nconst runtime = createRuntime();\nconst userId = runtime.signal('1');\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value;\n    return fetchUser(id, { signal });\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state;\n  if (state.status === ResourceStatus.pending) console.log('loading user');\n  if (state.status === ResourceStatus.success) console.log('render', state.data);\n});\n\nuserId.value = '2';\n\nexport function disposeUserPanel(): void {\n  stopRendering();\n  user.dispose();\n  userId.dispose();\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "动态关系是 `userId → Resource → rendering effect`：fetcher 在返回 Promise 前同步读取 `userId.value`，Runtime 因而把 Resource 登记为 `userId` 的 observer；Effect 读取 `user.state`，又成为 Resource 内部状态 Signal 的 observer。`userId` 写入经 Reactive 的 idle/microtask 通道使 Resource 标脏，Resource abort 旧 generation、创建新 generation，状态变化再驱动 Effect 重跑。旧请求即使忽略 abort 并延迟返回，也会被 generation 校验拒绝写回。首次 `await` 之后的响应式读取不在同步追踪窗口内，不会形成这条自动刷新链。"
               }
             ]
           },
@@ -1456,12 +1484,12 @@
           "errors": ["No documented errors are declared for Resource."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for Resource.",
           "examples": [
-            "import { Resource } from '@migaia/resource';\nimport { Signal, createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst userId = new Signal(1, runtime);\n\nconst user = new Resource(\n  async ({ signal }) => {\n    const response = await fetch(`/api/users/${userId.value}`, { signal });\n    if (!response.ok) throw new Error('加载用户失败');\n    return response.json();\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nuserId.value = 2; // 触发新请求",
+            "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\nimport { fetchUser } from './user-api.js';\n\nconst runtime = createRuntime();\nconst userId = runtime.signal('1');\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value;\n    return fetchUser(id, { signal });\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state;\n  if (state.status === ResourceStatus.pending) console.log('loading user');\n  if (state.status === ResourceStatus.success) console.log('render', state.data);\n});\n\nuserId.value = '2';\n\nexport function disposeUserPanel(): void {\n  stopRendering();\n  user.dispose();\n  userId.dispose();\n}",
             "// 服务端：\nconst snapshot = userResource.dehydrate(); // undefined 或 { version: 1, data, updatedAt, expiresAt }\n// 序列化 snapshot 注入 HTML\n\n// 客户端：\nconst userResource = new Resource(fetchUser, runtime, {\n  initialSnapshot: snapshot, // 有值且未过期时不会重新发起请求\n  ttl: 30_000\n});",
             "const list = new Resource(fetchList, runtime, {\n  ttl: 10_000,\n  staleWhileRevalidate: true\n});\n\n// list.state.status === 'success' 时，即使正在后台刷新，\n// list.state.data 仍是旧数据，list.refreshing === true 可用来展示\"刷新中\"角标",
             "const resource = new Resource(fetchWithFlakyBackend, runtime, {\n  retry: (failureCount, error) => failureCount < 5 && !(error instanceof TypeError),\n  retryDelay: (failureCount) => Math.min(1000 * 2 ** failureCount, 30_000) // 指数退避，封顶 30s\n});",
-            "import { Resource } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\n\nconst user = new Resource(\n  ({ signal }) => fetch('/api/user', { signal }).then((r) => r.json()),\n  runtime\n);\n\nswitch (user.state.status) {\n  case 'pending':\n    console.log('loading...');\n    break;\n  case 'success':\n    console.log(user.state.data);\n    break;\n  case 'error':\n    console.error(user.state.error);\n    break;\n}\n\nawait user.refetch(); // 手动触发一次新请求\nuser.dispose(); // 不再使用时释放，中止在途请求并清理订阅",
-            "import { Resource } from '@migaia/resource';\nimport { Signal, createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst userId = new Signal(1, runtime);\n\nconst user = new Resource(\n  async ({ signal }) => {\n    const response = await fetch(`/api/users/${userId.value}`, { signal });\n    if (!response.ok) throw new Error('加载用户失败');\n    return response.json();\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nuserId.value = 2; // fetcher 里对 userId.value 的同步读取已被登记为依赖，这行会触发新请求"
+            "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\n\ntype IUser = { id: string; name: string };\n\nclass UserRequestError extends Error {\n  readonly code = 'USER_REQUEST_FAILED';\n\n  constructor(readonly status: number) {\n    super(`GET /api/user failed: ${status}`);\n  }\n}\n\nconst runtime = createRuntime();\n\nconst user = new Resource<IUser>(\n  async ({ signal }) => {\n    const response = await fetch('/api/user', { signal });\n    if (!response.ok) throw new UserRequestError(response.status);\n    return (await response.json()) as IUser;\n  },\n  runtime\n);\n\nswitch (user.state.status) {\n  case ResourceStatus.idle:\n  case ResourceStatus.pending:\n    console.log('loading...');\n    break;\n  case ResourceStatus.success:\n    console.log(user.state.data);\n    break;\n  case ResourceStatus.error:\n  case ResourceStatus.cancelled:\n    console.error(user.state.error);\n    break;\n}\n\ntry {\n  const freshUser = await user.refetch();\n  console.log('refetched user', freshUser);\n} finally {\n  user.dispose();\n}",
+            "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\nimport { fetchUser } from './user-api.js';\n\nconst runtime = createRuntime();\nconst userId = runtime.signal('1');\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value; // 在返回 Promise 前读取：Runtime 建立 userId → user 依赖边\n    return fetchUser(id, { signal });\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state; // 建立 user.state → 当前渲染任务的依赖边\n  if (state.status === ResourceStatus.pending) console.log('loading user');\n  if (state.status === ResourceStatus.success) console.log('render', state.data);\n  if (state.status === ResourceStatus.error) console.error(state.error);\n});\n\nexport function selectUser(id: string): void {\n  userId.value = id;\n}\n\nselectUser('2'); // 标脏 Resource；当前请求被替换，新请求使用 id = '2'\n\nexport function disposeUserPanel(): void {\n  stopRendering();\n  user.dispose();\n  userId.dispose();\n}"
           ],
           "aliasOf": "Resource",
           "exportPath": ".",
@@ -1668,7 +1696,7 @@
               ]
             }
           ],
-          "usageScore": 166,
+          "usageScore": 204,
           "configuration": [],
           "fragment": "resource-index--Resource"
         },
@@ -1947,7 +1975,10 @@
           "errors": ["No documented errors are declared for ResourceStatus."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ResourceStatus.",
           "examples": [
-            "type IResourceState<T> =\n  | { status: 'idle' }\n  | { status: 'pending' }\n  | { status: 'success'; data: T; refreshing?: boolean }\n  | { status: 'error'; error: unknown }\n  | { status: 'cancelled'; error: DOMException };\n\nconst ResourceStatus: {\n  idle: 'idle';\n  pending: 'pending';\n  success: 'success';\n  error: 'error';\n  cancelled: 'cancelled';\n  fetching: 'fetching';\n};\n\ntype IResourceFetchStatus = 'idle' | 'fetching';"
+            "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\nimport { fetchUser } from './user-api.js';\n\nconst runtime = createRuntime();\nconst userId = runtime.signal('1');\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value;\n    return fetchUser(id, { signal });\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state;\n  if (state.status === ResourceStatus.pending) console.log('loading user');\n  if (state.status === ResourceStatus.success) console.log('render', state.data);\n});\n\nuserId.value = '2';\n\nexport function disposeUserPanel(): void {\n  stopRendering();\n  user.dispose();\n  userId.dispose();\n}",
+            "type IResourceState<T> =\n  | { status: 'idle' }\n  | { status: 'pending' }\n  | { status: 'success'; data: T; refreshing?: boolean }\n  | { status: 'error'; error: unknown }\n  | { status: 'cancelled'; error: DOMException };\n\nconst ResourceStatus: {\n  idle: 'idle';\n  pending: 'pending';\n  success: 'success';\n  error: 'error';\n  cancelled: 'cancelled';\n  fetching: 'fetching';\n};\n\ntype IResourceFetchStatus = 'idle' | 'fetching';",
+            "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\n\ntype IUser = { id: string; name: string };\n\nclass UserRequestError extends Error {\n  readonly code = 'USER_REQUEST_FAILED';\n\n  constructor(readonly status: number) {\n    super(`GET /api/user failed: ${status}`);\n  }\n}\n\nconst runtime = createRuntime();\n\nconst user = new Resource<IUser>(\n  async ({ signal }) => {\n    const response = await fetch('/api/user', { signal });\n    if (!response.ok) throw new UserRequestError(response.status);\n    return (await response.json()) as IUser;\n  },\n  runtime\n);\n\nswitch (user.state.status) {\n  case ResourceStatus.idle:\n  case ResourceStatus.pending:\n    console.log('loading...');\n    break;\n  case ResourceStatus.success:\n    console.log(user.state.data);\n    break;\n  case ResourceStatus.error:\n  case ResourceStatus.cancelled:\n    console.error(user.state.error);\n    break;\n}\n\ntry {\n  const freshUser = await user.refetch();\n  console.log('refetched user', freshUser);\n} finally {\n  user.dispose();\n}",
+            "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\nimport { fetchUser } from './user-api.js';\n\nconst runtime = createRuntime();\nconst userId = runtime.signal('1');\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value; // 在返回 Promise 前读取：Runtime 建立 userId → user 依赖边\n    return fetchUser(id, { signal });\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state; // 建立 user.state → 当前渲染任务的依赖边\n  if (state.status === ResourceStatus.pending) console.log('loading user');\n  if (state.status === ResourceStatus.success) console.log('render', state.data);\n  if (state.status === ResourceStatus.error) console.error(state.error);\n});\n\nexport function selectUser(id: string): void {\n  userId.value = id;\n}\n\nselectUser('2'); // 标脏 Resource；当前请求被替换，新请求使用 id = '2'\n\nexport function disposeUserPanel(): void {\n  stopRendering();\n  user.dispose();\n  userId.dispose();\n}"
           ],
           "aliasOf": "ResourceStatus",
           "exportPath": ".",
@@ -1993,7 +2024,7 @@
           "declaredConfiguration": [],
           "identity": "packages/resource/dist/state-constants.d.ts:ResourceStatus:export declare const ResourceStatus: { readonly idle: \"idle\"; readonly pending: \"pending\"; readonly success: \"success\"; readonly error: \"error\"; readonly cancelled: \"cancelled\"; readonly fetching: \"fetching\"; };",
           "guidance": [],
-          "usageScore": 20,
+          "usageScore": 64,
           "configuration": [],
           "fragment": "resource-index--ResourceStatus"
         }

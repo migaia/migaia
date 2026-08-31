@@ -569,12 +569,6 @@
       "library": "event-subscriber"
     },
     {
-      "path": "/en/docs/event-subscriber/IEventAbortSignal",
-      "locale": "en",
-      "domain": "docs",
-      "library": "event-subscriber"
-    },
-    {
       "path": "/en/docs/event-subscriber/IEventApiStyle",
       "locale": "en",
       "domain": "docs",
@@ -593,12 +587,6 @@
       "library": "event-subscriber"
     },
     {
-      "path": "/en/docs/event-subscriber/IEventChannelLike",
-      "locale": "en",
-      "domain": "docs",
-      "library": "event-subscriber"
-    },
-    {
       "path": "/en/docs/event-subscriber/IEventChannelOptions",
       "locale": "en",
       "domain": "docs",
@@ -606,12 +594,6 @@
     },
     {
       "path": "/en/docs/event-subscriber/IEventChannelSubscription",
-      "locale": "en",
-      "domain": "docs",
-      "library": "event-subscriber"
-    },
-    {
-      "path": "/en/docs/event-subscriber/IEventContext",
       "locale": "en",
       "domain": "docs",
       "library": "event-subscriber"
@@ -659,12 +641,6 @@
       "library": "event-subscriber"
     },
     {
-      "path": "/en/docs/event-subscriber/IEventListener",
-      "locale": "en",
-      "domain": "docs",
-      "library": "event-subscriber"
-    },
-    {
       "path": "/en/docs/event-subscriber/IEventMap",
       "locale": "en",
       "domain": "docs",
@@ -672,12 +648,6 @@
     },
     {
       "path": "/en/docs/event-subscriber/IEventReport",
-      "locale": "en",
-      "domain": "docs",
-      "library": "event-subscriber"
-    },
-    {
-      "path": "/en/docs/event-subscriber/IEventSubscriber",
       "locale": "en",
       "domain": "docs",
       "library": "event-subscriber"
@@ -714,12 +684,6 @@
     },
     {
       "path": "/en/docs/event-subscriber/IStyledEventHub",
-      "locale": "en",
-      "domain": "docs",
-      "library": "event-subscriber"
-    },
-    {
-      "path": "/en/docs/event-subscriber/IUnsubscribe",
       "locale": "en",
       "domain": "docs",
       "library": "event-subscriber"
@@ -791,19 +755,61 @@
       "library": "event-subscriber"
     },
     {
-      "path": "/en/docs/event-subscriber/subscribeOnce",
+      "path": "/en/docs/event-subscriber/subscriber",
       "locale": "en",
       "domain": "docs",
       "library": "event-subscriber"
     },
     {
-      "path": "/en/docs/event-subscriber/subscribeSubscriber",
+      "path": "/en/docs/event-subscriber/subscriber/IEventAbortSignal",
       "locale": "en",
       "domain": "docs",
       "library": "event-subscriber"
     },
     {
-      "path": "/en/docs/event-subscriber/subscribeUntil",
+      "path": "/en/docs/event-subscriber/subscriber/IEventChannelLike",
+      "locale": "en",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/docs/event-subscriber/subscriber/IEventContext",
+      "locale": "en",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/docs/event-subscriber/subscriber/IEventListener",
+      "locale": "en",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/docs/event-subscriber/subscriber/IEventSubscriber",
+      "locale": "en",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/docs/event-subscriber/subscriber/IUnsubscribe",
+      "locale": "en",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/docs/event-subscriber/subscriber/subscribeOnce",
+      "locale": "en",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/docs/event-subscriber/subscriber/subscribeSubscriber",
+      "locale": "en",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/docs/event-subscriber/subscriber/subscribeUntil",
       "locale": "en",
       "domain": "docs",
       "library": "event-subscriber"
@@ -11045,12 +11051,6 @@
       "library": "event-subscriber"
     },
     {
-      "path": "/zh/docs/event-subscriber/IEventAbortSignal",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "event-subscriber"
-    },
-    {
       "path": "/zh/docs/event-subscriber/IEventApiStyle",
       "locale": "zh",
       "domain": "docs",
@@ -11069,12 +11069,6 @@
       "library": "event-subscriber"
     },
     {
-      "path": "/zh/docs/event-subscriber/IEventChannelLike",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "event-subscriber"
-    },
-    {
       "path": "/zh/docs/event-subscriber/IEventChannelOptions",
       "locale": "zh",
       "domain": "docs",
@@ -11082,12 +11076,6 @@
     },
     {
       "path": "/zh/docs/event-subscriber/IEventChannelSubscription",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "event-subscriber"
-    },
-    {
-      "path": "/zh/docs/event-subscriber/IEventContext",
       "locale": "zh",
       "domain": "docs",
       "library": "event-subscriber"
@@ -11135,12 +11123,6 @@
       "library": "event-subscriber"
     },
     {
-      "path": "/zh/docs/event-subscriber/IEventListener",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "event-subscriber"
-    },
-    {
       "path": "/zh/docs/event-subscriber/IEventMap",
       "locale": "zh",
       "domain": "docs",
@@ -11148,12 +11130,6 @@
     },
     {
       "path": "/zh/docs/event-subscriber/IEventReport",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "event-subscriber"
-    },
-    {
-      "path": "/zh/docs/event-subscriber/IEventSubscriber",
       "locale": "zh",
       "domain": "docs",
       "library": "event-subscriber"
@@ -11190,12 +11166,6 @@
     },
     {
       "path": "/zh/docs/event-subscriber/IStyledEventHub",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "event-subscriber"
-    },
-    {
-      "path": "/zh/docs/event-subscriber/IUnsubscribe",
       "locale": "zh",
       "domain": "docs",
       "library": "event-subscriber"
@@ -11285,19 +11255,61 @@
       "library": "event-subscriber"
     },
     {
-      "path": "/zh/docs/event-subscriber/subscribeOnce",
+      "path": "/zh/docs/event-subscriber/subscriber",
       "locale": "zh",
       "domain": "docs",
       "library": "event-subscriber"
     },
     {
-      "path": "/zh/docs/event-subscriber/subscribeSubscriber",
+      "path": "/zh/docs/event-subscriber/subscriber/IEventAbortSignal",
       "locale": "zh",
       "domain": "docs",
       "library": "event-subscriber"
     },
     {
-      "path": "/zh/docs/event-subscriber/subscribeUntil",
+      "path": "/zh/docs/event-subscriber/subscriber/IEventChannelLike",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/docs/event-subscriber/subscriber/IEventContext",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/docs/event-subscriber/subscriber/IEventListener",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/docs/event-subscriber/subscriber/IEventSubscriber",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/docs/event-subscriber/subscriber/IUnsubscribe",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/docs/event-subscriber/subscriber/subscribeOnce",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/docs/event-subscriber/subscriber/subscribeSubscriber",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/docs/event-subscriber/subscriber/subscribeUntil",
       "locale": "zh",
       "domain": "docs",
       "library": "event-subscriber"

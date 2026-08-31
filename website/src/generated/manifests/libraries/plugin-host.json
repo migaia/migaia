@@ -77,11 +77,23 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "普通应用继续使用 `use()` / `unUse()`；`@migaia/tray/host` 作为唯一 composition owner 使用 PluginHost 的 prepared admission、exact receipt 与 opaque data-order slot 协议。候选 setup 完成前不会 进入 committed view；commit 前 Host revision 漂移会拒绝发布，owner 必须调用 `discardPreparedAdmissions()`，其回滚 exactly once。slot 属于 exact Host definition：replace/restart 复用，definition delete/session terminal 退休，不能伪造或跨 Host 使用。"
+                "text": "这一节只给 Tray 的 Host 适配器维护者看。普通应用安装和卸载插件时继续使用 `use()` / `unUse()`，不需要接触下面这些对象。"
               },
               {
                 "type": "paragraph",
-                "text": "托管卸载把“逻辑撤销”和“物理完成”分开。extension/shared/stage 先从新读者视图撤销；Graph binding fence 和已经取得的 pipeline lease 未归零时，plugin/resource disposer 不会启动。bounded 调用可先得到 `cleanupComplete: false` 与共享 `physicalCompletion`，但不会用 timeout 破坏严格清理顺序。"
+                "text": "Tray 一次安装多个插件时，先让 PluginHost 完成插件的 `setup`，但暂时不让业务代码看见它们。这个“已经准备好、还没有正式发布”的批次叫 prepared admission，可以理解成数据库事务提交前的暂存区：整批都成功才一次性公开；其中一个失败，整批都不公开。"
+              },
+              {
+                "type": "paragraph",
+                "text": "正式公开前，PluginHost 会检查准备期间是否有别人改过 Host。这里的 Host revision 就是 Host 的修改版本号；版本号变了，说明这批结果基于旧状态，提交会被拒绝。Tray 随后调用 `discardPreparedAdmissions()`，PluginHost 只清理这批暂存资源一次，不会重复执行插件的释放逻辑。"
+              },
+              {
+                "type": "paragraph",
+                "text": "提交成功后，每个插件都会得到一张只能由当前 Host 签发和识别的“安装凭证”，正式类型名是 exact receipt。Tray 卸载或替换插件时拿这张凭证指向那一次具体安装，因此旧插件迟到的清理动作不会误删同名的新插件。opaque data-order slot 则是 Host 内部保存的排序位置：Tray 只能原样交还，不能读取或伪造；同一个插件定义重启或替换时沿用位置，定义删除或整个会话结束时才永久作废。"
+              },
+              {
+                "type": "paragraph",
+                "text": "托管卸载分两步。第一步先让新请求看不到待卸载插件，这叫“逻辑撤销”。第二步等待已经拿到旧插件的请求和正在执行的 pipeline 全部结束，再真正调用插件与资源的 `dispose()`，这叫“物理完成”。如果等待时间达到调用方设置的上限，接口会先返回 `cleanupComplete: false`；这不代表资源已经释放，调用方仍须等待返回的 `physicalCompletion` Promise。超时只允许调用方先拿回控制权，不会跳过或打乱清理顺序。"
               }
             ]
           },
@@ -92,11 +104,15 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { PluginHost, type IPlugin } from '@migaia/plugin-host'\n\n// 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能\ntype ICore = { emit(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { emit: (value) => console.log(value) }\n  }\n}\n\n// 第二步：写一个插件——install() 拿到领域 core，返回要挂载到宿主上的方法\nconst upper: IPlugin<ICore, { upper(value: string): string }> = {\n  name: 'upper',\n  install: (core) => ({\n    upper: (value: string) => {\n      const result = value.toUpperCase()\n      core.emit(result) // 插件可以调用领域能力\n      return result\n    }\n  })\n}\n\n// 第三步：安装、使用、卸载\nconst host = await new Host().use(upper)\nhost.upper('migaia') // 类型上直接就有 upper 方法，TypeScript 自动推导出来的\nawait host.unUse('upper')\nawait host.dispose()"
+                "code": "import { definePlugin } from '@migaia/plugin-host/defined'\nimport { PluginHost } from '@migaia/plugin-host/structural'\n\n// 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能\ntype ICore = { emit(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { emit: (value) => console.log(value) }\n  }\n}\n\n// 第二步：definePlugin(name, install) 定义插件；这里只定义，不会立刻安装\nconst upper = definePlugin<ICore, { upper(value: string): string }>(\n  'upper',\n  (core) => ({\n    upper: (value: string) => {\n      const result = value.toUpperCase()\n      core.emit(result) // 插件可以调用领域能力\n      return result\n    }\n  })\n)\n\n// 第三步：安装、使用、卸载\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst view = await host.use(upper)\nview.extensions.upper('migaia') // 扩展只出现在成功安装后返回的 committed view 上\nawait view.unUse('upper')\nawait host.dispose()"
               },
               {
                 "type": "paragraph",
-                "text": "`PluginHost<TDomainCore, TValue>` 子类唯一必须实现的是 `createPluginDomainCore()`——每次插件安装都会调用一次，产出一份独立的领域 core。插件通过 `install(core)` 拿到\"领域能力 + 通用 core 能力\"，返回要挂到宿主实例上的扩展方法。`use()`/`unUse()`/`dispose()` 管理插件的生命周期。"
+                "text": "`definePlugin()` 有两种写法。上面是短写法 `definePlugin(name, install)`，适合只有名称和安装函数的插件；需要 `config`、`shared`、`update` 或 `dispose` 时使用完整对象写法：`definePlugin({ name, config, install, shared, update, dispose })`。调用 `definePlugin()` 只会校验并保存定义，不会执行 `install()`；真正的安装发生在 `host.use(plugin)`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`PluginHost<TDomainCore, TValue>` 子类唯一必须实现的是 `createPluginDomainCore()`——每次插件安装都会调用一次，产出一份独立的领域 core。插件通过 `install(core)` 拿到“领域能力 + 通用 core 能力”，返回扩展方法。`use()` 成功后返回不可变 view，业务代码从 `view.extensions` 调用这些方法；`view.unUse()` 卸载插件，`host.dispose()` 关闭整个宿主。"
               }
             ]
           },
@@ -344,7 +360,15 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { GENERATOR_CONTINUE } from '@migaia/plugin-host'\n\nconst host = new Host({ pipeline: { mode: 'async-generator' } })\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  await Promise.resolve() // 可以在 yield 之间做任意异步工作\n  yield value.trim() // 中间 yield 只用于本 stage 内部观测\n  return GENERATOR_CONTINUE // 采用最后一次 yield 的值，交给下一个 stage\n})"
+                "code": "import { GENERATOR_CONTINUE } from '@migaia/plugin-host'\n\nconst host = new Host({ pipeline: { mode: 'async-generator' } })\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  await Promise.resolve() // 可以在 yield 之间做任意异步工作\n  yield value.trim()\n  yield value.trim().toUpperCase()\n  return GENERATOR_CONTINUE // 下一 stage 收到最后一次 yield 的大写字符串\n})\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  return `[${value}]` // 收到上一个 stage 的最后一次 yield，继续产生最终结果\n})"
+              },
+              {
+                "type": "paragraph",
+                "text": "`GENERATOR_CONTINUE` 是框架导出的唯一 `Symbol` 控制信号，不是需要下游处理的业务数据。generator 函数的 `return` 只能提供一个终值，而一个 stage 可能先后 `yield` 多个候选值；返回这个信号是在明确告诉 runner：“忽略这个 Symbol 本身，把本 stage 最后一次 `yield` 的值交给下一 stage。”上例输入 `\" migaia \"` 时，第二个 stage 收到 `MIGAIA`，最终结果是 `[MIGAIA]`。如果该 stage 一次也没有 `yield`，`GENERATOR_CONTINUE` 会原样转发进入该 stage 时的输入。"
+              },
+              {
+                "type": "paragraph",
+                "text": "它与另外三种返回方式不同：`return transformedValue` 直接把该值交给下一 stage；`return GENERATOR_HALT` 或普通的 `return`（即 `undefined`）终止整条 pipeline；只有业务类型本身允许 `undefined` 时，才用 `return GENERATOR_UNDEFINED` 把真正的 `undefined` 作为数据继续向下传。"
               },
               {
                 "type": "table",
@@ -912,6 +936,19 @@
             "blocks": [
               {
                 "type": "paragraph",
+                "text": "推荐用 `definePlugin()` 创建插件定义，而不是手写类型断言："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { definePlugin } from '@migaia/plugin-host/defined'\n\nconst health = definePlugin('health', () => ({\n  check: () => ({ ok: true as const })\n}))\n\nconst configurable = definePlugin({\n  name: 'configurable',\n  config: { prefix: '[app]' },\n  install: (core) => ({ readPrefix: () => core.config.get().prefix }),\n  dispose: () => undefined\n})"
+              },
+              {
+                "type": "paragraph",
+                "text": "第一种是 `definePlugin(name, install)` 短写法；第二种完整对象写法可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`setupHost()` 只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。"
+              },
+              {
+                "type": "paragraph",
                 "text": "安装时获得的 `core` 是一个稳定的 facade（`src/core.ts` 的 `createPluginCore`）。它包含子类提供的领域方法，加上下面的通用能力："
               },
               {
@@ -1003,6 +1040,15 @@
               {
                 "type": "paragraph",
                 "text": "`IPluginHostCompositionIntegration` 面向 Tray 这类唯一 owner，不是业务插件的第二套 Host API："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "prepared admission：插件 setup 已完成、但尚未对业务读取和 pipeline 发布的临时批次；作用类似“事务待提交区”。",
+                  "registration receipt：某一次成功安装的不可伪造凭证；卸载凭证指向的具体安装，不按插件名猜测目标。",
+                  "data-order slot：Host 私有的排序位置；Tray 只能保存并原样传回，不能查看内部序号或自行构造。",
+                  "Host revision：Host 的修改版本号；准备和提交之间版本变化时拒绝提交，避免把基于旧状态的插件批次发布出去。"
+                ]
               },
               {
                 "type": "paragraph",
@@ -1104,6 +1150,14 @@
                     "terminal 语义与 `generator` 完全一致（同一套 `GENERATOR_CONTINUE`/`GENERATOR_HALT`/`GENERATOR_UNDEFINED` 判定）；区别是每个 stage 被完整、串行 `await` 耗尽（`await iterator.next()` 循环），中间 yield 只用于本 stage 内部观测，不会提前进入下一 stage，也不产生流式/fan-out 效果。"
                   ]
                 ]
+              },
+              {
+                "type": "paragraph",
+                "text": "`GENERATOR_CONTINUE` 是 runner 识别的唯一 `Symbol` 控制信号，不是业务数据。一个 generator stage 可以 `yield` 多次，返回该信号表示“采用最后一次 `yield` 的值作为下一 stage 输入”；如果一次也没有 `yield`，则沿用进入当前 stage 的原输入。比如输入 `\" migaia \"`，依次 `yield value.trim()`、`yield value.trim().toUpperCase()` 后返回 `GENERATOR_CONTINUE`，下一 stage 得到的是 `MIGAIA`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "相对地，`return transformedValue` 直接采用返回值，`return GENERATOR_HALT` 或普通 `return` 终止 pipeline，`return GENERATOR_UNDEFINED` 才是把真正的 `undefined` 作为业务值继续传递。"
               },
               {
                 "type": "paragraph",
@@ -2616,7 +2670,6 @@
             "const provider: IPlugin<ICore, {}, {}, { format: (value: string) => string }> = {\n  name: 'provider',\n  install: () => ({}),\n  shared: () => ({ format: (value) => value.trim() })\n}\n\nconst consumer: IPlugin<ICore> = {\n  name: 'consumer',\n  install: (core) => {\n    core.getShared('format')?.(' value ')\n    return {}\n  }\n}\n\nawait host.use(provider, consumer)",
             "import { PluginHost, type IPlugin } from '@migaia/plugin-host'\n\ntype ICore = { write(text: string): void }\ntype IFormatterConfig = { prefix?: string }\ntype IFormatterShared = { format: (value: string) => string }\n\nconst formatter: IPlugin<ICore, {}, IFormatterConfig, IFormatterShared> = {\n  name: 'formatter',\n  config: { prefix: '[app]' },\n  install: () => ({}),\n  shared: (core) => ({\n    format: (value: string) => `${core.config.get().prefix} ${value}`\n  })\n}\n\nconst writer: IPlugin<ICore, { log(msg: string): void }> = {\n  name: 'writer',\n  install: (core) => ({\n    log: (msg: string) => core.write(core.getShared<IFormatterShared['format']>('format')!(msg))\n  })\n}\n\nclass Host extends PluginHost<ICore, never> {\n  protected createPluginDomainCore(): ICore {\n    return { write: (text) => console.log(text) }\n  }\n}\n\nconst host = await new Host().use(formatter, writer)\nhost.log('server started') // \"[app] server started\"\n\nawait host.config.update('formatter', () => ({ prefix: '[api]' }))\nhost.log('request handled') // \"[api] request handled\"\n\nawait host.dispose()",
             "import { PluginHost, PluginHostError, type IPlugin } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<{}, never> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n}\n\nconst broken: IPlugin<{}, {}> = {\n  name: 'broken',\n  install: () => {\n    throw new Error('boom')\n  }\n}\n\ntry {\n  await new Host().use(broken)\n} catch (error) {\n  if (error instanceof PluginHostError && error.code === 'PLUGIN_INSTALL_FAILED') {\n    console.error('安装失败，原始错误:', (error.cause as Error).message) // 'boom'\n    console.error('失败插件:', error.detail?.failedName)\n    console.error('回滚错误身份:', error.detail?.rollbackErrors)\n  }\n}",
-            "import { PluginHost, type IPlugin } from '@migaia/plugin-host'\n\n// 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能\ntype ICore = { emit(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { emit: (value) => console.log(value) }\n  }\n}\n\n// 第二步：写一个插件——install() 拿到领域 core，返回要挂载到宿主上的方法\nconst upper: IPlugin<ICore, { upper(value: string): string }> = {\n  name: 'upper',\n  install: (core) => ({\n    upper: (value: string) => {\n      const result = value.toUpperCase()\n      core.emit(result) // 插件可以调用领域能力\n      return result\n    }\n  })\n}\n\n// 第三步：安装、使用、卸载\nconst host = await new Host().use(upper)\nhost.upper('migaia') // 类型上直接就有 upper 方法，TypeScript 自动推导出来的\nawait host.unUse('upper')\nawait host.dispose()",
             "import { PluginHost, type IPlugin } from '@migaia/plugin-host'\n\ntype ICore = { write(text: string): void }\ntype IFormatterConfig = { prefix?: string }\ntype IFormatterShared = { format: (value: string) => string }\n\nconst formatter: IPlugin<ICore, {}, IFormatterConfig, IFormatterShared> = {\n  name: 'formatter',\n  config: { prefix: '[app]' },\n  install: () => ({}),\n  shared: (core) => ({ format: (value: string) => `${core.config.get().prefix} ${value}` })\n}\n\nconst writer: IPlugin<ICore, { log(msg: string): void }> = {\n  name: 'writer',\n  install: (core) => ({\n    log: (msg: string) => core.write(core.getShared<IFormatterShared['format']>('format')!(msg))\n  })\n}\n\nclass Host extends PluginHost<ICore, never> {\n  protected createPluginDomainCore(): ICore {\n    return { write: (text) => console.log(text) }\n  }\n}\n\nconst host = await new Host().use(formatter, writer)\nhost.log('server started') // \"[app] server started\"\n\nawait host.config.update('formatter', () => ({ prefix: '[api]' }))\nhost.log('request handled') // \"[api] request handled\"\n\nawait host.dispose()",
             "import { PluginHost, PluginHostError, type IPlugin } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<{}, never> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n}\n\nconst broken: IPlugin<{}, {}> = {\n  name: 'broken',\n  install: () => {\n    throw new Error('boom')\n  }\n}\n\ntry {\n  await new Host().use(broken)\n} catch (error) {\n  if (error instanceof PluginHostError && error.code === 'PLUGIN_INSTALL_FAILED') {\n    console.error('安装失败，原始错误:', (error.cause as Error).message) // 'boom'\n  }\n}"
           ],
@@ -2947,7 +3000,7 @@
               ]
             }
           ],
-          "usageScore": 118,
+          "usageScore": 108,
           "configuration": [],
           "fragment": "plugin-host-index--IPlugin"
         },
@@ -5853,7 +5906,7 @@
               ]
             }
           ],
-          "usageScore": 212,
+          "usageScore": 216,
           "configuration": [
             {
               "name": "execution",
@@ -6944,7 +6997,10 @@
           "returns": "IDefinedPluginConstraint<TCore, TValue, TExtension, IPluginConfig, Record<string, never>, TName> | IDefinedPluginConstraint<TCore, TValue, TExtension, TConfig, TShared, TName> & Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>",
           "errors": ["No documented errors are declared for definePlugin."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for definePlugin.",
-          "examples": [],
+          "examples": [
+            "import { definePlugin } from '@migaia/plugin-host/defined'\n\nconst health = definePlugin('health', () => ({\n  check: () => ({ ok: true as const })\n}))\n\nconst configurable = definePlugin({\n  name: 'configurable',\n  config: { prefix: '[app]' },\n  install: (core) => ({ readPrefix: () => core.config.get().prefix }),\n  dispose: () => undefined\n})",
+            "import { definePlugin } from '@migaia/plugin-host/defined'\nimport { PluginHost } from '@migaia/plugin-host/structural'\n\n// 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能\ntype ICore = { emit(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { emit: (value) => console.log(value) }\n  }\n}\n\n// 第二步：definePlugin(name, install) 定义插件；这里只定义，不会立刻安装\nconst upper = definePlugin<ICore, { upper(value: string): string }>(\n  'upper',\n  (core) => ({\n    upper: (value: string) => {\n      const result = value.toUpperCase()\n      core.emit(result) // 插件可以调用领域能力\n      return result\n    }\n  })\n)\n\n// 第三步：安装、使用、卸载\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst view = await host.use(upper)\nview.extensions.upper('migaia') // 扩展只出现在成功安装后返回的 committed view 上\nawait view.unUse('upper')\nawait host.dispose()"
+          ],
           "aliasOf": "definePlugin",
           "exportPath": "./defined",
           "overloadSignatures": [
@@ -7013,7 +7069,7 @@
           "declaredConfiguration": [],
           "identity": "packages/plugin-host/dist/define-plugin.d.ts:definePlugin:export declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<string, never>, TValue = never, const TName extends string = string>(name: TName, install: (core: TCore & import('./typing.js').IPluginHostCore<TValue>) => import('./typing.js').IPluginAwaitable<TExtension>): IDefinedPluginConstraint<TCore, TValue, TExtension, IPluginConfig, Record<string, never>, TName>;\nexport declare function definePlugin<TCore extends object = Record<string, never>, TExtension extends Record<string, unknown> = Record<string, never>, TValue = never, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, const TName extends string = string, TDefinition extends object = object>(definition: IPlugin<TCore & import('./typing.js').IPluginHostCore<TValue>, TExtension, TConfig, TShared> & Readonly<{ name: TName; }> & TDefinition): IDefinedPluginConstraint<TCore, TValue, TExtension, TConfig, TShared, TName> & Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 50,
           "configuration": [],
           "fragment": "plugin-host-defined--definePlugin"
         },
@@ -8395,15 +8451,15 @@
           ],
           "identity": "packages/plugin-host/dist/setup-host.d.ts:setupHost:export declare function setupHost<TCore extends object, const TPlugins extends readonly IDefinedPluginConstraint<TCore, any>[], TValue = never>(options: ISetupHostOptions<TCore, TPlugins, TValue>): Promise<ISetupHostView<ISetupPluginHost<TCore, TValue>, TCore, TValue, TPlugins>>;\nexport declare function setupHost<TCore extends object>(options: ISetupHostOptions<TCore, readonly [], never>): Promise<ISetupHostView<ISetupPluginHost<TCore, never>, TCore, never, readonly []>>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 4,
           "configuration": [
             {
               "name": "host",
               "type": "IPluginHostOptions",
               "optional": false,
-              "description": "Groups `host.execution`, `host.execution.mutationTimeoutMs`, `host.execution.pipelineDrainTimeoutMs`, `host.pipeline`, `host.diagnostic`, `host.scheduler`, `host.queueAdmissionTimeoutMs`, `host.queueAdmissionDiagnosticMs`, `host.disposeStepTimeoutMs`, `host.pipeline.mode`; configure the nested fields below.",
-              "descriptionEn": "Groups `host.execution`, `host.execution.mutationTimeoutMs`, `host.execution.pipelineDrainTimeoutMs`, `host.pipeline`, `host.diagnostic`, `host.scheduler`, `host.queueAdmissionTimeoutMs`, `host.queueAdmissionDiagnosticMs`, `host.disposeStepTimeoutMs`, `host.pipeline.mode`; configure the nested fields below.",
-              "descriptionZh": ""
+              "description": "第一种是 `definePlugin(name, install)` 短写法；第二种完整对象写法可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`setupHost()` 只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。",
+              "descriptionEn": "",
+              "descriptionZh": "第一种是 `definePlugin(name, install)` 短写法；第二种完整对象写法可继续提供 `config`、`shared`、`update`、`dispose`。两者都只创建定义，不执行生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`setupHost()` 只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。"
             },
             {
               "name": "setupTimeoutMs",
@@ -8425,9 +8481,9 @@
               "name": "core",
               "type": "(context: IHostSetupContext) => IPluginAwaitable<TCore>",
               "optional": false,
-              "description": "Factory that creates the domain core before any plugin installer runs.",
+              "description": "安装时获得的 `core` 是一个稳定的 facade（`src/core.ts` 的 `createPluginCore`）。它包含子类提供的领域方法，加上下面的通用能力：",
               "descriptionEn": "Factory that creates the domain core before any plugin installer runs.",
-              "descriptionZh": ""
+              "descriptionZh": "安装时获得的 `core` 是一个稳定的 facade（`src/core.ts` 的 `createPluginCore`）。它包含子类提供的领域方法，加上下面的通用能力："
             },
             {
               "name": "plugins",
@@ -9430,7 +9486,7 @@
               ]
             }
           ],
-          "usageScore": 212,
+          "usageScore": 216,
           "configuration": [
             {
               "name": "execution",
