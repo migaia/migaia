@@ -1621,6 +1621,11 @@ describe('phase transition continuation containment', () => {
     const afterError = new Error('after-continuation')
     const tagAfterError = new Error('tag-after-continuation')
     const onUnhandled = (reason: unknown) => unhandled.push(reason)
+    const restoreRuntime = setLoggerRuntimeManager({
+      randomUUID: () => 'continuation-failure',
+      defer: (task) => task(),
+      write: () => undefined
+    })
     process.on('unhandledRejection', onUnhandled)
     try {
       const makeTarget = (error: Error): any => {
@@ -1656,6 +1661,7 @@ describe('phase transition continuation containment', () => {
       await new Promise((resolve) => setTimeout(resolve, 10))
     } finally {
       process.off('unhandledRejection', onUnhandled)
+      restoreRuntime()
     }
 
     expect(unhandled).toEqual([])
