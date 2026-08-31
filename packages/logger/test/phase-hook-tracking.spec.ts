@@ -1,6 +1,19 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Logger } from '../src/log.js'
 import type { ILogFailure, ILoggerCore } from '../src/typing.js'
+import { installSilentLoggerReporter } from './helpers/silent-runtime.js'
+
+/** Restores the reporter layer installed for the currently running phase case. */
+let restoreSilentReporter: (() => void) | undefined
+
+beforeEach(() => {
+  restoreSilentReporter = installSilentLoggerReporter()
+})
+
+afterEach(() => {
+  restoreSilentReporter?.()
+  restoreSilentReporter = undefined
+})
 
 type IPhaseCase = {
   readonly hookName: string

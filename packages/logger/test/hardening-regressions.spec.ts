@@ -1,5 +1,5 @@
 /** Hardening regression cases for logger lifecycle and dispatch invariants. */
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { Logger } from '../src/log'
 import { batch } from '../src/plugins/batch'
@@ -10,6 +10,19 @@ import { boundedWait as waitUntil, createManualScheduler, systemScheduler } from
 import type { ILogEntry } from '../src/typing'
 import { LoggerErrorCode, LOGGER_SOURCE } from '../src/errors.js'
 import { LoggerErrorText } from '../src/error-text.js'
+import { installSilentLoggerReporter } from './helpers/silent-runtime.js'
+
+/** Restores the reporter layer installed for the currently running hostile regression. */
+let restoreSilentReporter: (() => void) | undefined
+
+beforeEach(() => {
+  restoreSilentReporter = installSilentLoggerReporter()
+})
+
+afterEach(() => {
+  restoreSilentReporter?.()
+  restoreSilentReporter = undefined
+})
 
 /** Finds a logger-tagged error through both cause and AggregateError branches. */
 const findLoggerError = (value: unknown, code: string): (Error & { code?: string }) | undefined => {
