@@ -200,7 +200,17 @@ const tools = {
   typescript: packageVersion('typescript'),
   vitest: packageVersion('vitest')
 }
-const resolvedBuildOptions = resolvedConfig
+const resolvedBuildOptions = {
+  root: resolvedConfig.root,
+  configFile: resolvedConfig.configFile,
+  logLevel: resolvedConfig.logLevel,
+  build: {
+    write: resolvedConfig.build.write,
+    sourcemap: resolvedConfig.build.sourcemap,
+    minify: resolvedConfig.build.minify,
+    rollupOptions: { input: resolvedConfig.build.rollupOptions.input }
+  }
+}
 const outputOptions = {
   formats: ['es'],
   sourcemap: true,
