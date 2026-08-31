@@ -1,6 +1,6 @@
 {
   "name": "@migaia/event-subscriber",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "private": true,
   "description": "Runtime-neutral transient event subscription and fan-out primitives.",
   "license": "MIT",
