@@ -67,3 +67,22 @@ test('ship dry-run cannot reach release mutations', () => {
   ])
     assert.doesNotMatch(commandGraph, new RegExp(forbidden))
 })
+
+test('ship completes every CI and pack gate before entering resumable CD', () => {
+  /** Expanded ship graph proves phase ordering without version, Git, or registry mutation. */
+  const commandGraph = execFileSync('make', ['-n', 'ship'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8'
+  })
+  /** First marker owned by the all-package CI phase. */
+  const ci = commandGraph.indexOf('echo "==> CI validating $package"')
+  /** Artifact preview begins only after every package check has expanded. */
+  const pack = commandGraph.indexOf('echo "==> previewing @migaia/$package artifact"')
+  /** CD is the first phase allowed to patch or publish. */
+  const cd = commandGraph.indexOf('echo "==> CD releasing $package"')
+  assert.ok(ci >= 0 && pack > ci && cd > pack)
+  assert.match(commandGraph, /release-progress\.mjs/)
+  assert.match(commandGraph, /pnpm view/)
+  assert.match(commandGraph, /already published/)
+  assert.match(commandGraph, /resuming tag push/)
+})
