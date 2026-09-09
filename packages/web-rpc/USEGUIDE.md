@@ -88,7 +88,7 @@ type IWebRpcTransport = {
 
 ### 1.3 Feature（功能模块）
 
-Feature 决定 endpoint 运行时安装哪些领域能力、根对象公开哪些方法。当前可组合 Feature 为 `outbound()`、`provider()`、`discovery()`、`control()`、`chunk()`，分别从 `@migaia/web-rpc/features/*` 导入。
+Feature 决定 endpoint 运行时安装哪些领域能力、根对象公开哪些方法。当前可组合 Feature 为 `outbound()`、`provider()`、`discovery()`、`control()`，分片由 framing layer 负责。
 
 Feature 会自动安装其私有依赖，但依赖不会自动扩大根对象的公开 API。例如 `discovery()` 内部依赖 outbound，却只公开 `connect` 和 `discovery`；要在同一个 endpoint 上调用 `send()`，仍需显式选择 `outbound()`。
 
@@ -96,7 +96,7 @@ Feature 会自动安装其私有依赖，但依赖不会自动扩大根对象的
 
 Middleware 是 PluginHost 管理的配置、协议和策略插件，例如 `connect()`、`contract()`、`timeout()`、`ping()`。它不负责选择 endpoint 根对象的业务表面。
 
-Feature 与 Middleware 必须分开理解：`features/chunk` 选择分片帧处理能力，根入口导出的 middleware `chunk({...})` 配置分片策略；`features/control` 选择控制帧能力，middleware `ping()` 才让 `ping` / `pingAll` 出现在精确推导出的类型上。完整参考见 [§3](#3-中间件详细参考)。
+Feature 与 Middleware 必须分开理解：framing layer 选择分片帧处理能力，根入口导出的 `framer({...})` descriptor 配置分片策略；`features/control` 选择控制帧能力，middleware `ping()` 才让 `ping` / `pingAll` 出现在精确推导出的类型上。完整参考见 [§3](#3-中间件详细参考)。
 
 ### 1.5 Provider（提供者）与 Contract（契约）
 
@@ -221,8 +221,8 @@ const alive = await endpoint.ping('worker')
 
 - Feature tuple 不能为空，重复 token 会以 `CAPABILITY_CONFLICT` 拒绝。
 - Feature 的运行时依赖由组合器安装并去重；依赖是私有安装关系，不等于公开根投影。
-- `provider()` 的公开闭包特意包含 outbound，因此选择 provider 后可以 `send()`；`discovery()` 和 `chunk()` 的私有 outbound 依赖不会公开 `send()`。
-- `chunk()` Feature 不增加独立方法，只安装分片帧所有者；它通常与根入口导出的 `chunk({...})` middleware 一起使用。
+- `provider()` 的公开闭包特意包含 outbound，因此选择 provider 后可以 `send()`；framing layer 的私有 outbound 依赖不会公开 `send()`。
+- framing layer 不增加独立方法，只安装分片帧所有者；它与 `framer({...})` descriptor 一起使用。
 - middleware tuple 使用 `as const`，TypeScript 才能精确推断手动发现模式和 `ping()` 带来的条件方法。
 - 构造是异步、原子的：任何 Feature 或 middleware 安装失败时，已安装项会逆序清理，原始失败保留在 `cause` / `AggregateError.errors` 链中。
 
@@ -275,10 +275,10 @@ contract({
 
 版本不匹配时对端请求会被拒绝（`CONTRACT_VERSION_UNSUPPORTED`）。`schemas` 未覆盖的方法名不做参数/返回值校验——按方法名精确匹配，没有通配符。`maxIdentifierLength` **默认 128**，且这个默认值不依赖是否安装了 `contract()` 中间件——`createEndpoint` 内部读取 `contract` capability 时统一 `?? 128`，即使完全不装 `contract()`，`senderId`/`targetId`/`taskId`/`method`/`receiverId` 这些标识符字段也一律按 128 字符上限校验。传入非正安全整数会在构造期抛 `INVALID_CONFIG`。
 
-### 3.2 `protocol(config?)`
+### 3.2 `codec(descriptor)`
 
 ```ts
-protocol({
+codec({
   encode?: (value: unknown) => unknown;   // 默认恒等
   decode?: (value: unknown) => unknown;   // 默认恒等
   encodedType?: 'any' | 'string' | 'uint8array';
@@ -323,10 +323,10 @@ authentication({
 
 **成对校验规则（构造期强制，均抛 `INVALID_CONFIG`）**：`encrypt`/`decrypt` 必须同时提供或同时不提供，只给一个会被拒绝；`sign`/`verify` 同理。两对里至少要配置一对（`encrypt`+`decrypt`，或 `sign`+`verify`，或两对都配），完全不给任何一个函数同样会被拒绝——`authentication()` 存在的意义就是至少做一种保护，空配置没有意义。出站顺序固定是先 `encrypt` 后 `sign`（`protect`），入站顺序固定是先 `verify` 后 `decrypt`（`unprotect`），与配置的字段顺序无关。任一 transform 在执行期抛出的异常都会被统一包装成 `WebRpcAuthenticationError`（`code: 'AUTHENTICATION_FAILED'`）。
 
-### 3.5 `chunk(config?)`
+### 3.5 `framer(descriptor?)`
 
 ```ts
-chunk({
+framer({
   chunkSize?: number;                 // 单帧最大字节数，超过则自动分片；未设不主动分片
   maxMessageBytes?: number;           // 单条消息（分片前）允许的最大总字节数；未设不检查
   maxConcurrentMessages?: number;     // 端点级别同时进行中的分片重组数量上限，默认 128
@@ -432,7 +432,7 @@ ServiceWorker 场景发送方和接收方是两个独立的宿主对象（页面
 createWebTransportDatagramTransport({ writable: WritableStream<Uint8Array>; readable: ReadableStream<Uint8Array> })
 ```
 
-包装 HTTP/3 WebTransport 的 datagram 读写流。datagram 是无连接、无内建分帧的字节流，协议编解码（`protocol()` 中间件）需要自行处理好帧边界；适配器内部维护一个贯穿整个传输生命周期的持久 reader——取消订阅（移除所有 RPC 监听器）不会连带取消这个 reader，只有调用 `close()` 才会真正取消 reader、释放读锁、关闭 writer；第二次调用 `close()` 会复用第一次的 close 结果，不会重复执行清理。
+包装 HTTP/3 WebTransport 的 datagram 读写流。datagram 是无连接、无内建分帧的字节流，codec/framer descriptors 需要自行处理好帧边界；适配器内部维护一个贯穿整个传输生命周期的持久 reader——取消订阅（移除所有 RPC 监听器）不会连带取消这个 reader，只有调用 `close()` 才会真正取消 reader、释放读锁、关闭 writer；第二次调用 `close()` 会复用第一次的 close 结果，不会重复执行清理。
 
 ### 4.9 `createMemoryTransportPair()` — `@migaia/web-rpc/adapters/memory`
 
@@ -611,13 +611,13 @@ try {
 | `INVALID_CONFIG`                                      | `createEndpoint()` 配置本身不合法（含读取配置字段时抛出的异常）   | 修配置；这类错误在任何中间件产生副作用**之前**抛出                                       |
 | `PROVIDER_DUPLICATED`                                 | 同一个方法名被 `provide()` 注册了两次                             | 检查方法名是否冲突                                                                       |
 | `UUID_UNAVAILABLE` / `UUID_INVALID` / `UUID_CONFLICT` | 自定义 `uuid()` 中间件生成的 id 不合法或冲突                      | 检查自定义生成函数的实现                                                                 |
-| `PROTOCOL_INVALID`                                    | 协议编解码失败                                                    | 检查 `protocol()` 的 `encode`/`decode` 实现或对端协议是否一致                            |
-| `PROTOCOL_UNSUPPORTED`                                | 协议输出类型和传输要求的 `encodedType` 不匹配                     | 调整 `protocol()`/`encodedType` 配置                                                     |
+| `PROTOCOL_INVALID`                                    | 协议编解码失败                                                    | 检查 codec descriptor 的 `encode`/`decode` 实现或对端协议是否一致                       |
+| `PROTOCOL_UNSUPPORTED`                                | 协议输出类型和传输要求的 `encodedType` 不匹配                     | 调整 codec descriptor/`encodedType` 配置                                                  |
 | `PROTOCOL_DECRYPT_FAILED`                             | `authentication()` 的解密/验签失败                                | 通常代表消息被篡改或密钥不匹配，不建议重试                                               |
 | `CONTRACT_INVALID`                                    | 契约配置本身不合法                                                | 检查 `contract()` 配置                                                                   |
 | `CONTRACT_VERSION_UNSUPPORTED`                        | 对端协议版本不在可接受范围                                        | 升级/降级到兼容版本                                                                      |
 | `PAYLOAD_INVALID`                                     | 序列化/反序列化失败，或分片校验失败                               | 检查发送的数据是否可序列化                                                               |
-| `PAYLOAD_TOO_LARGE`                                   | 消息超过 `chunk()` 配置的大小上限                                 | 调大限制或减小消息体积                                                                   |
+| `PAYLOAD_TOO_LARGE`                                   | 消息超过 framer descriptor 配置的大小上限                         | 调大限制或减小消息体积                                                                   |
 | `METHOD_NOT_FOUND`                                    | 调用了对端没有 `provide()` 的方法名                               | 检查方法名拼写、确认对端已注册                                                           |
 | `PROVIDER_NOT_FOUND`                                  | provider 执行器在入站处理阶段解析不到目标 method 的 provider      | 检查 method 是否已 `provide()`；与 `METHOD_NOT_FOUND` 语义相邻但是独立的错误码，不可重试 |
 | `PROVIDER_NOT_SETTLED`                                | provider 函数没有正确返回 `success()`/`failed()` 结果             | 检查 provider 实现                                                                       |
@@ -635,11 +635,11 @@ try {
 | `SCHEMA_INVALID`                                      | `contract()` 配置的 schema 校验未通过                             | 检查参数/返回值是否符合约定的 schema                                                     |
 | `CAPABILITY_CONFLICT`                                 | 多个中间件/配置之间的能力声明冲突                                 | 检查中间件组合是否合理                                                                   |
 | `OVERLOADED`                                          | 出站 id 账本、并发限制等资源预算耗尽                              | 降低发送频率或调大对应限制（如 `replay.maxEntries`）                                     |
-| `CHUNK_INVALID`                                       | 分片帧不合法                                                      | 检查 `chunk()` 自定义 `split`/`byteLength` 实现                                          |
-| `CHUNK_TOO_LARGE`                                     | 单条消息或单个分片超过配置上限                                    | 调整 `chunk()` 限制                                                                      |
+| `CHUNK_INVALID`                                       | 分片帧不合法                                                      | 检查 framer descriptor 自定义 `split`/`byteLength` 实现                                  |
+| `CHUNK_TOO_LARGE`                                     | 单条消息或单个分片超过配置上限                                    | 调整 framer descriptor 限制                                                               |
 | `CHUNK_CAPACITY_EXCEEDED`                             | 并发重组数量/缓冲区超限                                           | 降低并发大消息发送量或调大限制                                                           |
 | `CHUNK_RECEIVE_TIMEOUT`                               | 分片重组在 `assemblyTimeoutMs` 内未收全                           | 检查网络稳定性，或调大超时                                                               |
-| `CHUNK_ACK_TIMEOUT`                                   | 分片确认超时（预留字段，当前分片层不做确认应答）                  | 见 `chunk()` 说明——分片层是尽力而为传递                                                  |
+| `CHUNK_ACK_TIMEOUT`                                   | 分片确认超时（预留字段，当前分片层不做确认应答）                  | 见 framer descriptor 说明——分片层是尽力而为传递                                          |
 
 `WebRpcRemoteError` 专门代表"对端 provider 主动调用 `ctx.failed(message, code)` 返回的业务失败"，其 `data` 字段携带 provider 传回的附加数据。它继承原生 `Error` 而不是 `WebRpcError`，但仍有 `source` / `code`，所以 `isWebRpcError()` 能按结构识别它。
 
@@ -741,12 +741,12 @@ type IWebRpcHookEvent = {
 | ----------------------------------- | ------------------------ | -------------------------------------- |
 | 出站请求 id 重放窗口容量            | `replay.maxEntries`      | 4096                                   |
 | 出站请求 id 重放窗口 TTL            | `replay.ttlMs`           | 310 秒                                 |
-| 分片并发消息数（端点级）            | `chunk()`                | 按配置，未设默认不限                   |
-| 分片并发消息数（单 peer）           | `chunk()`                | 按配置                                 |
-| 单条消息最大分片数                  | `chunk()`                | 按配置                                 |
-| 单个分片最大字节数                  | `chunk()`                | 按配置                                 |
-| 分片重组总缓冲字节数                | `chunk()`                | 按配置                                 |
-| 分片重组超时                        | `chunk()`                | 按配置                                 |
+| 分片并发消息数（端点级）            | framer descriptor        | 按配置，未设默认不限                   |
+| 分片并发消息数（单 peer）           | framer descriptor        | 按配置                                 |
+| 单条消息最大分片数                  | framer descriptor        | 按配置                                 |
+| 单个分片最大字节数                  | framer descriptor        | 按配置                                 |
+| 分片重组总缓冲字节数                | framer descriptor        | 按配置                                 |
+| 分片重组超时                        | framer descriptor        | 按配置                                 |
 | 自动发现的入站查询并发/单 peer 限制 | `connect()` 自动模式内部 | 有界，超限时新查询被拒绝而不是无限排队 |
 | 手动模式待处理入站查询配额          | `connect()` 手动模式内部 | 有界 + 超时自动过期，不会永久占用配额  |
 
@@ -762,7 +762,7 @@ type IWebRpcHookEvent = {
 
 ```ts
 // worker.ts
-import { contract, protocol, connect } from '@migaia/web-rpc'
+import { contract, codec, connect } from '@migaia/web-rpc'
 import { createProviderEndpoint } from '@migaia/web-rpc/provider'
 import { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'
 
@@ -770,7 +770,7 @@ const transport = createWebWorkerTransport(self as unknown as Worker)
 const endpoint = await createProviderEndpoint({
   id: 'worker',
   transport,
-  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]
+  middlewares: [contract({ version: '1' }), codec({ encode: (value) => value, decode: (value) => value }), connect({ transport })]
 })
 endpoint.provide('heavyCompute', (ctx) => {
   const result = doHeavyWork(ctx.data as number[])
@@ -780,7 +780,7 @@ endpoint.provide('heavyCompute', (ctx) => {
 
 ```ts
 // main.ts
-import { contract, protocol, connect, timeout } from '@migaia/web-rpc'
+import { contract, codec, connect, timeout } from '@migaia/web-rpc'
 import { createClientEndpoint } from '@migaia/web-rpc/client'
 import { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'
 
@@ -792,7 +792,7 @@ const endpoint = await createClientEndpoint({
   targetIds: ['worker'],
   middlewares: [
     contract({ version: '1' }),
-    protocol(),
+    codec({ encode: (value) => value, decode: (value) => value }),
     connect({ transport }),
     timeout({ timeoutMs: 30_000 })
   ]
@@ -804,7 +804,7 @@ const result = await endpoint.send<number[]>('worker', 'heavyCompute', [1, 2, 3]
 ### 13.2 iframe 白名单鉴权通信
 
 ```ts
-import { contract, protocol, connect } from '@migaia/web-rpc'
+import { contract, codec, connect } from '@migaia/web-rpc'
 import { createClientEndpoint } from '@migaia/web-rpc/client'
 import { createWindowMessageTransport } from '@migaia/web-rpc/adapters/window'
 
@@ -822,7 +822,7 @@ const endpoint = await createClientEndpoint({
   transport,
   middlewares: [
     contract({ version: '1' }),
-    protocol(),
+    codec({ encode: (value) => value, decode: (value) => value }),
     connect({
       transport,
       useBaseIdVerifyOnly: false,
@@ -835,7 +835,7 @@ const endpoint = await createClientEndpoint({
 ### 13.3 标签页广播通知（不需要响应）
 
 ```ts
-import { contract, protocol, connect } from '@migaia/web-rpc'
+import { contract, codec, connect } from '@migaia/web-rpc'
 import { createClientEndpoint } from '@migaia/web-rpc/client'
 import { createBroadcastChannelTransport } from '@migaia/web-rpc/adapters/broadcast-channel'
 
@@ -843,7 +843,7 @@ const transport = createBroadcastChannelTransport(new BroadcastChannel('app-sync
 const endpoint = await createClientEndpoint({
   id: `tab-${crypto.randomUUID()}`,
   transport,
-  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]
+  middlewares: [contract({ version: '1' }), codec({ encode: (value) => value, decode: (value) => value }), connect({ transport })]
 })
 
 endpoint.on('cache-invalidated', (ctx) => {
@@ -857,10 +857,9 @@ endpoint.dispatchAll('cache-invalidated', { key: 'user-profile' })
 ### 13.4 大文件跨端传输
 
 ```ts
-import { contract, protocol, connect, chunk } from '@migaia/web-rpc'
+import { contract, codec, connect, framer } from '@migaia/web-rpc'
 import { createComposedEndpoint } from '@migaia/web-rpc/core'
 import { outbound } from '@migaia/web-rpc/features/outbound'
-import { chunk as chunkFeature } from '@migaia/web-rpc/features/chunk'
 
 const endpoint = await createComposedEndpoint(
   {
@@ -868,16 +867,16 @@ const endpoint = await createComposedEndpoint(
     transport,
     middlewares: [
       contract({ version: '1' }),
-      protocol(),
+      codec({ encode: (value) => value, decode: (value) => value }),
       connect({ transport }),
-      chunk({
+      framer({
         chunkSize: 16_384, // 单帧 16KB
         maxMessageBytes: 50 * 1024 * 1024, // 单条消息最大 50MB
         assemblyTimeoutMs: 30_000
       })
     ]
   },
-  [outbound(), chunkFeature()] as const
+  [outbound()] as const
 )
 
 // 业务代码完全不用关心分片，正常发一个大 payload 即可
@@ -894,8 +893,8 @@ await endpoint.send('receiver', 'uploadFile', { name: 'video.mp4', bytes: largeU
 **Q：为什么选了 `discovery()`，endpoint 上还是没有 `send()`？**
 Feature 的私有依赖不会扩大根投影。discovery 在内部需要 outbound 完成查询，但它对业务只承诺 `connect` / `discovery`；需要发送能力时显式加 `outbound()`。这是 tree-shaking 与最小权限边界，不是依赖安装失败。
 
-**Q：`features/chunk` 和根入口的 `chunk()` 为什么同名？**
-前者是 Feature token，决定是否安装分片帧运行时所有者；后者是 middleware，提供 `chunkSize`、容量和超时等策略。自定义组合通常两者都要，建议导入时把 Feature 改名为 `chunkFeature`。`control()` Feature 与 `ping()` middleware 也是同样的分层关系。
+**Q：framing layer 和 `framer()` descriptor 如何配合？**
+framing layer 决定是否安装分片帧运行时所有者；`framer()` descriptor 提供 `chunkSize`、容量和超时等策略。`control()` Feature 与 `ping()` middleware 也是同样的分层关系。
 
 **Q：`send()` 一直不 resolve 也不 reject。**
 检查是否装了 `timeout()` 中间件——默认没有超时限制的场景下，对端确实没有响应就会一直挂起。同时确认 `connect()` 配置正确，否则请求可能在对端因身份校验失败被静默丢弃（可以订阅 `authentication.rejected`/`receive.failure` hook 事件确认）。
@@ -904,7 +903,7 @@ Feature 的私有依赖不会扩大根投影。discovery 在内部需要 outboun
 自动发现模式下确认对端确实 `provide()` 了对应方法、`id` 拼写一致；跨源场景确认 `targetOrigin`/`connect` 的身份校验没有把合法请求也拒绝了。手动模式下确认调用方已经 `register()` 过这个接收端。
 
 **Q：大消息发送失败，报 `PAYLOAD_TOO_LARGE` 或 `CHUNK_TOO_LARGE`。**
-检查是否装了 `chunk()` 中间件，以及 `chunkSize`/`maxMessageBytes` 是否够用；已经是 `Uint8Array` 的消息不支持自动分片，需要传输通道本身能处理大二进制，或者在业务层手动切分。
+检查 framer descriptor 的 `chunkSize`/`maxMessageBytes` 是否够用；已经是 `Uint8Array` 的消息不支持自动分片，需要传输通道本身能处理大二进制，或者在业务层手动切分。
 
 **Q：`dispose()` reject 了，应用要怎么继续？**
 `dispose()` 的清理是尽力而为——即使 reject，能清理的部分也已经清理完了，`cleanupErrors` 只是告诉你哪些具体资源没清理干净（通常需要人工介入，比如某个外部连接对象自己的 `close()` 抛了异常）。不需要重试 `dispose()`（幂等，重试也只会拿到同一个结果），根据 `cleanupErrors` 里列出的资源名针对性排查即可。
@@ -930,8 +929,6 @@ import {
   WebRpcTransportTopology,
   WebRpcTransportOwnership,
   WebRpcTransportEncoding,
-  WebRpcMessageKind,
-  WebRpcVariation,
   WebRpcEndpointStatus,
   WebRpcDebugPhase
 } from '@migaia/web-rpc'
@@ -950,8 +947,6 @@ const transport = {
 
 | 常量                        | 用途                                                 |
 | --------------------------- | ---------------------------------------------------- |
-| `WebRpcMessageKind`         | discovery/request/response/variation/chunk wire 类型 |
-| `WebRpcVariation`           | abort/ping/pong 控制变化                             |
 | `WebRpcPlatform`            | adapter 平台标签                                     |
 | `WebRpcTransportTopology`   | exclusive/multiplexed/broadcast 信任拓扑             |
 | `WebRpcTransportOwnership`  | owned/borrowed 资源释放契约                          |

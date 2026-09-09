@@ -1,6 +1,9 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it, vi } from 'vitest'
 import { createMemoryTransportPair } from '../src/adapters/memory.js'
+import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
+import { createStringFramer } from '@migaia/rpc-contract/framing'
+import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { WebRpcErrorCode } from '../src/errors.js'
 import { createClientEndpoint } from '../src/client.js'
 import { createComposedEndpoint, type IWebRpcEndpointModule } from '../src/core.js'
@@ -59,6 +62,7 @@ import {
 } from '../src/internal/plugin-inventory.js'
 import { hasNativeProviderClaimAuthority } from '../src/internal/provider-claim-authority.js'
 import { outbound } from '../src/features/outbound.js'
+import { oneWay } from '../src/features/one-way.js'
 import {
   WebRpcConfigurationError,
   WebRpcError,
@@ -68,12 +72,11 @@ import {
 import { WebRpcErrorText } from '../src/error-text.js'
 import { authentication } from '../src/middleware/authentication.js'
 import { abort } from '../src/middleware/abort.js'
-import { chunk as chunkMiddleware } from '../src/middleware/chunk.js'
 import { connect } from '../src/middleware/connect.js'
 import { contract } from '../src/middleware/contract.js'
 import { hooks } from '../src/middleware/hooks.js'
 import { ping } from '../src/middleware/ping.js'
-import { protocol } from '../src/middleware/protocol.js'
+import { canonicalProtocol as protocol } from '../src/middleware/canonical-protocol.js'
 import { timeout } from '../src/middleware/timeout.js'
 
 import { uuid } from '../src/middleware/uuid.js'
@@ -86,7 +89,8 @@ function createProviderRequest(
   taskId: string,
   overrides: Readonly<Record<string, unknown>> = {}
 ): Readonly<Record<string, unknown>> {
-  return {
+  /** Retains every legacy override as raw fixture input before canonical projection. */
+  const raw: Readonly<Record<string, unknown>> = {
     kind: 'request',
     version: '1.0',
     taskId,
@@ -97,6 +101,23 @@ function createProviderRequest(
     data: 'r70-data',
     sentAt: Date.now(),
     ...overrides
+  }
+  /** Projects raw values without filtering hostile route or payload overrides. */
+  const routing: Readonly<Record<string, unknown>> = {
+    profile: 'web-rpc.route.v1',
+    type: 'request',
+    applicationVersion: raw.version,
+    senderId: raw.senderId,
+    targetId: raw.targetId,
+    receiverId: raw.receiverId,
+    sentAt: raw.sentAt,
+    ...(raw.dispatchOnly === undefined ? {} : { dispatchOnly: raw.dispatchOnly })
+  }
+  return {
+    kind: raw.kind,
+    id: raw.taskId,
+    method: raw.method,
+    data: { webRpc: routing, ...(raw.data === undefined ? {} : { payload: raw.data }) }
   }
 }
 
@@ -263,7 +284,6 @@ async function createActualAdmissionFixture(
       contract(options.contractConfig),
       connect({ ...options.connectConfig, transport: composedTransport }),
       uuid(),
-      chunkMiddleware(),
       ping(),
       abort(),
       timeout(),
@@ -874,9 +894,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T113 real provider response baseline preserves native provider error code and residue', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
+    const cause = new TypeError('provider failure cause')
+    const primary = new Error('provider failure', { cause })
     const server = await createRealProvider('provider-error-host', serverTransport, {
       fail: () => {
-        throw new Error('provider failure')
+        throw primary
       }
     })
     const client = await createClientEndpoint({
@@ -887,7 +909,16 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     })
     try {
       await expect(client.send('provider-error-host', 'fail', null)).rejects.toMatchObject({
-        code: WebRpcErrorCode.internal
+        code: WebRpcErrorCode.internal,
+        cause: expect.objectContaining({
+          message: primary.message,
+          stack: primary.stack,
+          cause: expect.objectContaining({
+            name: 'TypeError',
+            message: cause.message,
+            stack: cause.stack
+          })
+        })
       })
       expect(readEndpointDebugSnapshot(server)?.activeControllers).toBe(0)
       expect(readEndpointDebugSnapshot(server)?.providers).toBe(1)
@@ -1894,7 +1925,10 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(reportResult).toBeUndefined()
       expect(reporterCalls.filter((error) => error === reporterInput)).toHaveLength(1)
       commandKinds.push('response')
-      const responseResult = operations.send({ kind: 'response', message: null })
+      const responseResult = operations.send({
+        kind: 'response',
+        message: normalizeRpcEnvelope({ kind: 'response', ok: true, id: 'response', data: null })
+      })
       expect(responseResult).toBeInstanceOf(Promise)
       await expect(responseResult).rejects.toMatchObject({
         name: 'WebRpcTransportError',
@@ -1904,7 +1938,10 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       })
       expect(responseResult).toBe(observations[3]?.result)
       commandKinds.push('frame')
-      const frameResult = operations.send({ kind: 'frame', message: null })
+      const frameResult = operations.send({
+        kind: 'frame',
+        message: normalizeRpcEnvelope({ kind: 'response', ok: true, id: 'frame', data: null })
+      })
       expect(frameResult).toBeInstanceOf(Promise)
       await expect(frameResult).rejects.toMatchObject({
         name: 'WebRpcTransportError',
@@ -2431,7 +2468,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
 
   it('T130 provider source boundary excludes D95 from all migrated feature consumers', async () => {
     const sources = await Promise.all(
-      ['discovery.ts', 'control.ts', 'provider.ts', 'chunk.ts'].map((name) =>
+      ['discovery.ts', 'control.ts', 'provider.ts', 'canonical-chunk.ts'].map((name) =>
         readFile(new URL(`../src/features/${name}`, import.meta.url), 'utf8')
       )
     )
@@ -2450,8 +2487,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(attachmentSource).not.toContain('legacy-discovery-owner')
     expect(attachmentSource).not.toContain('#legacyOptions')
     expect(attachmentSource).not.toContain('getLegacyControls')
-    expect(attachmentSource).toContain('kernel.registerRoute(WebRpcMessageKind.discoveryQuery')
-    expect(attachmentSource).toContain('kernel.registerRoute(WebRpcMessageKind.discoveryResponse')
+    expect(attachmentSource).toContain("kernel.registerRoute('discovery'")
+    expect(attachmentSource).not.toContain('kernel.registerRoute(WebRpcMessageKind.discovery')
   })
 
   it('T246 real composed discovery consumes narrow ports and publishes only its resolver', async () => {
@@ -2892,7 +2929,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T266 superseded intermediate deletion leaves both migrated consumers free of D95', async () => {
     const [controlSource, chunkSource] = await Promise.all([
       readFile(new URL('../src/features/control.ts', import.meta.url), 'utf8'),
-      readFile(new URL('../src/features/chunk.ts', import.meta.url), 'utf8')
+      readFile(new URL('../src/features/canonical-chunk.ts', import.meta.url), 'utf8')
     ])
     expect(controlSource).not.toContain('outboundCompatibility')
     expect(chunkSource).not.toContain('outboundCompatibility')
@@ -2901,7 +2938,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T267 final deletion boundary removes D95 from control and chunk after both narrow migrations', async () => {
     const [controlSource, chunkSource] = await Promise.all([
       readFile(new URL('../src/features/control.ts', import.meta.url), 'utf8'),
-      readFile(new URL('../src/features/chunk.ts', import.meta.url), 'utf8')
+      readFile(new URL('../src/features/canonical-chunk.ts', import.meta.url), 'utf8')
     ])
     expect(controlSource).not.toContain('outboundCompatibility')
     expect(chunkSource).not.toContain('outboundCompatibility')
@@ -3396,7 +3433,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   it('T275 final source boundary excludes D95 from control and chunk', async () => {
     const [controlSource, chunkSource] = await Promise.all([
       readFile(new URL('../src/features/control.ts', import.meta.url), 'utf8'),
-      readFile(new URL('../src/features/chunk.ts', import.meta.url), 'utf8')
+      readFile(new URL('../src/features/canonical-chunk.ts', import.meta.url), 'utf8')
     ])
     await expect(readFile(new URL('../src/endpoint.ts', import.meta.url), 'utf8')).rejects.toThrow()
     await expect(
@@ -3404,8 +3441,10 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     ).rejects.toThrow()
     expect(controlSource).not.toContain('outboundCompatibility')
     expect(chunkSource).not.toContain('outboundCompatibility')
-    expect(chunkSource).toContain('WebRpcSharedKey.inboundIdentity')
-    expect(chunkSource).toContain('WebRpcSharedKey.time')
+    expect(chunkSource).toContain('WebRpcCanonicalChunkAttachment')
+    expect(chunkSource).toContain("provides: ['selected-framer-bridge']")
+    expect(chunkSource).not.toContain('WebRpcSharedKey.inboundIdentity')
+    expect(chunkSource).not.toContain('WebRpcSharedKey.time')
   })
 
   it('T276 concurrent reused control modules preserve independent endpoint snapshots', async () => {
@@ -3903,7 +3942,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         if (
           typeof message === 'object' &&
           message !== null &&
-          (message as { readonly variation?: unknown }).variation === 'ping'
+          (message as { readonly data?: { readonly webRpc?: { readonly variation?: unknown } } })
+            .data?.webRpc?.variation === 'ping'
         ) {
           pingFrames.push(message)
           return
@@ -4041,7 +4081,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         if (
           typeof message === 'object' &&
           message !== null &&
-          (message as { readonly variation?: unknown }).variation === 'ping'
+          (message as { readonly data?: { readonly webRpc?: { readonly variation?: unknown } } })
+            .data?.webRpc?.variation === 'ping'
         )
           return lateSend
         return baseClientTransport.send(message)
@@ -4187,7 +4228,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
   })
 
   it('T221 provider and adjacent-consumer artifacts expose the final removed D95 boundary', async () => {
-    const featureNames = ['provider', 'discovery', 'control', 'chunk'] as const
+    const featureNames = ['provider', 'discovery', 'control', 'canonical-chunk'] as const
     const sourceTexts = await Promise.all(
       featureNames.map((name) =>
         readFile(new URL(`../src/features/${name}.ts`, import.meta.url), 'utf8')
@@ -4223,14 +4264,18 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const server = await createFullEndpoint({
       id: 'r73-chunk-server',
       transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport }), chunkMiddleware({ chunkSize: 4 })],
+      codec: defineJsonCodec({ version: 1 }),
+      framer: createStringFramer({ chunkBytes: 4 }),
+      middlewares: [connect({ transport: serverTransport })],
       provider: { echo: (context) => context.success(context.data) }
     })
     const client = await createFullEndpoint({
       id: 'r73-chunk-client',
       targetIds: ['r73-chunk-server'],
       transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), chunkMiddleware({ chunkSize: 4 })]
+      codec: defineJsonCodec({ version: 1 }),
+      framer: createStringFramer({ chunkBytes: 4 }),
+      middlewares: [connect({ transport: clientTransport })]
     })
     try {
       expect(client.send).toBeTypeOf('function')
@@ -4238,16 +4283,14 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         client.send('r73-chunk-server', 'echo', 'r73-non-empty-framed-payload-😀')
       ).resolves.toBe('r73-non-empty-framed-payload-😀')
       expect(readEndpointDebugSnapshot(client)).toMatchObject({
-        chunks: 0,
         resources: expect.any(Number),
         phase: 'active'
       })
-      expect(readEndpointDebugSnapshot(server)).toMatchObject({ chunks: 0, phase: 'active' })
+      expect(readEndpointDebugSnapshot(server)).toMatchObject({ phase: 'active' })
       const dispose = client.dispose()
       expect(client.dispose()).toBe(dispose)
       await dispose
       expect(readEndpointDebugSnapshot(client)).toMatchObject({
-        chunks: 0,
         resources: 0,
         phase: 'disposed'
       })
@@ -4255,7 +4298,6 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(server.dispose()).toBe(serverDispose)
       await serverDispose
       expect(readEndpointDebugSnapshot(server)).toMatchObject({
-        chunks: 0,
         resources: 0,
         phase: 'disposed'
       })
@@ -5697,7 +5739,15 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       await settleProviderDelivery()
       expect(executions).toBe(1)
       expect(messages).toContainEqual(
-        expect.objectContaining({ kind: 'response', taskId: 'verified', ok: true })
+        expect.objectContaining({
+          kind: 'response',
+          id: 'verified',
+          ok: true,
+          data: expect.objectContaining({
+            webRpc: expect.objectContaining({ type: 'response', targetId: 'r70-client' }),
+            payload: 'r70-data'
+          })
+        })
       )
       await fixture.clientTransport.send(
         createProviderRequest('forged-receiver', { receiverId: 'wrong-receiver' })
@@ -5774,7 +5824,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(messages).toContainEqual(
         expect.objectContaining({
           kind: 'response',
-          taskId: 'not-found',
+          id: 'not-found',
           ok: false,
           code: WebRpcErrorCode.providerNotFound
         })
@@ -5800,7 +5850,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(messages).toContainEqual(
         expect.objectContaining({
           kind: 'response',
-          taskId: 'not-settled',
+          id: 'not-settled',
           ok: false,
           code: WebRpcErrorCode.providerNotSettled
         })
@@ -5887,7 +5937,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(messages).toContainEqual(
         expect.objectContaining({
           kind: 'response',
-          taskId: 'async-failure',
+          id: 'async-failure',
           ok: false,
           code: WebRpcErrorCode.internal
         })
@@ -5917,7 +5967,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(messages).toContainEqual(
         expect.objectContaining({
           kind: 'response',
-          taskId: 'transfer-overflow',
+          id: 'transfer-overflow',
           ok: false,
           code: WebRpcErrorCode.internal
         })
@@ -6033,7 +6083,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         messages.filter(
           (message) =>
             (message as { readonly kind?: unknown }).kind === 'response' &&
-            (message as { readonly taskId?: unknown }).taskId === 'concurrent-duplicate'
+            (message as { readonly id?: unknown }).id === 'concurrent-duplicate'
         )
       ).toHaveLength(1)
       expect(fixture.snapshot().activeSubscriptions).toBe(1)
@@ -6135,13 +6185,11 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       const response = messages.find(
         (message) =>
           (message as { readonly kind?: unknown }).kind === 'response' &&
-          (message as { readonly taskId?: unknown }).taskId === 'schema-failure'
-      ) as
-        | { readonly code?: unknown; readonly serializedError?: Record<string, unknown> }
-        | undefined
+          (message as { readonly id?: unknown }).id === 'schema-failure'
+      ) as { readonly code?: unknown; readonly error?: Record<string, unknown> } | undefined
       expect(executions).toBe(0)
       expect(response).toMatchObject({ code: WebRpcErrorCode.schemaInvalid })
-      expect(response?.serializedError).toMatchObject({
+      expect(response?.error).toMatchObject({
         name: 'WebRpcSchemaValidationError',
         source: '@migaia/web-rpc',
         code: WebRpcErrorCode.schemaInvalid,
@@ -6195,7 +6243,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(messages).toContainEqual(
         expect.objectContaining({
           kind: 'response',
-          taskId: 'late-rejection',
+          id: 'late-rejection',
           code: WebRpcErrorCode.internal
         })
       )
@@ -6335,7 +6383,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect(messages).toContainEqual(
         expect.objectContaining({
           kind: 'response',
-          taskId: 'r70-sync-failure',
+          id: 'r70-sync-failure',
           code: WebRpcErrorCode.internal,
           message: 'Provider failed'
         })
@@ -6483,27 +6531,21 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       const response = messages.find(
         (message) =>
           (message as { readonly kind?: unknown }).kind === 'response' &&
-          (message as { readonly taskId?: unknown }).taskId === 'r70-result-schema'
-      ) as
-        | { readonly serializedError?: { readonly causes?: readonly Record<string, unknown>[] } }
-        | undefined
+          (message as { readonly id?: unknown }).id === 'r70-result-schema'
+      ) as { readonly error?: { readonly cause?: Record<string, unknown> } } | undefined
       expect(response).toMatchObject({
-        serializedError: {
+        error: {
           name: 'WebRpcSchemaValidationError',
           source: '@migaia/web-rpc',
           code: WebRpcErrorCode.schemaInvalid,
           stack: expect.any(String)
         }
       })
-      expect(response?.serializedError?.causes).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: 'Error',
-            message: resultCause.message,
-            stack: expect.any(String)
-          })
-        ])
-      )
+      expect(response?.error?.cause).toMatchObject({
+        name: 'Error',
+        message: resultCause.message,
+        stack: expect.any(String)
+      })
       expect(fixture.snapshot().providerState).toEqual({
         admission: 0,
         replay: 1,
@@ -6530,9 +6572,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const messages: unknown[] = []
     const unsubscribe = fixture.clientTransport.subscribe(({ data }) => messages.push(data))
     let report: Extract<IWebRpcOutboundCommand, { readonly kind: 'report' }> | undefined
-    let response:
-      | { readonly serializedError?: { readonly causes?: readonly Record<string, unknown>[] } }
-      | undefined
+    let response: { readonly error?: { readonly cause?: Record<string, unknown> } } | undefined
     let terminal: ReturnType<IActualAdmissionFixture['snapshot']> | undefined
     let hostPromiseStable = false
     try {
@@ -6545,10 +6585,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       response = messages.find(
         (message) =>
           (message as { readonly kind?: unknown }).kind === 'response' &&
-          (message as { readonly taskId?: unknown }).taskId === 'r70-sync-serialized'
-      ) as
-        | { readonly serializedError?: { readonly causes?: readonly Record<string, unknown>[] } }
-        | undefined
+          (message as { readonly id?: unknown }).id === 'r70-sync-serialized'
+      ) as { readonly error?: { readonly cause?: Record<string, unknown> } } | undefined
       const dispose = fixture.host.dispose()
       hostPromiseStable = fixture.host.dispose() === dispose
       await dispose
@@ -6556,19 +6594,17 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect({ report, response, terminal, hostPromiseStable }).toMatchObject({
         report: { code: WebRpcErrorCode.internal, error: primary, kind: 'report' },
         response: {
-          serializedError: {
+          error: {
             name: 'WebRpcError',
             source: '@migaia/web-rpc',
             code: WebRpcErrorCode.internal,
             message: primary.message,
             stack: primary.stack,
-            causes: expect.arrayContaining([
-              expect.objectContaining({
-                name: 'Error',
-                message: cause.message,
-                stack: cause.stack
-              })
-            ])
+            cause: expect.objectContaining({
+              name: 'Error',
+              message: cause.message,
+              stack: cause.stack
+            })
           }
         },
         hostPromiseStable: true,
@@ -6603,7 +6639,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     const messages: unknown[] = []
     const unsubscribe = fixture.clientTransport.subscribe(({ data }) => messages.push(data))
     let report: IWebRpcOutboundCommandObservation['command'] | undefined
-    let response: { readonly serializedError?: Record<string, unknown> } | undefined
+    let response: { readonly error?: Record<string, unknown> } | undefined
     let terminal: ReturnType<IActualAdmissionFixture['snapshot']> | undefined
     let hostPromiseStable = false
     try {
@@ -6614,8 +6650,8 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       response = messages.find(
         (message) =>
           (message as { readonly kind?: unknown }).kind === 'response' &&
-          (message as { readonly taskId?: unknown }).taskId === 'r70-async-serialized'
-      ) as { readonly serializedError?: Record<string, unknown> } | undefined
+          (message as { readonly id?: unknown }).id === 'r70-async-serialized'
+      ) as { readonly error?: Record<string, unknown> } | undefined
       const dispose = fixture.host.dispose()
       hostPromiseStable = fixture.host.dispose() === dispose
       await dispose
@@ -6623,19 +6659,17 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       expect({ report, response, terminal, hostPromiseStable }).toMatchObject({
         report: { code: WebRpcErrorCode.internal, error: primary, kind: 'report' },
         response: {
-          serializedError: {
+          error: {
             name: 'WebRpcError',
             source: '@migaia/web-rpc',
             code: WebRpcErrorCode.internal,
             message: primary.message,
             stack: primary.stack,
-            causes: expect.arrayContaining([
-              expect.objectContaining({
-                name: 'Error',
-                message: cause.message,
-                stack: cause.stack
-              })
-            ])
+            cause: expect.objectContaining({
+              name: 'Error',
+              message: cause.message,
+              stack: cause.stack
+            })
           }
         },
         hostPromiseStable: true,
@@ -6734,7 +6768,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       response = messages.find(
         (message) =>
           (message as { readonly kind?: unknown }).kind === 'response' &&
-          (message as { readonly taskId?: unknown }).taskId === 'r70-invalid-transfer'
+          (message as { readonly id?: unknown }).id === 'r70-invalid-transfer'
       ) as Record<string, unknown> | undefined
       const reportError = report?.error as
         | {
@@ -6763,15 +6797,14 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         },
         response: {
           kind: 'response',
-          taskId: 'r70-invalid-transfer',
+          id: 'r70-invalid-transfer',
           code: WebRpcErrorCode.internal,
-          serializedError: {
+          error: {
             name: reportError?.name,
             source: reportError?.source,
             code: reportError?.code,
             message: reportError?.message,
-            stack: reportError?.stack,
-            causes: []
+            stack: reportError?.stack
           }
         },
         terminal: {
@@ -6817,25 +6850,19 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       const response = messages.find(
         (message) =>
           (message as { readonly kind?: unknown }).kind === 'response' &&
-          (message as { readonly taskId?: unknown }).taskId === 'r70-params-schema'
-      ) as
-        | { readonly serializedError?: { readonly causes?: readonly Record<string, unknown>[] } }
-        | undefined
-      expect(response?.serializedError).toMatchObject({
+          (message as { readonly id?: unknown }).id === 'r70-params-schema'
+      ) as { readonly error?: { readonly cause?: Record<string, unknown> } } | undefined
+      expect(response?.error).toMatchObject({
         name: 'WebRpcSchemaValidationError',
         source: '@migaia/web-rpc',
         code: WebRpcErrorCode.schemaInvalid,
         stack: expect.any(String)
       })
-      expect(response?.serializedError?.causes).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: 'Error',
-            message: paramsCause.message,
-            stack: expect.any(String)
-          })
-        ])
-      )
+      expect(response?.error?.cause).toMatchObject({
+        name: 'Error',
+        message: paramsCause.message,
+        stack: expect.any(String)
+      })
     } finally {
       unsubscribe()
       await fixture.dispose()
@@ -6930,7 +6957,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
       response = messages.find(
         (message) =>
           (message as { readonly kind?: unknown }).kind === 'response' &&
-          (message as { readonly taskId?: unknown }).taskId === 'r70-transfer-overflow'
+          (message as { readonly id?: unknown }).id === 'r70-transfer-overflow'
       ) as Record<string, unknown> | undefined
       const reportError = report?.error as
         | {
@@ -6959,15 +6986,14 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         },
         response: {
           kind: 'response',
-          taskId: 'r70-transfer-overflow',
+          id: 'r70-transfer-overflow',
           code: WebRpcErrorCode.internal,
-          serializedError: {
+          error: {
             name: reportError?.name,
             source: reportError?.source,
             code: reportError?.code,
             message: reportError?.message,
-            stack: reportError?.stack,
-            causes: []
+            stack: reportError?.stack
           }
         },
         terminal: {
@@ -7541,5 +7567,129 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
     expect(closeCalls).toBe(0)
     expect(readComposedDisposalPromises(endpoint)).toBe(observed)
     expect(readEndpointDebugSnapshot(endpoint)).toEqual(terminal)
+  })
+
+  it('keeps one-way sender pending empty and releases receiver admission after physical delivery', async () => {
+    const [clientTransport, baseServerTransport] = createMemoryTransportPair()
+    /** Captures server-to-client physical sends; dispatch-only delivery must not emit responses. */
+    const responseFrames: unknown[] = []
+    const serverTransport: IWebRpcTransport = {
+      ...baseServerTransport,
+      send(message, options) {
+        responseFrames.push(message)
+        return baseServerTransport.send(message, options)
+      }
+    }
+    /** Captures real provider invocation instead of treating a dropped frame as delivery. */
+    const deliveries: unknown[] = []
+    /** Holds receiver work long enough to observe its legitimate controller and admission lease. */
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    /** Signals that provider execution began through the canonical request route. */
+    let started!: () => void
+    const invoked = new Promise<void>((resolve) => {
+      started = resolve
+    })
+    const server = await createProviderEndpoint({
+      id: 'one-way-server',
+      transport: serverTransport,
+      middlewares: [connect({ transport: serverTransport })],
+      provider: {
+        notify: async (context) => {
+          deliveries.push(context.data)
+          started()
+          await held
+          return context.success(null)
+        }
+      }
+    })
+    const client = await createComposedEndpoint(
+      {
+        id: 'one-way-client',
+        transport: clientTransport,
+        targetIds: ['one-way-server'],
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      [oneWay()] as const
+    )
+    try {
+      const sent = client.sendOneWay('one-way-server', 'notify', 'payload')
+      await invoked
+      expect(deliveries).toEqual(['payload'])
+      await vi.waitFor(() => expect(readEndpointDebugSnapshot(client)?.pending).toBe(0))
+      expect(readEndpointDebugSnapshot(server)?.providerState?.admission).toBeGreaterThan(0)
+      expect(readEndpointDebugSnapshot(server)?.activeControllers).toBeGreaterThan(0)
+      expect(responseFrames).toEqual([])
+      release()
+      await expect(sent).resolves.toBeUndefined()
+      await vi.waitFor(() =>
+        expect(readEndpointDebugSnapshot(server)?.providerState?.admission).toBe(0)
+      )
+      expect(readEndpointDebugSnapshot(server)?.activeControllers).toBe(0)
+      expect(responseFrames).toEqual([])
+    } finally {
+      release()
+      await Promise.all([client.dispose(), server.dispose()])
+    }
+  })
+
+  it('preserves a physical one-way rejection before a later delivery', async () => {
+    /** Supplies the underlying delivery pair while permitting one controlled client send failure. */
+    const [baseClientTransport, serverTransport] = createMemoryTransportPair()
+    /** Is the exact physical transport failure that must remain reachable through the rejection. */
+    const physicalFailure = new Error('one-way physical send failed')
+    /** Controls whether the next client physical send fails before memory transport delivery. */
+    let rejectPhysicalSend = true
+    /** Injects the controlled rejection without changing the canonical memory peer setup. */
+    const clientTransport: IWebRpcTransport = {
+      ...baseClientTransport,
+      send(message, options) {
+        if (rejectPhysicalSend) return Promise.reject(physicalFailure)
+        return baseClientTransport.send(message, options)
+      }
+    }
+    /** Records provider execution to prove the Good retry delivered a real request. */
+    const deliveries: unknown[] = []
+    const server = await createProviderEndpoint({
+      id: 'one-way-rejection-server',
+      transport: serverTransport,
+      middlewares: [connect({ transport: serverTransport })],
+      provider: {
+        notify: (context) => {
+          deliveries.push(context.data)
+          return context.success(null)
+        }
+      }
+    })
+    const client = await createComposedEndpoint(
+      {
+        id: 'one-way-rejection-client',
+        transport: clientTransport,
+        targetIds: ['one-way-rejection-server'],
+        middlewares: [connect({ transport: clientTransport })]
+      },
+      [oneWay()] as const
+    )
+    try {
+      /** Captures the rejected one-way result for precise wrapper/cause identity assertions. */
+      const failure = await client.sendOneWay('one-way-rejection-server', 'notify', 'failed').then(
+        () => undefined,
+        (error: unknown) => error
+      )
+      expect(failure).toMatchObject({ code: WebRpcErrorCode.transport })
+      expect((failure as { cause?: unknown }).cause).toBe(physicalFailure)
+      expect(readEndpointDebugSnapshot(client)?.pending).toBe(0)
+
+      rejectPhysicalSend = false
+      await expect(
+        client.sendOneWay('one-way-rejection-server', 'notify', 'delivered')
+      ).resolves.toBeUndefined()
+      await vi.waitFor(() => expect(deliveries).toEqual(['delivered']))
+      expect(readEndpointDebugSnapshot(client)?.pending).toBe(0)
+    } finally {
+      await Promise.all([client.dispose(), server.dispose()])
+    }
   })
 })

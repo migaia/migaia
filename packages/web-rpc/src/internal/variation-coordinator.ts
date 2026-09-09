@@ -1,4 +1,4 @@
-import type { IWebRpcVariation } from '../protocol-constants.js'
+import type { IWebRpcVariation } from '../semantic-constants.js'
 import { VariationAdmissionRegistry } from './variation-admission.js'
 
 /** Private handler port for one verified variation subkind. */
@@ -9,7 +9,10 @@ export class WebRpcVariationCoordinator {
   /** Shared replay/admission owner for all variation subkinds. */
   readonly #admission: VariationAdmissionRegistry
   /** Abort-before-request tombstones retained by the canonical variation owner. */
-  readonly #pendingAborts = new Map<string, number>()
+  readonly #pendingAborts = new Map<
+    string,
+    { readonly expiresAt: number; readonly reason: unknown }
+  >()
   /** Single-provider typed variation handlers. */
   readonly #handlers = new Map<IWebRpcVariation, IVariationHandler>()
 
@@ -54,24 +57,30 @@ export class WebRpcVariationCoordinator {
   }
 
   /** Aborts an active provider task or records a bounded early-abort tombstone. */
-  abort(key: string, controller: AbortController | undefined, expiresAt: number): boolean {
+  abort(
+    key: string,
+    controller: AbortController | undefined,
+    expiresAt: number,
+    reason: unknown
+  ): boolean {
     if (controller) {
-      controller.abort()
+      controller.abort(reason)
       return true
     }
     this.#purgeAborts()
     if (this.#pendingAborts.has(key)) return true
     if (this.#pendingAborts.size >= 4096) return false
-    this.#pendingAborts.set(key, expiresAt)
+    this.#pendingAborts.set(key, Object.freeze({ expiresAt, reason }))
     return true
   }
 
   /** Consumes one early-abort tombstone when provider execution creates its controller. */
-  consumeAbort(key: string): boolean {
+  consumeAbort(key: string): { readonly found: boolean; readonly reason: unknown } {
     this.#purgeAborts()
-    if (!this.#pendingAborts.has(key)) return false
+    const pending = this.#pendingAborts.get(key)
+    if (!pending) return Object.freeze({ found: false, reason: undefined })
     this.#pendingAborts.delete(key)
-    return true
+    return Object.freeze({ found: true, reason: pending.reason })
   }
 
   /** Clears replay/admission and handler state during endpoint disposal. */
@@ -84,7 +93,7 @@ export class WebRpcVariationCoordinator {
   /** Removes expired early-abort tombstones without touching handler ownership. */
   #purgeAborts(): void {
     const now = this.#now()
-    for (const [key, expiresAt] of this.#pendingAborts)
-      if (expiresAt <= now) this.#pendingAborts.delete(key)
+    for (const [key, pending] of this.#pendingAborts)
+      if (pending.expiresAt <= now) this.#pendingAborts.delete(key)
   }
 }

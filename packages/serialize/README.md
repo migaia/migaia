@@ -62,6 +62,20 @@ import {
 } from '@migaia/serialize';
 ```
 
+### Versioned identity codec
+
+```ts
+import { identityCodec } from '@migaia/serialize/codecs/identity/v1';
+import { identityCodecV1 } from '@migaia/serialize/codec';
+
+// The versioned entry is the modern name; the retained alias is the same object.
+const sameCodec = identityCodec === identityCodecV1;
+const literal: { readonly ok: true } = identityCodec.encode({ ok: true } as const);
+```
+
+`identityCodec` preserves the runtime value and its actual TypeScript type in both directions. The
+legacy `identityCodecV1` export remains available for existing callers.
+
 **`createSerializeRegistry` + `registry.encode`/`.decode`｜10 秒上手** —— 建一个只认 JSON 的注册表，编解码一个值：
 
 ```ts

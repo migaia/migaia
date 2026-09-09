@@ -1,0 +1,743 @@
+{
+  "schema": "RPCC-D18-f004-intended-cost-custody-v3",
+  "owner": "@migaia/web-rpc test/evidence custody",
+  "revision": "RPCC-SDD-v12",
+  "currentLineage": {
+    "proposal": "EVT-000655",
+    "challenge": "EVT-000649",
+    "resolution": "EVT-000656"
+  },
+  "historicalLineage": {
+    "proposal": "EVT-000603",
+    "challenge": "EVT-000597",
+    "resolution": "EVT-000604"
+  },
+  "canonicalInputs": {
+    "entry": "packages/web-rpc/test/fixtures/tree-shaking/root-entry.ts",
+    "builder": "packages/web-rpc/test/tree-shaking-canonical-build.mjs",
+    "sourceRoot": "packages/web-rpc/src",
+    "write": false,
+    "sourcemap": true,
+    "minify": false
+  },
+  "counterfactualRecipe": {
+    "legacySourceOverride": {
+      "successorHunkBase64": "ICBsZXQgc2VsZWN0ZWRNb2R1bGVzOiByZWFkb25seSBJV2ViUnBjRW5kcG9pbnRNb2R1bGVbXSA9IFtdCiAgbGV0IGRlZmluaXRpb25zOiBSZXR1cm5UeXBlPHR5cGVvZiBzbmFwc2hvd0VuZHBvaW50TW9kdWxlczxJV2ViUnBjQ29yZUNvbmZpZz4+CiAgdHJ5IHsKICAgIGNvbnN0IGZlYXR1cmVUb2tlbnMgPSBzbmFwc2hvd0ZlYXR1cmVUdXBsZShjb25maWcuZmVhdHVyZXMpCiAgICBzZWxlY3RlZE1vZHVsZXMgPSBbLi4ubW9kdWxlcywgLi4uZmVhdHVyZVRva2Vuc10KICAgIGRlZmluaXRpb25zID0gc25hcHNob3RFbmRwb2ludE1vZHVsZXM8SVdlYlJwY0NvcmVDb25maWc+KHNlbGVjdGVkTW9kdWxlcykK",
+      "predecessorHunkBase64": "ICBjb25zdCBmZWF0dXJlVG9rZW5zID0gc25hcHNob3RGZWF0dXJlVHVwbGUoY29uZmlnLmZlYXR1cmVzKQogIGNvbnN0IHNlbGVjdGVkTW9kdWxlcyA9IFsuLi5tb2R1bGVzLCAuLi5mZWF0dHVyZVRva2Vuc10KICBsZXQgZGVmaW5pdGlvbnM6IFJldHVyblR5cGU8dHlwZW9mIHNuYXBzaG90RW5kcG9pbnRNb2R1bGVzPElXZWJScGNDb3JlQ29uZmlnPj4KICB0cnkgewogICAgZGVmaW5pdGlvbnMgPSBzbmFwc2hvdEVuZHBvaW50TW9kdWxlczxJV2ViUnBjQ29yZUNvbmZpZz4oc2VsZWN0ZWRNb2R1bGVzKQo=",
+      "successorHunkSha256": "469d4e72245d1852a82bf100ff6a147a1e38be7f1b810ea829b5bbaaeca53179",
+      "predecessorHunkSha256": "8f4d181cca698f1748fa808f110282572eb78b09ab005836236dc91c0b3f3cb3"
+    },
+    "sourceOverrideExact": {
+      "successorHunkBase64": "ICBsZXQgc2VsZWN0ZWRNb2R1bGVzOiByZWFkb25seSBJV2ViUnBjRW5kcG9pbnRNb2R1bGVbXSA9IFtdCiAgbGV0IGRlZmluaXRpb25zOiBSZXR1cm5UeXBlPHR5cGVvZiBzbmFwc2hvd0VuZHBvaW50TW9kdWxlczxJV2ViUnBjQ29yZUNvbmZpZz4+CiAgdHJ5IHsKICAgIGNvbnN0IGZlYXR1cmVUb2tlbnMgPSBzbmFwc2hvd0ZlYXR1cmVUdXBsZShjb25maWcuZmVhdHVyZXMpCiAgICBzZWxlY3RlZE1vZHVsZXMgPSBbLi4ubW9kdWxlcywgLi4uZmVhdHVyZVRva2Vuc10KICAgIGRlZmluaXRpb25zID0gc25hcHNob3RFbmRwb2ludE1vZHVsZXM8SVdlYlJwY0NvcmVDb25maWc+KHNlbGVjdGVkTW9kdWxlcykK",
+      "predecessorHunkBase64": "ICBjb25zdCBmZWF0dXJlVG9rZW5zID0gc25hcHNob3RGZWF0dXJlVHVwbGUoY29uZmlnLmZlYXR1cmVzKQogIGNvbnN0IHNlbGVjdGVkTW9kdWxlcyA9IFsuLi5tb2R1bGVzLCAuLi5mZWF0dHVyZVRva2Vuc10KICBsZXQgZGVmaW5pdGlvbnM6IFJldHVyblR5cGU8dHlwZW9mIHNuYXBzaG90RW5kcG9pbnRNb2R1bGVzPElXZWJScGNDb3JlQ29uZmlnPj4KICB0cnkgewogICAgZGVmaW5pdGlvbnMgPSBzbmFwc2hvdEVuZHBvaW50TW9kdWxlczxJV2ViUnBjQ29yZUNvbmZpZz4oc2VsZWN0ZWRNb2R1bGVzKQo=",
+      "successorHunkSha256": "469d4e72245d1852a82bf100ff6a147a1e38be7f1b810ea829b5bbaaeca53179",
+      "predecessorHunkSha256": "8f4d181cca698f1748fa808f110282572eb78b09ab005836236dc91c0b3f3cb3"
+    },
+    "sourceOverrideCanonical": {
+      "target": "packages/web-rpc/src/core.ts",
+      "strategy": "derive the exact bounded predecessor hunk from the current source and replace it once",
+      "successorHunkSha256": "469d4e72245d1852a82bf100ff6a147a1e38be7f1b810ea829b5bbaaeca53179",
+      "predecessorHunkSha256": "8f4d181cca698f1748fa808f110282572eb78b09ab005836236dc91c0b3f3cb3",
+      "predecessorSha256": "b0303f548c2eba49c9e17da35132a9f0c2ff564c82bcfb49a670e1f474d6279e"
+    },
+    "strategy": "replace exact core source with repository-persistent predecessor bytes",
+    "target": "packages/web-rpc/src/core.ts",
+    "successorSha256": "5bca38486740d31ef8693d5d6fcf35826527527d0a9c9014aa97f76cf3d3972b",
+    "predecessorSha256": "b0303f548c2eba49c9e17da35132a9f0c2ff564c82bcfb49a670e1f474d6279e",
+    "successorHunkBase64": "ICBsZXQgc2VsZWN0ZWRNb2R1bGVzOiByZWFkb25seSBJV2ViUnBjRW5kcG9pbnRNb2R1bGVbXSA9IFtdCiAgbGV0IGRlZmluaXRpb25zOiBSZXR1cm5UeXBlPHR5cGVvZiBzbmFwc2hvd0VuZHBvaW50TW9kdWxlczxJV2ViUnBjQ29yZUNvbmZpZz4+CiAgdHJ5IHsKICAgIGNvbnN0IGZlYXR1cmVUb2tlbnMgPSBzbmFwc2hvd0ZlYXR1cmVUdXBsZShjb25maWcuZmVhdHVyZXMpCiAgICBzZWxlY3RlZE1vZHVsZXMgPSBbLi4ubW9kdWxlcywgLi4uZmVhdHVyZVRva2Vuc10KICAgIGRlZmluaXRpb25zID0gc25hcHNob3RFbmRwb2ludE1vZHVsZXM8SVdlYlJwY0NvcmVDb25maWc+KHNlbGVjdGVkTW9kdWxlcykK",
+    "successorHunkSha256": "469d4e72245d1852a82bf100ff6a147a1e38be7f1b810ea829b5bbaaeca53179",
+    "predecessorHunkBase64": "ICBjb25zdCBmZWF0dXJlVG9rZW5zID0gc25hcHNob3RGZWF0dXJlVHVwbGUoY29uZmlnLmZlYXR1cmVzKQogIGNvbnN0IHNlbGVjdGVkTW9kdWxlcyA9IFsuLi5tb2R1bGVzLCAuLi5mZWF0dXJlVG9rZW5zXQogIGxldCBkZWZpbml0aW9uczogUmV0dXJuVHlwZTx0eXBlb2Ygc25hcHNob3RFbmRwb2ludE1vZHVsZXM8SVdlYlJwY0NvcmVDb25maWc+PgogIHRyeSB7CiAgICBkZWZpbml0aW9ucyA9IHNuYXBzaG90RW5kcG9pbnRNb2R1bGVzPElXZWJScGNDb3JlQ29uZmlnPihzZWxlY3RlZE1vZHVsZXMpCg==",
+    "predecessorHunkSha256": "8f4d181cca698f1748fa808f110282572eb78b09ab005836236dc91c0b3f3cb3",
+    "predecessorSourceBase64": "aW1wb3J0IHsKICBXZWJScGNDb25zdHJ1Y3Rpb25FcnJvciwKICBXZWJScGNFcnJvciwKICBXZWJScGNFcnJvckNvZGUsCiAgdHlwZSBJV2ViUnBjQ2xlYW51cEVycm9yCn0gZnJvbSAnLi9lcnJvcnMuanMnCmltcG9ydCB7IFdlYlJwY0Vycm9yVGV4dCB9IGZyb20gJy4vZXJyb3ItdGV4dC5qcycKaW1wb3J0IHsKICBlbmRwb2ludE1vZHVsZUR1cGxpY2F0ZSwKICBnZXRFbmRwb2ludE1vZHVsZVJvb3RQcm9qZWN0aW9uLAogIHNuYXBzaG90RW5kcG9pbnRNb2R1bGVzCn0gZnJvbSAnLi9pbnRlcm5hbC9lbmRwb2ludC1tb2R1bGVzLmpzJwppbXBvcnQgewogIGFzc2VydFBsdWdpbkNsYWltUGFyaXR5LAogIHByZWZsaWdodFBsdWdpbkNsYWltcywKICB0b1BsdWdpbkhvc3REZWZpbml0aW9uLAogIHR5cGUgSVdlYlJwY1RyYW5zbGF0ZWRQbHVnaW4KfSBmcm9tICcuL2ludGVybmFsL3BsdWdpbi10cmFuc2xhdG9yLmpzJwppbXBvcnQgewogIGJ1aWxkQ29tcG9zZWRQbHVnaW5JbnZlbnRvcnksCiAgdHlwZSBJV2ViUnBjQ29tcG9zZWRSdW50aW1lU3RhdGUKfSBmcm9tICcuL2ludGVybmFsL3BsdWdpbi1pbnZlbnRvcnkuanMnCmltcG9ydCB7IGNyZWF0ZUNvbnN0cnVjdGlvbkNvbnRyb2wgfSBmcm9tICcuL2ludGVybmFsL2NvbnN0cnVjdGlvbi1pbnN0YWxsLmpzJwppbXBvcnQgeyBXZWJScGNQbHVnaW5Ib3N0IH0gZnJvbSAnLi9pbnRlcm5hbC93ZWItcnBjLXBsdWdpbi1ob3N0LmpzJwppbXBvcnQgewogIHR5cGUgSURlZmVycmVkUHJlcGFyZWRFbmRwb2ludCwKICB0eXBlIElQcmVwYXJlZEVuZHBvaW50LAogIHByZXBhcmVFbmRwb2ludAp9IGZyb20gJy4vaW50ZXJuYWwvZW5kcG9pbnQtYm9vdHN0cmFwLmpzJwppbXBvcnQgewogIGNyZWF0ZUVuZHBvaW50S2VybmVsLAogIEVuZHBvaW50S2VybmVsU3RhdGUsCiAgdHlwZSBJRW5kcG9pbnRLZXJuZWxIb3N0Cn0gZnJvbSAnLi9lbmRwb2ludC1rZXJuZWwuanMnCmltcG9ydCB7CiAgZ2V0RW5kcG9pbnREZWJ1Z1NuYXBzaG90UmVhZGVyLAogIHJlYWREaXNjb3ZlcnlDbGVhbnVwRmF1bHRzLAogIHJlZ2lzdGVyRGlzY292ZXJ5Q2xlYW51cEZhdWx0cywKICByZWdpc3RlckVuZHBvaW50RGVidWdTbmFwc2hvdCwKICByZWdpc3RlckVuZHBvaW50VGltZVBvcnRPd25lcgp9IGZyb20gJy4vaW50ZXJuYWwvdGVzdC1vYnNlcnZlci5qcycKaW1wb3J0IHsgY3JlYXRlRW5kcG9pbnRQcm9qZWN0aW9uIH0gZnJvbSAnLi9pbnRlcm5hbC9lbmRwb2ludC1wcm9qZWN0aW9uLmpzJwppbXBvcnQgdHlwZSB7CiAgSUZhY3RvcnlQaW5nQ2FwYWJpbGl0eSwKICBJV2ViUnBjRW5kcG9pbnQsCiAgSVdlYlJwY0ZhY3RvcnlDb25maWcsCiAgSVdlYlJwY1BsdWdpbiwKICBJV2ViUnBjUHJvdmlkZXIsCiAgSVdlYlJwY1BpbmdFbmRwb2ludFN1cmZhY2UsCiAgSVdlYlJwY0Fib3J0U2lnbmFsLAogIElXZWJScGNIb29rRXZlbnQKfSBmcm9tICcuL3R5cGluZy5qcycKCi8qKiBSdW50aW1lLW5ldXRyYWwgY29uZmlndXJhdGlvbiBhY2NlcHRlZCBieSB0aGUgY29tcG9zaXRpb24ga2VybmVsLiAqLwpleHBvcnQgdHlwZSBJV2ViUnBjQ29yZUNvbmZpZyA9IElXZWJScGNGYWN0b3J5Q29uZmlnCgovKiogT3BhcXVlIGZpcnN0LXBhcnR5IHRva2VuIHVzZWQgdG8gc2VsZWN0IHN0YXRpY2FsbHkgaW1wb3J0ZWQgZmVhdHVyZSBtb2R1bGVzLiAqLwpkZWNsYXJlIGNvbnN0IGVuZHBvaW50TW9kdWxlQnJhbmQ6IHVuaXF1ZSBzeW1ib2wKZGVjbGFyZSBjb25zdCBlbmRwb2ludE1vZHVsZVJvb3RCcmFuZDogdW5pcXVlIHN5bWJvbAoKLyoqIE5vbi1jb25zdHJ1Y3RpYmxlIHB1YmxpYyBicmFuZCBmb3IgcGFja2FnZS1vd25lZCBmZWF0dXJlIHRva2Vucy4gKi8KZXhwb3J0IHR5cGUgSVdlYlJwY0VuZHBvaW50TW9kdWxlPAogIFRTdXJmYWNlIGV4dGVuZHMgb2JqZWN0ID0gb2JqZWN0LAogIFRSb290U3VyZmFjZSBleHRlbmRzIG9iamVjdCA9IFRTdXJmYWNlCj4gPSB7CiAgcmVhZG9ubHkga2V5OiBzdHJpbmcKICByZWFkb25seSBbZW5kcG9pbnRNb2R1bGVCcmFuZF06IFRTdXJmYWNlCiAgcmVhZG9ubHkgW2VuZHBvaW50TW9kdWxlUm9vdEJyYW5kXTogVFJvb3RTdXJmYWNlCn0KCi8qKiBDb21wb3NlcyBzZWxlY3RlZCBmaXJzdC1wYXJ0eSBtb2R1bGVzIHdoaWxlIHByZXNlcnZpbmcgZXhpc3RpbmcgZW5kcG9pbnQgb3duZXJzaGlwLiAqLwpleHBvcnQgYXN5bmMgZnVuY3Rpb24gY3JlYXRlQ29tcG9zZWRFbmRwb2ludDwKICBjb25zdCBUTW9kdWxlcyBleHRlbmRzIHJlYWRvbmx5IElXZWJScGNFbmRwb2ludE1vZHVsZVtdLAogIFRUYXJnZXRJZCBleHRlbmRzIHN0cmluZyA9IHN0cmluZywKICBUTWlkZGxld2FyZXMgZXh0ZW5kcyByZWFkb25seSBJV2ViUnBjUGx1Z2luW10gPSByZWFkb25seSBJV2ViUnBjUGx1Z2luW10KPigKICBjb25maWc6IElXZWJScGNGYWN0b3J5Q29uZmlnPFRUYXJnZXRJZCwgVE1pZGRsZXdhcmVzPiwKICBtb2R1bGVzOiBUTW9kdWxlcwopOiBQcm9taXNlPAogIElXZWJScGNLZXJuZWxTdXJmYWNlICYKICAgIElXZWJScGNDb21wb3NlZE1vZHVsZVN1cmZhY2U8VE1vZHVsZXM+ICYKICAgIElXZWJScGNQaW5nRW5kcG9pbnRTdXJmYWNlPElGYWN0b3J5UGluZ0NhcGFiaWxpdHk8VE1pZGRsZXdhcmVzPj4KPiB7CiAgbGV0IGRlZmluaXRpb25zOiBSZXR1cm5UeXBlPHR5cGVvZiBzbmFwc2hvdEVuZHBvaW50TW9kdWxlczxJV2ViUnBjQ29yZUNvbmZpZz4+CiAgdHJ5IHsKICAgIGRlZmluaXRpb25zID0gc25hcHNob3RFbmRwb2ludE1vZHVsZXM8SVdlYlJwY0NvcmVDb25maWc+KG1vZHVsZXMpCiAgICBpZiAoZGVmaW5pdGlvbnMubGVuZ3RoID09PSAwKQogICAgICB0aHJvdyBuZXcgV2ViUnBjRXJyb3IoV2ViUnBjRXJyb3JDb2RlLmludmFsaWRDb25maWcsIFdlYlJwY0Vycm9yVGV4dC5lbmRwb2ludE1vZHVsZUludmFsaWQpCiAgfSBjYXRjaCAoZXJyb3IpIHsKICAgIGlmIChlcnJvciA9PT0gZW5kcG9pbnRNb2R1bGVEdXBsaWNhdGUpCiAgICAgIHRocm93IG5ldyBXZWJScGNFcnJvcigKICAgICAgICBXZWJScGNFcnJvckNvZGUuY2FwYWJpbGl0eUNvbmZsaWN0LAogICAgICAgIFdlYlJwY0Vycm9yVGV4dC5lbmRwb2ludE1vZHVsZUR1cGxpY2F0ZWQsCiAgICAgICAgZXJyb3IKICAgICAgKQogICAgaWYgKGVycm9yIGluc3RhbmNlb2YgV2ViUnBjRXJyb3IpIHRocm93IGVycm9yCiAgICB0aHJvdyBuZXcgV2ViUnBjRXJyb3IoCiAgICAgIFdlYlJwY0Vycm9yQ29kZS5pbnZhbGlkQ29uZmlnLAogICAgICBXZWJScGNFcnJvclRleHQuZW5kcG9pbnRNb2R1bGVJbnZhbGlkLAogICAgICBlcnJvcgogICAgKQogIH0KICBjb25zdCBkZWZlcnJlZCA9IChhd2FpdCBwcmVwYXJlRW5kcG9pbnQoY29uZmlnLCB7CiAgICBkZWZlck1pZGRsZXdhcmVJbnN0YWxsOiB0cnVlCiAgfSkpIGFzIElEZWZlcnJlZFByZXBhcmVkRW5kcG9pbnQ8VFRhcmdldElkPgogIGxldCBrZXJuZWw6IElFbmRwb2ludEtlcm5lbEhvc3QgfCB1bmRlZmluZWQKICBsZXQgaG9zdDogV2ViUnBjUGx1Z2luSG9zdCB8IHVuZGVmaW5lZAogIGxldCBob3N0VmlldzogaW1wb3J0KCdAbWlnYWlhL3BsdWdpbi1ob3N0JykuSVBsdWdpbkhvc3RWaWV3PFdlYlJwY1BsdWdpbkhvc3Q+IHwgdW5kZWZpbmVkCiAgbGV0IGNvbnN0cnVjdGlvbjogUmV0dXJuVHlwZTx0eXBlb2YgY3JlYXRlQ29uc3RydWN0aW9uQ29udHJvbD4gfCB1bmRlZmluZWQKICBsZXQgcHJlcGFyZWQ6IElQcmVwYXJlZEVuZHBvaW50PFRUYXJnZXRJZD4gfCB1bmRlZmluZWQKICBsZXQgaW5zdGFsbGVkOiB1bmtub3duW10gPSBbXQogIGxldCByb290Q2xlYW51cEVycm9yczogSVdlYlJwY0NsZWFudXBFcnJvcltdID0gW10KICBsZXQgcHVibGljS2V5czogcmVhZG9ubHkgc3RyaW5nW10gPSBbXQogIHRyeSB7CiAgICBrZXJuZWwgPSBjcmVhdGVFbmRwb2ludEtlcm5lbChkZWZlcnJlZC50cmFuc3BvcnQpCiAgICBjb25zdCBjb25zdHJ1Y3Rpb25Db25maWcgPSBkZWZlcnJlZC5jb25zdHJ1Y3Rpb24KICAgIGNvbnN0IGNvbnN0cnVjdGlvblNpZ25hbCA9CiAgICAgIGNvbnN0cnVjdGlvbkNvbmZpZz8uc2lnbmFsID8/IChuZXcgQWJvcnRDb250cm9sbGVyKCkuc2lnbmFsIGFzIElXZWJScGNBYm9ydFNpZ25hbCkKICAgIGNvbnN0cnVjdGlvbiA9IGNyZWF0ZUNvbnN0cnVjdGlvbkNvbnRyb2woewogICAgICBzaWduYWw6IGNvbnN0cnVjdGlvblNpZ25hbCwKICAgICAgdGltZW91dE1zOiBjb25zdHJ1Y3Rpb25Db25maWc/LnRpbWVvdXRNcwogICAgfSkKICAgIGNvbnN0IGhvb2tFdmVudHM6IElXZWJScGNIb29rRXZlbnRbXSA9IFtdCiAgICBob3N0ID0gbmV3IFdlYlJwY1BsdWdpbkhvc3QoCiAgICAgIGRlZmVycmVkLmlkLAogICAgICBkZWZlcnJlZC50cmFuc3BvcnQsCiAgICAgIGNvbnN0cnVjdGlvbiwKICAgICAgKGV2ZW50KSA9PiBob29rRXZlbnRzLnB1c2goZXZlbnQpLAogICAgICB7CiAgICAgICAgZXhlY3V0aW9uOiB7CiAgICAgICAgICBtdXRhdGlvblRpbWVvdXRNczogY29uc3RydWN0aW9uQ29uZmlnPy50aW1lb3V0TXMgPz8gZmFsc2UsCiAgICAgICAgICBwaXBlbGluZURyYWluVGltZW91dE1zOiBjb25zdHJ1Y3Rpb25Db25maWc/LnRpbWVvdXRNcyA/PyBmYWxzZQogICAgICAgIH0KICAgICAgfSwKICAgICAgKCkgPT4gcm9vdENsZWFudXBFcnJvcnMKICAgICkKICAgIGxldCBhY3RpdmF0aW9uQ29tbWl0dGVkID0gZmFsc2UKICAgIGxldCB0cmFuc2xhdGVkRmVhdHVyZXM6IElXZWJScGNUcmFuc2xhdGVkUGx1Z2luW10gPSBbXQogICAgbGV0IGFjdGl2YXRpb25QcmVmbGlnaHQ6CiAgICAgIHwgKCgKICAgICAgICAgIHN0YXRlOiBJV2ViUnBjQ29tcG9zZWRSdW50aW1lU3RhdGUsCiAgICAgICAgICBob3N0OiB7IHJlYWRvbmx5IGdldFNoYXJlZDogKGtleTogUHJvcGVydHlLZXkpID0+IHVua25vd24gfQogICAgICAgICkgPT4gdm9pZCkKICAgICAgfCB1bmRlZmluZWQKICAgIGNvbnN0IGludmVudG9yeSA9IGJ1aWxkQ29tcG9zZWRQbHVnaW5JbnZlbnRvcnkoewogICAgICBkZWZpbml0aW9ucywKICAgICAgY29uZmlnLAogICAgICBrZXJuZWwsCiAgICAgIGRlZmVycmVkOiBkZWZlcnJlZCBhcyB1bmtub3duIGFzIElEZWZlcnJlZFByZXBhcmVkRW5kcG9pbnQ8c3RyaW5nPiwKICAgICAgbWlkZGxld2FyZVNuYXBzaG90czogZGVmZXJyZWQubWlkZGxld2FyZVNuYXBzaG90cywKICAgICAgaG9va0V2ZW50cywKICAgICAgb25QcmVwYXJlZDogKHZhbHVlKSA9PiB7CiAgICAgICAgcHJlcGFyZWQgPSB2YWx1ZSBhcyBJUHJlcGFyZWRFbmRwb2ludDxUVGFyZ2V0SWQ+CiAgICAgIH0sCiAgICAgIGdldFByZXBhcmVkOiAoKSA9PiB7CiAgICAgICAgaWYgKCFwcmVwYXJlZCkKICAgICAgICAgIHRocm93IG5ldyBXZWJScGNFcnJvcigKICAgICAgICAgICAgV2ViUnBjRXJyb3JDb2RlLmludmFsaWRDb25maWcsCiAgICAgICAgICAgIFdlYlJwY0Vycm9yVGV4dC5lbmRwb2ludE1vZHVsZUludmFsaWQKICAgICAgICAgICkKICAgICAgICByZXR1cm4gcHJlcGFyZWQgYXMgSVByZXBhcmVkRW5kcG9pbnQ8c3RyaW5nPgogICAgICB9LAogICAgICBnZXRGZWF0dXJlSW5zdGFsbGF0aW9uczogKCkgPT4gdHJhbnNsYXRlZEZlYXR1cmVzLAogICAgICBvbkFjdGl2YXRpb25Db21taXR0ZWQ6ICgpID0+IHsKICAgICAgICBhY3RpdmF0aW9uQ29tbWl0dGVkID0gdHJ1ZQogICAgICB9LAogICAgICBvbkFjdGl2YXRpb25Sb2xsZWRCYWNrOiAoKSA9PiB7CiAgICAgICAgYWN0aXZhdGlvbkNvbW1pdHRlZCA9IGZhbHNlCiAgICAgIH0sCiAgICAgIG9uUm9vdERpc3Bvc2FsRXJyb3JzOiAoZXJyb3JzKSA9PiB7CiAgICAgICAgcm9vdENsZWFudXBFcnJvcnMgPSBbLi4ucm9vdENsZWFudXBFcnJvcnMsIC4uLmVycm9yc10KICAgICAgfSwKICAgICAgb25BY3RpdmF0aW9uUHJlZmxpZ2h0OiAoc3RhdGUsIGdldFNoYXJlZCkgPT4gYWN0aXZhdGlvblByZWZsaWdodD8uKHN0YXRlLCB7IGdldFNoYXJlZCB9KQogICAgfSkKICAgIGNvbnN0IGRlc2NyaXB0b3JzID0gaW52ZW50b3J5Lm1hcCgoeyBkZXNjcmlwdG9yIH0pID0+IGRlc2NyaXB0b3IpCiAgICBwdWJsaWNLZXlzID0gWy4uLm5ldyBTZXQoZGVzY3JpcHRvcnMuZmxhdE1hcCgoZGVzY3JpcHRvcikgPT4gZGVzY3JpcHRvci5jbGFpbXMucHVibGljS2V5cykpXQogICAgY29uc3QgY2xhaW1zID0gZGVzY3JpcHRvcnMubWFwKChkZXNjcmlwdG9yKSA9PiBkZXNjcmlwdG9yLmNsYWltcykKICAgIGNvbnN0IHRyYW5zbGF0ZWQgPSBkZXNjcmlwdG9ycy5tYXAoKGRlc2NyaXB0b3IsIGluZGV4KSA9PgogICAgICB0b1BsdWdpbkhvc3REZWZpbml0aW9uKGRlc2NyaXB0b3IsIGNsYWltc1tpbmRleF0hKQogICAgKSBhcyBJV2ViUnBjVHJhbnNsYXRlZFBsdWdpbltdCiAgICB0cmFuc2xhdGVkRmVhdHVyZXMgPSB0cmFuc2xhdGVkLmZpbHRlcigKICAgICAgKF9pdGVtLCBpbmRleCkgPT4gaW52ZW50b3J5W2luZGV4XT8ucm9sZS5raW5kID09PSAnZmVhdHVyZScKICAgICkKICAgIHByZWZsaWdodFBsdWdpbkNsYWltcyhkZXNjcmlwdG9ycywgY2xhaW1zKQogICAgY29uc3QgYWN0aXZhdGlvbkhvc3QgPSBob3N0CiAgICBjb25zdCBhY3RpdmF0aW9uS2VybmVsID0ga2VybmVsCiAgICBpZiAoIWFjdGl2YXRpb25Ib3N0IHx8ICFhY3RpdmF0aW9uS2VybmVsKQogICAgICB0aHJvdyBuZXcgV2ViUnBjRXJyb3IoV2ViUnBjRXJyb3JDb2RlLmludmFsaWRDb25maWcsIFdlYlJwY0Vycm9yVGV4dC5lbmRwb2ludE1vZHVsZUludmFsaWQpCiAgICBhY3RpdmF0aW9uUHJlZmxpZ2h0ID0gKHN0YXRlLCBjYW5kaWRhdGVIb3N0KSA9PgogICAgICBhc3NlcnRQbHVnaW5DbGFpbVBhcml0eShjbGFpbXMsIGRlc2NyaXB0b3JzLCBjYW5kaWRhdGVIb3N0LCBhY3RpdmF0aW9uS2VybmVsLCB7CiAgICAgICAgYWN0aXZhdGVkOiBzdGF0ZS5hY3RpdmF0ZWQsCiAgICAgICAgYWN0aXZhdGlvblBoYXNlOiAncHJlLWFjdGl2YXRpb24nLAogICAgICAgIHJvdXRlS2V5czogc3RhdGUucm91dGVLZXlzLAogICAgICAgIHRyYW5zbGF0ZWQKICAgICAgfSkKICAgIGhvc3RWaWV3ID0gYXdhaXQgaG9zdC5pbnN0YWxsQmF0Y2godHJhbnNsYXRlZC5tYXAoKGl0ZW0pID0+IGl0ZW0uZGVmaW5pdGlvbikpCiAgICBhc3NlcnRQbHVnaW5DbGFpbVBhcml0eShjbGFpbXMsIGRlc2NyaXB0b3JzLCBob3N0Vmlldywga2VybmVsLCB7CiAgICAgIGFjdGl2YXRlZDogYWN0aXZhdGlvbkNvbW1pdHRlZCwKICAgICAgdHJhbnNsYXRlZAogICAgfSkKICAgIGluc3RhbGxlZCA9IHRyYW5zbGF0ZWRGZWF0dXJlcy5tYXAoKGl0ZW0pID0+IGl0ZW0uZ2V0SW5zdGFsbGF0aW9uKCkpCiAgICBpZiAoaW5zdGFsbGVkLnNvbWUoKGluc3RhbGxhdGlvbikgPT4gaW5zdGFsbGF0aW9uID09PSB1bmRlZmluZWQpKQogICAgICB0aHJvdyBuZXcgV2ViUnBjRXJyb3IoV2ViUnBjRXJyb3JDb2RlLmludmFsaWRDb25maWcsIFdlYlJwY0Vycm9yVGV4dC5lbmRwb2ludE1vZHVsZUludmFsaWQpCiAgfSBjYXRjaCAocHJpbWFyeSkgewogICAgaWYgKGhvc3QpIHsKICAgICAgdHJ5IHsKICAgICAgICBhd2FpdCBob3N0LmRpc3Bvc2UoKQogICAgICB9IGNhdGNoIChlcnJvcikgewogICAgICAgIHRocm93IG5ldyBXZWJScGNDb25zdHJ1Y3Rpb25FcnJvcihXZWJScGNFcnJvclRleHQuZW5kcG9pbnRNb2R1bGVJbnZhbGlkLCBwcmltYXJ5LCBbCiAgICAgICAgICB7IHJlc291cmNlOiAncGx1Z2luLWhvc3QnLCBlcnJvciB9CiAgICAgICAgXSkKICAgICAgfQogICAgICBjb25zdCBob3N0RmFpbHVyZSA9IHByaW1hcnkgYXMgewogICAgICAgIHJlYWRvbmx5IGNvZGU/OiB1bmtub3duCiAgICAgICAgcmVhZG9ubHkgY2F1c2U/OiB1bmtub3duCiAgICAgICAgcmVhZG9ubHkgZGV0YWlsPzogeyByZWFkb25seSByb2xsYmFja0Vycm9ycz86IHJlYWRvbmx5IHVua25vd25bXSB9CiAgICAgIH0KICAgICAgaWYgKGhvc3RGYWlsdXJlLmNvZGUgPT09ICdQTFVHSU5fSU5TVEFMTF9GQUlMRUQnKSB7CiAgICAgICAgY29uc3QgY2F1c2UgPSBob3N0RmFpbHVyZS5jYXVzZSA/PyBwcmltYXJ5CiAgICAgICAgY29uc3Qgcm9sbGJhY2tFcnJvcnMgPSAoaG9zdEZhaWx1cmUuZGV0YWlsPy5yb2xsYmFja0Vycm9ycyA/PyBbXSkuZmxhdE1hcCgoZXJyb3IpID0+CiAgICAgICAgICBlcnJvciBpbnN0YW5jZW9mIEFnZ3JlZ2F0ZUVycm9yID8gWy4uLmVycm9yLmVycm9yc10gOiBbZXJyb3JdCiAgICAgICAgKQogICAgICAgIGlmIChyb2xsYmFja0Vycm9ycy5sZW5ndGggPiAwKQogICAgICAgICAgdGhyb3cgbmV3IFdlYlJwY0NvbnN0cnVjdGlvbkVycm9yKAogICAgICAgICAgICBXZWJScGNFcnJvclRleHQuZW5kcG9pbnRNb2R1bGVJbnZhbGlkLAogICAgICAgICAgICBjYXVzZSwKICAgICAgICAgICAgcm9sbGJhY2tFcnJvcnMubWFwKChlcnJvciwgaW5kZXgpID0+ICh7CiAgICAgICAgICAgICAgcmVzb3VyY2U6IGBlbmRwb2ludC1tb2R1bGUtJHtpbmRleH1gLAogICAgICAgICAgICAgIGVycm9yCiAgICAgICAgICAgIH0pKQogICAgICAgICAgKQogICAgICAgIHRocm93IGNhdXNlCiAgICAgIH0KICAgIH0gZWxzZSBpZiAoa2VybmVsKSB7CiAgICAgIGNvbnN0cnVjdGlvbj8uY2xvc2UoKQogICAgICBpZiAoa2VybmVsLnN0YXRlICE9PSBFbmRwb2ludEtlcm5lbFN0YXRlLmRpc3Bvc2VkKQogICAgICAgIHRyeSB7CiAgICAgICAgICBrZXJuZWwuYmVnaW5DbG9zZSgpCiAgICAgICAgICBhd2FpdCBrZXJuZWwucmVzb3VyY2VzLnJlbGVhc2VBbGwoKQogICAgICAgICAga2VybmVsLmNvbXBsZXRlRGlzcG9zZSgpCiAgICAgICAgfSBjYXRjaCAoZXJyb3IpIHsKICAgICAgICAgIHRocm93IG5ldyBXZWJScGNDb25zdHJ1Y3Rpb25FcnJvcihXZWJScGNFcnJvclRleHQuZW5kcG9pbnRNb2R1bGVJbnZhbGlkLCBwcmltYXJ5LCBbCiAgICAgICAgICAgIHsgcmVzb3VyY2U6ICdlbmRwb2ludC1rZXJuZWwnLCBlcnJvciB9CiAgICAgICAgICBdKQogICAgICAgIH0KICAgIH0gZWxzZSB7CiAgICAgIGNvbnN0IGNsZWFudXBFcnJvcnM6IHsgcmVzb3VyY2U6IHN0cmluZzsgZXJyb3I6IHVua25vd24gfVtdID0gW10KICAgICAgaWYgKGRlZmVycmVkLnRyYW5zcG9ydC5vd25lcnNoaXAgIT09ICdib3Jyb3dlZCcpCiAgICAgICAgdHJ5IHsKICAgICAgICAgIGF3YWl0IGRlZmVycmVkLnRyYW5zcG9ydC5jbG9zZT8uKCkKICAgICAgICB9IGNhdGNoIChlcnJvcikgewogICAgICAgICAgY2xlYW51cEVycm9ycy5wdXNoKHsgcmVzb3VyY2U6ICd0cmFuc3BvcnQnLCBlcnJvciB9KQogICAgICAgIH0KICAgICAgaWYgKGNsZWFudXBFcnJvcnMubGVuZ3RoID4gMCkKICAgICAgICB0aHJvdyBuZXcgV2ViUnBjQ29uc3RydWN0aW9uRXJyb3IoCiAgICAgICAgICBXZWJScGNFcnJvclRleHQuZW5kcG9pbnRNb2R1bGVJbnZhbGlkLAogICAgICAgICAgcHJpbWFyeSwKICAgICAgICAgIGNsZWFudXBFcnJvcnMKICAgICAgICApCiAgICB9CiAgICB0aHJvdyBwcmltYXJ5CiAgfQogIC8qKiBQcm9qZWN0IG9ubHkgc2VsZWN0ZWQgcm9vdCB0b2tlbnM7IGRlcGVuZGVuY2llcyBpbnN0YWxsIHByaXZhdGVseSBhbmQgbmV2ZXIgd2lkZW4gdGhlIHJvb3QuICovCiAgY29uc3QgZXhwb3NlZEtleXMgPSBbCiAgICAuLi5uZXcgU2V0PHN0cmluZz4obW9kdWxlcy5mbGF0TWFwKChtb2R1bGUpID0+IGdldEVuZHBvaW50TW9kdWxlUm9vdFByb2plY3Rpb24obW9kdWxlKSkpCiAgXQogIGNvbnN0IHNuYXBzaG90UmVhZGVyID0gaW5zdGFsbGVkCiAgICAudG9SZXZlcnNlZCgpCiAgICAubWFwKCh2YWx1ZSkgPT4gZ2V0RW5kcG9pbnREZWJ1Z1NuYXBzaG90UmVhZGVyKHZhbHVlIGFzIG9iamVjdCkpCiAgICAuZmluZCgocmVhZGVyKTogcmVhZGVyIGlzIE5vbk51bGxhYmxlPHR5cGVvZiByZWFkZXI+ID0+IHJlYWRlciAhPT0gdW5kZWZpbmVkKQogIGNvbnN0IGhvb2tPd25lciA9IGluc3RhbGxlZC5maW5kKAogICAgKHZhbHVlKSA9PiB0eXBlb2YgKHZhbHVlIGFzIHsgaG9va3M/OiB1bmtub3duIH0pLmhvb2tzID09PSAnb2JqZWN0JwogICkgYXMgeyBob29rcz86IElXZWJScGNLZXJuZWxTdXJmYWNlWydob29rcyddIH0gfCB1bmRlZmluZWQKICBjb25zdCBvbk93bmVyID0gaW5zdGFsbGVkLmZpbmRMYXN0KAogICAgKHZhbHVlKSA9PiB0eXBlb2YgKHZhbHVlIGFzIHsgb24/OiB1bmtub3duIH0pLm9uID09PSAnZnVuY3Rpb24nCiAgKSBhcyB7IG9uOiBJV2ViUnBjRW5kcG9pbnRbJ29uJ10gfSB8IHVuZGVmaW5lZAogIGxldCBwdWJsaWNTdXJmYWNlOiBvYmplY3QKICBsZXQgZW5kcG9pbnRIb3N0RGlzcG9zZTogUHJvbWlzZTx2b2lkPiB8IHVuZGVmaW5lZAogIHRyeSB7CiAgICBwdWJsaWNTdXJmYWNlID0gY3JlYXRlRW5kcG9pbnRQcm9qZWN0aW9uKHsKICAgICAgaG9zdDogaG9zdFZpZXc/LmV4dGVuc2lvbnMgPz8gaG9zdCEsCiAgICAgIHB1YmxpY0tleXMsCiAgICAgIGV4cG9zZWRLZXlzLAogICAgICBvbjogKC4uLmFyZ3MpID0+IHsKICAgICAgICBpZiAoIW9uT3duZXIpCiAgICAgICAgICB0aHJvdyBuZXcgV2ViUnBjRXJyb3IoCiAgICAgICAgICAgIFdlYlJwY0Vycm9yQ29kZS5pbnZhbGlkQ29uZmlnLAogICAgICAgICAgICBXZWJScGNFcnJvclRleHQuZW5kcG9pbnRNb2R1bGVJbnZhbGlkCiAgICAgICAgICApCiAgICAgICAgcmV0dXJuIG9uT3duZXIub24oYXJnc1swXSBhcyBzdHJpbmcsIGFyZ3NbMV0gYXMgUGFyYW1ldGVyczxJV2ViUnBjRW5kcG9pbnRbJ29uJ10+WzFdKQogICAgICB9LAogICAgICBob29rczogaG9va093bmVyPy5ob29rcywKICAgICAgaG9zdERpc3Bvc2U6ICgpID0+IChlbmRwb2ludEhvc3REaXNwb3NlID8/PSBob3N0IS5kaXNwb3NlKCkudGhlbigoKSA9PiB1bmRlZmluZWQpKSwKICAgICAgYmVmb3JlRGlzcG9zZTogKGVuZHBvaW50KSA9PiB7CiAgICAgICAgY29uc3QgY2xlYW51cEZhdWx0cyA9IHJlYWREaXNjb3ZlcnlDbGVhbnVwRmF1bHRzKGVuZHBvaW50KQogICAgICAgIGlmICghY2xlYW51cEZhdWx0cykgcmV0dXJuCiAgICAgICAgZm9yIChjb25zdCB2YWx1ZSBvZiBpbnN0YWxsZWQpIHsKICAgICAgICAgIGlmICh0eXBlb2YgdmFsdWUgPT09ICdvYmplY3QnICYmIHZhbHVlICE9PSBudWxsKQogICAgICAgICAgICByZWdpc3RlckRpc2NvdmVyeUNsZWFudXBGYXVsdHModmFsdWUsIGNsZWFudXBGYXVsdHMpCiAgICAgICAgfQogICAgICB9CiAgICB9KQogIH0gY2F0Y2ggKHByaW1hcnkpIHsKICAgIHRyeSB7CiAgICAgIGF3YWl0IGhvc3QhLmRpc3Bvc2UoKQogICAgfSBjYXRjaCAoZXJyb3IpIHsKICAgICAgdGhyb3cgbmV3IFdlYlJwY0NvbnN0cnVjdGlvbkVycm9yKFdlYlJwY0Vycm9yVGV4dC5lbmRwb2ludE1vZHVsZUludmFsaWQsIHByaW1hcnksIFsKICAgICAgICB7IHJlc291cmNlOiAncGx1Z2luLWhvc3QnLCBlcnJvciB9CiAgICAgIF0pCiAgICB9CiAgICB0aHJvdyBwcmltYXJ5CiAgfQogIHJlZ2lzdGVyRW5kcG9pbnRUaW1lUG9ydE93bmVyKHB1YmxpY1N1cmZhY2UsIGtlcm5lbC50aW1lKQogIGlmIChzbmFwc2hvdFJlYWRlcikgcmVnaXN0ZXJFbmRwb2ludERlYnVnU25hcHNob3QocHVibGljU3VyZmFjZSwgc25hcHNob3RSZWFkZXIpCiAgcmV0dXJuIHB1YmxpY1N1cmZhY2UgYXMgSVdlYlJwY0tlcm5lbFN1cmZhY2UgJgogICAgSVdlYlJwY0NvbXBvc2VkTW9kdWxlU3VyZmFjZTxUTW9kdWxlcz4gJgogICAgSVdlYlJwY1BpbmdFbmRwb2ludFN1cmZhY2U8SUZhY3RvcnlQaW5nQ2FwYWJpbGl0eTxUTWlkZGxld2FyZXM+Pgp9CgovKiogUHVibGljIG1ldGhvZHMgY29udHJpYnV0ZWQgYnkgc2VsZWN0ZWQgbW9kdWxlIHR1cGxlOyB1bnNlbGVjdGVkIGZlYXR1cmVzIGFyZSBhYnNlbnQgZnJvbSB0eXBlcy4gKi8KZXhwb3J0IHR5cGUgSVdlYlJwY01vZHVsZVN1cmZhY2U8VE1vZHVsZXMgZXh0ZW5kcyByZWFkb25seSBJV2ViUnBjRW5kcG9pbnRNb2R1bGVbXT4gPSAoCiAgVE1vZHVsZXNbbnVtYmVyXSBleHRlbmRzIGluZmVyIFRNb2R1bGUKICAgID8gVE1vZHVsZSBleHRlbmRzIElXZWJScGNFbmRwb2ludE1vZHVsZTxpbmZlciBfVERlc2NyaXB0b3JTdXJmYWNlLCBpbmZlciBUUm9vdFN1cmZhY2U+CiAgICAgID8gVFJvb3RTdXJmYWNlCiAgICAgIDogbmV2ZXIKICAgIDogbmV2ZXIKKSBleHRlbmRzIGluZmVyIFRTdXJmYWNlCiAgPyBJVW5pb25Ub0ludGVyc2VjdGlvbjxUU3VyZmFjZT4KICA6IG5ldmVyCgovKiogUmVwcm9qZWN0cyBhIHNlbGVjdGVkIG1vZHVsZSB0dXBsZSBzbyBmbHVlbnQgYHByb3ZpZGUoKWAgcmV0YWlucyB0aGUgY29tcG9zZWQgc3VyZmFjZS4gKi8KZXhwb3J0IHR5cGUgSVdlYlJwY0NvbXBvc2VkTW9kdWxlU3VyZmFjZTxUTW9kdWxlcyBleHRlbmRzIHJlYWRvbmx5IElXZWJScGNFbmRwb2ludE1vZHVsZVtdPiA9CiAgSVJlY3Vyc2l2ZVByb3ZpZGVTdXJmYWNlPElXZWJScGNNb2R1bGVTdXJmYWNlPFRNb2R1bGVzPiAmIG9iamVjdD4KCnR5cGUgSVJlY3Vyc2l2ZVByb3ZpZGVTdXJmYWNlPFRTdXJmYWNlIGV4dGVuZHMgb2JqZWN0PiA9IE9taXQ8VFN1cmZhY2UsICdwcm92aWRlJz4gJgogICgncHJvdmlkZScgZXh0ZW5kcyBrZXlvZiBUU3VyZmFjZQogICAgPyB7CiAgICAgICAgcHJvdmlkZShtZXRob2Q6IHN0cmluZywgcHJvdmlkZXI6IElXZWJScGNQcm92aWRlcik6IElSZWN1cnNpdmVQcm92aWRlU3VyZmFjZTxUU3VyZmFjZT4KICAgICAgfQogICAgOiB7fSkKCnR5cGUgSVVuaW9uVG9JbnRlcnNlY3Rpb248VD4gPSAoVCBleHRlbmRzIHVua25vd24gPyAodmFsdWU6IFQpID0+IHZvaWQgOiBuZXZlcikgZXh0ZW5kcyAoCiAgdmFsdWU6IGluZmVyIEkKKSA9PiB2b2lkCiAgPyBJCiAgOiBuZXZlcgoKZXhwb3J0IHR5cGUgSVdlYlJwY0tlcm5lbFN1cmZhY2UgPSBQaWNrPElXZWJScGNFbmRwb2ludCwgJ29uJyB8ICdob29rcycgfCAnZGlzcG9zZSc+Cg=="
+  },
+  "predecessorTuple": {
+    "moduleCount": 119,
+    "rawBytes": 468731,
+    "gzipBytes": 112116,
+    "endpointStaticImportCount": 13
+  },
+  "successorTuple": {
+    "moduleCount": 119,
+    "rawBytes": 468754,
+    "gzipBytes": 112123,
+    "endpointStaticImportCount": 13
+  },
+  "delta": {
+    "moduleCount": 0,
+    "rawBytes": 23,
+    "gzipBytes": 7,
+    "endpointStaticImportCount": 0
+  },
+  "moduleLedger": [
+    {
+      "module": "packages/web-rpc/src/core.ts",
+      "predecessorContentSha256": "7ad43d2e3fe28189809d89274098d86824cd95659949a69cdf05cbadf54cfd17",
+      "successorContentSha256": "5bca38486740d31ef8693d5d6fcf35826527527d0a9c9014aa97f76cf3d3972b"
+    },
+    {
+      "module": "packages/web-rpc/src/endpoint-kernel.ts",
+      "predecessorContentSha256": "b550954fb714f5501f960b10052182a06c5eff35e9374a8fcbb0acf8b6ee8720",
+      "successorContentSha256": "b550954fb714f5501f960b10052182a06c5eff35e9374a8fcbb0acf8b6ee8720"
+    },
+    {
+      "module": "packages/web-rpc/src/error-code.ts",
+      "predecessorContentSha256": "4e8793530f03776c8078e5640ba231234f634bf9f6f8289100d2cc641a159ba1",
+      "successorContentSha256": "4e8793530f03776c8078e5640ba231234f634bf9f6f8289100d2cc641a159ba1"
+    },
+    {
+      "module": "packages/web-rpc/src/error-serialization.ts",
+      "predecessorContentSha256": "93803c36349d8d82ac197aa4e29b2495c450a5c761c73b524a34955391cd11e3",
+      "successorContentSha256": "93803c36349d8d82ac197aa4e29b2495c450a5c761c73b524a34955391cd11e3"
+    },
+    {
+      "module": "packages/web-rpc/src/error-text.ts",
+      "predecessorContentSha256": "fe1f3cf950f9b107e1a1677b76f9a2179281d65f8e7aa8af7393809fea12e5cb",
+      "successorContentSha256": "fe1f3cf950f9b107e1a1677b76f9a2179281d65f8e7aa8af7393809fea12e5cb"
+    },
+    {
+      "module": "packages/web-rpc/src/errors.ts",
+      "predecessorContentSha256": "6ef9e77506650dd97efa77ed20050fc9f50b3a17480ba8be6c9531d7472d4acf",
+      "successorContentSha256": "6ef9e77506650dd97efa77ed20050fc9f50b3a17480ba8be6c9531d7472d4acf"
+    },
+    {
+      "module": "packages/web-rpc/src/features/control.ts",
+      "predecessorContentSha256": "7573fd4a44839f285bcadc0990ba5d8a933db721fdb2660727400f687a7df028",
+      "successorContentSha256": "7573fd4a44839f285bcadc0990ba5d8a933db721fdb2660727400f687a7df028"
+    },
+    {
+      "module": "packages/web-rpc/src/features/discovery.ts",
+      "predecessorContentSha256": "84ee275621ae3d9818f5d6a7ea284fb585a4fee77a4cba5147266dd109845353",
+      "successorContentSha256": "84ee275621ae3d9818f5d6a7ea284fb585a4fee77a4cba5147266dd109845353"
+    },
+    {
+      "module": "packages/web-rpc/src/features/outbound.ts",
+      "predecessorContentSha256": "7a86efce17d2412c4d3627dd5a09cd46b53e3be727bfe385cb30f0c54c65895e",
+      "successorContentSha256": "7a86efce17d2412c4d3627dd5a09cd46b53e3be727bfe385cb30f0c54c65895e"
+    },
+    {
+      "module": "packages/web-rpc/src/features/provider.ts",
+      "predecessorContentSha256": "b3e78ab14e9ed8d7ca3a12b2b151b9c648641452519be956e5634d70d266163e",
+      "successorContentSha256": "b3e78ab14e9ed8d7ca3a12b2b151b9c648641452519be956e5634d70d266163e"
+    },
+    {
+      "module": "packages/web-rpc/src/full.ts",
+      "predecessorContentSha256": "9cfe7520b368c192e65711db113a8a2b0e09d01d9d8f40a07ee80f3a45be466a",
+      "successorContentSha256": "9cfe7520b368c192e65711db113a8a2b0e09d01d9d8f40a07ee80f3a45be466a"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/async-control.ts",
+      "predecessorContentSha256": "4f8dfb6fc5787ff5b33b3d194eea3257a603adf5b02d7fb3d59670c7bae1ff1d",
+      "successorContentSha256": "4f8dfb6fc5787ff5b33b3d194eea3257a603adf5b02d7fb3d59670c7bae1ff1d"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/canonical-envelope.ts",
+      "predecessorContentSha256": "fda13b2d9254ad47b2bfc2ad51a8f531fbefdbd201c51a409cbe682242f62143",
+      "successorContentSha256": "fda13b2d9254ad47b2bfc2ad51a8f531fbefdbd201c51a409cbe682242f62143"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/composed-disposal-observer.ts",
+      "predecessorContentSha256": "e6f958bb6773186eb648387caf6147eed5012554e9079928dab5dddd6fc07511",
+      "successorContentSha256": "e6f958bb6773186eb648387caf6147eed5012554e9079928dab5dddd6fc07511"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/construction-install.ts",
+      "predecessorContentSha256": "8dae9ca434ffa1d81dd422c4d386c1530f985b068821524cb61729a292c2e420",
+      "successorContentSha256": "8dae9ca434ffa1d81dd422c4d386c1530f985b068821524cb61729a292c2e420"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/contract.ts",
+      "predecessorContentSha256": "bf2d4ed25c5c3b7728e9b7d854b88f733fd3b4655de4e97bc788e9965d797ec5",
+      "successorContentSha256": "bf2d4ed25c5c3b7728e9b7d854b88f733fd3b4655de4e97bc788e9965d797ec5"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/control-attachment.ts",
+      "predecessorContentSha256": "4e9b72627120a6520fa8ffb6accf9ab640934d21ad76e1776308258c0fc9adab",
+      "successorContentSha256": "4e9b72627120a6520fa8ffb6accf9ab640934d21ad76e1776308258c0fc9adab"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/discovery-attachment.ts",
+      "predecessorContentSha256": "3580825c47789603f66b93d7fbd95a57ceaadf3019df1858ec96945c371ba2fe",
+      "successorContentSha256": "3580825c47789603f66b93d7fbd95a57ceaadf3019df1858ec96945c371ba2fe"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/discovery-registry.ts",
+      "predecessorContentSha256": "0c9be615cf3dafb3da9c866954c93718921c338a29d895d67489a1a4f7d59d94",
+      "successorContentSha256": "0c9be615cf3dafb3da9c866954c93718921c338a29d895d67489a1a4f7d59d94"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/disposal-translation.ts",
+      "predecessorContentSha256": "459a4578d100c5bb2e2820cc392a17fa6d80d2a10b23467e7c528bf64bfbe54f",
+      "successorContentSha256": "459a4578d100c5bb2e2820cc392a17fa6d80d2a10b23467e7c528bf64bfbe54f"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/endpoint-bootstrap.ts",
+      "predecessorContentSha256": "0a65bfee42412abfcaccb801a6c0fd1f38197dd9c7bb75259b3cadf3bf06080e",
+      "successorContentSha256": "0a65bfee42412abfcaccb801a6c0fd1f38197dd9c7bb75259b3cadf3bf06080e"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/endpoint-modules.ts",
+      "predecessorContentSha256": "a7044d8a8b251d63e25fd536fc97fc57ea5b8e552547c79b929f9b6c1da7711d",
+      "successorContentSha256": "a7044d8a8b251d63e25fd536fc97fc57ea5b8e552547c79b929f9b6c1da7711d"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/endpoint-projection.ts",
+      "predecessorContentSha256": "76bc6d23d89513996e6b9e4a31aca3f99da8227f69a423931058245c8acd1115",
+      "successorContentSha256": "76bc6d23d89513996e6b9e4a31aca3f99da8227f69a423931058245c8acd1115"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/hooks.ts",
+      "predecessorContentSha256": "d3e98b3df2610bc10f717e0dc83aac8888097e5ae67b451f237af5efb088793d",
+      "successorContentSha256": "d3e98b3df2610bc10f717e0dc83aac8888097e5ae67b451f237af5efb088793d"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/id.ts",
+      "predecessorContentSha256": "f064a74a97d8be9b6d01d917e34b3e3ac3528678beba292970727d01645890fd",
+      "successorContentSha256": "f064a74a97d8be9b6d01d917e34b3e3ac3528678beba292970727d01645890fd"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/identity.ts",
+      "predecessorContentSha256": "3e015221a315d298790c7384508b40014c7aceed0fa86e3a4304a1796f075edd",
+      "successorContentSha256": "3e015221a315d298790c7384508b40014c7aceed0fa86e3a4304a1796f075edd"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/inbound-identity.ts",
+      "predecessorContentSha256": "a59984fd730ac581af6729116c2ae298769ed91be2606e032dfb1737fc7aeeaa",
+      "successorContentSha256": "a59984fd730ac581af6729116c2ae298769ed91be2606e032dfb1737fc7aeeaa"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/operation-scope.ts",
+      "predecessorContentSha256": "3186ef9476891c378a3ba4ef01590c83d55b78682d646a384f82605b70931eed",
+      "successorContentSha256": "3186ef9476891c378a3ba4ef01590c83d55b78682d646a384f82605b70931eed"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/outbound-attachment.ts",
+      "predecessorContentSha256": "ae67ed115a918b9a8d82b2494477d644f3f56ef3b682f52fbe317d4deedf43b0",
+      "successorContentSha256": "ae67ed115a918b9a8d82b2494477d644f3f56ef3b682f52fbe317d4deedf43b0"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/outbound-sender.ts",
+      "predecessorContentSha256": "6c3d998aebb399d7cca9a778fe1c762cfa58275e115899422232548d6939090c",
+      "successorContentSha256": "6c3d998aebb399d7cca9a778fe1c762cfa58275e115899422232548d6939090c"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/pending.ts",
+      "predecessorContentSha256": "dcbc450802c8ec81fe588819967ca55b98eb777b9078a8a60b60fd8dfc1f9ebf",
+      "successorContentSha256": "dcbc450802c8ec81fe588819967ca55b98eb777b9078a8a60b60fd8dfc1f9ebf"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/plugin-contract.ts",
+      "predecessorContentSha256": "1b145805ead24104dd250e2eb2ccd706cbd57bb6abaa251ea825ee43418e78a6",
+      "successorContentSha256": "1b145805ead24104dd250e2eb2ccd706cbd57bb6abaa251ea825ee43418e78a6"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/plugin-descriptor.ts",
+      "predecessorContentSha256": "22144e33ef2a084af8d3225624466b9fe525acc616c897e5644b917b904b9aa5",
+      "successorContentSha256": "22144e33ef2a084af8d3225624466b9fe525acc616c897e5644b917b904b9aa5"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/plugin-inventory.ts",
+      "predecessorContentSha256": "0d27749b74cfc2267a4b399c4e443d707e3ae81b4cc1bfefccaeb71ea91567dd",
+      "successorContentSha256": "0d27749b74cfc2267a4b399c4e443d707e3ae81b4cc1bfefccaeb71ea91567dd"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/plugin-shared-keys.ts",
+      "predecessorContentSha256": "1f1c814d662ce6ffef86005725cc77426d2c75ea0bdcf985418e8c0b198e2bd1",
+      "successorContentSha256": "1f1c814d662ce6ffef86005725cc77426d2c75ea0bdcf985418e8c0b198e2bd1"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/plugin-translator.ts",
+      "predecessorContentSha256": "7c0de467a5c4234f67d3c4b72f378634cfb0a65a2be849f772c474277aabf5f4",
+      "successorContentSha256": "7c0de467a5c4234f67d3c4b72f378634cfb0a65a2be849f772c474277aabf5f4"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/provider-admission.ts",
+      "predecessorContentSha256": "9a9c64420d6169c4bc44957a8772b884840319440de926b4ac230a9652e27f9b",
+      "successorContentSha256": "9a9c64420d6169c4bc44957a8772b884840319440de926b4ac230a9652e27f9b"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/provider-attachment.ts",
+      "predecessorContentSha256": "8af5e5f0347e284d5a7afe5f7110bce499d0d80a9c8bd2284340ff36bf07be35",
+      "successorContentSha256": "8af5e5f0347e284d5a7afe5f7110bce499d0d80a9c8bd2284340ff36bf07be35"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/provider-claim-authority.ts",
+      "predecessorContentSha256": "e5c8909316eb0c06894a401eb208f601f1b03f93809827a8d9679b81ef3d5d61",
+      "successorContentSha256": "e5c8909316eb0c06894a401eb208f601f1b03f93809827a8d9679b81ef3d5d61"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/provider-executor.ts",
+      "predecessorContentSha256": "bbb15008dd8efb4830e6ee5a1b8590128533fc37bc2d069d9f7a76638bb3f869",
+      "successorContentSha256": "bbb15008dd8efb4830e6ee5a1b8590128533fc37bc2d069d9f7a76638bb3f869"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/provider.ts",
+      "predecessorContentSha256": "4bba253ccc97296f3eb5b2036167f5324d44872484c3eb55bb8975e02b2586ff",
+      "successorContentSha256": "4bba253ccc97296f3eb5b2036167f5324d44872484c3eb55bb8975e02b2586ff"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/replay.ts",
+      "predecessorContentSha256": "9954783224d95d42675dfc4751fc1358255bf06192542ce041d4c6ea2cef49cb",
+      "successorContentSha256": "9954783224d95d42675dfc4751fc1358255bf06192542ce041d4c6ea2cef49cb"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/request-replay-ledger.ts",
+      "predecessorContentSha256": "4d931f2682660b7ed17045f46af796891ae5036737e0d1d2452081484a77ce74",
+      "successorContentSha256": "4d931f2682660b7ed17045f46af796891ae5036737e0d1d2452081484a77ce74"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/resource-scope.ts",
+      "predecessorContentSha256": "550f251ba74a876874197f7784bf941aac456a4ba28bebc8e569583161d50580",
+      "successorContentSha256": "550f251ba74a876874197f7784bf941aac456a4ba28bebc8e569583161d50580"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/safe-value.ts",
+      "predecessorContentSha256": "0e82338762ca77c1755a0fd86603e7e7dbd1ff0c459a819a43a08dc271f7b98c",
+      "successorContentSha256": "0e82338762ca77c1755a0fd86603e7e7dbd1ff0c459a819a43a08dc271f7b98c"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/source-identity.ts",
+      "predecessorContentSha256": "0a665ab2fe684a434d1920cdd8c738bec15192e41d4d22b6a419d5671ee63907",
+      "successorContentSha256": "0a665ab2fe684a434d1920cdd8c738bec15192e41d4d22b6a419d5671ee63907"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/test-observer.ts",
+      "predecessorContentSha256": "d834abb059285703432b4944ffaa35e3e1967e3d6e544892dcfaf7d3acbc00b0",
+      "successorContentSha256": "d834abb059285703432b4944ffaa35e3e1967e3d6e544892dcfaf7d3acbc00b0"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/time-port.ts",
+      "predecessorContentSha256": "50025bcc037adcb7965ab93e8edb1b98c64b03dc898c007a5d4d3a71c2ad60f4",
+      "successorContentSha256": "50025bcc037adcb7965ab93e8edb1b98c64b03dc898c007a5d4d3a71c2ad60f4"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/transport-activation.ts",
+      "predecessorContentSha256": "0dfeb0b6e0ebaa3932221e1e320dce2cd788a480e1121f6a46024271bafa0382",
+      "successorContentSha256": "0dfeb0b6e0ebaa3932221e1e320dce2cd788a480e1121f6a46024271bafa0382"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/utf8.ts",
+      "predecessorContentSha256": "21227a1e2101dc6df724f48a30fafafc9a7a50cd3bafb484db79bc3e406a8088",
+      "successorContentSha256": "21227a1e2101dc6df724f48a30fafafc9a7a50cd3bafb484db79bc3e406a8088"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/variation-admission.ts",
+      "predecessorContentSha256": "37c42d6762fc36c8eb6192f825952c85fa9a5e5f5932038259191a8bf86adbdb",
+      "successorContentSha256": "37c42d6762fc36c8eb6192f825952c85fa9a5e5f5932038259191a8bf86adbdb"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/variation-coordinator.ts",
+      "predecessorContentSha256": "ccc7f12052e292d1f8b259df42279f9052560583c11d613fe3bf7f12886fcecd",
+      "successorContentSha256": "ccc7f12052e292d1f8b259df42279f9052560583c11d613fe3bf7f12886fcecd"
+    },
+    {
+      "module": "packages/web-rpc/src/internal/web-rpc-plugin-host.ts",
+      "predecessorContentSha256": "879cb03d0d5552ef9ec3f91afbc339cd623e2d1dacc72521bfcf3219d5e5fffe",
+      "successorContentSha256": "879cb03d0d5552ef9ec3f91afbc339cd623e2d1dacc72521bfcf3219d5e5fffe"
+    },
+    {
+      "module": "packages/web-rpc/src/protocol-constants.ts",
+      "predecessorContentSha256": "62e30b156365d415aa6900ec1271df69fcc1d2325a38a36a602fcd98b29542a7",
+      "successorContentSha256": "62e30b156365d415aa6900ec1271df69fcc1d2325a38a36a602fcd98b29542a7"
+    },
+    {
+      "module": "packages/web-rpc/src/semantic-constants.ts",
+      "predecessorContentSha256": "a93c8541e8d382af65bdc47b35de25560e39848d9bdf0af62b3a8b1b0d2faf99",
+      "successorContentSha256": "a93c8541e8d382af65bdc47b35de25560e39848d9bdf0af62b3a8b1b0d2faf99"
+    },
+    {
+      "module": "packages/web-rpc/test/fixtures/tree-shaking/root-entry.ts",
+      "predecessorContentSha256": "294ffa05d4fef9b3a5f7e3beabf2053a9f30f89714e262811ca49efdc80fed12",
+      "successorContentSha256": "294ffa05d4fef9b3a5f7e3beabf2053a9f30f89714e262811ca49efdc80fed12"
+    },
+    {
+      "module": "workspace:packages/capability/dist/graph/topology.js",
+      "predecessorContentSha256": "728f4025195b702642a02c973dba5714dea4c31ee1adeca28766cf3f6abd6576",
+      "successorContentSha256": "728f4025195b702642a02c973dba5714dea4c31ee1adeca28766cf3f6abd6576"
+    },
+    {
+      "module": "workspace:packages/event-subscriber/dist/channel-D8-zrqiP.js",
+      "predecessorContentSha256": "bf214437f50ab68ac08b2ce5324913e56829a0a3337f5f81e30490761d26ffd1",
+      "successorContentSha256": "bf214437f50ab68ac08b2ce5324913e56829a0a3337f5f81e30490761d26ffd1"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/abort-factory.js",
+      "predecessorContentSha256": "e949eeaccb369be4fde680037481b48449f5679c788983a3fe8bfd4bd30bc356",
+      "successorContentSha256": "e949eeaccb369be4fde680037481b48449f5679c788983a3fe8bfd4bd30bc356"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/abort.js",
+      "predecessorContentSha256": "e3f49f0c9000e95ab0b7daed5c7eeee548e397e00c095fc51bde912e6ba11472",
+      "successorContentSha256": "e3f49f0c9000e95ab0b7daed5c7eeee548e397e00c095fc51bde912e6ba11472"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/bounded-wait.js",
+      "predecessorContentSha256": "f9846def1da0de612b604f5f901012c93e382da2a5686a0ae6f25829577aeebc",
+      "successorContentSha256": "f9846def1da0de612b604f5f901012c93e382da2a5686a0ae6f25829577aeebc"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/dispose-transaction.js",
+      "predecessorContentSha256": "8a2c13b062a1cfc514bddae203ad62a005ba7aecee39d8267f3be1fb79089204",
+      "successorContentSha256": "8a2c13b062a1cfc514bddae203ad62a005ba7aecee39d8267f3be1fb79089204"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/disposer-context.js",
+      "predecessorContentSha256": "bb3a593e3d0e1473cde16f7969fc72b17278d4a0cd181bba0c06e8f356f53e09",
+      "successorContentSha256": "bb3a593e3d0e1473cde16f7969fc72b17278d4a0cd181bba0c06e8f356f53e09"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/error-code.js",
+      "predecessorContentSha256": "cd895b3f13525c7b34fa00370d660c8311f4714e348b1dd905e282cda9a086a0",
+      "successorContentSha256": "cd895b3f13525c7b34fa00370d660c8311f4714e348b1dd905e282cda9a086a0"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/error-text.js",
+      "predecessorContentSha256": "a7563a43ace05755abc0bd80001448c179bbfe475ca397774a9c9a470ead5abf",
+      "successorContentSha256": "a7563a43ace05755abc0bd80001448c179bbfe475ca397774a9c9a470ead5abf"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/errors.js",
+      "predecessorContentSha256": "101ee957262c57ad108356a5a4c3412393ccbc1e271be89a88b06eea4d46641b",
+      "successorContentSha256": "101ee957262c57ad108356a5a4c3412393ccbc1e271be89a88b06eea4d46641b"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/generation-controller.js",
+      "predecessorContentSha256": "8e1a61ffe9b83fdd8aa23303bd94112e0c98d7b960ed865c47573e3f576ee37e",
+      "successorContentSha256": "8e1a61ffe9b83fdd8aa23303bd94112e0c98d7b960ed865c47573e3f576ee37e"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/lifecycle-scope.js",
+      "predecessorContentSha256": "5f7b29831ddcdb4112935e230371afca4dbf103030314dad3debb9e7853d72e9",
+      "successorContentSha256": "5f7b29831ddcdb4112935e230371afca4dbf103030314dad3debb9e7853d72e9"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/mutation-queue.js",
+      "predecessorContentSha256": "8cd76703230876a7983a4aefcc128e7e6b2e1c4c1abf103efc19ee7395d88c48",
+      "successorContentSha256": "8cd76703230876a7983a4aefcc128e7e6b2e1c4c1abf103efc19ee7395d88c48"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/observed-subscription.js",
+      "predecessorContentSha256": "6e10d08e7352b0a928880091da5d9fe88e5e171cb617dbe50c54444cef9dea3b",
+      "successorContentSha256": "6e10d08e7352b0a928880091da5d9fe88e5e171cb617dbe50c54444cef9dea3b"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/provisional-scope.js",
+      "predecessorContentSha256": "46fba201b95c6c2d995acc7e53521f8169817c62f31cab9a3937946ebc4e7511",
+      "successorContentSha256": "46fba201b95c6c2d995acc7e53521f8169817c62f31cab9a3937946ebc4e7511"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/quiescence-tracker.js",
+      "predecessorContentSha256": "baf35e8b6566a87791c2b61ffcd8ffa3ff0c39779ac645590d8c0c7965a46e43",
+      "successorContentSha256": "baf35e8b6566a87791c2b61ffcd8ffa3ff0c39779ac645590d8c0c7965a46e43"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/scheduler.js",
+      "predecessorContentSha256": "701b45adf3ac61e85e27c516061b8ba69703c3e1bfdfc1df8d433d6b30c8a87d",
+      "successorContentSha256": "701b45adf3ac61e85e27c516061b8ba69703c3e1bfdfc1df8d433d6b30c8a87d"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/state-constants.js",
+      "predecessorContentSha256": "61f6f61a29090f579c8d73bb4a4de571fc96d15e52e8f4892d49e84857bbf3fb",
+      "successorContentSha256": "61f6f61a29090f579c8d73bb4a4de571fc96d15e52e8f4892d49e84857bbf3fb"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/sync-lifecycle-scope.js",
+      "predecessorContentSha256": "c2dab04597c70f94941dae3a852bac1582edfbe6b9095bfd32a03b09f99ffa16",
+      "successorContentSha256": "c2dab04597c70f94941dae3a852bac1582edfbe6b9095bfd32a03b09f99ffa16"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/terminal-controller.js",
+      "predecessorContentSha256": "94ec4e1b08905f81c1a65acfb954cbf7cfb4d090870fada04a20baddae360faa",
+      "successorContentSha256": "94ec4e1b08905f81c1a65acfb954cbf7cfb4d090870fada04a20baddae360faa"
+    },
+    {
+      "module": "workspace:packages/lifecycle/dist/types.js",
+      "predecessorContentSha256": "33e51c40529c88c931fa1d06e60af1ef59c4ceedbba66d33eeca615e13033bfa",
+      "successorContentSha256": "33e51c40529c88c931fa1d06e60af1ef59c4ceedbba66d33eeca615e13033bfa"
+    },
+    {
+      "module": "workspace:packages/middleware-pipeline/dist/index.js",
+      "predecessorContentSha256": "12df100794979f61cd59de9527d58ddc0bc697c7e1ae07e4698e7ef9e5ef60ac",
+      "successorContentSha256": "12df100794979f61cd59de9527d58ddc0bc697c7e1ae07e4698e7ef9e5ef60ac"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/assertClassBrand.js",
+      "predecessorContentSha256": "c53364b723ccc4c111149fc7dee86cec002f79c580135fc72b5814e411b12162",
+      "successorContentSha256": "c53364b723ccc4c111149fc7dee86cec002f79c580135fc72b5814e411b12162"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/checkPrivateRedeclaration.js",
+      "predecessorContentSha256": "6cedc9c1140a34c9368835adc376c3ddf8d7a49dddc0058d9de968e527df227d",
+      "successorContentSha256": "6cedc9c1140a34c9368835adc376c3ddf8d7a49dddc0058d9de968e527df227d"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldGet2.js",
+      "predecessorContentSha256": "9fcfb21245951e57fd821c8e8bdba00f1fd3bdb964d6e2e624b10e2044df9322",
+      "successorContentSha256": "9fcfb21245951e57fd821c8e8bdba00f1fd3bdb964d6e2e624b10e2044df9322"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldInitSpec.js",
+      "predecessorContentSha256": "845a3c5e820c0165e41d074083b5339b9d5c9414f3007df897381b0e8f932122",
+      "successorContentSha256": "845a3c5e820c0165e41d074083b5339b9d5c9414f3007df897381b0e8f932122"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateFieldSet2.js",
+      "predecessorContentSha256": "a49497b9fa4c6ef560459f3bfcc4e643c60d4ba5e0ca5ee579335b516ee47eb7",
+      "successorContentSha256": "a49497b9fa4c6ef560459f3bfcc4e643c60d4ba5e0ca5ee579335b516ee47eb7"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/classPrivateMethodInitSpec.js",
+      "predecessorContentSha256": "ad804b2e4fb8a30b977de586c65d3f8ed44963f5b1a58b047020d81594bfce8b",
+      "successorContentSha256": "ad804b2e4fb8a30b977de586c65d3f8ed44963f5b1a58b047020d81594bfce8b"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/defineProperty.js",
+      "predecessorContentSha256": "f9cd48c10148fa6c0cdc351fd4f2cacb1ecb17b84d80f0144d1d7132c56f3be5",
+      "successorContentSha256": "f9cd48c10148fa6c0cdc351fd4f2cacb1ecb17b84d80f0144d1d7132c56f3be5"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPrimitive.js",
+      "predecessorContentSha256": "80ed19b5e14696b42b6faffebe8370c3318fb14f1894139405efae6eb9d40967",
+      "successorContentSha256": "80ed19b5e14696b42b6faffebe8370c3318fb14f1894139405efae6eb9d40967"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/toPropertyKey.js",
+      "predecessorContentSha256": "0e5f6aa31ce322cc19e88f5159ac23483c80d8dfb06449866298ca444c705482",
+      "successorContentSha256": "0e5f6aa31ce322cc19e88f5159ac23483c80d8dfb06449866298ca444c705482"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/typeof.js",
+      "predecessorContentSha256": "396209f0298d00a442c70d735b1111ee577698559056cbabdfd64e69d67fac74",
+      "successorContentSha256": "396209f0298d00a442c70d735b1111ee577698559056cbabdfd64e69d67fac74"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/admission-runtime.js",
+      "predecessorContentSha256": "3e10c6480ff9a00faf7ce3dc1678c738ec02469b6a060d22a022a844d05454d2",
+      "successorContentSha256": "3e10c6480ff9a00faf7ce3dc1678c738ec02469b6a060d22a022a844d05454d2"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/cleanup-runtime.js",
+      "predecessorContentSha256": "ab37a5de411f88e492bc3f6af298cbc4f0498c7ec8c23db28b665889ae7a1964",
+      "successorContentSha256": "ab37a5de411f88e492bc3f6af298cbc4f0498c7ec8c23db28b665889ae7a1964"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/composition-runtime.js",
+      "predecessorContentSha256": "bb0db87c411f89cd1866d6ba26d36c4a63d5d10fdc16158a13b9c9da68d97b54",
+      "successorContentSha256": "bb0db87c411f89cd1866d6ba26d36c4a63d5d10fdc16158a13b9c9da68d97b54"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/composition.js",
+      "predecessorContentSha256": "60151f6b745dd3facabbcd2becc88573dcabcc1c56f52c562b66cd1596a4a6b3",
+      "successorContentSha256": "60151f6b745dd3facabbcd2becc88573dcabcc1c56f52c562b66cd1596a4a6b3"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/config-runtime.js",
+      "predecessorContentSha256": "56684bcf1b5d65e377b29f16f2770925f37534acbe7071c18aad8ee1231fd309",
+      "successorContentSha256": "56684bcf1b5d65e377b29f16f2770925f37534acbe7071c18aad8ee1231fd309"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/config.js",
+      "predecessorContentSha256": "949c3aa654d7d8551f6fb4836a092e0bc1775bf7bfb0061926a892b740b6fbd7",
+      "successorContentSha256": "949c3aa654d7d8551f6fb4836a092e0bc1775bf7bfb0061926a892b740b6fbd7"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/core-runtime.js",
+      "predecessorContentSha256": "a621631d22b7b495ee9a393f30d520bcc73fe81d05c888618f659d8d3f86c536",
+      "successorContentSha256": "a621631d22b7b495ee9a393f30d520bcc73fe81d05c888618f659d8d3f86c536"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/core.js",
+      "predecessorContentSha256": "0546b6be0cf3240fc631efa0dd37da2c60c0fe8d8bfe6de40272fbc0b82ebd26",
+      "successorContentSha256": "0546b6be0cf3240fc631efa0dd37da2c60c0fe8d8bfe6de40272fbc0b82ebd26"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/define-plugin.js",
+      "predecessorContentSha256": "dc24dc2df40474c406fc8ebee06747885ad9cdcc67b65e327505b4f97af13e5e",
+      "successorContentSha256": "dc24dc2df40474c406fc8ebee06747885ad9cdcc67b65e327505b4f97af13e5e"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/disposal.js",
+      "predecessorContentSha256": "a4083d203b98f775681e98ef0ae1eafc1ef8fcd303c38117b9a6adba1e78985d",
+      "successorContentSha256": "a4083d203b98f775681e98ef0ae1eafc1ef8fcd303c38117b9a6adba1e78985d"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/error-code.js",
+      "predecessorContentSha256": "d6ffcc4a6e885e1a4bf2a7e0785946d75fe19ec20406441729f60126b0000f86",
+      "successorContentSha256": "d6ffcc4a6e885e1a4bf2a7e0785946d75fe19ec20406441729f60126b0000f86"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/error-text.js",
+      "predecessorContentSha256": "a400cda8eeca92dcbefd4df4b28c7372f813c3e2ab3089790262258b8683846e",
+      "successorContentSha256": "a400cda8eeca92dcbefd4df4b28c7372f813c3e2ab3089790262258b8683846e"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/extension.js",
+      "predecessorContentSha256": "06af4ed18e7d64e2e7621c6e2c0a973d5ed26289dbe74575baba0d15cb111de9",
+      "successorContentSha256": "06af4ed18e7d64e2e7621c6e2c0a973d5ed26289dbe74575baba0d15cb111de9"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/host-disposal-runtime.js",
+      "predecessorContentSha256": "83f66a952389cf4f991ea7050b745d9f6df3daf6ced5e4333cb1fb2071145eb8",
+      "successorContentSha256": "83f66a952389cf4f991ea7050b745d9f6df3daf6ced5e4333cb1fb2071145eb8"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/host-runtime.js",
+      "predecessorContentSha256": "20a2b80fa48caddc542e47e05043ab68fd59190dbbcf626f7bcb9217c27fb693",
+      "successorContentSha256": "20a2b80fa48caddc542e47e05043ab68fd59190dbbcf626f7bcb9217c27fb693"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/index.js",
+      "predecessorContentSha256": "db66553822b3f797c5bf51268795218789a233cd8c4ab406d43c9dfa7e0bc0ed",
+      "successorContentSha256": "db66553822b3f797c5bf51268795218789a233cd8c4ab406d43c9dfa7e0bc0ed"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/install-runtime.js",
+      "predecessorContentSha256": "ccfc65affaeb3b8d9c8676fccae6e58811dc5ff69f473f5bd8cbfa34442c6a1b",
+      "successorContentSha256": "ccfc65affaeb3b8d9c8676fccae6e58811dc5ff69f473f5bd8cbfa34442c6a1b"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/invocation.js",
+      "predecessorContentSha256": "08fdfc5dfdb16e5bbe65f3bf12539d83f65ea55d359c369c87ed8a5488ac0c27",
+      "successorContentSha256": "08fdfc5dfdb16e5bbe65f3bf12539d83f65ea55d359c369c87ed8a5488ac0c27"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/operation-runtime.js",
+      "predecessorContentSha256": "a80a6cc9666af99b325a4be555f58a386e19c08d6f6b4bf535aed4030b66a9d5",
+      "successorContentSha256": "a80a6cc9666af99b325a4be555f58a386e19c08d6f6b4bf535aed4030b66a9d5"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/pipeline-runtime.js",
+      "predecessorContentSha256": "eb61668edd8eb7136b5a8e15e06243fe39cbfffd4beaf12c4c23fbcc5999ce2a",
+      "successorContentSha256": "eb61668edd8eb7136b5a8e15e06243fe39cbfffd4beaf12c4c23fbcc5999ce2a"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/pipeline.js",
+      "predecessorContentSha256": "49998bec4956fe61d868b2d64f911d0008c08d5ba2fe73aef445be479084cffe",
+      "successorContentSha256": "49998bec4956fe61d868b2d64f911d0008c08d5ba2fe73aef445be479084cffe"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/publication.js",
+      "predecessorContentSha256": "5cbad4b01b62252ee1a91284ae2ee30339c09143784b9d461dbe5ee8f62b8d14",
+      "successorContentSha256": "5cbad4b01b62252ee1a91284ae2ee30339c09143784b9d461dbe5ee8f62b8d14"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/removal-runtime.js",
+      "predecessorContentSha256": "7fb59724bed9f8b5e94f53ecc2b08854bf7ac511a50733edada91a42cc2e9888",
+      "successorContentSha256": "7fb59724bed9f8b5e94f53ecc2b08854bf7ac511a50733edada91a42cc2e9888"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/state-constants.js",
+      "predecessorContentSha256": "a443b37db74d9dd612cd342d654765a3f1abfc7a99d415e4d59a957a763c51db",
+      "successorContentSha256": "a443b37db74d9dd612cd342d654765a3f1abfc7a99d415e4d59a957a763c51db"
+    },
+    {
+      "module": "workspace:packages/plugin-host/dist/symbols.js",
+      "predecessorContentSha256": "f95611d0080637b1fc7ec634c88aefa2940f82609ba9c9ad43f97f10bbba1e4e",
+      "successorContentSha256": "f95611d0080637b1fc7ec634c88aefa2940f82609ba9c9ad43f97f10bbba1e4e"
+    },
+    {
+      "module": "workspace:packages/utils/dist/bytes.js",
+      "predecessorContentSha256": "9cb39e2baaf21da748ab58f8b078353b85739d558c50406cd4139de4b382b45a",
+      "successorContentSha256": "9cb39e2baaf21da748ab58f8b078353b85739d558c50406cd4139de4b382b45a"
+    },
+    {
+      "module": "workspace:packages/utils/dist/config.js",
+      "predecessorContentSha256": "25937a905e880f6958611aca5ab5792f4fb9982b6b4d2a21b08be7b7ecf9863f",
+      "successorContentSha256": "25937a905e880f6958611aca5ab5792f4fb9982b6b4d2a21b08be7b7ecf9863f"
+    },
+    {
+      "module": "workspace:packages/utils/dist/error-text-Cw8rxmXe.js",
+      "predecessorContentSha256": "3ea61a2db99b76b0f78b878a6cfe13b41b4c49e250f5a3896e17db9e4c46493b",
+      "successorContentSha256": "3ea61a2db99b76b0f78b878a6cfe13b41b4c49e250f5a3896e17db9e4c46493b"
+    },
+    {
+      "module": "workspace:packages/utils/dist/error.js",
+      "predecessorContentSha256": "bcdff288857a61fb90890e0908dd78a08945a097d6f8ffd746fbdc8c8b16cee2",
+      "successorContentSha256": "bcdff288857a61fb90890e0908dd78a08945a097d6f8ffd746fbdc8c8b16cee2"
+    },
+    {
+      "module": "workspace:packages/utils/dist/function.js",
+      "predecessorContentSha256": "c74920f0df23755e4b91ebd3dc33e77ea396ced713027f163809ee63d21118b1",
+      "successorContentSha256": "c74920f0df23755e4b91ebd3dc33e77ea396ced713027f163809ee63d21118b1"
+    },
+    {
+      "module": "workspace:packages/utils/dist/object-path.js",
+      "predecessorContentSha256": "b1dac1bfbc50fa3d0e2b92d2684ab33c98c95d41a9f9be0a024b02f2e9034b1a",
+      "successorContentSha256": "b1dac1bfbc50fa3d0e2b92d2684ab33c98c95d41a9f9be0a024b02f2e9034b1a"
+    }
+  ],
+  "causalRows": [
+    {
+      "id": "F006-PASS-B01-ROOT-D18",
+      "status": "PASS",
+      "evidence": "successor graph and exact predecessor tuple are bound to the persisted ledger"
+    },
+    {
+      "id": "F006-PASS-B11-D18",
+      "status": "PASS",
+      "evidence": "all 119 module identities carry dual content hashes"
+    },
+    {
+      "id": "F006-PASS-B11F-D18",
+      "status": "PASS",
+      "evidence": "exact one-file counterfactual and successor rebuild are independently validated"
+    },
+    {
+      "id": "F006-PASS-B01-CHUNK",
+      "status": "PASS",
+      "evidence": "default root omits chunk-assembler and explicit canonicalChunk owns exactly one"
+    },
+    {
+      "id": "F006-PASS-B11-CHUNK",
+      "status": "PASS",
+      "evidence": "selected canonicalChunk attribution is unique and historical topology remains separate"
+    }
+  ],
+  "postRouteMatrix": {
+    "causalPassCount": 5,
+    "residualCount": 8,
+    "source": "EVT-000655/EVT-000656",
+    "rows": [
+      {
+        "id": "F006-RED-CONTINUATION-SDD",
+        "signature": "same stale-locator set: WRC-C-T120, WRC-C-T138, WRC-C-T12, WRC-C-T17, WRC-C-T24, WRC-C-T38"
+      },
+      {
+        "id": "F006-RED-ENDPOINT-OBSERVER",
+        "signature": "same owner-list signature: expected chunk-assembler owner, current owner list omits chunk-assembler"
+      },
+      {
+        "id": "F006-RED-PROVIDER-T275",
+        "signature": "same source assertion signature: chunk source lacks WebRpcSharedKey.inboundIdentity"
+      },
+      {
+        "id": "F006-RED-B12B03",
+        "signature": "same source assertion signature: worker source does not match abort()"
+      },
+      {
+        "id": "F006-RED-B12B04",
+        "signature": "same source assertion signature: chunk source does not contain IWebRpcPlugin"
+      },
+      {
+        "id": "F006-RED-CONTINUATION-B01",
+        "signature": "same count signature: expected moduleCount 108, current 109"
+      },
+      {
+        "id": "F006-RED-CORE-CAUSAL",
+        "signature": "same module-set signature: current adds internal/canonical-envelope.js and semantic-constants.js, omits wire.js, and resolves event-subscriber channel bundle"
+      },
+      {
+        "id": "F006-RED-PROVENANCE",
+        "signature": "same digest mismatch signature: expected 4e5d5ed27fc9d63018e59f7cb2ba5f66d040d2cd0c54d937a286a399166d7516, current 575e903a0048f2f28002e5e0285015ac47cd959d6966c91c36705c38b78272b6"
+      }
+    ]
+  },
+  "decision": {
+    "status": "accepted",
+    "scope": "custody-only",
+    "productMutation": false,
+    "network": false,
+    "packageTestsMayRead": "artifact and package-local canonical build only"
+  },
+  "admissionAuthentication": "COORDINATOR_OWNED",
+  "productMutation": false
+}

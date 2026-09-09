@@ -8,7 +8,8 @@ import { hooks } from '../../src/middleware/hooks.js'
 import { timeout } from '../../src/middleware/timeout.js'
 import { readEndpointDebugSnapshot } from '../../src/internal/test-observer.js'
 import type { IWebRpcInboundMessage, IWebRpcTransport } from '../../src/transport.js'
-import type { IWebRpcEnvelope, IWebRpcRequest } from '../../src/wire.js'
+import type { IRpcEnvelope, IRpcPortableValue, IRpcRequestEnvelope } from '@migaia/rpc-contract'
+import { normalizeWebRpcRoutingData } from '../../src/internal/routing-data.js'
 
 /** Flushes receiver and provider promise continuations without relying on timer duration. */
 const flush = async (): Promise<void> => {
@@ -47,18 +48,26 @@ function createDrivenTransport(sourceProof: (source: unknown) => boolean = () =>
 }
 
 /** Creates a matching successful response for one captured slim request. */
-function responseFor(request: IWebRpcRequest, data: unknown): IWebRpcEnvelope {
+function responseFor(request: IRpcRequestEnvelope, data: unknown): IRpcEnvelope {
+  const route = normalizeWebRpcRoutingData(request.data)
+  if (!route) throw new Error('captured request must carry canonical routing data')
   return {
     kind: 'response',
-    version: request.version,
-    taskId: request.taskId,
-    senderId: request.targetId,
-    targetId: request.senderId,
-    receiverId: request.senderId,
-    method: request.method,
+    id: request.id,
     ok: true,
-    data,
-    sentAt: Date.now()
+    data: {
+      webRpc: {
+        profile: 'web-rpc.route.v1',
+        type: 'response',
+        applicationVersion: route.webRpc.applicationVersion,
+        senderId: route.webRpc.targetId,
+        targetId: route.webRpc.senderId,
+        receiverId: route.webRpc.senderId,
+        method: request.method,
+        sentAt: Date.now()
+      },
+      payload: data as IRpcPortableValue
+    }
   }
 }
 
@@ -82,9 +91,12 @@ describe('slim attachment hostile equivalence', () => {
         })
       ]
     })
-    const pending = endpoint.send('provider-source-proof', 'echo', 1, { timeoutMs: false })
-    await flush()
-    const request = driven.sent[0] as IWebRpcRequest
+    const pending = endpoint.send('provider-source-proof', 'echo', 1, {
+      timeoutMs: false,
+      receiverId: 'provider-source-proof'
+    } as never)
+    await vi.waitFor(() => expect(driven.sent).toHaveLength(1))
+    const request = driven.sent[0] as IRpcRequestEnvelope
     let settled = false
     void pending.then(() => {
       settled = true
@@ -95,9 +107,12 @@ describe('slim attachment hostile equivalence', () => {
     driven.receive({ data: responseFor(request, 'accepted'), source: acceptedSource })
     await expect(pending).resolves.toBe('accepted')
     enforceSourceProof = false
-    const pinned = endpoint.send('provider-source-proof', 'echo', 2, { timeoutMs: false })
-    await flush()
-    const pinnedRequest = driven.sent[1] as IWebRpcRequest
+    const pinned = endpoint.send('provider-source-proof', 'echo', 2, {
+      timeoutMs: false,
+      receiverId: 'provider-source-proof'
+    } as never)
+    await vi.waitFor(() => expect(driven.sent).toHaveLength(2))
+    const pinnedRequest = driven.sent[1] as IRpcRequestEnvelope
     let pinnedSettled = false
     void pinned.then(() => {
       pinnedSettled = true
@@ -129,17 +144,23 @@ describe('slim attachment hostile equivalence', () => {
       return context.success()
     })
     expect(readEndpointDebugSnapshot(endpoint)).toMatchObject({ providers: 1, pending: 0 })
-    const request: IWebRpcRequest = {
+    const request: IRpcRequestEnvelope = {
       kind: 'request',
-      version: '1.0',
-      taskId: 'shared-task',
-      senderId: 'client-source-isolation',
-      targetId: 'provider-source-isolation',
-      receiverId: 'provider-source-isolation',
+      id: 'shared-task',
       method: 'event',
-      data: null,
-      dispatchOnly: true,
-      sentAt: Date.now()
+      data: {
+        webRpc: {
+          profile: 'web-rpc.route.v1',
+          type: 'request',
+          applicationVersion: '1.0',
+          senderId: 'client-source-isolation',
+          targetId: 'provider-source-isolation',
+          receiverId: 'provider-source-isolation',
+          dispatchOnly: true,
+          sentAt: Date.now()
+        },
+        payload: null
+      }
     }
     driven.receive({ data: request, source: {} })
     driven.receive({ data: request, source: {} })
@@ -286,7 +307,9 @@ describe('slim attachment hostile equivalence', () => {
       ]
     })
     await flush()
-    expect(listener).toHaveBeenCalledTimes(2)
+    // Two constructor events fail independently; the retained endpoint hook receives its own
+    // successful activation event after both failures without re-entering either reporter.
+    expect(listener).toHaveBeenCalledTimes(3)
     expect(reporter).toHaveBeenCalledTimes(2)
     expect(reports).toHaveLength(2)
     expect(readEndpointDebugSnapshot(endpoint)?.hooks).toBe(1)

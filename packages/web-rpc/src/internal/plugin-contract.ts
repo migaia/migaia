@@ -6,7 +6,6 @@ import {
   WebRpcSharedKey,
   type IWebRpcAuthenticationPort,
   type IWebRpcAbortEnablePort,
-  type IWebRpcChunkPort,
   type IWebRpcConnectPort,
   type IWebRpcContractPort,
   type IWebRpcDiscoveryResolverPort,
@@ -48,7 +47,6 @@ export const WebRpcFirstPartyRole = {
   hooks: 'hooks',
   ping: 'ping',
   uuid: 'uuid',
-  chunk: 'chunk',
   finalize: 'middleware-finalize'
 } as const
 
@@ -80,11 +78,6 @@ export const WebRpcFirstPartyRoleSchema: Readonly<
     sharedConsumes: Object.freeze([]),
     sharedOptionalConsumes: Object.freeze([])
   }),
-  chunk: Object.freeze({
-    sharedProvides: Object.freeze([WebRpcSharedKey.chunk]),
-    sharedConsumes: Object.freeze([]),
-    sharedOptionalConsumes: Object.freeze([])
-  }),
   'middleware-finalize': Object.freeze({
     sharedProvides: Object.freeze([]),
     sharedConsumes: Object.freeze([WebRpcSharedKey.connect]),
@@ -96,8 +89,7 @@ export const WebRpcFirstPartyRoleSchema: Readonly<
       WebRpcSharedKey.abort,
       WebRpcSharedKey.hooks,
       WebRpcSharedKey.ping,
-      WebRpcSharedKey.uuid,
-      WebRpcSharedKey.chunk
+      WebRpcSharedKey.uuid
     ])
   })
 })
@@ -218,7 +210,6 @@ export type IWebRpcPluginHostCore = Omit<
   getShared(key: typeof WebRpcSharedKey.hooks): IWebRpcHooksPort | undefined
   getShared(key: typeof WebRpcSharedKey.timeout): IWebRpcTimeoutPort | undefined
   getShared(key: typeof WebRpcSharedKey.uuid): IWebRpcUuidPort | undefined
-  getShared(key: typeof WebRpcSharedKey.chunk): IWebRpcChunkPort | undefined
   getShared(key: typeof WebRpcSharedKey.inboundIdentity): IWebRpcInboundIdentityPort | undefined
   getShared(
     key: typeof WebRpcSharedKey.variationCoordinator

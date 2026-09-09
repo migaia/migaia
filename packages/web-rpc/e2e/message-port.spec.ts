@@ -45,7 +45,7 @@ test('browser MessagePort converges remote error, timeout, and caller abort', as
   expect(result.transportTerminalSnapshot).toMatchObject({
     phase: 'active',
     pending: 0,
-    chunks: 0
+    chunks: undefined
   })
   expect(result.pingSuccess).toBe(true)
   expect(result.pingTimeout).toBe(false)

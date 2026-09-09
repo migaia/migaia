@@ -6,7 +6,9 @@ import {
   WebRpcTransportError
 } from '../errors.js'
 import { WebRpcErrorText } from '../error-text.js'
-import { WebRpcMessageKind, WebRpcVariation } from '../protocol-constants.js'
+import { WebRpcVariation } from '../semantic-constants.js'
+import type { IRpcEnvelope } from '@migaia/rpc-contract'
+import { WebRpcRoutingProfile } from './routing-data.js'
 import type { IWebRpcAbortSignal, IWebRpcFanoutResult } from '../typing.js'
 import type { IWebRpcUuidConfig } from '../typing.js'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
@@ -59,6 +61,8 @@ export class WebRpcControlAttachment {
   readonly #maxIdentifierLength: number
   /** Prepared UUID capability reused for collision-safe control correlation IDs. */
   readonly #uuid: IWebRpcUuidConfig
+  /** Application contract version carried by canonical variation route metadata. */
+  readonly #applicationVersion: string
   /** Resolves a per-call timeout override against the canonical timeout capability default. */
   readonly #resolveTimeout: (override?: number | false) => number | false | undefined
 
@@ -75,6 +79,7 @@ export class WebRpcControlAttachment {
     this.#pingEnabled = prepared.options.features?.ping === true
     this.#maxIdentifierLength = prepared.options.contract?.maxIdentifierLength ?? 128
     this.#uuid = prepared.options.uuid ?? {}
+    this.#applicationVersion = prepared.options.contract?.version ?? '1.0.0'
     const timeout = prepared.options.timeout ?? {}
     const timeoutDefault = timeout.timeoutMs ?? 1000
     this.#resolveTimeout =
@@ -173,15 +178,12 @@ export class WebRpcControlAttachment {
         .then((selected) =>
           this.#ports.outboundOperations.send({
             kind: 'frame',
-            message: {
-              kind: WebRpcMessageKind.variation,
-              variation: WebRpcVariation.ping,
+            message: this.#variationEnvelope(
+              WebRpcVariation.ping,
               taskId,
-              senderId: this.#id,
               targetId,
-              sentAt: this.#ports.time.now(),
-              receiverId: selected.receiverId
-            }
+              selected.receiverId
+            )
           })
         )
         .catch((error) => {
@@ -245,36 +247,55 @@ export class WebRpcControlAttachment {
    */
   #receivePing(message: unknown): void {
     if (!this.#pingEnabled) return
-    const envelope = (
-      message as {
-        envelope?: { taskId?: string; senderId?: string; receiverId?: string }
-      }
-    ).envelope
-    if (!envelope?.taskId || !envelope.senderId) return
+    const record = message as {
+      envelope?: IRpcEnvelope
+      route?: { readonly webRpc?: { readonly senderId?: string; readonly receiverId?: string } }
+    }
+    const taskId = record.envelope?.kind === 'variation' ? record.envelope.id : undefined
+    const senderId = record.route?.webRpc?.senderId
+    if (!taskId || !senderId) return
     void this.#ports.outboundOperations
       .send({
         kind: 'frame',
-        message: {
-          kind: WebRpcMessageKind.variation,
-          variation: WebRpcVariation.pong,
-          taskId: envelope.taskId,
-          senderId: this.#id,
-          targetId: envelope.senderId,
-          sentAt: this.#ports.time.now(),
-          receiverId: envelope.senderId
-        }
+        message: this.#variationEnvelope(WebRpcVariation.pong, taskId, senderId, senderId)
       })
       .catch((error) => this.#ports.outboundOperations.send({ kind: 'report', error }))
   }
 
   /** Resolves only a pong admitted by the shared variation coordinator. */
   #receivePong(message: unknown): void {
-    const taskId = (message as { envelope?: { taskId?: string } }).envelope?.taskId
+    const envelope = (message as { envelope?: IRpcEnvelope }).envelope
+    const taskId = envelope?.kind === 'variation' ? envelope.id : undefined
     if (!taskId) return
     const pending = this.#pending.get(taskId)
     if (!pending) return
     if (pending.timer) this.#ports.time.clearTimeout(pending.timer)
     this.#pending.delete(taskId)
     pending.resolve(true)
+  }
+
+  /** Builds the one canonical variation envelope used by ping and pong traffic. */
+  #variationEnvelope(
+    variation: (typeof WebRpcVariation)[keyof typeof WebRpcVariation],
+    taskId: string,
+    targetId: string,
+    receiverId: string
+  ): IRpcEnvelope {
+    return {
+      kind: 'variation',
+      id: taskId,
+      data: {
+        webRpc: {
+          profile: WebRpcRoutingProfile,
+          type: 'variation',
+          applicationVersion: this.#applicationVersion,
+          senderId: this.#id,
+          targetId,
+          receiverId,
+          sentAt: this.#ports.time.now(),
+          variation
+        }
+      }
+    }
   }
 }

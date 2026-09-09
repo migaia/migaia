@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   abort,
-  chunk,
   connect,
   contract,
   hooks,
@@ -26,7 +25,6 @@ describe('middleware capabilities', () => {
       connect({ transport }),
       uuid(),
       timeout({ timeoutMs: 10 }),
-      chunk({ chunkSize: 8 }),
       hooks(),
       abort(),
       ping()
@@ -36,7 +34,6 @@ describe('middleware capabilities', () => {
       for (const [key, value] of installPlugin(middleware, transport)) values.set(key, value)
     expect(values.has('connectCapability')).toBe(true)
     expect(values.has('timeoutCapability')).toBe(true)
-    expect(values.has('chunkCapability')).toBe(true)
     expect(values.get('abortCapability')).toEqual({ enabled: true })
     expect(values.get('pingCapability')).toEqual({ enabled: true })
     const protocolResult = protocol().install(pluginScope()) as IWebRpcPluginInstallResult
@@ -48,7 +45,7 @@ describe('middleware capabilities', () => {
   })
 
   it('rejects invalid middleware configuration during installation', async () => {
-    const invalid = [timeout({ timeoutMs: -1 }), chunk({ chunkSize: 0 }), chunk({ chunkSize: 3 })]
+    const invalid = [timeout({ timeoutMs: -1 })]
     for (const middleware of invalid) {
       await expect(Promise.resolve().then(() => installPlugin(middleware))).rejects.toThrow()
     }
@@ -62,9 +59,6 @@ describe('middleware capabilities', () => {
       expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
     )
     expect(() => installPlugin(timeout(null as never))).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
-    )
-    expect(() => installPlugin(chunk(null as never))).toThrow(
       expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
     )
     expect(() => installPlugin(uuid(null as never))).toThrow(
@@ -110,19 +104,6 @@ describe('middleware capabilities', () => {
       }
     )
     expect(() => installPlugin(timeout(unreadable as never))).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
-    )
-  })
-  it('rejects unreadable chunk descriptors with INVALID_CONFIG', () => {
-    const unreadable = new Proxy(
-      {},
-      {
-        ownKeys() {
-          throw new Error('chunk keys')
-        }
-      }
-    )
-    expect(() => installPlugin(chunk(unreadable as never))).toThrow(
       expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
     )
   })

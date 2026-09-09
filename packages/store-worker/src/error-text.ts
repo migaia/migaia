@@ -13,6 +13,8 @@ export const StoreWorkerErrorText = {
   terminateOnDispose: '[store] worker options.terminateOnDispose must be boolean',
   stringOption: (name: string): string => `[store] worker options.${name} must be a string`,
   disposed: '[store] worker adapter is disposed',
+  requestAbortedBoundary: '[store] worker request aborted',
+  requestTimedOut: '[store] worker request timed out',
   invalidChunk: '[store] serialize worker returned an invalid chunk',
   aborted: (transferred: boolean): string =>
     `[store] serialize worker request aborted${transferred ? '; transferred input is detached and cannot be retried' : ''}`,

@@ -6,13 +6,98 @@ import {
   WebRpcSerializationError
 } from '../../src/errors.js'
 import { WebRpcOutboundSender } from '../../src/internal/outbound-sender.js'
-import { ReplayWindow } from '../../src/internal/replay.js'
-import { WebRpcMessageKind } from '../../src/protocol-constants.js'
+import { WebRpcErrorText } from '../../src/error-text.js'
 import type { IWebRpcAuthenticationTransform } from '../../src/typing.js'
 import type { IWebRpcTransport } from '../../src/transport.js'
+import { rpcProtocol, type IRpcEnvelope } from '@migaia/rpc-contract/v1'
+import { bindRpcFrameIngress } from '@migaia/rpc-contract/framing'
+import { messageFramer } from '@migaia/rpc-contract/framing/v1'
+import type { IWebRpcSelectedComponents } from '../../src/internal/endpoint-options.js'
+
+/** Builds the same selected component boundary production passes to the outbound sender. */
+function selectedStringComponents(
+  encode: (value: IRpcEnvelope) => string,
+  decode: (value: unknown) => IRpcEnvelope = (value) => rpcProtocol.normalize(value),
+  framer: IWebRpcSelectedComponents['framer'] = messageFramer
+): IWebRpcSelectedComponents {
+  return {
+    protocol: rpcProtocol,
+    codec: { id: 'test-string', version: 1, encodedType: 'string', encode, decode },
+    framer,
+    ingressPrepare: bindRpcFrameIngress(framer.accept, framer.frame),
+    shadowed: []
+  }
+}
+
+/** Creates a guarded test descriptor that proves sender behavior across selected physical frames. */
+function selectedTwoFrameComponents(
+  encode: (value: IRpcEnvelope) => string
+): IWebRpcSelectedComponents {
+  const framer: IWebRpcSelectedComponents['framer'] = {
+    id: 'sender-test',
+    version: 1,
+    inputEncodedType: 'string',
+    outputEncodedType: 'string',
+    frame(value, context) {
+      if (typeof value !== 'string')
+        throw new WebRpcSerializationError(WebRpcErrorText.protocolEncodedType('string'))
+      const frame = messageFramer.frame(value, context)
+      return [...frame, ...frame]
+    },
+    accept(frame, context) {
+      return messageFramer.accept(frame, context)
+    },
+    close(reason) {
+      messageFramer.close(reason)
+    }
+  }
+  return selectedStringComponents(encode, undefined, framer)
+}
+
+/** Creates a selected descriptor whose physical framing failure remains visible to the sender. */
+function selectedFailingFramerComponents(
+  encode: (value: IRpcEnvelope) => string,
+  failure: unknown
+): IWebRpcSelectedComponents {
+  const framer: IWebRpcSelectedComponents['framer'] = {
+    id: 'sender-failing-test',
+    version: 1,
+    inputEncodedType: 'string',
+    outputEncodedType: 'string',
+    frame() {
+      throw failure
+    },
+    accept(frame, context) {
+      return messageFramer.accept(frame, context)
+    },
+    close(reason) {
+      messageFramer.close(reason)
+    }
+  }
+  return selectedStringComponents(encode, undefined, framer)
+}
+
+/** Produces a minimal canonical semantic message for framing-only sender tests. */
+function canonicalRequest(id = 'task'): IRpcEnvelope {
+  return rpcProtocol.normalize({
+    kind: 'request',
+    id,
+    method: 'test',
+    data: {
+      webRpc: {
+        profile: 'web-rpc.route.v1',
+        type: 'request',
+        applicationVersion: '1',
+        senderId: 'a',
+        targetId: 'b',
+        sentAt: 0
+      }
+    }
+  })
+}
 
 describe('outbound sender encoded type boundary', () => {
-  it('preserves a non-transport ID admission error before allocating a chunk', () => {
+  it('preserves a semantic encode error before framing', () => {
     const admissionError = new WebRpcError(WebRpcErrorCode.overloaded, 'outbound capacity')
     const pipeline = new WebRpcOutboundSender(
       {
@@ -24,29 +109,23 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      { encodedType: 'string', encode: () => 'payload', decode: (value) => value },
-      {
-        chunkSize: 4,
-        byteLength: (value) => value.length,
-        split: () => ['payl', 'oad']
-      },
+      selectedStringComponents(() => {
+        throw admissionError
+      }),
       () => undefined
     )
 
     let thrown: unknown
     try {
-      pipeline.send({ targetId: 'b' }, () => {
-        throw admissionError
-      })
+      pipeline.send(canonicalRequest())
     } catch (error) {
       thrown = error
     }
-    expect(thrown).toBe(admissionError)
+    expect(thrown).toMatchObject({ code: WebRpcErrorCode.payloadInvalid, cause: admissionError })
   })
 
-  it('prepares every authenticated chunk before sending and releases once on failure', async () => {
+  it('prepares every authenticated selected frame before sending and retains first observed failure', async () => {
     let sends = 0
-    let releaseCount = 0
     let protectCalls = 0
     let rejectFirst: ((error: unknown) => void) | undefined
     let rejectSecond: ((error: unknown) => void) | undefined
@@ -62,12 +141,7 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      { encodedType: 'string', encode: () => 'payload', decode: (value) => value },
-      {
-        chunkSize: 4,
-        byteLength: (value) => value.length,
-        split: () => ['payl', 'oad']
-      },
+      selectedTwoFrameComponents(() => 'payload'),
       () => undefined,
       {
         enabled: true,
@@ -80,27 +154,22 @@ describe('outbound sender encoded type boundary', () => {
           })
         },
         unprotect: (value) => value
-      },
-      undefined,
-      () => {
-        releaseCount += 1
       }
     )
 
-    const pending = pipeline.send({ targetId: 'b' }, () => 'message')
+    const pending = pipeline.send(canonicalRequest())
     await vi.waitFor(() => expect(protectCalls).toBe(2))
     expect(sends).toBe(0)
-    rejectFirst?.(firstAuthenticationError)
     rejectSecond?.(secondAuthenticationError)
+    await Promise.resolve()
+    rejectFirst?.(firstAuthenticationError)
 
-    await expect(pending).rejects.toBe(firstAuthenticationError)
+    await expect(pending).rejects.toBe(secondAuthenticationError)
     expect(sends).toBe(0)
-    expect(releaseCount).toBe(1)
   })
 
-  it('keeps authentication failure primary when chunk ID cleanup also fails', async () => {
+  it('keeps an authentication failure reachable through the sender boundary', async () => {
     const authenticationError = new WebRpcAuthenticationError('authentication failure')
-    const cleanupError = new Error('message ID cleanup failure')
     const pipeline = new WebRpcOutboundSender(
       {
         platform: 'Memory' as const,
@@ -111,33 +180,22 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      { encodedType: 'string', encode: () => 'payload', decode: (value) => value },
-      {
-        chunkSize: 4,
-        byteLength: (value) => value.length,
-        split: () => ['payl', 'oad']
-      },
+      selectedStringComponents(() => 'payload'),
       () => undefined,
       {
         enabled: true,
         encodedType: 'string',
         protect: () => Promise.reject(authenticationError),
         unprotect: (value) => value
-      },
-      undefined,
-      () => {
-        throw cleanupError
       }
     )
 
-    const thrown = await Promise.resolve(pipeline.send({ targetId: 'b' }, () => 'message')).then(
+    const thrown = await Promise.resolve(pipeline.send(canonicalRequest())).then(
       () => undefined,
       (error: unknown) => error
     )
     expect(thrown).toMatchObject({ code: 'AUTHENTICATION_FAILED' })
-    expect((thrown as { cause?: AggregateError }).cause).toMatchObject({
-      errors: [authenticationError, cleanupError]
-    })
+    expect(thrown).toBe(authenticationError)
   })
 
   it.each([
@@ -175,8 +233,7 @@ describe('outbound sender encoded type boundary', () => {
           subscribe: () => () => undefined
         },
         'a',
-        { encodedType: 'string', encode: () => 'payload', decode: (value) => value },
-        { byteLength: (value) => value.length, split: (value) => [value] },
+        selectedStringComponents(() => 'payload'),
         () => undefined,
         {
           enabled: true,
@@ -186,7 +243,7 @@ describe('outbound sender encoded type boundary', () => {
         }
       )
 
-      const thrown = await Promise.resolve(pipeline.send({ targetId: 'b' }, () => 'message')).then(
+      const thrown = await Promise.resolve(pipeline.send(canonicalRequest())).then(
         () => undefined,
         (error: unknown) => error
       )
@@ -217,49 +274,41 @@ describe('outbound sender encoded type boundary', () => {
       label: 'returns an invalid encoded value',
       createProtect: (): IWebRpcAuthenticationTransform => () => 42
     }
-  ])('does not send chunks when authentication $label', async ({ label, createProtect }) => {
-    const cause = new Error(`chunk authentication ${label}`)
-    let sends = 0
-    let releases = 0
-    const pipeline = new WebRpcOutboundSender(
-      {
-        platform: 'Memory' as const,
-        encodedType: 'string',
-        send: () => {
-          sends += 1
+  ])(
+    'does not send framed messages when authentication $label',
+    async ({ label, createProtect }) => {
+      const cause = new Error(`frame authentication ${label}`)
+      let sends = 0
+      const pipeline = new WebRpcOutboundSender(
+        {
+          platform: 'Memory' as const,
+          encodedType: 'string',
+          send: () => {
+            sends += 1
+          },
+          subscribe: () => () => undefined
         },
-        subscribe: () => () => undefined
-      },
-      'a',
-      { encodedType: 'string', encode: () => 'payload', decode: (value) => value },
-      {
-        chunkSize: 4,
-        byteLength: (value) => value.length,
-        split: () => ['payl', 'oad']
-      },
-      () => undefined,
-      {
-        enabled: true,
-        encodedType: 'string',
-        protect: createProtect(cause),
-        unprotect: (value) => value
-      },
-      undefined,
-      () => {
-        releases += 1
-      }
-    )
+        'a',
+        selectedStringComponents(() => 'payload'),
+        () => undefined,
+        {
+          enabled: true,
+          encodedType: 'string',
+          protect: createProtect(cause),
+          unprotect: (value) => value
+        }
+      )
 
-    const thrown = await Promise.resolve(pipeline.send({ targetId: 'b' }, () => 'message')).then(
-      () => undefined,
-      (error: unknown) => error
-    )
-    expect(thrown).toMatchObject({ code: 'AUTHENTICATION_FAILED' })
-    if (label !== 'returns an invalid encoded value')
-      expect((thrown as { cause: unknown }).cause).toBe(cause)
-    expect(sends).toBe(0)
-    expect(releases).toBe(1)
-  })
+      const thrown = await Promise.resolve(pipeline.send(canonicalRequest())).then(
+        () => undefined,
+        (error: unknown) => error
+      )
+      expect(thrown).toMatchObject({ code: 'AUTHENTICATION_FAILED' })
+      if (label !== 'returns an invalid encoded value')
+        expect((thrown as { cause: unknown }).cause).toBe(cause)
+      expect(sends).toBe(0)
+    }
+  )
 
   it('preserves a class transport receiver for ordinary and chunked sends', async () => {
     class PrivateTransport implements IWebRpcTransport {
@@ -282,35 +331,18 @@ describe('outbound sender encoded type boundary', () => {
     }
 
     const transport = new PrivateTransport()
-    const protocol = {
-      encodedType: 'string' as const,
-      encode(value: unknown): string {
-        return typeof value === 'string' ? value : 'payload'
-      },
-      decode: (value: unknown) => value
-    }
-    const pipeline = new WebRpcOutboundSender(
+    const components = selectedStringComponents(() => 'payload')
+    const pipeline = new WebRpcOutboundSender(transport, 'a', components, () => undefined)
+
+    await pipeline.send(canonicalRequest())
+
+    const secondPipeline = new WebRpcOutboundSender(
       transport,
       'a',
-      protocol,
-      { byteLength: (value) => value.length, split: (value) => [value] },
+      selectedTwoFrameComponents(() => 'payload'),
       () => undefined
     )
-
-    await pipeline.send({ targetId: 'b' }, () => 'message')
-
-    const chunkedPipeline = new WebRpcOutboundSender(
-      transport,
-      'a',
-      protocol,
-      {
-        chunkSize: 4,
-        byteLength: (value) => value.length,
-        split: () => ['payl', 'oad']
-      },
-      () => undefined
-    )
-    await chunkedPipeline.send({ targetId: 'b' }, () => 'chunk-message')
+    await secondPipeline.send(canonicalRequest('second-message'))
 
     expect(transport.sendCount).toBe(3)
   })
@@ -335,8 +367,7 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      { encodedType: 'string', encode: () => 'payload', decode: (value) => value },
-      { byteLength: (value) => value.length, split: (value) => [value] },
+      selectedStringComponents(() => 'payload'),
       () => undefined
     )
     const options = {
@@ -346,12 +377,64 @@ describe('outbound sender encoded type boundary', () => {
         return transfer
       }
     }
-    await pipeline.send({ targetId: 'b' }, () => 'message', options)
+    await pipeline.send(canonicalRequest(), options)
     expect(transferReads).toBe(1)
     expect(transferLengthReads).toBe(1)
     expect(sent[0]?.transfer).not.toBe(transfer)
     expect(sent[0]?.transfer).toEqual([transfer[0]])
     expect(Object.isFrozen(sent[0]?.transfer)).toBe(true)
+  })
+
+  it('keeps the owned transfer snapshot through caller mutation and exposes the physical failure cause', async () => {
+    /** Represents the first caller-owned transferable preserved by the sender snapshot. */
+    const firstTransferable = {}
+    /** Represents the second caller-owned transferable preserved by the sender snapshot. */
+    const secondTransferable = {}
+    /** Represents a post-send caller mutation that must not alter the owned snapshot. */
+    const laterTransferable = {}
+    /** Holds caller-owned transfer state that becomes mutable after physical sending starts. */
+    const callerTransfer = [firstTransferable, secondTransferable]
+    /** Records the physical transport options after the outbound owner takes custody. */
+    const sent: Array<{ value: unknown; transfer?: readonly unknown[] }> = []
+    /** Is the exact physical rejection that must remain reachable as the wrapper cause. */
+    const physicalFailure = new Error('physical send failed')
+    /** Rejects the held physical send only after the caller mutation assertions run. */
+    let rejectPhysicalSend: ((reason?: unknown) => void) | undefined
+    const pipeline = new WebRpcOutboundSender(
+      {
+        platform: 'Memory' as const,
+        encodedType: 'string',
+        send(value, options) {
+          sent.push({ value, transfer: options?.transfer })
+          return new Promise<void>((_resolve, reject) => {
+            rejectPhysicalSend = reject
+          })
+        },
+        subscribe: () => () => undefined
+      },
+      'a',
+      selectedStringComponents(() => 'payload'),
+      () => undefined
+    )
+
+    /** Observes the outbound result across the held physical transport boundary. */
+    const pending = Promise.resolve(pipeline.send(canonicalRequest(), { transfer: callerTransfer }))
+    await vi.waitFor(() => expect(sent).toHaveLength(1))
+
+    callerTransfer.splice(0, callerTransfer.length, laterTransferable)
+    expect(sent[0]?.transfer).toEqual([firstTransferable, secondTransferable])
+    expect(sent[0]?.transfer?.[0]).toBe(firstTransferable)
+    expect(sent[0]?.transfer?.[1]).toBe(secondTransferable)
+    expect(Object.isFrozen(sent[0]?.transfer)).toBe(true)
+
+    rejectPhysicalSend?.(physicalFailure)
+    /** Captures the normalized outbound rejection for code and cause identity assertions. */
+    const failure = await pending.then(
+      () => undefined,
+      (error: unknown) => error
+    )
+    expect(failure).toMatchObject({ code: WebRpcErrorCode.transport })
+    expect((failure as { cause?: unknown }).cause).toBe(physicalFailure)
   })
 
   it('rejects a hostile transfer getter without sending', () => {
@@ -366,8 +449,7 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      { encodedType: 'string', encode: () => 'payload', decode: (value) => value },
-      { byteLength: (value) => value.length, split: (value) => [value] },
+      selectedStringComponents(() => 'payload'),
       () => undefined
     )
     const options = Object.defineProperty({}, 'transfer', {
@@ -375,20 +457,14 @@ describe('outbound sender encoded type boundary', () => {
         throw new Error('hostile transfer')
       }
     })
-    expect(() => pipeline.send({ targetId: 'b' }, () => 'message', options)).toThrow(
+    expect(() => pipeline.send(canonicalRequest(), options)).toThrow(
       'Transfer list must be an array'
     )
     expect(sends).toBe(0)
   })
 
-  it('encodes every chunk frame before starting transport and releases on encode failure', async () => {
+  it('reports one semantic encode failure before framing or transport send', async () => {
     let sends = 0
-    let releaseCount = 0
-    let unhandled: unknown
-    const onUnhandledRejection = (reason: unknown): void => {
-      unhandled = reason
-    }
-    process.on('unhandledRejection', onUnhandledRejection)
     const encodeError = new Error('frame encode failed')
     const pipeline = new WebRpcOutboundSender(
       {
@@ -401,53 +477,14 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      {
-        encodedType: 'string',
-        encode(value) {
-          if (
-            typeof value === 'object' &&
-            value !== null &&
-            (value as { kind?: string }).kind === WebRpcMessageKind.chunk &&
-            (value as { index?: number }).index === 1
-          )
-            throw encodeError
-          return typeof value === 'object' && value !== null
-            ? (value as { kind?: string }).kind === WebRpcMessageKind.chunk
-              ? 'frame'
-              : 'payload'
-            : value
-        },
-        decode: (value) => value
-      },
-      {
-        chunkSize: 4,
-        byteLength: (value) => value.length,
-        split: () => ['payl', 'oad']
-      },
-      () => undefined,
-      undefined,
-      undefined,
-      () => {
-        releaseCount += 1
-      }
+      selectedStringComponents(() => {
+        throw encodeError
+      }),
+      () => undefined
     )
 
-    try {
-      let thrown: unknown
-      try {
-        pipeline.send({ targetId: 'b' }, () => 'message')
-      } catch (error) {
-        thrown = error
-      }
-      expect(thrown).toBeInstanceOf(WebRpcSerializationError)
-      expect(thrown).toMatchObject({ code: 'PAYLOAD_INVALID', cause: encodeError })
-      expect(sends).toBe(0)
-      expect(releaseCount).toBe(1)
-      await Promise.resolve()
-      expect(unhandled).toBeUndefined()
-    } finally {
-      process.off('unhandledRejection', onUnhandledRejection)
-    }
+    expect(() => pipeline.send(canonicalRequest())).toThrow(WebRpcSerializationError)
+    expect(sends).toBe(0)
   })
 
   it('protects variation frames through the authentication capability', async () => {
@@ -463,8 +500,7 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      { encodedType: 'string', encode: () => 'variation', decode: (value) => value },
-      { byteLength: (value) => value.length, split: (value) => [value] },
+      selectedStringComponents(() => 'variation'),
       () => undefined,
       {
         enabled: true,
@@ -477,29 +513,32 @@ describe('outbound sender encoded type boundary', () => {
       }
     )
 
-    await pipeline.sendVariation({})
+    await pipeline.sendVariation(canonicalRequest())
     expect(protectedValue).toBe('variation')
     expect(sentValue).toBe('variation:protected')
   })
 
-  it('rejects a custom byteLength that undercounts canonical UTF-8 bytes', () => {
+  it('sends every physical frame selected by the canonical framer', async () => {
+    const frames: unknown[] = []
     const pipeline = new WebRpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'string' as const,
-        send: () => undefined,
+        send(value) {
+          frames.push(value)
+        },
         subscribe: () => () => undefined
       },
       'a',
-      { encodedType: 'string', encode: () => '😀', decode: (value) => value },
-      { maxMessageBytes: 100, byteLength: () => 1, split: (value) => [value] },
+      selectedStringComponents(() => 'payload'),
       () => undefined
     )
-    expect(() => pipeline.send({ targetId: 'b' }, () => 'message')).toThrow('unsafe measurement')
+    await pipeline.send(canonicalRequest())
+    expect(frames).toHaveLength(1)
   })
 
-  it('encodes chunk metadata through the protocol boundary', async () => {
-    const encoded: unknown[] = []
+  it('encodes once and sends every frame produced by the selected framer', async () => {
+    let encodes = 0
     const sends: unknown[] = []
     const pipeline = new WebRpcOutboundSender(
       {
@@ -511,36 +550,18 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      {
-        encodedType: 'string',
-        encode: (value) => {
-          encoded.push(value)
-          return JSON.stringify(value)
-        },
-        decode: (value) => value
-      },
-      {
-        chunkSize: 4,
-        byteLength: (value) => value.length,
-        split: (value) => {
-          const parts: string[] = []
-          for (let index = 0; index < value.length; index += 4)
-            parts.push(value.slice(index, index + 4))
-          return parts
-        }
-      },
+      selectedTwoFrameComponents(() => {
+        encodes += 1
+        return 'payload'
+      }),
       () => undefined
     )
-    await pipeline.send({ targetId: 'b', data: 'payload' }, () => 'message')
-    const frames = encoded.slice(1) as Array<Record<string, unknown>>
-    expect(frames.length).toBeGreaterThan(1)
-    expect(frames.every((frame) => frame.kind === 'chunk')).toBe(true)
-    expect(frames.every((frame) => frame.messageId === 'message')).toBe(true)
-    expect(frames.every((frame) => frame.total === frames.length)).toBe(true)
-    expect(sends).toHaveLength(frames.length)
+    await pipeline.send(canonicalRequest())
+    expect(encodes).toBe(1)
+    expect(sends).toHaveLength(2)
   })
 
-  it('rejects codec output that violates the transport type before send', () => {
+  it('rejects a codec failure before send', () => {
     let sends = 0
     const pipeline = new WebRpcOutboundSender(
       {
@@ -552,21 +573,12 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      {
-        encodedType: 'string',
-        encode: () => ({ invalid: true }),
-        decode: (value) => value
-      },
-      {
-        chunkSize: undefined,
-        byteLength: (value) => value.length,
-        split: (value) => [value]
-      },
+      selectedStringComponents(() => {
+        throw new WebRpcSerializationError(WebRpcErrorText.protocolEncodedType('string'))
+      }),
       () => undefined
     )
-    expect(() => pipeline.send({ targetId: 'b' }, () => 'message')).toThrow(
-      'Protocol encode failed'
-    )
+    expect(() => pipeline.send(canonicalRequest())).toThrow('Protocol encode failed')
     expect(sends).toBe(0)
   })
   it('normalizes a synchronous transport throw into a rejected promise', async () => {
@@ -580,23 +592,14 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      {
-        encodedType: 'any',
-        encode: (value) => value,
-        decode: (value) => value
-      },
-      {
-        byteLength: (value) => value.length,
-        split: (value) => [value]
-      },
+      selectedStringComponents(() => 'payload'),
       () => undefined
     )
-    await expect(pipeline.send({ targetId: 'b' }, () => 'message')).rejects.toMatchObject({
+    await expect(pipeline.send(canonicalRequest())).rejects.toMatchObject({
       code: 'TRANSPORT'
     })
   })
-  it('releases a chunk message id when any frame send fails', async () => {
-    let released: string | undefined
+  it('reports transport failure when any selected frame send fails', async () => {
     const pipeline = new WebRpcOutboundSender(
       {
         platform: 'Memory' as const,
@@ -605,42 +608,14 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      {
-        encodedType: 'string',
-        encode: (value) =>
-          typeof value === 'object' &&
-          value !== null &&
-          (value as { kind?: string }).kind === WebRpcMessageKind.chunk
-            ? JSON.stringify(value)
-            : 'payload',
-        decode: (value) => value
-      },
-      {
-        chunkSize: 4,
-        byteLength: (value) => value.length,
-        split: (value) => {
-          const parts: string[] = []
-          for (let index = 0; index < value.length; index += 4)
-            parts.push(value.slice(index, index + 4))
-          return parts
-        }
-      },
-      () => undefined,
-      undefined,
-      undefined,
-      (messageId) => {
-        released = messageId
-      }
+      selectedTwoFrameComponents(() => 'payload'),
+      () => undefined
     )
-    await expect(
-      pipeline.send({ targetId: 'b', data: 'payload' }, () => 'message')
-    ).rejects.toMatchObject({ code: 'TRANSPORT' })
-    expect(released).toBe('message')
+    await expect(pipeline.send(canonicalRequest())).rejects.toMatchObject({ code: 'TRANSPORT' })
   })
 
-  it('HR-T01 waits for every frame send to settle before releasing the message id', async () => {
+  it('HR-T01 waits for every selected frame send to settle before rejecting', async () => {
     let sendCount = 0
-    let releaseCount = 0
     let rejectFirst: ((error: unknown) => void) | undefined
     let resolveSecond: (() => void) | undefined
     const firstFailure = new Error('first frame failed')
@@ -661,271 +636,64 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      {
-        encodedType: 'string',
-        encode: (value) =>
-          typeof value === 'object' &&
-          value !== null &&
-          (value as { kind?: string }).kind === WebRpcMessageKind.chunk
-            ? JSON.stringify(value)
-            : 'payload',
-        decode: (value) => value
-      },
-      {
-        chunkSize: 4,
-        byteLength: (value) => value.length,
-        split: () => ['payl', 'oad']
-      },
-      () => undefined,
-      undefined,
-      undefined,
-      () => {
-        releaseCount += 1
-      }
+      selectedTwoFrameComponents(() => 'payload'),
+      () => undefined
     )
 
-    const result = pipeline.send({ targetId: 'b', data: 'payload' }, () => 'message')
+    const result = pipeline.send(canonicalRequest())
     const observed = Promise.resolve(result).catch((error: unknown) => error)
+    let settled = false
+    void observed.then(() => {
+      settled = true
+    })
     await vi.waitFor(() => expect(sendCount).toBe(2))
 
     rejectFirst?.(firstFailure)
     await Promise.resolve()
-    expect(releaseCount).toBe(0)
+    expect(settled).toBe(false)
 
     resolveSecond?.()
     await expect(observed).resolves.toMatchObject({
       code: 'TRANSPORT',
       cause: firstFailure
     })
-    expect(releaseCount).toBe(1)
   })
 
-  it('keeps a pending chunk id active past TTL and tombstones it after all sends settle', async () => {
-    vi.useFakeTimers()
-    try {
-      const replay = new ReplayWindow(1, 100)
-      let resolveFirst: (() => void) | undefined
-      let resolveSecond: (() => void) | undefined
-      let sendCount = 0
-      const pipeline = new WebRpcOutboundSender(
-        {
-          platform: 'Memory' as const,
-          encodedType: 'string',
-          send: () => {
-            sendCount += 1
-            return new Promise<void>((resolve) => {
-              if (sendCount === 1) resolveFirst = resolve
-              else resolveSecond = resolve
-            })
-          },
-          subscribe: () => () => undefined
-        },
-        'a',
-        {
-          encodedType: 'string',
-          encode: (value) =>
-            typeof value === 'object' &&
-            value !== null &&
-            (value as { kind?: string }).kind === WebRpcMessageKind.chunk
-              ? JSON.stringify(value)
-              : 'payload',
-          decode: (value) => value
-        },
-        {
-          chunkSize: 4,
-          byteLength: (value) => value.length,
-          split: () => ['payl', 'oad']
-        },
-        () => undefined,
-        undefined,
-        undefined,
-        (messageId) => replay.releaseId(messageId)
-      )
-
-      const pending = pipeline.send({ targetId: 'b', data: 'payload' }, (target) => {
-        expect(target).toBe('b')
-        expect(replay.reserveId('message')).toBe(true)
-        return 'message'
-      })
-      await vi.waitFor(() => expect(sendCount).toBe(2))
-      vi.advanceTimersByTime(100)
-      expect(replay.hasReservedId('message')).toBe(true)
-      expect(replay.reserveId('message')).toBe(false)
-
-      resolveFirst?.()
-      resolveSecond?.()
-      await expect(pending).resolves.toBeUndefined()
-      expect(replay.hasReservedId('message')).toBe(true)
-      vi.advanceTimersByTime(100)
-      expect(replay.hasReservedId('message')).toBe(false)
-      expect(replay.reserveId('message')).toBe(true)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('HR-T02 keeps the frame encoding error primary when message id cleanup also fails', () => {
-    const encodeError = new Error('frame encode failed')
-    const cleanupError = new Error('message id cleanup failed')
+  it('HR-T02 retains a selected-framer failure as the primary sender cause', () => {
+    const frameError = new Error('frame encode failed')
+    let encodes = 0
+    let sends = 0
     const pipeline = new WebRpcOutboundSender(
       {
         platform: 'Memory' as const,
         encodedType: 'string',
-        send: () => undefined,
+        send() {
+          sends += 1
+        },
         subscribe: () => () => undefined
       },
       'a',
-      {
-        encodedType: 'string',
-        encode(value) {
-          if (
-            typeof value === 'object' &&
-            value !== null &&
-            (value as { kind?: string }).kind === WebRpcMessageKind.chunk &&
-            (value as { index?: number }).index === 1
-          )
-            throw encodeError
-          return typeof value === 'object' && value !== null
-            ? (value as { kind?: string }).kind === WebRpcMessageKind.chunk
-              ? 'frame'
-              : 'payload'
-            : value
-        },
-        decode: (value) => value
-      },
-      {
-        chunkSize: 4,
-        byteLength: (value) => value.length,
-        split: () => ['payl', 'oad']
-      },
-      () => undefined,
-      undefined,
-      undefined,
-      () => {
-        throw cleanupError
-      }
+      selectedFailingFramerComponents(() => {
+        encodes += 1
+        return 'payload'
+      }, frameError),
+      () => undefined
     )
 
     let thrown: unknown
     try {
-      pipeline.send({ targetId: 'b', data: 'payload' }, () => 'message')
+      pipeline.send(canonicalRequest())
     } catch (error) {
       thrown = error
     }
-    expect(thrown).toMatchObject({ code: 'PAYLOAD_INVALID' })
-    expect((thrown as { cause?: AggregateError }).cause).toMatchObject({
-      errors: [encodeError, cleanupError]
-    })
-  })
-
-  it('rejects a splitter result above the configured frame budget', () => {
-    const pipeline = new WebRpcOutboundSender(
-      {
-        platform: 'Memory' as const,
-        encodedType: 'string',
-        send() {},
-        subscribe: () => () => undefined
-      },
-      'a',
-      {
-        encodedType: 'string',
-        encode: (value) => JSON.stringify(value),
-        decode: (value) => value
-      },
-      {
-        chunkSize: 8,
-        maxChunksPerMessage: 1,
-        byteLength: (value) => new TextEncoder().encode(value).byteLength,
-        split: () => ['part', 'more']
-      },
-      () => undefined
-    )
-    expect(() => pipeline.send({ targetId: 'b', data: 'payload' }, () => 'message')).toThrow(
-      'Chunk splitter returned invalid frames'
-    )
-  })
-  it('rejects parts above the receiver single-frame byte budget', () => {
-    const pipeline = new WebRpcOutboundSender(
-      {
-        platform: 'Memory' as const,
-        encodedType: 'string',
-        send() {},
-        subscribe: () => () => undefined
-      },
-      'a',
-      {
-        encodedType: 'string',
-        encode: (value) => JSON.stringify(value),
-        decode: (value) => value
-      },
-      {
-        chunkSize: 4,
-        maxChunkBytes: 3,
-        byteLength: (value) => value.length,
-        split: (value) => [value.slice(0, 4), value.slice(4)]
-      },
-      () => undefined
-    )
-    expect(() => pipeline.send({ targetId: 'b', data: 'payload' }, () => 'message')).toThrow(
-      'Chunk splitter returned invalid frames'
-    )
-  })
-  it.each([
-    ['empty output', () => [] as string[]],
-    ['non-joining output', () => ['not', 'the', 'payload']],
-    ['empty part', () => ['payload', '']],
-    ['non-string part', () => ['payload', 1] as never]
-  ])('rejects splitter %s before allocating a message id or sending', (_name, split) => {
-    let sends = 0
-    let ids = 0
-    const pipeline = new WebRpcOutboundSender(
-      {
-        platform: 'Memory' as const,
-        encodedType: 'string',
-        send() {
-          sends += 1
-        },
-        subscribe: () => () => undefined
-      },
-      'a',
-      {
-        encodedType: 'string',
-        encode: (value) => JSON.stringify(value),
-        decode: (value) => value
-      },
-      {
-        chunkSize: 4,
-        byteLength: (value) => value.length,
-        split
-      },
-      () => undefined
-    )
-    expect(() =>
-      pipeline.send({ targetId: 'b', data: 'payload' }, () => {
-        ids += 1
-        return 'message'
-      })
-    ).toThrow('Chunk splitter returned invalid frames')
-    expect(ids).toBe(0)
+    expect(thrown).toMatchObject({ code: WebRpcErrorCode.payloadInvalid, cause: frameError })
+    expect(encodes).toBe(1)
     expect(sends).toBe(0)
   })
 
-  it('rejects oversized splitter arrays before reading any part', () => {
-    let indexReads = 0
-    let lengthReads = 0
+  it('does not send when the selected codec rejects before framing', () => {
+    const failure = new Error('selected codec failed')
     let sends = 0
-    let ids = 0
-    const split = (): readonly string[] =>
-      new Proxy(
-        Array.from({ length: 3 }, () => ''),
-        {
-          get(target, property, receiver) {
-            if (property === 'length') lengthReads += 1
-            if (property !== 'length' && property !== 'join') indexReads += 1
-            return Reflect.get(target, property, receiver)
-          }
-        }
-      )
     const pipeline = new WebRpcOutboundSender(
       {
         platform: 'Memory' as const,
@@ -936,28 +704,37 @@ describe('outbound sender encoded type boundary', () => {
         subscribe: () => () => undefined
       },
       'a',
-      {
-        encodedType: 'string',
-        encode: (value) => JSON.stringify(value),
-        decode: (value) => value
-      },
-      {
-        chunkSize: 4,
-        maxChunksPerMessage: 2,
-        byteLength: (value) => value.length,
-        split
-      },
+      selectedStringComponents(() => {
+        throw failure
+      }),
       () => undefined
     )
-    expect(() =>
-      pipeline.send({ targetId: 'b', data: 'payload' }, () => {
-        ids += 1
-        return 'message'
-      })
-    ).toThrow('Chunk splitter returned invalid frames')
-    expect(lengthReads).toBe(1)
-    expect(indexReads).toBe(0)
-    expect(ids).toBe(0)
+    expect(() => pipeline.send(canonicalRequest())).toThrow(WebRpcSerializationError)
+    expect(sends).toBe(0)
+  })
+  it('does not send when a selected framer rejects', () => {
+    const failure = new Error('selected framer failed')
+    let sends = 0
+    const pipeline = new WebRpcOutboundSender(
+      {
+        platform: 'Memory' as const,
+        encodedType: 'string',
+        send() {
+          sends += 1
+        },
+        subscribe: () => () => undefined
+      },
+      'a',
+      selectedFailingFramerComponents(() => 'payload', failure),
+      () => undefined
+    )
+    let thrown: unknown
+    try {
+      pipeline.send(canonicalRequest())
+    } catch (error) {
+      thrown = error
+    }
+    expect(thrown).toMatchObject({ code: WebRpcErrorCode.payloadInvalid, cause: failure })
     expect(sends).toBe(0)
   })
 })

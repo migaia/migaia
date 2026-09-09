@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "@migaia/reactive": "workspace:^",
+    "@migaia/rpc-contract": "workspace:^",
     "@migaia/resource": "workspace:^",
     "@migaia/serialize": "workspace:^",
     "@migaia/utils": "workspace:^",

@@ -1,4 +1,6 @@
 import type { IWebRpcProvider } from '../typing.js'
+import { messageFramer } from '@migaia/rpc-contract/framing/v1'
+import type { IWebRpcSelectedComponents } from './endpoint-options.js'
 
 /** Snapshot of endpoint-owned lifecycle state exposed only to package tests. */
 export type IWebRpcEndpointDebugSnapshot = {
@@ -11,7 +13,7 @@ export type IWebRpcEndpointDebugSnapshot = {
     readonly admission: number
     readonly replay: number
   }
-  readonly chunks: number
+  readonly chunks: number | undefined
   readonly providers: number
   readonly events: number
   readonly hooks: number
@@ -28,6 +30,18 @@ export type IWebRpcEndpointDebugSnapshot = {
     readonly inboundQueries: number
     readonly inboundTimers: number
   }
+}
+
+/** Projects only the proven stateless native message framer; custom framing state remains opaque. */
+export function readSelectedFramerChunks(
+  components: IWebRpcSelectedComponents
+): number | undefined {
+  const framer = components.framer
+  return framer.frame === messageFramer.frame &&
+    framer.accept === messageFramer.accept &&
+    framer.close === messageFramer.close
+    ? 0
+    : undefined
 }
 
 /** Immutable provider registration fact recorded at the canonical registry boundary. */

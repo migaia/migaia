@@ -345,7 +345,7 @@ for (const [rowId, title] of Object.entries({
   'MET-RED-011': 'proves MET-RED-011 keeps replay admission in ReplayWindow',
   'MET-RED-012': 'proves MET-RED-012 keeps peer leases in PeerRegistry',
   'MET-RED-013': 'proves MET-RED-013 keeps provider admission in ProviderAdmissionRegistry',
-  'MET-RED-014': 'proves MET-RED-014 keeps chunk assembly in ChunkAssembler',
+  'MET-RED-014': 'proves MET-RED-014 keeps chunk assembly in the D13 framer owner',
   'MET-RED-015': 'proves MET-RED-015 installs dependencies before the requesting feature',
   'MET-RED-017': 'proves MET-RED-017 accepts only package-minted feature definitions',
   'MET-RED-018': 'proves MET-RED-018 rejects shadow public writes before install effects',
@@ -355,7 +355,7 @@ for (const [rowId, title] of Object.entries({
   'MET-RED-025': 'proves MET-RED-025 injects one canonical dependency owner without public leakage',
   'MET-RED-026': 'proves MET-RED-026 slim features use canonical lifecycle owners',
   'MET-RED-027': 'proves MET-RED-027 does not leak implicit dependency surfaces',
-  'MET-RED-028': 'proves MET-RED-028 gives chunk expiry one injected timer owner',
+  'MET-RED-028': 'proves MET-RED-028 gives D13 framing expiry one injected timer owner',
   'MET-RED-029': 'proves MET-RED-029 returns the canonical root projection without a full wrapper',
   'MET-RED-030': 'proves MET-RED-030 uses canonical configuration error semantics',
   'MET-RED-032': 'proves MET-RED-032 keeps diagnostic cleanup at the Host disposal boundary'

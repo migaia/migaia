@@ -6,7 +6,6 @@ import { connect } from '../src/middleware/connect.js'
 import { ping } from '../src/middleware/ping.js'
 import { uuid } from '../src/middleware/uuid.js'
 import { WebRpcError, WebRpcContractError } from '../src/errors.js'
-import { WebRpcMessageKind } from '../src/protocol-constants.js'
 import {
   readEndpointDebugSnapshot,
   registerEndpointTimePortObserver,
@@ -146,9 +145,9 @@ describe('composed root ping() parity', () => {
     const clientTransport: IWebRpcTransport = {
       ...baseClientTransport,
       send(message, options) {
-        const candidate = message as { readonly kind?: unknown; readonly taskId?: unknown }
-        if (candidate.kind === WebRpcMessageKind.variation && typeof candidate.taskId === 'string')
-          taskIds.push(candidate.taskId)
+        const candidate = message as { readonly kind?: unknown; readonly id?: unknown }
+        if (candidate.kind === 'variation' && typeof candidate.id === 'string')
+          taskIds.push(candidate.id)
         return baseClientTransport.send(message, options)
       }
     }

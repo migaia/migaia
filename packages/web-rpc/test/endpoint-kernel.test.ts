@@ -9,6 +9,8 @@ import {
 import { WebRpcErrorCode } from '../src/errors.js'
 import type { IWebRpcInboundMessage, IWebRpcTransport } from '../src/transport.js'
 import { createEndpointTransportActivation } from '../src/internal/transport-activation.js'
+import { WebRpcCanonicalChunkAttachment } from '../src/internal/canonical-chunk-attachment.js'
+import { createStringFramer } from '@migaia/rpc-contract/framing'
 
 /** Creates callbacks that expose transport ownership without adding feature behavior. */
 const callbacks = (
@@ -53,7 +55,130 @@ const disposeKernel = (
   return terminal
 }
 
+/** Fails with one stable message if the canonical attachment regains the retired semantic route. */
+async function assertNoLegacyChunkRoute(
+  kernel: ReturnType<typeof createEndpointKernel>
+): Promise<void> {
+  if (await kernel.dispatchRoute('chunk', { legacy: true }))
+    throw new Error('Canonical chunk attachment retained forbidden legacy chunk route authority')
+}
+
+/** Releases the local kernel resources after a direct attachment probe. */
+async function disposeAttachmentProbe(
+  kernel: ReturnType<typeof createEndpointKernel>
+): Promise<void> {
+  kernel.beginClose()
+  await kernel.resources.releaseAll()
+  kernel.completeDispose()
+}
+
 describe('canonical endpoint kernel', () => {
+  it('keeps canonical attachment out of the retired semantic chunk route', async () => {
+    /** Installs the real attachment, optionally recreating only the retired route in a proxy. */
+    const install = (restoreLegacyRoute = false): ReturnType<typeof createEndpointKernel> => {
+      const kernel = createEndpointKernel({
+        platform: 'Memory',
+        ownership: 'owned',
+        send: () => undefined,
+        subscribe: () => () => undefined
+      })
+      const attachmentKernel = restoreLegacyRoute
+        ? new Proxy(kernel, {
+            get(target, key) {
+              if (key === 'registerOwner')
+                return (owner: string, value: object) => {
+                  target.registerOwner(owner, value)
+                  target.registerRoute('chunk', () => undefined)
+                }
+              return Reflect.get(target, key, target)
+            }
+          })
+        : kernel
+      new WebRpcCanonicalChunkAttachment(attachmentKernel, createStringFramer({ chunkBytes: 64 }))
+      return kernel
+    }
+
+    const baseline = install()
+    try {
+      expect(baseline.ownerKeys).toContain('chunk-assembler')
+      await assertNoLegacyChunkRoute(baseline)
+    } finally {
+      await disposeAttachmentProbe(baseline)
+    }
+
+    const mutated = install(true)
+    try {
+      expect(mutated.ownerKeys).toContain('chunk-assembler')
+      await expect(assertNoLegacyChunkRoute(mutated)).rejects.toThrow(
+        'Canonical chunk attachment retained forbidden legacy chunk route authority'
+      )
+    } finally {
+      await disposeAttachmentProbe(mutated)
+    }
+
+    const restored = install()
+    try {
+      expect(restored.ownerKeys).toContain('chunk-assembler')
+      await assertNoLegacyChunkRoute(restored)
+    } finally {
+      await disposeAttachmentProbe(restored)
+    }
+  })
+
+  it('closes selected framer synchronously once with the first kernel reason', async () => {
+    const kernel = createEndpointKernel({
+      platform: 'Memory',
+      ownership: 'owned',
+      send: () => undefined,
+      subscribe: () => () => undefined
+    })
+    const native = createStringFramer({ chunkBytes: 64 })
+    const first = new Error('first')
+    const second = new Error('second')
+    const reasons: unknown[] = []
+    new WebRpcCanonicalChunkAttachment(kernel, {
+      ...native,
+      close: (reason) => {
+        reasons.push(reason)
+        native.close(reason)
+      }
+    })
+    kernel.beginClose(first)
+    kernel.beginClose(second)
+    expect(reasons).toHaveLength(1)
+    expect(reasons[0]).toBe(first)
+    await kernel.resources.releaseAll()
+    expect(reasons).toHaveLength(1)
+    expect(reasons[0]).toBe(first)
+  })
+
+  it('keeps the first close reason, aborts synchronously, and increments generation once', () => {
+    const kernel = createEndpointKernel({
+      platform: 'Memory',
+      ownership: 'owned',
+      send: () => undefined,
+      subscribe: () => () => undefined
+    })
+    const firstReason = new Error('first close')
+    const secondReason = new Error('second close')
+
+    kernel.beginClose(firstReason)
+    kernel.beginClose(secondReason)
+
+    expect(kernel.closingSignal.aborted).toBe(true)
+    expect(kernel.closingSignal.reason).toBe(firstReason)
+    expect(kernel.generation).toBe(1)
+
+    const noArgumentKernel = createEndpointKernel({
+      platform: 'Memory',
+      ownership: 'owned',
+      send: () => undefined,
+      subscribe: () => () => undefined
+    })
+    noArgumentKernel.beginClose()
+    expect(noArgumentKernel.closingSignal.reason).toMatchObject({ name: 'AbortError' })
+  })
+
   it('owns one receiver, constant-time routes, and one terminal Promise', async () => {
     const events: string[] = []
     let listener: ((message: IWebRpcInboundMessage<unknown>) => void) | undefined

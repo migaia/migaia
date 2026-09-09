@@ -1,24 +1,13 @@
 import type { IRuntime } from '@migaia/reactive'
 import { defaultRuntime } from '@migaia/reactive'
-import { WebRpcPlatform } from '@migaia/web-rpc/protocol-constants'
 import { Resource, type IResourceOptions } from '@migaia/resource'
-import {
-  abort,
-  connect,
-  protocol,
-  timeout,
-  type IWebRpcAbortSignal,
-  type IWebRpcEndpoint
-} from '@migaia/web-rpc'
-import { createClientEndpoint } from '@migaia/web-rpc/client'
-import { createProviderEndpoint } from '@migaia/web-rpc/provider'
-import {
-  createWebWorkerTransport,
-  type IWebWorkerLikePort
-} from '@migaia/web-rpc/adapters/web-worker'
+import type { IWebRpcAbortSignal } from '@migaia/web-rpc'
+import { createWorkerContractEndpoint, type IWorkerContractEndpoint } from './worker-contract.js'
+import type { IWebWorkerLikePort } from '@migaia/web-rpc/adapters/web-worker'
 import { toManagedRpcHandler, type IManagedRpcHandler } from './managed-rpc-handler.js'
 import { createStoreWorkerError, STORE_WORKER_SOURCE, StoreWorkerErrorCode } from './errors.js'
 import { StoreWorkerErrorText } from './error-text.js'
+import { WorkerRpcIdentity } from './worker-constants.js'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 export type { IManagedRpcHandler } from './managed-rpc-handler.js'
@@ -83,23 +72,16 @@ function snapshotWorkerRequestOptions(options: object): {
 function createWorkerEndpoint(
   port: IWorkerPort,
   options: { readonly clientId?: string; readonly timeoutMs?: number }
-): Promise<IWebRpcEndpoint<'worker', 'automatic', false>> {
-  const transport = createWebWorkerTransport(port, { peerId: 'worker' })
-  return createClientEndpoint({
-    id: options.clientId ?? 'main',
-    targetIds: ['worker'],
-    transport,
-    middlewares: [
-      connect({ transport }),
-      protocol(),
-      abort(),
-      timeout({ timeoutMs: options.timeoutMs })
-    ]
-  }) as Promise<IWebRpcEndpoint<'worker', 'automatic', false>>
+): Promise<IWorkerContractEndpoint> {
+  return createWorkerContractEndpoint(port, {
+    id: options.clientId ?? WorkerRpcIdentity.main,
+    targetId: WorkerRpcIdentity.worker,
+    timeoutMs: options.timeoutMs
+  })
 }
 
 export class WorkerAdapter {
-  #endpoint: Promise<IWebRpcEndpoint<'worker', 'automatic', false>>
+  #endpoint: Promise<IWorkerContractEndpoint>
   #disposed = false
   #disposePromise: Promise<void> | undefined
 
@@ -133,9 +115,14 @@ export class WorkerAdapter {
     } catch (error) {
       return Promise.reject(error)
     }
-    return this.#endpoint.then((endpoint) =>
-      endpoint.send<Output>('worker', 'call', payload, requestOptions)
-    )
+    return this.#endpoint.then((endpoint) => {
+      if (this.#disposed)
+        throw createStoreWorkerError(
+          StoreWorkerErrorCode.adapterDisposed,
+          StoreWorkerErrorText.disposed
+        )
+      return endpoint.request(payload, requestOptions).then((result) => result as Output)
+    })
   }
 
   /** 同步标记不可用：仅置 `disposed = true`，不释放底层 endpoint。幂等。 */
@@ -152,7 +139,7 @@ export class WorkerAdapter {
       this.#disposePromise = (async () => {
         this.close()
         const endpoint = await this.#endpoint
-        await endpoint.dispose()
+        await endpoint.close()
       })()
     }
     return this.#disposePromise
@@ -177,31 +164,41 @@ export function createWorkerHandler<Input, Output>(
       StoreWorkerErrorText.workerHandlerCallback('postMessage')
     )
   }
-  const timeoutMs = snapshotWorkerClientOptions(options).timeoutMs
-  let deliver: (message: unknown) => void = () => undefined
-  const transport = {
-    platform: WebRpcPlatform.worker,
-    peerId: 'main' as const,
-    send: (message: unknown) => {
-      postMessage(message)
+  let inboundListener: ((event: MessageEvent<unknown>) => void) | undefined
+  const endpointOptions = snapshotWorkerClientOptions(options)
+  const endpoint = createWorkerContractEndpoint(
+    {
+      postMessage,
+      addEventListener: (type, listener) => {
+        if (type === 'message') inboundListener = listener as (event: MessageEvent<unknown>) => void
+      },
+      removeEventListener: (type, listener) => {
+        if (type === 'message' && inboundListener === listener) inboundListener = undefined
+      }
     },
-    subscribe: (listener: (message: { data: unknown }) => void) => {
-      deliver = (message) => listener({ data: message })
-      return () => {
-        deliver = () => undefined
+    {
+      id: WorkerRpcIdentity.worker,
+      targetId: endpointOptions.clientId ?? WorkerRpcIdentity.main,
+      timeoutMs: endpointOptions.timeoutMs
+    }
+  )
+  const endpointPromise = endpoint.then((readyEndpoint) => {
+    const unsubscribe = readyEndpoint.onRequest(WorkerRpcIdentity.call, (payload, signal) =>
+      compute(payload as Input, { signal: signal as IWebRpcAbortSignal })
+    )
+    return {
+      dispose: async () => {
+        unsubscribe()
+        await readyEndpoint.close()
       }
     }
-  }
-  const endpoint = createProviderEndpoint({
-    id: 'worker',
-    transport,
-    middlewares: [connect({ transport }), protocol(), abort(), timeout({ timeoutMs })]
-  }).then((providerEndpoint) =>
-    providerEndpoint.provide('call', async (context) =>
-      context.success(await compute(context.data as Input, { signal: context.signal }))
-    )
-  )
-  return toManagedRpcHandler(endpoint, (message) => deliver(message))
+  })
+  let deliver: (message: unknown) => void = () => undefined
+  const handler = toManagedRpcHandler(endpointPromise, (message) => deliver(message))
+  // The managed callback is the host boundary: it forwards each raw message into
+  // the canonical endpoint's transport listener without recreating a provider path.
+  deliver = (message) => inboundListener?.({ data: message } as MessageEvent<unknown>)
+  return handler
 }
 
 export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & {

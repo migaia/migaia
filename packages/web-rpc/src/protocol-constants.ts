@@ -1,19 +1,3 @@
-/** Canonical discriminants used on the web-rpc wire. */
-export const WebRpcMessageKind = {
-  discoveryQuery: 'discovery-query',
-  discoveryResponse: 'discovery-response',
-  request: 'request',
-  response: 'response',
-  variation: 'variation',
-  chunk: 'chunk'
-} as const
-
-export const WebRpcVariation = {
-  abort: 'abort',
-  ping: 'ping',
-  pong: 'pong'
-} as const
-
 /** Stable platform labels attached to transports and endpoint diagnostics. */
 export const WebRpcPlatform = {
   broadcastChannel: 'BroadcastChannel',
@@ -82,8 +66,6 @@ export const WebRpcChunkEvent = {
   expired: 'chunk.expired'
 } as const
 
-export type IWebRpcMessageKind = (typeof WebRpcMessageKind)[keyof typeof WebRpcMessageKind]
-export type IWebRpcVariation = (typeof WebRpcVariation)[keyof typeof WebRpcVariation]
 export type IWebRpcChunkEvent = (typeof WebRpcChunkEvent)[keyof typeof WebRpcChunkEvent]
 export type IWebRpcPlatformValue = (typeof WebRpcPlatform)[keyof typeof WebRpcPlatform]
 export type IWebRpcTransportOwnershipValue =

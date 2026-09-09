@@ -1,10 +1,13 @@
 import { safeRead, safeString } from './internal/safe-value.js'
-import { WebRpcSerializationError } from './errors.js'
+import { WEBRPC_SOURCE, WebRpcErrorCode, WebRpcSerializationError } from './errors.js'
+import type { IRpcSerializedError } from '@migaia/rpc-contract'
 
 /** Maximum error-graph depth accepted by either boundary direction. */
 const MAX_ERROR_GRAPH_DEPTH = 64
 /** Maximum serialized error records allocated by either boundary direction. */
 const MAX_ERROR_GRAPH_NODES = 1024
+/** RPC semantic envelopes accept no more than this many nested error edges. */
+const MAX_RPC_ERROR_GRAPH_DEPTH = 32
 /** Stable diagnostic for malformed or over-budget error graphs. */
 const SERIALIZED_ERROR_GRAPH_INVALID =
   'Serialized error graph exceeds safety limits or is malformed'
@@ -262,6 +265,87 @@ export function serializeError(error: unknown): ISerializedError {
   return { ...root, causes }
 }
 
+/**
+ * Projects WebRPC's bounded native-error snapshot into the RPC portable wire shape.
+ *
+ * WebRPC remains the native graph owner: this preserves its extended native variants and aggregate
+ * reconstruction path while translating the legacy plural `causes` edge to the semantic contract's
+ * singular `cause` plus `errors` reachability. An over-depth graph is rejected instead of silently
+ * truncating a failure chain at the protocol boundary.
+ */
+export function serializeErrorForRpc(error: unknown): IRpcSerializedError {
+  const serialized = serializeError(error)
+  return projectSerializedErrorForRpc(
+    serialized.source.length === 0 || serialized.code.length === 0
+      ? { ...serialized, source: WEBRPC_SOURCE, code: WebRpcErrorCode.internal }
+      : serialized,
+    0
+  )
+}
+
+/** Rehydrates an RPC portable error through the existing WebRPC native-error reconstruction. */
+export function deserializeErrorFromRpc(error: IRpcSerializedError): Error {
+  return deserializeError(projectRpcErrorForNative(error, 0))
+}
+
+/** Maps a WebRPC snapshot to the exact portable error fields accepted by RPC envelopes. */
+function projectSerializedErrorForRpc(
+  serialized: ISerializedError,
+  depth: number,
+  continuation: readonly ISerializedError[] = []
+): IRpcSerializedError {
+  if (depth > MAX_RPC_ERROR_GRAPH_DEPTH) throwMalformedSerializedError()
+  const aggregateErrors = serialized.errors ?? []
+  const causes = [
+    ...removeAggregateErrorReach(serialized.causes ?? [], aggregateErrors),
+    ...continuation
+  ]
+  return Object.freeze({
+    source: serialized.source,
+    code: serialized.code,
+    name: serialized.name,
+    message: serialized.message,
+    stack: serialized.stack ?? `${serialized.name}: ${serialized.message}`,
+    ...(causes[0] === undefined
+      ? {}
+      : { cause: projectSerializedErrorForRpc(causes[0], depth + 1, causes.slice(1)) }),
+    ...(aggregateErrors.length === 0
+      ? {}
+      : {
+          errors: Object.freeze(
+            aggregateErrors.map((entry) => projectSerializedErrorForRpc(entry, depth + 1))
+          )
+        })
+  })
+}
+
+/** Recreates WebRPC's legacy snapshot shape so its native variant and cause handling is reused. */
+function projectRpcErrorForNative(
+  serialized: IRpcSerializedError,
+  depth: number
+): ISerializedError {
+  if (depth > MAX_RPC_ERROR_GRAPH_DEPTH) throwMalformedSerializedError()
+  const causes = [
+    ...(serialized.cause === undefined
+      ? []
+      : [projectRpcErrorForNative(serialized.cause, depth + 1)]),
+    ...(serialized.name === 'AggregateError'
+      ? []
+      : (serialized.errors ?? []).map((entry) => projectRpcErrorForNative(entry, depth + 1)))
+  ]
+  return {
+    source: serialized.source,
+    code: serialized.code,
+    name: serialized.name,
+    message: serialized.message,
+    stack: serialized.stack,
+    ...(causes.length === 0 ? {} : { causes }),
+    ...(serialized.name !== 'AggregateError' || serialized.errors === undefined
+      ? {}
+      : { errors: serialized.errors.map((entry) => projectRpcErrorForNative(entry, depth + 1)) })
+  }
+}
+
 function buildError(serialized: ISerializedSnapshot, children: readonly Error[] = []): Error {
   const domException = (
     globalThis as typeof globalThis & {
@@ -317,7 +401,7 @@ function defineCause(target: Error, cause: Error): void {
 }
 
 /** Compares wire snapshots by owned graph shape after structured cloning removed identity. */
-function serializedNodeEqual(left: ISerializedSnapshot, right: ISerializedSnapshot): boolean {
+function serializedNodeEqual(left: ISerializedError, right: ISerializedError): boolean {
   if (
     left.source !== right.source ||
     left.code !== right.code ||
@@ -339,7 +423,7 @@ function serializedNodeEqual(left: ISerializedSnapshot, right: ISerializedSnapsh
 }
 
 /** Lists one serialized node's diagnostic reach in source traversal order. */
-function serializedReach(node: ISerializedSnapshot): ISerializedSnapshot[] {
+function serializedReach(node: ISerializedError): ISerializedError[] {
   const reached = [node]
   for (const cause of node.causes ?? []) reached.push(...serializedReach(cause))
   for (const child of node.errors ?? []) reached.push(...serializedReach(child))
@@ -348,9 +432,9 @@ function serializedReach(node: ISerializedSnapshot): ISerializedSnapshot[] {
 
 /** Removes aggregate children already represented by nested `errors` graphs from flat causes. */
 function removeAggregateErrorReach(
-  causes: readonly ISerializedSnapshot[],
-  errors: readonly ISerializedSnapshot[]
-): ISerializedSnapshot[] {
+  causes: readonly ISerializedError[],
+  errors: readonly ISerializedError[]
+): ISerializedError[] {
   const remaining = [...causes]
   for (const error of errors) {
     const reach = serializedReach(error)

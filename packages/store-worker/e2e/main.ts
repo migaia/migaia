@@ -6,11 +6,23 @@ declare global {
     runStoreWorkerTimeoutScenario(): Promise<unknown>
     runStoreWorkerTransferScenario(): Promise<readonly number[]>
     runStoreWorkerAbortScenario(): Promise<unknown>
-    runStoreWorkerErrorScenario(): Promise<readonly string[]>
+    runStoreWorkerErrorScenario(): Promise<readonly IWorkerErrorSummary[]>
     runStoreWorkerRequestOptionsScenario(): Promise<readonly number[]>
     runStoreWorkerComputedScenario(): Promise<readonly number[]>
   }
 }
+
+/**
+ * Captures observable remote-error identity without serializing a browser Error object across the
+ * test boundary.
+ */
+type IWorkerErrorSummary = Readonly<{
+  readonly name: string
+  readonly message: string
+  readonly source: string | undefined
+  readonly code: string | undefined
+  readonly hasStack: boolean
+}>
 
 window.runStoreWorkerScenario = async () => {
   const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
@@ -61,6 +73,10 @@ window.runStoreWorkerAbortScenario = async () => {
   }
 }
 
+/**
+ * Reads the bounded remote cause chain as structured observable identity for the real Worker
+ * failure scenario.
+ */
 window.runStoreWorkerErrorScenario = async () => {
   const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
   const adapter = new WorkerAdapter(worker)
@@ -68,10 +84,29 @@ window.runStoreWorkerErrorScenario = async () => {
     await adapter.request('fail')
     return []
   } catch (error) {
-    const messages: string[] = []
+    /**
+     * Ordered, bounded public identity projections of the outer remote error and each reachable
+     * cause.
+     */
+    const messages: IWorkerErrorSummary[] = []
+    /**
+     * Advances through the causal chain without serializing native Error instances across the
+     * browser boundary.
+     */
     let current: unknown = error
     while (current instanceof Error && messages.length < 8) {
-      messages.push(`${current.name}: ${current.message}`)
+      /**
+       * Reads optional WebRPC identity fields while preserving native Error identity and stack
+       * access.
+       */
+      const remote = current as Error & { readonly source?: unknown; readonly code?: unknown }
+      messages.push({
+        name: current.name,
+        message: current.message,
+        source: typeof remote.source === 'string' ? remote.source : undefined,
+        code: typeof remote.code === 'string' ? remote.code : undefined,
+        hasStack: typeof current.stack === 'string' && current.stack.length > 0
+      })
       current = current.cause
     }
     return messages

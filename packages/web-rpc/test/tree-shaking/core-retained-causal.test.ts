@@ -2,10 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import {
-  reviewedRetainedInventory,
-  type IRetainedConsumer
-} from '../fixtures/tree-shaking/retained-inventory.js'
+import type { IRetainedConsumer } from '../fixtures/tree-shaking/retained-inventory.js'
 
 type IConsumer = IRetainedConsumer
 type ICausalEdge = { readonly consumer: IConsumer; readonly from: string; readonly to: string }
@@ -41,6 +38,9 @@ type ICausalReport = {
   readonly removedModules: readonly string[]
   readonly candidateAttribution: readonly ICandidateAttribution[]
 }
+type IRetainedProbe = Readonly<
+  Record<IConsumer, Readonly<{ moduleCount: number; modules: readonly string[] }>>
+>
 
 const consumers: readonly IConsumer[] = ['core', 'client', 'provider', 'full', 'custom']
 
@@ -48,6 +48,14 @@ const consumers: readonly IConsumer[] = ['core', 'client', 'provider', 'full', '
 function readCausalReport(): ICausalReport {
   const script = resolve(import.meta.dirname, 'core-retained-causal.mjs')
   return JSON.parse(execFileSync(process.execPath, [script], { encoding: 'utf8' })) as ICausalReport
+}
+
+/** Runs the independent emitted-consumer probe rather than reusing historical inventory. */
+function readRetainedProbe(): IRetainedProbe {
+  const script = resolve(import.meta.dirname, '..', 'tree-shaking-retained.mjs')
+  return JSON.parse(
+    execFileSync(process.execPath, [script], { encoding: 'utf8' })
+  ) as IRetainedProbe
 }
 
 /** Runs canonical root inventory output independently of the causal harness. */
@@ -101,6 +109,7 @@ function expectedModuleDiff(): {
 describe('WRC-C-B11f five-consumer causal graph', () => {
   it('derives exact added/removed sets and non-empty causal attribution', () => {
     const report = readCausalReport()
+    const retainedProbe = readRetainedProbe()
     const expected = expectedModuleDiff()
     expect(report.schema).toBe('WRC-C-B11f-five-consumer-causal-v2')
     expect(Object.keys(report.consumers)).toEqual(consumers)
@@ -110,11 +119,14 @@ describe('WRC-C-B11f five-consumer causal graph', () => {
     expect(report.candidateAttribution.map(({ module }) => module)).toEqual(expected.added)
 
     for (const consumer of consumers) {
-      expect(report.consumers[consumer].modules).toEqual(reviewedRetainedInventory[consumer])
-      expect(report.consumers[consumer].moduleCount).toBe(
-        reviewedRetainedInventory[consumer].length
-      )
-      expect(report.retainedCounts[consumer]).toBe(report.consumers[consumer].moduleCount)
+      const closure = report.consumers[consumer]
+      expect(closure.modules).toEqual(retainedProbe[consumer].modules)
+      expect(new Set(closure.modules).size).toBe(closure.modules.length)
+      expect(closure.moduleCount).toBe(retainedProbe[consumer].moduleCount)
+      expect(report.retainedCounts[consumer]).toBe(closure.moduleCount)
+      expect(closure.roots.every((root) => closure.modules.includes(root))).toBe(true)
+      expect(closure.modules).not.toContain('src/internal/chunk.ts')
+      expect(closure.modules).not.toContain('src/internal/canonical-envelope.ts')
     }
     for (const consumer of ['custom', 'full'] as const)
       expect(report.consumers[consumer].edges).not.toContainEqual({
@@ -162,7 +174,7 @@ describe('WRC-C-B11f five-consumer causal graph', () => {
       'src/features/provider.ts',
       'src/features/discovery.ts',
       'src/features/control.ts',
-      'src/features/chunk.ts'
+      'src/features/canonical-chunk.ts'
     ])
     expect(report.consumers.core.modules).not.toContain('src/internal/transport-activation.ts')
     expect(report.consumers.core.modules).not.toContain('src/internal/outbound-sender.ts')

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { protocol } from '../../src/middleware/protocol'
+import { canonicalProtocol as protocol } from '../../src/middleware/canonical-protocol.js'
 import { WebRpcErrorCode } from '../../src/errors'
-import { WebRpcSharedKey } from '../../src/internal/plugin-shared-keys'
+import { WebRpcErrorText } from '../../src/error-text.js'
+import { WebRpcSharedKey } from '../../src/internal/plugin-shared-keys.js'
+import { rpcProtocolV1 } from '@migaia/rpc-contract'
 import type { IWebRpcPluginInstallResult, IWebRpcPluginInstallScope } from '../../src/typing'
 
 function scope(): IWebRpcPluginInstallScope {
@@ -17,30 +19,35 @@ function scope(): IWebRpcPluginInstallScope {
 }
 
 describe('protocol plugin', () => {
-  it('returns normalized encode/decode capability through the typed shared result', () => {
-    const result = protocol({
-      encode: (value: unknown) => JSON.stringify(value),
-      decode: (value: unknown) => JSON.parse(String(value))
-    }).install(scope()) as IWebRpcPluginInstallResult
-    const capability = result.shared[WebRpcSharedKey.protocol] as {
-      encode(value: unknown): unknown
-      decode(value: unknown): unknown
-    }
+  it('contributes only the semantic normalizer and leaves byte conversion to codec()', () => {
+    const result = protocol(rpcProtocolV1).install(scope()) as IWebRpcPluginInstallResult
     expect(result.extension).toEqual({})
-    expect(capability.decode(capability.encode({ ok: true }))).toEqual({ ok: true })
+    expect(result.shared).toMatchObject({ [WebRpcSharedKey.protocol]: rpcProtocolV1 })
   })
 
-  it('rejects unreadable configuration with the native error identity', () => {
-    const unreadable = new Proxy(
+  it('rejects legacy encode/decode installation before the Host can subscribe', () => {
+    expect(() => protocol({ encode: () => undefined, decode: () => undefined } as never)).toThrow(
+      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
+    )
+  })
+
+  it('turns a hostile normalizer getter into the canonical coded configuration error', () => {
+    const cause = new Error('hostile protocol normalize')
+    const descriptor = new Proxy(
       {},
       {
-        get() {
-          throw new Error('protocol getter')
+        get(_target, key) {
+          if (key === 'normalize') throw cause
+          return undefined
         }
       }
     )
-    expect(() => protocol(unreadable as never).install(scope())).toThrow(
-      expect.objectContaining({ code: WebRpcErrorCode.invalidConfig })
+    expect(() => protocol(descriptor as never)).toThrow(
+      expect.objectContaining({
+        code: WebRpcErrorCode.invalidConfig,
+        message: WebRpcErrorText.codecDescriptorInvalid,
+        cause
+      })
     )
   })
 })

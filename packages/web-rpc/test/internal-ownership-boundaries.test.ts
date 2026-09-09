@@ -359,7 +359,7 @@ describe('internal ownership boundary semantics', () => {
           deferMiddlewareInstall: true
         }
       )
-    ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+    ).resolves.toMatchObject({ id: 'fixture-endpoint', transport: alternateTransport })
     await expect(
       prepareEndpoint(
         { ...valid, transport: { platform: 'Memory' } },
@@ -373,7 +373,7 @@ describe('internal ownership boundary semantics', () => {
         { ...valid, middlewares: [{ ...plugin, transport: alternateTransport }] },
         { deferMiddlewareInstall: true }
       )
-    ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+    ).resolves.toMatchObject({ id: 'fixture-endpoint', transport })
     await expect(prepareEndpoint(valid, { deferMiddlewareInstall: true })).resolves.toMatchObject({
       id: 'fixture-endpoint'
     })

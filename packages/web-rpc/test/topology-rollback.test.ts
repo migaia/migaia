@@ -7,7 +7,7 @@ import { outbound } from '../src/features/outbound.js'
 import { provider } from '../src/features/provider.js'
 import { discovery } from '../src/features/discovery.js'
 import { control } from '../src/features/control.js'
-import { chunk } from '../src/features/chunk.js'
+import { canonicalChunk as chunk } from '../src/features/canonical-chunk.js'
 import { WebRpcErrorCode } from '../src/errors.js'
 import { createMemoryTransportPair } from '../src/adapters/memory.js'
 import type { IWebRpcCoreConfig, IWebRpcKernelSurface } from '../src/core.js'
@@ -75,6 +75,241 @@ describe('composition topology and rollback', () => {
     expect(admission?.token).toEqual(expect.any(String))
     admission?.release()
     coordinator.clear()
+  })
+
+  it('consumes prepared physical identity receipts once and cannot revive after clear', async () => {
+    const source = {}
+    const physicalData = { payload: 'physical' }
+    const logicalData = { payload: 'logical' }
+    let sourceReads = 0
+    let dataReads = 0
+    let originReads = 0
+    let peerIdReads = 0
+    let proofCalls = 0
+    let verifyCalls = 0
+    let resolveVerify: ((value: boolean) => void) | undefined
+    const coordinator = new InboundIdentityCoordinator({
+      platform: 'Memory',
+      sourceProof: (value) => {
+        proofCalls += 1
+        return value === source
+      },
+      connect: {
+        verify: (identity) => {
+          verifyCalls += 1
+          expect(identity).toMatchObject({
+            origin: 'https://peer.test',
+            peerId: 'peer'
+          })
+          expect(identity.data).toBe(logicalData)
+          expect(identity.data).not.toBe(physicalData)
+          return new Promise<boolean>((resolve) => {
+            resolveVerify = resolve
+          })
+        }
+      }
+    })
+    const inbound = {
+      get data() {
+        dataReads += 1
+        return physicalData
+      },
+      get source() {
+        sourceReads += 1
+        return source
+      },
+      get origin() {
+        originReads += 1
+        return 'https://peer.test'
+      },
+      get peerId() {
+        peerIdReads += 1
+        return 'peer'
+      }
+    }
+    const prepared = coordinator.prepareSource(inbound)
+    expect(prepared).toBeDefined()
+    expect(Object.isFrozen(prepared)).toBe(true)
+    expect(dataReads).toBe(1)
+    expect(sourceReads).toBe(1)
+    expect(originReads).toBe(1)
+    expect(peerIdReads).toBe(1)
+    expect(proofCalls).toBe(1)
+    const request = { senderId: 'sender', targetId: 'target', data: logicalData, inbound }
+    const admission = coordinator.admitPrepared(prepared!, request)
+    await expect(coordinator.admitPrepared(prepared!, request)).resolves.toBeUndefined()
+    expect(verifyCalls).toBe(1)
+    coordinator.clear()
+    resolveVerify!(true)
+    await expect(admission).resolves.toBeUndefined()
+    await expect(
+      coordinator.admit({ senderId: 'sender', targetId: 'target', data: null, inbound })
+    ).resolves.toBeUndefined()
+  })
+
+  it('reuses an established lease for source-less inbound messages', async () => {
+    let verifyCalls = 0
+    const coordinator = new InboundIdentityCoordinator({
+      platform: 'Memory',
+      connect: {
+        verify: async () => {
+          verifyCalls += 1
+          return true
+        }
+      }
+    })
+    const request = { senderId: 'sender', targetId: 'target', data: null }
+    const first = await coordinator.admit(request)
+    const reused = await coordinator.admit(request)
+
+    expect(first?.token).toEqual(expect.any(String))
+    expect(reused?.token).toBe(first?.token)
+    expect(reused?.bindingKey).toBe(first?.bindingKey)
+    expect(verifyCalls).toBe(1)
+    first?.release()
+    reused?.release()
+  })
+
+  it('admits a deferred verification once and denies a pending receipt replay', async () => {
+    let resolveVerify: ((value: boolean) => void) | undefined
+    const coordinator = new InboundIdentityCoordinator({
+      platform: 'Memory',
+      connect: {
+        verify: () =>
+          new Promise<boolean>((resolve) => {
+            resolveVerify = resolve
+          })
+      }
+    })
+    const request = {
+      senderId: 'sender',
+      targetId: 'target',
+      data: null,
+      inbound: { data: null, source: {} }
+    }
+    const prepared = coordinator.prepareSource(request.inbound)!
+    const admission = coordinator.admitPrepared(prepared, request)
+
+    await expect(coordinator.admitPrepared(prepared, request)).resolves.toBeUndefined()
+    resolveVerify!(true)
+    await expect(admission).resolves.toMatchObject({ token: expect.any(String) })
+  })
+
+  it('preserves a verification rejection and never revives its consumed receipt', async () => {
+    const rejection = new Error('verify rejection')
+    let rejectVerify: ((reason: unknown) => void) | undefined
+    const coordinator = new InboundIdentityCoordinator({
+      platform: 'Memory',
+      connect: {
+        verify: () =>
+          new Promise<boolean>((_resolve, reject) => {
+            rejectVerify = reject
+          })
+      }
+    })
+    const request = {
+      senderId: 'sender',
+      targetId: 'target',
+      data: null,
+      inbound: { data: null, source: {} }
+    }
+    const prepared = coordinator.prepareSource(request.inbound)!
+    const admission = coordinator.admitPrepared(prepared, request)
+
+    rejectVerify!(rejection)
+    await expect(admission).rejects.toBe(rejection)
+    await expect(coordinator.admitPrepared(prepared, request)).resolves.toBeUndefined()
+  })
+
+  it('does not allocate a receipt when source proof closes its owner', () => {
+    let proofCalls = 0
+    let coordinator: InboundIdentityCoordinator
+    coordinator = new InboundIdentityCoordinator({
+      platform: 'Memory',
+      sourceProof: () => {
+        proofCalls += 1
+        coordinator.clear()
+        return true
+      }
+    })
+    expect(coordinator.prepareSource({ data: null, source: {} })).toBeUndefined()
+    expect(proofCalls).toBe(1)
+  })
+
+  it('reuses only the exact logical and physical identity tuple', async () => {
+    let verifies = 0
+    const coordinator = new InboundIdentityCoordinator({
+      platform: 'Memory',
+      connect: {
+        verify: async () => {
+          verifies += 1
+          return true
+        }
+      }
+    })
+    const firstSource = {}
+    const first = await coordinator.admit({
+      senderId: 'sender',
+      targetId: 'target',
+      data: null,
+      inbound: { data: null, source: firstSource, origin: 'one', peerId: 'peer-one' }
+    })
+    const reused = await coordinator.admit({
+      senderId: 'sender',
+      targetId: 'target',
+      data: null,
+      inbound: { data: null, source: firstSource, origin: 'one', peerId: 'peer-one' }
+    })
+    const changed = await coordinator.admit({
+      senderId: 'sender',
+      targetId: 'target',
+      data: null,
+      inbound: { data: null, source: {}, origin: 'one', peerId: 'peer-one' }
+    })
+    const changedOrigin = await coordinator.admit({
+      senderId: 'sender',
+      targetId: 'target',
+      data: null,
+      inbound: { data: null, source: firstSource, origin: 'two', peerId: 'peer-one' }
+    })
+    const changedPeer = await coordinator.admit({
+      senderId: 'sender',
+      targetId: 'target',
+      data: null,
+      inbound: { data: null, source: firstSource, origin: 'one', peerId: 'peer-two' }
+    })
+    expect(reused?.token).toBe(first?.token)
+    expect(reused?.bindingKey).toBe(first?.bindingKey)
+    expect(changed?.bindingKey).not.toBe(first?.bindingKey)
+    expect(changedOrigin?.bindingKey).not.toBe(first?.bindingKey)
+    expect(changedPeer?.bindingKey).not.toBe(first?.bindingKey)
+    expect(verifies).toBe(4)
+    first?.release()
+    reused?.release()
+    changed?.release()
+    changedOrigin?.release()
+    changedPeer?.release()
+  })
+
+  it('rejects copied, foreign, replayed, and terminal prepared receipts', async () => {
+    const request = {
+      senderId: 'sender',
+      targetId: 'target',
+      data: null,
+      inbound: { data: null, source: {} }
+    }
+    const owner = new InboundIdentityCoordinator({ platform: 'Memory' })
+    const foreign = new InboundIdentityCoordinator({ platform: 'Memory' })
+    const prepared = owner.prepareSource(request.inbound)!
+    await expect(foreign.admitPrepared(prepared, request)).resolves.toBeUndefined()
+    await expect(owner.admitPrepared({ ...prepared }, request)).resolves.toBeUndefined()
+    await expect(owner.admitPrepared(prepared, request)).resolves.toMatchObject({
+      token: expect.any(String)
+    })
+    await expect(owner.admitPrepared(prepared, request)).resolves.toBeUndefined()
+    const terminal = owner.prepareSource(request.inbound)!
+    owner.clear()
+    await expect(owner.admitPrepared(terminal, request)).resolves.toBeUndefined()
   })
 
   it('keeps variation route ownership single-provider and replay-admitted', async () => {

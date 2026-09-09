@@ -1,12 +1,13 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { DiscoveryRegistry } from '../src/internal/discovery-registry'
-import { ChunkAssembler, splitUtf8, utf8ByteLength } from '../src/internal/chunk'
 import { ResourceScope } from '../src/internal/resource-scope'
 import { RequestReplayLedger } from '../src/internal/request-replay-ledger'
 import { createSettlement } from '../src/internal/settlement'
 import { OperationScope } from '../src/internal/operation-scope'
-import { isWebRpcEnvelope, normalizeWebRpcEnvelope } from '../src/wire'
+import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
+import { createStringFramer } from '@migaia/rpc-contract/framing'
+import { normalizeWebRpcRoutingData } from '../src/internal/routing-data.js'
 
 const runtimeProcess = (globalThis as { process?: { env?: { CI?: string } } }).process
 const propertyParameters = { numRuns: runtimeProcess?.env?.CI ? 2_000 : 500 } as const
@@ -14,12 +15,28 @@ const propertyParameters = { numRuns: runtimeProcess?.env?.CI ? 2_000 : 500 } as
 describe('property invariants', () => {
   it('normalizes arbitrary JSON values without producing a mutable partial envelope', () => {
     fc.assert(
-      fc.property(fc.jsonValue(), (value) => {
-        const normalized = normalizeWebRpcEnvelope(value)
-        if (normalized === undefined) return
-        expect(isWebRpcEnvelope(normalized)).toBe(true)
-        expect(Object.isFrozen(normalized)).toBe(true)
-      }),
+      fc.property(
+        fc.oneof(
+          fc.jsonValue(),
+          fc.constant({ kind: 'request', id: 'valid', method: 'ping', data: null })
+        ),
+        (value) => {
+          /** Captures either canonical success or the expected closed-boundary failure. */
+          let outcome:
+            | { readonly value: ReturnType<typeof normalizeRpcEnvelope> }
+            | { readonly error: unknown }
+          try {
+            outcome = { value: normalizeRpcEnvelope(value) }
+          } catch (error) {
+            outcome = { error }
+          }
+          if ('error' in outcome) {
+            expect(outcome.error).toMatchObject({ code: 'INVALID_ENVELOPE' })
+            return
+          }
+          expect(Object.isFrozen(outcome.value)).toBe(true)
+        }
+      ),
       propertyParameters
     )
   })
@@ -27,33 +44,116 @@ describe('property invariants', () => {
   it('contains hostile getters and prototype keys at the wire boundary', () => {
     fc.assert(
       fc.property(
-        fc.constantFrom('kind', 'taskId', 'senderId', 'targetId', 'sentAt', 'data', '__proto__'),
+        fc.constantFrom(
+          'profile',
+          'type',
+          'applicationVersion',
+          'senderId',
+          'targetId',
+          'sentAt',
+          'payload',
+          '__proto__'
+        ),
         (hostileKey) => {
           const base = {
-            kind: 'request',
-            version: '1',
-            taskId: 'task',
-            senderId: 'sender',
-            targetId: 'target',
-            method: 'echo',
-            data: { safe: true },
-            sentAt: 1
+            webRpc: {
+              profile: 'web-rpc.route.v1',
+              type: 'request',
+              applicationVersion: '1',
+              senderId: 'sender',
+              targetId: 'target',
+              sentAt: 1
+            },
+            payload: { safe: true }
           }
           const hostile = new Proxy(base, {
             get(target, key, receiver) {
+              if (key === 'webRpc' && hostileKey !== 'payload' && hostileKey !== '__proto__')
+                return new Proxy(target.webRpc, {
+                  get(route, routeKey, routeReceiver) {
+                    if (routeKey === hostileKey) throw new Error('hostile getter')
+                    return Reflect.get(route, routeKey, routeReceiver)
+                  }
+                })
               if (key === hostileKey) throw new Error('hostile getter')
               return Reflect.get(target, key, receiver)
             }
           })
-          expect(() => normalizeWebRpcEnvelope(hostile)).not.toThrow()
-          const normalized = normalizeWebRpcEnvelope(hostile)
-          if (hostileKey === 'kind' || hostileKey === 'taskId' || hostileKey === 'senderId')
+          const normalized = normalizeWebRpcRoutingData(hostile)
+          if (hostileKey !== 'payload' && hostileKey !== '__proto__')
             expect(normalized).toBeUndefined()
-          else if (normalized) expect(Object.isFrozen(normalized)).toBe(true)
+          else {
+            expect(Object.isFrozen(normalized)).toBe(true)
+            if (hostileKey === 'payload') expect(normalized).not.toHaveProperty('payload')
+          }
         }
       ),
       propertyParameters
     )
+  })
+
+  it('accepts only tag-owned portable route metadata', () => {
+    const valid = normalizeWebRpcRoutingData({
+      webRpc: {
+        profile: 'web-rpc.route.v1',
+        type: 'request',
+        applicationVersion: '1.0.0',
+        senderId: 'sender',
+        targetId: 'target',
+        sentAt: 1
+      },
+      payload: { args: [1, 2] }
+    })
+    expect(valid).toEqual({
+      webRpc: {
+        profile: 'web-rpc.route.v1',
+        type: 'request',
+        applicationVersion: '1.0.0',
+        senderId: 'sender',
+        targetId: 'target',
+        sentAt: 1
+      },
+      payload: { args: [1, 2] }
+    })
+    expect(
+      normalizeWebRpcRoutingData({
+        webRpc: {
+          profile: 'web-rpc.route.v1',
+          type: 'request',
+          applicationVersion: '1.0.0',
+          senderId: 'sender',
+          targetId: 'target',
+          accepted: true,
+          sentAt: 1
+        }
+      })
+    ).toBeUndefined()
+    expect(
+      normalizeWebRpcRoutingData({
+        webRpc: {
+          profile: 'web-rpc.route.v1',
+          type: 'request',
+          applicationVersion: '1.0.0',
+          senderId: 'sender',
+          targetId: 'target',
+          sentAt: 1,
+          unexpected: true
+        }
+      })
+    ).toBeUndefined()
+    expect(
+      normalizeWebRpcRoutingData({
+        webRpc: {
+          profile: 'web-rpc.route.v1',
+          type: 'request',
+          applicationVersion: '1.0.0',
+          senderId: 'sender',
+          targetId: 'target',
+          sentAt: 1
+        },
+        unexpected: true
+      })
+    ).toBeUndefined()
   })
 
   it('keeps discovery remote state equivalent to a bounded map model', () => {
@@ -130,33 +230,22 @@ describe('property invariants', () => {
     )
   })
 
-  it('reassembles every valid UTF-8 chunk permutation without retaining state', () => {
+  it('roundtrips every canonically framed string in physical order', () => {
     fc.assert(
-      fc.property(
-        fc.string(),
-        fc.integer({ min: 4, max: 32 }),
-        fc.array(fc.nat(), { minLength: 1, maxLength: 64 }),
-        (value, maxBytes, permutationKeys) => {
-          const parts = splitUtf8(value, maxBytes)
-          if (parts.length === 0) return
-          const order = Array.from({ length: parts.length }, (_, index) => index).sort(
-            (left, right) =>
-              (permutationKeys[left % permutationKeys.length] ?? 0) -
-                (permutationKeys[right % permutationKeys.length] ?? 0) || left - right
-          )
-          const assembler = new ChunkAssembler({
-            chunkSize: maxBytes,
-            maxMessageBytes: Math.max(1, utf8ByteLength(value))
-          })
-          const result = order.map((index) =>
-            assembler.accept(
-              { messageId: 'property', index, total: parts.length, data: parts[index]! },
-              'peer'
-            )
-          )
-          expect(result.at(-1)).toBe(value)
-        }
-      ),
+      fc.property(fc.string(), fc.integer({ min: 4, max: 32 }), (value, chunkBytes) => {
+        /** Uses D13's canonical framer instead of the removed WebRPC chunk owner. */
+        const framer = createStringFramer({
+          chunkBytes,
+          maxMessageBytes: Math.max(chunkBytes, value.length)
+        })
+        /** Produces physical frames through the canonical selected-framer host. */
+        const frames = framer.frame(value, { source: 'peer', messageId: 'property' })
+        /** Feeds the canonical physical order to its reassembly owner. */
+        const result = frames.map((frame) =>
+          framer.accept(frame, { source: 'peer', messageId: 'property' })
+        )
+        expect(result.at(-1)).toEqual({ status: 'complete', value })
+      }),
       propertyParameters
     )
   })

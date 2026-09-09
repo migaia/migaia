@@ -3,6 +3,8 @@ import type { IWebRpcEndpointModule } from '../core.js'
 import { WebRpcErrorText } from '../error-text.js'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
+import type { IWebRpcAbortSignal, IWebRpcHookEvent } from '../typing.js'
+import type { IWebRpcTransport } from '../transport.js'
 
 /** Private runtime brand; no public constructor or minting path exists. */
 type IPrivateEndpointDefinition = {
@@ -96,6 +98,7 @@ export function getEndpointModuleRootProjection(value: unknown): readonly string
 /** Stable first-party topology keys shared by immutable feature definitions. */
 export const EndpointModuleKey = {
   outbound: 'outbound',
+  oneWay: 'one-way',
   provider: 'provider',
   discovery: 'discovery',
   control: 'control',
@@ -107,6 +110,12 @@ export type IEndpointModuleInstallContext<T> = {
   readonly config: T
   readonly kernel: IEndpointKernelHost
   readonly prepared: IPreparedEndpoint<string>
+  /** Host-owned construction scope fields exposed to a custom feature installer. */
+  readonly id: string
+  readonly transport: IWebRpcTransport
+  readonly signal: IWebRpcAbortSignal
+  readonly hooks: (event: IWebRpcHookEvent) => void
+  readonly own: <TResource>(resource: TResource, release: () => void | Promise<void>) => TResource
   /** Reads package-owned typed ports from the Host shared publication. */
   readonly getShared: (key: PropertyKey) => unknown
 }

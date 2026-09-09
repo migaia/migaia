@@ -23,11 +23,11 @@ const repositoryRoot = resolve(packageDirectory, '../..')
 process.chdir(repositoryRoot)
 const authorizationPath = resolve(
   packageDirectory,
-  'test/fixtures/tree-shaking/baseline-authorization.json'
+  'test/fixtures/tree-shaking/current-delivery-approval.json'
 )
 const authorityPath = resolve(
   packageDirectory,
-  'test/fixtures/tree-shaking/baseline-authority.json'
+  'test/fixtures/tree-shaking/current-delivery-authority.json'
 )
 
 /** Returns the owning workspace package for a physical retained module. */

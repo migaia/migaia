@@ -1,23 +1,21 @@
 import {
   WebRpcAuthenticationError,
   WebRpcErrorCode,
-  WebRpcError,
+  WebRpcLifecycleError,
   WebRpcSerializationError,
   WebRpcTransportError
 } from '../errors.js'
 import type {
   IWebRpcAuthenticationCapability,
   IWebRpcAuthenticationContext,
-  IWebRpcChunkCapability,
   IWebRpcPlatform,
-  IWebRpcProtocolCapability,
   ISendOptions
 } from '../typing.js'
 import type { IWebRpcSendOptions, IWebRpcTransport } from '../transport.js'
 import { isUint8Array } from './safe-value.js'
-import { utf8ByteLength } from './utf8.js'
-import { WebRpcMessageKind } from '../protocol-constants.js'
 import { WebRpcErrorText } from '../error-text.js'
+import type { IWebRpcSelectedComponents } from './endpoint-options.js'
+import type { IRpcEnvelope } from '@migaia/rpc-contract'
 
 /** Minimal canonical send port consumed by the outbound owner. */
 export type IWebRpcOutboundTransport = {
@@ -26,37 +24,43 @@ export type IWebRpcOutboundTransport = {
   send(message: unknown, options?: IWebRpcSendOptions): void | Promise<void>
 } & Partial<Omit<IWebRpcTransport, 'send' | 'platform' | 'encodedType'>>
 
+/** Optional kernel lifecycle surface used to reject frames captured before endpoint close. */
+type IWebRpcOutboundLifecycle = Readonly<{
+  readonly generation: number
+  assertActive(generation?: number): void
+}>
+
 /** Owns outbound protocol encoding, chunk framing, and transport error classification. */
-export class WebRpcOutboundSender<TTargetId extends string> {
+export class WebRpcOutboundSender {
   readonly transport: IWebRpcOutboundTransport
   readonly id: string
-  readonly protocol: IWebRpcProtocolCapability
-  readonly chunk: IWebRpcChunkCapability
+  readonly components: IWebRpcSelectedComponents
   readonly authentication: IWebRpcAuthenticationCapability | undefined
   readonly onVariationFailure: (code: string, error: unknown) => void
-  /** Releases a chunk message id after every frame has settled. */
-  readonly #releaseMessageId: (id: string) => void
   /** Captures the validated transport payload discriminant for every outbound frame. */
   readonly #transportEncodedType: IWebRpcTransport['encodedType']
+  /** Captures the kernel lifecycle once so every asynchronous send phase shares one generation. */
+  readonly #lifecycle: IWebRpcOutboundLifecycle | undefined
 
   constructor(
     transport: IWebRpcOutboundTransport,
     id: string,
-    protocol: IWebRpcProtocolCapability,
-    chunk: IWebRpcChunkCapability,
+    components: IWebRpcSelectedComponents,
     onVariationFailure: (code: string, error: unknown) => void,
     authentication?: IWebRpcAuthenticationCapability,
-    platform: IWebRpcPlatform = transport.platform,
-    releaseMessageId: (id: string) => void = () => undefined
+    platform: IWebRpcPlatform = transport.platform
   ) {
     this.transport = transport
     this.id = id
-    this.protocol = protocol
-    this.chunk = chunk
+    this.components = components
     this.authentication = authentication
     this.onVariationFailure = onVariationFailure
-    this.#releaseMessageId = releaseMessageId
     this.#transportEncodedType = transport.encodedType
+    const lifecycle = transport as Partial<IWebRpcOutboundLifecycle>
+    this.#lifecycle =
+      typeof lifecycle.assertActive === 'function' && typeof lifecycle.generation === 'number'
+        ? (lifecycle as IWebRpcOutboundLifecycle)
+        : undefined
     this.#authenticationContext = Object.freeze({
       direction: 'outbound',
       endpointId: id,
@@ -67,232 +71,57 @@ export class WebRpcOutboundSender<TTargetId extends string> {
   /** Stable context passed to every outbound authentication transform. */
   readonly #authenticationContext: IWebRpcAuthenticationContext
 
-  /** Encodes and sends a contract message, optionally framing it into chunks. */
-  send(
-    message: unknown,
-    createMessageId: (targetId: TTargetId) => string,
-    options?: ISendOptions
-  ): void | Promise<void> {
+  /** Encodes one semantic envelope once, then protects and sends each selected physical frame. */
+  send(message: IRpcEnvelope, options?: ISendOptions): void | Promise<void> {
+    const generation = this.#lifecycle?.generation
+    this.#lifecycle?.assertActive(generation)
     const transfer = this.#snapshotTransfer(options)
     const hasTransfer = transfer !== undefined && transfer.length > 0
     let encoded: unknown
     try {
-      encoded = this.protocol.encode(message)
+      encoded = this.components.codec.encode(message)
       this.assertProtocolEncodedType(encoded)
     } catch (cause) {
       throw new WebRpcSerializationError(WebRpcErrorText.protocolEncodeFailed, cause)
     }
+    let frames: readonly unknown[]
     try {
-      const chunkSize = this.chunk.chunkSize ?? 0
-      const byteLength = (value: string): number => {
-        const canonical = utf8ByteLength(value)
-        const measured = this.chunk.byteLength(value)
-        if (!Number.isSafeInteger(measured) || measured < canonical || measured < 0)
-          throw new WebRpcSerializationError(WebRpcErrorText.invalidByteLengthMeasurement)
-        return measured
-      }
-      if (this.chunk.maxMessageBytes) {
-        const size =
-          typeof encoded === 'string'
-            ? byteLength(encoded)
-            : isUint8Array(encoded)
-              ? encoded.byteLength
-              : undefined
-        if (size === undefined || size > this.chunk.maxMessageBytes)
-          throw new WebRpcSerializationError(WebRpcErrorText.encodedMessageTooLarge)
-      }
-      if (chunkSize > 0 && typeof encoded === 'string' && byteLength(encoded) > chunkSize) {
-        if (hasTransfer)
-          throw new WebRpcSerializationError(WebRpcErrorText.transferUnsupportedForChunking)
-        const targetId = (message as { targetId: TTargetId }).targetId
-        const receiverId = (message as { receiverId?: string }).receiverId
-        const maxChunks = this.chunk.maxChunksPerMessage ?? 4096
-        if (!Number.isSafeInteger(maxChunks) || maxChunks <= 0)
-          throw new WebRpcSerializationError(WebRpcErrorText.invalidChunkFrames)
-        const splitResult = this.chunk.split(encoded, chunkSize)
-        let partCount: number
-        try {
-          if (!Array.isArray(splitResult))
-            throw new WebRpcSerializationError(WebRpcErrorText.invalidChunkFrames)
-          partCount = splitResult.length
-        } catch (cause) {
-          if (cause instanceof WebRpcSerializationError) throw cause
-          throw new WebRpcSerializationError(WebRpcErrorText.invalidChunkFrames, cause)
-        }
-        if (!Number.isSafeInteger(partCount) || partCount === 0 || partCount > maxChunks)
-          throw new WebRpcSerializationError(WebRpcErrorText.invalidChunkFrames)
-        const parts: string[] = []
-        const maxChunkBytes = this.chunk.maxChunkBytes ?? 4 * 1024 * 1024
-        try {
-          for (let index = 0; index < partCount; index += 1) {
-            const part = splitResult[index]
-            if (typeof part !== 'string' || part.length === 0) {
-              throw new WebRpcSerializationError(WebRpcErrorText.invalidChunkFrames)
-            }
-            const partBytes = byteLength(part)
-            if (partBytes > chunkSize || partBytes > maxChunkBytes)
-              throw new WebRpcSerializationError(WebRpcErrorText.invalidChunkFrames)
-            parts.push(part)
-          }
-        } catch (cause) {
-          if (cause instanceof WebRpcSerializationError) throw cause
-          throw new WebRpcSerializationError(WebRpcErrorText.invalidChunkFrames, cause)
-        }
-        if (parts.join('') !== encoded)
-          throw new WebRpcSerializationError(WebRpcErrorText.invalidChunkFrames)
-        let messageId: string
-        try {
-          messageId = createMessageId(targetId)
-        } catch (cause) {
-          // ID admission is not a transport operation. Preserve a typed capacity,
-          // lifecycle, or configuration error so callers can apply the right policy.
-          if (cause instanceof WebRpcError) throw cause
-          throw new WebRpcTransportError(WebRpcErrorText.transportSendFailed, cause)
-        }
-        const frames: unknown[] = []
-        try {
-          for (let index = 0; index < parts.length; index += 1) {
-            const data = parts[index]
-            frames.push(
-              this.encodeFrame({
-                kind: WebRpcMessageKind.chunk,
-                messageId,
-                index,
-                total: parts.length,
-                data,
-                senderId: this.id,
-                targetId,
-                ...(receiverId === undefined ? {} : { receiverId })
-              })
-            )
-          }
-        } catch (cause) {
-          let releaseError: unknown
-          let releaseFailed = false
-          try {
-            this.#releaseMessageId(messageId)
-          } catch (error) {
-            releaseFailed = true
-            releaseError = error
-          }
-          if (releaseFailed) {
-            throw new WebRpcSerializationError(
-              WebRpcErrorText.protocolEncodeFailed,
-              new AggregateError([cause, releaseError], WebRpcErrorText.protocolEncodeFailed, {
-                cause
-              })
-            )
-          }
-          if (cause instanceof WebRpcSerializationError) throw cause
-          throw new WebRpcSerializationError(WebRpcErrorText.protocolEncodeFailed, cause)
-        }
-        const preparedFrames: unknown[] = []
-        let hasPreprocessingFailure = false
-        let preprocessingFailure: unknown
-        const observedPreprocessing = frames.map(async (frame, index) => {
-          try {
-            preparedFrames[index] = await this.#prepareTransportValue(frame)
-          } catch (cause) {
-            hasPreprocessingFailure = true
-            preprocessingFailure ??= cause
-          }
-        })
-        return Promise.all(observedPreprocessing).then(() => {
-          if (hasPreprocessingFailure) {
-            let releaseError: unknown
-            let releaseFailed = false
-            try {
-              this.#releaseMessageId(messageId)
-            } catch (error) {
-              releaseFailed = true
-              releaseError = error
-            }
-            if (releaseFailed) {
-              const primary = preprocessingFailure
-              if (primary instanceof WebRpcAuthenticationError)
-                throw new WebRpcAuthenticationError(
-                  WebRpcErrorText.transportSendFailed,
-                  new AggregateError([primary, releaseError], WebRpcErrorText.transportSendFailed, {
-                    cause: primary
-                  })
-                )
-              throw new WebRpcTransportError(
-                WebRpcErrorText.transportSendFailed,
-                new AggregateError([primary, releaseError], WebRpcErrorText.transportSendFailed, {
-                  cause: primary
-                })
-              )
-            }
-            throw preprocessingFailure
-          }
-
-          let hasFailure = false
-          let firstFailure: unknown
-          const observedSends = preparedFrames.map((frame) =>
-            this.#sendPreparedTransport(frame).catch((cause) => {
-              if (!hasFailure) {
-                hasFailure = true
-                firstFailure = cause
-              }
-            })
-          )
-          return Promise.all(observedSends).then(() => {
-            let releaseError: unknown
-            let releaseFailed = false
-            try {
-              this.#releaseMessageId(messageId)
-            } catch (error) {
-              releaseFailed = true
-              releaseError = error
-            }
-            if (hasFailure) {
-              if (releaseFailed)
-                throw new WebRpcTransportError(
-                  WebRpcErrorText.transportSendFailed,
-                  new AggregateError(
-                    [firstFailure, releaseError],
-                    WebRpcErrorText.transportSendFailed,
-                    {
-                      cause: firstFailure
-                    }
-                  )
-                )
-              throw firstFailure
-            }
-            if (releaseFailed) throw releaseError
-          })
-        })
-      }
-      return this.#sendTransport(encoded, transfer, hasTransfer)
+      frames = this.components.framer.frame(encoded, {
+        source: this.id,
+        messageId: message.id
+      })
     } catch (cause) {
-      if (cause instanceof WebRpcError) throw cause
-      throw new WebRpcTransportError(WebRpcErrorText.transportSendFailed, cause)
+      throw new WebRpcSerializationError(WebRpcErrorText.protocolEncodeFailed, cause)
     }
+    this.#lifecycle?.assertActive(generation)
+    if (hasTransfer && frames.length !== 1)
+      throw new WebRpcSerializationError(WebRpcErrorText.transferUnsupportedForChunking)
+    return this.#prepareFrames(frames, transfer, hasTransfer, generation).then((preparedFrames) => {
+      this.#lifecycle?.assertActive(generation)
+      return this.#sendPreparedFrames(preparedFrames, transfer, generation)
+    })
   }
 
-  /** Encodes and sends a variation without chunking it. */
-  sendVariation(message: unknown, rejectOnFailure = false): Promise<void> {
-    let encoded: unknown
+  /** Encodes and sends a variation through the same selected framing path as every envelope. */
+  sendVariation(message: IRpcEnvelope, rejectOnFailure = false): Promise<void> {
     try {
-      encoded = this.protocol.encode(message)
-      this.assertProtocolEncodedType(encoded)
+      return Promise.resolve(this.send(message)).catch((error) => {
+        const code =
+          error instanceof WebRpcAuthenticationError
+            ? WebRpcErrorCode.authenticationFailed
+            : WebRpcErrorCode.transport
+        this.onVariationFailure(code, error)
+        if (rejectOnFailure) throw error
+      })
     } catch (error) {
       this.onVariationFailure(WebRpcErrorCode.internal, error)
       return rejectOnFailure ? Promise.reject(error) : Promise.resolve()
     }
-    return this.#sendTransport(encoded).catch((error) => {
-      const code =
-        error instanceof WebRpcAuthenticationError
-          ? WebRpcErrorCode.authenticationFailed
-          : WebRpcErrorCode.transport
-      this.onVariationFailure(code, error)
-      if (rejectOnFailure) throw error
-    })
   }
 
   /** Validates codec output before it reaches a typed transport boundary. */
   private assertProtocolEncodedType(value: unknown): void {
-    const encodedType = this.protocol.encodedType
+    const encodedType = this.components.codec.encodedType
     if (
       (encodedType === 'string' && typeof value !== 'string') ||
       (encodedType === 'uint8array' && !isUint8Array(value))
@@ -334,53 +163,114 @@ export class WebRpcOutboundSender<TTargetId extends string> {
     }
   }
 
-  /** Encodes and validates one internally generated chunk frame. */
-  private encodeFrame(value: unknown): unknown {
-    const encoded = this.protocol.encode(value)
-    this.assertProtocolEncodedType(encoded)
-    return encoded
+  /** Protects every frame before any transport send and preserves the first observed failure. */
+  #prepareFrames(
+    frames: readonly unknown[],
+    transfer: readonly unknown[] | undefined,
+    hasTransfer: boolean,
+    generation: number | undefined
+  ): Promise<readonly unknown[]> {
+    let hasFailure = false
+    let firstFailure: unknown
+    const preparations = frames.map((frame) =>
+      this.#prepareTransportValue(frame, transfer, hasTransfer, generation).catch(
+        (error: unknown) => {
+          if (!hasFailure) {
+            hasFailure = true
+            firstFailure = error
+          }
+          throw error
+        }
+      )
+    )
+    return Promise.all(
+      preparations.map((preparation) =>
+        preparation.then(
+          (value) => ({ ok: true as const, value }),
+          (error: unknown) => ({ ok: false as const, error })
+        )
+      )
+    ).then((results) => {
+      if (hasFailure) throw firstFailure
+      const prepared: unknown[] = []
+      for (const result of results) {
+        if (result.ok) prepared.push(result.value)
+      }
+      return prepared
+    })
+  }
+
+  /** Starts all transport sends only after protection succeeded, while retaining first failure. */
+  #sendPreparedFrames(
+    frames: readonly unknown[],
+    transfer: readonly unknown[] | undefined,
+    generation: number | undefined
+  ): Promise<void> {
+    let hasFailure = false
+    let firstFailure: unknown
+    const sends = frames.map((frame) =>
+      this.#sendPreparedTransport(frame, transfer, generation).catch((error: unknown) => {
+        if (!hasFailure) {
+          hasFailure = true
+          firstFailure = error
+        }
+        throw error
+      })
+    )
+    return Promise.all(
+      sends.map((send) =>
+        send.then(
+          () => ({ ok: true as const }),
+          (error: unknown) => ({ ok: false as const, error })
+        )
+      )
+    ).then(() => {
+      if (hasFailure) throw firstFailure
+    })
   }
 
   /** Normalizes synchronous and asynchronous transport failures without changing send ordering. */
-  #sendTransport(
+  #prepareTransportValue(
     value: unknown,
     transfer?: readonly unknown[],
-    hasTransfer = transfer !== undefined && transfer.length > 0
-  ): Promise<void> {
+    hasTransfer = transfer !== undefined && transfer.length > 0,
+    generation?: number
+  ): Promise<unknown> {
     if (this.authentication && hasTransfer)
       return Promise.reject(
         new WebRpcAuthenticationError(WebRpcErrorText.transferUnsupportedWithAuthentication)
       )
-    return this.#prepareTransportValue(value).then((protectedValue) =>
-      this.#sendPreparedTransport(protectedValue, transfer)
-    )
-  }
-
-  /** Applies authentication and transport-type validation without touching the transport. */
-  #prepareTransportValue(value: unknown): Promise<unknown> {
     const authentication = this.authentication
     if (!authentication)
       return Promise.resolve().then(() => {
         try {
+          this.#lifecycle?.assertActive(generation)
           this.assertTransportEncodedType(value)
           return value
         } catch (cause) {
+          if (cause instanceof WebRpcLifecycleError) throw cause
           throw new WebRpcTransportError(WebRpcErrorText.transportSendFailed, cause)
         }
       })
 
     return Promise.resolve()
-      .then(() => authentication.protect(value, this.#authenticationContext))
+      .then(() => {
+        this.#lifecycle?.assertActive(generation)
+        return authentication.protect(value, this.#authenticationContext)
+      })
       .catch((cause) => {
         if (cause instanceof WebRpcAuthenticationError) throw cause
+        if (cause instanceof WebRpcLifecycleError) throw cause
         throw new WebRpcAuthenticationError(WebRpcErrorText.authenticationFailed, cause)
       })
       .then((protectedValue) => {
         try {
+          this.#lifecycle?.assertActive(generation)
           this.assertTransportEncodedType(protectedValue)
           return protectedValue
         } catch (cause) {
           if (cause instanceof WebRpcAuthenticationError) throw cause
+          if (cause instanceof WebRpcLifecycleError) throw cause
           throw new WebRpcAuthenticationError(
             WebRpcErrorText.protectedEncodedType(this.#transportEncodedType ?? 'any'),
             cause
@@ -390,12 +280,23 @@ export class WebRpcOutboundSender<TTargetId extends string> {
   }
 
   /** Sends a fully prepared value while preserving the transport method receiver. */
-  #sendPreparedTransport(value: unknown, transfer?: readonly unknown[]): Promise<void> {
+  #sendPreparedTransport(
+    value: unknown,
+    transfer: readonly unknown[] | undefined,
+    generation: number | undefined
+  ): Promise<void> {
     return Promise.resolve()
-      .then(() => this.transport.send(value, { transfer }))
+      .then(() => {
+        this.#lifecycle?.assertActive(generation)
+        return this.transport.send(value, { transfer })
+      })
+      .then(() => {
+        this.#lifecycle?.assertActive(generation)
+      })
       .then(() => undefined)
       .catch((cause) => {
         if (cause instanceof WebRpcAuthenticationError) throw cause
+        if (cause instanceof WebRpcLifecycleError) throw cause
         throw new WebRpcTransportError(WebRpcErrorText.transportSendFailed, cause)
       })
   }

@@ -2,7 +2,6 @@ import type {
   IWebRpcAuthenticationCapability,
   IWebRpcConnectCapability,
   IWebRpcContractCapability,
-  IWebRpcChunkCapability,
   IWebRpcDiscoveryCandidate,
   IWebRpcHookEvent,
   IWebRpcHook,
@@ -15,7 +14,8 @@ import type { IWebRpcHookFailureReporter } from './hooks.js'
 import type { IOutboundAttachmentHost } from './outbound-attachment.js'
 import type { IInboundIdentityAdmission, IInboundIdentityRequest } from './inbound-identity.js'
 import type { IVariationHandler } from './variation-coordinator.js'
-import type { IWebRpcVariation } from '../protocol-constants.js'
+import type { IWebRpcVariation } from '../semantic-constants.js'
+import type { IRpcEnvelope } from '@migaia/rpc-contract'
 
 /** Typed outbound owner port consumed by dependent feature descriptors. */
 export type IWebRpcOutboundAttachmentPort = IOutboundAttachmentHost
@@ -30,7 +30,6 @@ export const WebRpcSharedKey = Object.freeze({
   hooks: Symbol('web-rpc.shared.hooks'),
   timeout: Symbol('web-rpc.shared.timeout'),
   uuid: Symbol('web-rpc.shared.uuid'),
-  chunk: Symbol('web-rpc.shared.chunk'),
   ping: Symbol('web-rpc.shared.ping-enable'),
   inboundIdentity: Symbol('web-rpc.shared.inbound-identity'),
   variationCoordinator: Symbol('web-rpc.shared.variation-coordinator'),
@@ -78,14 +77,11 @@ export const WebRpcPingEnablePortShape: IWebRpcPingEnablePort = Object.freeze({ 
 /** Identifier factory shared by request and response correlation owners. */
 export type IWebRpcUuidPort = { readonly generate?: IWebRpcUuidConfig['generate'] }
 
-/** Chunk framing commands shared by the chunk feature and sender. */
-export type IWebRpcChunkPort = IWebRpcChunkCapability
-
 /** Bounded provider command sent through the one outbound operation. */
 export type IWebRpcOutboundCommand =
   | {
       readonly kind: 'response' | 'frame'
-      readonly message: unknown
+      readonly message: IRpcEnvelope
       readonly transfer?: readonly unknown[]
     }
   | {
@@ -93,6 +89,14 @@ export type IWebRpcOutboundCommand =
       readonly targetId: string
       readonly method: string
       readonly data: unknown
+    }
+  | {
+      /** One-way delivery waits for physical pipeline completion without response settlement. */
+      readonly kind: 'one-way'
+      readonly targetId: string
+      readonly method: string
+      readonly data: unknown
+      readonly transfer?: readonly unknown[]
     }
   | {
       readonly kind: 'validate'
@@ -109,7 +113,7 @@ export type IWebRpcOutboundCommand =
 /** Commands whose canonical transport operation is asynchronous. */
 export type IWebRpcResponseOutboundCommand = Extract<
   IWebRpcOutboundCommand,
-  { readonly kind: 'response' | 'frame' }
+  { readonly kind: 'response' | 'frame' | 'one-way' }
 >
 
 /** Commands whose canonical owner must preserve synchronous throw timing. */
@@ -149,11 +153,14 @@ export type IWebRpcVariationAdmissionRequest =
       readonly key: string
       readonly controller: AbortController | undefined
       readonly expiresAt: number
+      readonly reason: unknown
     }
 
 /** Exact variation admission operation; no second variation owner is published. */
 export type IWebRpcVariationCoordinatorPort = {
-  readonly admit: (request: IWebRpcVariationAdmissionRequest) => boolean | (() => void) | void
+  readonly admit: (
+    request: IWebRpcVariationAdmissionRequest
+  ) => boolean | { readonly found: boolean; readonly reason: unknown } | (() => void) | void
 }
 
 /** Exact D87 outbound operation; provider dispatch uses the existing send owner. */
@@ -201,7 +208,6 @@ export type IWebRpcSharedValues = {
   readonly [WebRpcSharedKey.hooks]?: IWebRpcHooksPort
   readonly [WebRpcSharedKey.timeout]?: IWebRpcTimeoutPort
   readonly [WebRpcSharedKey.uuid]?: IWebRpcUuidPort
-  readonly [WebRpcSharedKey.chunk]?: IWebRpcChunkPort
   readonly [WebRpcSharedKey.inboundIdentity]?: IWebRpcInboundIdentityPort
   readonly [WebRpcSharedKey.variationCoordinator]?: IWebRpcVariationCoordinatorPort
   readonly [WebRpcSharedKey.outboundOperations]?: IWebRpcOutboundOperationsPort

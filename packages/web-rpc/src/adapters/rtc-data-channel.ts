@@ -13,7 +13,7 @@ import {
   releaseListenerRegistration,
   reportListenerFailure
 } from '../internal/listener-safety.js'
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js'
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../transport-constants.js'
 import { createMessageListenerHub } from '../internal/message-listener-hub.js'
 
 /** Minimal RTCDataChannel surface accepted by the adapter. */

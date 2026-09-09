@@ -9,8 +9,18 @@ import type { IWebRpcPlatform } from '../typing.js'
 /** Result of shared inbound identity admission; token is leased until release. */
 export type IInboundIdentityAdmission = {
   readonly token: string
+  readonly bindingKey: string
   readonly release: () => void
 }
+
+/** One-shot physical-source receipt consumed only by its creating identity owner. */
+export type IInboundIdentityPreparedSource = Readonly<{
+  readonly data: unknown
+  readonly source: unknown
+  readonly origin: string | undefined
+  readonly peerId: string | undefined
+  readonly sourceToken: string
+}>
 
 /** Narrow request context accepted by the endpoint-local identity owner. */
 export type IInboundIdentityRequest = {
@@ -45,6 +55,10 @@ export class InboundIdentityCoordinator {
   readonly #topology: IWebRpcTransportTopology | undefined
   /** Discovery-established peer leases reused by later frames on source-less transports. */
   readonly #established = new Map<string, string>()
+  /** Exact prepared receipts prevent copied, foreign, or replayed source admission. */
+  readonly #prepared = new WeakSet<object>()
+  /** Terminal clear prevents a stale asynchronous verification from reviving identity state. */
+  #closed = false
 
   /** Creates one endpoint-local identity owner without subscribing or allocating feature state. */
   constructor(options: {
@@ -68,13 +82,50 @@ export class InboundIdentityCoordinator {
 
   /** Verifies source and connect identity before a feature allocates protocol state. */
   async admit(request: IInboundIdentityRequest): Promise<IInboundIdentityAdmission | undefined> {
-    const inbound = request.inbound
-    if (this.#sourceProof && !this.#sourceProof(inbound?.source, inbound?.origin)) return undefined
-    const establishedKey = tupleKey(request.senderId, request.targetId)
+    const prepared = this.prepareSource(request.inbound)
+    return prepared === undefined ? undefined : this.admitPrepared(prepared, request)
+  }
+
+  /** Snapshots physical inbound metadata and proves its source before framing allocates state. */
+  prepareSource(
+    inbound: IInboundIdentityRequest['inbound']
+  ): IInboundIdentityPreparedSource | undefined {
+    if (this.#closed) return undefined
+    const data = inbound?.data
+    const source = inbound?.source
+    const origin = inbound?.origin
+    const peerId = inbound?.peerId
+    if (this.#sourceProof && !this.#sourceProof(source, origin)) return undefined
+    if (this.#closed) return undefined
+    const prepared = Object.freeze({
+      data,
+      source,
+      origin,
+      peerId,
+      sourceToken: this.#sources.token(source)
+    })
+    this.#prepared.add(prepared)
+    return prepared
+  }
+
+  /** Consumes one prepared physical proof before establishing or retaining a logical lease. */
+  async admitPrepared(
+    prepared: IInboundIdentityPreparedSource,
+    request: IInboundIdentityRequest
+  ): Promise<IInboundIdentityAdmission | undefined> {
+    if (this.#closed || !this.#prepared.delete(prepared)) return undefined
+    const establishedKey = tupleKey(
+      request.senderId,
+      request.targetId,
+      prepared.peerId ?? '',
+      prepared.origin ?? '',
+      prepared.sourceToken
+    )
     const establishedToken = this.#established.get(establishedKey)
     if (establishedToken !== undefined && this.#peers.retain(establishedToken))
       return {
         token: establishedToken,
+        bindingKey: establishedKey,
         release: () => {
           this.#peers.release(establishedToken)
           recordInboundIdentityRelease(this)
@@ -84,20 +135,20 @@ export class InboundIdentityCoordinator {
       const verified = await this.#connect.verify({
         senderId: request.senderId,
         targetId: request.targetId,
-        peerId: inbound?.peerId,
-        origin: inbound?.origin,
-        source: inbound?.source,
+        peerId: prepared.peerId,
+        origin: prepared.origin,
+        source: prepared.source,
         data: request.data,
         platform: this.#platform,
         topology: this.#topology
       })
-      if (!verified) return undefined
+      if (!verified || this.#closed) return undefined
     }
     const token = this.#peers.register(
       request.senderId,
-      inbound?.peerId,
-      inbound?.origin,
-      this.#sources.token(inbound?.source)
+      prepared.peerId,
+      prepared.origin,
+      prepared.sourceToken
     )
     if (!token || !this.#peers.retain(token)) return undefined
     if (this.#established.get(establishedKey) !== token) {
@@ -108,6 +159,7 @@ export class InboundIdentityCoordinator {
     }
     return {
       token,
+      bindingKey: establishedKey,
       release: () => {
         this.#peers.release(token)
         recordInboundIdentityRelease(this)
@@ -127,6 +179,7 @@ export class InboundIdentityCoordinator {
 
   /** Clears all endpoint-local identity state during terminal disposal. */
   clear(): void {
+    this.#closed = true
     this.#established.clear()
     this.#peers.clear()
   }

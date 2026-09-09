@@ -17,6 +17,15 @@ type IControlledTransport = IWebRpcTransport & {
   deliver(message: unknown): void
 }
 
+/** Canonical semantic frame fields read by the source-less Worker transport oracle. */
+type ICanonicalWorkerFrame = {
+  readonly id: string
+  readonly data: {
+    readonly webRpc: { readonly receiverId?: string }
+    readonly payload?: unknown
+  }
+}
+
 /** Creates a source-less Worker-like transport whose delivery order is test-controlled. */
 function createControlledTransport(): IControlledTransport {
   let listener: ((message: IQueuedFrame) => void) | undefined
@@ -88,24 +97,28 @@ describe('deterministic source-less Worker settlement', () => {
       await drainMicrotasks()
       const requests = takeFrames(clientTransport)
       expect(requests).toHaveLength(2)
-      const taskIds = requests.map((frame) => (frame as { taskId: string }).taskId)
+      const taskIds = requests.map((frame) => (frame as ICanonicalWorkerFrame).id)
       requests.forEach((frame) => {
-        const record = frame as { data: string; taskId: string }
-        taskIdByData.set(record.data, record.taskId)
+        const record = frame as ICanonicalWorkerFrame
+        taskIdByData.set(String(record.data.payload), record.id)
       })
       expect(
         requests.every(
           (frame) =>
             typeof frame === 'object' &&
             frame !== null &&
-            'receiverId' in frame &&
-            frame.receiverId === 'worker-provider'
+            'data' in frame &&
+            (frame as ICanonicalWorkerFrame).data.webRpc.receiverId === 'worker-provider'
         )
       ).toBe(true)
 
+      const firstRequest = requests[0] as ICanonicalWorkerFrame
       providerTransport.deliver({
-        ...(requests[0] as Record<string, unknown>),
-        receiverId: 'foreign-provider'
+        ...firstRequest,
+        data: {
+          ...firstRequest.data,
+          webRpc: { ...firstRequest.data.webRpc, receiverId: 'foreign-provider' }
+        }
       })
       await drainMicrotasks()
       expect(executions).toBe(0)
@@ -122,39 +135,41 @@ describe('deterministic source-less Worker settlement', () => {
       expect(executions).toBe(2)
       expect(readEndpointDebugSnapshot(provider)).toMatchObject({ activeControllers: 2 })
       expect(readEndpointDebugSnapshot(client)).toMatchObject({ pending: 2 })
-      for (const taskId of taskIds) {
-        expect(providerAcquireSpy.mock.calls.filter(([key]) => key.includes(taskId))).toHaveLength(
-          1
-        )
-      }
+      const providerAdmissionKeys = providerAcquireSpy.mock.calls.map(([key]) => key)
+      expect(providerAdmissionKeys).toHaveLength(2)
+      expect(new Set(providerAdmissionKeys)).toHaveLength(2)
 
       releaseProviderCalls.get(taskIdByData.get('first') ?? 'first')?.()
       releaseProviderCalls.get(taskIdByData.get('second') ?? 'second')?.()
       await drainMicrotasks()
       const responses = takeFrames(providerTransport)
       expect(responses).toHaveLength(2)
-      for (const taskId of taskIds) {
-        expect(providerReleaseSpy.mock.calls.filter(([key]) => key.includes(taskId))).toHaveLength(
-          1
+      await vi.waitFor(() =>
+        expect(providerReleaseSpy.mock.calls.map(([key]) => key).sort()).toEqual(
+          providerAdmissionKeys.slice().sort()
         )
-      }
+      )
       expect(
         responses.every(
           (frame) =>
             typeof frame === 'object' &&
             frame !== null &&
-            'receiverId' in frame &&
-            frame.receiverId === 'worker-client'
+            'data' in frame &&
+            (frame as ICanonicalWorkerFrame).data.webRpc.receiverId === 'worker-client'
         )
       ).toBe(true)
 
+      const firstResponse = responses[0] as ICanonicalWorkerFrame
       clientTransport.deliver({
-        ...(responses[0] as Record<string, unknown>),
-        receiverId: 'foreign-client'
+        ...firstResponse,
+        data: {
+          ...firstResponse.data,
+          webRpc: { ...firstResponse.data.webRpc, receiverId: 'foreign-client' }
+        }
       })
       clientTransport.deliver({
-        ...(responses[0] as Record<string, unknown>),
-        taskId: 'unknown-task'
+        ...firstResponse,
+        id: 'unknown-task'
       })
       await drainMicrotasks()
       expect(readEndpointDebugSnapshot(client)).toMatchObject({ pending: 2 })

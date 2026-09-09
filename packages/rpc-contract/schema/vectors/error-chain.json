@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "fields": ["source", "code", "name", "message", "stack", "cause", "errors"],
+  "ordering": "cause before errors; cleanup errors remain secondary"
+}

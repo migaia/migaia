@@ -93,7 +93,7 @@ test('authenticated BroadcastChannel rejects an observed forged response', async
     pending: 0,
     pingPending: 0,
     activeControllers: 0,
-    chunks: 0,
+    chunks: undefined,
     resources: 0,
     discovery: {
       waiters: 0,
@@ -113,7 +113,7 @@ test('authenticated BroadcastChannel rejects an observed forged response', async
     pending: 0,
     pingPending: 0,
     activeControllers: 0,
-    chunks: 0,
+    chunks: undefined,
     resources: 0,
     discovery: {
       waiters: 0,

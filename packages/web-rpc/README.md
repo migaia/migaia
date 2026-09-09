@@ -30,7 +30,7 @@
 - **双向调用**：不是"客户端发请求、服务端只能回响应"的单向模型——每一端既可以是调用方也可以是被调用方，`provide()` 和 `send()` 在同一个 `endpoint` 上共存。
 - **请求超时**：`timeout()` 中间件统一管理请求 deadline；每个请求只发送一次，避免隐含的 at-least-once 语义。
 - **鉴权与加密**：`authentication()` 中间件对每一帧（包括分片帧、控制帧）做签名/验签、加解密，`connect()` 中间件对"这条消息真的来自我认识的那个 peer 吗"做验证，不是只信任 `senderId` 这个可以被伪造的字符串字段。
-- **大消息自动分片**：`chunk()` 中间件在发送侧按字节预算自动切分、接收侧自动重组，并从并发消息数、单 peer 消息数、分片数、分片大小、缓冲区总量、重组超时六个维度限制资源占用，防止恶意/异常大消息把内存打爆。
+- **大消息自动分片**：`framer()` 层在发送侧按字节预算自动切分、接收侧自动重组，并从并发消息数、单 peer 消息数、分片数、分片大小、缓冲区总量、重组超时六个维度限制资源占用，防止恶意/异常大消息把内存打爆。
 - **多接收端的服务发现与负载均衡**：同一个 `targetId` 背后可以有多个存活的接收端（比如多个 SharedWorker tab），框架自动维护"谁还活着"的路由表，未指定接收端时对活跃接收端做首次成功即返回的竞速调用；也支持手动模式精确控制发现/注册/固定路由。
 - **统一的错误处理**：跨包错误都带稳定的 `(source, code)`；原生 `TypeError`/`RangeError`/`AggregateError` 和远端 `WebRpcRemoteError` 保留自己的运行时类型，调用方可先用 `isWebRpcError()`/结构化 `code` 分支，再按需检查原生类型。
 - **可控的生命周期**：`dispose()` 保证按预期顺序清理中间件、传输连接、进行中的请求，任何一步清理失败都会被收集而不是让后续清理步骤中断。
@@ -129,12 +129,12 @@ try {
 }
 ```
 
-`connect()` 是唯一必需 middleware。`contract()`、`protocol()`、`timeout()` 等按需要添加；不应为了“凑齐默认栈”机械安装。
+`connect()` 是唯一必需 middleware。`contract()`、`codec()`、`timeout()` 等按需要添加；不应为了“凑齐默认栈”机械安装。
 
 ### 7.3 完整预设：根 `createEndpoint`
 
 ```ts
-import { createEndpoint, contract, protocol, connect } from '@migaia/web-rpc'
+import { createEndpoint, contract, codec, connect } from '@migaia/web-rpc'
 ```
 
 根入口的 `createEndpoint` 是 `createFullEndpoint` 的公开别名，适合确实同时需要 provider、discovery、control 和 chunk 的应用。它不是所有场景的唯一入口：只调用远端时优先使用 client preset。
@@ -143,7 +143,7 @@ import { createEndpoint, contract, protocol, connect } from '@migaia/web-rpc'
 const endpoint = await createEndpoint({
   id: 'server',
   transport,
-  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]
+middlewares: [contract({ version: '1' }), codec(identityCodecV1), connect({ transport })]
 })
 endpoint.provide('add', (ctx) => {
   const { a, b } = ctx.data as { a: number; b: number }
@@ -194,9 +194,9 @@ const alive = await endpoint.ping('service')
 - `provider()`：`provide`，并把 inseparable outbound closure 投影到根对象。
 - `discovery()`：`connect` / `discovery`；内部依赖 outbound，但单独选择时不暴露发送方法。
 - `control()`：ping/pong 控制面；公开 `ping` / `pingAll` 还要求 middleware tuple 包含 `ping()`。
-- `chunk()`：分片 framing，没有独立公开方法；具体限制来自 middleware `chunk(config)`。
+- `framer()`：分片 framing，没有独立公开方法；具体限制来自 framing descriptor 配置。
 
-`Feature` 和同名 `middleware` 不是重复实现：前者决定运行时模块与公开 surface，后者只提供配置/capability。例如完整预设选择 `features/chunk`，而 `middleware/chunk` 决定 chunk size 和容量限制。
+`Feature` 和 layer descriptor 不是重复实现：前者决定运行时模块与公开 surface，后者只提供配置/capability。分片能力由 framing layer 负责，策略由 framer descriptor 决定。
 
 ### 7.5 Endpoint 方法
 
@@ -288,10 +288,10 @@ contract({
 
 全部选项：`version?: string`（本端协议版本号）、`acceptVersions?: string[]`（接受的对端版本号，默认只接受自己声明的 `version`）、`maxIdentifierLength?: number`（`id`/`targetId`/method 等标识符最大长度，**默认 128**，不装这个中间件时同样生效默认值）、`schemas?: Record<string, { params: IWebRpcSchema; result: IWebRpcSchema }>`（未覆盖的方法名不做校验，按方法名精确匹配）。建议总是加，否则契约不匹配问题会在业务代码里才暴露。
 
-**`protocol(config?)`｜3 秒上手** —— 定义消息信封的编码/解码方式：
+**`codec(descriptor)`｜3 秒上手** —— 定义消息信封的编码/解码方式：
 
 ```ts
-protocol({ encode: (v) => msgpackEncode(v), decode: (v) => msgpackDecode(v) })
+codec({ encode: (v) => msgpackEncode(v), decode: (v) => msgpackDecode(v) })
 ```
 
 全部选项：`encode?: (value) => unknown`（默认恒等）、`decode?: (value) => unknown`（默认恒等）、`encodedType?: 'any' | 'string' | 'uint8array'`（默认 `'any'`，需要和传输层的编码要求一致，不一致在构造期直接报错）。
@@ -319,10 +319,10 @@ authentication({
 
 全部选项：`encrypt?`/`decrypt?`/`sign?`/`verify?: (value, context) => unknown | Promise<unknown>`（`context.direction` 为 `'outbound' | 'inbound'`；`encrypt`/`decrypt` 必须成对提供，`sign`/`verify`同理，且至少要配置一对，否则构造期抛 `INVALID_CONFIG`）、`encodedType?: 'any' | 'string' | 'uint8array'`（默认 `'any'`）。启用后 `Transfer` 零拷贝列表不再受支持。通道本身不可信（如匿名 BroadcastChannel）时必须加。
 
-**`chunk(config?)`｜10 秒上手** —— 大消息自动分片与重组：
+**`framer(descriptor?)`｜10 秒上手** —— 大消息自动分片与重组：
 
 ```ts
-chunk({ chunkSize: 16_384, maxMessageBytes: 50 * 1024 * 1024, assemblyTimeoutMs: 30_000 })
+framer({ chunkSize: 16_384, maxMessageBytes: 50 * 1024 * 1024, assemblyTimeoutMs: 30_000 })
 ```
 
 全部选项（六个容量维度即使不配置也带内置默认值，不是"不设置就不限"）：`chunkSize?: number`（单帧字节数，超过触发分片，未设不主动分片）、`maxMessageBytes?: number`（单条消息总字节数上限，未设不检查）、`maxConcurrentMessages?: number`（端点级并发重组数，默认 128）、`maxConcurrentMessagesPerPeer?: number`（单 peer 并发重组数，默认 32）、`maxBufferedBytes?: number`（重组缓冲区总字节，默认 16MiB）、`maxChunksPerMessage?: number`（单消息最大分片数，默认 4096）、`maxChunkBytes?: number`（单分片最大字节，默认 4MiB）、`assemblyTimeoutMs?: number`（重组超时，默认 30 秒）、`byteLength?: (value) => number`（自定义字节测量，默认按 UTF-8）、`split?: (value, maxBytes) => readonly string[]`（自定义切分算法）。已是 `Uint8Array` 的消息不支持自动分片。
@@ -465,7 +465,7 @@ const transport = createWebTransportDatagramTransport({
 })
 ```
 
-单参数 `{ writable: WritableStream<Uint8Array>; readable: ReadableStream<Uint8Array> }`，无其他选项。datagram 无内建分帧，`protocol()` 需自行处理帧边界；`close()` 才会真正取消内部持久 reader，取消订阅不会。
+单参数 `{ writable: WritableStream<Uint8Array>; readable: ReadableStream<Uint8Array> }`，无其他选项。datagram 无内建分帧，codec/framer descriptors 需自行处理帧边界；`close()` 才会真正取消内部持久 reader，取消订阅不会。
 
 > 用不了官方适配器？实现 `IWebRpcTransport`（只有 `send`/`subscribe` 两个必需方法）就能接入任意自定义通道，见 [USEGUIDE.md](./USEGUIDE.md#5-自定义传输适配器)。
 
@@ -523,7 +523,7 @@ const restored = deserializeError(wire)
 for (const node of reachError(topLevelError)) console.error(node)
 ```
 
-单参数 `error: unknown`，无选项；和序列化使用同一安全预算，图超过 64 层或 1024 个节点、或 hostile getter 读取失败时会抛带 `PAYLOAD_INVALID` 的 `WebRpcSerializationError`，不会返回不完整遍历。完整字段与类型定义见 [USEGUIDE §16](./USEGUIDE.md#16-跨端错误序列化)。此外主入口还整体导出 `protocol-constants` 里的全部枚举常量（`WebRpcPlatform`/`WebRpcTransportTopology`/`WebRpcMessageKind` 等），用于替代手写字符串字面量，完整清单见 [USEGUIDE §15](./USEGUIDE.md#15-协议常量与类型工具)。
+单参数 `error: unknown`，无选项；和序列化使用同一安全预算，图超过 64 层或 1024 个节点、或 hostile getter 读取失败时会抛带 `PAYLOAD_INVALID` 的 `WebRpcSerializationError`，不会返回不完整遍历。完整字段与类型定义见 [USEGUIDE §16](./USEGUIDE.md#16-跨端错误序列化)。此外主入口还整体导出传输与契约常量，用于替代手写字符串字面量，完整清单见 [USEGUIDE §15](./USEGUIDE.md#15-协议常量与类型工具)。
 
 ---
 
@@ -533,7 +533,7 @@ for (const node of reachError(topLevelError)) console.error(node)
 
 ```ts
 // worker.ts
-import { contract, protocol, connect } from '@migaia/web-rpc'
+import { contract, codec, connect } from '@migaia/web-rpc'
 import { createProviderEndpoint } from '@migaia/web-rpc/provider'
 import { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'
 
@@ -541,14 +541,14 @@ const transport = createWebWorkerTransport(self as unknown as Worker)
 const endpoint = await createProviderEndpoint({
   id: 'worker',
   transport,
-  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]
+  middlewares: [contract({ version: '1' }), codec({ encode: (value) => value, decode: (value) => value }), connect({ transport })]
 })
 endpoint.provide('heavyCompute', (ctx) => ctx.success(doHeavyWork(ctx.data as number[])))
 ```
 
 ```ts
 // main.ts
-import { contract, protocol, connect, timeout } from '@migaia/web-rpc'
+import { contract, codec, connect, timeout } from '@migaia/web-rpc'
 import { createClientEndpoint } from '@migaia/web-rpc/client'
 import { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'
 
@@ -560,7 +560,7 @@ const endpoint = await createClientEndpoint({
   targetIds: ['worker'],
   middlewares: [
     contract({ version: '1' }),
-    protocol(),
+    codec({ encode: (value) => value, decode: (value) => value }),
     connect({ transport }),
     timeout({ timeoutMs: 30_000 })
   ]
@@ -572,7 +572,7 @@ const result = await endpoint.send<number[]>('worker', 'heavyCompute', [1, 2, 3]
 ### 2. iframe 白名单鉴权通信
 
 ```ts
-import { contract, protocol, connect } from '@migaia/web-rpc'
+import { contract, codec, connect } from '@migaia/web-rpc'
 import { createClientEndpoint } from '@migaia/web-rpc/client'
 import { createWindowMessageTransport } from '@migaia/web-rpc/adapters/window'
 
@@ -589,7 +589,7 @@ const endpoint = await createClientEndpoint({
   transport,
   middlewares: [
     contract({ version: '1' }),
-    protocol(),
+    codec({ encode: (value) => value, decode: (value) => value }),
     connect({
       transport,
       useBaseIdVerifyOnly: false,
@@ -602,7 +602,7 @@ const endpoint = await createClientEndpoint({
 ### 3. 标签页广播通知（不需要响应）
 
 ```ts
-import { contract, protocol, connect } from '@migaia/web-rpc'
+import { contract, codec, connect } from '@migaia/web-rpc'
 import { createClientEndpoint } from '@migaia/web-rpc/client'
 import { createBroadcastChannelTransport } from '@migaia/web-rpc/adapters/broadcast-channel'
 
@@ -610,7 +610,7 @@ const transport = createBroadcastChannelTransport(new BroadcastChannel('app-sync
 const endpoint = await createClientEndpoint({
   id: `tab-${crypto.randomUUID()}`,
   transport,
-  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]
+  middlewares: [contract({ version: '1' }), codec({ encode: (value) => value, decode: (value) => value }), connect({ transport })]
 })
 
 endpoint.on('cache-invalidated', (ctx) => console.log('缓存失效通知：', ctx.data))
@@ -620,10 +620,9 @@ endpoint.dispatchAll('cache-invalidated', { key: 'user-profile' }) // 其余标�
 ### 4. 大文件跨端传输（自动分片）
 
 ```ts
-import { contract, protocol, connect, chunk } from '@migaia/web-rpc'
+import { contract, codec, connect, framer } from '@migaia/web-rpc'
 import { createComposedEndpoint } from '@migaia/web-rpc/core'
 import { outbound } from '@migaia/web-rpc/features/outbound'
-import { chunk as chunkFeature } from '@migaia/web-rpc/features/chunk'
 
 const endpoint = await createComposedEndpoint(
   {
@@ -631,16 +630,16 @@ const endpoint = await createComposedEndpoint(
     transport,
     middlewares: [
       contract({ version: '1' }),
-      protocol(),
+      codec({ encode: (value) => value, decode: (value) => value }),
       connect({ transport }),
-      chunk({
+      framer({
         chunkSize: 16_384,
         maxMessageBytes: 50 * 1024 * 1024,
         assemblyTimeoutMs: 30_000
       })
     ]
   },
-  [outbound(), chunkFeature()] as const
+  [outbound()] as const
 )
 
 // 业务代码完全不用关心分片，正常发一个大 payload 即可
@@ -650,7 +649,7 @@ await endpoint.send('receiver', 'uploadFile', { name: 'video.mp4', bytes: largeU
 ### 5. 超时 + 可取消调用
 
 ```ts
-import { contract, protocol, connect, timeout, abort } from '@migaia/web-rpc'
+import { contract, codec, connect, timeout, abort } from '@migaia/web-rpc'
 import { createClientEndpoint } from '@migaia/web-rpc/client'
 
 const endpoint = await createClientEndpoint({
@@ -659,7 +658,7 @@ const endpoint = await createClientEndpoint({
   targetIds: ['server'],
   middlewares: [
     contract({ version: '1' }),
-    protocol(),
+    codec({ encode: (value) => value, decode: (value) => value }),
     connect({ transport }),
     timeout({
       timeoutMs: 5000,
@@ -689,8 +688,8 @@ const result = await resultPromise
 6. **`dispose()` 是幂等的、会等待全部清理完成才 settle**；某一步清理失败不会阻止其余步骤执行，失败信息汇总在抛出的错误的 `cleanupErrors` 里，每一项都带着资源名，方便定位是哪个中间件或传输没清理干净。
 7. **自定义传输必须准确声明 `topology`**（`exclusive` / `multiplexed` / `broadcast`），且 `platform` 必须是内置枚举值之一（`WebRpcPlatform` 常量表列出的 7 个值）。声明为 `multiplexed` 的传输必须提供 peer/source 身份或显式校验，框架不会把它当成"只有一个发送方"的独占通道来信任。
 8. **回调函数不依赖 `this`**。中间件 `install`、`provider`、`verifier`、pipeline 回调都以裸函数形式被调用（框架内部明确不使用 `bind`/`call`/`apply`），请用箭头函数或闭包捕获状态。
-9. **`chunk()` 的容量限制不是"不设置就不限"**——六个维度里有五个（并发消息数、单 peer 消息数、分片数、分片字节、重组超时）自带内置默认值，只有 `chunkSize`/`maxMessageBytes` 才是真正的"未设不限"。
-10. **Feature 决定“有没有这个公开方法”，middleware 决定“这个能力怎样工作”**。不要把 `features/chunk` 与 middleware `chunk()`、`features/control` 与 middleware `ping()` 当作二选一；需要对应行为时两层都要满足，类型会对缺失的条件能力 fail closed。
+9. **framer descriptor 的容量限制不是"不设置就不限"**——六个维度里有五个（并发消息数、单 peer 消息数、分片数、分片字节、重组超时）自带内置默认值，只有 `chunkSize`/`maxMessageBytes` 才是真正的"未设不限"。
+10. **Feature 决定“有没有这个公开方法”，layer descriptor 决定“这个能力怎样工作”**。分片由 framing layer 负责，控制面由 control Feature 与 `ping()` middleware 共同提供；类型会对缺失的条件能力 fail closed。
 11. **优先从最窄子路径导入**。只调用远端用 `@migaia/web-rpc/client`，只提供服务用 `@migaia/web-rpc/provider`；根 `createEndpoint` 是 full preset，不是零成本门面。
 
 ## 13. 构建门禁

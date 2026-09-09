@@ -61,7 +61,7 @@ test('two pages isolate same sender/task through one SharedWorker', async ({ con
     activePageSnapshot: expect.objectContaining({
       phase: 'active',
       pending: 0,
-      chunks: 0,
+      chunks: undefined,
       activeControllers: 0
     })
   })

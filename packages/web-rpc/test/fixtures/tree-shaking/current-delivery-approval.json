@@ -1,0 +1,42 @@
+{
+  "status": "approved",
+  "approvalRecord": {
+    "schema": "WRC-C-B11-approval-v2",
+    "authorityId": "rpcc-corrected-delivery-v38",
+    "keyId": "rpcc-corrected-v38-20260909",
+    "decisionId": "WRC-C-B11-RPCC-V38-D4-20260909",
+    "issuedAt": "2026-09-09T01:01:06.802Z",
+    "rationale": "User-authorized current-candidate delivery pair under preserved corrected controller; complete frozen provenance, optional historical cost diagnostics, and unchanged functional acceptance.",
+    "oldTuple": {
+      "moduleCount": 53,
+      "rawBytes": 250129,
+      "gzipBytes": 61171
+    },
+    "newTuple": {
+      "moduleCount": 130,
+      "rawBytes": 502445,
+      "gzipBytes": 120841
+    },
+    "digest": "068e275c1b872af060bdb92ff4b5cd57da05f3a97a62e1e3808f35b562d53574",
+    "signature": "JfjlHEGW0U76r2sgpXAlXyynEcAZW1tBb9bNczW+0VQ+JdicVkEXRn0SryHa01diEEw7gY0HQcg5O/iFvE3sDA==",
+    "payload": {
+      "schema": "WRC-C-B11-approval-v2",
+      "authorityId": "rpcc-corrected-delivery-v38",
+      "keyId": "rpcc-corrected-v38-20260909",
+      "decisionId": "WRC-C-B11-RPCC-V38-D4-20260909",
+      "issuedAt": "2026-09-09T01:01:06.802Z",
+      "rationale": "User-authorized current-candidate delivery pair under preserved corrected controller; complete frozen provenance, optional historical cost diagnostics, and unchanged functional acceptance.",
+      "oldTuple": {
+        "moduleCount": 53,
+        "rawBytes": 250129,
+        "gzipBytes": 61171
+      },
+      "newTuple": {
+        "moduleCount": 130,
+        "rawBytes": 502445,
+        "gzipBytes": 120841
+      },
+      "digest": "068e275c1b872af060bdb92ff4b5cd57da05f3a97a62e1e3808f35b562d53574"
+    }
+  }
+}

@@ -37,6 +37,8 @@ export function toManagedRpcHandler<TTargetId extends string = string>(
     pendingCount += 1
     try {
       await endpointPromise
+      // Readiness may resolve after close/dispose; never deliver into a terminal endpoint.
+      if (disposed) return
       deliver(message)
       await Promise.resolve()
     } finally {

@@ -4,7 +4,7 @@ import type {
   IWebRpcTransportEncodingValue,
   IWebRpcTransportOwnershipValue,
   IWebRpcTransportTopologyValue
-} from './protocol-constants.js'
+} from './transport-constants.js'
 export type IWebRpcTransportTopology = IWebRpcTransportTopologyValue
 export type IWebRpcTransportEncoding = IWebRpcTransportEncodingValue
 export type IWebRpcTransportOwnership = IWebRpcTransportOwnershipValue

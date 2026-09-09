@@ -75,6 +75,7 @@ describe('composed inbound variation capability gating', () => {
   it('cancels an active provider task only when the receiver selected the abort() middleware', async () => {
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     let observedAborted: boolean | undefined
+    let observedReason: unknown
     let started: (() => void) | undefined
     const startedPromise = new Promise<void>((resolve) => {
       started = resolve
@@ -95,6 +96,7 @@ describe('composed inbound variation capability gating', () => {
             setTimeout(resolve, 400)
           })
           observedAborted = context.signal.aborted
+          observedReason = context.signal.reason
           return context.success(undefined)
         }
       }
@@ -112,9 +114,14 @@ describe('composed inbound variation capability gating', () => {
       })
       request.catch(() => undefined)
       await startedPromise
-      controller.abort()
+      const abortReason = { reason: ['active', { route: 'portable' }] }
+      controller.abort(abortReason)
+      await expect(request).rejects.toSatisfy(
+        (error: unknown) => (error as { readonly cause?: unknown }).cause === abortReason
+      )
       await new Promise((resolve) => setTimeout(resolve, 200))
       expect(observedAborted).toBe(true)
+      expect(observedReason).toEqual({ reason: ['active', { route: 'portable' }] })
     } finally {
       await client.dispose()
       await server.dispose()

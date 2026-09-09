@@ -29,6 +29,34 @@
     "./registry": {
       "types": "./dist/registry.d.ts",
       "default": "./dist/registry.js"
+    },
+    "./codec": {
+      "types": "./dist/codec.d.ts",
+      "default": "./dist/codec.js"
+    },
+    "./codecs/identity": {
+      "types": "./dist/codecs/identity.d.ts",
+      "default": "./dist/codecs/identity.js"
+    },
+    "./codecs/identity/v1": {
+      "types": "./dist/codecs/identity/v1.d.ts",
+      "default": "./dist/codecs/identity/v1.js"
+    },
+    "./codecs/json": {
+      "types": "./dist/codecs/json.d.ts",
+      "default": "./dist/codecs/json.js"
+    },
+    "./codecs/message-pack": {
+      "types": "./dist/codecs/message-pack.d.ts",
+      "default": "./dist/codecs/message-pack.js"
+    },
+    "./codecs/cbor": {
+      "types": "./dist/codecs/cbor.d.ts",
+      "default": "./dist/codecs/cbor.js"
+    },
+    "./codecs/protobuf": {
+      "types": "./dist/codecs/protobuf.d.ts",
+      "default": "./dist/codecs/protobuf.js"
     }
   },
   "scripts": {
@@ -43,10 +71,16 @@
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "2.14.0",
     "@migaia/lifecycle": "workspace:^",
-    "@migaia/utils": "workspace:^"
+    "@migaia/utils": "workspace:^",
+    "@msgpack/msgpack": "3.1.3",
+    "cbor-x": "1.6.6"
   },
   "devDependencies": {
+    "cborg": "6.1.1",
+    "msgpackr": "2.1.0",
+    "protobufjs": "8.8.0",
     "typescript": "~6.0.2",
     "vitest": "4.1.10"
   }

@@ -1,20 +1,23 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { createMemoryTransportPair } from '../../src/adapters/memory.js'
+import { rpcProtocolV1 } from '@migaia/rpc-contract'
+import { createStringFramer } from '@migaia/rpc-contract/framing'
+import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { createComposedEndpoint, type IWebRpcCoreConfig } from '../../src/core.js'
 import { createClientEndpoint } from '../../src/client.js'
 import { createEndpoint } from '../../src/index.js'
 import { abort } from '../../src/middleware/abort.js'
 import { authentication } from '../../src/middleware/authentication.js'
-import { chunk as chunkMiddleware } from '../../src/middleware/chunk.js'
+import { codec } from '../../src/middleware/codec.js'
 import { connect } from '../../src/middleware/connect.js'
 import { contract } from '../../src/middleware/contract.js'
 import { hooks } from '../../src/middleware/hooks.js'
 import { ping } from '../../src/middleware/ping.js'
-import { protocol } from '../../src/middleware/protocol.js'
+import { canonicalProtocol as protocol } from '../../src/middleware/canonical-protocol.js'
 import { timeout } from '../../src/middleware/timeout.js'
 import { uuid } from '../../src/middleware/uuid.js'
-import { chunk } from '../../src/features/chunk.js'
+import { canonicalChunk as chunk } from '../../src/features/canonical-chunk.js'
 import { control } from '../../src/features/control.js'
 import { discovery } from '../../src/features/discovery.js'
 import { outbound } from '../../src/features/outbound.js'
@@ -66,8 +69,7 @@ import {
 import {
   WebRpcSharedKey,
   WebRpcPingEnablePortShape,
-  type IWebRpcContractPort,
-  type IWebRpcProtocolPort
+  type IWebRpcContractPort
 } from '../../src/internal/plugin-shared-keys.js'
 import { WebRpcOutboundAttachment } from '../../src/internal/outbound-attachment.js'
 import { WebRpcFirstPartyRoleSchema } from '../../src/internal/plugin-contract.js'
@@ -161,13 +163,14 @@ type IProductionLifecycleTraceEntry = {
 type IProductionBatchOptions = {
   readonly providers?: Readonly<Record<string, IWebRpcProvider>>
   readonly protocolMiddleware?: IWebRpcPlugin
+  readonly codecMiddleware?: IWebRpcPlugin
   readonly contractMiddleware?: IWebRpcPlugin
   readonly authenticationMiddleware?: IWebRpcPlugin
   readonly connectMiddleware?: IWebRpcPlugin
   readonly hooksMiddleware?: IWebRpcPlugin
   readonly pingMiddleware?: IWebRpcPlugin
   readonly uuidMiddleware?: IWebRpcPlugin
-  readonly chunkMiddleware?: IWebRpcPlugin
+  readonly framer?: IWebRpcCoreConfig['framer']
   readonly omitProtocol?: boolean
   readonly omitContract?: boolean
   readonly omitAuthentication?: boolean
@@ -213,6 +216,7 @@ function sameRole(left: IWebRpcPluginRole, right: IWebRpcPluginRole): boolean {
 function productionMiddleware(
   transport: IWebRpcCoreConfig['transport'],
   protocolMiddleware: IWebRpcPlugin | null | undefined = protocol(),
+  codecMiddleware: IWebRpcPlugin | null | undefined = codec(defineJsonCodec({ version: 1 })),
   contractMiddleware: IWebRpcPlugin | null | undefined = contract(),
   authenticationMiddleware: IWebRpcPlugin | null | undefined = authentication({
     encrypt: (value) => value,
@@ -223,16 +227,15 @@ function productionMiddleware(
   timeoutMiddleware: IWebRpcPlugin | null | undefined = timeout(),
   hooksMiddleware: IWebRpcPlugin | null | undefined = hooks(),
   pingMiddleware: IWebRpcPlugin | null | undefined = ping(),
-  uuidMiddleware: IWebRpcPlugin | null | undefined = uuid(),
-  chunkMiddlewareItem: IWebRpcPlugin | null | undefined = chunkMiddleware()
+  uuidMiddleware: IWebRpcPlugin | null | undefined = uuid()
 ): readonly IWebRpcPlugin[] {
   return [
     protocolMiddleware,
+    codecMiddleware,
     authenticationMiddleware,
     contractMiddleware,
     connectMiddleware,
     uuidMiddleware,
-    chunkMiddlewareItem,
     pingMiddleware,
     abortMiddleware,
     timeoutMiddleware,
@@ -281,9 +284,11 @@ async function createProductionBatch(
     transport,
     provider: options.providers,
     construction: options.construction,
+    framer: options.framer ?? (createStringFramer() as unknown as IWebRpcCoreConfig['framer']),
     middlewares: productionMiddleware(
       transport,
       options.omitProtocol ? null : options.protocolMiddleware,
+      options.codecMiddleware ?? codec(defineJsonCodec({ version: 1 })),
       options.omitContract ? null : options.contractMiddleware,
       options.omitAuthentication ? null : options.authenticationMiddleware,
       options.omitConnect ? null : options.connectMiddleware,
@@ -291,8 +296,7 @@ async function createProductionBatch(
       options.omitTimeout ? null : timeout(),
       options.hooksMiddleware ?? hooks(),
       options.omitPing ? null : (options.pingMiddleware ?? ping()),
-      options.uuidMiddleware ?? uuid(),
-      options.chunkMiddleware ?? chunkMiddleware()
+      options.uuidMiddleware ?? uuid()
     )
   }
   const definitions = snapshotEndpointModules<IWebRpcCoreConfig>([
@@ -442,7 +446,6 @@ function productionHostSnapshot(batch: IProductionBatch): Readonly<{
     WebRpcSharedKey.hooks,
     WebRpcSharedKey.ping,
     WebRpcSharedKey.uuid,
-    WebRpcSharedKey.chunk,
     WebRpcSharedKey.outboundAttachment
   ] as const
   return {
@@ -610,8 +613,7 @@ function observeOptionalCancellationPorts(
 const plannedB12b04Keys = {
   hooks: WebRpcSharedKey.hooks,
   ping: WebRpcSharedKey.ping,
-  uuid: WebRpcSharedKey.uuid,
-  chunk: WebRpcSharedKey.chunk
+  uuid: WebRpcSharedKey.uuid
 } as const
 
 function errorChainContains(failure: unknown, expected: unknown): boolean {
@@ -1061,8 +1063,9 @@ describe('B12a atomic middleware and claim contracts', () => {
     await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
 
     expect(batch.host.getShared(WebRpcSharedKey.protocol)).toMatchObject({
-      encodedType: 'any',
-      identity: true
+      id: 'migaia.rpc',
+      version: 1,
+      normalize: expect.any(Function)
     })
     expect(batch.host.getShared(WebRpcSharedKey.contract)).toMatchObject({
       validateData: expect.any(Function)
@@ -1283,17 +1286,19 @@ describe('B12a atomic middleware and claim contracts', () => {
 
   it('preserves custom protocol/contract behavior and read order through the production seam', async () => {
     const trace: string[] = []
-    const customProtocol = protocol({
+    const jsonCodec = defineJsonCodec({ version: 1 })
+    const customCodec = codec({
+      ...jsonCodec,
       get encode() {
-        trace.push('protocol.encode')
-        return (value: unknown) => `encoded:${String(value)}`
+        trace.push('codec.encode')
+        return jsonCodec.encode
       },
       get decode() {
-        trace.push('protocol.decode')
-        return (value: unknown) => String(value).replace('encoded:', '')
+        trace.push('codec.decode')
+        return jsonCodec.decode
       },
       get encodedType() {
-        trace.push('protocol.encodedType')
+        trace.push('codec.encodedType')
         return 'string' as const
       }
     })
@@ -1322,19 +1327,31 @@ describe('B12a atomic middleware and claim contracts', () => {
       }
     })
     const batch = await createProductionBatch({
-      protocolMiddleware: customProtocol,
+      protocolMiddleware: protocol(),
+      codecMiddleware: customCodec,
       contractMiddleware: customContract
     })
     const host = await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-    const protocolPort = host.getShared(WebRpcSharedKey.protocol) as IWebRpcProtocolPort
+    const prepared = batch.getPrepared()!
     const contractPort = host.getShared(WebRpcSharedKey.contract) as IWebRpcContractPort
-    expect(protocolPort?.encodedType).toBe('string')
-    expect(protocolPort?.decode(protocolPort.encode('value'))).toBe('value')
+    expect(prepared.options.components?.codec.encodedType).toBe('string')
+    expect(
+      prepared.options.components?.codec.decode(
+        prepared.options.components.codec.encode({
+          kind: 'response',
+          ok: true,
+          id: 'value',
+          data: null
+        })
+      )
+    ).toBeDefined()
     contractPort?.validateData('echo', 'params', { ok: true })
-    expect(trace.slice(0, 7)).toEqual([
-      'protocol.encode',
-      'protocol.decode',
-      'protocol.encodedType',
+    expect(trace.slice(0, 9)).toEqual([
+      'codec.encode',
+      'codec.decode',
+      'codec.encode',
+      'codec.decode',
+      'codec.encodedType',
       'contract.version',
       'contract.acceptVersions',
       'contract.maxIdentifierLength',
@@ -1477,13 +1494,58 @@ describe('B12a atomic middleware and claim contracts', () => {
         {},
         {
           get(_target, key) {
-            if (key === (failedRole === 'protocol' ? 'encode' : 'version')) throw hostile
+            if (key === (failedRole === 'protocol' ? 'normalize' : 'version')) throw hostile
             return undefined
           }
         }
       )
+      if (failedRole === 'protocol') {
+        let failure: unknown
+        try {
+          protocol(config as never)
+        } catch (error) {
+          failure = error
+        }
+        expect(failure).toBeInstanceOf(WebRpcError)
+        expect((failure as { readonly cause?: unknown }).cause).toBe(hostile)
+        let normalizeReads = 0
+        const selectedDescriptor = new Proxy(
+          { id: 'hostile-selected-protocol', version: 1 },
+          {
+            get(target, key, receiver) {
+              if (key === 'normalize') {
+                normalizeReads += 1
+                if (normalizeReads > 1) throw hostile
+                return rpcProtocolV1.normalize
+              }
+              return Reflect.get(target, key, receiver)
+            }
+          }
+        )
+        const selectedProtocol = protocol(selectedDescriptor as never)
+        const [baseTransport] = createMemoryTransportPair()
+        let subscribeCalls = 0
+        const transport = {
+          ...baseTransport,
+          subscribe: (listener: Parameters<typeof baseTransport.subscribe>[0]) => {
+            subscribeCalls += 1
+            return baseTransport.subscribe(listener)
+          }
+        }
+        const constructionFailure = await createComposedEndpoint(
+          {
+            id: 'protocol-hostile-selected-normalize',
+            transport,
+            middlewares: [connect({ transport }), selectedProtocol]
+          },
+          [outbound()]
+        ).catch((error: unknown) => error)
+        expect(errorChainContains(constructionFailure, hostile)).toBe(true)
+        expect(subscribeCalls).toBe(0)
+        return
+      }
       const batch = await createProductionBatch({
-        protocolMiddleware: failedRole === 'protocol' ? protocol(config as never) : undefined,
+        protocolMiddleware: undefined,
         contractMiddleware: failedRole === 'contract' ? contract(config as never) : undefined,
         injectInstall: (role, install) => {
           if (role.kind !== 'middleware' || role.name !== failedRole) return install
@@ -3712,6 +3774,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it('B12b03 RED: operation abort-first barrier chooses one terminal identity and clears late provider state', async () => {
+    vi.useFakeTimers()
     const [clientTransport, serverTransport] = createMemoryTransportPair()
     let lateResolve!: () => void
     let providerStartedResolve!: () => void
@@ -3752,15 +3815,16 @@ describe('B12a atomic middleware and claim contracts', () => {
     await providerStarted
     controller.abort(reason)
     const failure = await settled
+    await vi.advanceTimersByTimeAsync(1)
     try {
       expect(failure).toMatchObject({ name: 'AbortError', cause: reason })
     } finally {
       lateResolve?.()
-      await Promise.resolve()
-      await Promise.resolve()
-      expect(readEndpointDebugSnapshot(server)?.activeControllers).toBe(0)
+      await vi.runAllTimersAsync()
+      await vi.waitFor(() => expect(readEndpointDebugSnapshot(server)?.activeControllers).toBe(0))
       await client.dispose()
       await server.dispose()
+      vi.useRealTimers()
     }
   })
 
@@ -3881,10 +3945,9 @@ describe('B12a atomic middleware and claim contracts', () => {
       const failure = await settled
       expect(failure).toMatchObject({ name: 'AbortError', cause: reason })
       releaseReject()
-      await Promise.resolve()
-      await Promise.resolve()
-      await Promise.resolve()
-      expect(reports.some((error) => errorChainContains(error, latePrimary))).toBe(true)
+      await vi.waitFor(() =>
+        expect(reports.some((error) => errorChainContains(error, latePrimary))).toBe(true)
+      )
       /** Captures the active server after late settlement but before endpoint disposal. */
       const afterLateReject = readEndpointDebugSnapshot(server)
       expect(afterLateReject).toMatchObject({
@@ -3926,7 +3989,7 @@ describe('B12a atomic middleware and claim contracts', () => {
 
   it('B12b03: Store Worker direct consumers retain both cancellation middleware factories', () => {
     const workerSource = readFileSync(
-      new URL('../../../store-worker/src/worker.ts', import.meta.url),
+      new URL('../../../store-worker/src/worker-contract.ts', import.meta.url),
       'utf8'
     )
     const serializeSource = readFileSync(
@@ -3935,11 +3998,10 @@ describe('B12a atomic middleware and claim contracts', () => {
     )
     expect(workerSource).toMatch(/abort\(\)/)
     expect(workerSource).toMatch(/timeout\(/)
-    expect(serializeSource).toMatch(/abort\(\)/)
-    expect(serializeSource).toMatch(/timeout\(/)
+    expect(serializeSource).toContain('createWorkerContractEndpoint')
   })
 
-  it.each(['hooks', 'ping', 'uuid', 'chunk'] as const)(
+  it.each(['hooks', 'ping', 'uuid'] as const)(
     'B12b04 RED: production inventory exposes the exact %s role schema',
     async (role) => {
       const batch = await createProductionBatch()
@@ -3986,7 +4048,7 @@ describe('B12a atomic middleware and claim contracts', () => {
 
   it('B12b04: package role schema and ping port shape are frozen exact contracts', () => {
     expect(Object.isFrozen(WebRpcFirstPartyRoleSchema)).toBe(true)
-    for (const role of ['hooks', 'ping', 'uuid', 'chunk', 'middleware-finalize'] as const) {
+    for (const role of ['hooks', 'ping', 'uuid', 'middleware-finalize'] as const) {
       const schema = WebRpcFirstPartyRoleSchema[role]
       expect(Object.isFrozen(schema)).toBe(true)
       expect(Object.isFrozen(schema.sharedProvides)).toBe(true)
@@ -4009,12 +4071,11 @@ describe('B12a atomic middleware and claim contracts', () => {
       WebRpcSharedKey.abort,
       WebRpcSharedKey.hooks,
       WebRpcSharedKey.ping,
-      WebRpcSharedKey.uuid,
-      WebRpcSharedKey.chunk
+      WebRpcSharedKey.uuid
     ])
   })
 
-  it.each(['hooks', 'ping', 'uuid', 'chunk'] as const)(
+  it.each(['hooks', 'ping', 'uuid'] as const)(
     'B12b04 RED: owning %s file has no legacy registry write and is a native plugin',
     (role) => {
       const source = readFileSync(
@@ -4034,7 +4095,8 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(source).not.toMatch(/installPluginForLegacy/)
   })
 
-  it('B12b04: real production builder snapshots hook/uuid/chunk factories at install', async () => {
+  // Legacy chunk middleware assertions were removed with that API; framing belongs to rpc-contract.
+  it('B12b04: real production builder snapshots hook/uuid factories at install', async () => {
     const reads: string[] = []
     let currentGenerate = () => 'initial-id'
     let currentListeners: readonly (() => void)[] = [() => undefined]
@@ -4054,25 +4116,13 @@ describe('B12a atomic middleware and claim contracts', () => {
         return currentGenerate
       }
     }
-    const chunkConfig = {
-      get chunkSize() {
-        reads.push('chunk.chunkSize')
-        return 8
-      }
-    }
     const batch = await createProductionBatch({
       hooksMiddleware: hooks(hooksConfig),
-      uuidMiddleware: uuid(uuidConfig),
-      chunkMiddleware: chunkMiddleware(chunkConfig)
+      uuidMiddleware: uuid(uuidConfig)
     })
     expect(reads).toEqual([])
     await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-    expect(reads).toEqual([
-      'uuid.generate',
-      'chunk.chunkSize',
-      'hooks.listeners',
-      'hooks.onHookError'
-    ])
+    expect(reads).toEqual(['uuid.generate', 'hooks.listeners', 'hooks.onHookError'])
     currentGenerate = () => 'mutated-id'
     currentListeners = []
     expect(batch.getPrepared()?.options.uuid?.generate).toBeDefined()
@@ -4083,257 +4133,54 @@ describe('B12a atomic middleware and claim contracts', () => {
         targetId: 'target'
       })
     ).toBe('initial-id')
-    expect(batch.getPrepared()?.options.chunk?.chunkSize).toBe(8)
     expect(batch.getPrepared()?.options.hooks?.listeners).toHaveLength(1)
     expect(Object.isFrozen(batch.getPrepared()?.options.uuid)).toBe(true)
     expect(Object.isFrozen(batch.getPrepared()?.options.hooks)).toBe(true)
-    expect(Object.isFrozen(batch.getPrepared()?.options.chunk)).toBe(true)
     expect(batch.getPrepared()?.options.hooks?.listeners).not.toBe(currentListeners)
     await batch.host.dispose()
   })
 
-  it('B12b04 RED: chunk production snapshots are concurrent, retry-fresh, barrier-gated, and isolated', async () => {
-    const fieldOrder = [
-      'chunk.chunkSize',
-      'chunk.maxMessageBytes',
-      'chunk.maxConcurrentMessages',
-      'chunk.maxConcurrentMessagesPerPeer',
-      'chunk.maxBufferedBytes',
-      'chunk.maxChunksPerMessage',
-      'chunk.maxChunkBytes',
-      'chunk.assemblyTimeoutMs',
-      'chunk.byteLength',
-      'chunk.split'
-    ] as const
-    type IChunkValues = {
-      chunkSize: number
-      maxMessageBytes: number
-      maxConcurrentMessages: number
-      maxConcurrentMessagesPerPeer: number
-      maxBufferedBytes: number
-      maxChunksPerMessage: number
-      maxChunkBytes: number
-      assemblyTimeoutMs: number
-      byteLength: (value: string) => number
-      split: (value: string) => readonly string[]
-    }
-    const createChunkAttempt = (values: IChunkValues) => {
-      const reads: string[] = []
-      const receivers: unknown[] = []
-      const config = Object.create(null) as Record<string, unknown>
-      for (const field of fieldOrder.map((entry) => entry.slice('chunk.'.length)))
-        Object.defineProperty(config, field, {
-          configurable: true,
-          enumerable: true,
-          get() {
-            reads.push(`chunk.${field}`)
-            receivers.push(this)
-            return values[field as keyof IChunkValues]
-          }
-        })
-      return {
-        config: config as Parameters<typeof chunkMiddleware>[0],
-        reads,
-        receivers,
-        values
-      }
-    }
-    const assertChunkSnapshot = (
-      snapshot: Partial<Record<keyof IChunkValues, unknown>> | undefined,
-      expected: IChunkValues
-    ): void => {
-      expect(snapshot?.chunkSize).toBe(expected.chunkSize)
-      expect(snapshot?.maxMessageBytes).toBe(expected.maxMessageBytes)
-      expect(snapshot?.maxConcurrentMessages).toBe(expected.maxConcurrentMessages)
-      expect(snapshot?.maxConcurrentMessagesPerPeer).toBe(expected.maxConcurrentMessagesPerPeer)
-      expect(snapshot?.maxBufferedBytes).toBe(expected.maxBufferedBytes)
-      expect(snapshot?.maxChunksPerMessage).toBe(expected.maxChunksPerMessage)
-      expect(snapshot?.maxChunkBytes).toBe(expected.maxChunkBytes)
-      expect(snapshot?.assemblyTimeoutMs).toBe(expected.assemblyTimeoutMs)
-      expect(snapshot?.byteLength).toBe(expected.byteLength)
-      expect(snapshot?.split).toBe(expected.split)
-    }
-    const leftValues: IChunkValues = {
-      chunkSize: 8,
-      maxMessageBytes: 1024,
-      maxConcurrentMessages: 2,
-      maxConcurrentMessagesPerPeer: 2,
-      maxBufferedBytes: 4096,
-      maxChunksPerMessage: 16,
-      maxChunkBytes: 1024,
-      assemblyTimeoutMs: 1000,
-      byteLength: (value) => value.length,
-      split: (value) => [value]
-    }
-    const rightValues: IChunkValues = {
-      chunkSize: 12,
-      maxMessageBytes: 1536,
-      maxConcurrentMessages: 3,
-      maxConcurrentMessagesPerPeer: 4,
-      maxBufferedBytes: 6144,
-      maxChunksPerMessage: 24,
-      maxChunkBytes: 1536,
-      assemblyTimeoutMs: 1500,
-      byteLength: (value) => value.length + 10,
-      split: (value) => [value, value]
-    }
-    const leftAttempt = createChunkAttempt(leftValues)
-    const rightAttempt = createChunkAttempt(rightValues)
-    const leftSnapshot = { ...leftValues }
-    const rightSnapshot = { ...rightValues }
+  // D34/D37 retire middleware chunk configuration; rpc-contract owns framer limits and cleanup.
+  it('B12b04: selected framers remain endpoint-local across concurrent production batches', async () => {
+    const leftFramer = createStringFramer({ chunkBytes: 4 })
+    const rightFramer = createStringFramer({ chunkBytes: 8 })
     const [left, right] = await Promise.all([
-      createProductionBatch({ chunkMiddleware: chunkMiddleware(leftAttempt.config) }),
-      createProductionBatch({ chunkMiddleware: chunkMiddleware(rightAttempt.config) })
+      createProductionBatch({ framer: leftFramer as unknown as IWebRpcCoreConfig['framer'] }),
+      createProductionBatch({ framer: rightFramer as unknown as IWebRpcCoreConfig['framer'] })
     ])
-    expect(leftAttempt.reads).toEqual([])
-    expect(rightAttempt.reads).toEqual([])
     await Promise.all([
       left.host.installBatch(left.translated.map(({ definition }) => definition)),
       right.host.installBatch(right.translated.map(({ definition }) => definition))
     ])
-    expect(leftAttempt.reads).toEqual([...fieldOrder])
-    expect(rightAttempt.reads).toEqual([...fieldOrder])
-    for (const receiver of leftAttempt.receivers) expect(receiver).toBe(leftAttempt.config)
-    for (const receiver of rightAttempt.receivers) expect(receiver).toBe(rightAttempt.config)
-    const leftPrepared = left.getPrepared()?.options.chunk
-    const rightPrepared = right.getPrepared()?.options.chunk
-    assertChunkSnapshot(leftPrepared, leftSnapshot)
-    assertChunkSnapshot(rightPrepared, rightSnapshot)
-    expect(Object.isFrozen(leftPrepared)).toBe(true)
-    expect(Object.isFrozen(rightPrepared)).toBe(true)
-    leftValues.chunkSize = 99
-    leftValues.maxMessageBytes = 9999
-    leftValues.maxConcurrentMessages = 9
-    leftValues.maxConcurrentMessagesPerPeer = 10
-    leftValues.maxBufferedBytes = 99999
-    leftValues.maxChunksPerMessage = 96
-    leftValues.maxChunkBytes = 9999
-    leftValues.assemblyTimeoutMs = 9000
-    leftValues.byteLength = () => 99
-    leftValues.split = () => ['left-mutated']
-    rightValues.chunkSize = 199
-    rightValues.maxMessageBytes = 1999
-    rightValues.maxConcurrentMessages = 19
-    rightValues.maxConcurrentMessagesPerPeer = 20
-    rightValues.maxBufferedBytes = 19999
-    rightValues.maxChunksPerMessage = 196
-    rightValues.maxChunkBytes = 1999
-    rightValues.assemblyTimeoutMs = 19000
-    rightValues.byteLength = () => 199
-    rightValues.split = () => ['mutated']
-    assertChunkSnapshot(leftPrepared, leftSnapshot)
-    assertChunkSnapshot(rightPrepared, rightSnapshot)
+    const leftSelected = left.getPrepared()?.options.components
+      ?.framer as unknown as typeof leftFramer
+    const rightSelected = right.getPrepared()?.options.components
+      ?.framer as unknown as typeof rightFramer
+    const context = { source: 'atomic-framer', messageId: 'shared' }
+    expect(leftSelected).not.toBe(leftFramer)
+    expect(rightSelected).not.toBe(rightFramer)
+    expect(leftSelected).not.toBe(rightSelected)
+    const leftFrames = leftSelected.frame('A¢中😀', context)
+    const rightFrames = rightSelected.frame('A¢中😀', context)
+    expect(leftFrames).toHaveLength(2)
+    expect(rightFrames).toHaveLength(1)
+    for (const frame of leftFrames.slice(0, -1))
+      expect(leftSelected.accept(frame, context)).toEqual({ status: 'pending' })
+    expect(leftSelected.accept(leftFrames.at(-1)!, context)).toEqual({
+      status: 'complete',
+      value: 'A¢中😀'
+    })
+    expect(rightSelected.accept(rightFrames[0]!, context)).toEqual({
+      status: 'complete',
+      value: 'A¢中😀'
+    })
     const leftDispose = left.host.dispose()
     const rightDispose = right.host.dispose()
     expect(left.host.dispose()).toBe(leftDispose)
     expect(right.host.dispose()).toBe(rightDispose)
     await Promise.all([leftDispose, rightDispose])
-
-    const retryValues: IChunkValues = {
-      chunkSize: 20,
-      maxMessageBytes: 2020,
-      maxConcurrentMessages: 5,
-      maxConcurrentMessagesPerPeer: 6,
-      maxBufferedBytes: 8200,
-      maxChunksPerMessage: 40,
-      maxChunkBytes: 2020,
-      assemblyTimeoutMs: 2200,
-      byteLength: (value) => value.length + 20,
-      split: (value) => [value, 'retry']
-    }
-    const retryAttempt = createChunkAttempt(retryValues)
-    const retryMiddleware = chunkMiddleware(retryAttempt.config)
-    const failedPrimary = new Error('chunk failed attempt')
-    const failed = await createProductionBatch({
-      chunkMiddleware: retryMiddleware,
-      injectInstall: (role, install) =>
-        role.kind === 'middleware' && role.name === 'chunk'
-          ? async (scope) => {
-              await install(scope)
-              throw failedPrimary
-            }
-          : install
-    })
-    await expect(
-      failed.host.installBatch(failed.translated.map(({ definition }) => definition))
-    ).rejects.toMatchObject({ cause: failedPrimary, detail: { failedName: 'middleware:chunk' } })
-    expect(retryAttempt.reads).toEqual([...fieldOrder])
-    for (const receiver of retryAttempt.receivers) expect(receiver).toBe(retryAttempt.config)
-    retryValues.chunkSize = 28
-    retryValues.maxMessageBytes = 4096
-    retryValues.maxConcurrentMessages = 7
-    retryValues.maxConcurrentMessagesPerPeer = 8
-    retryValues.maxBufferedBytes = 16384
-    retryValues.maxChunksPerMessage = 64
-    retryValues.maxChunkBytes = 4096
-    retryValues.assemblyTimeoutMs = 3200
-    retryValues.byteLength = (value) => value.length + 28
-    retryValues.split = (value) => [value, 'fresh-retry']
-    const retryFreshSnapshot = { ...retryValues }
-    const fresh = await createProductionBatch({ chunkMiddleware: retryMiddleware })
-    await fresh.host.installBatch(fresh.translated.map(({ definition }) => definition))
-    expect(retryAttempt.reads).toEqual([...fieldOrder, ...fieldOrder])
-    for (const receiver of retryAttempt.receivers) expect(receiver).toBe(retryAttempt.config)
-    assertChunkSnapshot(fresh.getPrepared()?.options.chunk, retryFreshSnapshot)
-    const failedDispose = failed.host.dispose()
-    const freshDispose = fresh.host.dispose()
-    expect(failed.host.dispose()).toBe(failedDispose)
-    expect(fresh.host.dispose()).toBe(freshDispose)
-    await Promise.all([failedDispose, freshDispose])
-
-    const barrierValues: IChunkValues = {
-      chunkSize: 32,
-      maxMessageBytes: 3072,
-      maxConcurrentMessages: 11,
-      maxConcurrentMessagesPerPeer: 12,
-      maxBufferedBytes: 12288,
-      maxChunksPerMessage: 48,
-      maxChunkBytes: 3072,
-      assemblyTimeoutMs: 3300,
-      byteLength: (value) => value.length + 32,
-      split: (value) => [value, 'barrier']
-    }
-    const barrierSnapshot = { ...barrierValues }
-    const barrierAttempt = createChunkAttempt(barrierValues)
-    const barrierMiddleware = chunkMiddleware(barrierAttempt.config)
-    let release!: () => void
-    const barrier = new Promise<void>((resolve) => {
-      release = resolve
-    })
-    const barrierBatch = await createProductionBatch({
-      chunkMiddleware: barrierMiddleware,
-      injectInstall: (role, install) =>
-        role.kind === 'middleware' && role.name === 'chunk'
-          ? async (scope) => {
-              await barrier
-              return install(scope)
-            }
-          : install
-    })
-    const barrierInstall = barrierBatch.host.installBatch(
-      barrierBatch.translated.map(({ definition }) => definition)
-    )
-    await Promise.resolve()
-    expect(barrierAttempt.reads).toEqual([])
-    release()
-    await barrierInstall
-    expect(barrierAttempt.reads).toEqual([...fieldOrder])
-    for (const receiver of barrierAttempt.receivers) expect(receiver).toBe(barrierAttempt.config)
-    assertChunkSnapshot(barrierBatch.getPrepared()?.options.chunk, barrierSnapshot)
-    barrierValues.chunkSize = 42
-    barrierValues.maxMessageBytes = 4096
-    barrierValues.maxConcurrentMessages = 13
-    barrierValues.maxConcurrentMessagesPerPeer = 14
-    barrierValues.maxBufferedBytes = 16384
-    barrierValues.maxChunksPerMessage = 80
-    barrierValues.maxChunkBytes = 4096
-    barrierValues.assemblyTimeoutMs = 4300
-    barrierValues.byteLength = () => 42
-    barrierValues.split = () => ['barrier-mutated']
-    assertChunkSnapshot(barrierBatch.getPrepared()?.options.chunk, barrierSnapshot)
-    const barrierDispose = barrierBatch.host.dispose()
-    expect(barrierBatch.host.dispose()).toBe(barrierDispose)
-    await barrierDispose
+    leftFramer.close()
+    rightFramer.close()
   })
 
   it('B12b04 RED: hooks and UUID snapshots preserve receiver, retry freshness, and async install barrier', async () => {
@@ -4520,17 +4367,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   it.each([
     ['hooks', 'listeners'],
     ['hooks', 'onHookError'],
-    ['uuid', 'generate'],
-    ['chunk', 'chunkSize'],
-    ['chunk', 'maxMessageBytes'],
-    ['chunk', 'maxConcurrentMessages'],
-    ['chunk', 'maxConcurrentMessagesPerPeer'],
-    ['chunk', 'maxBufferedBytes'],
-    ['chunk', 'maxChunksPerMessage'],
-    ['chunk', 'maxChunkBytes'],
-    ['chunk', 'assemblyTimeoutMs'],
-    ['chunk', 'byteLength'],
-    ['chunk', 'split']
+    ['uuid', 'generate']
   ] as const)(
     'B12b04 T87: hostile %s snapshot getter %s preserves exact cutoff and residue',
     async (role, field) => {
@@ -4540,19 +4377,9 @@ describe('B12a atomic middleware and claim contracts', () => {
       const values: Record<string, unknown> = {
         listeners: [],
         onHookError: undefined,
-        generate: () => 'hostile-id',
-        chunkSize: 8,
-        maxMessageBytes: 1024,
-        maxConcurrentMessages: 2,
-        maxConcurrentMessagesPerPeer: 2,
-        maxBufferedBytes: 4096,
-        maxChunksPerMessage: 16,
-        maxChunkBytes: 1024,
-        assemblyTimeoutMs: 1000,
-        byteLength: (value: unknown) => String(value).length,
-        split: (value: unknown) => [value]
+        generate: () => 'hostile-id'
       }
-      let middleware: IWebRpcPlugin
+      let middleware!: IWebRpcPlugin
       let snapshotConfig: unknown
       if (role === 'hooks') {
         const config = {
@@ -4582,40 +4409,10 @@ describe('B12a atomic middleware and claim contracts', () => {
         }
         snapshotConfig = config
         middleware = uuid(config as Parameters<typeof uuid>[0])
-      } else {
-        const config = Object.create(null) as Record<string, unknown>
-        for (const name of [
-          'chunkSize',
-          'maxMessageBytes',
-          'maxConcurrentMessages',
-          'maxConcurrentMessagesPerPeer',
-          'maxBufferedBytes',
-          'maxChunksPerMessage',
-          'maxChunkBytes',
-          'assemblyTimeoutMs',
-          'byteLength',
-          'split'
-        ])
-          Object.defineProperty(config, name, {
-            configurable: true,
-            enumerable: true,
-            get: () => {
-              reads.push(`chunk.${name}`)
-              receivers.push(config)
-              if (name === field) throw primary
-              return values[name]
-            }
-          })
-        snapshotConfig = config
-        middleware = chunkMiddleware(config as Parameters<typeof chunkMiddleware>[0])
       }
       let roleInstallCalls = 0
       const batch = await createProductionBatch({
-        ...(role === 'hooks'
-          ? { hooksMiddleware: middleware }
-          : role === 'uuid'
-            ? { uuidMiddleware: middleware }
-            : { chunkMiddleware: middleware }),
+        ...(role === 'hooks' ? { hooksMiddleware: middleware } : { uuidMiddleware: middleware }),
         injectInstall: (candidate, install) => {
           if (candidate.kind !== 'middleware' || candidate.name !== role) return install
           return async (scope) => {
@@ -4632,22 +4429,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         failure = error
       }
       const fieldOrder =
-        role === 'hooks'
-          ? ['hooks.listeners', 'hooks.onHookError']
-          : role === 'uuid'
-            ? ['uuid.generate']
-            : [
-                'chunk.chunkSize',
-                'chunk.maxMessageBytes',
-                'chunk.maxConcurrentMessages',
-                'chunk.maxConcurrentMessagesPerPeer',
-                'chunk.maxBufferedBytes',
-                'chunk.maxChunksPerMessage',
-                'chunk.maxChunkBytes',
-                'chunk.assemblyTimeoutMs',
-                'chunk.byteLength',
-                'chunk.split'
-              ]
+        role === 'hooks' ? ['hooks.listeners', 'hooks.onHookError'] : ['uuid.generate']
       const cutoff = fieldOrder.indexOf(`${role}.${field}`)
       expect(reads).toEqual(fieldOrder.slice(0, cutoff + 1))
       expect(receivers.every((receiver) => receiver === snapshotConfig)).toBe(true)
@@ -4692,7 +4474,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     await Promise.all([leftDispose, rightDispose])
   })
 
-  it.each(['hooks', 'ping', 'uuid', 'chunk'] as const)(
+  it.each(['hooks', 'ping', 'uuid'] as const)(
     'B12b04 RED: native %s publication is endpoint-local and removed on rollback/dispose',
     async (role) => {
       const batch = await createProductionBatch()
@@ -4722,7 +4504,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     await Promise.all([enabledDispose, disabledDispose])
   })
 
-  it.each(['hooks', 'ping', 'uuid', 'chunk'] as const)(
+  it.each(['hooks', 'ping', 'uuid'] as const)(
     'B12b04 RED: native %s publication is endpoint-local and terminal removal is exact',
     async (role) => {
       const left = await createProductionBatch()
@@ -4746,7 +4528,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it.each(['hooks', 'ping', 'uuid', 'chunk'] as const)(
+  it.each(['hooks', 'ping', 'uuid'] as const)(
     'B12b04 RED: native %s duplicate provider is rejected before Host mutation',
     async (role) => {
       const batch = await createProductionBatch()
@@ -4770,7 +4552,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it.each(['hooks', 'ping', 'uuid', 'chunk'] as const)(
+  it.each(['hooks', 'ping', 'uuid'] as const)(
     'B12b04 RED: native %s forged string key is rejected before Host mutation',
     async (role) => {
       const batch = await createProductionBatch()
@@ -4790,7 +4572,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it.each(['hooks', 'ping', 'uuid', 'chunk'] as const)(
+  it.each(['hooks', 'ping', 'uuid'] as const)(
     'B12b04 RED: native %s forged package symbol is rejected before Host mutation',
     async (role) => {
       const batch = await createProductionBatch()
@@ -4811,7 +4593,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   )
 
   it.each(
-    (['hooks', 'ping', 'uuid', 'chunk'] as const).flatMap((role) =>
+    (['hooks', 'ping', 'uuid'] as const).flatMap((role) =>
       (['sync', 'async'] as const).map((mode) => ({ role, mode }))
     )
   )(
@@ -4851,7 +4633,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it.each(['hooks', 'ping', 'uuid', 'chunk'] as const)(
+  it.each(['hooks', 'ping', 'uuid'] as const)(
     'B12b04 baseline: legacy %s partial rollback is reverse-once with exact cleanup children',
     async (role) => {
       const primary = new Error(`${role}-partial-primary`)
@@ -4904,7 +4686,6 @@ describe('B12a atomic middleware and claim contracts', () => {
           WebRpcSharedKey.hooks,
           WebRpcSharedKey.ping,
           WebRpcSharedKey.uuid,
-          WebRpcSharedKey.chunk,
           WebRpcSharedKey.outboundAttachment
         ].every((key) => batch.host.getShared(key) === undefined)
       ).toBe(true)
@@ -4914,7 +4695,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it.each(['hooks', 'ping', 'uuid', 'chunk'] as const)(
+  it.each(['hooks', 'ping', 'uuid'] as const)(
     'B12b04 T89: native-shaped %s publication and endpoint disposal share one composed transaction',
     async (role) => {
       const key = plannedB12b04Keys[role]
@@ -4923,9 +4704,7 @@ describe('B12a atomic middleware and claim contracts', () => {
           ? Object.freeze({ emit: (_event: unknown) => undefined })
           : role === 'ping'
             ? WebRpcPingEnablePortShape
-            : role === 'uuid'
-              ? Object.freeze({ create: () => `${role}-id` })
-              : Object.freeze({ split: (value: unknown) => [value] })
+            : Object.freeze({ create: () => `${role}-id` })
       const primary = new Error(`${role}-endpoint-primary`)
       const nativeCleanup = new Error(`${role}-native-cleanup`)
       const releases: string[] = []
@@ -4944,7 +4723,7 @@ describe('B12a atomic middleware and claim contracts', () => {
           sharedConsumes: schema.sharedConsumes,
           sharedOptionalConsumes: schema.sharedOptionalConsumes
         }),
-        install: (scope) => {
+        install: (scope: IWebRpcPluginInstallScope) => {
           nativeInstallCalls += 1
           const installation = Object.freeze({
             extension: Object.freeze({ [extensionKey]: role }),
@@ -4964,7 +4743,7 @@ describe('B12a atomic middleware and claim contracts', () => {
           claims: emptyClaims,
           sharedConsumes: Object.freeze([key])
         }),
-        install: (scope) => {
+        install: (scope: IWebRpcPluginInstallScope) => {
           consumerInstallCalls += 1
           observedShared.push(scope.getShared(key))
           const installation = Object.freeze({
@@ -4991,7 +4770,6 @@ describe('B12a atomic middleware and claim contracts', () => {
         ...(role === 'hooks' ? [] : [hooks()]),
         ...(role === 'ping' ? [] : [ping()]),
         ...(role === 'uuid' ? [] : [uuid()]),
-        ...(role === 'chunk' ? [] : [chunkMiddleware()]),
         abort(),
         timeout()
       ]
@@ -5066,24 +4844,24 @@ describe('B12a atomic middleware and claim contracts', () => {
     }
   )
 
-  it('B12b04: production chunk seam retains boundary, ordering, limit, cancellation, and cleanup baselines', async () => {
+  it('B12b04: production framer seam retains boundary and cleanup ownership', async () => {
+    const framer = createStringFramer({ chunkBytes: 4 })
     const batch = await createProductionBatch({
-      chunkMiddleware: chunkMiddleware({ chunkSize: 4 })
+      framer: framer as unknown as IWebRpcCoreConfig['framer']
     })
     await batch.host.installBatch(batch.translated.map(({ definition }) => definition))
-    const capability = batch.getPrepared()?.options.chunk
-    expect(capability).toBeDefined()
-    const chunkCapability = capability!
-    const split = chunkCapability.split!
-    const byteLength = chunkCapability.byteLength!
-    expect(split('A¢中😀', 4).join('')).toBe('A¢中😀')
-    expect(Math.max(...split('A¢中😀', 4).map((part) => byteLength(part)))).toBeLessThanOrEqual(4)
+    const frames = framer.frame('A¢中😀', { source: 'atomic-framer', messageId: 'boundary' })
+    expect(frames.length).toBeGreaterThan(1)
+    expect(
+      frames.every((frame) => (typeof frame === 'string' ? frame.length : frame.data.length) <= 4)
+    ).toBe(true)
     const first = batch.host.dispose()
     expect(batch.host.dispose()).toBe(first)
     await first
+    framer.close()
   })
 
-  it.each(['hooks', 'uuid', 'chunk'] as const)(
+  it.each(['hooks', 'uuid'] as const)(
     'B12b04: hostile %s configuration preserves primary/cause and leaves zero activation residue',
     async (role) => {
       const hostile = new Error(`${role} hostile getter`)
@@ -5094,23 +4872,13 @@ describe('B12a atomic middleware and claim contracts', () => {
                 throw hostile
               }
             } as never)
-          : role === 'uuid'
-            ? uuid({
-                get generate(): never {
-                  throw hostile
-                }
-              } as never)
-            : chunkMiddleware({
-                get chunkSize(): never {
-                  throw hostile
-                }
-              } as never)
+          : uuid({
+              get generate(): never {
+                throw hostile
+              }
+            } as never)
       const batch = await createProductionBatch(
-        role === 'hooks'
-          ? { hooksMiddleware: middleware }
-          : role === 'uuid'
-            ? { uuidMiddleware: middleware }
-            : { chunkMiddleware: middleware }
+        role === 'hooks' ? { hooksMiddleware: middleware } : { uuidMiddleware: middleware }
       )
       let failure: unknown
       try {
@@ -5341,6 +5109,472 @@ describe('B12c01 outbound feature production-seam matrix', () => {
       cause: hostile
     })
     expect(reads).toBe(1)
+  })
+
+  it('WP2: native framed output needs an opaque sink or concrete authentication before subscribe', async () => {
+    const [baseTransport] = createMemoryTransportPair()
+    let subscribeCalls = 0
+    const transport = {
+      ...baseTransport,
+      encodedType: 'string' as const,
+      subscribe: (listener: Parameters<typeof baseTransport.subscribe>[0]) => {
+        subscribeCalls += 1
+        return baseTransport.subscribe(listener)
+      }
+    }
+    const nativeFramer = createStringFramer({ chunkBytes: 2 })
+    const codec = defineJsonCodec({ version: 1 })
+    const rejected = await createClientEndpoint({
+      id: 'wp2-native-rejected',
+      transport,
+      framer: nativeFramer,
+      codec,
+      middlewares: [connect({ transport })]
+    } as never).catch((error: unknown) => error)
+    expect(rejected).toMatchObject({ code: WebRpcErrorCode.invalidConfig })
+    expect(subscribeCalls).toBe(0)
+
+    const client = await createClientEndpoint({
+      id: 'wp2-native-authenticated',
+      transport,
+      framer: nativeFramer,
+      codec,
+      middlewares: [
+        connect({ transport }),
+        authentication({
+          encrypt: (value) => String(value),
+          decrypt: (value) => value,
+          encodedType: 'string'
+        })
+      ]
+    } as never)
+    try {
+      expect(subscribeCalls).toBe(1)
+    } finally {
+      await client.dispose()
+    }
+  })
+
+  it('WP2: directed unknown producers reject concrete string sinks before subscribe', async () => {
+    const [base] = createMemoryTransportPair()
+    let subscriptions = 0
+    const transport = {
+      ...base,
+      encodedType: 'string' as const,
+      subscribe: (listener: Parameters<typeof base.subscribe>[0]) => {
+        subscriptions += 1
+        return base.subscribe(listener)
+      }
+    }
+    const unknownCodec = {
+      id: 'unknown',
+      version: 1,
+      encodedType: 'unknown' as const,
+      encode: (value: unknown) => value,
+      decode: (value: unknown) => value
+    }
+    const customFramer = {
+      id: 'custom',
+      version: 1,
+      inputEncodedType: 'string' as const,
+      outputEncodedType: 'unknown' as const,
+      frame: (value: string) => [value],
+      accept: (value: string) => ({ status: 'complete' as const, value }),
+      close: () => undefined
+    }
+    for (const config of [
+      { codec: unknownCodec, framer: createStringFramer(), middlewares: [connect({ transport })] },
+      {
+        codec: defineJsonCodec({ version: 1 }),
+        framer: customFramer,
+        middlewares: [connect({ transport })]
+      },
+      {
+        codec: defineJsonCodec({ version: 1 }),
+        framer: createStringFramer(),
+        middlewares: [
+          connect({ transport }),
+          authentication({
+            encrypt: (value) => value,
+            decrypt: (value) => value,
+            encodedType: 'any'
+          })
+        ]
+      }
+    ]) {
+      const failure = await createClientEndpoint({
+        id: `wp2-unknown-${subscriptions}`,
+        transport,
+        ...config
+      } as never).catch((error: unknown) => error)
+      expect(failure).toMatchObject({ code: WebRpcErrorCode.invalidConfig })
+      expect(subscriptions).toBe(0)
+    }
+  })
+
+  it('WP2: top-level transport shadows one plugin transport before subscription', async () => {
+    const [winnerBase] = createMemoryTransportPair()
+    const [shadowedBase] = createMemoryTransportPair()
+    let winnerSubscriptions = 0
+    let shadowedSubscriptions = 0
+    const order: string[] = []
+    const winner = {
+      ...winnerBase,
+      subscribe: (listener: Parameters<typeof winnerBase.subscribe>[0]) => {
+        winnerSubscriptions += 1
+        order.push('subscribe')
+        return winnerBase.subscribe(listener)
+      }
+    }
+    const shadowed = {
+      ...shadowedBase,
+      subscribe: (listener: Parameters<typeof shadowedBase.subscribe>[0]) => {
+        shadowedSubscriptions += 1
+        return shadowedBase.subscribe(listener)
+      }
+    }
+    const events: IWebRpcHookEvent[] = []
+    const client = await createClientEndpoint({
+      id: 'wp2-transport-shadow',
+      transport: winner,
+      middlewares: [
+        connect({ transport: shadowed }),
+        hooks({
+          listeners: [
+            (event) => {
+              events.push(event)
+              order.push(event.name)
+            }
+          ]
+        })
+      ]
+    } as never)
+    try {
+      const shadows = events.filter((value) => value.name === 'component-shadowed')
+      const event = shadows[0]
+      expect(winnerSubscriptions).toBe(1)
+      expect(shadowedSubscriptions).toBe(0)
+      expect(event).toBeDefined()
+      expect(shadows).toHaveLength(1)
+      expect(order.indexOf('component-shadowed')).toBeLessThan(order.indexOf('subscribe'))
+      expect(Object.isFrozen(event)).toBe(true)
+      expect(Object.isFrozen(event?.contract)).toBe(true)
+    } finally {
+      await client.dispose()
+      expect(events.filter((value) => value.name === 'component-shadowed')).toHaveLength(1)
+    }
+  })
+
+  it('WP2: selected descriptor getters run once without framing during construction', async () => {
+    const [transport] = createMemoryTransportPair()
+    const events: IWebRpcHookEvent[] = []
+    const protocolReads = new Map<string, number>()
+    const countedProtocol = new Proxy(
+      {},
+      {
+        get(_target, key) {
+          if (typeof key === 'string') protocolReads.set(key, (protocolReads.get(key) ?? 0) + 1)
+          return Reflect.get(rpcProtocolV1, key)
+        }
+      }
+    ) as typeof rpcProtocolV1
+    const codec = defineJsonCodec({ version: 1 })
+    const reads = new Map<string, number>()
+    const countedCodec = new Proxy(codec, {
+      get(target, key, receiver) {
+        if (typeof key === 'string') reads.set(key, (reads.get(key) ?? 0) + 1)
+        return Reflect.get(target, key, receiver)
+      }
+    })
+    const framer = createStringFramer()
+    const framerReads = new Map<string, number>()
+    let frameCalls = 0
+    let acceptCalls = 0
+    const countedFramer = new Proxy(
+      {},
+      {
+        get(_target, key) {
+          if (typeof key === 'string') framerReads.set(key, (framerReads.get(key) ?? 0) + 1)
+          if (key === 'frame')
+            return (...args: Parameters<typeof framer.frame>) => {
+              frameCalls += 1
+              return framer.frame(...args)
+            }
+          if (key === 'accept')
+            return (...args: Parameters<typeof framer.accept>) => {
+              acceptCalls += 1
+              return framer.accept(...args)
+            }
+          return Reflect.get(framer, key)
+        }
+      }
+    ) as typeof framer
+    const componentPlugin = {
+      ...connect({ transport }),
+      protocol: rpcProtocolV1,
+      codec: defineJsonCodec({ version: 2 }),
+      framer
+    }
+    const endpoint = await createClientEndpoint({
+      id: 'wp2-getters',
+      transport,
+      protocol: countedProtocol,
+      codec: countedCodec,
+      framer: countedFramer,
+      middlewares: [
+        componentPlugin,
+        hooks({
+          listeners: [
+            (event) => {
+              events.push(event)
+            }
+          ]
+        })
+      ]
+    } as never)
+    try {
+      expect(frameCalls).toBe(0)
+      expect(acceptCalls).toBe(0)
+      const shadows = events.filter((event) => event.name === WebRpcErrorText.componentShadowed)
+      const isComponentShadow = (event: IWebRpcHookEvent, component: string): boolean =>
+        typeof event.contract === 'object' &&
+        event.contract !== null &&
+        'component' in event.contract &&
+        event.contract.component === component
+      expect(shadows.filter((event) => isComponentShadow(event, 'protocol'))).toHaveLength(1)
+      expect(shadows.filter((event) => isComponentShadow(event, 'codec'))).toHaveLength(1)
+      expect(shadows.filter((event) => isComponentShadow(event, 'framer'))).toHaveLength(1)
+      expect(shadows).toContainEqual(
+        expect.objectContaining({
+          contract: {
+            component: 'codec',
+            winner: { id: 'json', version: 1 },
+            shadowed: { id: 'json', version: 2 }
+          }
+        })
+      )
+      for (const field of ['id', 'version', 'normalize']) expect(protocolReads.get(field)).toBe(1)
+      for (const field of ['id', 'version', 'encodedType', 'encode', 'decode'])
+        expect(reads.get(field)).toBe(1)
+      for (const field of [
+        'id',
+        'version',
+        'inputEncodedType',
+        'outputEncodedType',
+        'frame',
+        'accept',
+        'close'
+      ])
+        expect(framerReads.get(field)).toBe(1)
+    } finally {
+      await endpoint.dispose()
+    }
+  })
+
+  const hostileDescriptorCause = new Error('wp2 hostile descriptor getter')
+  const hostileProtocol = { ...rpcProtocolV1 }
+  Object.defineProperty(hostileProtocol, 'id', {
+    enumerable: true,
+    get: () => {
+      throw hostileDescriptorCause
+    }
+  })
+  const descriptorCases: readonly [
+    string,
+    'protocol' | 'codec' | 'framer',
+    object,
+    Error | undefined
+  ][] = [
+    ['protocol empty id', 'protocol', { ...rpcProtocolV1, id: '' }, undefined],
+    ['protocol zero version', 'protocol', { ...rpcProtocolV1, version: 0 }, undefined],
+    [
+      'protocol noncallable normalize',
+      'protocol',
+      { ...rpcProtocolV1, normalize: undefined },
+      undefined
+    ],
+    ['codec empty id', 'codec', { ...defineJsonCodec({ version: 1 }), id: '' }, undefined],
+    ['codec zero version', 'codec', { ...defineJsonCodec({ version: 1 }), version: 0 }, undefined],
+    [
+      'codec invalid encoded type',
+      'codec',
+      { ...defineJsonCodec({ version: 1 }), encodedType: 'opaque' },
+      undefined
+    ],
+    [
+      'codec noncallable encode',
+      'codec',
+      { ...defineJsonCodec({ version: 1 }), encode: undefined },
+      undefined
+    ],
+    [
+      'codec noncallable decode',
+      'codec',
+      { ...defineJsonCodec({ version: 1 }), decode: undefined },
+      undefined
+    ],
+    ['framer empty id', 'framer', { ...createStringFramer(), id: '' }, undefined],
+    ['framer zero version', 'framer', { ...createStringFramer(), version: 0 }, undefined],
+    [
+      'framer invalid input domain',
+      'framer',
+      { ...createStringFramer(), inputEncodedType: 'opaque' },
+      undefined
+    ],
+    [
+      'framer invalid output domain',
+      'framer',
+      { ...createStringFramer(), outputEncodedType: 'opaque' },
+      undefined
+    ],
+    [
+      'framer noncallable frame',
+      'framer',
+      { ...createStringFramer(), frame: undefined },
+      undefined
+    ],
+    [
+      'framer noncallable accept',
+      'framer',
+      { ...createStringFramer(), accept: undefined },
+      undefined
+    ],
+    [
+      'framer noncallable close',
+      'framer',
+      { ...createStringFramer(), close: undefined },
+      undefined
+    ],
+    ['protocol throwing id getter', 'protocol', hostileProtocol, hostileDescriptorCause]
+  ]
+
+  it.each(descriptorCases)(
+    'WP2: rejects invalid selected %s before subscribe',
+    async (_name, component, descriptor, cause) => {
+      const [baseTransport] = createMemoryTransportPair()
+      let subscriptions = 0
+      const transport = {
+        ...baseTransport,
+        subscribe: (listener: Parameters<typeof baseTransport.subscribe>[0]) => {
+          subscriptions += 1
+          return baseTransport.subscribe(listener)
+        }
+      }
+      const failure = await createClientEndpoint({
+        id: 'wp2-invalid-descriptor',
+        transport,
+        protocol: component === 'protocol' ? descriptor : rpcProtocolV1,
+        codec: component === 'codec' ? descriptor : defineJsonCodec({ version: 1 }),
+        framer: component === 'framer' ? descriptor : createStringFramer(),
+        middlewares: [connect({ transport })]
+      } as never).catch((error: unknown) => error)
+      expect(failure).toMatchObject({ code: WebRpcErrorCode.invalidConfig })
+      expect(subscriptions).toBe(0)
+      if (cause !== undefined) expect(errorChainContains(failure, cause)).toBe(true)
+    }
+  )
+
+  it('WP2: selected transport getters run once when top-level transport shadows a plugin', async () => {
+    const [baseTransport] = createMemoryTransportPair()
+    const reads = new Map<string, number>()
+    let subscriptions = 0
+    const transport = new Proxy(
+      {},
+      {
+        get(_target, key) {
+          if (typeof key === 'string') reads.set(key, (reads.get(key) ?? 0) + 1)
+          if (key === 'subscribe')
+            return (listener: Parameters<typeof baseTransport.subscribe>[0]) => {
+              subscriptions += 1
+              return baseTransport.subscribe(listener)
+            }
+          return Reflect.get(baseTransport, key)
+        }
+      }
+    ) as typeof baseTransport
+    const endpoint = await createClientEndpoint({
+      id: 'wp2-transport-getters',
+      transport,
+      middlewares: [connect({ transport: baseTransport })]
+    } as never)
+    try {
+      expect(subscriptions).toBe(1)
+      for (const field of ['platform', 'encodedType', 'ownership']) expect(reads.get(field)).toBe(1)
+    } finally {
+      await endpoint.dispose()
+    }
+  })
+
+  it('WP2: selected class transport retains its private method receiver', async () => {
+    class PrivateReceiverTransport {
+      #subscriptions = 0
+      readonly platform = 'Memory' as const
+      readonly ownership = 'borrowed' as const
+
+      send(_message: unknown): void {}
+
+      subscribe(
+        _listener: Parameters<ReturnType<typeof createMemoryTransportPair>[0]['subscribe']>[0]
+      ): () => void {
+        this.#subscriptions += 1
+        return () => undefined
+      }
+
+      get subscriptions(): number {
+        return this.#subscriptions
+      }
+    }
+    const [pluginTransport] = createMemoryTransportPair()
+    const transport = new PrivateReceiverTransport()
+    const endpoint = await createClientEndpoint({
+      id: 'wp2-transport-private-receiver',
+      transport,
+      middlewares: [connect({ transport: pluginTransport })]
+    } as never)
+    try {
+      expect(transport.subscriptions).toBe(1)
+    } finally {
+      await endpoint.dispose()
+    }
+  })
+
+  it('WP2: rejects duplicate plugin transports before either transport subscribes', async () => {
+    const [firstBase] = createMemoryTransportPair()
+    const [secondBase] = createMemoryTransportPair()
+    let firstSubscriptions = 0
+    let secondSubscriptions = 0
+    const first = {
+      ...firstBase,
+      subscribe: (listener: Parameters<typeof firstBase.subscribe>[0]) => {
+        firstSubscriptions += 1
+        return firstBase.subscribe(listener)
+      }
+    }
+    const second = {
+      ...secondBase,
+      subscribe: (listener: Parameters<typeof secondBase.subscribe>[0]) => {
+        secondSubscriptions += 1
+        return secondBase.subscribe(listener)
+      }
+    }
+    const failure = await createClientEndpoint({
+      id: 'wp2-duplicate-transport',
+      middlewares: [
+        { ...connect({ transport: first }), name: 'wp2-connect-first' },
+        { ...connect({ transport: second }), name: 'wp2-connect-second' }
+      ]
+    } as never).catch((error: unknown) => error)
+    expect(failure).toMatchObject({ code: WebRpcErrorCode.capabilityConflict })
+    expect(firstSubscriptions).toBe(0)
+    expect(secondSubscriptions).toBe(0)
+  })
+
+  it('WP2: rejects a missing transport before Host construction', async () => {
+    const failure = await createClientEndpoint({
+      id: 'wp2-missing-transport',
+      middlewares: [connect()]
+    } as never).catch((error: unknown) => error)
+    expect(failure).toMatchObject({ code: WebRpcErrorCode.invalidConfig })
   })
 
   it('T97 B12c01: real outbound send and RPC fanout preserve canonical results', async () => {
@@ -5727,12 +5961,14 @@ describe('B12c01 outbound feature production-seam matrix', () => {
       id: 'order-client',
       transport,
       middlewares: [
-        protocol({
+        codec({
+          ...defineJsonCodec({ version: 1 }),
           encode: (value) => {
             events.push('encode')
-            return value
+            return JSON.stringify(value)
           }
         }),
+        protocol(),
         authentication({
           encrypt: (value) => {
             events.push('encrypt')
@@ -5750,8 +5986,7 @@ describe('B12c01 outbound feature production-seam matrix', () => {
     })
     try {
       client.dispatch('order-target', 'order-method', 'order-data')
-      await drainBatchTurns()
-      expect(events).toEqual(['encode', 'encrypt', 'sign', 'transport'])
+      await vi.waitFor(() => expect(events).toEqual(['encode', 'encrypt', 'sign', 'transport']))
     } finally {
       await client.dispose()
     }
@@ -6453,10 +6688,10 @@ describe('Cycle L discovery Host transactions', () => {
       ).cleanupErrors
       expect(cleanupErrors?.map(({ error }) => error)).toEqual([
         routeFirst,
-        routeSecond,
         replayError,
         registryError
       ])
+      expect(cleanupErrors?.map(({ error }) => error)).not.toContain(routeSecond)
       expect(endpoint.dispose()).toBe(firstDispose)
       const promises = readComposedDisposalPromises(endpoint)
       expect(promises).toBeDefined()

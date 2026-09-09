@@ -1,6 +1,6 @@
 import type { IWebRpcSendOptions, IWebRpcTransport } from '../transport.js'
 import { safeRead } from '../internal/safe-value.js'
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js'
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../transport-constants.js'
 import { WebRpcErrorCode } from '../errors.js'
 import {
   createListenerFailureState,
@@ -36,6 +36,9 @@ export function createServiceWorkerTransport(
 ): IWebRpcTransport<unknown, Transferable> {
   const { target, receiver } = options
   const peerId = options.peerId ?? target.id
+  /** Preserves the adapter's existing physical-source admission boundary. */
+  const sourceProof = (source: unknown) =>
+    source === target || (peerId !== undefined && safeRead<unknown>(source, 'id') === peerId)
   const listeners = createMessageListenerHub<{
     data: unknown
     origin?: string
@@ -56,7 +59,9 @@ export function createServiceWorkerTransport(
       reportListenerFailure(error, transportErrors, secondaryFailures)
       return
     }
-    listeners.dispatch({ data, origin, source }, (listener, message) => {
+    /** A verified cross-realm Client wrapper represents the configured stable peer. */
+    const normalizedSource = sourceProof(source) ? target : source
+    listeners.dispatch({ data, origin, source: normalizedSource }, (listener, message) => {
       observeListener(
         () => listener(message),
         (error) => reportListenerFailure(error, listenerErrors, secondaryFailures),
@@ -69,8 +74,7 @@ export function createServiceWorkerTransport(
     topology: 'multiplexed',
     ownership: WebRpcTransportOwnership.borrowed,
     peerId,
-    sourceProof: (source) =>
-      source === target || (peerId !== undefined && safeRead<unknown>(source, 'id') === peerId),
+    sourceProof,
     send(message, options?: IWebRpcSendOptions<Transferable>) {
       target.postMessage(message, options?.transfer)
     },

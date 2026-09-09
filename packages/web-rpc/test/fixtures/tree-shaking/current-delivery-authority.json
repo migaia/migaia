@@ -1,0 +1,11 @@
+{
+  "schema": "WRC-C-B11-approval-v2",
+  "algorithm": "ed25519",
+  "authorityId": "rpcc-corrected-delivery-v38",
+  "keyId": "rpcc-corrected-v38-20260909",
+  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAQtCn2TKynM4nvzifZLvo9owb/05pWXb8hm6QkTbx8bA=\n-----END PUBLIC KEY-----\n",
+  "decisionId": "WRC-C-B11-RPCC-V38-D4-20260909",
+  "payloadDigest": "068e275c1b872af060bdb92ff4b5cd57da05f3a97a62e1e3808f35b562d53574",
+  "status": "approved",
+  "reason": "User-authorized current-candidate delivery pair under preserved corrected controller; complete frozen provenance, optional historical cost diagnostics, and unchanged functional acceptance."
+}

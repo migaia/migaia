@@ -45,7 +45,7 @@ test('DedicatedWorker supports concurrent RPC and terminal convergence', async (
   expect(result.activePageSnapshot).toMatchObject({
     phase: 'active',
     pending: 0,
-    chunks: 0,
+    chunks: undefined,
     activeControllers: 0
   })
   expect(result.terminal).toBe('DEADLINE_EXCEEDED')

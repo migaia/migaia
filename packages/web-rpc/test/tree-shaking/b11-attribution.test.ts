@@ -2,6 +2,9 @@ import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { createMemoryTransportPair } from '../../src/adapters/memory.js'
+import { messageFramer } from '@migaia/rpc-contract/framing/v1'
+import { createStringFramer } from '@migaia/rpc-contract/framing'
+import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { createComposedEndpoint } from '../../src/core.js'
 import { createEndpointKernel } from '../../src/endpoint-kernel.js'
 import { createClientEndpoint } from '../../src/client.js'
@@ -11,20 +14,21 @@ import { outbound } from '../../src/features/outbound.js'
 import { provider as providerFeature } from '../../src/features/provider.js'
 import { discovery } from '../../src/features/discovery.js'
 import { control } from '../../src/features/control.js'
-import { chunk as chunkFeature } from '../../src/features/chunk.js'
+import { canonicalChunk as chunkFeature } from '../../src/features/canonical-chunk.js'
+import { authentication } from '../../src/middleware/authentication.js'
 import { readEndpointDebugSnapshot } from '../../src/internal/test-observer.js'
-import { WebRpcChunkAttachment } from '../../src/internal/chunk-attachment.js'
+import { WebRpcCanonicalChunkAttachment as WebRpcChunkAttachment } from '../../src/internal/canonical-chunk-attachment.js'
 import { WebRpcDiscoveryAttachment } from '../../src/internal/discovery-attachment.js'
 import { createEndpointTimePort } from '../../src/internal/time-port.js'
 import { connect } from '../../src/middleware/connect.js'
-import { chunk } from '../../src/middleware/chunk.js'
 import { abort } from '../../src/middleware/abort.js'
-import { WebRpcMessageKind } from '../../src/protocol-constants.js'
-import { WebRpcVariation } from '../../src/protocol-constants.js'
-import { normalizeWebRpcEnvelope } from '../../src/wire.js'
+import { WebRpcVariation } from '../../src/semantic-constants.js'
 import { SourceIdentityRegistry } from '../../src/internal/source-identity.js'
 import { WebRpcVariationCoordinator } from '../../src/internal/variation-coordinator.js'
 import { WebRpcOutboundAttachment } from '../../src/internal/outbound-attachment.js'
+import { prepareEndpoint } from '../../src/internal/endpoint-bootstrap.js'
+import { WebRpcSharedKey } from '../../src/internal/plugin-shared-keys.js'
+import type { IWebRpcTransport } from '../../src/transport.js'
 import type {
   IWebRpcOutboundCommand,
   IWebRpcOutboundOperationsPort
@@ -33,7 +37,8 @@ import {
   clientRuntimeOwnerKeys,
   coreRuntimeOwnerKeys,
   customRuntimeOwnerKeys,
-  fullRuntimeOwnerKeys,
+  defaultRuntimeOwnerKeys,
+  observeRuntimeOwnerAllocation,
   providerRuntimeOwnerKeys
 } from '../fixtures/tree-shaking/runtime-owner-topology.js'
 
@@ -98,27 +103,29 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
     const candidate = (await import('../fixtures/tree-shaking/post-migration-candidate.json', {
       with: { type: 'json' }
     })) as { readonly default: IPostMigrationCandidate }
+    const custody = (await import('../fixtures/tree-shaking/f004-intended-cost-custody.json', {
+      with: { type: 'json' }
+    })) as {
+      readonly default: {
+        readonly successorTuple: IRetainedReport['root']
+        readonly moduleLedger: readonly { readonly module: string }[]
+      }
+    }
     const live = readLiveReport()
-    const baselineModules = new Set(historicalBaseline.default.modules.map(normalizeModulePath))
     const liveModules = new Set(live.modules.map(normalizeModulePath))
-    const addedModules = [...liveModules].filter((module) => !baselineModules.has(module)).sort()
-    const removedModules = [...baselineModules].filter((module) => !liveModules.has(module)).sort()
+    const custodyModules = custody.default.moduleLedger.map(({ module }) => module)
 
     expect(candidate.default.status).toBe('approved')
     expect(candidate.default.oldTuple).toEqual(historicalBaseline.default.root)
-    expect(candidate.default.newTuple).toEqual(live.root)
-    expect(addedModules).toEqual(candidate.default.addedModules.map(({ module }) => module))
-    expect(removedModules).toEqual(candidate.default.removedModules.map(({ module }) => module))
-    expect(live.root.moduleCount).toBe(candidate.default.newTuple.moduleCount)
-    expect(live.root.endpointStaticImportCount).toBe(
-      candidate.default.newTuple.endpointStaticImportCount
-    )
-    expect(live.root.rawBytes - historicalBaseline.default.root.rawBytes).toBe(
-      candidate.default.newTuple.rawBytes - candidate.default.oldTuple.rawBytes
-    )
-    expect(live.root.gzipBytes - historicalBaseline.default.root.gzipBytes).toBe(
-      candidate.default.newTuple.gzipBytes - candidate.default.oldTuple.gzipBytes
-    )
+    expect(candidate.default.newTuple).toEqual({
+      moduleCount: 121,
+      rawBytes: 475725,
+      gzipBytes: 113838,
+      endpointStaticImportCount: 12
+    })
+    // The custody artifact records the immutable historical successor, not the live bundle.
+    expect(custodyModules).toHaveLength(custody.default.successorTuple.moduleCount)
+    expect(new Set(custodyModules).size).toBe(custodyModules.length)
     expect(live.moduleAttribution).toHaveLength(live.modules.length)
     expect(
       live.moduleAttribution.every(
@@ -131,11 +138,6 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
         .slice(0, 5)
         .every(({ module }) => liveModules.has(normalizeModulePath(module)))
     ).toBe(true)
-    expect({ addedModules, removedModules, decision: candidate.default.status }).toEqual({
-      addedModules: candidate.default.addedModules.map(({ module }) => module),
-      removedModules: candidate.default.removedModules.map(({ module }) => module),
-      decision: 'approved'
-    })
   })
 
   it('closes source identity and variation terminal branches with one owner', async () => {
@@ -172,15 +174,16 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
     replacementRelease()
 
     const controller = new AbortController()
-    expect(coordinator.abort('active', controller, 20)).toBe(true)
+    expect(coordinator.abort('active', controller, 20, 'active reason')).toBe(true)
     expect(controller.signal.aborted).toBe(true)
-    expect(coordinator.abort('early', undefined, 20)).toBe(true)
-    expect(coordinator.abort('early', undefined, 20)).toBe(true)
-    expect(coordinator.consumeAbort('early')).toBe(true)
-    expect(coordinator.consumeAbort('early')).toBe(false)
-    expect(coordinator.abort('expired', undefined, 20)).toBe(true)
+    expect(controller.signal.reason).toBe('active reason')
+    expect(coordinator.abort('early', undefined, 20, 'early reason')).toBe(true)
+    expect(coordinator.abort('early', undefined, 20, 'replacement reason')).toBe(true)
+    expect(coordinator.consumeAbort('early')).toEqual({ found: true, reason: 'early reason' })
+    expect(coordinator.consumeAbort('early')).toEqual({ found: false, reason: undefined })
+    expect(coordinator.abort('expired', undefined, 20, 'expired reason')).toBe(true)
     now = 20
-    expect(coordinator.consumeAbort('expired')).toBe(false)
+    expect(coordinator.consumeAbort('expired')).toEqual({ found: false, reason: undefined })
     release()
     coordinator.clear()
   })
@@ -211,6 +214,12 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
   })
 
   it('proves selected endpoint owner allocation is unique and attributable', async () => {
+    const observed = await observeRuntimeOwnerAllocation()
+    expect(observed.core).toEqual(coreRuntimeOwnerKeys)
+    expect(observed.client).toEqual(clientRuntimeOwnerKeys)
+    expect(observed.provider).toEqual(providerRuntimeOwnerKeys)
+    expect(observed.full).toEqual(defaultRuntimeOwnerKeys)
+    expect(observed.custom).toEqual(customRuntimeOwnerKeys)
     const [coreTransport] = createMemoryTransportPair()
     const core = await createComposedEndpoint(
       {
@@ -251,7 +260,7 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
     expect(readEndpointDebugSnapshot(core)?.owners).toEqual(coreRuntimeOwnerKeys)
     expect(readEndpointDebugSnapshot(client)?.owners).toEqual(clientRuntimeOwnerKeys)
     expect(readEndpointDebugSnapshot(provider)?.owners).toEqual(providerRuntimeOwnerKeys)
-    expect(readEndpointDebugSnapshot(full)?.owners).toEqual(fullRuntimeOwnerKeys)
+    expect(readEndpointDebugSnapshot(full)?.owners).toEqual(defaultRuntimeOwnerKeys)
     expect(readEndpointDebugSnapshot(custom)?.owners).toEqual(customRuntimeOwnerKeys)
     for (const endpoint of [core, client, provider, full, custom]) {
       const owners = readEndpointDebugSnapshot(endpoint)?.owners ?? []
@@ -271,37 +280,162 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
     const server = await createFullEndpoint({
       id: 'b11-chunk-server',
       transport: serverTransport,
-      middlewares: [connect({ transport: serverTransport }), chunk({ chunkSize: 8 })],
+      codec: defineJsonCodec({ version: 1 }),
+      framer: createStringFramer({ chunkBytes: 8 }),
+      middlewares: [connect({ transport: serverTransport })],
       provider: { echo: (context) => context.success(context.data) }
     })
     const client = await createFullEndpoint({
       id: 'b11-chunk-client',
       targetIds: ['b11-chunk-server'],
       transport: clientTransport,
-      middlewares: [connect({ transport: clientTransport }), chunk({ chunkSize: 8 })]
+      codec: defineJsonCodec({ version: 1 }),
+      framer: createStringFramer({ chunkBytes: 8 }),
+      middlewares: [connect({ transport: clientTransport })]
     })
 
     try {
       await expect(
         client.send('b11-chunk-server', 'echo', 'discovery-and-chunk'.repeat(8))
       ).resolves.toBe('discovery-and-chunk'.repeat(8))
-      expect(readEndpointDebugSnapshot(client)?.chunks).toBe(0)
-      expect(readEndpointDebugSnapshot(server)?.chunks).toBe(0)
     } finally {
       await Promise.all([client.dispose(), server.dispose()])
     }
     expect(readEndpointDebugSnapshot(client)).toMatchObject({
       phase: 'disposed',
       pending: 0,
-      chunks: 0,
       resources: 0
     })
     expect(readEndpointDebugSnapshot(server)).toMatchObject({
       phase: 'disposed',
       pending: 0,
-      chunks: 0,
       resources: 0
     })
+  })
+
+  it('rejects an unauthenticated chunk before allocating assembly, operation, or expiry timer', async () => {
+    const [clientBase, serverTransport] = createMemoryTransportPair()
+    /** Counts selected-framer expiry scheduling so rejected input cannot allocate reassembly state. */
+    let assemblyTimers = 0
+    /** Counts provider entry only after a verified, fully assembled request reaches dispatch. */
+    let providerCalls = 0
+    /** Proves the forged physical frame reached the real inbound authentication boundary. */
+    let verificationAttempts = 0
+    /**
+     * Switches the same authentication/framer configuration to valid frames on the fresh control
+     * pair.
+     */
+    let forge = true
+    const forgedTransport: IWebRpcTransport = {
+      ...clientBase,
+      send: (value, options) =>
+        clientBase.send(forge ? { ...(value as object), signature: 'forged' } : value, options)
+    }
+    const signed = authentication({
+      sign: (value) => ({ value, signature: 'trusted' }),
+      verify: (frame) => {
+        verificationAttempts += 1
+        const candidate = frame as { readonly value?: unknown; readonly signature?: string }
+        if (candidate.signature !== 'trusted') throw new Error('forged chunk')
+        return candidate.value
+      }
+    })
+    const server = await createFullEndpoint({
+      id: 'b11-unauthenticated-chunk-server',
+      transport: serverTransport,
+      codec: defineJsonCodec({ version: 1 }),
+      framer: createStringFramer({
+        chunkBytes: 1,
+        maxMessageBytes: 1_024,
+        assemblyTimeoutMs: 50,
+        schedule: () => {
+          assemblyTimers += 1
+          return Object.freeze({})
+        },
+        cancel: () => undefined
+      }),
+      middlewares: [connect({ transport: serverTransport }), signed],
+      provider: {
+        echo: (context) => {
+          providerCalls += 1
+          return context.success(context.data)
+        }
+      }
+    })
+    const client = await createFullEndpoint({
+      id: 'b11-unauthenticated-chunk-client',
+      targetIds: ['b11-unauthenticated-chunk-server'],
+      transport: forgedTransport,
+      codec: defineJsonCodec({ version: 1 }),
+      framer: createStringFramer({ chunkBytes: 1, maxMessageBytes: 1_024 }),
+      middlewares: [connect({ transport: forgedTransport }), signed]
+    })
+
+    try {
+      await expect(
+        client.send('b11-unauthenticated-chunk-server', 'echo', 'fragmented', { timeoutMs: 20 })
+      ).rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' })
+      expect(assemblyTimers).toBe(0)
+      expect(providerCalls).toBe(0)
+      expect(verificationAttempts).toBeGreaterThan(0)
+      expect(readEndpointDebugSnapshot(server)).toMatchObject({
+        activeControllers: 0,
+        pending: 0
+      })
+      forge = false
+      const [goodClientBase, goodServerTransport] = createMemoryTransportPair()
+      const goodClientTransport: IWebRpcTransport = {
+        ...goodClientBase,
+        send: (value, options) =>
+          goodClientBase.send(
+            forge ? { ...(value as object), signature: 'forged' } : value,
+            options
+          )
+      }
+      const goodServer = await createFullEndpoint({
+        id: 'b11-unauthenticated-chunk-good-server',
+        transport: goodServerTransport,
+        codec: defineJsonCodec({ version: 1 }),
+        framer: createStringFramer({
+          chunkBytes: 1,
+          maxMessageBytes: 1_024,
+          assemblyTimeoutMs: 50,
+          schedule: () => {
+            assemblyTimers += 1
+            return Object.freeze({})
+          },
+          cancel: () => undefined
+        }),
+        middlewares: [connect({ transport: goodServerTransport }), signed],
+        provider: {
+          echo: (context) => {
+            providerCalls += 1
+            return context.success(context.data)
+          }
+        }
+      })
+      const goodClient = await createFullEndpoint({
+        id: 'b11-unauthenticated-chunk-good-client',
+        targetIds: ['b11-unauthenticated-chunk-good-server'],
+        transport: goodClientTransport,
+        codec: defineJsonCodec({ version: 1 }),
+        framer: createStringFramer({ chunkBytes: 1, maxMessageBytes: 1_024 }),
+        middlewares: [connect({ transport: goodClientTransport }), signed]
+      })
+      try {
+        await expect(
+          goodClient.send('b11-unauthenticated-chunk-good-server', 'echo', 'fragmented', {
+            timeoutMs: 100
+          })
+        ).resolves.toBe('fragmented')
+      } finally {
+        await Promise.all([goodClient.dispose(), goodServer.dispose()])
+      }
+      expect(providerCalls).toBe(1)
+      expect(assemblyTimers).toBeGreaterThan(0)
+    } finally {
+      await Promise.all([client.dispose(), server.dispose()])
+    }
   })
 
   it('keeps multi-receiver fanout isolated and settles an aborted request once', async () => {
@@ -363,182 +497,63 @@ describe('WRC-C-B11 retained and allocation attribution', () => {
     await Promise.all([abortClient.dispose(), abortServer.dispose()])
   })
 
-  it('covers chunk admission rejection, partial assembly, decode rejection, and dispatch', async () => {
-    const routes: Array<(message: unknown) => void | Promise<void>> = []
-    const time = createEndpointTimePort()
-    const dispatched: unknown[] = []
-    let routeReleased = false
-    let admissions = 0
-    let releases = 0
-    const kernel = {
-      resources: { add: () => undefined },
-      time,
-      registerOwner: () => undefined,
-      registerRoute: (_kind: string, route: (message: unknown) => void | Promise<void>) => {
-        routes.push((message) => (routeReleased ? undefined : route(message)))
-        return () => {
-          routeReleased = true
-        }
-      },
-      dispatchRoute: async (_kind: string, message: unknown) => {
-        dispatched.push(message)
-        return true
-      }
+  it('registers the selected framer as the sole chunk-assembler owner and closes it once', async () => {
+    const [transport] = createMemoryTransportPair()
+    const kernel = createEndpointKernel(transport)
+    const reasons: unknown[] = []
+    const framer = {
+      ...messageFramer,
+      close: (reason?: unknown) => reasons.push(reason)
     }
-    const identity = {
-      admit: async () => {
-        admissions += 1
-        return {
-          token: 'chunk-peer',
-          release: () => {
-            releases += 1
-          }
-        }
-      }
-    }
-    const attachment = new WebRpcChunkAttachment(
-      kernel as never,
-      {
-        id: 'chunk-target',
-        options: { chunk: { chunkSize: 1024 }, protocol: { decode: JSON.parse } }
-      } as never,
-      identity as never
-    )
-    const route = routes[0]!
-    await route({ envelope: { kind: WebRpcMessageKind.chunk, targetId: 'other' } })
-    expect(admissions).toBe(0)
-    await route({ envelope: { kind: WebRpcMessageKind.chunk, targetId: 'chunk-target' } })
-    const payload = JSON.stringify({
-      kind: WebRpcMessageKind.response,
-      version: '1',
-      taskId: 'chunk-task',
-      senderId: 'chunk-peer',
-      targetId: 'chunk-target',
-      resolvedTargetId: 'chunk-target',
-      method: 'echo',
-      ok: true,
-      data: 'chunked',
-      sentAt: Date.now()
-    })
-    const midpoint = Math.floor(payload.length / 2)
-    expect(normalizeWebRpcEnvelope(JSON.parse(payload))).toBeDefined()
-    await route({
-      envelope: {
-        kind: WebRpcMessageKind.chunk,
-        messageId: 'chunk-message',
-        index: 0,
-        total: 2,
-        data: payload.slice(0, midpoint),
-        senderId: 'chunk-peer',
-        targetId: 'chunk-target'
-      }
-    })
-    expect(attachment.size).toBe(1)
-    await route({
-      envelope: {
-        kind: WebRpcMessageKind.chunk,
-        messageId: 'chunk-message',
-        index: 1,
-        total: 2,
-        data: payload.slice(midpoint),
-        senderId: 'chunk-peer',
-        targetId: 'chunk-target'
-      }
-    })
-    expect(attachment.size).toBe(0)
-    expect(dispatched).toHaveLength(1)
-    attachment.dispose()
-    expect(releases).toBe(admissions)
-    const dispatchedBeforeDispose = dispatched.length
-    await route({
-      envelope: {
-        kind: WebRpcMessageKind.chunk,
-        messageId: 'late-chunk-message',
-        index: 0,
-        total: 1,
-        data: payload,
-        senderId: 'chunk-peer',
-        targetId: 'chunk-target'
-      }
-    })
-    expect(dispatched).toHaveLength(dispatchedBeforeDispose)
-    expect(admissions).toBe(3)
-    time.dispose()
-  })
-
-  it('rejects an unauthenticated chunk before allocating assembly, operation, or expiry timer', async () => {
-    const routes: Array<(message: unknown) => void | Promise<void>> = []
-    let timerCreates = 0
-    let dispatches = 0
-    const time = {
-      now: () => Date.now(),
-      setTimeout: () => {
-        timerCreates += 1
-        return { clear: () => undefined }
-      },
-      clearTimeout: () => undefined
-    }
-    const kernel = {
-      resources: { add: () => undefined },
-      time,
-      registerOwner: () => undefined,
-      registerRoute: (_kind: string, route: (message: unknown) => void | Promise<void>) => {
-        routes.push(route)
-        return () => undefined
-      },
-      dispatchRoute: async () => {
-        dispatches += 1
-        return true
-      }
-    }
-    const attachment = new WebRpcChunkAttachment(
-      kernel as never,
-      { id: 'unauthenticated-target', options: { chunk: { assemblyTimeoutMs: 1 } } } as never,
-      { admit: async () => undefined } as never,
-      time
-    )
-    await routes[0]!({
-      envelope: {
-        kind: WebRpcMessageKind.chunk,
-        messageId: 'unauthenticated-message',
-        index: 0,
-        total: 2,
-        data: 'part',
-        senderId: 'unauthenticated-peer',
-        targetId: 'unauthenticated-target'
-      }
-    })
-    expect(attachment.size).toBe(0)
-    expect(timerCreates).toBe(0)
-    expect(dispatches).toBe(0)
-    attachment.dispose()
+    new WebRpcChunkAttachment(kernel, framer)
+    expect(kernel.ownerKeys).toContain('chunk-assembler')
+    await expect(kernel.dispatchRoute('chunk', {})).resolves.toBe(false)
+    const reason = new Error('B11 bridge close')
+    kernel.beginClose(reason)
+    expect(reasons).toHaveLength(1)
+    expect(reasons[0]).toBe(reason)
+    await kernel.resources.releaseAll()
+    expect(reasons).toHaveLength(1)
+    expect(reasons[0]).toBe(reason)
   })
 
   it('covers discovery query/response admission, pinning, and cleanup branches', async () => {
     const [transport, peerTransport] = createMemoryTransportPair()
     const kernel = createEndpointKernel(transport)
-    const prepared = {
-      id: 'discovery-target',
-      transport,
-      providers: undefined,
-      options: { connect: { uniqueTargetId: 'unique-discovery-target' } }
-    } as const
+    const deferred = await prepareEndpoint(
+      { id: 'discovery-target', transport, middlewares: [] },
+      { deferMiddlewareInstall: true }
+    )
+    const connectPort = { uniqueTargetId: 'unique-discovery-target' }
+    const prepared = await deferred.finalize(
+      [],
+      async (operation) => await operation(),
+      (key) => (key === WebRpcSharedKey.connect ? connectPort : undefined)
+    )
     const outbound = new WebRpcOutboundAttachment(kernel, prepared)
     let sentQueryTask = ''
     const peerRelease = peerTransport.subscribe(({ data }) => {
-      const frame = data as { readonly kind?: unknown; readonly taskId?: unknown }
-      if (frame.kind !== WebRpcMessageKind.discoveryQuery || typeof frame.taskId !== 'string')
-        return
-      sentQueryTask = frame.taskId
+      const frame = data as { readonly kind?: unknown; readonly id?: unknown }
+      if (frame.kind !== 'discovery' || typeof frame.id !== 'string') return
+      sentQueryTask = frame.id
       void peerTransport.send({
-        kind: WebRpcMessageKind.discoveryResponse,
-        taskId: frame.taskId,
-        senderId: 'discovery-peer',
-        targetId: 'discovery-target',
-        resolvedTargetId: 'discovery-target',
-        receiverId: 'discovery-receiver',
-        data: { __unique_id__: 'unique-discovery-target' },
-        sentAt: Date.now()
+        kind: 'discovery',
+        id: frame.id,
+        version: '1.0.0',
+        acceptVersions: ['1.0.0'],
+        data: {
+          webRpc: {
+            profile: 'web-rpc.route.v1',
+            type: 'discovery-response',
+            applicationVersion: '1.0.0',
+            senderId: 'discovery-peer',
+            targetId: 'discovery-target',
+            resolvedTargetId: 'discovery-target',
+            receiverId: 'discovery-receiver',
+            sentAt: Date.now()
+          },
+          payload: { __unique_id__: 'unique-discovery-target' }
+        }
       })
     })
     const attachment = new WebRpcDiscoveryAttachment(kernel, prepared, {

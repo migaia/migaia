@@ -1,8 +1,14 @@
 /** Public runtime-neutral API for bidirectional web-rpc endpoints. */
-export { createFullEndpoint } from './full.js'
-export { createFullEndpoint as createEndpoint } from './full.js'
+export { createFullEndpoint as createEndpoint, createFullEndpoint } from './full.js'
+export {
+  defineFeature,
+  type IWebRpcFeature,
+  type IWebRpcFeatureDefinition,
+  type IWebRpcFeatureInstallScope,
+  type IWebRpcFeatureSurface
+} from './feature.js'
 export type * from './typing.js'
-export * from './protocol-constants.js'
+export * from './transport-constants.js'
 export {
   WebRpcErrorCode,
   WebRpcError,

@@ -1,4 +1,6 @@
 import { createEndpoint } from '../../src/index'
+import { createStringFramer } from '@migaia/rpc-contract/framing'
+import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { connect } from '../../src/middleware/connect'
 import { timeout } from '../../src/middleware/timeout'
 import { uuid } from '../../src/middleware/uuid'
@@ -6,7 +8,6 @@ import { ping } from '../../src/middleware/ping'
 import { authentication } from '../../src/middleware/authentication'
 import { abort } from '../../src/middleware/abort'
 import { contract } from '../../src/middleware/contract'
-import { chunk } from '../../src/middleware/chunk'
 import type { IWebRpcContractConfig } from '../../src/typing'
 import type { IWebRpcProvider } from '../../src/typing'
 import type { IWebRpcEndpoint } from '../../src/typing'
@@ -31,6 +32,12 @@ export const createRpc = <TDiscoveryMode extends 'automatic' | 'manual' = 'autom
     id,
     targetIds,
     provider,
+    ...(chunkConfig?.chunkSize === undefined
+      ? {}
+      : {
+          codec: defineJsonCodec({ version: 1 }),
+          framer: createStringFramer({ chunkBytes: chunkConfig.chunkSize })
+        }),
     middlewares: [
       connect({
         transport,
@@ -59,7 +66,6 @@ export const createRpc = <TDiscoveryMode extends 'automatic' | 'manual' = 'autom
       abort(),
       ping(),
       ...(contractConfig === undefined ? [] : [contract(contractConfig)]),
-      ...(chunkConfig === undefined ? [] : [chunk(chunkConfig)]),
       ...(fixedUuid === undefined
         ? []
         : [uuid({ generate: typeof fixedUuid === 'function' ? fixedUuid : () => fixedUuid })])

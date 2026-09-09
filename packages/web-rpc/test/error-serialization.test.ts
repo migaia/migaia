@@ -9,6 +9,7 @@ import {
   WEBRPC_SOURCE,
   type ISerializedError
 } from '../src'
+import { deserializeErrorFromRpc, serializeErrorForRpc } from '../src/error-serialization.js'
 
 describe('cross-realm error serialization', () => {
   it('reaches cause, cleanupErrors and AggregateError entries (E-T3)', () => {
@@ -81,6 +82,28 @@ describe('cross-realm error serialization', () => {
 
     expect(serialized.causes?.map((entry) => entry.message)).toEqual(['child', 'inner'])
     expect(serializeError(deserializeError(structuredClone(serialized)))).toEqual(serialized)
+  })
+
+  it('projects the legacy bounded graph to RPC without losing linear causes or AggregateError arity', () => {
+    const leaf = new TypeError('leaf')
+    const middle = new Error('middle', { cause: leaf })
+    const aggregate = new AggregateError([middle, new RangeError('sibling')], 'aggregate')
+    const root = new Error('root', { cause: aggregate })
+
+    const wire = serializeErrorForRpc(root)
+    const restored = deserializeErrorFromRpc(wire)
+
+    expect(wire.cause?.name).toBe('AggregateError')
+    expect(wire.cause?.errors).toHaveLength(2)
+    expect([...reachError(restored)].map((entry) => (entry as Error).message)).toEqual(
+      expect.arrayContaining(['root', 'aggregate', 'middle', 'leaf', 'sibling'])
+    )
+    expect((restored.cause as AggregateError).errors ?? []).toHaveLength(2)
+    expect((restored.cause as AggregateError).errors[0]?.cause).toMatchObject({
+      name: 'TypeError',
+      message: leaf.message,
+      stack: leaf.stack
+    })
   })
 
   it('keeps AggregateError own cause separate from child cause graph', () => {

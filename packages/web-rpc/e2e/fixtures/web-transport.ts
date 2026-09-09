@@ -1,13 +1,15 @@
 import { createWebTransportDatagramTransport } from '../../src/adapters/web-transport'
 import { readEndpointDebugSnapshot } from '../../src/internal/test-observer'
 import { createEndpoint } from '../../src/index'
+import { createBinaryFramer } from '@migaia/rpc-contract/framing'
+import { messageFramer } from '@migaia/rpc-contract/framing/v1'
+import { defineCBORCodec } from '@migaia/serialize/codecs/cbor'
 import { connect } from '../../src/middleware/connect'
-import { protocol } from '../../src/middleware/protocol'
+import { authentication } from '../../src/middleware/authentication.js'
 import { timeout } from '../../src/middleware/timeout'
 import { abort } from '../../src/middleware/abort'
 import { ping } from '../../src/middleware/ping'
 import { contract } from '../../src/middleware/contract'
-import { chunk } from '../../src/middleware/chunk'
 import type { IWebRpcContractConfig, IWebRpcEndpoint, IWebRpcProvider } from '../../src/typing'
 import { installErrorGuards, terminalProviders } from './rpc'
 
@@ -21,23 +23,29 @@ const createWebTransportRpc = (
   provider: Readonly<Record<string, IWebRpcProvider>> = {},
   contractConfig?: IWebRpcContractConfig
 ): Promise<IWebRpcEndpoint<string, 'automatic', true>> =>
-  createEndpoint({
-    id,
-    targetIds,
-    provider,
-    middlewares: [
-      connect({ transport }),
-      protocol({
-        encodedType: 'uint8array',
-        encode: (value) => new TextEncoder().encode(JSON.stringify(value)),
-        decode: (value) => JSON.parse(new TextDecoder().decode(value as Uint8Array))
-      }),
-      timeout({ timeoutMs: 2_000 }),
-      abort(),
-      ping(),
-      ...(contractConfig === undefined ? [] : [contract(contractConfig)])
-    ]
-  }) as Promise<IWebRpcEndpoint<string, 'automatic', true>>
+  (() => {
+    const codec = defineCBORCodec({ version: 1 })
+    return createEndpoint({
+      id,
+      targetIds,
+      provider,
+      transport,
+      codec,
+      framer: messageFramer,
+      middlewares: [
+        connect({ transport }),
+        authentication({
+          encodedType: 'uint8array',
+          encrypt: (value) => value,
+          decrypt: (value) => value
+        }),
+        timeout({ timeoutMs: 2_000 }),
+        abort(),
+        ping(),
+        ...(contractConfig === undefined ? [] : [contract(contractConfig)])
+      ]
+    }) as Promise<IWebRpcEndpoint<string, 'automatic', true>>
+  })()
 
 /** Creates two in-memory datagram directions with the same stream contract as WebTransport. */
 const createDatagramPair = () => {
@@ -91,15 +99,9 @@ globalThis.runWebTransportScenario = async () => {
     try {
       await createEndpoint({
         id: 'unsupported-chunk',
-        middlewares: [
-          connect({ transport: unsupportedTransport }),
-          protocol({
-            encodedType: 'uint8array',
-            encode: (value) => new TextEncoder().encode(JSON.stringify(value)),
-            decode: (value) => JSON.parse(new TextDecoder().decode(value as Uint8Array))
-          }),
-          chunk({ chunkSize: 4 })
-        ]
+        codec: defineCBORCodec({ version: 1 }),
+        framer: createBinaryFramer({ chunkBytes: 4 }),
+        middlewares: [connect({ transport: unsupportedTransport })]
       })
       return 'resolved'
     } catch (error) {
