@@ -7,7 +7,6 @@ import {
   WebRpcTimeoutError
 } from '../errors.js'
 import { WebRpcErrorText } from '../error-text.js'
-import { WebRpcMessageKind } from '../protocol-constants.js'
 import type {
   IWebRpcConnectControl,
   IWebRpcDiscoveryControl,
@@ -20,12 +19,17 @@ import type {
   IWebRpcHookEvent,
   IWebRpcUuidConfig
 } from '../typing.js'
-import type { IWebRpcDiscoveryResponse, IWebRpcDiscoveryQuery } from '../wire.js'
+import {
+  normalizeRpcEnvelope,
+  type IRpcEnvelope,
+  type IRpcPortableValue
+} from '@migaia/rpc-contract'
+import { WebRpcRoutingProfile, WebRpcRoutingType, type IWebRpcRoutingData } from './routing-data.js'
 import type { IWebRpcInboundMessage } from '../transport.js'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
 import type { IOutboundReceiver } from './outbound-attachment.js'
-import type { IInboundIdentityAdmission, IInboundIdentityRequest } from './inbound-identity.js'
+import type { IInboundIdentityAdmission } from './inbound-identity.js'
 import {
   type IWebRpcInboundIdentityPort,
   type IWebRpcOutboundOperationsPort,
@@ -113,6 +117,10 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   readonly #uuid: IWebRpcUuidConfig
   /** Optional receiver selector retained as executable connect configuration. */
   readonly #receiverSelector: IWebRpcConnectCapability['receiverSelector']
+  /** Contract version retained for discovery negotiation envelopes. */
+  readonly #applicationVersion: string
+  /** Compatible versions retained for discovery negotiation envelopes. */
+  readonly #acceptVersions: readonly string[]
   /** Last receiver identity snapshot reported for one target. */
   readonly #multipleReceiverSnapshots = new Map<TTargetId, string>()
   /** Manual query listeners are discovery-owner state, not endpoint state. */
@@ -156,6 +164,10 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     this.#maxIdentifierLength = prepared.options.contract?.maxIdentifierLength ?? 128
     this.#uuid = Object.freeze({ ...prepared.options.uuid })
     this.#receiverSelector = prepared.options.connect?.receiverSelector
+    this.#applicationVersion = prepared.options.contract?.version ?? '1.0.0'
+    this.#acceptVersions = Object.freeze([
+      ...(prepared.options.contract?.acceptVersions ?? [this.#applicationVersion])
+    ])
     this.#registry = new DiscoveryRegistry(
       {
         retain: (token) => this.#retainIdentity(token),
@@ -170,12 +182,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     kernel.registerOwner('discovery-registry', this.#registry)
     kernel.registerOwner('discovery-replay', this.#replay)
     this.#releaseRoutes = [
-      kernel.registerRoute(WebRpcMessageKind.discoveryQuery, (message) =>
-        this.#receiveQuery(message)
-      ),
-      kernel.registerRoute(WebRpcMessageKind.discoveryResponse, (message) =>
-        this.#receiveResponse(message)
-      )
+      kernel.registerRoute('discovery', (message) => this.#receiveDiscovery(message))
     ]
     const baseControls: IWebRpcDiscoveryControl<TTargetId> = Object.freeze({
       getServerList: (targetId?: TTargetId) => this.#getServerList(targetId),
@@ -687,15 +694,18 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       const sessionTimeoutMs = timeoutMs === false ? this.limits.sessionTtlMs : timeoutMs
       waiter.sessionDeadlineAt = this.#ports.time.now() + sessionTimeoutMs
       this.#scheduleAutomaticTimer(taskId, waiter, sessionTimeoutMs, targetId)
-      void this.#sendFrame({
-        kind: WebRpcMessageKind.discoveryQuery,
-        taskId,
-        senderId: this.#identity.id,
-        targetId,
+      void this.#sendFrame(taskId, {
+        webRpc: {
+          profile: WebRpcRoutingProfile,
+          type: WebRpcRoutingType.discoveryQuery,
+          applicationVersion: this.#applicationVersion,
+          senderId: this.#identity.id,
+          targetId,
+          sentAt: this.#ports.time.now()
+        },
         ...(this.#uniqueTargetId === undefined
           ? {}
-          : { data: { __unique_id__: this.#uniqueTargetId } }),
-        sentAt: this.#ports.time.now()
+          : { payload: { __unique_id__: this.#uniqueTargetId } })
       }).catch((error: unknown) => {
         this.#clearAutomaticTimer(taskId, waiter)
         this.#registry.deleteResponseCount(taskId)
@@ -830,16 +840,19 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       void Promise.resolve()
         .then(() => {
           if (this.#registry.getManualWaiter(taskId) !== waiter) return
-          return this.#sendFrame({
-            kind: WebRpcMessageKind.discoveryQuery,
-            taskId,
-            senderId: this.#identity.id,
-            targetId,
-            sentAt: this.#ports.time.now(),
+          return this.#sendFrame(taskId, {
+            webRpc: {
+              profile: WebRpcRoutingProfile,
+              type: WebRpcRoutingType.discoveryQuery,
+              applicationVersion: this.#applicationVersion,
+              senderId: this.#identity.id,
+              targetId,
+              sentAt: this.#ports.time.now(),
+              manual: true
+            },
             ...(this.#uniqueTargetId === undefined
               ? {}
-              : { data: { __unique_id__: this.#uniqueTargetId } }),
-            manual: true
+              : { payload: { __unique_id__: this.#uniqueTargetId } })
           })
         })
         .catch((error) => {
@@ -1023,19 +1036,25 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
 
   /** Handles both inbound discovery protocol branches after endpoint identity verification. */
   async handleInboundDiscovery(
-    envelope: IWebRpcDiscoveryQuery | IWebRpcDiscoveryResponse,
+    envelope: IRpcEnvelope,
+    route: IWebRpcRoutingData,
     verifiedPeerKey: string,
     source?: IWebRpcInboundMessage<unknown>
   ): Promise<void> {
-    if (envelope.targetId !== this.#identity.id) return
-    if (envelope.manual && this.#mode !== 'manual') return
-    if (envelope.kind === WebRpcMessageKind.discoveryQuery) {
-      if (envelope.manual && this.#mode === 'manual') {
+    if (
+      envelope.kind !== 'discovery' ||
+      typeof envelope.id !== 'string' ||
+      route.webRpc.targetId !== this.#identity.id
+    )
+      return
+    if (route.webRpc.manual && this.#mode !== 'manual') return
+    if (route.webRpc.type === WebRpcRoutingType.discoveryQuery) {
+      if (route.webRpc.manual && this.#mode === 'manual') {
         const replayKey = tupleKey(
           'manual-query',
           verifiedPeerKey,
-          envelope.senderId,
-          envelope.taskId
+          route.webRpc.senderId,
+          envelope.id
         )
         if (this.#replay.has(replayKey)) {
           this.#emit({ name: 'authentication.rejected', code: 'MANUAL_QUERY_REPLAY' })
@@ -1044,8 +1063,8 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
         const queryKey = tupleKey(
           'manual-query',
           verifiedPeerKey,
-          envelope.senderId,
-          envelope.taskId
+          route.webRpc.senderId,
+          envelope.id
         )
         if (this.#registry.hasInboundQuery(queryKey)) {
           this.#emit({ name: 'authentication.rejected', code: 'MANUAL_QUERY_COLLISION' })
@@ -1060,19 +1079,19 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
           return
         }
         const queryData =
-          envelope.data && typeof envelope.data === 'object' && !Array.isArray(envelope.data)
+          route.payload && typeof route.payload === 'object' && !Array.isArray(route.payload)
             ? Object.freeze(
                 Object.fromEntries(
-                  Object.entries(envelope.data as Record<string, unknown>).filter(
+                  Object.entries(route.payload as Record<string, unknown>).filter(
                     ([key]) => key !== '__unique_id__'
                   )
                 )
               )
-            : envelope.data
+            : route.payload
         this.#registry.setInboundQuery(queryKey, {
-          queryId: envelope.taskId,
-          senderId: envelope.senderId,
-          targetId: envelope.targetId,
+          queryId: envelope.id,
+          senderId: route.webRpc.senderId,
+          targetId: route.webRpc.targetId,
           verifiedPeerKey,
           data: queryData,
           platform: this.#kernel.platform,
@@ -1094,8 +1113,9 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
             data: queryData,
             platform: this.#kernel.platform,
             origin: source?.origin,
-            accept: (data) => this.#settleManualInboundQuery(queryKey, true, data),
-            reject: (reason) => this.#settleManualInboundQuery(queryKey, false, undefined, reason)
+            accept: (data: unknown) => this.#settleManualInboundQuery(queryKey, true, data),
+            reject: (reason?: string) =>
+              this.#settleManualInboundQuery(queryKey, false, undefined, reason)
           })
           try {
             void Promise.resolve(listener(handle)).catch((error) =>
@@ -1110,8 +1130,8 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       const replayKey = tupleKey(
         'automatic-query',
         verifiedPeerKey,
-        envelope.senderId,
-        envelope.taskId
+        route.webRpc.senderId,
+        envelope.id
       )
       if (this.#replay.has(replayKey)) {
         this.#emit({ name: 'authentication.rejected', code: 'DISCOVERY_QUERY_REPLAY' })
@@ -1131,46 +1151,49 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
         return
       }
       const receiverId = this.ensureLocalReceiver(this.#identity.id as TTargetId)
-      const response: IWebRpcDiscoveryResponse = {
-        kind: WebRpcMessageKind.discoveryResponse,
-        taskId: envelope.taskId,
-        senderId: this.#identity.id,
-        targetId: envelope.senderId,
-        resolvedTargetId: this.#identity.id,
-        sentAt: this.#ports.time.now(),
+      const response: IWebRpcRoutingData = {
+        webRpc: {
+          profile: WebRpcRoutingProfile,
+          type: WebRpcRoutingType.discoveryResponse,
+          applicationVersion: this.#applicationVersion,
+          senderId: this.#identity.id,
+          targetId: route.webRpc.senderId,
+          resolvedTargetId: this.#identity.id,
+          sentAt: this.#ports.time.now(),
+          platform: this.#kernel.platform,
+          receiverId
+        },
         ...(this.#uniqueTargetId === undefined
           ? {}
-          : { data: { __unique_id__: this.#uniqueTargetId } }),
-        platform: this.#kernel.platform,
-        receiverId
+          : { payload: { __unique_id__: this.#uniqueTargetId } })
       }
-      void this.#sendFrame(response).catch((error: unknown) =>
+      void this.#sendFrame(envelope.id, response).catch((error: unknown) =>
         this.#emit({ name: 'transport.failure', code: WebRpcErrorCode.transport, error })
       )
       return
     }
-    if (envelope.manual && envelope.operation === 'unregister') {
+    const resolvedTargetId = route.webRpc.resolvedTargetId
+    if (typeof resolvedTargetId !== 'string') return
+    if (route.webRpc.manual && route.webRpc.operation === 'unregister') {
       this.#emit({
         name: 'authentication.rejected',
         code: 'UNAUTHORIZED_MANUAL_UNREGISTER'
       })
       return
     }
-    if (envelope.manual) {
-      const waiter = this.#registry.getManualWaiter<IManualDiscoveryWaiter<TTargetId>>(
-        envelope.taskId
-      )
-      if (!waiter || waiter.targetId !== envelope.resolvedTargetId) return
-      if (envelope.accepted !== true || typeof envelope.receiverId !== 'string') return
+    if (route.webRpc.manual) {
+      const waiter = this.#registry.getManualWaiter<IManualDiscoveryWaiter<TTargetId>>(envelope.id)
+      if (!waiter || waiter.targetId !== route.webRpc.resolvedTargetId) return
+      if (route.webRpc.accepted !== true || typeof route.webRpc.receiverId !== 'string') return
       try {
-        this.#validateIdentifier(envelope.receiverId, 'receiverId')
+        this.#validateIdentifier(route.webRpc.receiverId, 'receiverId')
       } catch (error) {
         this.#emit({ name: 'failure', code: WebRpcErrorCode.invalidConfig, error })
         return
       }
       const candidateUniqueId =
-        envelope.data && typeof envelope.data === 'object'
-          ? safeRead<unknown>(envelope.data, '__unique_id__')
+        route.payload && typeof route.payload === 'object'
+          ? safeRead<unknown>(route.payload, '__unique_id__')
           : undefined
       if (candidateUniqueId !== undefined && typeof candidateUniqueId !== 'string') {
         this.#emit({
@@ -1193,13 +1216,17 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       }
       if (
         this.#kernel.platform === 'BroadcastChannel' &&
-        envelope.receiverId !==
+        route.webRpc.receiverId !==
           (candidateUniqueId === undefined
-            ? envelope.resolvedTargetId
-            : `${envelope.resolvedTargetId}:${candidateUniqueId}`)
+            ? route.webRpc.resolvedTargetId
+            : `${route.webRpc.resolvedTargetId}:${candidateUniqueId}`)
       )
         return
-      const candidateKey = tupleKey(verifiedPeerKey, envelope.resolvedTargetId, envelope.receiverId)
+      const candidateKey = tupleKey(
+        verifiedPeerKey,
+        route.webRpc.resolvedTargetId,
+        route.webRpc.receiverId
+      )
       if (waiter.candidateKeys.has(candidateKey)) return
       const peerCandidateCount = waiter.candidatePeerCounts.get(verifiedPeerKey) ?? 0
       if (waiter.candidates.length >= this.limits.maxManualCandidatesPerQuery) {
@@ -1211,10 +1238,10 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
         return
       }
       const candidate = Object.freeze({
-        queryId: envelope.taskId,
-        targetId: envelope.resolvedTargetId as TTargetId,
-        receiverId: envelope.receiverId,
-        data: envelope.data,
+        queryId: envelope.id,
+        targetId: route.webRpc.resolvedTargetId as TTargetId,
+        receiverId: route.webRpc.receiverId,
+        data: route.payload,
         platform: this.#kernel.platform,
         origin: source?.origin
       })
@@ -1233,21 +1260,26 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       )
       return
     }
-    const targetId = this.#registry.getTask(envelope.taskId)
-    if (targetId !== envelope.resolvedTargetId || envelope.targetId !== this.#identity.id) return
-    if (typeof envelope.receiverId !== 'string') {
+    const targetId = this.#registry.getTask(envelope.id)
+    if (
+      targetId === undefined ||
+      targetId !== route.webRpc.resolvedTargetId ||
+      route.webRpc.targetId !== this.#identity.id
+    )
+      return
+    if (typeof route.webRpc.receiverId !== 'string') {
       this.#emit({ name: 'failure', code: WebRpcErrorCode.invalidConfig })
       return
     }
     try {
-      this.#validateIdentifier(envelope.receiverId, 'receiverId')
+      this.#validateIdentifier(route.webRpc.receiverId, 'receiverId')
     } catch (error) {
       this.#emit({ name: 'failure', code: WebRpcErrorCode.invalidConfig, error })
       return
     }
     const uniqueTargetId =
-      envelope.data && typeof envelope.data === 'object'
-        ? safeRead<unknown>(envelope.data, '__unique_id__')
+      route.payload && typeof route.payload === 'object'
+        ? safeRead<unknown>(route.payload, '__unique_id__')
         : undefined
     if (uniqueTargetId !== undefined) {
       if (typeof uniqueTargetId !== 'string') {
@@ -1263,15 +1295,15 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     }
     if (
       this.#kernel.platform === 'BroadcastChannel' &&
-      envelope.receiverId !==
+      route.webRpc.receiverId !==
         (uniqueTargetId === undefined
-          ? envelope.resolvedTargetId
-          : `${envelope.resolvedTargetId}:${uniqueTargetId}`)
+          ? route.webRpc.resolvedTargetId
+          : `${route.webRpc.resolvedTargetId}:${uniqueTargetId}`)
     )
       return
-    const receiverId = envelope.receiverId
-    const responseCount = (this.#registry.getResponseCount(envelope.taskId) ?? 0) + 1
-    this.#registry.setResponseCount(envelope.taskId, responseCount)
+    const receiverId = route.webRpc.receiverId
+    const responseCount = (this.#registry.getResponseCount(envelope.id) ?? 0) + 1
+    this.#registry.setResponseCount(envelope.id, responseCount)
     if (
       responseCount === 2 &&
       this.#kernel.platform === 'BroadcastChannel' &&
@@ -1280,13 +1312,13 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       this.#emit({
         name: 'connect.multiple-receivers',
         code: 'MULTIPLE_RECEIVERS',
-        targetId: envelope.resolvedTargetId,
+        targetId: route.webRpc.resolvedTargetId,
         requesterId: this.#identity.id,
-        receiverIds: Object.freeze([String(envelope.resolvedTargetId)]),
+        receiverIds: Object.freeze([String(route.webRpc.resolvedTargetId)]),
         ambiguous: true,
         responseCount
       })
-    const remoteKey = tupleKey(envelope.resolvedTargetId, receiverId)
+    const remoteKey = tupleKey(resolvedTargetId, receiverId)
     const now = this.#ports.time.now()
     this.#registry.purgeRemote<IWebRpcServerMetadata<TTargetId>>(
       (entry) => entry.status === 'active' && now - entry.lastSeenAt >= this.#receiverStaleAfterMs,
@@ -1294,12 +1326,12 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
     )
     if (
       !this.#registry.hasRemote(remoteKey) &&
-      this.receiverCount(envelope.resolvedTargetId) >= this.#maxReceiversPerTarget
+      this.receiverCount(resolvedTargetId) >= this.#maxReceiversPerTarget
     ) {
       this.#emit({
         name: 'connect.receiver-announcement.failure',
         code: 'RECEIVER_LIMIT',
-        targetId: envelope.resolvedTargetId,
+        targetId: resolvedTargetId,
         receiverId
       })
       return
@@ -1309,7 +1341,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       !this.#registry.setRemoteWithBinding(
         remoteKey,
         {
-          targetId: envelope.resolvedTargetId as TTargetId,
+          targetId: resolvedTargetId as TTargetId,
           receiverId,
           ...(typeof uniqueTargetId === 'string' ? { uniqueTargetId } : {}),
           platform: this.#kernel.platform,
@@ -1318,7 +1350,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
           lastSeenAt: now,
           pinned:
             previousRemote?.pinned ??
-            this.#registry.getPin(envelope.resolvedTargetId as TTargetId) === receiverId,
+            this.#registry.getPin(resolvedTargetId as TTargetId) === receiverId,
           status: 'active'
         },
         verifiedPeerKey
@@ -1327,7 +1359,7 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
       this.#emit({ name: 'connect.receiver-announcement.failure', code: 'DISCOVERY_LIMIT' })
       return
     }
-    this.diagnoseMultipleReceivers(envelope.resolvedTargetId as TTargetId)
+    this.diagnoseMultipleReceivers(resolvedTargetId as TTargetId)
     this.#registry.resolveAutomatic(targetId, (onExpire) =>
       this.#ports.time.setTimeout(onExpire, 1000)
     )
@@ -1384,17 +1416,23 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
               : { value: acceptedData }),
             __unique_id__: this.#uniqueTargetId
           }
-    await this.#sendFrame({
-      kind: WebRpcMessageKind.discoveryResponse,
-      taskId: query.queryId,
-      senderId: this.#identity.id,
-      targetId: query.senderId,
-      resolvedTargetId: this.#identity.id,
-      sentAt: this.#ports.time.now(),
-      manual: true,
-      accepted,
-      ...(accepted ? { data: controlData, platform: this.#kernel.platform, receiverId } : {}),
-      ...(reason === undefined ? {} : { message: reason })
+    await this.#sendFrame(query.queryId, {
+      webRpc: {
+        profile: WebRpcRoutingProfile,
+        type: WebRpcRoutingType.discoveryResponse,
+        applicationVersion: this.#applicationVersion,
+        senderId: this.#identity.id,
+        targetId: query.senderId,
+        resolvedTargetId: this.#identity.id,
+        sentAt: this.#ports.time.now(),
+        manual: true,
+        accepted,
+        ...(accepted
+          ? { platform: this.#kernel.platform, ...(receiverId === undefined ? {} : { receiverId }) }
+          : {}),
+        ...(reason === undefined ? {} : { message: reason })
+      },
+      ...(accepted ? { payload: controlData as IRpcPortableValue } : {})
     })
     return true
   }
@@ -1459,132 +1497,169 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
 
   /** Admits and answers one discovery query through the shared identity owner. */
   async #receiveQuery(message: unknown): Promise<void> {
-    const record = message as { envelope?: IWebRpcDiscoveryQuery; inbound?: IWebRpcInboundMessage }
+    const record = message as {
+      envelope?: IRpcEnvelope
+      route?: IWebRpcRoutingData
+      inbound?: IWebRpcInboundMessage
+      admission?: IInboundIdentityAdmission
+    }
     const envelope = record.envelope
+    const route = record.route
     if (
       !envelope ||
-      envelope.kind !== WebRpcMessageKind.discoveryQuery ||
-      envelope.targetId !== this.#identity.id
+      envelope.kind !== 'discovery' ||
+      typeof envelope.id !== 'string' ||
+      route?.webRpc.type !== WebRpcRoutingType.discoveryQuery ||
+      route.webRpc.targetId !== this.#identity.id
     )
       return
-    const admission = await this.#admitIdentity({
-      senderId: envelope.senderId,
-      targetId: envelope.targetId,
-      data: envelope.data,
-      inbound: record.inbound
-    })
-    if (!admission) return
-    try {
-      if (envelope.manual) {
-        await this.handleInboundDiscovery(envelope, admission.token, record.inbound)
-        return
-      }
-      const replayKey = tupleKey(
-        'discovery-query',
-        admission.token,
-        envelope.senderId,
-        envelope.taskId
-      )
-      if (!this.#replay.admit(replayKey, admission.token)) return
-      const receiverId = this.ensureLocalReceiver(this.#identity.id as TTargetId)
-      await this.#sendFrame({
-        kind: WebRpcMessageKind.discoveryResponse,
-        taskId: envelope.taskId,
+    if (!record.admission) return
+    if (route.webRpc.manual) {
+      await this.handleInboundDiscovery(envelope, route, record.admission.token, record.inbound)
+      return
+    }
+    const replayKey = tupleKey(
+      'discovery-query',
+      record.admission.token,
+      route.webRpc.senderId,
+      envelope.id
+    )
+    if (!this.#replay.admit(replayKey, record.admission.token)) return
+    const receiverId = this.ensureLocalReceiver(this.#identity.id as TTargetId)
+    await this.#sendFrame(envelope.id, {
+      webRpc: {
+        profile: WebRpcRoutingProfile,
+        type: WebRpcRoutingType.discoveryResponse,
+        applicationVersion: this.#applicationVersion,
         senderId: this.#identity.id,
-        targetId: envelope.senderId,
+        targetId: route.webRpc.senderId,
         resolvedTargetId: this.#identity.id,
         sentAt: this.#ports.time.now(),
-        ...(this.#uniqueTargetId === undefined
-          ? {}
-          : { data: { __unique_id__: this.#uniqueTargetId } }),
         platform: this.#kernel.platform,
         receiverId
-      })
-    } finally {
-      admission.release()
-    }
+      },
+      ...(this.#uniqueTargetId === undefined
+        ? {}
+        : { payload: { __unique_id__: this.#uniqueTargetId } })
+    })
   }
 
   /** Admits one response and settles the matching discovery waiter/snapshot. */
   async #receiveResponse(message: unknown): Promise<void> {
     const record = message as {
-      envelope?: IWebRpcDiscoveryResponse
+      envelope?: IRpcEnvelope
+      route?: IWebRpcRoutingData
       inbound?: IWebRpcInboundMessage
+      admission?: IInboundIdentityAdmission
     }
     const envelope = record.envelope
+    const route = record.route
     if (
       !envelope ||
-      envelope.kind !== WebRpcMessageKind.discoveryResponse ||
-      envelope.targetId !== this.#identity.id
+      envelope.kind !== 'discovery' ||
+      typeof envelope.id !== 'string' ||
+      route?.webRpc.type !== WebRpcRoutingType.discoveryResponse ||
+      route.webRpc.targetId !== this.#identity.id ||
+      typeof route.webRpc.resolvedTargetId !== 'string'
     )
       return
-    const admission = await this.#admitIdentity({
-      senderId: envelope.senderId,
-      targetId: envelope.targetId,
-      data: envelope.data,
-      inbound: record.inbound
-    })
-    if (!admission) return
-    try {
-      if (envelope.manual) {
-        await this.handleInboundDiscovery(envelope, admission.token, record.inbound)
-        return
-      }
-      const targetId = this.#registry.getTask(envelope.taskId)
-      if (
-        !targetId ||
-        targetId !== envelope.resolvedTargetId ||
-        typeof envelope.receiverId !== 'string'
-      )
-        return
-      this.#validateIdentifier(envelope.receiverId, 'receiverId')
-      const key = tupleKey(envelope.resolvedTargetId, envelope.receiverId)
-      const now = this.#ports.time.now()
-      this.#registry.purgeRemote<IWebRpcServerMetadata<TTargetId>>(
-        (entry) =>
-          entry.status === 'active' && now - entry.lastSeenAt >= this.#receiverStaleAfterMs,
-        (entry) => entry.pinned || this.#registry.getPin(entry.targetId) === entry.receiverId
-      )
-      if (
-        !this.#registry.hasRemote(key) &&
-        this.receiverCount(envelope.resolvedTargetId) >= this.#maxReceiversPerTarget
-      )
-        return
-      this.#registry.setRemoteWithBinding(
-        key,
-        {
-          targetId: envelope.resolvedTargetId as TTargetId,
-          receiverId: envelope.receiverId,
-          ...(envelope.data &&
-          typeof envelope.data === 'object' &&
-          typeof (envelope.data as { __unique_id__?: unknown }).__unique_id__ === 'string'
-            ? { uniqueTargetId: (envelope.data as { __unique_id__: string }).__unique_id__ }
-            : {}),
-          platform: this.#kernel.platform,
-          origin: record.inbound?.origin,
-          registeredAt: now,
-          lastSeenAt: now,
-          pinned: false,
-          status: 'active'
-        },
-        admission.token
-      )
-      const waiter = this.#registry.getWaiter<{ resolve: () => void }>(targetId)
-      waiter?.resolve()
-      const responseCount = (this.#registry.getResponseCount(envelope.taskId) ?? 0) + 1
-      this.#registry.setResponseCount(envelope.taskId, responseCount)
-      this.diagnoseMultipleReceivers(envelope.resolvedTargetId as TTargetId)
-      this.#registry.resolveAutomatic(targetId, (onExpire) =>
-        this.#ports.time.setTimeout(onExpire, 1000)
-      )
-    } finally {
-      admission.release()
+    if (!record.admission) return
+    if (route.webRpc.manual) {
+      await this.handleInboundDiscovery(envelope, route, record.admission.token, record.inbound)
+      return
     }
+    const targetId = this.#registry.getTask(envelope.id)
+    if (
+      !targetId ||
+      targetId !== route.webRpc.resolvedTargetId ||
+      typeof route.webRpc.receiverId !== 'string'
+    )
+      return
+    this.#validateIdentifier(route.webRpc.receiverId, 'receiverId')
+    const key = tupleKey(route.webRpc.resolvedTargetId, route.webRpc.receiverId)
+    const now = this.#ports.time.now()
+    this.#registry.purgeRemote<IWebRpcServerMetadata<TTargetId>>(
+      (entry) => entry.status === 'active' && now - entry.lastSeenAt >= this.#receiverStaleAfterMs,
+      (entry) => entry.pinned || this.#registry.getPin(entry.targetId) === entry.receiverId
+    )
+    if (
+      !this.#registry.hasRemote(key) &&
+      this.receiverCount(route.webRpc.resolvedTargetId) >= this.#maxReceiversPerTarget
+    )
+      return
+    this.#registry.setRemoteWithBinding(
+      key,
+      {
+        targetId: route.webRpc.resolvedTargetId as TTargetId,
+        receiverId: route.webRpc.receiverId,
+        ...(route.payload &&
+        typeof route.payload === 'object' &&
+        typeof (route.payload as { __unique_id__?: unknown }).__unique_id__ === 'string'
+          ? { uniqueTargetId: (route.payload as { __unique_id__: string }).__unique_id__ }
+          : {}),
+        platform: this.#kernel.platform,
+        origin: record.inbound?.origin,
+        registeredAt: now,
+        lastSeenAt: now,
+        pinned: false,
+        status: 'active'
+      },
+      record.admission.token
+    )
+    const waiter = this.#registry.getWaiter<{ resolve: () => void }>(targetId)
+    waiter?.resolve()
+    const responseCount = (this.#registry.getResponseCount(envelope.id) ?? 0) + 1
+    this.#registry.setResponseCount(envelope.id, responseCount)
+    this.diagnoseMultipleReceivers(route.webRpc.resolvedTargetId as TTargetId)
+    this.#registry.resolveAutomatic(targetId, (onExpire) =>
+      this.#ports.time.setTimeout(onExpire, 1000)
+    )
   }
 
-  /** Sends a discovery frame through the one outbound operation port. */
-  #sendFrame(message: unknown): Promise<void> {
-    return this.#ports.outboundOperations.send({ kind: 'frame', message })
+  /** Dispatches only canonical discovery envelope and route pairs after route validation. */
+  async #receiveDiscovery(message: unknown): Promise<void> {
+    const record = message as {
+      envelope?: IRpcEnvelope
+      route?: IWebRpcRoutingData
+      inbound?: IWebRpcInboundMessage
+      admission?: IInboundIdentityAdmission
+    }
+    const envelope = record.envelope
+    const route = record.route
+    if (envelope?.kind !== 'discovery' || !route) return
+    if (route.webRpc.type === WebRpcRoutingType.discoveryQuery) {
+      await this.#receiveQuery({
+        envelope,
+        route,
+        inbound: record.inbound,
+        admission: record.admission
+      })
+      return
+    }
+    if (route.webRpc.type !== WebRpcRoutingType.discoveryResponse) return
+    /** Response routing requires a concrete target before it can touch discovery state. */
+    const resolvedTargetId = route.webRpc.resolvedTargetId
+    if (typeof resolvedTargetId !== 'string') return
+    await this.#receiveResponse({
+      envelope,
+      route,
+      inbound: record.inbound,
+      admission: record.admission
+    })
+  }
+
+  /** Sends discovery through the canonical semantic envelope and WebRPC route profile. */
+  #sendFrame(id: string, route: IWebRpcRoutingData): Promise<void> {
+    return this.#ports.outboundOperations.send({
+      kind: 'frame',
+      message: normalizeRpcEnvelope({
+        kind: 'discovery',
+        id,
+        version: this.#applicationVersion,
+        acceptVersions: this.#acceptVersions,
+        data: route
+      })
+    })
   }
 
   /** Rejects work after composition disposal through the canonical kernel state. */
@@ -1623,23 +1698,6 @@ export class WebRpcDiscoveryAttachment<TTargetId extends string = string> {
   /** Emits one discovery diagnostic through the canonical outbound hook owner. */
   #emit(event: Omit<IWebRpcHookEvent, 'at' | 'localId'>): void {
     this.#ports.outboundOperations.send({ kind: 'diagnostic', event })
-  }
-
-  /** Admits one inbound identity through the canonical outbound identity owner. */
-  async #admitIdentity(
-    request: IInboundIdentityRequest
-  ): Promise<IInboundIdentityAdmission | undefined> {
-    const admission = await this.#ports.inboundIdentity.verify({ operation: 'admit', request })
-    if (
-      typeof admission === 'object' &&
-      admission !== null &&
-      'token' in admission &&
-      typeof admission.token === 'string' &&
-      'release' in admission &&
-      typeof admission.release === 'function'
-    )
-      return admission as IInboundIdentityAdmission
-    return undefined
   }
 
   /** Retains one identity lease without creating a discovery-owned identity registry. */

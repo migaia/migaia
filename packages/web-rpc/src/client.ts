@@ -1,11 +1,41 @@
 import { createComposedEndpoint } from './core.js'
 import { outbound } from './features/outbound.js'
-import type { IWebRpcCoreConfig, IWebRpcKernelSurface } from './core.js'
+import type { IWebRpcKernelSurface } from './core.js'
 import type { IOutboundSurface } from './features/outbound.js'
+import type { IWebRpcFeature, IWebRpcFeatureSurface } from './feature.js'
+import type { IWebRpcFactoryConfig, IWebRpcPlugin } from './typing.js'
 
 /** Creates client preset using the statically selected outbound feature. */
-export function createClientEndpoint(
-  config: IWebRpcCoreConfig
-): Promise<IWebRpcKernelSurface & IOutboundSurface> {
-  return createComposedEndpoint(config, [outbound()])
+function createClientEndpointRuntime<
+  TTargetId extends string = string,
+  TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[],
+  TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[]
+>(
+  config: IWebRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures> & {
+    readonly features?: import('./feature.js').IWebRpcFiniteFeatureTuple<TFeatures>
+  }
+): Promise<IWebRpcKernelSurface & IOutboundSurface & IWebRpcFeatureSurface<TFeatures>> {
+  return createComposedEndpoint(
+    config as unknown as IWebRpcFactoryConfig<string, readonly IWebRpcPlugin[], readonly []>,
+    [outbound()] as const
+  ) as Promise<IWebRpcKernelSurface & IOutboundSurface & IWebRpcFeatureSurface<TFeatures>>
 }
+
+import type { IChecked, ICheckedInput, IFeatures, ILegacyDefault } from './pipeline-contract.js'
+
+/** Public client callable prevents unchecked component configurations from reaching the runtime. */
+type IPublicCallable = {
+  <const TConfig extends ICheckedInput>(
+    config: TConfig & IChecked<TConfig>
+  ): Promise<IWebRpcKernelSurface & IOutboundSurface & IWebRpcFeatureSurface<IFeatures<TConfig>>>
+  <
+    TTargetId extends string = string,
+    TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[],
+    TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[]
+  >(
+    config: ILegacyDefault<TTargetId, TMiddlewares, TFeatures>
+  ): Promise<IWebRpcKernelSurface & IOutboundSurface & IWebRpcFeatureSurface<TFeatures>>
+}
+
+/** Checked public boundary delegates to the existing client runtime. */
+export const createClientEndpoint = createClientEndpointRuntime as unknown as IPublicCallable

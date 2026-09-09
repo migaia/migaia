@@ -1,23 +1,32 @@
 import { WebRpcConfigurationError, WebRpcError, WebRpcErrorCode } from '../errors.js'
-import { WebRpcMessageKind, WebRpcVariation } from '../protocol-constants.js'
+import { WebRpcMessageKind, WebRpcVariation } from '../semantic-constants.js'
 import { WebRpcErrorText } from '../error-text.js'
 import type { IWebRpcEventListener, IWebRpcProvider } from '../typing.js'
-import type { IWebRpcRequest } from '../wire.js'
+import {
+  normalizeRpcEnvelope,
+  type IRpcEnvelope,
+  type IRpcSerializedError
+} from '@migaia/rpc-contract'
+import { WebRpcRoutingProfile, type IWebRpcRoutingData } from './routing-data.js'
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
+import type { IInboundIdentityAdmission } from './inbound-identity.js'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
 import type {
-  IWebRpcIdentityCommand,
   IWebRpcInboundIdentityPort,
   IWebRpcOutboundOperationsPort,
   IWebRpcVariationCoordinatorPort
 } from './plugin-shared-keys.js'
 import { ProviderAdmissionRegistry } from './provider-admission.js'
+import { assertContractMethod } from './contract.js'
 import { ProviderExecutor } from './provider-executor.js'
 import { ProviderRegistry } from './provider.js'
 import { RequestReplayLedger } from './request-replay-ledger.js'
 import { tupleKey } from './safe-value.js'
-import { recordProviderRegistration, type IWebRpcEndpointDebugSnapshot } from './test-observer.js'
-import type { IWebRpcInboundMessage } from '../transport.js'
+import {
+  readSelectedFramerChunks,
+  recordProviderRegistration,
+  type IWebRpcEndpointDebugSnapshot
+} from './test-observer.js'
 
 /** Inbound transport metadata retained only for identity admission. */
 type IProviderInbound = {
@@ -47,8 +56,6 @@ export class WebRpcProviderAttachment {
   readonly #executor: ProviderExecutor<string>
   /** Narrow outbound facts and operations owned by the outbound feature. */
   readonly #outbound: IWebRpcOutboundOperationsPort
-  /** Verified inbound identity and lease owner. */
-  readonly #identity: IWebRpcInboundIdentityPort
   /** Verified variation and cancellation owner. */
   readonly #variations: IWebRpcVariationCoordinatorPort
   /** Kernel lifecycle operations remain owned by the composed endpoint. */
@@ -59,6 +66,8 @@ export class WebRpcProviderAttachment {
   readonly #targetIds: readonly string[]
   /** Receiver identity snapshot used by provider request admission. */
   readonly #receiverId: string
+  /** Read-only selected-framer observation; provider never owns reassembly state. */
+  readonly #chunks: number | undefined
   /** Release callback for the provider-owned abort variation handler. */
   readonly #releaseAbortHandler: () => void
   /** True only when the `abort()` capability middleware selected this endpoint into cancellation. */
@@ -73,8 +82,8 @@ export class WebRpcProviderAttachment {
     prepared: IPreparedEndpoint<string>
   ) {
     this.#kernel = kernel
+    this.#chunks = readSelectedFramerChunks(prepared.options.components!)
     this.#outbound = ports.outboundOperations
-    this.#identity = ports.inboundIdentity
     this.#variations = ports.variationCoordinator
     this.#id = prepared.id
     this.#targetIds = Object.freeze([...(prepared.options.targetIds ?? [])])
@@ -100,19 +109,29 @@ export class WebRpcProviderAttachment {
         this.#outbound.send({ kind: 'dispatch', targetId, method, data })
       },
       send: (response, transfer) =>
-        this.#outbound.send({ kind: 'response', message: response, transfer }),
+        this.#outbound.send({
+          kind: 'response',
+          message: toCanonicalResponse(response),
+          transfer
+        }),
       validate: (method, side, data) =>
         this.#outbound.send({ kind: 'validate', method, side, data }),
       emitFailure: (error, code) => {
         this.#outbound.send({ kind: 'report', error, code })
       },
       isReplay: (request, peerKey) =>
-        this.#replay.has(tupleKey(peerKey, request.senderId, request.taskId)),
+        this.#replay.has(tupleKey(peerKey, request.route.webRpc.senderId, request.envelope.id)),
       admitReplay: (request, peerKey) =>
-        this.#replay.admit(tupleKey(peerKey, request.senderId, request.taskId), peerKey),
+        this.#replay.admit(
+          tupleKey(peerKey, request.route.webRpc.senderId, request.envelope.id),
+          peerKey
+        ),
       consumePendingAbort: (key) =>
-        this.#variations.admit({ operation: 'consumeAbort', key }) as boolean,
-      responseReceiverId: (request) => request.senderId
+        this.#variations.admit({ operation: 'consumeAbort', key }) as {
+          readonly found: boolean
+          readonly reason: unknown
+        },
+      responseReceiverId: (request) => request.route.webRpc.senderId
     })
     kernel.registerOwner('provider-registry', this.#registry)
     kernel.registerOwner('request-replay', this.#replay)
@@ -149,7 +168,7 @@ export class WebRpcProviderAttachment {
   /** Registers an inbound dispatch listener in the same provider registry as request handlers. */
   on(event: string, listener: IWebRpcEventListener): () => void {
     this.#kernel.assertActive()
-    assertProviderEvent(event)
+    assertContractMethod(event)
     if (typeof listener !== 'function')
       throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.eventListenerInvalid)
     return this.#registry.listen(event, listener)
@@ -183,7 +202,7 @@ export class WebRpcProviderAttachment {
       phase: this.#kernel.state === 'disposed' ? 'disposed' : 'active',
       pending: 0,
       pingPending: 0,
-      chunks: 0,
+      chunks: this.#chunks,
       hooks: 0,
       resources: this.#kernel.resources.size,
       owners: this.#kernel.ownerKeys,
@@ -232,47 +251,93 @@ export class WebRpcProviderAttachment {
    */
   #receiveAbort(message: unknown, peerKey: string): void {
     if (!this.#abortEnabled) return
-    const envelope = (message as { envelope?: { senderId?: string; taskId?: string } }).envelope
-    if (!envelope?.senderId || !envelope.taskId) return
-    const key = tupleKey(peerKey, envelope.senderId, envelope.taskId)
+    const record = message as { envelope?: IRpcEnvelope; route?: IWebRpcRoutingData }
+    const envelope = record.envelope
+    const route = record.route
+    if (envelope?.kind !== 'variation' || route?.webRpc.type !== 'variation') return
+    const key = tupleKey(peerKey, route.webRpc.senderId, envelope.id)
     this.#variations.admit({
       operation: 'abort',
       key,
       controller: this.#controllers.get(key),
-      expiresAt: this.#kernel.time.now() + 310_000
+      expiresAt: this.#kernel.time.now() + 310_000,
+      reason: route.payload
     })
   }
 
   /** Verifies source identity, rejects replay, and executes one provider request. */
   async #receiveRequest(message: unknown): Promise<void> {
-    const record = message as { envelope?: IWebRpcRequest; inbound?: IProviderInbound }
+    const record = message as {
+      envelope?: IRpcEnvelope
+      route?: IWebRpcRoutingData
+      inbound?: IProviderInbound
+      admission?: IInboundIdentityAdmission
+    }
     const request = record.envelope
-    const inbound = record.inbound
+    const route = record.route
     if (
       !request ||
-      request.kind !== WebRpcMessageKind.request ||
-      request.targetId !== this.#id ||
-      request.receiverId !== this.#receiverId
+      request.kind !== 'request' ||
+      route?.webRpc.type !== 'request' ||
+      route.webRpc.targetId !== this.#id ||
+      route.webRpc.receiverId !== this.#receiverId
     )
       return
     if (this.#kernel.state !== 'active') return
-    const admission = await this.#identity.verify({
-      operation: 'admit',
-      request: {
-        senderId: request.senderId,
-        targetId: request.targetId,
-        data: request.data,
-        inbound: inbound as IWebRpcInboundMessage
-      }
-    } as IWebRpcIdentityCommand)
-    if (!admission || typeof admission !== 'object' || typeof admission.release !== 'function')
-      return
-    try {
-      await this.#executor.execute(request, admission.token)
-    } finally {
-      admission.release()
-    }
+    if (!record.admission) return
+    await this.#executor.execute({ envelope: request, route }, record.admission.token)
   }
+}
+
+/** Maps the provider executor's private result record into the sole RPC envelope authority. */
+function toCanonicalResponse(response: unknown): IRpcEnvelope {
+  const current = response as {
+    readonly version: string
+    readonly taskId: string
+    readonly senderId: string
+    readonly targetId: string
+    readonly receiverId?: string
+    readonly method: string
+    readonly ok: boolean
+    readonly data?: unknown
+    readonly message?: string
+    readonly code?: string
+    readonly serializedError?: IRpcSerializedError
+    readonly sentAt: number
+  }
+  const route = {
+    profile: WebRpcRoutingProfile,
+    type: 'response' as const,
+    applicationVersion: current.version,
+    senderId: current.senderId,
+    targetId: current.targetId,
+    ...(current.receiverId === undefined ? {} : { receiverId: current.receiverId }),
+    sentAt: current.sentAt,
+    method: current.method,
+    ...(current.message === undefined ? {} : { message: current.message })
+  }
+  if (current.ok)
+    return normalizeRpcEnvelope({
+      kind: 'response',
+      ok: true,
+      id: current.taskId,
+      data: {
+        webRpc: route,
+        ...(current.data === undefined ? {} : { payload: current.data })
+      } as never
+    })
+  return normalizeRpcEnvelope({
+    kind: 'response',
+    ok: false,
+    id: current.taskId,
+    code: current.code ?? WebRpcErrorCode.internal,
+    message: current.message ?? WebRpcErrorText.remoteRequestFailed,
+    data: {
+      webRpc: route,
+      ...(current.data === undefined ? {} : { payload: current.data })
+    } as never,
+    ...(current.serializedError === undefined ? {} : { error: current.serializedError })
+  })
 }
 
 /** Snapshots provider entries once and preserves the original getter failure as the cause. */
@@ -284,10 +349,4 @@ function snapshotProviderEntries(
   } catch (error) {
     throw new WebRpcConfigurationError(WebRpcErrorText.providerDescriptorInvalid, error)
   }
-}
-/** Validates provider-owned event names without retaining the broad wire module. */
-function assertProviderEvent(event: string): string {
-  if (typeof event !== 'string' || event.length === 0)
-    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.methodInvalid)
-  return event
 }

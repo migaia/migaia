@@ -1,0 +1,54 @@
+{
+  "schema": "migaia.rpc",
+  "version": 1,
+  "cases": [
+    {
+      "id": "null",
+      "value": null
+    },
+    {
+      "id": "boolean",
+      "value": true
+    },
+    {
+      "id": "number",
+      "value": -1.5
+    },
+    {
+      "id": "string",
+      "value": "text"
+    },
+    {
+      "id": "bytes",
+      "value": {
+        "$rpc": "bytes",
+        "base64url": "AAE"
+      }
+    },
+    {
+      "id": "array",
+      "value": [
+        "nested",
+        0
+      ]
+    },
+    {
+      "id": "record",
+      "value": {
+        "key": "value"
+      }
+    }
+  ],
+  "invalid": [
+    "Date",
+    "Map",
+    "Set",
+    "cycle",
+    "function",
+    "symbol",
+    "bigint",
+    "nonfinite",
+    "malformed-bytes",
+    "reserved-key-collision"
+  ]
+}

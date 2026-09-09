@@ -18,6 +18,7 @@ import type { IWebRpcEndpoint } from '../typing.js'
 import { outbound } from './outbound.js'
 import {
   readDiscoveryCleanupFaults,
+  readSelectedFramerChunks,
   registerEndpointDebugSnapshot,
   type IWebRpcEndpointDebugSnapshot
 } from '../internal/test-observer.js'
@@ -77,7 +78,7 @@ const discoveryModule = defineEndpointModule<
           pending: 0,
           pingPending: 0,
           activeControllers: 0,
-          chunks: 0,
+          chunks: readSelectedFramerChunks(prepared.options.components!),
           providers: 0,
           events: 0,
           hooks: 0,
@@ -91,7 +92,7 @@ const discoveryModule = defineEndpointModule<
   [outbound()],
   [],
   {
-    routes: ['discovery-query', 'discovery-response'],
+    routes: ['discovery'],
     consumes: ['inbound-identity'],
     publicKeys: ['connect', 'discovery'],
     sharedProvides: [WebRpcSharedKey.discoveryResolver],

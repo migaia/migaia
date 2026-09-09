@@ -14,7 +14,7 @@ import {
   reportListenerFailure
 } from '../internal/listener-safety.js'
 import { createMessageListenerHub } from '../internal/message-listener-hub.js'
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js'
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../transport-constants.js'
 
 /**
  * Structural shape of Node's `worker_threads.MessagePort` (and close enough to `EventEmitter`

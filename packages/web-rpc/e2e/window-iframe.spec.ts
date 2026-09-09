@@ -58,7 +58,7 @@ test('Window iframe proves source/origin and rejects sibling spoof', async ({ pa
     pending: 0,
     pingPending: 0,
     activeControllers: 0,
-    chunks: 0
+    chunks: undefined
   })
   expect(result.errors).toEqual([])
   expect(result.listenerAdds).toBe(1)
@@ -68,7 +68,7 @@ test('Window iframe proves source/origin and rejects sibling spoof', async ({ pa
     pending: 0,
     pingPending: 0,
     activeControllers: 0,
-    chunks: 0,
+    chunks: undefined,
     providers: 0,
     events: 0,
     hooks: 0,

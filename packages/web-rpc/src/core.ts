@@ -50,9 +50,13 @@ import type {
   IWebRpcAbortSignal,
   IWebRpcHookEvent
 } from './typing.js'
+import type { IWebRpcFeature, IWebRpcFeatureSurface } from './feature.js'
 
 /** Runtime-neutral configuration accepted by the composition kernel. */
-export type IWebRpcCoreConfig = IWebRpcFactoryConfig
+export type IWebRpcCoreConfig = Omit<IWebRpcFactoryConfig, 'features'> & {
+  /** Internal normalized view omits optional custom features from legacy fixtures. */
+  readonly features?: undefined
+}
 
 /** Opaque first-party token used to select statically imported feature modules. */
 declare const endpointModuleBrand: unique symbol
@@ -69,23 +73,50 @@ export type IWebRpcEndpointModule<
 }
 
 /** Composes selected first-party modules while preserving existing endpoint ownership. */
-export async function createComposedEndpoint<
+async function createComposedEndpointRuntime<
   const TModules extends readonly IWebRpcEndpointModule[],
   TTargetId extends string = string,
-  TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[]
+  TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[],
+  TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[]
 >(
-  config: IWebRpcFactoryConfig<TTargetId, TMiddlewares>,
+  config: IWebRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures> & {
+    readonly features?: import('./feature.js').IWebRpcFiniteFeatureTuple<TFeatures>
+  },
   modules: TModules
 ): Promise<
   IWebRpcKernelSurface &
     IWebRpcComposedModuleSurface<TModules> &
+    IWebRpcFeatureSurface<TFeatures> &
     IWebRpcPingEndpointSurface<IFactoryPingCapability<TMiddlewares>>
 > {
+  let selectedModules: readonly IWebRpcEndpointModule[] = []
   let definitions: ReturnType<typeof snapshotEndpointModules<IWebRpcCoreConfig>>
   try {
-    definitions = snapshotEndpointModules<IWebRpcCoreConfig>(modules)
+    const featureTokens = snapshotFeatureTuple(config.features)
+    selectedModules = [...modules, ...featureTokens]
+    definitions = snapshotEndpointModules<IWebRpcCoreConfig>(selectedModules)
     if (definitions.length === 0)
       throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleInvalid)
+    const reservedKeys = new Set([
+      'on',
+      'hooks',
+      'dispose',
+      'use',
+      'unUse',
+      'config',
+      'getShared',
+      'usePipeline',
+      '__proto__'
+    ])
+    if (
+      definitions.some((definition) =>
+        definition.claims.publicKeys.some((key) => reservedKeys.has(key))
+      )
+    )
+      throw new WebRpcError(
+        WebRpcErrorCode.capabilityConflict,
+        WebRpcErrorText.endpointModuleDuplicated
+      )
   } catch (error) {
     if (error === endpointModuleDuplicate)
       throw new WebRpcError(
@@ -112,7 +143,7 @@ export async function createComposedEndpoint<
   let rootCleanupErrors: IWebRpcCleanupError[] = []
   let publicKeys: readonly string[] = []
   try {
-    kernel = createEndpointKernel(deferred.transport)
+    kernel = createEndpointKernel(deferred.transport, deferred.transportSnapshot)
     const constructionConfig = deferred.construction
     const constructionSignal =
       constructionConfig?.signal ?? (new AbortController().signal as IWebRpcAbortSignal)
@@ -144,7 +175,7 @@ export async function createComposedEndpoint<
       | undefined
     const inventory = buildComposedPluginInventory({
       definitions,
-      config,
+      config: config as unknown as IWebRpcCoreConfig,
       kernel,
       deferred: deferred as unknown as IDeferredPreparedEndpoint<string>,
       middlewareSnapshots: deferred.middlewareSnapshots,
@@ -262,7 +293,7 @@ export async function createComposedEndpoint<
   }
   /** Project only selected root tokens; dependencies install privately and never widen the root. */
   const exposedKeys = [
-    ...new Set<string>(modules.flatMap((module) => getEndpointModuleRootProjection(module)))
+    ...new Set<string>(selectedModules.flatMap((module) => getEndpointModuleRootProjection(module)))
   ]
   const snapshotReader = installed
     .toReversed()
@@ -314,7 +345,64 @@ export async function createComposedEndpoint<
   if (snapshotReader) registerEndpointDebugSnapshot(publicSurface, snapshotReader)
   return publicSurface as IWebRpcKernelSurface &
     IWebRpcComposedModuleSurface<TModules> &
+    IWebRpcFeatureSurface<TFeatures> &
     IWebRpcPingEndpointSurface<IFactoryPingCapability<TMiddlewares>>
+}
+
+import type {
+  IChecked,
+  ICheckedInput,
+  IFeatures,
+  ILegacyDefault,
+  IMiddlewares
+} from './pipeline-contract.js'
+
+/** Public composed callable retains module-derived surface while enforcing pipeline edges. */
+type IPublicCallable = {
+  <const TModules extends readonly IWebRpcEndpointModule[], const TConfig extends ICheckedInput>(
+    config: TConfig & IChecked<TConfig>,
+    modules: TModules
+  ): Promise<
+    IWebRpcKernelSurface &
+      IWebRpcComposedModuleSurface<TModules> &
+      IWebRpcFeatureSurface<IFeatures<TConfig>> &
+      IWebRpcPingEndpointSurface<IFactoryPingCapability<IMiddlewares<TConfig>>>
+  >
+  <
+    const TModules extends readonly IWebRpcEndpointModule[],
+    TTargetId extends string = string,
+    TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[],
+    TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[]
+  >(
+    config: ILegacyDefault<TTargetId, TMiddlewares, TFeatures>,
+    modules: TModules
+  ): Promise<
+    IWebRpcKernelSurface &
+      IWebRpcComposedModuleSurface<TModules> &
+      IWebRpcFeatureSurface<TFeatures> &
+      IWebRpcPingEndpointSurface<IFactoryPingCapability<TMiddlewares>>
+  >
+}
+
+/** Checked public boundary reuses the original composition runtime and prepare path. */
+export const createComposedEndpoint = createComposedEndpointRuntime as unknown as IPublicCallable
+
+/** Snapshots the optional feature tuple before endpoint preparation can cause side effects. */
+function snapshotFeatureTuple(
+  features: readonly IWebRpcFeature[] | undefined
+): readonly IWebRpcFeature[] {
+  if (features === undefined) return []
+  if (!Array.isArray(features))
+    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.endpointModuleInvalid)
+  try {
+    return Object.freeze([...features])
+  } catch (error) {
+    throw new WebRpcError(
+      WebRpcErrorCode.invalidConfig,
+      WebRpcErrorText.endpointModuleInvalid,
+      error
+    )
+  }
 }
 
 /** Public methods contributed by selected module tuple; unselected features are absent from types. */

@@ -105,7 +105,7 @@ describe('WRC-C-B11 retained provenance', () => {
       )
     ).root
     const { default: authority } = await import(
-      '../fixtures/tree-shaking/baseline-authority.json',
+      '../fixtures/tree-shaking/current-delivery-authority.json',
       { with: { type: 'json' } }
     )
     expect(report.approval.status).toBe('approved')

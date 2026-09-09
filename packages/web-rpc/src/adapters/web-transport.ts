@@ -2,7 +2,7 @@ import { WebRpcErrorCode, WebRpcTransportError, tagWebRpcError } from '../errors
 import { WebRpcErrorText } from '../error-text.js'
 import type { IWebRpcTransport } from '../transport.js'
 import { isUint8Array } from '../internal/safe-value.js'
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js'
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../transport-constants.js'
 import {
   collectListenerFailure,
   createListenerFailureState,

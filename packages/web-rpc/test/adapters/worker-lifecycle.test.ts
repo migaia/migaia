@@ -218,7 +218,7 @@ describe('service-worker adapter lifecycle', () => {
     const source = { id: 'client-1' }
     inbound?.({ data: 'inbound', origin: 'origin', source } as unknown as MessageEvent)
     expect(target.postMessage).toHaveBeenCalledWith('outbound', [transfer])
-    expect(received).toEqual([{ data: 'inbound', origin: 'origin', source }])
+    expect(received).toEqual([{ data: 'inbound', origin: 'origin', source: target }])
     expect(listenerFailures).toHaveLength(1)
     stopFirst()
     expect(receiver.removeEventListener).not.toHaveBeenCalled()

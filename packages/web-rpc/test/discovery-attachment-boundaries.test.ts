@@ -2,9 +2,19 @@ import { describe, expect, it, vi } from 'vitest'
 import { createMemoryTransportPair } from '../src/adapters/memory.js'
 import { createEndpointKernel } from '../src/endpoint-kernel.js'
 import { WebRpcError, WebRpcLifecycleError } from '../src/errors.js'
-import { WebRpcMessageKind, WebRpcPlatform } from '../src/protocol-constants.js'
+import { WebRpcMessageKind } from '../src/semantic-constants.js'
+import { WebRpcPlatform } from '../src/transport-constants.js'
 import { WebRpcDiscoveryAttachment } from '../src/internal/discovery-attachment.js'
+import { prepareEndpoint } from '../src/internal/endpoint-bootstrap.js'
+import { WebRpcSharedKey } from '../src/internal/plugin-shared-keys.js'
+import { WebRpcRoutingProfile, WebRpcRoutingType } from '../src/internal/routing-data.js'
+import type { IWebRpcRoutingData } from '../src/internal/routing-data.js'
+import type { IRpcEnvelope, IRpcPortableValue } from '@migaia/rpc-contract'
 import { WebRpcOutboundAttachment } from '../src/internal/outbound-attachment.js'
+import {
+  readInboundIdentityReleaseObservation,
+  registerInboundIdentityReleaseObservation
+} from '../src/internal/test-observer.js'
 import type {
   IWebRpcDiscoveryCandidate,
   IWebRpcInboundDiscoveryQuery,
@@ -38,43 +48,73 @@ type IReceiverSelector = (
   servers: readonly IWebRpcServerMetadata<string>[]
 ) => string | undefined | Promise<string | undefined>
 
+/**
+ * Builds raw canonical discovery test input without normalizing intentionally malformed fixture
+ * fields.
+ */
+function discoveryInput(
+  fixture: Record<string, unknown>
+): readonly [IRpcEnvelope, IWebRpcRoutingData] {
+  const { kind, taskId, data, ...metadata } = fixture
+  return [
+    {
+      kind: 'discovery',
+      id: taskId as string,
+      version: '1.0.0',
+      acceptVersions: ['1.0.0']
+    },
+    {
+      webRpc: {
+        profile: WebRpcRoutingProfile,
+        applicationVersion: '1.0.0',
+        ...metadata,
+        type: kind as IWebRpcRoutingData['webRpc']['type']
+      } as IWebRpcRoutingData['webRpc'],
+      ...(data === undefined ? {} : { payload: data as IRpcPortableValue })
+    }
+  ]
+}
+
 /** Creates a direct attachment harness with real kernel and outbound identity owners. */
-function createDiscoveryHarness(
+async function createDiscoveryHarness(
   mode: 'automatic' | 'manual' = 'manual',
   uniqueTargetId?: string,
   receiverSelector?: IReceiverSelector,
   platform?: typeof WebRpcPlatform.broadcastChannel,
   topology?: 'exclusive' | 'multiplexed' | 'broadcast',
   verifyPeer?: (senderId: string, targetId: string) => boolean | Promise<boolean>
-): IDiscoveryHarness {
+): Promise<IDiscoveryHarness> {
   const [transport, peerTransport] = createMemoryTransportPair()
   if (platform !== undefined)
     Object.defineProperty(transport, 'platform', { configurable: true, value: platform })
   if (topology !== undefined)
     Object.defineProperty(transport, 'topology', { configurable: true, value: topology })
   const kernel = createEndpointKernel(transport)
-  const prepared = {
-    id: `coverage-direct-${mode}`,
-    transport,
-    options: {
-      connect: {
-        discoveryMode: mode,
-        ...(uniqueTargetId ? { uniqueTargetId } : {}),
-        ...(receiverSelector ? { receiverSelector } : {}),
-        ...(verifyPeer
-          ? {
-              verify: ({
-                senderId,
-                targetId
-              }: {
-                readonly senderId: string
-                readonly targetId: string
-              }) => verifyPeer(senderId, targetId)
-            }
-          : {})
-      }
-    }
-  } as never
+  const connectPort = {
+    discoveryMode: mode,
+    ...(uniqueTargetId ? { uniqueTargetId } : {}),
+    ...(receiverSelector ? { receiverSelector } : {}),
+    ...(verifyPeer
+      ? {
+          verify: ({
+            senderId,
+            targetId
+          }: {
+            readonly senderId: string
+            readonly targetId: string
+          }) => verifyPeer(senderId, targetId)
+        }
+      : {})
+  }
+  const deferred = await prepareEndpoint(
+    { id: `coverage-direct-${mode}`, transport, middlewares: [] },
+    { deferMiddlewareInstall: true }
+  )
+  const prepared = await deferred.finalize(
+    [],
+    async (operation) => await operation(),
+    (key) => (key === WebRpcSharedKey.connect ? connectPort : undefined)
+  )
   const outbound = new WebRpcOutboundAttachment(kernel, prepared)
   const commands: IWebRpcOutboundCommand[] = []
   const identityTrace: IIdentityTrace = {
@@ -101,6 +141,7 @@ function createDiscoveryHarness(
             identityTrace.acceptedAdmits += 1
             return {
               token: admission.token,
+              bindingKey: admission.bindingKey,
               release: () => {
                 identityTrace.releases += 1
                 admission.release()
@@ -155,18 +196,6 @@ async function flushTransport(): Promise<void> {
   await Promise.resolve()
 }
 
-/** Returns the routed identity trace with accepted leases reduced to a net balance. */
-function identitySnapshot(harness: IDiscoveryHarness) {
-  const { acceptedAdmits, rejectedAdmits, retains, releases } = harness.identityTrace
-  return {
-    acceptedAdmits,
-    rejectedAdmits,
-    retains,
-    releases,
-    balance: acceptedAdmits + retains - releases
-  }
-}
-
 /** Returns the task ID from the most recent discovery frame sent by a harness. */
 function latestTaskId(commands: readonly IWebRpcOutboundCommand[]): string {
   const frame = [...commands]
@@ -177,25 +206,33 @@ function latestTaskId(commands: readonly IWebRpcOutboundCommand[]): string {
       ): command is Extract<IWebRpcOutboundCommand, { readonly kind: 'response' | 'frame' }> =>
         command.kind === 'frame' || command.kind === 'response'
     )
-  const taskId = (frame?.message as { readonly taskId?: unknown } | undefined)?.taskId
+  const taskId = (frame?.message as { readonly id?: unknown } | undefined)?.id
   if (typeof taskId !== 'string') throw new Error('coverage harness did not capture a task ID')
   return taskId
 }
 
 /** Returns one discovery task ID for a target from the direct outbound command trace. */
 function taskIdForTarget(commands: readonly IWebRpcOutboundCommand[], targetId: string): string {
-  const frame = [...commands]
-    .reverse()
-    .find(
+  const frame = [...commands].reverse().find(
+    (
+      command
+    ): command is Extract<IWebRpcOutboundCommand, { readonly kind: 'response' | 'frame' }> =>
+      command.kind === 'frame' &&
+      (command.message as { readonly kind?: unknown }).kind === 'discovery' &&
       (
-        command
-      ): command is Extract<IWebRpcOutboundCommand, { readonly kind: 'response' | 'frame' }> =>
-        command.kind === 'frame' &&
-        (command.message as { readonly kind?: unknown }).kind ===
-          WebRpcMessageKind.discoveryQuery &&
-        (command.message as { readonly targetId?: unknown }).targetId === targetId
-    )
-  const taskId = (frame?.message as { readonly taskId?: unknown } | undefined)?.taskId
+        command.message as {
+          readonly data?: {
+            readonly webRpc?: { readonly type?: unknown; readonly targetId?: unknown }
+          }
+        }
+      ).data?.webRpc?.type === 'discovery-query' &&
+      (
+        command.message as {
+          readonly data?: { readonly webRpc?: { readonly targetId?: unknown } }
+        }
+      ).data?.webRpc?.targetId === targetId
+  )
+  const taskId = (frame?.message as { readonly id?: unknown } | undefined)?.id
   if (typeof taskId !== 'string')
     throw new Error(`coverage harness did not capture task ID for ${targetId}`)
   return taskId
@@ -263,7 +300,7 @@ function forgedCandidate(): IWebRpcDiscoveryCandidate<string> {
 
 describe('discovery attachment boundary semantics', () => {
   it('covers direct automatic query response, receiver binding, selector fallback, and local ownership', async () => {
-    const harness = createDiscoveryHarness('automatic', 'unique-direct')
+    const harness = await createDiscoveryHarness('automatic', 'unique-direct')
     const targetId = 'direct-remote'
     try {
       const pending = harness.attachment.query(targetId)
@@ -277,14 +314,23 @@ describe('discovery attachment boundary semantics', () => {
       })
       await harness.attachment.handleInboundDiscovery(
         {
-          kind: WebRpcMessageKind.discoveryResponse,
-          taskId,
-          senderId: 'direct-peer',
-          targetId: 'coverage-direct-automatic',
-          resolvedTargetId: targetId,
-          receiverId: 'direct-receiver',
-          data: { __unique_id__: 'unique-direct' },
-          sentAt: Date.now()
+          kind: 'discovery',
+          id: taskId,
+          version: '1.0.0',
+          acceptVersions: ['1.0.0']
+        },
+        {
+          webRpc: {
+            profile: WebRpcRoutingProfile,
+            type: WebRpcRoutingType.discoveryResponse,
+            applicationVersion: '1.0.0',
+            senderId: 'direct-peer',
+            targetId: 'coverage-direct-automatic',
+            resolvedTargetId: targetId,
+            receiverId: 'direct-receiver',
+            sentAt: Date.now()
+          },
+          payload: { __unique_id__: 'unique-direct' }
         },
         verifiedPeerKey
       )
@@ -346,7 +392,7 @@ describe('discovery attachment boundary semantics', () => {
       () => new Promise<string | undefined>(() => undefined)
     ]
     for (const [index, selector] of selectors.entries()) {
-      const harness = createDiscoveryHarness('automatic', undefined, selector)
+      const harness = await createDiscoveryHarness('automatic', undefined, selector)
       const targetId = `selector-target-${index}`
       try {
         const pending = harness.attachment.query(targetId)
@@ -356,7 +402,7 @@ describe('discovery attachment boundary semantics', () => {
           'coverage-direct-automatic'
         )
         await harness.attachment.handleInboundDiscovery(
-          {
+          ...discoveryInput({
             kind: WebRpcMessageKind.discoveryResponse,
             taskId,
             senderId: `selector-peer-${index}`,
@@ -364,7 +410,7 @@ describe('discovery attachment boundary semantics', () => {
             resolvedTargetId: targetId,
             receiverId: `selector-receiver-${index}`,
             sentAt: Date.now()
-          },
+          }),
           verifiedPeerKey
         )
         await expect(pending).resolves.toBeUndefined()
@@ -394,7 +440,7 @@ describe('discovery attachment boundary semantics', () => {
   })
 
   it('fails closed for malformed automatic responses before settling a valid waiter', async () => {
-    const harness = createDiscoveryHarness('automatic')
+    const harness = await createDiscoveryHarness('automatic')
     const targetId = 'automatic-guard-target'
     try {
       const pending = harness.attachment.query(targetId)
@@ -413,27 +459,30 @@ describe('discovery attachment boundary semantics', () => {
         sentAt: Date.now()
       } as const
       await harness.attachment.handleInboundDiscovery(
-        { ...base, targetId: 'wrong-target' },
+        ...discoveryInput({ ...base, targetId: 'wrong-target' }),
         verifiedPeerKey
       )
       await harness.attachment.handleInboundDiscovery(
-        { ...base, resolvedTargetId: 'wrong-resolved-target' },
+        ...discoveryInput({ ...base, resolvedTargetId: 'wrong-resolved-target' }),
         verifiedPeerKey
       )
       await harness.attachment.handleInboundDiscovery(
-        { ...base, receiverId: undefined } as never,
-        verifiedPeerKey
-      )
-      await harness.attachment.handleInboundDiscovery({ ...base, receiverId: '' }, verifiedPeerKey)
-      await harness.attachment.handleInboundDiscovery(
-        { ...base, data: { __unique_id__: 42 } },
+        ...discoveryInput({ ...base, receiverId: undefined } as never),
         verifiedPeerKey
       )
       await harness.attachment.handleInboundDiscovery(
-        { ...base, data: { __unique_id__: '' } },
+        ...discoveryInput({ ...base, receiverId: '' }),
         verifiedPeerKey
       )
-      await harness.attachment.handleInboundDiscovery(base, verifiedPeerKey)
+      await harness.attachment.handleInboundDiscovery(
+        ...discoveryInput({ ...base, data: { __unique_id__: 42 } }),
+        verifiedPeerKey
+      )
+      await harness.attachment.handleInboundDiscovery(
+        ...discoveryInput({ ...base, data: { __unique_id__: '' } }),
+        verifiedPeerKey
+      )
+      await harness.attachment.handleInboundDiscovery(...discoveryInput(base), verifiedPeerKey)
       await expect(pending).resolves.toBeUndefined()
       expect(harness.attachment.getServerList(targetId)).toEqual([
         expect.objectContaining({ receiverId: 'automatic-guard-receiver', status: 'active' })
@@ -444,8 +493,8 @@ describe('discovery attachment boundary semantics', () => {
   })
 
   it('covers transport-routed query replay and response settlement for automatic and manual modes', async () => {
-    const automatic = createDiscoveryHarness('automatic', 'route-unique')
-    const manual = createDiscoveryHarness('manual', 'route-manual-unique')
+    const automatic = await createDiscoveryHarness('automatic', 'route-unique')
+    const manual = await createDiscoveryHarness('manual', 'route-manual-unique')
     const removeListener = manual.attachment.controls.onQuery!(async (query) => {
       await query.reject('route-rejected')
     })
@@ -454,11 +503,20 @@ describe('discovery attachment boundary semantics', () => {
     }
     try {
       const routedQuery = {
-        kind: WebRpcMessageKind.discoveryQuery,
-        taskId: 'routed-automatic-query',
-        senderId: 'routed-peer',
-        targetId: 'coverage-direct-automatic',
-        sentAt: Date.now()
+        kind: 'discovery',
+        id: 'routed-automatic-query',
+        version: '1.0.0',
+        acceptVersions: ['1.0.0'],
+        data: {
+          webRpc: {
+            profile: 'web-rpc.route.v1',
+            type: 'discovery-query',
+            applicationVersion: '1.0.0',
+            senderId: 'routed-peer',
+            targetId: 'coverage-direct-automatic',
+            sentAt: Date.now()
+          }
+        }
       }
       await automatic.peerTransport.send(routedQuery)
       await flushTransport()
@@ -467,9 +525,11 @@ describe('discovery attachment boundary semantics', () => {
           expect.objectContaining({
             kind: 'frame',
             message: expect.objectContaining({
-              kind: WebRpcMessageKind.discoveryResponse,
-              taskId: routedQuery.taskId,
-              targetId: routedQuery.senderId
+              kind: 'discovery',
+              id: routedQuery.id,
+              data: expect.objectContaining({
+                webRpc: expect.objectContaining({ targetId: 'routed-peer' })
+              })
             })
           })
         ])
@@ -480,24 +540,42 @@ describe('discovery attachment boundary semantics', () => {
       const pending = automatic.attachment.query('routed-response-target')
       const taskId = latestTaskId(automatic.commands)
       await automatic.peerTransport.send({
-        kind: WebRpcMessageKind.discoveryResponse,
-        taskId,
-        senderId: 'routed-response-peer',
-        targetId: 'coverage-direct-automatic',
-        resolvedTargetId: 'routed-response-target',
-        receiverId: 'routed-response-receiver',
-        sentAt: Date.now()
+        kind: 'discovery',
+        id: taskId,
+        version: '1.0.0',
+        acceptVersions: ['1.0.0'],
+        data: {
+          webRpc: {
+            profile: 'web-rpc.route.v1',
+            type: 'discovery-response',
+            applicationVersion: '1.0.0',
+            senderId: 'routed-response-peer',
+            targetId: 'coverage-direct-automatic',
+            resolvedTargetId: 'routed-response-target',
+            receiverId: 'routed-response-receiver',
+            sentAt: Date.now()
+          }
+        }
       })
       await expect(pending).resolves.toBeUndefined()
 
       await manual.peerTransport.send({
-        kind: WebRpcMessageKind.discoveryQuery,
-        taskId: 'routed-manual-query',
-        senderId: 'routed-manual-peer',
-        targetId: 'coverage-direct-manual',
-        sentAt: Date.now(),
-        manual: true,
-        data: { request: true, __unique_id__: 'hidden' }
+        kind: 'discovery',
+        id: 'routed-manual-query',
+        version: '1.0.0',
+        acceptVersions: ['1.0.0'],
+        data: {
+          webRpc: {
+            profile: 'web-rpc.route.v1',
+            type: 'discovery-query',
+            applicationVersion: '1.0.0',
+            senderId: 'routed-manual-peer',
+            targetId: 'coverage-direct-manual',
+            sentAt: Date.now(),
+            manual: true
+          },
+          payload: { request: true, __unique_id__: 'hidden' }
+        }
       })
       await flushTransport()
       expect(manual.commands).toEqual(
@@ -505,9 +583,10 @@ describe('discovery attachment boundary semantics', () => {
           expect.objectContaining({
             kind: 'frame',
             message: expect.objectContaining({
-              kind: WebRpcMessageKind.discoveryResponse,
-              accepted: false,
-              message: 'route-rejected'
+              kind: 'discovery',
+              data: expect.objectContaining({
+                webRpc: expect.objectContaining({ accepted: false, message: 'route-rejected' })
+              })
             })
           })
         ])
@@ -521,13 +600,13 @@ describe('discovery attachment boundary semantics', () => {
 
   it('covers BroadcastChannel identity checks and stale pinned receiver failure', async () => {
     vi.useFakeTimers()
-    const harness = createDiscoveryHarness(
+    const harness = await createDiscoveryHarness(
       'automatic',
       undefined,
       undefined,
       WebRpcPlatform.broadcastChannel
     )
-    const staleHarness = createDiscoveryHarness('automatic')
+    const staleHarness = await createDiscoveryHarness('automatic')
     const targetId = 'broadcast-target'
     try {
       const pending = harness.attachment.query(targetId)
@@ -542,12 +621,12 @@ describe('discovery attachment boundary semantics', () => {
         receiverId: targetId,
         sentAt: Date.now()
       } as const
-      await harness.attachment.handleInboundDiscovery(response, verifiedPeerKey)
+      await harness.attachment.handleInboundDiscovery(...discoveryInput(response), verifiedPeerKey)
       await expect(pending).resolves.toBeUndefined()
       expect(() => harness.attachment.controls.pinReceiver(targetId, targetId)).toThrowError(
         WebRpcError
       )
-      await harness.attachment.handleInboundDiscovery(response, verifiedPeerKey)
+      await harness.attachment.handleInboundDiscovery(...discoveryInput(response), verifiedPeerKey)
       expect(harness.commands).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -565,7 +644,7 @@ describe('discovery attachment boundary semantics', () => {
       const staleTaskId = latestTaskId(staleHarness.commands)
       const stalePeerKey = await staleHarness.admitPeer('stale-peer', 'coverage-direct-automatic')
       await staleHarness.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId: staleTaskId,
           senderId: 'stale-peer',
@@ -573,7 +652,7 @@ describe('discovery attachment boundary semantics', () => {
           resolvedTargetId: staleTargetId,
           receiverId: 'stale-receiver',
           sentAt: Date.now()
-        },
+        }),
         stalePeerKey
       )
       await stalePending
@@ -591,7 +670,7 @@ describe('discovery attachment boundary semantics', () => {
   })
 
   it('covers manual inbound accept/reject, replay, collision, and listener failure reporting', async () => {
-    const harness = createDiscoveryHarness('manual', 'unique-manual')
+    const harness = await createDiscoveryHarness('manual', 'unique-manual')
     const query = {
       kind: WebRpcMessageKind.discoveryQuery,
       taskId: 'manual-direct-query',
@@ -608,7 +687,7 @@ describe('discovery attachment boundary semantics', () => {
     })
     try {
       const verifiedPeerKey = await harness.admitPeer('manual-peer', 'coverage-direct-manual')
-      await harness.attachment.handleInboundDiscovery(query, verifiedPeerKey, {
+      await harness.attachment.handleInboundDiscovery(...discoveryInput(query), verifiedPeerKey, {
         origin: 'test',
         data: undefined
       } as never)
@@ -618,13 +697,19 @@ describe('discovery attachment boundary semantics', () => {
       await expect(inbound!.accept({ answer: 2, __unique_id__: 'hidden' })).resolves.toBe(true)
       await expect(inbound!.accept({ answer: 3 })).resolves.toBe(false)
       expect(harness.commands.some((command) => command.kind === 'frame')).toBe(true)
-      await harness.attachment.handleInboundDiscovery(query, verifiedPeerKey)
+      await harness.attachment.handleInboundDiscovery(...discoveryInput(query), verifiedPeerKey)
       expect(harness.commands.some((command) => command.kind === 'diagnostic')).toBe(true)
 
       const collisionQuery = { ...query, taskId: 'manual-collision-query' }
       const collisionPeerKey = await harness.admitPeer('manual-peer-2', 'coverage-direct-manual')
-      await harness.attachment.handleInboundDiscovery(collisionQuery, collisionPeerKey)
-      await harness.attachment.handleInboundDiscovery(collisionQuery, collisionPeerKey)
+      await harness.attachment.handleInboundDiscovery(
+        ...discoveryInput(collisionQuery),
+        collisionPeerKey
+      )
+      await harness.attachment.handleInboundDiscovery(
+        ...discoveryInput(collisionQuery),
+        collisionPeerKey
+      )
       const diagnosticCodes = harness.commands
         .filter(
           (command): command is Extract<IWebRpcOutboundCommand, { readonly kind: 'diagnostic' }> =>
@@ -640,7 +725,10 @@ describe('discovery attachment boundary semantics', () => {
         rejectHandle = value
       })
       const rejectedPeerKey = await harness.admitPeer('manual-peer-3', 'coverage-direct-manual')
-      await harness.attachment.handleInboundDiscovery(rejectedQuery, rejectedPeerKey)
+      await harness.attachment.handleInboundDiscovery(
+        ...discoveryInput(rejectedQuery),
+        rejectedPeerKey
+      )
       await Promise.resolve()
       await expect(rejectHandle?.reject('not-ready')).resolves.toBe(true)
       expect(harness.commands.some((command) => command.kind === 'frame')).toBe(true)
@@ -650,13 +738,16 @@ describe('discovery attachment boundary semantics', () => {
       const removeInvalidReasonListener = harness.attachment.controls.onQuery!((value) => {
         void value.reject(42 as never).catch(() => undefined)
       })
-      await harness.attachment.handleInboundDiscovery(invalidReasonQuery, rejectedPeerKey)
+      await harness.attachment.handleInboundDiscovery(
+        ...discoveryInput(invalidReasonQuery),
+        rejectedPeerKey
+      )
       await Promise.resolve()
       expect(harness.commands.some((command) => command.kind === 'diagnostic')).toBe(true)
       removeInvalidReasonListener()
 
       await harness.attachment.handleInboundDiscovery(
-        { ...query, taskId: 'manual-no-listener-query' },
+        ...discoveryInput({ ...query, taskId: 'manual-no-listener-query' }),
         rejectedPeerKey
       )
     } finally {
@@ -666,7 +757,7 @@ describe('discovery attachment boundary semantics', () => {
   })
 
   it('covers manual response candidate admission, registration, pin loss, and invalid response guards', async () => {
-    const harness = createDiscoveryHarness('manual')
+    const harness = await createDiscoveryHarness('manual')
     let invalidPending: Promise<readonly IWebRpcDiscoveryCandidate<string>[]> | undefined
     try {
       const pending = harness.attachment.controls.query!('manual-response-target', {
@@ -678,7 +769,7 @@ describe('discovery attachment boundary semantics', () => {
       )
       const taskId = latestTaskId(harness.commands)
       await harness.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId,
           senderId: 'manual-response-peer',
@@ -689,7 +780,7 @@ describe('discovery attachment boundary semantics', () => {
           accepted: true,
           receiverId: 'manual-response-receiver',
           data: { answer: 1 }
-        },
+        }),
         await harness.admitPeer('manual-response-peer', 'coverage-direct-manual')
       )
       const candidates = await pending
@@ -719,7 +810,7 @@ describe('discovery attachment boundary semantics', () => {
         'coverage-direct-manual'
       )
       await harness.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId: invalidTaskId,
           senderId: 'manual-response-peer',
@@ -729,11 +820,11 @@ describe('discovery attachment boundary semantics', () => {
           manual: true,
           accepted: true,
           receiverId: ''
-        },
+        }),
         invalidPeerKey
       )
       await harness.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId: invalidTaskId,
           senderId: 'manual-response-peer',
@@ -743,11 +834,11 @@ describe('discovery attachment boundary semantics', () => {
           manual: true,
           accepted: true,
           receiverId: 'valid-receiver'
-        },
+        }),
         invalidPeerKey
       )
       await harness.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId: invalidTaskId,
           senderId: 'manual-response-peer',
@@ -757,12 +848,12 @@ describe('discovery attachment boundary semantics', () => {
           manual: true,
           accepted: true,
           receiverId: 'valid-receiver'
-        },
+        }),
         invalidPeerKey
       )
       for (let index = 0; index < 33; index += 1)
         await harness.attachment.handleInboundDiscovery(
-          {
+          ...discoveryInput({
             kind: WebRpcMessageKind.discoveryResponse,
             taskId: invalidTaskId,
             senderId: 'manual-response-peer',
@@ -772,11 +863,11 @@ describe('discovery attachment boundary semantics', () => {
             manual: true,
             accepted: true,
             receiverId: `valid-receiver-${index}`
-          },
+          }),
           invalidPeerKey
         )
       await harness.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId: invalidTaskId,
           senderId: 'manual-response-peer',
@@ -785,11 +876,11 @@ describe('discovery attachment boundary semantics', () => {
           sentAt: Date.now(),
           manual: true,
           accepted: false
-        },
+        }),
         invalidPeerKey
       )
       await harness.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId: invalidTaskId,
           senderId: 'manual-response-peer',
@@ -800,11 +891,11 @@ describe('discovery attachment boundary semantics', () => {
           accepted: true,
           receiverId: 'valid-receiver',
           data: { __unique_id__: 42 }
-        },
+        }),
         invalidPeerKey
       )
       await harness.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId: invalidTaskId,
           senderId: 'manual-response-peer',
@@ -814,7 +905,7 @@ describe('discovery attachment boundary semantics', () => {
           manual: true,
           accepted: true,
           receiverId: 'valid-receiver'
-        },
+        }),
         invalidPeerKey
       )
       expect(harness.attachment.debugSnapshot().manualWaiters).toBe(1)
@@ -828,7 +919,7 @@ describe('discovery attachment boundary semantics', () => {
   })
 
   it('keeps foreign, source-less, and late automatic responses isolated', async () => {
-    const harness = createDiscoveryHarness('automatic')
+    const harness = await createDiscoveryHarness('automatic')
     const targetId = 'semantic-isolation-target'
     try {
       const pending = harness.attachment.query(targetId)
@@ -844,20 +935,20 @@ describe('discovery attachment boundary semantics', () => {
         sentAt: Date.now()
       } as const
       await harness.attachment.handleInboundDiscovery(
-        { ...response, targetId: 'foreign-endpoint' },
+        ...discoveryInput({ ...response, targetId: 'foreign-endpoint' }),
         verifiedPeerKey
       )
       await harness.attachment.handleInboundDiscovery(
-        { ...response, resolvedTargetId: 'foreign-target' },
+        ...discoveryInput({ ...response, resolvedTargetId: 'foreign-target' }),
         verifiedPeerKey
       )
       await harness.attachment.handleInboundDiscovery(
-        { ...response, receiverId: undefined } as never,
+        ...discoveryInput({ ...response, receiverId: undefined } as never),
         verifiedPeerKey
       )
-      await harness.attachment.handleInboundDiscovery(response, verifiedPeerKey)
+      await harness.attachment.handleInboundDiscovery(...discoveryInput(response), verifiedPeerKey)
       await expect(pending).resolves.toBeUndefined()
-      await harness.attachment.handleInboundDiscovery(response, verifiedPeerKey)
+      await harness.attachment.handleInboundDiscovery(...discoveryInput(response), verifiedPeerKey)
       await new Promise<void>((resolve) => setTimeout(resolve, 0))
       expect(harness.attachment.getServerList(targetId)).toEqual([
         expect.objectContaining({ receiverId: 'semantic-receiver', status: 'active' })
@@ -870,7 +961,7 @@ describe('discovery attachment boundary semantics', () => {
   })
 
   it('does not settle an aborted manual waiter when a late response arrives', async () => {
-    const harness = createDiscoveryHarness('manual')
+    const harness = await createDiscoveryHarness('manual')
     const controller = new AbortController()
     try {
       const pending = harness.attachment.controls.query!('semantic-abort-target', {
@@ -885,7 +976,7 @@ describe('discovery attachment boundary semantics', () => {
         'coverage-direct-manual'
       )
       await harness.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId,
           senderId: 'semantic-abort-peer',
@@ -895,7 +986,7 @@ describe('discovery attachment boundary semantics', () => {
           sentAt: Date.now(),
           manual: true,
           accepted: true
-        },
+        }),
         verifiedPeerKey
       )
       expect(harness.attachment.debugSnapshot()).toMatchObject({ manualWaiters: 0 })
@@ -907,7 +998,7 @@ describe('discovery attachment boundary semantics', () => {
 
   it('expires inbound manual queries and reports listener failures without residue', async () => {
     vi.useFakeTimers()
-    const harness = createDiscoveryHarness('manual')
+    const harness = await createDiscoveryHarness('manual')
     const listenerError = new Error('semantic listener failure')
     const removeListener = harness.attachment.controls.onQuery!(() => {
       throw listenerError
@@ -926,7 +1017,7 @@ describe('discovery attachment boundary semantics', () => {
         'semantic-expiring-peer',
         'coverage-direct-manual'
       )
-      await harness.attachment.handleInboundDiscovery(query, verifiedPeerKey)
+      await harness.attachment.handleInboundDiscovery(...discoveryInput(query), verifiedPeerKey)
       await Promise.resolve()
       expect(harness.commands).toEqual(
         expect.arrayContaining([
@@ -942,7 +1033,7 @@ describe('discovery attachment boundary semantics', () => {
         inboundTimers: 0
       })
       await harness.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId: query.taskId,
           senderId: query.senderId,
@@ -952,7 +1043,7 @@ describe('discovery attachment boundary semantics', () => {
           sentAt: query.sentAt,
           manual: true,
           operation: 'unregister'
-        } as never,
+        } as never),
         verifiedPeerKey
       )
       expect(harness.commands).toEqual(
@@ -971,7 +1062,7 @@ describe('discovery attachment boundary semantics', () => {
   })
 
   it('keeps multiple manual receivers independently selectable and observable', async () => {
-    const harness = createDiscoveryHarness('manual')
+    const harness = await createDiscoveryHarness('manual')
     try {
       const pending = harness.attachment.controls.query!('semantic-multi-target')
       await Promise.resolve()
@@ -982,7 +1073,7 @@ describe('discovery attachment boundary semantics', () => {
       )
       for (const receiverId of ['semantic-receiver-a', 'semantic-receiver-b'])
         await harness.attachment.handleInboundDiscovery(
-          {
+          ...discoveryInput({
             kind: WebRpcMessageKind.discoveryResponse,
             taskId,
             senderId: 'semantic-multi-peer',
@@ -993,7 +1084,7 @@ describe('discovery attachment boundary semantics', () => {
             manual: true,
             accepted: true,
             data: { receiverId }
-          },
+          }),
           verifiedPeerKey
         )
       const candidates = await pending
@@ -1025,15 +1116,15 @@ describe('discovery attachment boundary semantics', () => {
 
   it('covers automatic replay, shared waiter deadline extension, and manual query replay', async () => {
     vi.useFakeTimers()
-    const automatic = createDiscoveryHarness('automatic')
-    const multiplexed = createDiscoveryHarness(
+    const automatic = await createDiscoveryHarness('automatic')
+    const multiplexed = await createDiscoveryHarness(
       'automatic',
       undefined,
       undefined,
       undefined,
       'multiplexed'
     )
-    const manual = createDiscoveryHarness('manual')
+    const manual = await createDiscoveryHarness('manual')
     const removeListener = manual.attachment.controls.onQuery!(() => undefined)
     try {
       const verifiedPeerKey = await automatic.admitPeer(
@@ -1047,8 +1138,8 @@ describe('discovery attachment boundary semantics', () => {
         targetId: 'coverage-direct-automatic',
         sentAt: Date.now()
       } as const
-      await automatic.attachment.handleInboundDiscovery(query, verifiedPeerKey)
-      await automatic.attachment.handleInboundDiscovery(query, verifiedPeerKey)
+      await automatic.attachment.handleInboundDiscovery(...discoveryInput(query), verifiedPeerKey)
+      await automatic.attachment.handleInboundDiscovery(...discoveryInput(query), verifiedPeerKey)
       expect(automatic.commands).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -1093,8 +1184,8 @@ describe('discovery attachment boundary semantics', () => {
         'semantic-collision-peer',
         'coverage-direct-manual'
       )
-      await manual.attachment.handleInboundDiscovery(manualQuery, manualPeerKey)
-      await manual.attachment.handleInboundDiscovery(manualQuery, manualPeerKey)
+      await manual.attachment.handleInboundDiscovery(...discoveryInput(manualQuery), manualPeerKey)
+      await manual.attachment.handleInboundDiscovery(...discoveryInput(manualQuery), manualPeerKey)
       expect(manual.commands).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -1113,19 +1204,19 @@ describe('discovery attachment boundary semantics', () => {
   })
 
   it('fails closed on BroadcastChannel receiver identity and enforces candidate admission limits', async () => {
-    const broadcast = createDiscoveryHarness(
+    const broadcast = await createDiscoveryHarness(
       'manual',
       undefined,
       undefined,
       WebRpcPlatform.broadcastChannel
     )
-    const automatic = createDiscoveryHarness(
+    const automatic = await createDiscoveryHarness(
       'automatic',
       undefined,
       undefined,
       WebRpcPlatform.broadcastChannel
     )
-    const limited = createDiscoveryHarness('manual')
+    const limited = await createDiscoveryHarness('manual')
     try {
       const manualPending = broadcast.attachment.controls.query!('semantic-broadcast-target')
       await Promise.resolve()
@@ -1146,11 +1237,11 @@ describe('discovery attachment boundary semantics', () => {
         data: { __unique_id__: 'semantic-broadcast-id' }
       } as const
       await broadcast.attachment.handleInboundDiscovery(
-        { ...manualResponse, receiverId: 'wrong-broadcast-receiver' },
+        ...discoveryInput({ ...manualResponse, receiverId: 'wrong-broadcast-receiver' }),
         manualPeerKey
       )
       await broadcast.attachment.handleInboundDiscovery(
-        { ...manualResponse, receiverId: 'semantic-broadcast-target' },
+        ...discoveryInput({ ...manualResponse, receiverId: 'semantic-broadcast-target' }),
         manualPeerKey
       )
       await expect(manualPending).resolves.toHaveLength(0)
@@ -1170,11 +1261,11 @@ describe('discovery attachment boundary semantics', () => {
         sentAt: Date.now()
       } as const
       await automatic.attachment.handleInboundDiscovery(
-        { ...automaticResponse, receiverId: 'wrong-broadcast-receiver' },
+        ...discoveryInput({ ...automaticResponse, receiverId: 'wrong-broadcast-receiver' }),
         automaticPeerKey
       )
       await automatic.attachment.handleInboundDiscovery(
-        { ...automaticResponse, receiverId: 'semantic-broadcast-auto' },
+        ...discoveryInput({ ...automaticResponse, receiverId: 'semantic-broadcast-auto' }),
         automaticPeerKey
       )
       await expect(automaticPending).resolves.toBeUndefined()
@@ -1197,7 +1288,7 @@ describe('discovery attachment boundary semantics', () => {
       ) {
         const peerKey = peerKeys[index % peerKeys.length]!
         await limited.attachment.handleInboundDiscovery(
-          {
+          ...discoveryInput({
             kind: WebRpcMessageKind.discoveryResponse,
             taskId: limitedTaskId,
             senderId: `semantic-limit-peer-${index}`,
@@ -1207,7 +1298,7 @@ describe('discovery attachment boundary semantics', () => {
             sentAt: Date.now(),
             manual: true,
             accepted: true
-          },
+          }),
           peerKey
         )
       }
@@ -1229,15 +1320,15 @@ describe('discovery attachment boundary semantics', () => {
   })
 
   it('covers unique BroadcastChannel identity variants and public candidate validation', async () => {
-    const manual = createDiscoveryHarness('manual')
-    const broadcastManual = createDiscoveryHarness(
+    const manual = await createDiscoveryHarness('manual')
+    const broadcastManual = await createDiscoveryHarness(
       'manual',
       'semantic-manual-id',
       undefined,
       WebRpcPlatform.broadcastChannel,
       'broadcast'
     )
-    const broadcastAutomatic = createDiscoveryHarness(
+    const broadcastAutomatic = await createDiscoveryHarness(
       'automatic',
       'semantic-automatic-id',
       undefined,
@@ -1256,7 +1347,7 @@ describe('discovery attachment boundary semantics', () => {
         'coverage-direct-manual'
       )
       await broadcastManual.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId: manualTaskId,
           senderId: 'semantic-broadcast-manual-peer',
@@ -1267,7 +1358,7 @@ describe('discovery attachment boundary semantics', () => {
           manual: true,
           accepted: true,
           data: { __unique_id__: 'semantic-manual-id', answer: 1 }
-        },
+        }),
         manualPeerKey
       )
       const [manualCandidate] = await manualPending
@@ -1293,7 +1384,7 @@ describe('discovery attachment boundary semantics', () => {
         'coverage-direct-automatic'
       )
       await broadcastAutomatic.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId: automaticTaskId,
           senderId: 'semantic-broadcast-automatic-peer',
@@ -1302,11 +1393,11 @@ describe('discovery attachment boundary semantics', () => {
           receiverId: 'wrong-broadcast-receiver',
           sentAt: Date.now(),
           data: { __unique_id__: 'semantic-automatic-id' }
-        },
+        }),
         automaticPeerKey
       )
       await broadcastAutomatic.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId: automaticTaskId,
           senderId: 'semantic-broadcast-automatic-peer',
@@ -1315,7 +1406,7 @@ describe('discovery attachment boundary semantics', () => {
           receiverId: 'semantic-broadcast-automatic:semantic-automatic-id',
           sentAt: Date.now(),
           data: { __unique_id__: 'semantic-automatic-id' }
-        },
+        }),
         automaticPeerKey
       )
       await expect(automaticPending).resolves.toBeUndefined()
@@ -1330,22 +1421,22 @@ describe('discovery attachment boundary semantics', () => {
   })
 
   it('fails closed for automatic/manual mode mismatches and preserves direct disposal errors', async () => {
-    const automatic = createDiscoveryHarness('automatic')
-    const manual = createDiscoveryHarness('manual')
+    const automatic = await createDiscoveryHarness('automatic')
+    const manual = await createDiscoveryHarness('manual')
     try {
       await automatic.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryQuery,
           taskId: 'mode-mismatch',
           senderId: 'peer',
           targetId: 'coverage-direct-automatic',
           sentAt: Date.now(),
           manual: true
-        },
+        }),
         'peer-key'
       )
       await manual.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId: 'missing-task',
           senderId: 'peer',
@@ -1353,11 +1444,11 @@ describe('discovery attachment boundary semantics', () => {
           resolvedTargetId: 'target',
           receiverId: 'receiver',
           sentAt: Date.now()
-        },
+        }),
         'peer-key'
       )
       await manual.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId: 'missing-manual-task',
           senderId: 'peer',
@@ -1367,7 +1458,7 @@ describe('discovery attachment boundary semantics', () => {
           sentAt: Date.now(),
           manual: true,
           accepted: true
-        },
+        }),
         await manual.admitPeer('peer', 'coverage-direct-manual')
       )
       expect(() => automatic.attachment.controls.query).not.toThrow()
@@ -1382,7 +1473,7 @@ describe('discovery attachment boundary semantics', () => {
 
   it('proves receiver miss to replacement without stale pin or result leakage', async () => {
     vi.useFakeTimers()
-    const harness = createDiscoveryHarness('automatic')
+    const harness = await createDiscoveryHarness('automatic')
     const targetId = 'r2-v4-replacement-target'
     try {
       const pending = harness.attachment.query(targetId)
@@ -1391,7 +1482,7 @@ describe('discovery attachment boundary semantics', () => {
 
       const beforeMiss = combinedSnapshot(harness)
       await harness.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId,
           senderId: 'r2-v4-replacement-peer',
@@ -1399,7 +1490,7 @@ describe('discovery attachment boundary semantics', () => {
           resolvedTargetId: targetId,
           receiverId: undefined,
           sentAt: Date.now()
-        } as never,
+        } as never),
         peerKey
       )
       expectUnchangedSnapshot(beforeMiss, combinedSnapshot(harness))
@@ -1410,7 +1501,7 @@ describe('discovery attachment boundary semantics', () => {
       })
       void observed.catch(() => undefined)
       await harness.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId,
           senderId: 'r2-v4-replacement-peer',
@@ -1418,7 +1509,7 @@ describe('discovery attachment boundary semantics', () => {
           resolvedTargetId: targetId,
           receiverId: 'replacement-receiver',
           sentAt: Date.now()
-        },
+        }),
         peerKey
       )
       await observed
@@ -1437,7 +1528,7 @@ describe('discovery attachment boundary semantics', () => {
       const replacementTaskId = taskIdForTarget(harness.commands, targetId)
       expect(replacementTaskId).not.toBe(taskId)
       await harness.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId: replacementTaskId,
           senderId: 'r2-v4-replacement-peer',
@@ -1445,7 +1536,7 @@ describe('discovery attachment boundary semantics', () => {
           resolvedTargetId: targetId,
           receiverId: 'replacement-receiver',
           sentAt: Date.now()
-        },
+        }),
         peerKey
       )
       await expect(replacementPending).resolves.toBeUndefined()
@@ -1461,7 +1552,7 @@ describe('discovery attachment boundary semantics', () => {
   })
 
   it('pairs reversed concurrent discovery responses with exactly-once settlements', async () => {
-    const harness = createDiscoveryHarness('automatic')
+    const harness = await createDiscoveryHarness('automatic')
     const firstTargetId = 'r2-v4-first-task-target'
     const secondTargetId = 'r2-v4-second-task-target'
     try {
@@ -1483,7 +1574,7 @@ describe('discovery attachment boundary semantics', () => {
       const peerKey = await harness.admitPeer('r2-v4-task-peer', 'coverage-direct-automatic')
 
       await harness.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId: secondTaskId,
           senderId: 'r2-v4-task-peer',
@@ -1491,7 +1582,7 @@ describe('discovery attachment boundary semantics', () => {
           resolvedTargetId: secondTargetId,
           receiverId: 'second-receiver',
           sentAt: Date.now()
-        },
+        }),
         peerKey
       )
       await secondPending
@@ -1500,7 +1591,7 @@ describe('discovery attachment boundary semantics', () => {
       expect(secondSettlementCount).toBe(1)
 
       await harness.attachment.handleInboundDiscovery(
-        {
+        ...discoveryInput({
           kind: WebRpcMessageKind.discoveryResponse,
           taskId: firstTaskId,
           senderId: 'r2-v4-task-peer',
@@ -1508,7 +1599,7 @@ describe('discovery attachment boundary semantics', () => {
           resolvedTargetId: firstTargetId,
           receiverId: 'first-receiver',
           sentAt: Date.now()
-        },
+        }),
         peerKey
       )
       await firstPending
@@ -1523,7 +1614,7 @@ describe('discovery attachment boundary semantics', () => {
 
   it('proves response-wins and dispose-wins terminal races without late re-settlement', async () => {
     const runRace = async (responseFirst: boolean): Promise<void> => {
-      const harness = createDiscoveryHarness('automatic')
+      const harness = await createDiscoveryHarness('automatic')
       const targetId = responseFirst ? 'r2-v4-response-first' : 'r2-v4-dispose-first'
       let terminal = false
       try {
@@ -1566,7 +1657,7 @@ describe('discovery attachment boundary semantics', () => {
         } as const
 
         if (responseFirst) {
-          await harness.attachment.handleInboundDiscovery(response, peerKey)
+          await harness.attachment.handleInboundDiscovery(...discoveryInput(response), peerKey)
           await observed
           expect(firstOutcome).toBe('resolved')
         }
@@ -1601,7 +1692,7 @@ describe('discovery attachment boundary semantics', () => {
         }
 
         const commandCount = harness.commands.length
-        await harness.attachment.handleInboundDiscovery(response, peerKey)
+        await harness.attachment.handleInboundDiscovery(...discoveryInput(response), peerKey)
         await Promise.resolve()
         expect(harness.commands).toHaveLength(commandCount)
         expect(settlementCount).toBe(1)
@@ -1617,7 +1708,7 @@ describe('discovery attachment boundary semantics', () => {
 
   it('proves source-less valid admission and per-frame invalid admission no-delta', async () => {
     const validSender = 'r2-v5-source-less-peer'
-    const harness = createDiscoveryHarness(
+    const harness = await createDiscoveryHarness(
       'automatic',
       undefined,
       undefined,
@@ -1625,61 +1716,103 @@ describe('discovery attachment boundary semantics', () => {
       undefined,
       (senderId) => senderId === validSender
     )
+    const unregisterRelease = registerInboundIdentityReleaseObservation(
+      harness.outbound.inboundIdentity
+    )
+    const admitPrepared = vi.spyOn(harness.outbound.inboundIdentity, 'admitPrepared')
     try {
       const validTargetId = 'r2-v4-source-less-valid'
       const validPending = harness.attachment.query(validTargetId)
       const validTaskId = taskIdForTarget(harness.commands, validTargetId)
       await harness.peerTransport.send({
-        kind: WebRpcMessageKind.discoveryResponse,
-        taskId: validTaskId,
-        senderId: validSender,
-        targetId: 'coverage-direct-automatic',
-        resolvedTargetId: validTargetId,
-        receiverId: 'source-less-receiver',
-        sentAt: Date.now()
+        kind: 'discovery',
+        id: validTaskId,
+        version: '1.0.0',
+        acceptVersions: ['1.0.0'],
+        data: {
+          webRpc: {
+            profile: 'web-rpc.route.v1',
+            type: 'discovery-response',
+            applicationVersion: '1.0.0',
+            senderId: validSender,
+            targetId: 'coverage-direct-automatic',
+            resolvedTargetId: validTargetId,
+            receiverId: 'source-less-receiver',
+            sentAt: Date.now()
+          }
+        }
       })
       await flushTransport()
       await expect(validPending).resolves.toBeUndefined()
 
       const invalidTargetId = 'r2-v4-invalid-frame-target'
       const invalidPending = harness.attachment.query(invalidTargetId)
+      void invalidPending.catch(() => undefined)
       const invalidTaskId = taskIdForTarget(harness.commands, invalidTargetId)
       const base = {
-        kind: WebRpcMessageKind.discoveryResponse,
-        taskId: invalidTaskId,
-        senderId: validSender,
-        targetId: 'coverage-direct-automatic',
-        resolvedTargetId: invalidTargetId,
-        receiverId: 'valid-after-invalid-receiver',
-        sentAt: Date.now()
+        kind: 'discovery' as const,
+        id: invalidTaskId,
+        version: '1.0.0',
+        acceptVersions: ['1.0.0'],
+        data: {
+          webRpc: {
+            profile: 'web-rpc.route.v1' as const,
+            type: 'discovery-response' as const,
+            applicationVersion: '1.0.0',
+            senderId: validSender,
+            targetId: 'coverage-direct-automatic',
+            resolvedTargetId: invalidTargetId,
+            receiverId: 'valid-after-invalid-receiver',
+            sentAt: Date.now()
+          }
+        }
       } as const
       const invalidFrames = [
-        { ...base, receiverId: undefined } as never,
-        { ...base, targetId: 'foreign-endpoint' },
-        { ...base, resolvedTargetId: 'foreign-target' },
-        { ...base, receiverId: '' },
-        { ...base, senderId: 'r2-v5-foreign-sender' },
-        { ...base, taskId: 'missing-task' }
+        {
+          ...base,
+          data: {
+            webRpc: (() => {
+              const { receiverId: _receiverId, ...withoutReceiver } = base.data.webRpc
+              return withoutReceiver
+            })()
+          }
+        },
+        { ...base, data: { webRpc: { ...base.data.webRpc, targetId: 'foreign-endpoint' } } },
+        { ...base, data: { webRpc: { ...base.data.webRpc, resolvedTargetId: 'foreign-target' } } },
+        { ...base, data: { webRpc: { ...base.data.webRpc, receiverId: '' } } },
+        { ...base, data: { webRpc: { ...base.data.webRpc, senderId: 'r2-v5-foreign-sender' } } },
+        { ...base, id: 'missing-task' }
       ] as const
       for (const [index, frame] of invalidFrames.entries()) {
         const before = combinedSnapshot(harness)
-        const beforeIdentity = identitySnapshot(harness)
+        const beforeIdentity = {
+          admits: admitPrepared.mock.results.length,
+          releases: readInboundIdentityReleaseObservation(harness.outbound.inboundIdentity) ?? 0
+        }
         await harness.peerTransport.send(frame)
         await flushTransport()
         expectUnchangedSnapshot(before, combinedSnapshot(harness))
-        const afterIdentity = identitySnapshot(harness)
-        expect(afterIdentity.balance).toBe(beforeIdentity.balance)
-        if (index === 1) {
-          expect(afterIdentity.acceptedAdmits).toBe(beforeIdentity.acceptedAdmits)
-          expect(afterIdentity.rejectedAdmits).toBe(beforeIdentity.rejectedAdmits)
-          expect(afterIdentity.releases).toBe(beforeIdentity.releases)
-        } else if (index === 4) {
-          expect(afterIdentity.rejectedAdmits).toBe(beforeIdentity.rejectedAdmits + 1)
-          expect(afterIdentity.acceptedAdmits).toBe(beforeIdentity.acceptedAdmits)
+        const afterIdentity = {
+          admits: admitPrepared.mock.results.length,
+          releases: readInboundIdentityReleaseObservation(harness.outbound.inboundIdentity) ?? 0
+        }
+        expect(afterIdentity.admits).toBe(beforeIdentity.admits + 1)
+        const result = admitPrepared.mock.results.at(-1)?.value
+        expect(result).toBeInstanceOf(Promise)
+        const admission = await result
+        if (index === 4) {
+          expect(admission).toBeUndefined()
           expect(afterIdentity.releases).toBe(beforeIdentity.releases)
         } else {
-          expect(afterIdentity.acceptedAdmits).toBe(beforeIdentity.acceptedAdmits + 1)
-          expect(afterIdentity.releases).toBe(beforeIdentity.releases + 1)
+          expect(admission).toBeDefined()
+          await vi.waitFor(
+            () =>
+              expect(
+                readInboundIdentityReleaseObservation(harness.outbound.inboundIdentity) ?? 0,
+                `invalid frame ${index} must release its admitted identity`
+              ).toBe(beforeIdentity.releases + 1),
+            { timeout: 1_000, interval: 1 }
+          )
         }
       }
 
@@ -1700,6 +1833,8 @@ describe('discovery attachment boundary semantics', () => {
       await flushTransport()
       expect(settlementCount).toBe(1)
     } finally {
+      admitPrepared.mockRestore()
+      unregisterRelease()
       await harness.dispose()
       expectTerminalZero(combinedSnapshot(harness))
     }

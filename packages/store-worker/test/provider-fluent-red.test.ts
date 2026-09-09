@@ -1,18 +1,12 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { readFile } from 'node:fs/promises'
-import type { createProviderEndpoint } from '@migaia/web-rpc/provider'
 
 const { createProviderEndpointSpy } = vi.hoisted(() => ({
   createProviderEndpointSpy: vi.fn()
 }))
 
-type IProviderEndpointFactory = typeof import('@migaia/web-rpc/provider').createProviderEndpoint
-
-let actualCreateProviderEndpoint: IProviderEndpointFactory
-
 vi.mock('@migaia/web-rpc/provider', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@migaia/web-rpc/provider')>()
-  actualCreateProviderEndpoint = actual.createProviderEndpoint
   createProviderEndpointSpy.mockImplementation(actual.createProviderEndpoint)
   return {
     ...actual,
@@ -103,20 +97,10 @@ describe('Cycle H B12c02 Store Worker provider consumer RED matrix', () => {
   })
 
   it('T138 owning handler consumes WebRPC fluent provider seam without a Store export', async () => {
-    type IFluentProviderEndpoint = Awaited<ReturnType<typeof createProviderEndpoint>>
     type IStoreWorkerModule = typeof import('../src/worker.js')
-    expectTypeOf<IFluentProviderEndpoint>().toHaveProperty('provide').toBeFunction()
     expectTypeOf<IStoreWorkerModule>().not.toHaveProperty('createProviderEndpoint')
 
     createProviderEndpointSpy.mockClear()
-    let returnedEndpoint: IFluentProviderEndpoint | undefined
-    createProviderEndpointSpy.mockImplementation((config) => {
-      const endpointPromise = actualCreateProviderEndpoint(config)
-      void endpointPromise.then((endpoint) => {
-        returnedEndpoint = endpoint
-      })
-      return endpointPromise
-    })
     const { WorkerAdapter } = await import('../src/index.js')
     const { createWorkerHandler } = await import('../src/worker.js')
     const port = createLinkedWorkerPort()
@@ -127,15 +111,28 @@ describe('Cycle H B12c02 Store Worker provider consumer RED matrix', () => {
     port.install(handler)
     const adapter = new WorkerAdapter(port)
     await expect(adapter.request('fluent-provider')).resolves.toBe('reply:fluent-provider')
-    expect(createProviderEndpointSpy).toHaveBeenCalledTimes(1)
-    expect(returnedEndpoint).toBeDefined()
+    expect(createProviderEndpointSpy).not.toHaveBeenCalled()
     const workerSource = await readFile(new URL('../src/worker.ts', import.meta.url), 'utf8')
-    expect(workerSource).toContain("providerEndpoint.provide('call'")
+    expect(workerSource).toContain('createWorkerContractEndpoint')
+    expect(workerSource).not.toContain('createProviderEndpoint')
     const handlerDispose = handler.dispose()
     expect(handler.dispose()).toBe(handlerDispose)
     await handlerDispose
     const adapterDispose = adapter.dispose()
     expect(adapter.dispose()).toBe(adapterDispose)
     await adapterDispose
+  })
+
+  it('routes a custom clientId through the canonical provider response path', async () => {
+    const { WorkerAdapter, createWorkerHandler } = await import('../src/index.js')
+    const port = createLinkedWorkerPort()
+    const handler = createWorkerHandler(
+      (value: unknown) => `custom:${String(value)}`,
+      (message) => port.deliver(message)
+    )
+    port.install(handler)
+    const adapter = new WorkerAdapter(port, { clientId: 'custom-client' })
+    await expect(adapter.request('id')).resolves.toBe('custom:id')
+    await Promise.all([adapter.dispose(), handler.dispose()])
   })
 })

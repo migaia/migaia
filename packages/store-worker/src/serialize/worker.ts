@@ -9,13 +9,9 @@ import {
   type ISerializePlugin
 } from '@migaia/serialize'
 import { isUint8Array } from '@migaia/utils/bytes'
-import { abort, connect, createEndpoint, protocol, timeout } from '@migaia/web-rpc'
-import type { IWebRpcContext } from '@migaia/web-rpc'
-import { WebRpcPlatform } from '@migaia/web-rpc/protocol-constants'
-import {
-  createWebWorkerTransport,
-  type IWebWorkerLikePort
-} from '@migaia/web-rpc/adapters/web-worker'
+import type { IWebWorkerLikePort } from '@migaia/web-rpc/adapters/web-worker'
+import { WebRpcLifecycleError } from '@migaia/web-rpc'
+import { createWorkerContractEndpoint, type IWorkerContractEndpoint } from '../worker-contract.js'
 import { toManagedRpcHandler, type IManagedRpcHandler } from '../managed-rpc-handler.js'
 import {
   createStoreWorkerAggregateError,
@@ -340,21 +336,20 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
   }
   const resolvedOwnership = ownership ?? WorkerByteOwnership.copy
   const resolvedTerminateOnDispose = terminateOnDispose ?? false
-  const transport = createWebWorkerTransport(worker, { peerId: WorkerRpcIdentity.worker })
-  const client = createEndpoint<typeof WorkerRpcIdentity.worker>({
+  const client: Promise<IWorkerContractEndpoint> = createWorkerContractEndpoint(worker, {
     id: clientId ?? WorkerRpcIdentity.main,
-    targetIds: [WorkerRpcIdentity.worker],
-    transport,
-    middlewares: [connect({ transport }), protocol(), abort(), timeout()]
+    targetId: WorkerRpcIdentity.worker
   })
 
   const streams = new Map<string, IWorkerFrameQueue>()
   let nextStreamId = 1
   let frameSubscription: Promise<() => void> | undefined
+  let disposePromise: Promise<void> | undefined
   const ensureFrameSubscription = (): Promise<() => void> => {
-    frameSubscription ??= client.then((endpoint) =>
-      endpoint.on(WorkerSerializeFrameMethod, (context: IWebRpcContext) => {
-        const frame = context.data as IWorkerSerializeFrame
+    frameSubscription ??= client.then((endpoint) => {
+      if (disposePromise !== undefined) return () => undefined
+      return endpoint.onRequest(WorkerSerializeFrameMethod, (payload) => {
+        const frame = payload as IWorkerSerializeFrame
         const stream = streams.get(frame.streamId)
         if (!stream) return
         stream.push(frame)
@@ -364,7 +359,7 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
         )
           streams.delete(frame.streamId)
       })
-    )
+    })
     return frameSubscription
   }
 
@@ -375,12 +370,12 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
   ): Promise<ISerializeChunk> => {
     try {
       const endpoint = await client
-      const result = await endpoint.send<ISerializeChunk>(
-        WorkerRpcIdentity.worker,
-        WorkerRpcIdentity.call,
+      if (disposePromise !== undefined)
+        throw new WebRpcLifecycleError(StoreWorkerErrorText.disposed)
+      const result = (await endpoint.request(
         { phase, chunk },
         { signal: context.signal, transfer: transferablesOf(chunk, resolvedOwnership) }
-      )
+      )) as ISerializeChunk
       if (!isChunkShape(result)) {
         throw createStoreWorkerError(
           StoreWorkerErrorCode.invalidResponseChunk,
@@ -432,35 +427,48 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
     const queue = createWorkerFrameQueue(
       streamId,
       () => {
-        void client.then((endpoint) =>
-          endpoint.dispatch(WorkerRpcIdentity.worker, WorkerSerializeFrameMethod, {
-            streamId,
-            kind: WorkerSerializeFrameKind.cancel,
-            sequence: -1
-          })
-        )
+        void client.then((endpoint) => {
+          if (disposePromise !== undefined) return
+          return endpoint.notify(
+            {
+              streamId,
+              kind: WorkerSerializeFrameKind.cancel,
+              sequence: -1
+            },
+            WorkerSerializeFrameMethod
+          )
+        })
       },
       (sequence) => {
-        void client.then((endpoint) =>
-          endpoint.dispatch(WorkerRpcIdentity.worker, WorkerSerializeFrameMethod, {
-            streamId,
-            kind: WorkerSerializeFrameKind.ack,
-            sequence
-          })
-        )
+        void client.then((endpoint) => {
+          if (disposePromise !== undefined) return
+          return endpoint.notify(
+            {
+              streamId,
+              kind: WorkerSerializeFrameKind.ack,
+              sequence
+            },
+            WorkerSerializeFrameMethod
+          )
+        })
       }
     )
     streams.set(streamId, queue)
     void ensureFrameSubscription()
       .then(() => client)
-      .then((endpoint) =>
-        endpoint.send(
-          WorkerRpcIdentity.worker,
-          WorkerRpcIdentity.call,
-          { phase: WorkerSerializePhase.encode, chunk, streamId },
+      .then((endpoint) => {
+        if (disposePromise !== undefined)
+          throw new WebRpcLifecycleError(StoreWorkerErrorText.disposed)
+        return endpoint.request(
+          {
+            phase: WorkerSerializePhase.encode,
+            chunk,
+            streamId,
+            clientId: clientId ?? WorkerRpcIdentity.main
+          },
           { signal: context.signal, transfer: transferablesOf(chunk, resolvedOwnership) }
         )
-      )
+      })
       .then(
         () => undefined,
         (error: unknown) => {
@@ -471,14 +479,21 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
     return queue.output
   }
 
-  let disposePromise: Promise<void> | undefined
   const disposeOnce = async (): Promise<void> => {
+    const terminalError = new WebRpcLifecycleError(StoreWorkerErrorText.disposed)
+    for (const queue of streams.values()) queue.fail(terminalError)
+    streams.clear()
     let endpointError: unknown
     try {
       const endpoint = await client
-      await endpoint.dispose()
+      await endpoint.close()
     } catch (error) {
-      endpointError = error
+      endpointError =
+        error instanceof WebRpcLifecycleError
+          ? error
+          : new WebRpcLifecycleError('Endpoint disposal completed with cleanup errors', error, [
+              { resource: 'transport subscription', error }
+            ])
     }
     let terminateError: unknown
     if (resolvedTerminateOnDispose) {
@@ -547,176 +562,186 @@ export function createSerializeWorkerHandler(
       StoreWorkerErrorText.handlerInvalid
     )
   }
-  let deliver: (message: unknown) => void = () => undefined
-  const transport = {
-    platform: WebRpcPlatform.worker,
-    peerId: 'main' as const,
-    send: (message: unknown, sendOptions?: { transfer?: readonly Transferable[] }) =>
-      post(message, sendOptions?.transfer),
-    subscribe: (listener: (message: { data: unknown }) => void) => {
-      deliver = (message) => listener({ data: message })
-      return () => {
-        deliver = () => undefined
+  let inboundListener: ((event: MessageEvent<unknown>) => void) | undefined
+  const endpoint = createWorkerContractEndpoint(
+    {
+      postMessage: (message, transfer) => post(message, transfer),
+      addEventListener: (type, listener) => {
+        if (type === 'message') inboundListener = listener as (event: MessageEvent<unknown>) => void
+      },
+      removeEventListener: (type, listener) => {
+        if (type === 'message' && inboundListener === listener) inboundListener = undefined
       }
-    }
-  }
+    },
+    { id: WorkerRpcIdentity.worker, targetId: WorkerRpcIdentity.main }
+  )
   const streamStates = new Map<string, IWorkerAckState>()
-  const endpoint = createEndpoint({
-    id: WorkerRpcIdentity.worker,
-    targetIds: [WorkerRpcIdentity.main],
-    transport,
-    provider: {
-      call: async (context) => {
-        const { phase, chunk } = context.data as { phase: ISerializePhase; chunk: ISerializeChunk }
-        if (!isChunkShape(chunk))
-          throw createStoreWorkerError(
-            StoreWorkerErrorCode.invalidRequestChunk,
-            StoreWorkerErrorText.invalidRequestChunk
-          )
-        const serializeContext: ISerializeContext = {
-          signal: context.signal,
-          context: 'serialize-worker'
+  const endpointPromise = endpoint.then((readyEndpoint) => {
+    const unsubscribeFrame = readyEndpoint.onRequest(
+      WorkerSerializeFrameMethod,
+      async (payload) => {
+        const frame = payload as Partial<IWorkerSerializeFrame>
+        if (typeof frame.streamId !== 'string') return undefined
+        const state = streamStates.get(frame.streamId)
+        if (!state) return undefined
+        if (frame.kind === WorkerSerializeFrameKind.cancel) {
+          state.cancelled = true
+          wakeAllWorkers(state)
+          state.cancelReject?.(workerStreamCancelledError())
+          state.cancelReject = undefined
+          return undefined
         }
-        if (phase === WorkerSerializePhase.encode) {
-          const request = context.data as { readonly streamId?: unknown }
-          if (typeof request.streamId !== 'string' || request.streamId.length === 0)
-            throw createStoreWorkerError(
-              StoreWorkerErrorCode.invalidOption,
-              StoreWorkerErrorText.invalidPhase
-            )
-          const streamId = request.streamId
-          const ackState: IWorkerAckState = {
-            credits: 2,
-            cancelled: false,
-            nextAckSequence: 1,
-            wake: new CursorQueue()
-          }
-          streamStates.set(streamId, ackState)
-          const abort = (): void => {
-            ackState.cancelled = true
-            wakeAllWorkers(ackState)
-            ackState.cancelReject?.(workerStreamCancelledError())
-            ackState.cancelReject = undefined
-          }
-          context.signal.addEventListener('abort', abort, { once: true })
-          let sequence = 0
-          let completed = false
-          let iterator: AsyncIterator<ISerializeChunk> | Iterator<ISerializeChunk> | undefined
-          const send = async (
-            kind: keyof typeof WorkerSerializeFrameKind,
-            next?: ISerializeChunk,
-            error?: unknown
-          ) => {
-            if (kind === WorkerSerializeFrameKind.chunk) await waitForWorkerCredit(ackState)
-            context.dispatchTo({
-              id: WorkerRpcIdentity.main,
-              method: WorkerSerializeFrameMethod,
-              data: {
-                streamId,
-                kind,
-                sequence: sequence++,
-                ...(next ? { chunk: next } : {}),
-                ...(error ? { error } : {})
-              }
-            })
-          }
-          try {
-            context.dispatchTo({
-              id: WorkerRpcIdentity.main,
-              method: WorkerSerializeFrameMethod,
-              data: { streamId, kind: WorkerSerializeFrameKind.open, sequence: sequence++ }
-            })
-            const output = await parser.encode(chunk[1], serializeContext)
-            if (isChunkShape(output)) {
-              await send(WorkerSerializeFrameKind.chunk, output)
-            } else {
-              const candidate = Object(output) as {
-                readonly [Symbol.asyncIterator]?: () => AsyncIterator<ISerializeChunk>
-                readonly [Symbol.iterator]?: () => Iterator<ISerializeChunk>
-              }
-              const asyncFactory = candidate[Symbol.asyncIterator]
-              const syncFactory = candidate[Symbol.iterator]
-              if (typeof asyncFactory === 'function')
-                iterator = (candidate as AsyncIterable<ISerializeChunk>)[Symbol.asyncIterator]()
-              else if (typeof syncFactory === 'function')
-                iterator = (candidate as Iterable<ISerializeChunk>)[Symbol.iterator]()
-              else throw new TypeError(StoreWorkerErrorText.invalidChunk)
-              while (true) {
-                let rejectCancellation!: (reason: unknown) => void
-                const cancellation = new Promise<never>((_resolve, reject) => {
-                  rejectCancellation = reject
-                  ackState.cancelReject = reject
-                  if (ackState.cancelled) reject(workerStreamCancelledError())
-                })
-                let step: IteratorResult<ISerializeChunk>
-                try {
-                  step = await Promise.race([Promise.resolve(iterator.next()), cancellation])
-                } finally {
-                  if (ackState.cancelReject === rejectCancellation)
-                    ackState.cancelReject = undefined
-                }
-                if (step.done) break
-                if (!isChunkShape(step.value))
-                  throw new TypeError(StoreWorkerErrorText.invalidChunk)
-                await send(WorkerSerializeFrameKind.chunk, step.value)
-              }
-            }
-            await send(WorkerSerializeFrameKind.end)
-            completed = true
-            return context.success({ streamId })
-          } catch (error) {
-            try {
-              await send(WorkerSerializeFrameKind.error, undefined, error)
-            } catch {
-              // Cancellation may close the operation before an error frame can be delivered.
-            }
-            throw error
-          } finally {
-            if (!completed && iterator?.return) {
-              try {
-                await iterator.return()
-              } catch {
-                // Preserve the primary stream failure; endpoint error serialization owns it.
-              }
-            }
-            context.signal.removeEventListener('abort', abort)
-            streamStates.delete(streamId)
-          }
-        }
-        if (phase !== WorkerSerializePhase.decode) {
+        if (frame.kind !== WorkerSerializeFrameKind.ack) return undefined
+        if (frame.sequence !== state.nextAckSequence) return undefined
+        state.nextAckSequence++
+        state.credits++
+        takeWorkerWake(state)?.()
+        return undefined
+      }
+    )
+    const unsubscribe = readyEndpoint.onRequest(WorkerRpcIdentity.call, async (payload, signal) => {
+      const { phase, chunk } = payload as { phase: ISerializePhase; chunk: ISerializeChunk }
+      if (!isChunkShape(chunk))
+        throw createStoreWorkerError(
+          StoreWorkerErrorCode.invalidRequestChunk,
+          StoreWorkerErrorText.invalidRequestChunk
+        )
+      const serializeContext: ISerializeContext = {
+        signal: signal,
+        context: 'serialize-worker'
+      }
+      if (phase === WorkerSerializePhase.encode) {
+        const request = payload as { readonly streamId?: unknown; readonly clientId?: unknown }
+        if (typeof request.streamId !== 'string' || request.streamId.length === 0)
           throw createStoreWorkerError(
             StoreWorkerErrorCode.invalidOption,
             StoreWorkerErrorText.invalidPhase
           )
+        const streamId = request.streamId
+        const targetId = request.clientId
+        if (typeof targetId !== 'string' || targetId.length === 0)
+          throw createStoreWorkerError(
+            StoreWorkerErrorCode.invalidOption,
+            StoreWorkerErrorText.invalidPhase
+          )
+        const ackState: IWorkerAckState = {
+          credits: 2,
+          cancelled: false,
+          nextAckSequence: 1,
+          wake: new CursorQueue()
         }
-        const value = await parser.decode(chunk, serializeContext)
-        const result: ISerializeChunk = decodeWorkerValue(value)
-        return context.success(result, {
-          transfer: transferablesOf(result, WorkerByteOwnership.transfer)
-        })
+        streamStates.set(streamId, ackState)
+        const abort = (): void => {
+          ackState.cancelled = true
+          wakeAllWorkers(ackState)
+          ackState.cancelReject?.(workerStreamCancelledError())
+          ackState.cancelReject = undefined
+        }
+        signal.addEventListener('abort', abort, { once: true })
+        let sequence = 0
+        let completed = false
+        let iterator: AsyncIterator<ISerializeChunk> | Iterator<ISerializeChunk> | undefined
+        const send = async (
+          kind: keyof typeof WorkerSerializeFrameKind,
+          next?: ISerializeChunk,
+          error?: unknown
+        ) => {
+          if (kind === WorkerSerializeFrameKind.chunk) await waitForWorkerCredit(ackState)
+          await readyEndpoint.notify(
+            {
+              streamId,
+              kind,
+              sequence: sequence++,
+              ...(next ? { chunk: next } : {}),
+              ...(error ? { error } : {})
+            },
+            WorkerSerializeFrameMethod,
+            {
+              transfer: next ? transferablesOf(next, WorkerByteOwnership.transfer) : undefined,
+              targetId
+            }
+          )
+        }
+        try {
+          await readyEndpoint.notify(
+            { streamId, kind: WorkerSerializeFrameKind.open, sequence: sequence++ },
+            WorkerSerializeFrameMethod,
+            { targetId }
+          )
+          const output = await parser.encode(chunk[1], serializeContext)
+          if (isChunkShape(output)) {
+            await send(WorkerSerializeFrameKind.chunk, output)
+          } else {
+            const candidate = Object(output) as {
+              readonly [Symbol.asyncIterator]?: () => AsyncIterator<ISerializeChunk>
+              readonly [Symbol.iterator]?: () => Iterator<ISerializeChunk>
+            }
+            const asyncFactory = candidate[Symbol.asyncIterator]
+            const syncFactory = candidate[Symbol.iterator]
+            if (typeof asyncFactory === 'function')
+              iterator = (candidate as AsyncIterable<ISerializeChunk>)[Symbol.asyncIterator]()
+            else if (typeof syncFactory === 'function')
+              iterator = (candidate as Iterable<ISerializeChunk>)[Symbol.iterator]()
+            else throw new TypeError(StoreWorkerErrorText.invalidChunk)
+            while (true) {
+              let rejectCancellation!: (reason: unknown) => void
+              const cancellation = new Promise<never>((_resolve, reject) => {
+                rejectCancellation = reject
+                ackState.cancelReject = reject
+                if (ackState.cancelled) reject(workerStreamCancelledError())
+              })
+              let step: IteratorResult<ISerializeChunk>
+              try {
+                step = await Promise.race([Promise.resolve(iterator.next()), cancellation])
+              } finally {
+                if (ackState.cancelReject === rejectCancellation) ackState.cancelReject = undefined
+              }
+              if (step.done) break
+              if (!isChunkShape(step.value)) throw new TypeError(StoreWorkerErrorText.invalidChunk)
+              await send(WorkerSerializeFrameKind.chunk, step.value)
+            }
+          }
+          await send(WorkerSerializeFrameKind.end)
+          completed = true
+          return { streamId }
+        } catch (error) {
+          try {
+            await send(WorkerSerializeFrameKind.error, undefined, error)
+          } catch {
+            // Cancellation may close the operation before an error frame can be delivered.
+          }
+          throw error
+        } finally {
+          if (!completed && iterator?.return) {
+            try {
+              await iterator.return()
+            } catch {
+              // Preserve the primary stream failure; endpoint error serialization owns it.
+            }
+          }
+          signal.removeEventListener('abort', abort)
+          streamStates.delete(streamId)
+        }
       }
-    },
-    middlewares: [connect({ transport }), protocol(), abort(), timeout()]
-  })
-  void endpoint.then((resolved) =>
-    resolved.on(WorkerSerializeFrameMethod, (context) => {
-      const frame = context.data as Partial<IWorkerSerializeFrame>
-      if (typeof frame.streamId !== 'string') return
-      const state = streamStates.get(frame.streamId)
-      if (!state) return
-      if (frame.kind === WorkerSerializeFrameKind.cancel) {
-        state.cancelled = true
-        wakeAllWorkers(state)
-        state.cancelReject?.(workerStreamCancelledError())
-        state.cancelReject = undefined
-        return
+      if (phase !== WorkerSerializePhase.decode) {
+        throw createStoreWorkerError(
+          StoreWorkerErrorCode.invalidOption,
+          StoreWorkerErrorText.invalidPhase
+        )
       }
-      if (frame.kind !== WorkerSerializeFrameKind.ack) return
-      if (frame.sequence !== state.nextAckSequence) return
-      state.nextAckSequence++
-      state.credits++
-      takeWorkerWake(state)?.()
+      const value = await parser.decode(chunk, serializeContext)
+      const result: ISerializeChunk = decodeWorkerValue(value)
+      return result
     })
+    return {
+      dispose: async () => {
+        unsubscribeFrame()
+        unsubscribe()
+        await readyEndpoint.close()
+      }
+    }
+  })
+  return toManagedRpcHandler(endpointPromise, (message) =>
+    inboundListener?.({ data: message } as MessageEvent<unknown>)
   )
-  return toManagedRpcHandler(endpoint, (message) => deliver(message))
 }

@@ -41,8 +41,7 @@ export function installPlugin(
     [WebRpcSharedKey.abort, 'abortCapability'],
     [WebRpcSharedKey.hooks, 'hooks'],
     [WebRpcSharedKey.ping, 'pingCapability'],
-    [WebRpcSharedKey.uuid, 'uuid'],
-    [WebRpcSharedKey.chunk, 'chunkCapability']
+    [WebRpcSharedKey.uuid, 'uuid']
   ])
   for (const key of Reflect.ownKeys(shared)) {
     const name = names.get(key)

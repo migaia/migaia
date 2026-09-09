@@ -1,0 +1,26 @@
+{
+  "name": "@migaia/rpc-contract",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Runtime-neutral RPC semantic and framing contracts.",
+  "license": "MIT",
+  "files": ["dist", "README.md", "USEGUIDE.md", "schema"],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./v1": { "types": "./dist/v1/index.d.ts", "default": "./dist/v1/index.js" },
+    "./framing": { "types": "./dist/framing/index.d.ts", "default": "./dist/framing/index.js" },
+    "./framing/v1": { "types": "./dist/framing/v1.d.ts", "default": "./dist/framing/v1.js" }
+  },
+  "scripts": {
+    "fmt": "oxfmt src test",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:test": "tsc -p tsconfig.test.json",
+    "lint": "oxlint src test",
+    "test": "vitest run test"
+  }
+}

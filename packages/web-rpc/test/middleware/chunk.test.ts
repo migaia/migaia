@@ -1,27 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { chunk } from '../../src/middleware/chunk'
-import { installPlugin } from './helpers'
+import { createStringFramer } from '@migaia/rpc-contract/framing'
 
-describe('chunk middleware', () => {
-  it('splits by UTF-8 bytes without breaking unicode', () => {
-    const values = installPlugin(chunk({ chunkSize: 4 }))
-    const capability = values.get('chunkCapability') as {
-      byteLength(value: string): number
-      split(value: string, max: number): readonly string[]
-    }
-    const parts = capability.split('😀中文', 4)
-    expect(parts.join('')).toBe('😀中文')
-    expect(Math.max(...parts.map((part) => capability.byteLength(part)))).toBeLessThanOrEqual(4)
+describe('canonical framing contract', () => {
+  it('frames and reassembles unicode without a WebRPC middleware splitter', () => {
+    const framer = createStringFramer({ chunkBytes: 4 })
+    const value = '😀中文测试'
+    const frames = framer.frame(value, {
+      source: 'chunk-test',
+      messageId: 'chunk-test'
+    })
+    expect(frames.length).toBeGreaterThan(1)
+    const accepted = frames.map((frame) =>
+      framer.accept(frame, { source: 'chunk-test', messageId: 'chunk-test' })
+    )
+    expect(accepted.at(-1)).toMatchObject({ status: 'complete', value })
   })
-  it('preserves custom splitter and byte counter in middleware capability', () => {
-    const split = (value: string): readonly string[] => [value.slice(0, 1), value.slice(1)]
-    const byteLength = (value: string): number => value.length
-    const values = installPlugin(chunk({ split, byteLength }))
-    const capability = values.get('chunkCapability') as {
-      byteLength: (value: string) => number
-      split: (value: string, max: number) => readonly string[]
-    }
-    expect(capability.byteLength).toBe(byteLength)
-    expect(capability.split).toBe(split)
+
+  it('does not retain the former root chunk middleware export', async () => {
+    const root = await import('../../src/index.js')
+    expect('chunk' in root).toBe(false)
   })
 })

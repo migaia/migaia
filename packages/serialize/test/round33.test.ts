@@ -30,6 +30,18 @@ const packageRoots = [
   { name: '@migaia/lifecycle', root: resolve(repositoryRoot, 'packages/lifecycle') },
   { name: '@migaia/utils', root: resolve(repositoryRoot, 'packages/utils') }
 ] as const
+/** Installed external codec packages packed locally to keep the consumer offline. */
+const externalPackageRoots = [
+  {
+    name: '@bufbuild/protobuf',
+    root: realpathSync(join(serializeRoot, 'node_modules', '@bufbuild', 'protobuf'))
+  },
+  {
+    name: '@msgpack/msgpack',
+    root: realpathSync(join(serializeRoot, 'node_modules', '@msgpack', 'msgpack'))
+  },
+  { name: 'cbor-x', root: realpathSync(join(serializeRoot, 'node_modules', 'cbor-x')) }
+] as const
 
 /** Create one packed tarball and return its exact temporary path. */
 const packPackage = (packageRoot: string, destination: string): string => {
@@ -49,13 +61,41 @@ const packPackage = (packageRoot: string, destination: string): string => {
   return join(destination, archive)
 }
 
+/** Pack an installed external dependency without executing its lifecycle scripts. */
+const packExternalPackage = (packageRoot: string, destination: string): string => {
+  execFileSync('npm', ['pack', '--ignore-scripts', '--pack-destination', destination], {
+    cwd: packageRoot,
+    env: {
+      ...process.env,
+      npm_config_cache: join(destination, '.npm-cache'),
+      npm_config_update_notifier: 'false'
+    },
+    stdio: 'pipe'
+  })
+  const packageName = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
+    readonly name: string
+  }
+  const archive = readdirSync(destination).find(
+    (entry) =>
+      entry.startsWith(packageName.name.replace('/', '-').replace('@', '')) &&
+      entry.endsWith('.tgz')
+  )
+  if (archive === undefined) throw new Error(`missing packed archive for ${packageName.name}`)
+  return join(destination, archive)
+}
+
 /** Install packed serialize, lifecycle and utils artifacts into an isolated consumer. */
 const installPackedConsumer = (
   consumerRoot: string,
   serializeArchive: string,
   lifecycleArchive: string,
-  utilsArchive: string
+  utilsArchive: string,
+  externalArchives: readonly string[]
 ): void => {
+  /** External archive overrides prevent package-manager registry resolution. */
+  const externalDependencies = Object.fromEntries(
+    externalPackageRoots.map(({ name }, index) => [name, `file:${externalArchives[index]}`])
+  )
   writeFileSync(
     join(consumerRoot, 'package.json'),
     `${JSON.stringify(
@@ -66,7 +106,8 @@ const installPackedConsumer = (
         dependencies: {
           '@migaia/serialize': `file:${serializeArchive}`,
           '@migaia/lifecycle': `file:${lifecycleArchive}`,
-          '@migaia/utils': `file:${utilsArchive}`
+          '@migaia/utils': `file:${utilsArchive}`,
+          ...externalDependencies
         }
       },
       undefined,
@@ -81,7 +122,8 @@ const installPackedConsumer = (
         packages: [],
         overrides: {
           '@migaia/lifecycle': `file:${lifecycleArchive}`,
-          '@migaia/utils': `file:${utilsArchive}`
+          '@migaia/utils': `file:${utilsArchive}`,
+          ...externalDependencies
         }
       },
       undefined,
@@ -89,11 +131,15 @@ const installPackedConsumer = (
     )}\n`,
     'utf8'
   )
-  execFileSync('pnpm', ['install', '--offline', '--ignore-scripts', '--no-frozen-lockfile'], {
-    cwd: consumerRoot,
-    env: { ...process.env, CI: 'true' },
-    stdio: 'pipe'
-  })
+  execFileSync(
+    'pnpm',
+    ['install', '--offline', '--ignore-scripts', '--lockfile=false', '--no-optional'],
+    {
+      cwd: consumerRoot,
+      env: { ...process.env, CI: 'true' },
+      stdio: 'pipe'
+    }
+  )
 }
 
 /** Normalize Vite module IDs to exact package-relative ledger entries. */
@@ -153,6 +199,9 @@ describe('Round33 packed serialize core boundary', () => {
     const smokeRoot = mkdtempSync(join(tmpdir(), 'migaia-serialize-core-packed-'))
     try {
       const archives = packageRoots.map(({ root }) => packPackage(root, smokeRoot))
+      const externalArchives = externalPackageRoots.map(({ root }) =>
+        packExternalPackage(root, smokeRoot)
+      )
       const consumerRoot = join(smokeRoot, 'consumer')
       const serializeArchive = archives[0]
       const lifecycleArchive = archives[1]
@@ -164,7 +213,13 @@ describe('Round33 packed serialize core boundary', () => {
       )
         throw new Error('packed dependency archive missing')
       mkdirSync(consumerRoot, { recursive: true })
-      installPackedConsumer(consumerRoot, serializeArchive, lifecycleArchive, utilsArchive)
+      installPackedConsumer(
+        consumerRoot,
+        serializeArchive,
+        lifecycleArchive,
+        utilsArchive,
+        externalArchives
+      )
       const installedPackages = packageRoots.map(({ name }) => ({
         name,
         root: realpathSync(join(consumerRoot, 'node_modules', ...name.split('/')))
@@ -173,6 +228,12 @@ describe('Round33 packed serialize core boundary', () => {
         consumerRoot,
         'stream-entry.js',
         "import { encodeStream } from '@migaia/serialize/core'; export { encodeStream };\n",
+        installedPackages
+      )
+      const identityLedger = await buildLedger(
+        consumerRoot,
+        'identity-entry.js',
+        "import { identityCodecV1 } from '@migaia/serialize/codecs/identity'; const marker = identityCodecV1; const value = { marker: true }; if (marker.id !== 'identity' || marker.version !== 1 || marker.encodedType !== 'unknown' || marker.encode(value) !== value || marker.decode(value) !== value) throw new Error('identity codec changed value'); export { identityCodecV1 };\n",
         installedPackages
       )
       const coreLedger = await buildLedger(
@@ -197,6 +258,19 @@ describe('Round33 packed serialize core boundary', () => {
       expect(streamLedger).toContain('@migaia/lifecycle/dist/abort-factory.js')
       expect(streamLedger).toContain('@migaia/serialize/dist/stream.js')
       expect(streamLedger).toContain('@migaia/serialize/dist/signal.js')
+      expect(identityLedger).toContain('@migaia/serialize/dist/codecs/identity.js')
+      expect(
+        [...identityLedger].filter((moduleId) =>
+          /(?:message-pack|cbor|protobuf)\.js$/u.test(moduleId)
+        )
+      ).toEqual([])
+      expect(
+        [...identityLedger].filter((moduleId) => moduleId.includes('@msgpack/msgpack/'))
+      ).toEqual([])
+      expect([...identityLedger].filter((moduleId) => moduleId.includes('cbor-x/'))).toEqual([])
+      expect(
+        [...identityLedger].filter((moduleId) => moduleId.includes('@bufbuild/protobuf/'))
+      ).toEqual([])
     } finally {
       rmSync(smokeRoot, { recursive: true, force: true })
     }

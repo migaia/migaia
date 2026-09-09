@@ -4,6 +4,11 @@
  * text.
  */
 export const WebRpcErrorText = {
+  /** Stable construction-hook event name consumed by endpoint diagnostics. */
+  componentShadowed: 'component-shadowed',
+  /** Stable descriptor diagnostics used by native contract component middleware. */
+  codecDescriptorInvalid: 'Codec descriptor is invalid',
+  framerDescriptorInvalid: 'Framer descriptor is invalid',
   /** Stable descriptor failure emitted before the kernel subscribes to a transport. */
   transportDescriptorInvalid: 'transport descriptor is invalid',
   /** Stable metadata failure emitted before the kernel subscribes to a transport. */

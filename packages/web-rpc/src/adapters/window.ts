@@ -1,5 +1,5 @@
 import type { IWebRpcSendOptions, IWebRpcTransport } from '../transport.js'
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js'
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../transport-constants.js'
 import { WebRpcError, WebRpcErrorCode } from '../errors.js'
 import {
   createListenerFailureState,

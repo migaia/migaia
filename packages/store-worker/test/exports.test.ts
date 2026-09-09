@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { ISerializeChunk, ISerializeParser } from '@migaia/serialize'
 import { SerializeChunkKind } from '@migaia/serialize'
-import type { IWebRpcAbortSignal, IWebRpcEndpoint } from '@migaia/web-rpc'
+import { WebRpcRemoteError, type IWebRpcAbortSignal, type IWebRpcEndpoint } from '@migaia/web-rpc'
 import { WorkerAdapter, createWorkerHandler, workerComputed, workerParser } from '../src/index'
 import * as storeWorker from '../src/index'
 import { toManagedRpcHandler } from '../src/managed-rpc-handler'
 import { createSerializeWorkerHandler } from '../src/serialize/worker'
+import { createWorkerContractEndpoint } from '../src/worker-contract.js'
 
 function fakePort() {
   return {
@@ -113,11 +114,70 @@ describe('store-worker exports', () => {
           adapter.request<string, string>('three')
         ])
       ).resolves.toEqual(['reply:two', 'reply:three'])
-      await expect(adapter.request('failure')).rejects.toMatchObject({
+      const received = await adapter.request('failure').catch((error: unknown) => error)
+      expect(received).toBeInstanceOf(WebRpcRemoteError)
+      expect(received).toMatchObject({
+        name: 'WebRpcRemoteError',
+        message: 'Provider failed',
         source: '@migaia/web-rpc',
         code: 'INTERNAL',
-        cause: undefined
+        cause: expect.any(Error)
       })
+      expect((received as Error).stack).not.toHaveLength(0)
+      /** Preserves the reconstructed native single failure beneath the canonical remote outer. */
+      const cause = (received as Error & { cause?: unknown }).cause
+      expect(cause).toBeInstanceOf(Error)
+      expect(cause).toMatchObject({
+        name: providerFailure.name,
+        message: providerFailure.message,
+        source: '@migaia/web-rpc',
+        code: 'INTERNAL'
+      })
+      expect((cause as Error).stack).toBe(providerFailure.stack)
+    } finally {
+      await adapter.dispose()
+    }
+  })
+
+  it('restores nested native provider causes without replacing native constructors or stacks', async () => {
+    const port = createLinkedWorkerPort()
+    const nested = new RangeError('nested worker cause')
+    const primary = new TypeError('typed worker failure', { cause: nested })
+    installLinkedWorkerHandler(port, () => {
+      throw primary
+    })
+    const adapter = new WorkerAdapter(port)
+    try {
+      const received = await adapter.request('nested-error').catch((error: unknown) => error)
+      expect(received).toBeInstanceOf(WebRpcRemoteError)
+      expect(received).toMatchObject({
+        name: 'WebRpcRemoteError',
+        message: 'Provider failed',
+        source: '@migaia/web-rpc',
+        code: 'INTERNAL',
+        cause: expect.any(TypeError)
+      })
+      expect((received as Error).stack).not.toHaveLength(0)
+      /** Preserves the reconstructed primary native failure beneath the canonical remote outer. */
+      const cause = (received as Error & { cause?: unknown }).cause
+      expect(cause).toBeInstanceOf(TypeError)
+      expect(cause).toMatchObject({
+        name: primary.name,
+        message: primary.message,
+        source: '@migaia/web-rpc',
+        code: 'INTERNAL'
+      })
+      expect((cause as Error).stack).toBe(primary.stack)
+      /** Preserves the second native failure in the reconstructed nested causal chain. */
+      const nestedCause = (cause as Error & { cause?: unknown }).cause
+      expect(nestedCause).toBeInstanceOf(RangeError)
+      expect(nestedCause).toMatchObject({
+        name: nested.name,
+        message: nested.message,
+        source: '',
+        code: ''
+      })
+      expect((nestedCause as Error).stack).toBe(nested.stack)
     } finally {
       await adapter.dispose()
     }
@@ -158,6 +218,58 @@ describe('store-worker exports', () => {
     await adapter.dispose()
   })
 
+  it('completes one-way worker notification after synchronous transfer delivery and preserves send failures', async () => {
+    type IListener = (event: MessageEvent<unknown>) => void
+    const clientListeners = new Set<IListener>()
+    const workerListeners = new Set<IListener>()
+    const transfers: Array<readonly Transferable[] | undefined> = []
+    let postFailure: Error | undefined
+    const clientPort = {
+      postMessage(message: unknown, transfer?: readonly Transferable[]): void {
+        if (postFailure) throw postFailure
+        transfers.push(transfer)
+        for (const listener of workerListeners) listener({ data: message } as MessageEvent<unknown>)
+      },
+      addEventListener(type: 'message' | 'error' | 'messageerror', listener: IListener): void {
+        if (type === 'message') clientListeners.add(listener)
+      },
+      removeEventListener(type: 'message' | 'error' | 'messageerror', listener: IListener): void {
+        if (type === 'message') clientListeners.delete(listener)
+      }
+    }
+    const workerPort = {
+      postMessage(message: unknown): void {
+        for (const listener of clientListeners) listener({ data: message } as MessageEvent<unknown>)
+      },
+      addEventListener(type: 'message' | 'error' | 'messageerror', listener: IListener): void {
+        if (type === 'message') workerListeners.add(listener)
+      },
+      removeEventListener(type: 'message' | 'error' | 'messageerror', listener: IListener): void {
+        if (type === 'message') workerListeners.delete(listener)
+      }
+    }
+    const worker = await createWorkerContractEndpoint(workerPort, {
+      id: 'worker',
+      targetId: 'main'
+    })
+    const received: unknown[] = []
+    worker.onRequest('notice', (payload) => {
+      received.push(payload)
+    })
+    const client = await createWorkerContractEndpoint(clientPort)
+    const transferred = new ArrayBuffer(8)
+    try {
+      await client.notify({ transferred }, 'notice', { transfer: [transferred] })
+      expect(received).toEqual([{ transferred: expect.any(ArrayBuffer) }])
+      expect(transfers.some((transfer) => transfer?.[0] === transferred)).toBe(true)
+      postFailure = new Error('worker post failure')
+      const failure = await client.notify('fails', 'notice').catch((error: unknown) => error)
+      expect(failure).toMatchObject({ cause: postFailure })
+    } finally {
+      await Promise.all([client.close(), worker.close()])
+    }
+  })
+
   it('rejects an invalid serialize worker handler before endpoint creation', () => {
     expect(() => createSerializeWorkerHandler(null as never, (() => undefined) as never)).toThrow(
       '[store] serialize worker handler requires encode/decode parser functions'
@@ -165,39 +277,41 @@ describe('store-worker exports', () => {
   })
 
   it('streams encode frames through the existing WebRPC endpoint with bounded consumer credit', async () => {
-    let produced = 0
-    let returned = false
-    const parser: ISerializeParser = {
-      name: 'stream-test',
-      async *encode() {
-        try {
-          for (let index = 0; index < 4; index++) {
-            produced++
-            yield [SerializeChunkKind.bytes, new Uint8Array([index])] as const
+    for (const clientId of [undefined, 'custom-client'] as const) {
+      let produced = 0
+      let returned = false
+      const parser: ISerializeParser = {
+        name: 'stream-test',
+        async *encode() {
+          try {
+            for (let index = 0; index < 4; index++) {
+              produced++
+              yield [SerializeChunkKind.bytes, new Uint8Array([index])] as const
+            }
+          } finally {
+            returned = true
           }
-        } finally {
-          returned = true
-        }
-      },
-      decode: (chunk) => chunk[1]
+        },
+        decode: (chunk) => chunk[1]
+      }
+      const port = createLinkedWorkerPort()
+      const handler = installLinkedSerializeWorkerHandler(port, parser)
+      const worker = workerParser({ worker: port, ...(clientId === undefined ? {} : { clientId }) })
+      const output = worker.encode('input', {
+        signal: new AbortController().signal,
+        context: 'stream-test'
+      })
+      const iterator = (output as AsyncIterable<ISerializeChunk>)[Symbol.asyncIterator]()
+      const first = await iterator.next()
+      expect(first.value).toEqual([SerializeChunkKind.bytes, new Uint8Array([0])])
+      expect(produced).toBeLessThanOrEqual(3)
+      const rest: unknown[] = []
+      for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) rest.push(chunk)
+      expect(rest).toHaveLength(3)
+      expect(returned).toBe(true)
+      await handler.dispose()
+      await worker.dispose?.()
     }
-    const port = createLinkedWorkerPort()
-    const handler = installLinkedSerializeWorkerHandler(port, parser)
-    const worker = workerParser({ worker: port })
-    const output = worker.encode('input', {
-      signal: new AbortController().signal,
-      context: 'stream-test'
-    })
-    const iterator = (output as AsyncIterable<ISerializeChunk>)[Symbol.asyncIterator]()
-    const first = await iterator.next()
-    expect(first.value).toEqual([SerializeChunkKind.bytes, new Uint8Array([0])])
-    expect(produced).toBeLessThanOrEqual(3)
-    const rest: unknown[] = []
-    for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) rest.push(chunk)
-    expect(rest).toHaveLength(3)
-    expect(returned).toBe(true)
-    await handler.dispose()
-    await worker.dispose?.()
   })
 
   it('cancels a pending encode iterator and invokes the parser iterator return hook', async () => {
@@ -237,6 +351,30 @@ describe('store-worker exports', () => {
     expect(returned).toBe(true)
     await handler.dispose()
     await worker.dispose?.()
+  })
+
+  it('settles a close-before-ready stream without sending a worker frame', async () => {
+    let sends = 0
+    const worker = workerParser({
+      worker: {
+        postMessage: () => {
+          sends++
+        },
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined
+      }
+    })
+    const output = worker.encode('pending', {
+      signal: new AbortController().signal,
+      context: 'close-before-ready'
+    })
+    const iterator = (output as AsyncIterable<ISerializeChunk>)[Symbol.asyncIterator]()
+    const pending = iterator.next()
+    const firstDispose = worker.dispose!() as Promise<void>
+    expect(worker.dispose!()).toBe(firstDispose)
+    await expect(pending).rejects.toMatchObject({ name: 'WebRpcLifecycleError' })
+    await firstDispose
+    expect(sends).toBe(0)
   })
   it('rejects null options at worker entry points with a tagged configuration error', () => {
     expect(() => new WorkerAdapter(fakePort(), null as never)).toThrow(
@@ -406,7 +544,7 @@ describe('store-worker exports', () => {
     resolveEndpoint(mockEndpoint(async () => undefined))
     await admitted
 
-    expect(delivered).toEqual(['admitted'])
+    expect(delivered).toEqual([])
     expect(handler.pendingCount).toBe(0)
   })
 
@@ -428,7 +566,7 @@ describe('store-worker exports', () => {
     )
 
     await Promise.all([admitted, firstDispose])
-    expect(delivered).toEqual(['admitted'])
+    expect(delivered).toEqual([])
     expect(disposeCalls).toBe(1)
     expect(handler.pendingCount).toBe(0)
   })
@@ -439,7 +577,7 @@ describe('store-worker exports', () => {
     await expect(adapter.request({}, {})).rejects.toThrow('worker adapter is disposed')
   })
 
-  it('snapshots request accessors before returning the admitted Promise', () => {
+  it('snapshots request accessors before returning the admitted Promise', async () => {
     const adapter = new WorkerAdapter(fakePort())
     let signalReads = 0
     let transferReads = 0
@@ -459,11 +597,12 @@ describe('store-worker exports', () => {
       }
     })
 
-    void adapter.request({}, options)
+    const pending = adapter.request({}, options)
 
     expect(signalReads).toBe(1)
     expect(transferReads).toBe(1)
     adapter.close()
+    await expect(pending).rejects.toThrow('worker adapter is disposed')
   })
 
   it('rejects hostile request options with a tagged error and original cause', async () => {

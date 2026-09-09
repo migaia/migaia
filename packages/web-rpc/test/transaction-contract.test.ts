@@ -189,6 +189,7 @@ describe('MET-RED-006 PluginHost batch completeness', () => {
         'kernel',
         'connect',
         'middleware-finalize',
+        'chunk',
         'outbound',
         'provider',
         'activation'

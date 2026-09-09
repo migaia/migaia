@@ -24,10 +24,27 @@ test('主线程取消会终止在途 Worker 请求', async ({ page }) => {
   await expect(page.evaluate(() => window.runStoreWorkerAbortScenario())).rejects.toThrow(/abort/i)
 })
 
-test('未预期 Worker 计算异常跨 realm 时保持稳定脱敏边界', async ({ page }) => {
+test('Worker failure retains canonical remote outer and meaningful native cause across realms', async ({
+  page
+}) => {
   await page.goto('/')
   const messages = await page.evaluate(() => window.runStoreWorkerErrorScenario())
-  expect(messages).toEqual(['WebRpcRemoteError: Provider failed'])
+  expect(messages).toEqual([
+    {
+      name: 'WebRpcRemoteError',
+      message: 'Provider failed',
+      source: '@migaia/web-rpc',
+      code: 'INTERNAL',
+      hasStack: true
+    },
+    {
+      name: 'Error',
+      message: 'Unable to calculate the requested value',
+      source: '@migaia/web-rpc',
+      code: 'INTERNAL',
+      hasStack: true
+    }
+  ])
 })
 
 test('请求 options 在真实 Worker admission 时只读取一次', async ({ page }) => {

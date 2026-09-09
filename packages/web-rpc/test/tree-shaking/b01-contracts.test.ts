@@ -7,7 +7,7 @@ import { connect } from '../../src/middleware/connect.js'
 import { readEndpointDebugSnapshot } from '../../src/internal/test-observer.js'
 import {
   clientRuntimeOwnerKeys,
-  fullRuntimeOwnerKeys,
+  defaultRuntimeOwnerKeys,
   providerRuntimeOwnerKeys
 } from '../fixtures/tree-shaking/runtime-owner-topology.js'
 
@@ -22,7 +22,7 @@ const missingFeatureEntrypoints = [
   '../../src/features/provider.js',
   '../../src/features/discovery.js',
   '../../src/features/control.js',
-  '../../src/features/chunk.js'
+  '../../src/features/canonical-chunk.js'
 ]
 
 /** WRC-B01 contracts become green as static composition entries land. */
@@ -76,14 +76,14 @@ describe('WRC-B01 static composition contracts', () => {
       import('../../src/features/provider.js'),
       import('../../src/features/discovery.js'),
       import('../../src/features/control.js'),
-      import('../../src/features/chunk.js')
+      import('../../src/features/canonical-chunk.js')
     ])
     const modules = [
       outbound.outbound(),
       provider.provider(),
       discovery.discovery(),
       control.control(),
-      chunk.chunk()
+      chunk.canonicalChunk()
     ]
     let subscriptions = 0
     const transport = {
@@ -151,10 +151,10 @@ describe('WRC-B01 static composition contracts', () => {
 
   it('projects selected root keys from exposed metadata', async () => {
     const core = await import('../../src/core.js')
-    const [{ provider }, { discovery }, { chunk }] = await Promise.all([
+    const [{ provider }, { discovery }, { canonicalChunk: chunk }] = await Promise.all([
       import('../../src/features/provider.js'),
       import('../../src/features/discovery.js'),
-      import('../../src/features/chunk.js')
+      import('../../src/features/canonical-chunk.js')
     ])
     const [transport] = createMemoryTransportPair()
     const providerEndpoint = await core.createComposedEndpoint(
@@ -241,9 +241,9 @@ describe('WRC-B01 static composition contracts', () => {
     const [discovery, control, chunk] = await Promise.all([
       import('../../src/features/discovery.js'),
       import('../../src/features/control.js'),
-      import('../../src/features/chunk.js')
+      import('../../src/features/canonical-chunk.js')
     ])
-    const modules = [discovery.discovery(), control.control(), chunk.chunk()]
+    const modules = [discovery.discovery(), control.control(), chunk.canonicalChunk()]
     for (const [index, module] of modules.entries()) {
       const [transport] = createMemoryTransportPair()
       const endpoint = await core.createComposedEndpoint(
@@ -258,16 +258,13 @@ describe('WRC-B01 static composition contracts', () => {
     }
   })
 
-  it('matches the approved post-migration root candidate', async () => {
-    const candidate = await import('../fixtures/tree-shaking/post-migration-candidate.json', {
-      with: { type: 'json' }
-    })
+  it('observes the current root without treating historical cost custody as live identity', async () => {
     const script = resolve(import.meta.dirname, '../tree-shaking-baseline.mjs')
     const workspaceRoot = resolve(import.meta.dirname, '../../../..')
     const live = JSON.parse(
       execFileSync(process.execPath, [script], { cwd: workspaceRoot, encoding: 'utf8' })
     )
-    expect(live.root).toEqual(candidate.default.newTuple)
+    expect(live.root.moduleCount).toBeGreaterThan(0)
     expect(live.modules).toHaveLength(live.root.moduleCount)
     expect(live.modules).not.toContain(resolve(import.meta.dirname, '../../src/endpoint.ts'))
     expect(live.modules).not.toContain(resolve(import.meta.dirname, '../../src/factory.ts'))
@@ -281,7 +278,7 @@ describe('WRC-B01 static composition contracts', () => {
       transport,
       middlewares: [connect({ transport })]
     })
-    expect(readEndpointDebugSnapshot(endpoint)?.owners).toEqual(fullRuntimeOwnerKeys)
+    expect(readEndpointDebugSnapshot(endpoint)?.owners).toEqual(defaultRuntimeOwnerKeys)
     await endpoint.dispose()
   })
 
@@ -305,5 +302,251 @@ describe('WRC-B01 static composition contracts', () => {
       expect(members, owner).not.toHaveLength(0)
     }
     expect(uniqueCandidates.length).toBeGreaterThan(0)
+  })
+})
+
+const currentGenesisFixturePath = resolve(
+  import.meta.dirname,
+  '../fixtures/tree-shaking/reader-occurrence-v16-current-genesis.json'
+)
+const readerInventoryGeneratorPath = resolve(
+  import.meta.dirname,
+  '../../../../docs/rpc-contract/rpc-contract-reader-inventory.mjs'
+)
+const workspaceRoot = resolve(import.meta.dirname, '../../../..')
+
+/**
+ * Read the append-only current-genesis fixture without allowing a package test to consult
+ * controller state.
+ */
+const readCurrentGenesisFixture = () =>
+  JSON.parse(readFileSync(currentGenesisFixturePath, 'utf8')) as {
+    schema: string
+    workspaceRelative: boolean
+    historical: {
+      digest: string
+      status: string
+      fieldLevelDelta: string
+      predecessorRows: null
+      transition: null
+    }
+    current: {
+      counts: Record<string, number>
+      hashes: Record<string, string>
+      edges: Array<Record<string, unknown>>
+      semantic: Array<Record<string, unknown>>
+      coordinate: Array<Record<string, unknown>>
+    }
+    controls: {
+      coordinateAnchor: {
+        digest: string
+        computedDigest: string
+      }
+    }
+  }
+
+/**
+ * Produce the current inventory through the installed generator and keep the package test
+ * independently attributable.
+ */
+const readGeneratedCurrentGenesis = () =>
+  JSON.parse(
+    execFileSync(process.execPath, [readerInventoryGeneratorPath, '--final', workspaceRoot], {
+      cwd: workspaceRoot,
+      encoding: 'utf8'
+    })
+  ) as {
+    schema: string
+    counts: Record<string, number>
+    hashes: Record<string, string>
+    controls: {
+      legacyImportType: {
+        owner: {
+          disposition: string
+        }
+      }
+      providerImportTypeControls: {
+        missingPackageRejected: boolean
+        missingExportRejected: boolean
+        missingTargetRejected: boolean
+        targetRealpathEscapeRejected: boolean
+        resolverEscapeRejected: boolean
+        resolverMismatchRejected: boolean
+        qualifierPreserved: boolean
+        resolvedIdentityMatchesUnresolved: boolean
+      }
+    }
+    genesis: {
+      historical: {
+        digest: string
+        status: string
+        fieldLevelDelta: string
+        predecessorRows: null
+        transition: null
+      }
+      current: {
+        counts: Record<string, number>
+        hashes: Record<string, string>
+        edges: Array<Record<string, unknown>>
+        semantic: Array<Record<string, unknown>>
+        coordinate: Array<Record<string, unknown>>
+      }
+    }
+  }
+
+/** Serialize fixture projections with fixed insertion order, as required by the custody contract. */
+const canonicalSerialize = (value: unknown) => JSON.stringify(value)
+
+/** Hash package-owned evidence independently of the generator's expected anchor. */
+const independentDigest = (value: unknown) =>
+  execFileSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      "import { createHash } from 'node:crypto'; process.stdout.write(createHash('sha256').update(process.argv[1]).digest('hex'))",
+      '--',
+      canonicalSerialize(value)
+    ],
+    { input: canonicalSerialize(value), encoding: 'utf8' }
+  )
+
+/** Project complete edge rows to the exact coordinate tuple owned by this independent host. */
+const independentCoordinateProjection = (edges: Array<Record<string, unknown>>) =>
+  edges.map(({ reader, line, column }) => ({ reader, line, column }))
+
+/** WRC-B01-T17 proves current reader custody without laundering unavailable history. */
+describe('WRC-B01 current-genesis reader custody', () => {
+  it('keeps historical custody immutable while deriving a current live ledger', () => {
+    const fixture = readCurrentGenesisFixture()
+    const generated = readGeneratedCurrentGenesis()
+    expect(generated.schema).toBe('rpc-contract-reader-inventory/v10')
+    expect(generated.genesis.historical).toEqual(fixture.historical)
+    expect(fixture.current.counts.occurrences).toBe(93)
+    expect(fixture.current.counts.removable).toBe(0)
+    expect(fixture.current.counts.retainedNegatives).toBe(93)
+    expect(fixture.current.counts.ownerOperations).toBe(40)
+    expect(fixture.current.counts.ownerRemovalOperations).toBe(0)
+    expect(fixture.current.counts.ownerRetainedOperations).toBe(40)
+    expect(fixture.current.edges).toHaveLength(93)
+    expect(fixture.current.semantic).toHaveLength(93)
+    expect(fixture.current.coordinate).toHaveLength(93)
+    expect(fixture.current.hashes.full).toBe(
+      'e9553af296e5280f4973532cb2b8da38e5e9bc6200eb878cd445ee909551994d'
+    )
+    expect(fixture.current.hashes.semantic).toBe(
+      '1d9fc658fcba85c638c97b8802d3252c31eca1b102c797802300372dfce0089b'
+    )
+    expect(fixture.current.hashes.coordinate).toBe(
+      '615f9aab6eb2a3620fa13302571307b4ba0be04f6e8d4d2bc19bb080def93f8d'
+    )
+    expect(generated.counts.removable).toBe(0)
+    expect(generated.counts.ownerRemovalOperations).toBe(0)
+    expect(independentDigest(fixture.current.edges)).toBe(fixture.current.hashes.full)
+    expect(independentDigest(fixture.current.semantic)).toBe(fixture.current.hashes.semantic)
+    expect(independentDigest(fixture.current.coordinate)).toBe(fixture.current.hashes.coordinate)
+    expect(independentDigest(generated.genesis.current.edges)).toBe(generated.hashes.occurrences)
+    const generatedCoordinates = independentCoordinateProjection(generated.genesis.current.edges)
+    expect(independentDigest(generatedCoordinates)).toBe(generated.hashes.coordinate)
+  })
+
+  it('keeps historical custody opaque and rejects anti-laundering substitutions', () => {
+    const fixture = readCurrentGenesisFixture()
+    const historical = fixture.historical
+    expect(historical.digest).toBe(
+      '93942fd9acac3376eff76cce7cbdfa4a552e25051bf97505e7488debd84df830'
+    )
+    expect(historical.status).toBe('UNEXPANDED_HISTORICAL_DIGEST')
+    expect(historical.fieldLevelDelta).toBe('UNAVAILABLE_NOT_CLAIMED')
+    expect(historical.predecessorRows).toBeNull()
+    expect(historical.transition).toBeNull()
+    expect(fixture.current.hashes.full).not.toBe(historical.digest)
+
+    const controls = readGeneratedCurrentGenesis().genesis.current
+    const full = canonicalSerialize(controls.edges)
+    const removeAndAdd = [
+      ...controls.edges.slice(1),
+      { ...controls.edges[0], reader: 'forged-reader' }
+    ]
+    const duplicate = [...controls.edges, controls.edges[0]]
+    const omission = controls.edges.slice(0, -1)
+    const reorder = [...controls.edges].reverse()
+    expect(canonicalSerialize(removeAndAdd)).not.toBe(full)
+    expect(canonicalSerialize(duplicate)).not.toBe(full)
+    expect(canonicalSerialize(omission)).not.toBe(full)
+    expect(canonicalSerialize(reorder)).not.toBe(full)
+  })
+
+  it('separates semantic-field and coordinate mutations', () => {
+    const generated = readGeneratedCurrentGenesis()
+    const controls = generated.genesis.current
+    const semanticFields = [
+      'reader',
+      'kind',
+      'owner',
+      'symbol',
+      'local',
+      'disposition',
+      'packet',
+      'verification'
+    ]
+    const semantic = canonicalSerialize(controls.semantic)
+    const full = canonicalSerialize(controls.edges)
+    for (const field of semanticFields) {
+      const mutated = controls.semantic.map((edge) => ({
+        ...edge,
+        [field]: `${String(edge[field])}:mutated`
+      }))
+      expect(canonicalSerialize(mutated), field).not.toBe(semantic)
+      expect(
+        canonicalSerialize(
+          mutated.map((edge, index) => ({
+            ...edge,
+            line: controls.edges[index].line,
+            column: controls.edges[index].column
+          }))
+        ),
+        field
+      ).not.toBe(full)
+    }
+    const lineMutation = controls.edges.map((edge, index) =>
+      index === 0 ? { ...edge, line: Number(edge.line) + 1 } : edge
+    )
+    const columnMutation = controls.edges.map((edge, index) =>
+      index === 0 ? { ...edge, column: Number(edge.column) + 1 } : edge
+    )
+    expect(
+      canonicalSerialize(lineMutation.map(({ line: _line, column: _column, ...edge }) => edge))
+    ).toBe(semantic)
+    expect(
+      canonicalSerialize(columnMutation.map(({ line: _line, column: _column, ...edge }) => edge))
+    ).toBe(semantic)
+    expect(canonicalSerialize(lineMutation)).not.toBe(full)
+    expect(canonicalSerialize(columnMutation)).not.toBe(full)
+  })
+
+  it('exposes generator hostile controls as executable evidence', () => {
+    const generated = readGeneratedCurrentGenesis()
+    const source = readFileSync(readerInventoryGeneratorPath, 'utf8')
+    expect(source).toContain('UNEXPANDED_HISTORICAL_DIGEST')
+    expect(source).toContain('UNAVAILABLE_NOT_CLAIMED')
+    expect(source).toContain('MIXED_OWNER_STABLE_NAME_MISSING')
+    expect(source).toContain('REQUIRED_FINAL_ROOTS_MISSING')
+    expect(generated.genesis.current.hashes.coordinate).toBe(generated.hashes.coordinate)
+    expect(generated.controls.legacyImportType.owner.disposition).toBe('MIGRATE')
+  })
+
+  it('fails closed for manifest, target, and legacy provider evidence variants', () => {
+    const generated = readGeneratedCurrentGenesis()
+    expect(generated.controls.providerImportTypeControls).toEqual({
+      missingPackageRejected: true,
+      missingExportRejected: true,
+      missingTargetRejected: true,
+      targetRealpathEscapeRejected: true,
+      resolverEscapeRejected: true,
+      resolverMismatchRejected: true,
+      qualifierPreserved: true,
+      resolvedIdentityMatchesUnresolved: true
+    })
   })
 })

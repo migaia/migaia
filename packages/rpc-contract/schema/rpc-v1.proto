@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package migaia.rpc.v1;
+
+// Normative schema identity is migaia.rpc / 1. The runtime-neutral package
+// intentionally does not publish bindings tied to a protobuf implementation.
+message RpcEnvelope {
+  string kind = 1;
+  string id = 2;
+  bytes payload = 3;
+}

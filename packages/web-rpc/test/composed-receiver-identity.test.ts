@@ -3,7 +3,7 @@ import { createClientEndpoint } from '../src/client.js'
 import { createProviderEndpoint } from '../src/provider.js'
 import { createMemoryTransportPair } from '../src/adapters/memory.js'
 import { connect } from '../src/middleware/connect.js'
-import type { IWebRpcRequest } from '../src/wire.js'
+import type { IRpcRequestEnvelope } from '@migaia/rpc-contract'
 
 /** Proves composed provider admission rejects frames not addressed to its receiver identity. */
 describe('composed receiver identity admission', () => {
@@ -34,21 +34,35 @@ describe('composed receiver identity admission', () => {
     try {
       await client.send('receiver-provider', 'count', null)
       expect(executions).toBe(1)
-      const base: Omit<IWebRpcRequest, 'receiverId'> = {
+      const base: IRpcRequestEnvelope = {
         kind: 'request',
-        version: '1.0',
-        taskId: 'forged-task',
-        senderId: 'someone-else',
-        targetId: 'receiver-provider',
+        id: 'forged-task',
         method: 'count',
-        data: null,
-        dispatchOnly: true,
-        sentAt: Date.now()
+        data: {
+          webRpc: {
+            profile: 'web-rpc.route.v1',
+            type: 'request',
+            applicationVersion: '1.0',
+            senderId: 'someone-else',
+            targetId: 'receiver-provider',
+            dispatchOnly: true,
+            sentAt: Date.now()
+          },
+          payload: null
+        }
       }
+      /** Test fixture is a known routing record despite IRpcEnvelope's portable-value union. */
+      const baseData = base.data as { readonly webRpc: Record<string, unknown> }
       for (const frame of [
         base,
-        { ...base, receiverId: 'foreign-provider' },
-        { ...base, receiverId: 'receiver-provider' }
+        {
+          ...base,
+          data: { ...baseData, webRpc: { ...baseData.webRpc, receiverId: 'foreign-provider' } }
+        },
+        {
+          ...base,
+          data: { ...baseData, webRpc: { ...baseData.webRpc, receiverId: 'receiver-provider' } }
+        }
       ])
         clientTransport.send(frame)
       await new Promise((resolve) => setTimeout(resolve, 0))

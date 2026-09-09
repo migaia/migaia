@@ -3780,9 +3780,9 @@
           "metric": "MET-RED",
           "owner": ["@migaia/web-rpc"],
           "state": "implemented",
-          "implementation": "current-owner:packages/web-rpc/test/duplicate-owner-contract.test.ts::proves MET-RED-014 keeps chunk assembly in ChunkAssembler",
+          "implementation": "current-owner:packages/web-rpc/test/duplicate-owner-contract.test.ts::proves MET-RED-014 keeps chunk assembly in the D13 framer owner",
           "tests": [
-            "packages/web-rpc/test/duplicate-owner-contract.test.ts::proves MET-RED-014 keeps chunk assembly in ChunkAssembler"
+            "packages/web-rpc/test/duplicate-owner-contract.test.ts::proves MET-RED-014 keeps chunk assembly in the D13 framer owner"
           ],
           "evidence": [
             "fresh-pass:packages/web-rpc/test/duplicate-owner-contract.test.ts::proves MET-RED-014 keeps chunk assembly in ChunkAssembler:2026-08-26 SDD-v47/R6-v2 candidate-specific focused matrix PASS"
@@ -4107,9 +4107,9 @@
           "metric": "MET-RED",
           "owner": ["@migaia/web-rpc"],
           "state": "implemented",
-          "implementation": "current-owner:packages/web-rpc/test/duplicate-owner-contract.test.ts::proves MET-RED-028 gives chunk expiry one injected timer owner",
+          "implementation": "current-owner:packages/web-rpc/test/duplicate-owner-contract.test.ts::proves MET-RED-028 gives D13 framing expiry one injected timer owner",
           "tests": [
-            "packages/web-rpc/test/duplicate-owner-contract.test.ts::proves MET-RED-028 gives chunk expiry one injected timer owner"
+            "packages/web-rpc/test/duplicate-owner-contract.test.ts::proves MET-RED-028 gives D13 framing expiry one injected timer owner"
           ],
           "evidence": [
             "fresh-pass:packages/web-rpc/test/duplicate-owner-contract.test.ts::proves MET-RED-028 gives chunk expiry one injected timer owner:2026-08-26 SDD-v47/R6-v2 candidate-specific focused matrix PASS"
@@ -6123,133 +6123,133 @@
       "id": "WRC-C-T90",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5161,
+      "line": 4929,
       "title": "T90 B12c01 RED: outbound inventory claims exact narrow shared ports"
     },
     {
       "id": "WRC-C-T91",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5198,
+      "line": 4966,
       "title": "T91 B12c01 RED: outbound result uses Host-owned disposal without legacy blanket escape"
     },
     {
       "id": "WRC-C-T92",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5213,
+      "line": 4981,
       "title": "T92 B12c01 RED: outbound publishes typed operations and identity ports in one Host batch"
     },
     {
       "id": "WRC-C-T93",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5232,
+      "line": 5000,
       "title": "T93 B12c01: outbound install does not subscribe or activate before final activation"
     },
     {
       "id": "WRC-C-T94",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5263,
+      "line": 5031,
       "title": "T94 B12c01 RED: outbound typed ports are endpoint-local and never shared by identity"
     },
     {
       "id": "WRC-C-T95",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5293,
+      "line": 5061,
       "title": "T95 B12c01 supporting baseline: endpoint construction owns target snapshot before outbound activation"
     },
     {
       "id": "WRC-C-T96",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5322,
+      "line": 5090,
       "title": "T96 B12c01: hostile outbound target getter fails before activation with original cause"
     },
     {
       "id": "WRC-C-T97",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5346,
+      "line": 5580,
       "title": "T97 B12c01: real outbound send and RPC fanout preserve canonical results"
     },
     {
       "id": "WRC-C-T98",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5370,
+      "line": 5604,
       "title": "T98 B12c01: outbound dispose is host-owned, idempotent, and rejects later sends canonically"
     },
     {
       "id": "WRC-C-T99",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5386,
+      "line": 5620,
       "title": "T99 B12c01: later activation failure rolls back outbound publication and leaves zero subscription residue"
     },
     {
       "id": "WRC-C-T100",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5413,
+      "line": 5647,
       "title": "T100 B12c01 RED: outbound cleanup proves exact order, failure identity, and terminal idempotence"
     },
     {
       "id": "WRC-C-T102",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5675,
+      "line": 5909,
       "title": "T102 B12c01: caller cancellation preserves native cause and clears outbound pending state"
     },
     {
       "id": "WRC-C-T103",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5716,
+      "line": 5950,
       "title": "T103 B12c01: real outbound order is encode then encrypt then sign then transport send"
     },
     {
       "id": "WRC-C-T104",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5760,
+      "line": 5995,
       "title": "T104 B12c01: hostile outbound authentication preserves native source/code/cause identity"
     },
     {
       "id": "WRC-C-T105",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5789,
+      "line": 6024,
       "title": "T105 B12c01: descriptor four-key claims remain distinct from seven-key final projection"
     },
     {
       "id": "WRC-C-T107",
       "kind": "assertion",
       "path": "packages/store-worker/test/exports.test.ts",
-      "line": 126,
+      "line": 186,
       "title": "caller abort reaches a real provider context signal and late settlement is ignored"
     },
     {
       "id": "WRC-C-T107",
       "kind": "assertion",
       "path": "packages/store-worker/test/exports.test.ts",
-      "line": 149,
+      "line": 209,
       "title": "caller abort preserves exact reason identity through the WorkerAdapter boundary"
     },
     {
       "id": "WRC-C-T108",
       "kind": "assertion",
       "path": "packages/store-worker/test/exports.test.ts",
-      "line": 361,
+      "line": 499,
       "title": "dispose() closes first, awaits endpoint.dispose(), and reuses the same Promise"
     },
     {
       "id": "WRC-C-T108",
       "kind": "assertion",
       "path": "packages/store-worker/test/exports.test.ts",
-      "line": 379,
+      "line": 517,
       "title": "dispose() propagates endpoint cleanup errors instead of swallowing them"
     },
     {
@@ -6263,385 +6263,385 @@
       "id": "WRC-C-T109",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 757,
+      "line": 777,
       "title": "T109 unchanged actual candidate RED: claims remain broad versus the narrow schema"
     },
     {
       "id": "WRC-C-T110",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 780,
+      "line": 800,
       "title": "T110 real transaction baseline: provider RPC and public boundary execute before projection RED"
     },
     {
       "id": "WRC-C-T111",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 811,
+      "line": 831,
       "title": "T111 real transaction: provider success and endpoint-local disposal remain stable"
     },
     {
       "id": "WRC-C-T112",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 847,
+      "line": 867,
       "title": "T112 real provider security baseline rejects a forged receiver without execution"
     },
     {
       "id": "WRC-C-T113",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 875,
+      "line": 895,
       "title": "T113 real provider response baseline preserves native provider error code and residue"
     },
     {
       "id": "WRC-C-T114",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 900,
+      "line": 931,
       "title": "T114 real provider abort baseline preserves caller terminal reason and releases controller"
     },
     {
       "id": "WRC-C-T115",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 947,
+      "line": 978,
       "title": "T115 config snapshot baseline reads the provider object once before installation"
     },
     {
       "id": "WRC-C-T116",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 972,
+      "line": 1003,
       "title": "T116 hostile provider getter fails before transport subscription with original cause"
     },
     {
       "id": "WRC-C-T117",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 983,
+      "line": 1014,
       "title": "T117 later invalid provider entry preserves primary failure and terminal residue"
     },
     {
       "id": "WRC-C-T118",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1107,
+      "line": 1138,
       "title": "T118 source deletion boundary rejects D95 bridge ownership in provider files"
     },
     {
       "id": "WRC-C-T120",
       "kind": "assertion",
       "path": "packages/store-worker/test/provider-fluent-red.test.ts",
-      "line": 60,
+      "line": 54,
       "title": "T120 constructs the real handler seam and preserves request/result/repeated disposal"
     },
     {
       "id": "WRC-C-T121",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1116,
+      "line": 1147,
       "title": "T121 source ownership scan rejects provider attachment broad-bridge imports"
     },
     {
       "id": "WRC-C-T122",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1129,
+      "line": 1160,
       "title": "T122 contract: provider schema and cancellation metadata are frozen and candidate-independent"
     },
     {
       "id": "WRC-C-T123",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1244,
+      "line": 1275,
       "title": "T123 provider descriptor and selected-root projection remain separate after the real baseline"
     },
     {
       "id": "WRC-C-T124",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1263,
+      "line": 1294,
       "title": "T124 real provider snapshot reads outer config and every provider entry once"
     },
     {
       "id": "WRC-C-T125",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1300,
+      "line": 1331,
       "title": "T125 schema-derived hostile variant RED: missing outboundOperations reaches Host admission without mutation"
     },
     {
       "id": "WRC-C-T126",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1316,
+      "line": 1347,
       "title": "T126 schema-derived hostile variant RED: missing inboundIdentity reaches Host admission without mutation"
     },
     {
       "id": "WRC-C-T127",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1332,
+      "line": 1363,
       "title": "T127 schema-derived hostile variant RED: missing variationCoordinator reaches Host admission without mutation"
     },
     {
       "id": "WRC-C-T128",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1348,
+      "line": 1379,
       "title": "T128 schema-derived hostile variant RED: missing providerCancellation reaches Host admission without mutation"
     },
     {
       "id": "WRC-C-T129",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2412,
+      "line": 2449,
       "title": "T129 actual provider endpoint isolation and terminal removal preserve independent identity"
     },
     {
       "id": "WRC-C-T130",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2432,
+      "line": 2469,
       "title": "T130 provider source boundary excludes D95 from all migrated feature consumers"
     },
     {
       "id": "WRC-C-T131",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4460,
+      "line": 4502,
       "title": "T131 provider cancellation reuses the existing verified abort path and releases terminal state"
     },
     {
       "id": "WRC-C-T132",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5391,
+      "line": 5433,
       "title": "T132 source scan keeps provider ownership on registry/executor/replay and forbids a second lifecycle owner"
     },
     {
       "id": "WRC-C-T133",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5404,
+      "line": 5446,
       "title": "T133 failed provider installation can retry with a fresh candidate snapshot"
     },
     {
       "id": "WRC-C-T134",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5439,
+      "line": 5481,
       "title": "T134 hostile provider-map getter at first position preserves failedName and original cause"
     },
     {
       "id": "WRC-C-T135",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5502,
+      "line": 5544,
       "title": "T135 hostile provider-map getter at middle position preserves failedName and original cause"
     },
     {
       "id": "WRC-C-T136",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5572,
+      "line": 5614,
       "title": "T136 hostile provider-map getter at last position preserves failedName and original cause"
     },
     {
       "id": "WRC-C-T137",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5649,
+      "line": 5691,
       "title": "T137 concurrent same-map transactions isolate passive observation cleanup"
     },
     {
       "id": "WRC-C-T138",
       "kind": "assertion",
       "path": "packages/store-worker/test/provider-fluent-red.test.ts",
-      "line": 105,
+      "line": 99,
       "title": "T138 owning handler consumes WebRPC fluent provider seam without a Store export"
     },
     {
       "id": "WRC-C-T139",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1369,
+      "line": 1400,
       "title": "T139 schema-derived hostile variant RED: extra provider claim reaches Host admission without mutation"
     },
     {
       "id": "WRC-C-T140",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1387,
+      "line": 1418,
       "title": "T140 schema-derived duplicate descriptor baseline reaches Host admission without mutation"
     },
     {
       "id": "WRC-C-T141",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1418,
+      "line": 1449,
       "title": "T141 schema-derived hostile variant RED: forged string claim reaches Host admission without mutation"
     },
     {
       "id": "WRC-C-T142",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1431,
+      "line": 1462,
       "title": "T142 schema-derived hostile variant RED: forged symbol claim reaches Host admission without mutation"
     },
     {
       "id": "WRC-C-T143",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1738,
+      "line": 1769,
       "title": "T143 schema-derived hostile variant RED: admitted package key reaches Host publication mismatch"
     },
     {
       "id": "WRC-C-T144",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1962,
+      "line": 1999,
       "title": "T144 schema-derived admitted-unpublished provider key RED: controlled consumer reaches Host rollback"
     },
     {
       "id": "WRC-C-T145",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2072,
+      "line": 2109,
       "title": "T145 real Host rollback RED: provider result and later resources preserve reverse identities"
     },
     {
       "id": "WRC-C-T146",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2187,
+      "line": 2224,
       "title": "T146 canonical endpoint disposal seam RED: Host cleanup evidence is bounded by the real Host transaction"
     },
     {
       "id": "WRC-C-T147",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2270,
+      "line": 2307,
       "title": "T147 canonical composed endpoint RED: private Host and endpoint disposal identities share one failing transaction"
     },
     {
       "id": "WRC-C-T148",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2365,
+      "line": 2402,
       "title": "T148 composed disposal observer fails closed for forged and separate endpoint instances"
     },
     {
       "id": "WRC-C-T149",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1444,
+      "line": 1475,
       "title": "T149 schema-derived all-absent provider claims fail through Host before mutation"
     },
     {
       "id": "WRC-C-T150",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1457,
+      "line": 1488,
       "title": "T150 schema-derived all-forged provider claims fail through Host before mutation"
     },
     {
       "id": "WRC-C-T151",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1474,
+      "line": 1505,
       "title": "T151 hostile native claim access has identical async and sync Host parity"
     },
     {
       "id": "WRC-C-T152",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5857,
+      "line": 6092,
       "title": "T152 primitive installation retains durable history and clears live markers"
     },
     {
       "id": "WRC-C-T153",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5861,
+      "line": 6096,
       "title": "T153 undefined installation is distinguished as installed history"
     },
     {
       "id": "WRC-C-T154",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5865,
+      "line": 6100,
       "title": "T154 no-disposer installation clears live markers exactly once"
     },
     {
       "id": "WRC-C-T155",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5893,
+      "line": 6128,
       "title": "T155 disposeResult false retains history without invoking a disposer"
     },
     {
       "id": "WRC-C-T156",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5919,
+      "line": 6154,
       "title": "T156 onInstalled throw still clears live markers after rollback"
     },
     {
       "id": "WRC-C-T157",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 5962,
+      "line": 6197,
       "title": "T157 result cleanup failure clears after cleanup and preserves Promise identity"
     },
     {
       "id": "WRC-C-T158",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 6165,
+      "line": 6400,
       "title": "T158 later rollback releases the earlier result once and clears live markers"
     },
     {
       "id": "WRC-C-T159",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1514,
+      "line": 1545,
       "title": "T159 marked claim clone loses provider authority before Host mutation"
     },
     {
       "id": "WRC-C-T160",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1535,
+      "line": 1566,
       "title": "T160 frozen provider descriptor retains exact fail-before-mutation admission"
     },
     {
       "id": "WRC-C-T161",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1551,
+      "line": 1582,
       "title": "T161 prototype claim getter is wrapped without Host mutation"
     },
     {
       "id": "WRC-C-T162",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1589,
+      "line": 1620,
       "title": "T162 generic provider-name package-key collision remains admitted"
     },
     {
       "id": "WRC-C-T163",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1607,
+      "line": 1638,
       "title": "T163 structured-clone and foreign-token-shaped claims cannot mint provider authority"
     },
     {
       "id": "WRC-C-T164",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 1638,
+      "line": 1669,
       "title": "T164 direct async/sync Host and canonical composition reject the same unmarked provider"
     },
     {
@@ -6655,378 +6655,378 @@
       "id": "WRC-C-T166",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 6001,
+      "line": 6236,
       "title": "T166 throwing cleanup observer is diagnostic-only and cannot alter disposal"
     },
     {
       "id": "WRC-C-T167",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5682,
+      "line": 5724,
       "title": "T167 Host-installed provider verifies receiver admission before execution"
     },
     {
       "id": "WRC-C-T168",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5713,
+      "line": 5763,
       "title": "T168 Host-installed replay ledger suppresses duplicate task execution"
     },
     {
       "id": "WRC-C-T169",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5736,
+      "line": 5786,
       "title": "T169 Host-installed dispatch-only execution sends no response"
     },
     {
       "id": "WRC-C-T170",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5762,
+      "line": 5812,
       "title": "T170 Host-installed missing provider returns the canonical not-found response"
     },
     {
       "id": "WRC-C-T171",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5788,
+      "line": 5838,
       "title": "T171 Host-installed unbranded provider result reports not-settled"
     },
     {
       "id": "WRC-C-T172",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5814,
+      "line": 5864,
       "title": "T172 Host-installed reentrant duplicate request remains idempotent"
     },
     {
       "id": "WRC-C-T173",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5839,
+      "line": 5889,
       "title": "T173 concurrent Host endpoints preserve endpoint-local provider identity"
     },
     {
       "id": "WRC-C-T174",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5872,
+      "line": 5922,
       "title": "T174 Host-installed async provider rejection preserves terminal controller residue"
     },
     {
       "id": "WRC-C-T175",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5902,
+      "line": 5952,
       "title": "T175 Host-installed transfer overflow preserves the native provider failure code"
     },
     {
       "id": "WRC-C-T176",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5931,
+      "line": 5981,
       "title": "T176 real Host admission rejects forged source, sender, receiver, and cross-endpoint frames"
     },
     {
       "id": "WRC-C-T177",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5994,
+      "line": 6044,
       "title": "T177 concurrent duplicate requests preserve replay response uniqueness and controller release"
     },
     {
       "id": "WRC-C-T178",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 6051,
+      "line": 6101,
       "title": "T178 real Host admission capacity rejects one of 65 concurrent unique tasks and releases all"
     },
     {
       "id": "WRC-C-T179",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 6106,
+      "line": 6156,
       "title": "T179 real Host schema failure preserves serialized native identity and residue"
     },
     {
       "id": "WRC-C-T180",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 6162,
+      "line": 6210,
       "title": "T180 late provider rejection reports the original error and releases operation state"
     },
     {
       "id": "WRC-C-T181",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 6988,
+      "line": 7014,
       "title": "T181 canonical endpoint disposal preserves Promise identity and terminal provider residue"
     },
     {
       "id": "WRC-C-T182",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 6214,
+      "line": 6262,
       "title": "T182 two real Host transactions isolate cross-endpoint and post-removal requests"
     },
     {
       "id": "WRC-C-T183",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 6315,
+      "line": 6363,
       "title": "T183 synchronous provider failure preserves raw report identity and terminal release"
     },
     {
       "id": "WRC-C-T184",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 6363,
+      "line": 6411,
       "title": "T184 post-terminal late resolve has no response and leaves no provider state"
     },
     {
       "id": "WRC-C-T185",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 6408,
+      "line": 6456,
       "title": "T185 post-terminal late reject reports the distinct raw primary without a response"
     },
     {
       "id": "WRC-C-T186",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 6458,
+      "line": 6506,
       "title": "T186 result schema failure retains raw cause in serialized error graph"
     },
     {
       "id": "WRC-C-T187",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 6518,
+      "line": 6560,
       "title": "T187 synchronous provider WebRPC error serializes primary and cause across the real seam"
     },
     {
       "id": "WRC-C-T188",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 6590,
+      "line": 6626,
       "title": "T188 asynchronous provider WebRPC error serializes primary and cause across the real seam"
     },
     {
       "id": "WRC-C-T189",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 6657,
+      "line": 6691,
       "title": "T189 post-terminal late WebRPC rejection reports native cause identity without response"
     },
     {
       "id": "WRC-C-T190",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 6711,
+      "line": 6745,
       "title": "T190 invalid provider transfer shape preserves native contract failure and release"
     },
     {
       "id": "WRC-C-T191",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 6792,
+      "line": 6825,
       "title": "T191 params schema failure preserves exact parser cause in serialized graph"
     },
     {
       "id": "WRC-C-T193",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 6845,
+      "line": 6872,
       "title": "T193 canonical successful cleanup releases two independent disposers in reverse order"
     },
     {
       "id": "WRC-C-T194",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 6907,
+      "line": 6934,
       "title": "T194 transfer overflow preserves native failure identity and requires serialized error graph"
     },
     {
       "id": "WRC-C-T195",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4509,
+      "line": 4551,
       "title": "T195 providerCancellation publishes one frozen endpoint-local abort port"
     },
     {
       "id": "WRC-C-T196",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4548,
+      "line": 4590,
       "title": "T196 providerCancellation aborts an active Host-installed task by task id"
     },
     {
       "id": "WRC-C-T197",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4629,
+      "line": 4671,
       "title": "T197 providerCancellation rejects cross-endpoint task control and isolates release"
     },
     {
       "id": "WRC-C-T199",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4709,
+      "line": 4751,
       "title": "T199 providerCancellation before registration is a no-op with no owner-state allocation"
     },
     {
       "id": "WRC-C-T200",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4744,
+      "line": 4786,
       "title": "T200 providerCancellation after completion is idempotent and preserves Host disposal identity"
     },
     {
       "id": "WRC-C-T201",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4791,
+      "line": 4833,
       "title": "T201 repeated same-tick providerCancellation aborts one controller exactly once"
     },
     {
       "id": "WRC-C-T202",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4872,
+      "line": 4914,
       "title": "T202 providerCancellation late resolve emits no response and releases canonical state"
     },
     {
       "id": "WRC-C-T203",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4955,
+      "line": 4997,
       "title": "T203 providerCancellation late reject reports the raw error without a second response"
     },
     {
       "id": "WRC-C-T204",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5045,
+      "line": 5087,
       "title": "T204 caller primitive abort reason remains exact on the endpoint-owned path"
     },
     {
       "id": "WRC-C-T205",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5093,
+      "line": 5135,
       "title": "T205 forged non-string providerCancellation ids are fail-closed"
     },
     {
       "id": "WRC-C-T206",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5110,
+      "line": 5152,
       "title": "T206 real provider completion releases one identity admission lease before terminal disposal"
     },
     {
       "id": "WRC-C-T207",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5161,
+      "line": 5203,
       "title": "T207 repeated shared-port cancellation and late settlement release one identity lease"
     },
     {
       "id": "WRC-C-T208",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5240,
+      "line": 5282,
       "title": "T208 provider failure releases one identity admission lease and preserves the raw report"
     },
     {
       "id": "WRC-C-T209",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5307,
+      "line": 5349,
       "title": "T209 identity-release observation is isolated, non-forgeable, and non-interfering"
     },
     {
       "id": "WRC-C-T210",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5341,
+      "line": 5383,
       "title": "T210 duplicate identity observation registration uses tokens and unregisters fail-closed"
     },
     {
       "id": "WRC-C-T211",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 5373,
+      "line": 5415,
       "title": "T211 built declarations and package exports hide the identity observer callables"
     },
     {
       "id": "WRC-C-T212",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 7032,
+      "line": 7058,
       "title": "T212 real provider publication reaches a controlled consumer and releases its result once"
     },
     {
       "id": "WRC-C-T213",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 7099,
+      "line": 7125,
       "title": "T213 real provider publication precedes controlled later failure and reverse rollback"
     },
     {
       "id": "WRC-C-T214",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 7436,
+      "line": 7462,
       "title": "T214 owned provider transport closes once after successful canonical disposal"
     },
     {
       "id": "WRC-C-T215",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 7491,
+      "line": 7517,
       "title": "T215 borrowed provider transport remains open after repeated canonical disposal"
     },
     {
       "id": "WRC-C-T216",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 7203,
+      "line": 7229,
       "title": "T216 actual provider result disposal is observed once on success and remains stable"
     },
     {
       "id": "WRC-C-T217",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 7254,
+      "line": 7280,
       "title": "T217 actual provider result and two controlled cleanup leaves preserve rollback order"
     },
     {
       "id": "WRC-C-T218",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 7387,
+      "line": 7413,
       "title": "T218 provider-result observer is isolated, token-safe, and fail-closed"
     },
     {
       "id": "WRC-C-T219",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4133,
+      "line": 4174,
       "title": "T219 unchanged discovery/control consumers run through the ordered D95 bridge transaction"
     },
     {
       "id": "WRC-C-T220",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4173,
+      "line": 4214,
       "title": "T220 final D95 deletion removes bridge producers from source and dist"
     },
     {
       "id": "WRC-C-T221",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4189,
+      "line": 4230,
       "title": "T221 provider and adjacent-consumer artifacts expose the final removed D95 boundary"
     },
     {
@@ -7040,420 +7040,420 @@
       "id": "WRC-C-T223",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4221,
+      "line": 4262,
       "title": "T223 chunk is an explicitly inventoried D95 consumer with canonical assembly ownership"
     },
     {
       "id": "WRC-C-T224",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4268,
+      "line": 4310,
       "title": "T224 superseded copied bridge injection has no surviving shared-key seam"
     },
     {
       "id": "WRC-C-T225",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4272,
+      "line": 4314,
       "title": "T225 superseded hostile bridge injection has no surviving publisher descriptor seam"
     },
     {
       "id": "WRC-C-T226",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4291,
+      "line": 4333,
       "title": "T226 terminal disposal leaves no D95 compatibility installation"
     },
     {
       "id": "WRC-C-T227",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4344,
+      "line": 4386,
       "title": "T227 superseded replacement injection has no translator normalization seam"
     },
     {
       "id": "WRC-C-T228",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4353,
+      "line": 4395,
       "title": "T228 superseded missing-member injection has no internal export seam"
     },
     {
       "id": "WRC-C-T229",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4362,
+      "line": 4404,
       "title": "T229 superseded reordered injection has no runtime or declaration seam"
     },
     {
       "id": "WRC-C-T230",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4369,
+      "line": 4411,
       "title": "T230 superseded prototype injection has no packed deep-import seam"
     },
     {
       "id": "WRC-C-T231",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4377,
+      "line": 4419,
       "title": "T231 cross-endpoint final composition has no compatibility publication"
     },
     {
       "id": "WRC-C-T232",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4308,
+      "line": 4350,
       "title": "T232 Host disposal removes all final outbound compatibility residue"
     },
     {
       "id": "WRC-C-T246",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2457,
+      "line": 2494,
       "title": "T246 real composed discovery consumes narrow ports and publishes only its resolver"
     },
     {
       "id": "WRC-C-T247",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2546,
+      "line": 2583,
       "title": "T247 composed discovery schedules and clears its exact timer through the endpoint time port"
     },
     {
       "id": "WRC-C-T248",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 6241,
+      "line": 6476,
       "title": "T248 publishes and removes the real discovery resolver in one Host transaction"
     },
     {
       "id": "WRC-C-T250",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2444,
+      "line": 2481,
       "title": "T250 discovery ownership scan finds only the canonical attachment state owner"
     },
     {
       "id": "WRC-C-T252",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2619,
+      "line": 2656,
       "title": "T252 control inventory exposes only its planned narrow shared ports"
     },
     {
       "id": "WRC-C-T253",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2636,
+      "line": 2673,
       "title": "T253 actual control candidate matches the narrow contract through real inventory"
     },
     {
       "id": "WRC-C-T254",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2653,
+      "line": 2690,
       "title": "T254 missing outboundOperations reaches the real Host admission boundary"
     },
     {
       "id": "WRC-C-T255",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2661,
+      "line": 2698,
       "title": "T255 missing discoveryResolver reaches the real Host admission boundary"
     },
     {
       "id": "WRC-C-T256",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2669,
+      "line": 2706,
       "title": "T256 missing time reaches the real Host admission boundary"
     },
     {
       "id": "WRC-C-T257",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2677,
+      "line": 2714,
       "title": "T257 missing variationCoordinator reaches the real Host admission boundary"
     },
     {
       "id": "WRC-C-T258",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2685,
+      "line": 2722,
       "title": "T258 duplicate control claims fail before Host mutation"
     },
     {
       "id": "WRC-C-T259",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2693,
+      "line": 2730,
       "title": "T259 forged string control claim fails before Host mutation"
     },
     {
       "id": "WRC-C-T260",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2701,
+      "line": 2738,
       "title": "T260 forged symbol control claim fails before Host mutation"
     },
     {
       "id": "WRC-C-T261",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2709,
+      "line": 2746,
       "title": "T261 admitted-unpublished control publication fails with the same Host transaction evidence"
     },
     {
       "id": "WRC-C-T262",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2775,
+      "line": 2812,
       "title": "T262 control narrow publication is endpoint-local across two real Host transactions"
     },
     {
       "id": "WRC-C-T263",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2798,
+      "line": 2835,
       "title": "T263 terminal control disposal removes narrow shared state exactly once"
     },
     {
       "id": "WRC-C-T264",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2813,
+      "line": 2850,
       "title": "T264 successful control transaction preserves canonical cleanup and repeated Host Promise identity"
     },
     {
       "id": "WRC-C-T265",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2832,
+      "line": 2869,
       "title": "T265 later control participant failure preserves native primary and rollback identity"
     },
     {
       "id": "WRC-C-T266",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2892,
+      "line": 2929,
       "title": "T266 superseded intermediate deletion leaves both migrated consumers free of D95"
     },
     {
       "id": "WRC-C-T267",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2901,
+      "line": 2938,
       "title": "T267 final deletion boundary removes D95 from control and chunk after both narrow migrations"
     },
     {
       "id": "WRC-C-T268",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2910,
+      "line": 2947,
       "title": "T268 control role authority is deeply frozen with the exact contract shape"
     },
     {
       "id": "WRC-C-T269",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 2955,
+      "line": 2992,
       "title": "T269 native control admission keeps async and sync Host failure identity aligned"
     },
     {
       "id": "WRC-C-T270",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3070,
+      "line": 3107,
       "title": "T270 control rollback preserves two raw cleanup identities in reverse order"
     },
     {
       "id": "WRC-C-T271",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3173,
+      "line": 3210,
       "title": "T271 canonical control endpoint disposal exposes the same stable Host and endpoint Promises"
     },
     {
       "id": "WRC-C-T272",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3197,
+      "line": 3234,
       "title": "T272 selected control roots keep dependencies private and disposal endpoint-local"
     },
     {
       "id": "WRC-C-T273",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3255,
+      "line": 3292,
       "title": "T273 canonical control ping abort and timeout preserve peer and terminal isolation"
     },
     {
       "id": "WRC-C-T274",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3303,
+      "line": 3340,
       "title": "T274 canonical control endpoint translates two cleanup leaves on one transaction"
     },
     {
       "id": "WRC-C-T275",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3396,
+      "line": 3433,
       "title": "T275 final source boundary excludes D95 from control and chunk"
     },
     {
       "id": "WRC-C-T276",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3411,
+      "line": 3450,
       "title": "T276 concurrent reused control modules preserve independent endpoint snapshots"
     },
     {
       "id": "WRC-C-T277",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3452,
+      "line": 3491,
       "title": "T277 real control fanout keeps tagged peer results endpoint-local"
     },
     {
       "id": "WRC-C-T278",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3485,
+      "line": 3524,
       "title": "T278 disposed control endpoint rejects a later operation without reviving state"
     },
     {
       "id": "WRC-C-T279",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3514,
+      "line": 3553,
       "title": "T279 control abort and disposal race leaves no late pending state"
     },
     {
       "id": "WRC-C-T280",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3559,
+      "line": 3598,
       "title": "T280 runtime and declaration control D95 boundary remains fail-closed before artifact migration"
     },
     {
       "id": "WRC-C-T282",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3572,
+      "line": 3611,
       "title": "T282 control construction snapshots config getters once before later source mutation"
     },
     {
       "id": "WRC-C-T283",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3634,
+      "line": 3673,
       "title": "T283 failed control installation leaves a fresh retry transaction uncontaminated"
     },
     {
       "id": "WRC-C-T284",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3678,
+      "line": 3717,
       "title": "T284 async control installation has a pre-activation barrier without early activation"
     },
     {
       "id": "WRC-C-T285",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3714,
+      "line": 3753,
       "title": "T285 hostile control claim getter reports the exact native cutoff without Host mutation"
     },
     {
       "id": "WRC-C-T286",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3747,
+      "line": 3786,
       "title": "T286 late control delivery after timeout cannot resettle or revive terminal state"
     },
     {
       "id": "WRC-C-T287",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3811,
+      "line": 3850,
       "title": "T287 hostile control claim getter at first position stops before Host mutation"
     },
     {
       "id": "WRC-C-T288",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3815,
+      "line": 3854,
       "title": "T288 hostile control claim getter at middle position stops at the exact cutoff"
     },
     {
       "id": "WRC-C-T289",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3819,
+      "line": 3858,
       "title": "T289 hostile control claim getter at final position preserves exact failure identity"
     },
     {
       "id": "WRC-C-T290",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3823,
+      "line": 3862,
       "title": "T290 concurrent reused control tokens preserve independent post-snapshot target state"
     },
     {
       "id": "WRC-C-T291",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3896,
+      "line": 3935,
       "title": "T291 duplicate control delivery is rejected by canonical replay admission"
     },
     {
       "id": "WRC-C-T292",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 3967,
+      "line": 4007,
       "title": "T292 forged cross-peer control delivery cannot settle a trusted pending ping"
     },
     {
       "id": "WRC-C-T293",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4031,
+      "line": 4071,
       "title": "T293 late control send rejection reports once after timeout"
     },
     {
       "id": "WRC-C-T294",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4079,
+      "line": 4120,
       "title": "T294 endpoint time owner advances control timeout and clears its exact timer"
     },
     {
       "id": "WRC-C-T295",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4426,
+      "line": 4468,
       "title": "T295 final D95 mapping audit rejects stale bridge-injection claims"
     },
     {
       "id": "WRC-C-T01",
       "kind": "assertion",
       "path": "packages/web-rpc/test/tree-shaking/continuation-b01.red.test.ts",
-      "line": 26,
+      "line": 31,
       "title": "keeps bare core free from legacy and concrete owners"
     },
     {
       "id": "WRC-C-T02",
       "kind": "assertion",
       "path": "packages/web-rpc/test/tree-shaking/continuation-b01.red.test.ts",
-      "line": 34,
+      "line": 39,
       "title": "excludes legacy and unselected owners from retained client"
     },
     {
       "id": "WRC-C-T03",
       "kind": "assertion",
       "path": "packages/web-rpc/test/tree-shaking/continuation-b01.red.test.ts",
-      "line": 50,
+      "line": 55,
       "title": "keeps provider security closure but excludes legacy and unrelated owners"
     },
     {
@@ -7467,56 +7467,56 @@
       "id": "WRC-C-T05",
       "kind": "assertion",
       "path": "packages/web-rpc/test/composed-ping-parity.test.ts",
-      "line": 25,
+      "line": 24,
       "title": "root createEndpoint is the same value as createFullEndpoint"
     },
     {
       "id": "WRC-C-T06",
       "kind": "assertion",
       "path": "packages/web-rpc/test/topology-rollback.test.ts",
-      "line": 167,
+      "line": 402,
       "title": "rejects hostile module iteration before transport subscription"
     },
     {
       "id": "WRC-C-T07",
       "kind": "assertion",
       "path": "packages/web-rpc/test/topology-rollback.test.ts",
-      "line": 102,
+      "line": 337,
       "title": "accepts provider dependency closure without a duplicate outbound owner"
     },
     {
       "id": "WRC-C-T08",
       "kind": "assertion",
       "path": "packages/web-rpc/test/topology-rollback.test.ts",
-      "line": 223,
+      "line": 458,
       "title": "rolls back installed modules in reverse order and preserves primary failure"
     },
     {
       "id": "WRC-C-T09",
       "kind": "assertion",
       "path": "packages/web-rpc/test/topology-rollback.test.ts",
-      "line": 240,
+      "line": 475,
       "title": "continues rollback after disposer failures and keeps primary plus secondary errors reachable"
     },
     {
       "id": "WRC-C-T10",
       "kind": "assertion",
       "path": "packages/web-rpc/test/composed-ping-parity.test.ts",
-      "line": 142,
+      "line": 141,
       "title": "settles same-target same-tick pings independently with distinct variation IDs"
     },
     {
       "id": "WRC-C-T11",
       "kind": "assertion",
       "path": "packages/web-rpc/test/internal/provider-executor-result.test.ts",
-      "line": 239,
+      "line": 262,
       "title": "rejects replay and admission overflow before provider execution"
     },
     {
       "id": "WRC-C-T12",
       "kind": "assertion",
       "path": "packages/web-rpc/test/discovery-attachment-boundaries.test.ts",
-      "line": 265,
+      "line": 302,
       "title": "covers direct automatic query response, receiver binding, selector fallback, and local ownership"
     },
     {
@@ -7530,7 +7530,7 @@
       "id": "WRC-C-T17",
       "kind": "assertion",
       "path": "packages/web-rpc/test/tree-shaking/b11-attribution.test.ts",
-      "line": 91,
+      "line": 96,
       "title": "binds pending byte drift to the current and historical retained graphs"
     },
     {
@@ -7544,7 +7544,7 @@
       "id": "WRC-C-T22",
       "kind": "assertion",
       "path": "packages/web-rpc/test/endpoint-kernel.test.ts",
-      "line": 141,
+      "line": 266,
       "title": "quarantines synchronous receive and error callbacks until activation commits"
     },
     {
@@ -7558,7 +7558,7 @@
       "id": "WRC-C-T24",
       "kind": "assertion",
       "path": "packages/web-rpc/test/tree-shaking/b11-attribution.test.ts",
-      "line": 469,
+      "line": 316,
       "title": "rejects an unauthenticated chunk before allocating assembly, operation, or expiry timer"
     },
     {
@@ -7593,14 +7593,14 @@
       "id": "WRC-C-T29",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 3142,
+      "line": 3204,
       "title": "B12b03: construction control keeps one absolute fake-time deadline and idempotent close"
     },
     {
       "id": "WRC-C-T30",
       "kind": "assertion",
       "path": "packages/web-rpc/test/topology-rollback.test.ts",
-      "line": 167,
+      "line": 402,
       "title": "rejects hostile module iteration before transport subscription"
     },
     {
@@ -7635,7 +7635,7 @@
       "id": "WRC-C-T35",
       "kind": "assertion",
       "path": "packages/web-rpc/test/worker-deterministic.test.ts",
-      "line": 54,
+      "line": 63,
       "title": "settles concurrent out-of-order responses exactly once"
     },
     {
@@ -7649,14 +7649,14 @@
       "id": "WRC-C-T38",
       "kind": "assertion",
       "path": "packages/web-rpc/test/discovery-attachment-boundaries.test.ts",
-      "line": 1618,
+      "line": 1709,
       "title": "proves source-less valid admission and per-frame invalid admission no-delta"
     },
     {
       "id": "WRC-C-T39",
       "kind": "assertion",
       "path": "packages/web-rpc/test/tree-shaking/b11f-candidate.test.ts",
-      "line": 258,
+      "line": 259,
       "title": "matches canonical root, five-consumer closure, provenance, and causal attribution"
     },
     {
@@ -7684,14 +7684,14 @@
       "id": "WRC-C-T44",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 718,
+      "line": 720,
       "title": "invokes the captured middleware install once with an undefined receiver"
     },
     {
       "id": "WRC-C-T45",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 1048,
+      "line": 1050,
       "title": "routes protocol and contract through typed Host shared ports without legacy registry writes"
     },
     {
@@ -7712,7 +7712,7 @@
       "id": "WRC-C-T49",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 890,
+      "line": 892,
       "title": "drives every production role through one injected batch with PH01 identities and no residue"
     },
     {
@@ -7726,7 +7726,7 @@
       "id": "WRC-C-T52",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 2319,
+      "line": 2381,
       "title": "B12b02 RED: closes owned success once, borrowed success zero, and repeats Host dispose Promise"
     },
     {
@@ -7754,14 +7754,14 @@
       "id": "WRC-C-T57",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 1048,
+      "line": 1050,
       "title": "routes protocol and contract through typed Host shared ports without legacy registry writes"
     },
     {
       "id": "WRC-C-T58",
       "kind": "assertion",
       "path": "packages/web-rpc/test/endpoint-kernel.test.ts",
-      "line": 141,
+      "line": 266,
       "title": "quarantines synchronous receive and error callbacks until activation commits"
     },
     {
@@ -7796,7 +7796,7 @@
       "id": "WRC-C-T74",
       "kind": "assertion",
       "path": "packages/web-rpc/test/tree-shaking/b11f-candidate.test.ts",
-      "line": 258,
+      "line": 259,
       "title": "matches canonical root, five-consumer closure, provenance, and causal attribution"
     },
     {
@@ -7810,35 +7810,35 @@
       "id": "WRC-C-T80",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 945,
+      "line": 947,
       "title": "preflights the production inventory and rejects static/runtime claim mismatches before Host mutation"
     },
     {
       "id": "WRC-C-T81",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 2960,
+      "line": 3022,
       "title": "B12b03: injected timeout async rejection preserves PH01 primary and full rollback residue"
     },
     {
       "id": "WRC-C-T82",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 3714,
+      "line": 3776,
       "title": "B12b03 RED: operation abort-first barrier chooses one terminal identity and clears late provider state"
     },
     {
       "id": "WRC-C-T83",
       "kind": "assertion",
       "path": "packages/store-worker/test/exports.test.ts",
-      "line": 361,
+      "line": 499,
       "title": "dispose() closes first, awaits endpoint.dispose(), and reuses the same Promise"
     },
     {
       "id": "WRC-C-T84",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 3714,
+      "line": 3776,
       "title": "B12b03 RED: operation abort-first barrier chooses one terminal identity and clears late provider state"
     },
     {
@@ -7852,42 +7852,42 @@
       "id": "WRC-C-T86",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 945,
+      "line": 947,
       "title": "preflights the production inventory and rejects static/runtime claim mismatches before Host mutation"
     },
     {
       "id": "WRC-C-T87",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 4425,
+      "line": 4272,
       "title": "B12b04 T87: independent %s trace proves failed retry, async barrier, and mutation isolation"
     },
     {
       "id": "WRC-C-T88",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 4535,
+      "line": 4372,
       "title": "B12b04 T87: hostile %s snapshot getter %s preserves exact cutoff and residue"
     },
     {
       "id": "WRC-C-T89",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 4918,
+      "line": 4699,
       "title": "B12b04 T89: native-shaped %s publication and endpoint disposal share one composed transaction"
     },
     {
       "id": "WRC-C-T101",
       "kind": "assertion",
       "path": "packages/store-worker/test/exports.test.ts",
-      "line": 100,
+      "line": 101,
       "title": "T101 B12c01 real WorkerAdapter RPC fanout preserves result order and remote error contract"
     },
     {
       "id": "WRC-C-T106",
       "kind": "assertion",
       "path": "packages/web-rpc/test/provider-feature-red.test.ts",
-      "line": 4173,
+      "line": 4214,
       "title": "T220 final D95 deletion removes bridge producers from source and dist"
     },
     {
@@ -8048,7 +8048,7 @@
       "id": "WRC-C-T119",
       "kind": "assertion",
       "path": "packages/web-rpc/test/internal/provider-executor-result.test.ts",
-      "line": 239,
+      "line": 262,
       "title": "rejects replay and admission overflow before provider execution"
     },
     {
@@ -8069,28 +8069,28 @@
       "id": "WRC-C-T249",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 6264,
+      "line": 6499,
       "title": "T249 rolls back a published discovery resolver when a later real Host participant fails"
     },
     {
       "id": "WRC-C-T249",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 6307,
+      "line": 6542,
       "title": "T249 preserves the real discovery disposer failure identity and terminal residue"
     },
     {
       "id": "WRC-C-T249",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 6355,
+      "line": 6590,
       "title": "T249 preserves the shared canonical Host and endpoint disposal Promise on cleanup failure"
     },
     {
       "id": "WRC-C-T249",
       "kind": "assertion",
       "path": "packages/web-rpc/test/plugin-host/atomic-install.test.ts",
-      "line": 6419,
+      "line": 6654,
       "title": "T249 preserves ordered route, replay, and registry cleanup leaves from one composed endpoint"
     },
     {

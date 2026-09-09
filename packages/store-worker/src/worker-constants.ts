@@ -30,7 +30,9 @@ export const WorkerSerializeFrameKind = {
 export const WorkerRpcIdentity = {
   main: 'main',
   worker: 'worker',
-  call: 'call'
+  call: 'call',
+  /** Internal cancellation envelope route; never exposed as an application method. */
+  cancel: '__worker_cancel'
 } as const
 
 export type IWorkerDiagnosticType = (typeof WorkerDiagnosticType)[keyof typeof WorkerDiagnosticType]

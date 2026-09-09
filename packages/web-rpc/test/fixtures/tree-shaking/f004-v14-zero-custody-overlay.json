@@ -1,0 +1,72 @@
+{
+  "schema": "RPCC-v14-zero-f004-custody-overlay-v1",
+  "revision": "RPCC-SDD-v14",
+  "owner": "@migaia/web-rpc test/evidence custody",
+  "baseBinding": {
+    "path": "test/fixtures/tree-shaking/f004-intended-cost-custody.json",
+    "schema": "RPCC-D18-f004-intended-cost-custody-v3",
+    "revision": "RPCC-SDD-v12",
+    "proposal": "EVT-000655",
+    "challenge": "EVT-000649",
+    "resolution": "EVT-000656",
+    "sha256": "a20b0a6d69b70579a554b18c0c5eb8ed9df3fc03d9a389263ad6f90e5f0e460d"
+  },
+  "currentLineage": {
+    "challenge": "EVT-000831",
+    "evidenceCapture": "EVT-000825",
+    "proposal": "controller-assigned event for this revised proposal",
+    "resolution": "future signed CONVERGED event responding to this proposal",
+    "sourceCheckpoint": "EVT-000763"
+  },
+  "transition": {
+    "kind": "POST_BASELINE_SEMANTIC_DELETION",
+    "notPartOfBaseCounterfactual": true,
+    "changedModules": [
+      {
+        "module": "packages/web-rpc/src/protocol-constants.ts",
+        "baseSha256": "62e30b156365d415aa6900ec1271df69fcc1d2325a38a36a602fcd98b29542a7",
+        "currentSha256": "8e15bd9cc5d587e2b5de66550d978be557489167e92984ea4fd3001483f63314",
+        "cause": "EVT-000763 semantic-constant removal"
+      }
+    ]
+  },
+  "currentResidualMatrix": {
+    "count": 6,
+    "rows": [
+      {
+        "id": "F006-RED-CONTINUATION-SDD",
+        "signature": "same stale-locator set: WRC-C-T120, WRC-C-T138, WRC-C-T12, WRC-C-T17, WRC-C-T24, WRC-C-T38"
+      },
+      {
+        "id": "F006-RED-ENDPOINT-OBSERVER",
+        "signature": "same owner-list signature: expected chunk-assembler owner, current owner list omits chunk-assembler"
+      },
+      {
+        "id": "F006-RED-B12B03",
+        "signature": "same source assertion signature: worker source does not match abort()"
+      },
+      {
+        "id": "F006-RED-CONTINUATION-B01",
+        "signature": "same count signature: expected moduleCount 108, current 109"
+      },
+      {
+        "id": "F006-RED-CORE-CAUSAL",
+        "signature": "same module-set signature: current adds internal/canonical-envelope.js and semantic-constants.js,..."
+      },
+      {
+        "id": "F006-RED-PROVENANCE",
+        "signature": "same digest mismatch signature: expected 4e5d5ed27fc9d63018e59f7cb2ba5f66d040d2cd0c54d937a286a399..."
+      }
+    ]
+  },
+  "retainedBinding": {
+    "custom": "122/478620/113752 source 89c28ca3518d95c40cce19f05e4dbeb03c1c456c831392e49099fdeb4fc299ca bundle 8ba6445e7d09e77e1a1f4e9b855bc5a57171ede856739b1c64d45f6ffff8f6de edges 169",
+    "unchanged": [
+      "core 86/261074/65448",
+      "client 109/363505/90240",
+      "provider 115/392418/97208",
+      "full 120/469126/112252"
+    ]
+  },
+  "overlayDigest": "b92e03b7104c833e47d6bda121047afc1c3f8c9cbdcf3742ccc2dd1375ca691e"
+}

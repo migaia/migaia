@@ -15,7 +15,15 @@ import { fileURLToPath } from 'node:url'
 const packageDirectory = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const repositoryRoot = resolve(packageDirectory, '../..')
 const temporaryRoot = mkdtempSync(join(tmpdir(), 'migaia-web-rpc-d95-two-copy-'))
-const dependencies = ['capability', 'event-subscriber', 'lifecycle', 'plugin-host', 'utils']
+const dependencies = [
+  'capability',
+  'event-subscriber',
+  'lifecycle',
+  'plugin-host',
+  'rpc-contract',
+  'serialize',
+  'utils'
+]
 const T222 = 'T222'
 const T230 = 'T230'
 
@@ -48,11 +56,9 @@ const bRoot = await import('web-rpc-b')
 const aOutbound = (await import('web-rpc-a/features/outbound')).outbound
 const aDiscovery = (await import('web-rpc-a/features/discovery')).discovery
 const aControl = (await import('web-rpc-a/features/control')).control
-const aChunk = (await import('web-rpc-a/features/chunk')).chunk
 const bOutbound = (await import('web-rpc-b/features/outbound')).outbound
 const bDiscovery = (await import('web-rpc-b/features/discovery')).discovery
 const bControl = (await import('web-rpc-b/features/control')).control
-const bChunk = (await import('web-rpc-b/features/chunk')).chunk
 const { createTransport } = await import('./transport.mjs')
 
 let privateD95ImportSucceeded = false
@@ -72,7 +78,7 @@ let crossError
 try {
   await bCore.createComposedEndpoint(
     config('r73-cross-copy', cross.transport, bRoot.connect),
-    [aOutbound(), aDiscovery(), aControl(), aChunk()]
+    [aOutbound(), aDiscovery(), aControl()]
   )
 } catch (error) {
   crossError = error
@@ -87,13 +93,13 @@ if (cross.state.subscribe !== 0 || cross.state.close !== 0)
 
 const aResources = createTransport()
 const bResources = createTransport()
-const aEndpoint = await aCore.createComposedEndpoint(
-  config('r73-copy-a', aResources.transport, aRoot.connect),
-  [aOutbound(), aDiscovery(), aControl(), aChunk()]
-)
-const bEndpoint = await bCore.createComposedEndpoint(
-  config('r73-copy-b', bResources.transport, bRoot.connect),
-  [bOutbound(), bDiscovery(), bControl(), bChunk()]
+  const aEndpoint = await aCore.createComposedEndpoint(
+    config('r73-copy-a', aResources.transport, aRoot.connect),
+  [aOutbound(), aDiscovery(), aControl()]
+  )
+  const bEndpoint = await bCore.createComposedEndpoint(
+    config('r73-copy-b', bResources.transport, bRoot.connect),
+  [bOutbound(), bDiscovery(), bControl()]
 )
 if (!aEndpoint.discovery || !bEndpoint.discovery)
   throw new Error('same-copy discovery/control surface was not installed')
@@ -111,7 +117,7 @@ function assertPackedLedger(copyRoot) {
   if (readdirSync(packageRoot).includes('src'))
     throw new Error(`${T222} packed package unexpectedly contains source files`)
   const packageJson = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'))
-  const featureNames = ['provider', 'discovery', 'control', 'chunk']
+  const featureNames = ['provider', 'discovery', 'control', 'canonical-chunk']
   for (const featureName of featureNames) {
     const runtime = readFileSync(join(packageRoot, 'dist', 'features', `${featureName}.js`), 'utf8')
     const declaration = readFileSync(

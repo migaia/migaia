@@ -1,10 +1,17 @@
 import { WebRpcContractError, WebRpcErrorCode, WebRpcSchemaValidationError } from '../errors.js'
+import type { IRpcEnvelope } from '@migaia/rpc-contract'
 import type { IWebRpcProviderResult } from '../typing.js'
-import type { IWebRpcRequest } from '../wire.js'
+import type { IWebRpcRoutingData } from './routing-data.js'
 import type { ProviderRegistry } from './provider.js'
 import { safeRead, safeString, tupleKey } from './safe-value.js'
-import { WebRpcMessageKind } from '../protocol-constants.js'
-import { serializeError } from '../error-serialization.js'
+import { WebRpcMessageKind } from '../semantic-constants.js'
+import { serializeErrorForRpc } from '../error-serialization.js'
+
+/** Canonical request plus WebRPC-owned route data consumed by provider execution. */
+export type IProviderRequestInput = Readonly<{
+  readonly envelope: Extract<IRpcEnvelope, { readonly kind: 'request' }>
+  readonly route: IWebRpcRoutingData
+}>
 type IProviderAdmission = {
   acquire(taskKey: string, peerKey: string): boolean
   release(taskKey: string): void
@@ -24,15 +31,18 @@ type IProviderExecutorOptions<TTargetId extends string> = {
   readonly send: (response: unknown, transfer?: readonly unknown[]) => Promise<void>
   readonly validate: (method: string, side: 'params' | 'result', data: unknown) => void
   readonly emitFailure: (error: unknown, code: string) => void
-  readonly isReplay?: (request: IWebRpcRequest, verifiedPeerKey: string) => boolean
-  readonly admitReplay?: (request: IWebRpcRequest, verifiedPeerKey: string) => boolean
-  readonly markCompleted?: (request: IWebRpcRequest, verifiedPeerKey: string) => void
-  readonly consumePendingAbort?: (key: string) => boolean
+  readonly isReplay?: (request: IProviderRequestInput, verifiedPeerKey: string) => boolean
+  readonly admitReplay?: (request: IProviderRequestInput, verifiedPeerKey: string) => boolean
+  readonly markCompleted?: (request: IProviderRequestInput, verifiedPeerKey: string) => void
+  readonly consumePendingAbort?: (key: string) => {
+    readonly found: boolean
+    readonly reason: unknown
+  }
   readonly admission: IProviderAdmission
   readonly retainBinding?: (verifiedPeerKey: string) => boolean
   readonly releaseBinding?: (verifiedPeerKey: string) => void
   /** Selects response receiver identity for composed attachment admission. */
-  readonly responseReceiverId?: (request: IWebRpcRequest) => string | undefined
+  readonly responseReceiverId?: (request: IProviderRequestInput) => string | undefined
 }
 const providerResultBrand = Symbol('web-rpc-provider-result')
 type IBrandedProviderResult = IWebRpcProviderResult & { readonly [providerResultBrand]: object }
@@ -66,11 +76,15 @@ export class ProviderExecutor<TTargetId extends string> {
   }
 
   /** Validates, executes, and settles one inbound request. */
-  async execute(request: IWebRpcRequest, verifiedPeerKey = ''): Promise<void> {
-    const controllerKey = tupleKey(verifiedPeerKey, request.senderId, request.taskId)
+  async execute(request: IProviderRequestInput, verifiedPeerKey = ''): Promise<void> {
+    const controllerKey = tupleKey(
+      verifiedPeerKey,
+      request.route.webRpc.senderId,
+      request.envelope.id
+    )
     if (this.options.isReplay?.(request, verifiedPeerKey)) return
     if (this.options.admitReplay && !this.options.admitReplay(request, verifiedPeerKey)) {
-      if (!request.dispatchOnly)
+      if (!request.route.webRpc.dispatchOnly)
         await this.failureResponse(
           request,
           new Error('Request replay ledger is full'),
@@ -79,7 +93,7 @@ export class ProviderExecutor<TTargetId extends string> {
       return
     }
     if (!this.options.admission.acquire(controllerKey, verifiedPeerKey)) {
-      if (!request.dispatchOnly)
+      if (!request.route.webRpc.dispatchOnly)
         await this.failureResponse(
           request,
           new Error('Provider admission limit reached'),
@@ -89,7 +103,7 @@ export class ProviderExecutor<TTargetId extends string> {
     }
     if (this.options.retainBinding && !this.options.retainBinding(verifiedPeerKey)) {
       try {
-        if (!request.dispatchOnly)
+        if (!request.route.webRpc.dispatchOnly)
           await this.failureResponse(
             request,
             new Error('Verified peer binding expired'),
@@ -101,26 +115,27 @@ export class ProviderExecutor<TTargetId extends string> {
       return
     }
     try {
-      this.options.validate(request.method, 'params', request.data)
+      this.options.validate(request.envelope.method, 'params', request.route.payload)
     } catch (error) {
       try {
         this.options.markCompleted?.(request, verifiedPeerKey)
-        if (!request.dispatchOnly) await this.failureResponse(request, error)
+        if (!request.route.webRpc.dispatchOnly) await this.failureResponse(request, error)
       } finally {
         this.options.admission.release(controllerKey)
         this.options.releaseBinding?.(verifiedPeerKey)
       }
       return
     }
-    const listeners = this.options.registry.getListeners(request.method)
-    const provider = this.options.registry.getProvider(request.method)
+    const listeners = this.options.registry.getListeners(request.envelope.method)
+    const provider = this.options.registry.getProvider(request.envelope.method)
     let responseSendStarted = false
     if (this.options.controllers.has(controllerKey)) {
       return
     }
     const controller = new AbortController()
     this.options.controllers.set(controllerKey, controller)
-    if (this.options.consumePendingAbort?.(controllerKey)) controller.abort()
+    const pendingAbort = this.options.consumePendingAbort?.(controllerKey)
+    if (pendingAbort?.found) controller.abort(pendingAbort.reason)
     let expired = false
     const taskToken = {}
     const expiredResult = (): IBrandedProviderResult => ({
@@ -131,7 +146,7 @@ export class ProviderExecutor<TTargetId extends string> {
     })
     const isExpired = (): boolean => expired || controller.signal.aborted
     const context = {
-      data: request.data,
+      data: request.route.payload,
       signal: controller.signal,
       success: (
         data?: unknown,
@@ -164,16 +179,16 @@ export class ProviderExecutor<TTargetId extends string> {
           return
         }
         for (const peer of this.options.peers)
-          if (peer !== request.senderId) this.options.dispatch(peer, method, data)
+          if (peer !== request.route.webRpc.senderId) this.options.dispatch(peer, method, data)
       }
     }
     try {
-      if (request.dispatchOnly && listeners?.length) {
+      if (request.route.webRpc.dispatchOnly && listeners?.length) {
         for (const listener of Array.from(listeners)) await listener(context)
         return
       }
       if (!provider) {
-        if (!request.dispatchOnly) {
+        if (!request.route.webRpc.dispatchOnly) {
           responseSendStarted = true
           await this.failureResponse(
             request,
@@ -184,7 +199,7 @@ export class ProviderExecutor<TTargetId extends string> {
         return
       }
       const result = await provider(context)
-      if (request.dispatchOnly) return
+      if (request.route.webRpc.dispatchOnly) return
       if (isExpired()) return
       const response: IWebRpcProviderResult =
         result &&
@@ -196,31 +211,33 @@ export class ProviderExecutor<TTargetId extends string> {
               message: 'Provider did not settle',
               code: WebRpcErrorCode.providerNotSettled
             }
-      if (response.ok) this.options.validate(request.method, 'result', response.data)
+      if (response.ok) this.options.validate(request.envelope.method, 'result', response.data)
       responseSendStarted = true
       await this.options.send(
         {
           kind: WebRpcMessageKind.response,
-          version: request.version,
-          taskId: request.taskId,
+          version: request.route.webRpc.applicationVersion,
+          taskId: request.envelope.id,
           senderId: this.options.id,
-          targetId: request.senderId,
-          method: request.method,
+          targetId: request.route.webRpc.senderId,
+          method: request.envelope.method,
           ok: response.ok,
           data: response.ok ? response.data : undefined,
           message: response.ok ? undefined : response.message,
           code: response.ok ? undefined : response.code,
           sentAt: Date.now(),
-          ...((this.options.responseReceiverId?.(request) ?? request.receiverId) === undefined
+          ...((this.options.responseReceiverId?.(request) ?? request.route.webRpc.receiverId) ===
+          undefined
             ? {}
             : {
-                receiverId: this.options.responseReceiverId?.(request) ?? request.receiverId
+                receiverId:
+                  this.options.responseReceiverId?.(request) ?? request.route.webRpc.receiverId
               })
         },
         response.ok ? response.transfer : undefined
       )
     } catch (error) {
-      if (!request.dispatchOnly && !responseSendStarted && !isExpired())
+      if (!request.route.webRpc.dispatchOnly && !responseSendStarted && !isExpired())
         await this.failureResponse(request, error, undefined, true)
       this.options.emitFailure(
         error,
@@ -238,7 +255,7 @@ export class ProviderExecutor<TTargetId extends string> {
   }
 
   private async failureResponse(
-    request: IWebRpcRequest,
+    request: IProviderRequestInput,
     error: unknown,
     explicitCode?: string,
     includeSerializedError = false
@@ -246,11 +263,11 @@ export class ProviderExecutor<TTargetId extends string> {
     const schemaError = error instanceof WebRpcSchemaValidationError
     await this.options.send({
       kind: WebRpcMessageKind.response,
-      version: request.version,
-      taskId: request.taskId,
+      version: request.route.webRpc.applicationVersion,
+      taskId: request.envelope.id,
       senderId: this.options.id,
-      targetId: request.senderId,
-      method: request.method,
+      targetId: request.route.webRpc.senderId,
+      method: request.envelope.method,
       ok: false,
       code:
         explicitCode ?? (schemaError ? WebRpcErrorCode.schemaInvalid : WebRpcErrorCode.internal),
@@ -259,11 +276,15 @@ export class ProviderExecutor<TTargetId extends string> {
         : 'Provider failed',
       data: error instanceof WebRpcSchemaValidationError ? error.data : undefined,
       sentAt: Date.now(),
-      ...(schemaError || includeSerializedError ? { serializedError: serializeError(error) } : {}),
-      ...((this.options.responseReceiverId?.(request) ?? request.receiverId) === undefined
+      ...(schemaError || includeSerializedError
+        ? { serializedError: serializeErrorForRpc(error) }
+        : {}),
+      ...((this.options.responseReceiverId?.(request) ?? request.route.webRpc.receiverId) ===
+      undefined
         ? {}
         : {
-            receiverId: this.options.responseReceiverId?.(request) ?? request.receiverId
+            receiverId:
+              this.options.responseReceiverId?.(request) ?? request.route.webRpc.receiverId
           })
     })
   }

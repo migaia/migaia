@@ -901,3 +901,11 @@ Base64 编码本身会让体积膨胀约 4/3 倍，这不是本包的开销，�
 
 **Q：`base64ToBytes` 抛错时 `error.cause` 是 `undefined`，看不到底层失败原因。**
 这是刻意行为：`base64ToBytes` 捕获任意底层解析失败后统一抛出一个不带 `cause` 的 `TypeError`／`INVALID_OPTION`（"invalid base64 input"），不透传底层实现细节。
+# Versioned codec boundaries
+
+`@migaia/serialize/codec` defines the generic `ICodec<TValue, TEncoded, TId, TVersion>`
+shape and retains the `identityCodecV1` compatibility alias. New version-specific callers import
+`identityCodec` from `@migaia/serialize/codecs/identity/v1`; it is the same runtime object and
+preserves the input value's concrete type through `encode` and `decode`. Format implementations are intentionally split:
+`codecs/json`, `codecs/message-pack`, `codecs/cbor`, and `codecs/protobuf`. Importing the
+generic or identity path does not load binary format runtimes.

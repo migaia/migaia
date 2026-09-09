@@ -39,9 +39,17 @@
       "types": "./dist/full.d.ts",
       "default": "./dist/full.js"
     },
+    "./transport-constants": {
+      "types": "./dist/transport-constants.d.ts",
+      "default": "./dist/transport-constants.js"
+    },
     "./features/outbound": {
       "types": "./dist/features/outbound.d.ts",
       "default": "./dist/features/outbound.js"
+    },
+    "./features/one-way": {
+      "types": "./dist/features/one-way.d.ts",
+      "default": "./dist/features/one-way.js"
     },
     "./features/provider": {
       "types": "./dist/features/provider.d.ts",
@@ -54,14 +62,6 @@
     "./features/control": {
       "types": "./dist/features/control.d.ts",
       "default": "./dist/features/control.js"
-    },
-    "./features/chunk": {
-      "types": "./dist/features/chunk.d.ts",
-      "default": "./dist/features/chunk.js"
-    },
-    "./protocol-constants": {
-      "types": "./dist/protocol-constants.d.ts",
-      "default": "./dist/protocol-constants.js"
     },
     "./adapters/window": {
       "types": "./dist/adapters/window.d.ts",
@@ -125,9 +125,15 @@
     "@migaia/event-subscriber": "workspace:^",
     "@migaia/lifecycle": "workspace:^",
     "@migaia/plugin-host": "workspace:^",
+    "@migaia/rpc-contract": "workspace:^",
+    "@migaia/serialize": "workspace:^",
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
+    "cborg": "6.1.1",
+    "elysia": "1.4.30",
+    "msgpackr": "2.1.0",
+    "protobufjs": "8.8.0",
     "typescript": "~6.0.2",
     "vitest": "^4.1.10"
   },

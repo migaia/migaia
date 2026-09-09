@@ -1,20 +1,37 @@
-import { describe, expect, it, vi } from 'vitest'
-import { WebRpcSchemaValidationError } from '../../src/errors'
-import { ProviderExecutor } from '../../src/internal/provider-executor'
-import { ProviderAdmissionRegistry } from '../../src/internal/provider-admission'
-import { ProviderRegistry } from '../../src/internal/provider'
-import type { IWebRpcContext, IWebRpcProvider } from '../../src/typing'
-import type { IWebRpcRequest } from '../../src/wire'
+import { assert, describe, expect, it, vi } from 'vitest'
+import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
+import { WebRpcSchemaValidationError } from '../../src/errors.js'
+import {
+  ProviderExecutor,
+  type IProviderRequestInput
+} from '../../src/internal/provider-executor.js'
+import { ProviderAdmissionRegistry } from '../../src/internal/provider-admission.js'
+import { ProviderRegistry } from '../../src/internal/provider.js'
+import type { IWebRpcContext, IWebRpcProvider } from '../../src/typing.js'
+import { WebRpcRoutingProfile } from '../../src/internal/routing-data.js'
 
-const request: IWebRpcRequest = {
+/** Canonical provider input shared by executor behavior assertions. */
+/** Normalized fixture must remain a request before it enters the provider executor. */
+const requestEnvelope = normalizeRpcEnvelope({
   kind: 'request',
-  version: '1.0',
-  taskId: 'task',
-  senderId: 'peer',
-  targetId: 'host',
+  id: 'task',
   method: 'test',
-  data: null,
-  sentAt: Date.now()
+  data: null
+})
+assert(requestEnvelope.kind === 'request')
+const request: IProviderRequestInput = {
+  envelope: requestEnvelope,
+  route: {
+    webRpc: {
+      profile: WebRpcRoutingProfile,
+      type: 'request',
+      applicationVersion: '1.0',
+      senderId: 'peer',
+      targetId: 'host',
+      sentAt: Date.now()
+    },
+    payload: null
+  }
 }
 
 function makeExecutor(result: unknown, sent: unknown[]): ProviderExecutor<string> {
@@ -151,7 +168,10 @@ describe('ProviderExecutor result normalization', () => {
       validate: () => undefined,
       emitFailure: () => undefined
     })
-    await executor.execute({ ...request, receiverId: 'receiver-1' })
+    await executor.execute({
+      ...request,
+      route: { ...request.route, webRpc: { ...request.route.webRpc, receiverId: 'receiver-1' } }
+    })
     expect(sent).toHaveLength(1)
     expect(sent[0]?.response).toEqual(
       expect.objectContaining({ ok: true, data: 'ok', receiverId: 'receiver-1' })
@@ -231,7 +251,10 @@ describe('ProviderExecutor result normalization', () => {
       validate: () => undefined,
       emitFailure: () => undefined
     })
-    await executor.execute({ ...request, dispatchOnly: true })
+    await executor.execute({
+      ...request,
+      route: { ...request.route, webRpc: { ...request.route.webRpc, dispatchOnly: true } }
+    })
     expect(calls).toEqual(['first', 'second'])
     expect(send).not.toHaveBeenCalled()
   })
@@ -334,8 +357,7 @@ describe('ProviderExecutor result normalization', () => {
             code: 'SCHEMA_INVALID',
             serializedError: expect.objectContaining({
               name: 'WebRpcSchemaValidationError',
-              code: 'SCHEMA_INVALID',
-              data: { result: true }
+              code: 'SCHEMA_INVALID'
             })
           })
         )
@@ -357,8 +379,10 @@ describe('ProviderExecutor result normalization', () => {
   it('honors a pending abort before provider settlement and sends no late response', async () => {
     const registry = new ProviderRegistry()
     let signalAborted = false
+    let signalReason: unknown
     registry.register('test', (context) => {
       signalAborted = context.signal.aborted
+      signalReason = context.signal.reason
       return context.success('too-late')
     })
     const send = vi.fn(async () => undefined)
@@ -372,10 +396,11 @@ describe('ProviderExecutor result normalization', () => {
       send,
       validate: () => undefined,
       emitFailure: () => undefined,
-      consumePendingAbort: () => true
+      consumePendingAbort: () => ({ found: true, reason: ['early', { abort: true }] })
     })
     await executor.execute(request, 'verified-peer')
     expect(signalAborted).toBe(true)
+    expect(signalReason).toEqual(['early', { abort: true }])
     expect(send).not.toHaveBeenCalled()
   })
 
@@ -395,7 +420,10 @@ describe('ProviderExecutor result normalization', () => {
       validate: () => undefined,
       emitFailure: () => undefined
     })
-    await executor.execute({ ...request, dispatchOnly: true })
+    await executor.execute({
+      ...request,
+      route: { ...request.route, webRpc: { ...request.route.webRpc, dispatchOnly: true } }
+    })
     expect(provider).toHaveBeenCalledOnce()
     expect(send).not.toHaveBeenCalled()
   })

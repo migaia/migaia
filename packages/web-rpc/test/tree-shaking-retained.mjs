@@ -19,7 +19,7 @@ const entries = {
     `import * as provider from ${JSON.stringify(resolve(packageDirectory, 'src/features/provider.ts'))};`,
     `import * as discovery from ${JSON.stringify(resolve(packageDirectory, 'src/features/discovery.ts'))};`,
     `import * as control from ${JSON.stringify(resolve(packageDirectory, 'src/features/control.ts'))};`,
-    `import * as chunk from ${JSON.stringify(resolve(packageDirectory, 'src/features/chunk.ts'))};`,
+    `import * as chunk from ${JSON.stringify(resolve(packageDirectory, 'src/features/canonical-chunk.ts'))};`,
     'globalThis.__webRpcRetained = { core, outbound, provider, discovery, control, chunk };'
   ].join('\n')
 }

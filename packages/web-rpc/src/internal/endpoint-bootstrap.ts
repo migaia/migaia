@@ -1,4 +1,12 @@
 import { WebRpcSharedKey } from './plugin-shared-keys.js'
+import {
+  rpcProtocolV1,
+  type IRpcEnvelope,
+  type IRpcFramer,
+  type IRpcProtocol
+} from '@migaia/rpc-contract'
+import { identityCodecV1, type ICodec } from '@migaia/serialize/codec'
+import { bindRpcFrameIngress, messageFramerV1 } from '@migaia/rpc-contract/framing'
 import { WebRpcAbortError, WebRpcError, WebRpcErrorCode, WebRpcTimeoutError } from '../errors.js'
 import { safeRead } from './safe-value.js'
 import { WebRpcErrorText } from '../error-text.js'
@@ -12,7 +20,6 @@ import type {
   IWebRpcConnectCapability,
   IWebRpcAuthenticationCapability,
   IWebRpcContractCapability,
-  IWebRpcChunkCapability,
   IWebRpcHooksConfig,
   IWebRpcUuidConfig,
   IWebRpcProtocolCapability,
@@ -21,7 +28,9 @@ import type {
   IWebRpcProviderLimits
 } from '../typing.js'
 import type { IWebRpcTransport } from '../transport.js'
-import type { IWebRpcEndpointOptions } from './endpoint-options.js'
+import type { IEndpointKernelTransportSnapshot } from '../endpoint-kernel.js'
+import type { IWebRpcFeature } from '../feature.js'
+import type { IWebRpcEndpointOptions, IWebRpcSelectedComponents } from './endpoint-options.js'
 import type { IWebRpcHooksPort } from './plugin-shared-keys.js'
 
 /** Canonical validated factory snapshot consumed by WebRPC attachments. */
@@ -44,6 +53,8 @@ export type IEndpointMiddlewareSnapshot = {
 export type IDeferredPreparedEndpoint<TTargetId extends string = string> = {
   readonly id: string
   readonly transport: IWebRpcTransport
+  /** Complete descriptor snapshot consumed by the feature-neutral kernel. */
+  readonly transportSnapshot: IEndpointKernelTransportSnapshot
   readonly providers: Readonly<Record<string, IWebRpcProvider>> | undefined
   readonly providerLimits: IWebRpcProviderLimits | undefined
   /** Construction controls snapshotted with the other outer configuration fields. */
@@ -67,6 +78,7 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
   platform: IWebRpcPlatform,
   encodedType: string | undefined,
   _construction: IWebRpcFactoryConfig['construction'],
+  components: IWebRpcSelectedComponents,
   installHookEvents: IWebRpcHookEvent[],
   runConstruction: <T>(operation: () => PromiseLike<T>) => Promise<T>,
   getShared: (key: PropertyKey) => unknown
@@ -77,9 +89,6 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
   if (!installedConnect)
     throw new WebRpcError(WebRpcErrorCode.middlewareMissing, 'connect middleware is required')
   let connectCapability = installedConnect
-  const protocolCapability = getShared(WebRpcSharedKey.protocol) as
-    | { readonly encodedType?: string; readonly identity?: boolean }
-    | undefined
   const authenticationCapability = getShared(WebRpcSharedKey.authentication) as
     | IWebRpcAuthenticationCapability
     | undefined
@@ -99,7 +108,15 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
         ...(hooksPort.onHookError === undefined ? {} : { onHookError: hooksPort.onHookError })
       })
     : undefined
-  const chunkCapability = getShared(WebRpcSharedKey.chunk) as IWebRpcChunkCapability | undefined
+  for (const diagnostic of components.shadowed)
+    hooksPort?.reportConstructionDiagnostic?.(
+      Object.freeze({
+        name: WebRpcErrorText.componentShadowed,
+        at: Date.now(),
+        localId: factoryId,
+        contract: diagnostic
+      })
+    )
   const maxIdentifierLength = contractCapability?.maxIdentifierLength ?? 128
   if (
     !Number.isSafeInteger(maxIdentifierLength) ||
@@ -152,19 +169,10 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
     })
     connectCapability = { ...connectCapability, uniqueTargetId: undefined }
   }
-  if (
-    encodedType &&
-    encodedType !== 'any' &&
-    (authenticationCapability?.encodedType ?? protocolCapability?.encodedType) !== encodedType
-  )
+  if (!isDirectedCompatible(components, authenticationCapability, encodedType))
     throw new WebRpcError(
       WebRpcErrorCode.invalidConfig,
       'outbound frame and transport encoded types are incompatible'
-    )
-  if (chunkCapability?.chunkSize && protocolCapability?.encodedType === 'uint8array')
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
-      'chunking Uint8Array protocol output is unsupported'
     )
   return {
     id: factoryId,
@@ -178,7 +186,6 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
       authentication: authenticationCapability,
       timeout: timeoutCapability,
       hooks: hooksCapability,
-      chunk: chunkCapability,
       targetIds: normalizedTargetIds,
       providerLimits: factoryProviderLimits,
       connect: connectCapability,
@@ -195,16 +202,18 @@ async function finalizePreparedEndpoint<TTargetId extends string>(
 /** Validates and snapshots config before the single PluginHost construction batch. */
 export function prepareEndpoint<
   TTargetId extends string = string,
-  TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[]
+  TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[],
+  TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[]
 >(
-  config: IWebRpcFactoryConfig<TTargetId, TMiddlewares>,
+  config: IWebRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures>,
   options: { readonly deferMiddlewareInstall: true }
 ): Promise<IDeferredPreparedEndpoint<TTargetId>>
 export async function prepareEndpoint<
   TTargetId extends string = string,
-  TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[]
+  TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[],
+  TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[]
 >(
-  config: IWebRpcFactoryConfig<TTargetId, TMiddlewares>,
+  config: IWebRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures>,
   _options: { readonly deferMiddlewareInstall: true }
 ): Promise<IDeferredPreparedEndpoint<TTargetId>> {
   let factoryId: unknown
@@ -215,6 +224,9 @@ export async function prepareEndpoint<
   let factoryProviderLimits: unknown
   let construction: IWebRpcFactoryConfig['construction']
   let factoryReplay: IWebRpcFactoryConfig['replay']
+  let factoryProtocol: IWebRpcFactoryConfig['protocol']
+  let factoryCodec: IWebRpcFactoryConfig['codec']
+  let factoryFramer: IWebRpcFactoryConfig['framer']
   try {
     if (!config || typeof config !== 'object' || Array.isArray(config))
       throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'factory descriptor is invalid')
@@ -231,6 +243,9 @@ export async function prepareEndpoint<
     // upfront like every other config field — see WR-R3-2 in
     // docs/review/2026-08-13-plugin-host-logger-web-rpc-hardening.sdd.md.
     factoryReplay = config.replay
+    factoryProtocol = config.protocol
+    factoryCodec = config.codec
+    factoryFramer = config.framer
   } catch (error) {
     if (error instanceof WebRpcError) throw error
     throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'factory descriptor is unreadable', error)
@@ -264,6 +279,9 @@ export async function prepareEndpoint<
       const middlewareTransport = safeRead<unknown>(middleware, 'transport')
       const discoveryMode = safeRead<unknown>(middleware, 'discoveryMode')
       const pingCapability = safeRead<unknown>(middleware, 'pingCapability')
+      const protocol = safeRead<unknown>(middleware, 'protocol')
+      const codec = safeRead<unknown>(middleware, 'codec')
+      const framer = safeRead<unknown>(middleware, 'framer')
       const plugin =
         metadata && typeof metadata === 'object' && typeof install === 'function'
           ? Object.freeze({
@@ -272,7 +290,10 @@ export async function prepareEndpoint<
               install,
               ...(middlewareTransport === undefined ? {} : { transport: middlewareTransport }),
               ...(discoveryMode === undefined ? {} : { discoveryMode }),
-              ...(pingCapability === undefined ? {} : { pingCapability })
+              ...(pingCapability === undefined ? {} : { pingCapability }),
+              ...(protocol === undefined ? {} : { protocol }),
+              ...(codec === undefined ? {} : { codec }),
+              ...(framer === undefined ? {} : { framer })
             } as unknown as IWebRpcPlugin)
           : undefined
       if (
@@ -302,9 +323,12 @@ export async function prepareEndpoint<
     if (error instanceof WebRpcError) throw error
     throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'middlewares are unreadable', error)
   }
-  const transport =
-    (factoryTransport as IWebRpcTransport | undefined) ??
-    middlewareSnapshots.find((item) => item.transport)?.transport
+  const transportCandidates = middlewareSnapshots.flatMap((item) =>
+    item.transport === undefined ? [] : [item.transport]
+  )
+  if (transportCandidates.length > 1)
+    throw new WebRpcError(WebRpcErrorCode.capabilityConflict, WebRpcErrorText.endpointRouteOwned)
+  const transport = (factoryTransport as IWebRpcTransport | undefined) ?? transportCandidates[0]
   if (!transport)
     throw new WebRpcError(
       WebRpcErrorCode.invalidConfig,
@@ -312,9 +336,26 @@ export async function prepareEndpoint<
     )
   const send = safeRead<unknown>(transport, 'send')
   const subscribe = safeRead<unknown>(transport, 'subscribe')
+  const close = safeRead<unknown>(transport, 'close')
+  const onTransportError = safeRead<unknown>(transport, 'onTransportError')
+  const onListenerError = safeRead<unknown>(transport, 'onListenerError')
   const platform = safeRead<unknown>(transport, 'platform')
+  const topology = safeRead<unknown>(transport, 'topology')
+  const origin = safeRead<unknown>(transport, 'origin')
   const encodedType = safeRead<unknown>(transport, 'encodedType')
   const ownership = safeRead<unknown>(transport, 'ownership')
+  const transportSnapshot: IEndpointKernelTransportSnapshot = Object.freeze({
+    send,
+    subscribe,
+    close,
+    onTransportError,
+    onListenerError,
+    platform,
+    topology,
+    origin,
+    encodedType,
+    ownership
+  })
   if (
     typeof send !== 'function' ||
     typeof subscribe !== 'function' ||
@@ -334,20 +375,26 @@ export async function prepareEndpoint<
     (ownership !== undefined && ownership !== 'owned' && ownership !== 'borrowed')
   )
     throw new WebRpcError(WebRpcErrorCode.invalidConfig, 'transport descriptor is invalid')
-  if (middlewareSnapshots.some((item) => item.transport && item.transport !== transport))
-    throw new WebRpcError(
-      WebRpcErrorCode.invalidConfig,
-      'all middleware transports must share the canonical transport'
-    )
+  const components = selectWebRpcComponents({
+    protocol: factoryProtocol,
+    codec: factoryCodec,
+    framer: factoryFramer,
+    candidates: middlewareSnapshots.map(({ plugin }) => plugin),
+    transportShadow:
+      factoryTransport !== undefined && transportCandidates[0] !== undefined
+        ? Object.freeze({ winner: transport, shadowed: transportCandidates[0] })
+        : undefined
+  })
   return {
     id: factoryId as string,
     transport,
+    transportSnapshot,
     providers: factoryProvider as IWebRpcFactoryConfig<TTargetId>['provider'],
     providerLimits: factoryProviderLimits as IWebRpcFactoryConfig<TTargetId>['providerLimits'],
     construction,
     middlewareSnapshots: Object.freeze(middlewareSnapshots.map((item) => Object.freeze(item))),
-    finalize: async (installHookEvents, runConstruction, getShared) =>
-      finalizePreparedEndpoint(
+    finalize: async (installHookEvents, runConstruction, getShared) => {
+      const prepared = await finalizePreparedEndpoint(
         factoryId as string,
         factoryTargetIds as readonly TTargetId[] | undefined,
         factoryProvider as IWebRpcFactoryConfig<TTargetId>['provider'],
@@ -357,9 +404,226 @@ export async function prepareEndpoint<
         platform as IWebRpcPlatform,
         encodedType as string | undefined,
         construction,
+        components,
         installHookEvents,
         runConstruction,
         getShared
       )
+      return {
+        ...prepared,
+        options: { ...prepared.options, components }
+      }
+    }
   }
+}
+
+/** Resolves top-level then one plugin descriptor before Host installation creates subscriptions. */
+function selectWebRpcComponents(
+  input: Readonly<{
+    readonly protocol?: unknown
+    readonly codec?: unknown
+    readonly framer?: unknown
+    readonly candidates?: readonly IWebRpcPlugin[]
+    readonly transportShadow?: Readonly<{ readonly winner: object; readonly shadowed: object }>
+  }>
+): IWebRpcSelectedComponents {
+  const candidates = input.candidates ?? []
+  const shadowed: IWebRpcSelectedComponents['shadowed'][number][] = []
+  const select = (
+    name: 'protocol' | 'codec' | 'framer',
+    topLevel: unknown,
+    fallback: unknown
+  ): Readonly<{ readonly value: unknown; readonly shadowed?: unknown }> => {
+    const contributed = candidates.flatMap((candidate) => {
+      const value = candidate[name]
+      return value === undefined ? [] : [value]
+    })
+    if (contributed.length > 1)
+      throw new WebRpcError(WebRpcErrorCode.capabilityConflict, WebRpcErrorText.endpointRouteOwned)
+    return Object.freeze({
+      value: topLevel ?? contributed[0] ?? fallback,
+      ...(topLevel !== undefined && contributed[0] !== undefined
+        ? { shadowed: contributed[0] }
+        : {})
+    })
+  }
+  const selectedProtocol = select('protocol', input.protocol, rpcProtocolV1)
+  const selectedCodec = select('codec', input.codec, identityCodecV1)
+  const selectedFramer = select('framer', input.framer, messageFramerV1)
+  const protocol = snapshotProtocol(selectedProtocol.value)
+  const codec = snapshotCodec(selectedCodec.value)
+  const framer = snapshotFramer(selectedFramer.value)
+  const recordShadow = (
+    component: string,
+    winner: { readonly id: string; readonly version: number },
+    ignored: unknown
+  ) => {
+    if (ignored === undefined) return
+    shadowed.push(
+      Object.freeze({
+        component,
+        winner: Object.freeze({ id: winner.id, version: winner.version }),
+        shadowed: snapshotIdentity(ignored)
+      })
+    )
+  }
+  recordShadow('protocol', protocol, selectedProtocol.shadowed)
+  recordShadow('codec', codec, selectedCodec.shadowed)
+  recordShadow('framer', framer, selectedFramer.shadowed)
+  if (input.transportShadow)
+    shadowed.push(
+      Object.freeze({
+        component: 'transport',
+        winner: input.transportShadow.winner,
+        shadowed: input.transportShadow.shadowed
+      })
+    )
+  if (!isCompatible(codec, framer))
+    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.codecDescriptorInvalid)
+  return Object.freeze({
+    protocol,
+    codec,
+    framer,
+    ingressPrepare: bindRpcFrameIngress(framer.accept, framer.frame),
+    shadowed: Object.freeze(shadowed)
+  })
+}
+
+/** Captures descriptor identity once for a stable deferred diagnostic. */
+function snapshotIdentity(
+  value: unknown
+): Readonly<{ readonly id: string; readonly version: number }> {
+  const id = readDescriptorField(value, 'id')
+  const version = readDescriptorField(value, 'version')
+  if (!isDescriptorIdentity(id, version) || typeof version !== 'number')
+    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.codecDescriptorInvalid)
+  return Object.freeze({ id, version })
+}
+
+/** Reads one descriptor field once and turns hostile getter failure into one configuration error. */
+function readDescriptorField(value: unknown, field: string): unknown {
+  try {
+    if (!value || typeof value !== 'object') return undefined
+    return (value as Record<string, unknown>)[field]
+  } catch (cause) {
+    throw new WebRpcError(
+      WebRpcErrorCode.invalidConfig,
+      WebRpcErrorText.codecDescriptorInvalid,
+      cause
+    )
+  }
+}
+
+/** Snapshots protocol normalization and rejects the removed byte encode/decode capability. */
+function snapshotProtocol(value: unknown): IRpcProtocol<IRpcEnvelope, string, number> {
+  const normalize = readDescriptorField(value, 'normalize')
+  const id = readDescriptorField(value, 'id')
+  const version = readDescriptorField(value, 'version')
+  if (
+    typeof normalize !== 'function' ||
+    !isDescriptorIdentity(id, version) ||
+    readDescriptorField(value, 'encode') !== undefined ||
+    readDescriptorField(value, 'decode') !== undefined
+  )
+    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.codecDescriptorInvalid)
+  return Object.freeze({
+    id,
+    version,
+    normalize
+  }) as IRpcProtocol<IRpcEnvelope, string, number>
+}
+
+/** Snapshots codec callables and metadata so later descriptor mutation cannot affect transport. */
+function snapshotCodec(value: unknown): ICodec<IRpcEnvelope, unknown> {
+  const encode = readDescriptorField(value, 'encode')
+  const decode = readDescriptorField(value, 'decode')
+  const id = readDescriptorField(value, 'id')
+  const version = readDescriptorField(value, 'version')
+  const encodedType = readDescriptorField(value, 'encodedType')
+  if (
+    typeof encode !== 'function' ||
+    typeof decode !== 'function' ||
+    !isDescriptorIdentity(id, version) ||
+    !isEncodedType(encodedType)
+  )
+    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.codecDescriptorInvalid)
+  return Object.freeze({
+    id,
+    version,
+    encodedType,
+    encode,
+    decode
+  }) as ICodec<IRpcEnvelope, unknown>
+}
+
+/** Snapshots framer callables and metadata so accepted frame behavior stays construction-stable. */
+function snapshotFramer(value: unknown): IRpcFramer<unknown, unknown, string, number> {
+  const frame = readDescriptorField(value, 'frame')
+  const accept = readDescriptorField(value, 'accept')
+  const id = readDescriptorField(value, 'id')
+  const version = readDescriptorField(value, 'version')
+  const inputEncodedType = readDescriptorField(value, 'inputEncodedType')
+  const outputEncodedType = readDescriptorField(value, 'outputEncodedType')
+  const close = readDescriptorField(value, 'close')
+  if (
+    typeof frame !== 'function' ||
+    typeof accept !== 'function' ||
+    typeof close !== 'function' ||
+    !isDescriptorIdentity(id, version) ||
+    !isEncodedType(inputEncodedType) ||
+    !isEncodedType(outputEncodedType)
+  )
+    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.framerDescriptorInvalid)
+  return Object.freeze({
+    id,
+    version,
+    inputEncodedType,
+    outputEncodedType,
+    frame,
+    accept,
+    close
+  }) as IRpcFramer<unknown, unknown, string, number>
+}
+
+/** Validates the stable public identity required before a component enters construction. */
+function isDescriptorIdentity(id: unknown, version: unknown): id is string {
+  return (
+    typeof id === 'string' &&
+    id.length > 0 &&
+    typeof version === 'number' &&
+    Number.isSafeInteger(version) &&
+    version > 0
+  )
+}
+
+/** Limits directed metadata to the existing codec/framer runtime domain. */
+function isEncodedType(value: unknown): value is 'unknown' | 'string' | 'uint8array' {
+  return value === 'unknown' || value === 'string' || value === 'uint8array'
+}
+
+/** Rejects incompatible codec output before a Host install can create subscriptions. */
+function isCompatible(
+  codec: ICodec<IRpcEnvelope, unknown>,
+  framer: IRpcFramer<unknown, unknown, string, number>
+): boolean {
+  return framer.inputEncodedType === 'unknown' || codec.encodedType === framer.inputEncodedType
+}
+
+/**
+ * Verifies codec, actual framing output, authentication output and transport in their send order. A
+ * native carrier-or-fragment output is mixed until authentication proves a concrete carrier.
+ */
+function isDirectedCompatible(
+  components: IWebRpcSelectedComponents,
+  authentication: IWebRpcAuthenticationCapability | undefined,
+  transportEncodedType: string | undefined
+): boolean {
+  if (!isCompatible(components.codec, components.framer)) return false
+  if (transportEncodedType === undefined || transportEncodedType === 'any') return true
+  const postAuthentication = authentication?.encodedType
+  if (postAuthentication === 'any') return false
+  if (postAuthentication === 'string' || postAuthentication === 'uint8array')
+    return postAuthentication === transportEncodedType
+  if (components.ingressPrepare.nativeOutputDomain !== undefined) return false
+  return components.framer.outputEncodedType === transportEncodedType
 }

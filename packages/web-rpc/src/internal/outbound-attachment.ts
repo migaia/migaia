@@ -7,7 +7,7 @@ import {
   WebRpcRemoteError,
   WebRpcTimeoutError
 } from '../errors.js'
-import { WebRpcMessageKind } from '../protocol-constants.js'
+import { WebRpcMessageKind } from '../semantic-constants.js'
 import { WebRpcErrorText } from '../error-text.js'
 import type {
   IWebRpcEventListener,
@@ -16,28 +16,33 @@ import type {
   IWebRpcHookEvent,
   IWebRpcAuthenticationCapability,
   IWebRpcContractCapability,
-  IWebRpcProtocolCapability,
   IWebRpcTimeoutCapability,
   IWebRpcUuidConfig,
   ISendOptions
 } from '../typing.js'
-import { assertMethod, normalizeWebRpcEnvelope, type IWebRpcResponse } from '../wire.js'
+import { assertContractMethod as assertMethod, validateContractData } from './contract.js'
+import {
+  normalizePortable,
+  normalizeRpcEnvelope,
+  serializeRpcError,
+  type IRpcEnvelope,
+  type IRpcPortableValue
+} from '@migaia/rpc-contract'
+import { deserializeErrorFromRpc } from '../error-serialization.js'
+import { normalizeWebRpcRoutingData, WebRpcRoutingProfile } from './routing-data.js'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
 import type { IWebRpcInboundMessage } from '../transport.js'
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
 import { HookRegistry } from './hooks.js'
 import { allocateRpcId } from './id.js'
-import { validateContractData } from './contract.js'
 import { PendingRegistry } from './pending.js'
 import { WebRpcOutboundSender } from './outbound-sender.js'
 import { ReplayWindow } from './replay.js'
-import { splitUtf8, utf8ByteLength } from './utf8.js'
 import { OperationScope } from './operation-scope.js'
-import { SourceIdentityRegistry } from './source-identity.js'
-import { InboundIdentityCoordinator } from './inbound-identity.js'
+import { InboundIdentityCoordinator, type IInboundIdentityAdmission } from './inbound-identity.js'
 import { WebRpcVariationCoordinator } from './variation-coordinator.js'
-import { createSafeRecord, fanoutDeliveryKey, tupleKey } from './safe-value.js'
-import type { IWebRpcEndpointDebugSnapshot } from './test-observer.js'
+import { createSafeRecord, fanoutDeliveryKey } from './safe-value.js'
+import { readSelectedFramerChunks, type IWebRpcEndpointDebugSnapshot } from './test-observer.js'
 import type { IWebRpcDiscoveryResolverPort } from './plugin-shared-keys.js'
 import type { IEndpointTimer } from './time-port.js'
 import { createEndpointTransportActivation } from './transport-activation.js'
@@ -64,8 +69,14 @@ export type IOutboundAttachmentHost = {
   readonly receiverId: string
   readonly kernel: IEndpointKernelHost
   readonly targetIds: readonly string[]
-  sendFrame(message: unknown, transfer?: readonly unknown[]): Promise<void>
+  sendFrame(message: IRpcEnvelope, transfer?: readonly unknown[]): Promise<void>
   dispatch(targetId: string, method: string, data: unknown): void
+  sendOneWay(
+    targetId: string,
+    method: string,
+    data: unknown,
+    options?: { readonly transfer?: readonly unknown[] }
+  ): Promise<void>
   on(event: string, listener: IWebRpcEventListener): () => void
   readonly hooks: { on(listener: IWebRpcHook): () => void }
   emitFailure(error: unknown, code?: string): void
@@ -97,8 +108,8 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
   readonly #uuid: IWebRpcUuidConfig
   /** Contract validation owner shared with provider execution. */
   readonly #validateData: IWebRpcContractCapability['validateData']
-  /** Canonical protocol snapshot used in both directions. */
-  readonly #protocol: IWebRpcProtocolCapability
+  /** Validated canonical descriptors retained for the endpoint lifetime. */
+  readonly #components: import('./endpoint-options.js').IWebRpcSelectedComponents
   /** Optional inbound/outbound protection capability. */
   readonly #authentication: IWebRpcAuthenticationCapability | undefined
   /** Canonical dynamic timeout capability installed by middleware. */
@@ -106,7 +117,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
   /** Enables caller abort semantics only when the abort capability is selected. */
   readonly #abortEnabled: boolean
   /** Outbound transport/protocol pipeline. */
-  readonly #pipeline: WebRpcOutboundSender<string>
+  readonly #pipeline: WebRpcOutboundSender
   /** Active request settlements keyed by wire task id. */
   readonly #pending = new PendingRegistry<IOutboundPending>()
   /** Prevents active and recently released task-id reuse. */
@@ -115,8 +126,6 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
   readonly #hooks = new HookRegistry()
   /** Event listeners retained for the selected public kernel surface. */
   readonly #events = new Map<string, Set<IWebRpcEventListener>>()
-  /** Stable weak source identities used by response admission. */
-  readonly #sourceIdentity = new SourceIdentityRegistry()
   /** Shared inbound source-proof/connect/binding owner for all selected features. */
   readonly inboundIdentity: InboundIdentityCoordinator
   /** Shared variation route and admission owner for optional feature handlers. */
@@ -163,21 +172,10 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
         ? (contract.validateData as IWebRpcContractCapability['validateData'])
         : (method, side, data) => validateContractData(contract, method, side, data)
     this.#uuid = prepared.options.uuid ?? {}
-    const protocol = prepared.options.protocol ?? {}
-    this.#protocol = {
-      ...protocol,
-      encode: protocol.encode ?? ((value: unknown): unknown => value),
-      decode: protocol.decode ?? ((value: unknown): unknown => value)
-    }
+    this.#components = prepared.options.components!
     this.#authentication = prepared.options.authentication
     this.#hookErrorReporter = prepared.options.hooks?.onHookError
     this.#abortEnabled = prepared.options.features?.abort === true
-    const chunk = prepared.options.chunk ?? {}
-    const chunkCapability = {
-      ...chunk,
-      byteLength: chunk.byteLength ?? utf8ByteLength,
-      split: chunk.split ?? splitUtf8
-    }
     const timeout = prepared.options.timeout ?? {}
     const timeoutDefault = timeout.timeoutMs ?? 1000
     this.#timeout = {
@@ -190,12 +188,10 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
     this.#pipeline = new WebRpcOutboundSender(
       kernel,
       this.id,
-      this.#protocol,
-      chunkCapability,
+      this.#components,
       (code, error) => this.emitFailure(error, code),
       prepared.options.authentication,
-      kernel.platform,
-      (messageId) => this.#replay.releaseId(messageId)
+      kernel.platform
     )
     this.inboundIdentity = new InboundIdentityCoordinator({
       connect:
@@ -225,41 +221,27 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
   /** Routes one variation through the shared coordinator after identity admission. */
   async #receiveVariation(message: unknown): Promise<void> {
     const record = message as {
-      envelope?: {
-        variation?: string
-        taskId?: string
-        senderId?: string
-        targetId?: string
-        receiverId?: string
-      }
+      envelope?: IRpcEnvelope
+      route?: ReturnType<typeof normalizeWebRpcRoutingData>
       inbound?: import('../transport.js').IWebRpcInboundMessage
+      admission?: IInboundIdentityAdmission
     }
     const envelope = record.envelope
+    const route = record.route
     if (
-      !envelope?.variation ||
-      !envelope.taskId ||
-      !envelope.senderId ||
-      !envelope.targetId ||
-      (envelope.receiverId !== this.receiverId && envelope.receiverId !== this.id)
+      envelope?.kind !== 'variation' ||
+      route?.webRpc.type !== 'variation' ||
+      !route.webRpc.variation ||
+      (route.webRpc.receiverId !== this.receiverId && route.webRpc.receiverId !== this.id)
     )
       return
-    const admission = await this.inboundIdentity.admit({
-      senderId: envelope.senderId,
-      targetId: envelope.targetId,
-      data: envelope,
-      inbound: record.inbound
-    })
-    if (!admission) return
-    try {
-      await this.variations.dispatch(
-        envelope.variation as import('../protocol-constants.js').IWebRpcVariation,
-        `${admission.token}:${envelope.taskId}`,
-        message,
-        admission.token
-      )
-    } finally {
-      admission.release()
-    }
+    if (!record.admission) return
+    await this.variations.dispatch(
+      route.webRpc.variation,
+      `${record.admission.token}:${envelope.id}`,
+      message,
+      record.admission.token
+    )
   }
 
   /** Installs the one physical receiver after all selected routes exist. */
@@ -267,21 +249,63 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
     if (this.#activated) return
     const activation = createEndpointTransportActivation(this.kernel.transport, {
       receive: async (message) => {
-        let decoded = message.data
+        const generation = this.kernel.generation
         if (this.kernel.state !== 'active') return
+        const physical = this.inboundIdentity.prepareSource(message)
+        if (!physical) return
+        let frame = physical.data
         if (this.#authentication)
-          decoded = await this.#authentication.unprotect(decoded, {
+          frame = await this.#authentication.unprotect(frame, {
             direction: 'inbound',
             endpointId: this.id,
             platform: this.kernel.platform
           })
-        decoded = this.#protocol.decode(decoded)
-        const envelope = normalizeWebRpcEnvelope(decoded)
-        if (!envelope) return
-        await this.kernel.dispatchRoute(
-          envelope.kind,
-          Object.freeze({ envelope, inbound: message })
+        this.kernel.assertActive(generation)
+        const preparedFrame = this.#components.ingressPrepare(frame, {
+          source: physical.sourceToken,
+          messageId: 'whole'
+        })
+        const accepted = this.#components.framer.accept(preparedFrame.frame, {
+          source: physical.sourceToken,
+          messageId: preparedFrame.messageId
+        })
+        if (accepted.status === 'pending') return
+        if (accepted.status === 'rejected') {
+          this.emitFailure(accepted.error, WebRpcErrorCode.transport)
+          return
+        }
+        const decoded = this.#components.codec.decode(accepted.value)
+        let envelope: IRpcEnvelope
+        try {
+          envelope = this.#components.protocol.normalize(decoded)
+        } catch (error) {
+          this.emitFailure(error, WebRpcErrorCode.transport)
+          return
+        }
+        const route = normalizeWebRpcRoutingData(envelope.data)
+        if (
+          !route ||
+          (envelope.kind === 'discovery'
+            ? route.webRpc.type !== 'discovery-query' && route.webRpc.type !== 'discovery-response'
+            : route.webRpc.type !== envelope.kind)
         )
+          return
+        const admission = await this.inboundIdentity.admitPrepared(physical, {
+          senderId: route.webRpc.senderId,
+          targetId: route.webRpc.targetId,
+          data: route.payload,
+          inbound: message
+        })
+        if (!admission) return
+        try {
+          this.kernel.assertActive(generation)
+          await this.kernel.dispatchRoute(
+            envelope.kind,
+            Object.freeze({ envelope, route, inbound: message, admission })
+          )
+        } finally {
+          admission.release()
+        }
       },
       transportError: (error) => this.#failAll(error),
       listenerError: (error) => this.emitFailure(error, WebRpcErrorCode.transport),
@@ -386,24 +410,35 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
       // controller whenever this caller settles a request early for a reason the remote cannot
       // otherwise observe (caller abort signal or caller-side timeout) — never on success, remote
       // failure, or transport failure, which the remote already knows about from its own send.
-      const notifyRemoteAbort = (): void => {
+      const notifyRemoteAbort = (reason?: unknown): void => {
         if (!this.#abortEnabled) return
         void this.resolveReceiver(targetId)
-          .then((receiver) =>
-            this.#pipeline.sendVariation({
-              kind: WebRpcMessageKind.variation,
-              variation: 'abort',
-              taskId,
-              senderId: this.id,
-              targetId,
-              sentAt: this.kernel.time.now(),
-              receiverId: receiver.receiverId
-            })
-          )
+          .then((receiver) => {
+            const payload = reason === undefined ? undefined : normalizeAbortReason(reason)
+            return this.#pipeline.send(
+              normalizeRpcEnvelope({
+                kind: 'variation',
+                id: taskId,
+                data: {
+                  webRpc: {
+                    profile: WebRpcRoutingProfile,
+                    type: 'variation',
+                    applicationVersion: this.#version,
+                    senderId: this.id,
+                    targetId,
+                    receiverId: receiver.receiverId,
+                    sentAt: this.kernel.time.now(),
+                    variation: 'abort'
+                  },
+                  ...(payload === undefined ? {} : { payload })
+                }
+              })
+            )
+          })
           .catch((error) => this.emitFailure(error, WebRpcErrorCode.transport))
       }
       const onAbort = (): void => {
-        notifyRemoteAbort()
+        notifyRemoteAbort(registeredSignals.find((signal) => signal.aborted)?.reason)
         settleReject(
           new WebRpcAbortError(
             undefined,
@@ -445,17 +480,23 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
         .then((receiver) => {
           if (settled) return
           const request = {
-            kind: WebRpcMessageKind.request,
-            version: this.#version,
-            taskId,
-            senderId: this.id,
-            targetId,
+            kind: 'request' as const,
+            id: taskId,
             method,
-            data,
-            sentAt: this.kernel.time.now(),
-            receiverId: receiver.receiverId
+            data: {
+              webRpc: {
+                profile: WebRpcRoutingProfile,
+                type: 'request' as const,
+                applicationVersion: this.#version,
+                senderId: this.id,
+                targetId,
+                ...(receiver.receiverId === undefined ? {} : { receiverId: receiver.receiverId }),
+                sentAt: this.kernel.time.now()
+              },
+              ...(data === undefined ? {} : { payload: data as IRpcPortableValue })
+            }
           }
-          return this.#pipeline.send(request, () => taskId, options)
+          return this.#pipeline.send(normalizeRpcEnvelope(request), options)
         })
         .catch(settleReject)
     })
@@ -463,6 +504,28 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
 
   /** Sends one dispatch-only request without creating pending response state. */
   dispatch(targetId: string, method: string, data: unknown): void {
+    void this.#sendDispatchOnly(targetId, method, data).catch((error) =>
+      this.emitFailure(error, WebRpcErrorCode.transport)
+    )
+  }
+
+  /** Sends a dispatch-only request and exposes canonical physical completion to the caller. */
+  sendOneWay(
+    targetId: string,
+    method: string,
+    data: unknown,
+    options?: { readonly transfer?: readonly unknown[] }
+  ): Promise<void> {
+    return this.#sendDispatchOnly(targetId, method, data, options?.transfer)
+  }
+
+  /** Owns all dispatch-only request construction, reservation, physical send and release. */
+  #sendDispatchOnly(
+    targetId: string,
+    method: string,
+    data: unknown,
+    transfer?: readonly unknown[]
+  ): Promise<void> {
     this.kernel.assertActive()
     assertMethod(targetId)
     assertMethod(method)
@@ -472,32 +535,32 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
     )
     if (!this.#replay.reserveId(taskId))
       throw new WebRpcError(WebRpcErrorCode.overloaded, WebRpcErrorText.outboundReplayFull)
-    void Promise.resolve()
+    return Promise.resolve()
       .then(() => this.resolveReceiver(targetId))
       .then((receiver) =>
         this.#pipeline.send(
-          {
-            kind: WebRpcMessageKind.request,
-            version: this.#version,
-            taskId,
-            senderId: this.id,
-            targetId,
+          normalizeRpcEnvelope({
+            kind: 'request' as const,
+            id: taskId,
             method,
-            data,
-            dispatchOnly: true,
-            sentAt: this.kernel.time.now(),
-            receiverId: receiver.receiverId
-          },
-          () => taskId
+            data: {
+              webRpc: {
+                profile: WebRpcRoutingProfile,
+                type: 'request' as const,
+                applicationVersion: this.#version,
+                senderId: this.id,
+                targetId,
+                ...(receiver.receiverId === undefined ? {} : { receiverId: receiver.receiverId }),
+                dispatchOnly: true,
+                sentAt: this.kernel.time.now()
+              },
+              ...(data === undefined ? {} : { payload: data as IRpcPortableValue })
+            }
+          }),
+          transfer === undefined ? undefined : { transfer }
         )
       )
-      .then(
-        () => this.#replay.releaseId(taskId),
-        (error) => {
-          this.#replay.releaseId(taskId)
-          this.emitFailure(error, WebRpcErrorCode.transport)
-        }
-      )
+      .finally(() => this.#replay.releaseId(taskId))
   }
 
   /** Installs the one discovery-backed selector for all outbound operation kinds. */
@@ -514,9 +577,9 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
   }
 
   /** Sends a frame generated by the provider attachment through the canonical pipeline. */
-  sendFrame(message: unknown, transfer?: readonly unknown[]): Promise<void> {
+  sendFrame(message: IRpcEnvelope, transfer?: readonly unknown[]): Promise<void> {
     return Promise.resolve().then(() =>
-      this.#pipeline.send(message, () => '', transfer === undefined ? undefined : { transfer })
+      this.#pipeline.send(message, transfer === undefined ? undefined : { transfer })
     )
   }
 
@@ -610,7 +673,7 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
       pending: this.#pending.size,
       pingPending: 0,
       activeControllers: 0,
-      chunks: 0,
+      chunks: readSelectedFramerChunks(this.#components),
       providers: 0,
       events: [...this.#events.values()].reduce((total, listeners) => total + listeners.size, 0),
       hooks: this.#hooks.size,
@@ -646,67 +709,26 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
   /** Settles one authenticated response owned by this endpoint. */
   async #receiveResponse(message: unknown): Promise<void> {
     const record = message as {
-      envelope?: IWebRpcResponse
+      envelope?: IRpcEnvelope
+      route?: ReturnType<typeof normalizeWebRpcRoutingData>
       inbound?: IWebRpcInboundMessage<unknown>
+      admission?: IInboundIdentityAdmission
     }
-    const envelope = record.envelope
+    const canonical = record.envelope
+    const route = record.route
+    if (canonical?.kind !== 'response' || route?.webRpc.type !== 'response') return
     if (
-      !envelope ||
-      envelope.kind !== WebRpcMessageKind.response ||
-      envelope.targetId !== this.id ||
-      (envelope.receiverId !== this.receiverId && envelope.receiverId !== this.id)
+      route.webRpc.targetId !== this.id ||
+      (route.webRpc.receiverId !== this.receiverId && route.webRpc.receiverId !== this.id)
     )
       return
-    const pending = this.#pending.get(envelope.taskId)
-    if (!pending || pending.targetId !== envelope.senderId || pending.method !== envelope.method)
-      return
-    const binding = await this.#verifyResponseSource(envelope, record.inbound)
+    const method = route.webRpc.method
+    if (typeof method !== 'string') return
+    const pending = this.#pending.get(canonical.id)
+    if (!pending || pending.targetId !== route.webRpc.senderId || pending.method !== method) return
+    const binding = record.admission?.bindingKey
     if (!binding || this.kernel.state !== 'active') return
-    if (envelope.ok) {
-      try {
-        this.#validateData(envelope.method, 'result', envelope.data)
-        pending.resolve(envelope.data)
-      } catch (error) {
-        pending.reject(error)
-      }
-    } else
-      pending.reject(
-        new WebRpcRemoteError(
-          envelope.code ?? WebRpcErrorCode.internal,
-          envelope.message ?? WebRpcErrorText.remoteRequestFailed,
-          envelope.data
-        )
-      )
-  }
-
-  /** Verifies physical/logical source identity before a response may settle pending state. */
-  async #verifyResponseSource(
-    response: IWebRpcResponse,
-    inbound: IWebRpcInboundMessage<unknown> | undefined
-  ): Promise<string | false> {
-    const admission = await this.inboundIdentity.admit({
-      senderId: response.senderId,
-      targetId: response.targetId,
-      data: response.data,
-      inbound
-    })
-    if (!admission) {
-      this.#emit({
-        name: 'authentication.rejected',
-        at: this.kernel.time.now(),
-        localId: this.id,
-        code: 'UNAUTHENTICATED'
-      })
-      return false
-    }
-    admission.release()
-    const binding = tupleKey(
-      response.senderId,
-      inbound?.peerId ?? this.kernel.transport.peerId ?? '',
-      inbound?.origin ?? this.kernel.origin ?? '',
-      this.#sourceIdentity.token(inbound?.source)
-    )
-    const existing = this.#responseBindings.get(response.senderId)
+    const existing = this.#responseBindings.get(route.webRpc.senderId)
     if (existing !== undefined && existing !== binding) {
       this.#emit({
         name: 'authentication.rejected',
@@ -714,10 +736,25 @@ export class WebRpcOutboundAttachment implements IOutboundAttachmentHost {
         localId: this.id,
         code: 'SOURCE_BINDING_CONFLICT'
       })
-      return false
+      return
     }
-    this.#responseBindings.set(response.senderId, binding)
-    return binding
+    this.#responseBindings.set(route.webRpc.senderId, binding)
+    if (canonical.ok) {
+      try {
+        this.#validateData(method, 'result', route.payload)
+        pending.resolve(route.payload)
+      } catch (error) {
+        pending.reject(error)
+      }
+    } else
+      pending.reject(
+        new WebRpcRemoteError(
+          canonical.code ?? WebRpcErrorCode.internal,
+          canonical.message ?? WebRpcErrorText.remoteRequestFailed,
+          route.payload,
+          canonical.error === undefined ? undefined : deserializeErrorFromRpc(canonical.error)
+        )
+      )
   }
 
   /** Rejects and removes every pending operation after transport or lifecycle failure. */
@@ -738,6 +775,11 @@ function normalizeHooks(
 ): readonly IWebRpcHook[] {
   if (value === undefined) return []
   return Object.freeze(Array.isArray(value) ? [...value] : [value as IWebRpcHook])
+}
+
+/** Projects an abort reason through RPC portable/error owners before it crosses the wire. */
+function normalizeAbortReason(reason: unknown): IRpcPortableValue {
+  return normalizePortable(reason instanceof Error ? serializeRpcError(reason) : reason)
 }
 
 /** Rejects timeout values outside the inherited finite non-negative domain. */

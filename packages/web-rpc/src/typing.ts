@@ -1,7 +1,10 @@
 import type { IWebRpcError } from './errors.js'
 import type { IWebRpcTransport } from './transport.js'
-import type { IWebRpcPlatformValue as IProtocolWebRpcPlatform } from './protocol-constants.js'
-import type { IWebRpcCandidateStatus, IWebRpcOperation } from './protocol-constants.js'
+import type { IWebRpcFeature } from './feature.js'
+import type { IRpcEnvelope, IRpcFramer, IRpcProtocol } from '@migaia/rpc-contract'
+import type { ICodec } from '@migaia/serialize/codec'
+import type { IWebRpcPlatformValue as IProtocolWebRpcPlatform } from './transport-constants.js'
+import type { IWebRpcCandidateStatus, IWebRpcOperation } from './transport-constants.js'
 
 export type IWebRpcProviderResult =
   | { readonly ok: true; readonly data?: unknown; readonly transfer?: readonly unknown[] }
@@ -117,23 +120,6 @@ export type IWebRpcTimeoutCapability = IWebRpcTimeoutConfig & {
 export type IWebRpcHooksConfig = {
   readonly listeners?: IWebRpcHook | readonly IWebRpcHook[]
   readonly onHookError?: (error: unknown, event: IWebRpcHookEvent) => void
-}
-export type IWebRpcChunkConfig = {
-  readonly chunkSize?: number
-  readonly maxMessageBytes?: number
-  readonly maxConcurrentMessages?: number
-  readonly maxConcurrentMessagesPerPeer?: number
-  readonly maxBufferedBytes?: number
-  readonly maxChunksPerMessage?: number
-  readonly maxChunkBytes?: number
-  readonly assemblyTimeoutMs?: number
-  readonly byteLength?: (value: string) => number
-  readonly split?: (value: string, maxBytes: number) => readonly string[]
-}
-/** Normalized chunk capability installed by chunk middleware. */
-export type IWebRpcChunkCapability = IWebRpcChunkConfig & {
-  readonly byteLength: (value: string) => number
-  readonly split: (value: string, maxBytes: number) => readonly string[]
 }
 export type IWebRpcConnectContext = {
   readonly senderId: string
@@ -287,30 +273,43 @@ export type IWebRpcPluginInstallResult = {
   readonly shared: Readonly<Record<PropertyKey, unknown>>
 }
 
-/** Public item contract used by the migrated first-party middleware factories. */
-export type IWebRpcPlugin = {
+/** Public item contract used by migrated middleware without widening its component contribution. */
+export type IWebRpcPlugin<TComponents extends object = {}> = {
   readonly name: string
   readonly metadata: IWebRpcPluginMetadata
   /** Discovery mode retained on the native descriptor for factory conditional typing. */
   readonly discoveryMode?: IWebRpcDiscoveryMode
   /** Ping capability retained on the native descriptor for factory conditional typing. */
   readonly pingCapability?: true
-  /** Optional transport selected by this plugin when the factory omits one. */
-  readonly transport?: IWebRpcTransport
+  /** Runtime component slots stay opaque until tuple selection proves their exact contribution. */
+  readonly transport?: unknown
+  readonly protocol?: unknown
+  readonly codec?: unknown
+  readonly framer?: unknown
   readonly install: (
     scope: IWebRpcPluginInstallScope
   ) => IWebRpcPluginInstallResult | Promise<IWebRpcPluginInstallResult>
-}
+} & Readonly<TComponents>
 export type IWebRpcFactoryConfig<
   TTargetId extends string = string,
-  TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[]
+  TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[],
+  TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[],
+  TEnvelope extends IRpcEnvelope = IRpcEnvelope,
+  TEncoded = unknown,
+  TFrame = TEncoded
 > = {
   /** Stable local endpoint identity included in every routed protocol envelope. */
   readonly id: string
   /** Optional known-peer seed; automatic discovery may resolve additional target ids lazily. */
   readonly targetIds?: readonly TTargetId[]
-  /** Transport used for all encoded messages owned by this endpoint. */
-  readonly transport?: IWebRpcTransport
+  /** Transport receives exactly the selected framer output, except an explicit opaque sink. */
+  readonly transport?: IWebRpcTransport<TFrame>
+  /** Semantic descriptor feeding the codec edge in the canonical endpoint pipeline. */
+  readonly protocol?: IRpcProtocol<TEnvelope, string, number>
+  /** Codec whose output must match the selected framer input exactly. */
+  readonly codec?: ICodec<TEnvelope, TEncoded>
+  /** Framer whose output is the value delivered to the selected transport. */
+  readonly framer?: IRpcFramer<TEncoded, TFrame, string, number>
   /** Initial provider methods registered before endpoint construction completes. */
   readonly provider?: Readonly<Record<string, IWebRpcProvider>>
   /** Provider concurrency budgets; defaults to 256 global and 64 per peer. */
@@ -324,6 +323,8 @@ export type IWebRpcFactoryConfig<
   }
   /** Ordered middleware tuple installed atomically during endpoint construction. */
   readonly middlewares: TMiddlewares
+  /** Finite immutable tuple of user-defined features installed by the canonical Host batch. */
+  readonly features?: TFeatures
   /** Cancellation and deadline controls for middleware installation and rollback. */
   readonly construction?: {
     /** Aborts construction while still rolling back every installed middleware. */

@@ -7,7 +7,15 @@ import { fileURLToPath } from 'node:url'
 const packageDirectory = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const repositoryRoot = resolve(packageDirectory, '../..')
 const temporaryRoot = mkdtempSync(join(tmpdir(), 'migaia-web-rpc-two-copy-'))
-const dependencies = ['capability', 'event-subscriber', 'lifecycle', 'plugin-host', 'utils']
+const dependencies = [
+  'capability',
+  'event-subscriber',
+  'lifecycle',
+  'plugin-host',
+  'rpc-contract',
+  'serialize',
+  'utils'
+]
 
 /** Creates one minimal transport whose counters prove rejected composition did not reach Host. */
 function transportSource() {

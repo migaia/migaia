@@ -149,4 +149,37 @@ describe('worker adapter source metadata', () => {
     expect(transport.sourceProof?.(crossRealmSource)).toBe(true)
     expect(transport.sourceProof?.(structuredClone({ id: 'other-client' }))).toBe(false)
   })
+
+  it('normalizes only a verified cross-realm client wrapper to the configured peer', () => {
+    /** Captures the adapter ingress callback for distinct native-wrapper delivery. */
+    let listener: ((event: MessageEvent<unknown>) => void) | undefined
+    /** Represents the stable configured ServiceWorker client target. */
+    const client = {
+      id: 'client-stable',
+      postMessage() {},
+      addEventListener(_type: 'message', callback: (event: MessageEvent<unknown>) => void) {
+        listener = callback
+      },
+      removeEventListener() {}
+    }
+    /** Owns the canonical source-proof and normalization boundary under test. */
+    const transport = createServiceTransport(client)
+    /** Records dispatched messages after the adapter has chosen their source identity. */
+    const received: unknown[] = []
+    transport.subscribe((message) => received.push(message))
+    /** Simulates the first native WindowClient wrapper for the configured client id. */
+    const firstWrapper = structuredClone({ id: client.id })
+    /** Simulates a later distinct native wrapper with the same verified client id. */
+    const secondWrapper = structuredClone({ id: client.id })
+    /** Proves an unverified client id remains the original rejected-source identity. */
+    const rejectedSource = structuredClone({ id: 'other-client' })
+    listener?.({ data: 'first', source: firstWrapper } as unknown as MessageEvent)
+    listener?.({ data: 'second', source: secondWrapper } as unknown as MessageEvent)
+    listener?.({ data: 'rejected', source: rejectedSource } as unknown as MessageEvent)
+    expect(received).toEqual([
+      { data: 'first', origin: undefined, source: client },
+      { data: 'second', origin: undefined, source: client },
+      { data: 'rejected', origin: undefined, source: rejectedSource }
+    ])
+  })
 })

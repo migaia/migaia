@@ -1,5 +1,5 @@
 import type { IWebRpcTransport } from '../transport.js'
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js'
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../transport-constants.js'
 import { WebRpcErrorCode } from '../errors.js'
 import {
   collectListenerFailure,

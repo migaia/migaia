@@ -9,7 +9,7 @@ import {
   reportListenerFailure
 } from '../internal/listener-safety.js'
 import { createMessageListenerHub } from '../internal/message-listener-hub.js'
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js'
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../transport-constants.js'
 import { WebRpcErrorCode } from '../errors.js'
 
 /**

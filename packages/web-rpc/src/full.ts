@@ -7,7 +7,6 @@ import {
 import { provider, type IProviderSurface } from './features/provider.js'
 import { discovery, type IDiscoverySurface } from './features/discovery.js'
 import { control } from './features/control.js'
-import { chunk } from './features/chunk.js'
 import type {
   IFactoryPingCapability,
   IFactoryDiscoveryMode,
@@ -16,6 +15,7 @@ import type {
   IWebRpcFactoryConfig,
   IWebRpcPlugin
 } from './typing.js'
+import type { IWebRpcFeature, IWebRpcFeatureSurface } from './feature.js'
 
 type IFullModuleTuple = readonly [
   IWebRpcEndpointModule<IProviderSurface>,
@@ -28,13 +28,15 @@ type IFullModuleTuple = readonly [
 type IFullEndpointSurface<
   TTargetId extends string,
   TMode extends 'automatic' | 'manual',
-  TPing extends boolean
+  TPing extends boolean,
+  TFeatures extends readonly IWebRpcFeature[]
 > = Omit<
   IWebRpcKernelSurface & IWebRpcComposedModuleSurface<IFullModuleTuple>,
   'connect' | 'discovery'
 > &
   Pick<IWebRpcEndpoint<TTargetId, TMode>, 'connect' | 'discovery'> &
-  IWebRpcPingEndpointSurface<TPing>
+  IWebRpcPingEndpointSurface<TPing> &
+  IWebRpcFeatureSurface<TFeatures>
 
 /**
  * Creates the complete endpoint through one canonical kernel and attachment closure. The `ping`/
@@ -43,23 +45,67 @@ type IFullEndpointSurface<
  * `WebRpcControlAttachment` and throws `MIDDLEWARE_MISSING` when the type says the capability is
  * absent, so the type and the runtime observable contract stay in agreement.
  */
-export function createFullEndpoint<
+function createFullEndpointRuntime<
   TTargetId extends string = string,
-  TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[]
+  TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[],
+  TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[]
 >(
-  config: IWebRpcFactoryConfig<TTargetId, TMiddlewares>
+  config: IWebRpcFactoryConfig<TTargetId, TMiddlewares, TFeatures> & {
+    readonly features?: import('./feature.js').IWebRpcFiniteFeatureTuple<TFeatures>
+  }
 ): Promise<
   IFullEndpointSurface<
     TTargetId,
     IFactoryDiscoveryMode<TMiddlewares>,
-    IFactoryPingCapability<TMiddlewares>
+    IFactoryPingCapability<TMiddlewares>,
+    TFeatures
   >
 >
-export function createFullEndpoint(
-  config: IWebRpcFactoryConfig
-): Promise<IWebRpcKernelSurface & IWebRpcComposedModuleSurface<IFullModuleTuple>>
-export function createFullEndpoint(
+function createFullEndpointRuntime(
   config: IWebRpcFactoryConfig
 ): Promise<IWebRpcKernelSurface & IWebRpcComposedModuleSurface<IFullModuleTuple>> {
-  return createComposedEndpoint(config, [provider(), discovery(), control(), chunk()] as const)
+  return createComposedEndpoint(
+    config as unknown as IWebRpcFactoryConfig<string, readonly IWebRpcPlugin[], readonly []>,
+    [provider(), discovery(), control()] as const
+  )
 }
+
+import type {
+  IChecked,
+  ICheckedInput,
+  IFeatures,
+  ILegacyDefault,
+  IMiddlewares,
+  ITarget
+} from './pipeline-contract.js'
+
+/** Public full-endpoint callable preserves checked inferred and legacy-default forms. */
+type IPublicCallable = {
+  <const TConfig extends ICheckedInput>(
+    config: TConfig & IChecked<TConfig>
+  ): Promise<
+    IFullEndpointSurface<
+      ITarget<TConfig>,
+      IFactoryDiscoveryMode<IMiddlewares<TConfig>>,
+      IFactoryPingCapability<IMiddlewares<TConfig>>,
+      IFeatures<TConfig>
+    >
+  >
+  <
+    TTargetId extends string = string,
+    TMiddlewares extends readonly IWebRpcPlugin[] = readonly IWebRpcPlugin[],
+    TFeatures extends readonly IWebRpcFeature[] = readonly IWebRpcFeature[]
+  >(
+    config: ILegacyDefault<TTargetId, TMiddlewares, TFeatures>
+  ): Promise<
+    IFullEndpointSurface<
+      TTargetId,
+      IFactoryDiscoveryMode<TMiddlewares>,
+      IFactoryPingCapability<TMiddlewares>,
+      TFeatures
+    >
+  >
+}
+
+/** Checked public boundary delegates to the original runtime without a second lifecycle path. */
+export const createFullEndpoint = createFullEndpointRuntime as unknown as IPublicCallable

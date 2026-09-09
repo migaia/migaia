@@ -1,13 +1,15 @@
 import { createRtcDataChannelTransport } from '../../src/adapters/rtc-data-channel'
 import { readEndpointDebugSnapshot } from '../../src/internal/test-observer'
 import { createEndpoint } from '../../src/index'
+import { createStringFramer } from '@migaia/rpc-contract/framing'
+import { defineJsonCodec } from '@migaia/serialize/codecs/json'
+import type { ICodecValue } from '@migaia/serialize'
+import { authentication } from '../../src/middleware/authentication.js'
 import { connect } from '../../src/middleware/connect'
-import { protocol } from '../../src/middleware/protocol'
 import { timeout } from '../../src/middleware/timeout'
 import { abort } from '../../src/middleware/abort'
 import { contract } from '../../src/middleware/contract'
 import { ping } from '../../src/middleware/ping'
-import { chunk } from '../../src/middleware/chunk'
 import { installErrorGuards } from './rpc'
 
 const errors = installErrorGuards()
@@ -116,19 +118,22 @@ const linkPeers = async () => {
 globalThis.runRtcScenario = async () => {
   let dispatchPayload: unknown
   const peers = await linkPeers()
-  const codec = protocol({
-    encodedType: 'string',
-    encode: (value) => JSON.stringify(value),
-    decode: (value) => JSON.parse(String(value))
-  })
+  const codec = defineJsonCodec({ version: 1 })
+  const carrierCodec = defineJsonCodec({ version: 1 })
   const leftTransport = createRtcDataChannelTransport(peers.leftChannel)
   const rightTransport = createRtcDataChannelTransport(peers.rightChannel)
   const left = await createEndpoint({
     id: 'left',
     targetIds: ['right'],
+    codec,
+    framer: createStringFramer({ chunkBytes: 4 }),
     middlewares: [
       connect({ transport: leftTransport }),
-      codec,
+      authentication({
+        encodedType: 'string',
+        encrypt: (value) => carrierCodec.encode(value as ICodecValue),
+        decrypt: (value) => carrierCodec.decode(value as string)
+      }),
       timeout({ timeoutMs: 500 }),
       abort(),
       ping(),
@@ -143,13 +148,14 @@ globalThis.runRtcScenario = async () => {
             result: { parse: (value) => value }
           }
         }
-      }),
-      chunk({ chunkSize: 4 })
+      })
     ]
   })
   const right = await createEndpoint({
     id: 'right',
     targetIds: ['left'],
+    codec,
+    framer: createStringFramer({ chunkBytes: 4 }),
     provider: {
       echo: (context) => context.success(context.data),
       notify: (context) => {
@@ -161,11 +167,14 @@ globalThis.runRtcScenario = async () => {
     },
     middlewares: [
       connect({ transport: rightTransport }),
-      codec,
+      authentication({
+        encodedType: 'string',
+        encrypt: (value) => carrierCodec.encode(value as ICodecValue),
+        decrypt: (value) => carrierCodec.decode(value as string)
+      }),
       timeout({ timeoutMs: 500 }),
       abort(),
-      ping(),
-      chunk({ chunkSize: 4 })
+      ping()
     ]
   })
   const result = await left.send('right', 'echo', 'rtc-ok')

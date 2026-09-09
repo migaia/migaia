@@ -23,7 +23,7 @@ const consumerRoots = {
     'src/features/provider.ts',
     'src/features/discovery.ts',
     'src/features/control.ts',
-    'src/features/chunk.ts'
+    'src/features/canonical-chunk.ts'
   ]
 }
 const consumerNames = ['core', 'client', 'provider', 'full', 'custom']

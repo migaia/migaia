@@ -32,6 +32,20 @@ export type IEndpointKernelState = (typeof EndpointKernelState)[keyof typeof End
 /** One decoded frame owner installed into the kernel's constant-time route table. */
 export type IEndpointKernelRoute = (message: unknown) => void | Promise<void>
 
+/** Construction-time transport field values read exactly once before kernel allocation. */
+export type IEndpointKernelTransportSnapshot = Readonly<{
+  readonly send: unknown
+  readonly subscribe: unknown
+  readonly close: unknown
+  readonly onTransportError: unknown
+  readonly onListenerError: unknown
+  readonly platform: unknown
+  readonly topology: unknown
+  readonly origin: unknown
+  readonly encodedType: unknown
+  readonly ownership: unknown
+}>
+
 /** Failure and receive callbacks supplied by the temporarily adapted full endpoint. */
 export type IEndpointKernelCallbacks = {
   readonly receive: (message: IWebRpcInboundMessage<unknown>) => void | Promise<void>
@@ -72,7 +86,7 @@ export type IEndpointKernelHost = {
   registerRoute(kind: string, route: IEndpointKernelRoute): () => void
   registerOwner(key: string, owner: object): void
   dispatchRoute(kind: string, message: unknown): Promise<boolean>
-  beginClose(): void
+  beginClose(reason?: unknown): void
   completeDispose(): void
 }
 
@@ -108,17 +122,20 @@ class EndpointKernel implements IEndpointKernelHost {
   /** Invalidates callbacks captured before close without allocating per callback. */
   #generation = 0
   /** Snapshots and validates transport metadata without subscribing or allocating feature owners. */
-  constructor(transport: IWebRpcTransport) {
-    const transportSend = safeRead<unknown>(transport, 'send')
-    const transportSubscribe = safeRead<unknown>(transport, 'subscribe')
-    const transportClose = safeRead<unknown>(transport, 'close')
-    const onTransportError = safeRead<unknown>(transport, 'onTransportError')
-    const onListenerError = safeRead<unknown>(transport, 'onListenerError')
-    const platform = safeRead<unknown>(transport, 'platform')
-    const topology = safeRead<unknown>(transport, 'topology')
-    const origin = safeRead<unknown>(transport, 'origin')
-    const encodedType = safeRead<unknown>(transport, 'encodedType')
-    const ownership = safeRead<unknown>(transport, 'ownership')
+  constructor(transport: IWebRpcTransport, snapshot?: IEndpointKernelTransportSnapshot) {
+    const transportSnapshot = snapshot ?? readTransportSnapshot(transport)
+    const {
+      send: transportSend,
+      subscribe: transportSubscribe,
+      close: transportClose,
+      onTransportError,
+      onListenerError,
+      platform,
+      topology,
+      origin,
+      encodedType,
+      ownership
+    } = transportSnapshot
     if (typeof transportSend !== 'function' || typeof transportSubscribe !== 'function')
       throw new WebRpcError(
         WebRpcErrorCode.invalidConfig,
@@ -319,8 +336,8 @@ class EndpointKernel implements IEndpointKernelHost {
   }
 
   /** Starts close synchronously and returns the canonical terminal Promise. */
-  beginClose(): void {
-    this.#beginClose()
+  beginClose(reason?: unknown): void {
+    this.#beginClose(reason)
   }
 
   /** Completes the Host-owned terminal transition after root resources have been released. */
@@ -332,18 +349,38 @@ class EndpointKernel implements IEndpointKernelHost {
   }
 
   /** Closes admission and invalidates all captured callback generations synchronously. */
-  #beginClose(): void {
+  #beginClose(reason?: unknown): void {
     if (this.#state === EndpointKernelState.closing || this.#state === EndpointKernelState.disposed)
       return
     this.#state = EndpointKernelState.closing
     this.#generation += 1
-    this.#closing.abort()
+    if (reason === undefined) this.#closing.abort()
+    else this.#closing.abort(reason)
   }
 }
 
 /** Creates the one feature-neutral kernel without subscribing or constructing feature owners. */
-export function createEndpointKernel(transport: IWebRpcTransport): IEndpointKernelHost {
-  return new EndpointKernel(transport)
+export function createEndpointKernel(
+  transport: IWebRpcTransport,
+  snapshot?: IEndpointKernelTransportSnapshot
+): IEndpointKernelHost {
+  return new EndpointKernel(transport, snapshot)
+}
+
+/** Captures each transport descriptor field once when no bootstrap snapshot is available. */
+function readTransportSnapshot(transport: IWebRpcTransport): IEndpointKernelTransportSnapshot {
+  return Object.freeze({
+    send: safeRead<unknown>(transport, 'send'),
+    subscribe: safeRead<unknown>(transport, 'subscribe'),
+    close: safeRead<unknown>(transport, 'close'),
+    onTransportError: safeRead<unknown>(transport, 'onTransportError'),
+    onListenerError: safeRead<unknown>(transport, 'onListenerError'),
+    platform: safeRead<unknown>(transport, 'platform'),
+    topology: safeRead<unknown>(transport, 'topology'),
+    origin: safeRead<unknown>(transport, 'origin'),
+    encodedType: safeRead<unknown>(transport, 'encodedType'),
+    ownership: safeRead<unknown>(transport, 'ownership')
+  })
 }
 
 /** Narrows a hostile transport platform descriptor to the public platform domain. */

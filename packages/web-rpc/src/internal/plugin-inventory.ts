@@ -152,6 +152,11 @@ export function createEndpointPluginInventory(
           config,
           kernel,
           prepared: getPrepared(),
+          id: scope.id,
+          transport: scope.transport,
+          signal: scope.signal,
+          hooks: scope.hooks,
+          own: scope.own,
           getShared: scope.getShared
         }),
       ...(definition.key === EndpointModuleKey.outbound
@@ -180,7 +185,12 @@ export function createEndpointPluginInventory(
                 if (value.operation === 'consumeAbort')
                   return owner.variations.consumeAbort(value.key)
                 if (value.operation === 'abort')
-                  return owner.variations.abort(value.key, value.controller, value.expiresAt)
+                  return owner.variations.abort(
+                    value.key,
+                    value.controller,
+                    value.expiresAt,
+                    value.reason
+                  )
                 return undefined
               }
               const variationCoordinator: IWebRpcVariationCoordinatorPort = { admit }
@@ -220,6 +230,21 @@ export function createEndpointPluginInventory(
                     throw error
                   }
                   return
+                }
+                if (command.kind === 'one-way') {
+                  try {
+                    const result = outboundOwner.sendOneWay(
+                      command.targetId,
+                      command.method,
+                      command.data,
+                      { transfer: command.transfer }
+                    )
+                    observe(result)
+                    return result
+                  } catch (error) {
+                    observe(undefined, error)
+                    throw error
+                  }
                 }
                 if (command.kind === 'validate') {
                   try {
@@ -413,8 +438,7 @@ export function buildComposedPluginInventory(
         WebRpcSharedKey.abort,
         WebRpcSharedKey.hooks,
         WebRpcSharedKey.ping,
-        WebRpcSharedKey.uuid,
-        WebRpcSharedKey.chunk
+        WebRpcSharedKey.uuid
       ],
       install: async (scope) => {
         const prepared = await options.deferred.finalize(

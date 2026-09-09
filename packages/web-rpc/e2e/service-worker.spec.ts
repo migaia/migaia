@@ -47,7 +47,7 @@ test('two controlled pages keep ServiceWorker Client identities isolated', async
     activePageSnapshot: expect.objectContaining({
       phase: 'active',
       pending: 0,
-      chunks: 0,
+      chunks: undefined,
       activeControllers: 0
     }),
     dispatchPayload: 'service-worker-chunked-dispatch-😀',

@@ -5,6 +5,7 @@ import {
   withEndpointModuleOwner
 } from '../internal/endpoint-modules.js'
 import { WebRpcOutboundAttachment } from '../internal/outbound-attachment.js'
+import { canonicalChunk } from './canonical-chunk.js'
 import { registerEndpointDebugSnapshot } from '../internal/test-observer.js'
 import type { IWebRpcEndpoint } from '../typing.js'
 import type { IWebRpcCoreConfig, IWebRpcKernelSurface } from '../core.js'
@@ -51,7 +52,7 @@ const outboundModule = defineEndpointModule<IWebRpcCoreConfig, IOutboundSurface>
       )
     )
   },
-  [],
+  [canonicalChunk()],
   [],
   {
     routes: ['response', 'variation'],

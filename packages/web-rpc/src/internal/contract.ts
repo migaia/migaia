@@ -1,4 +1,5 @@
-import { WebRpcSchemaValidationError } from '../errors.js'
+import { WebRpcError, WebRpcErrorCode, WebRpcSchemaValidationError } from '../errors.js'
+import { WebRpcErrorText } from '../error-text.js'
 import type { IWebRpcContractConfig } from '../typing.js'
 import { safeRead, safeString } from './safe-value.js'
 import { WebRpcContractFailureKind } from '../protocol-constants.js'
@@ -72,4 +73,11 @@ export function validateContractData(
       cause
     )
   }
+}
+
+/** Validates public operation names at the existing contract-validation boundary. */
+export function assertContractMethod(method: string): string {
+  if (typeof method !== 'string' || method.length === 0)
+    throw new WebRpcError(WebRpcErrorCode.invalidConfig, WebRpcErrorText.methodInvalid)
+  return method
 }

@@ -20,8 +20,8 @@ import { WebRpcPluginHost } from '../src/internal/web-rpc-plugin-host.js'
 import { ReplayWindow } from '../src/internal/replay.js'
 import { PeerRegistry } from '../src/internal/peers.js'
 import { ProviderAdmissionRegistry } from '../src/internal/provider-admission.js'
-import { ChunkAssembler } from '../src/internal/chunk.js'
 import type { IWebRpcAbortSignal, IWebRpcPlugin } from '../src/typing.js'
+import { createStringFramer } from '@migaia/rpc-contract/framing'
 
 type IBuildCapabilityTopology =
   typeof import('@migaia/capability/graph/topology').buildCapabilityTopology
@@ -273,15 +273,12 @@ describe('candidate-specific duplicate-owner contracts', () => {
     expect(admission.size).toBe(1)
   })
 
-  it('proves MET-RED-014 keeps chunk assembly in ChunkAssembler', () => {
-    const chunks = new ChunkAssembler({ chunkSize: 8 })
-    expect(
-      chunks.accept({ messageId: 'candidate-014', index: 0, total: 2, data: 'a' }, 'peer')
-    ).toBeUndefined()
-    expect(
-      chunks.accept({ messageId: 'candidate-014', index: 1, total: 2, data: 'b' }, 'peer')
-    ).toBe('ab')
-    expect(chunks.size).toBe(0)
+  it('proves MET-RED-014 keeps chunk assembly in the D13 framer owner', () => {
+    const framer = createStringFramer({ chunkBytes: 1, maxMessageBytes: 8 })
+    const context = { source: 'peer', messageId: 'candidate-014' }
+    const frames = framer.frame('ab', context)
+    expect(framer.accept(frames[0], context)).toEqual({ status: 'pending' })
+    expect(framer.accept(frames[1], context)).toEqual({ status: 'complete', value: 'ab' })
   })
 
   it('proves MET-RED-015 installs dependencies before the requesting feature', async () => {
@@ -466,27 +463,26 @@ describe('candidate-specific duplicate-owner contracts', () => {
     await endpoint.dispose()
   })
 
-  it('proves MET-RED-028 gives chunk expiry one injected timer owner', () => {
+  it('proves MET-RED-028 gives D13 framing expiry one injected timer owner', () => {
     let timers = 0
     let clears = 0
-    const chunks = new ChunkAssembler(
-      { assemblyTimeoutMs: 10 },
-      {
-        now: () => 0,
-        setTimeout: () => {
-          timers += 1
-          return {
-            clear: () => {
-              clears += 1
-            }
-          }
-        },
-        clearTimeout: (timer) => timer.clear()
+    const framer = createStringFramer({
+      chunkBytes: 1,
+      maxMessageBytes: 8,
+      assemblyTimeoutMs: 10,
+      schedule: () => {
+        timers += 1
+        return Object.freeze({})
+      },
+      cancel: () => {
+        clears += 1
       }
-    )
-    chunks.accept({ messageId: 'candidate-028', index: 0, total: 2, data: 'a' }, 'peer')
+    })
+    const context = { source: 'peer', messageId: 'candidate-028' }
+    const [frame] = framer.frame('ab', context)
+    framer.accept(frame, context)
     expect(timers).toBe(1)
-    chunks.clear()
+    framer.close()
     expect(clears).toBe(1)
   })
 

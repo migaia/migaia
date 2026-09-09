@@ -167,7 +167,7 @@ declare global {
     activePageSnapshot: {
       phase: string
       pending: number
-      chunks: number
+      chunks?: number
       activeControllers: number
     }
   }>

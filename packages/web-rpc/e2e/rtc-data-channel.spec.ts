@@ -45,8 +45,8 @@ test('RTCDataChannel loopback performs RPC and reaches terminal state', async ({
   expect(result.pingAborted).toBe(false)
   expect(result.terminal).toBe('TRANSPORT')
   expect(result.activeSnapshots).toMatchObject({
-    left: { phase: 'active', pending: 0, chunks: 0, activeControllers: 0 },
-    right: { phase: 'active', pending: 0, chunks: 0 }
+    left: { phase: 'active', pending: 0, chunks: undefined, activeControllers: 0 },
+    right: { phase: 'active', pending: 0, chunks: undefined }
   })
   expect(result.errors).toEqual([])
   expect(result.snapshots).toMatchObject({

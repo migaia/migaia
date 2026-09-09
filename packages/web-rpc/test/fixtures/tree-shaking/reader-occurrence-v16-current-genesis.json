@@ -1,0 +1,2660 @@
+{
+  "schema": "rpc-contract-reader-current-genesis/v1",
+  "workspaceRelative": true,
+  "historical": {
+    "digest": "93942fd9acac3376eff76cce7cbdfa4a552e25051bf97505e7488debd84df830",
+    "status": "UNEXPANDED_HISTORICAL_DIGEST",
+    "fieldLevelDelta": "UNAVAILABLE_NOT_CLAIMED",
+    "predecessorRows": null,
+    "transition": null
+  },
+  "current": {
+    "counts": {
+      "occurrences": 93,
+      "removable": 0,
+      "retainedNegatives": 93,
+      "ownerOperations": 40,
+      "ownerRemovalOperations": 0,
+      "ownerRetainedOperations": 40
+    },
+    "hashes": {
+      "full": "e9553af296e5280f4973532cb2b8da38e5e9bc6200eb878cd445ee909551994d",
+      "semantic": "1d9fc658fcba85c638c97b8802d3252c31eca1b102c797802300372dfce0089b",
+      "coordinate": "615f9aab6eb2a3620fa13302571307b4ba0be04f6e8d4d2bc19bb080def93f8d",
+      "coordinateComputed": "615f9aab6eb2a3620fa13302571307b4ba0be04f6e8d4d2bc19bb080def93f8d",
+      "operations": "d9ab5a1f3c28de1089bc75fb0a008216e4337e655238d15667fab6afbd0a2aa2"
+    },
+    "edges": [
+      {
+        "reader": "packages/store-worker/test/provider-fluent-red.test.ts",
+        "line": 100,
+        "column": 31,
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/store-worker/src/worker.ts",
+        "symbol": "<import-type>",
+        "local": "typeof import('../src/worker.js')",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/store-worker/test/provider-fluent-red.test.ts",
+        "line": 9,
+        "column": 39,
+        "kind": "IMPORT_TYPE",
+        "owner": "@migaia/web-rpc/provider",
+        "symbol": "<import-type>",
+        "local": "typeof import('@migaia/web-rpc/provider')",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/README.md",
+        "line": 689,
+        "column": 99,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcPlatform",
+        "local": "WebRpcPlatform",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/client.ts",
+        "line": 15,
+        "column": 25,
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/web-rpc/src/feature.ts",
+        "symbol": "IWebRpcFiniteFeatureTuple",
+        "local": "import('./feature.js').IWebRpcFiniteFeatureTuple<TFeatures>",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/core.ts",
+        "line": 139,
+        "column": 17,
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/plugin-host/dist/index.ts",
+        "symbol": "IPluginHostView",
+        "local": "import('@migaia/plugin-host').IPluginHostView<WebRpcPluginHost>",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/core.ts",
+        "line": 83,
+        "column": 25,
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/web-rpc/src/feature.ts",
+        "symbol": "IWebRpcFiniteFeatureTuple",
+        "local": "import('./feature.js').IWebRpcFiniteFeatureTuple<TFeatures>",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/full.ts",
+        "line": 54,
+        "column": 25,
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/web-rpc/src/feature.ts",
+        "symbol": "IWebRpcFiniteFeatureTuple",
+        "local": "import('./feature.js').IWebRpcFiniteFeatureTuple<TFeatures>",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/contract.ts",
+        "line": 4,
+        "column": 10,
+        "kind": "IMPORT",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcContractFailureKind",
+        "local": "WebRpcContractFailureKind",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/contract.ts",
+        "line": 4,
+        "column": 43,
+        "kind": "MODULE_IMPORT",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "<mixed-module>",
+        "local": "../protocol-constants.js",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/contract.ts",
+        "line": 67,
+        "column": 15,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcContractFailureKind",
+        "local": "WebRpcContractFailureKind",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/outbound-attachment.ts",
+        "line": 239,
+        "column": 17,
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/web-rpc/src/transport.ts",
+        "symbol": "IWebRpcInboundMessage",
+        "local": "import('../transport.js').IWebRpcInboundMessage",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/outbound-attachment.ts",
+        "line": 259,
+        "column": 31,
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/web-rpc/src/semantic-constants.ts",
+        "symbol": "IWebRpcVariation",
+        "local": "import('../semantic-constants.js').IWebRpcVariation",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/test-observer.ts",
+        "line": 248,
+        "column": 10,
+        "kind": "IMPORT",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcDebugPhase",
+        "local": "WebRpcDebugPhase",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/test-observer.ts",
+        "line": 248,
+        "column": 34,
+        "kind": "MODULE_IMPORT",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "<mixed-module>",
+        "local": "../protocol-constants.js",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/test-observer.ts",
+        "line": 5,
+        "column": 27,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcDebugPhase",
+        "local": "WebRpcDebugPhase",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/test-observer.ts",
+        "line": 5,
+        "column": 58,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcDebugPhase",
+        "local": "WebRpcDebugPhase",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 13,
+        "column": 14,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcTransportOwnership",
+        "local": "WebRpcTransportOwnership",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 19,
+        "column": 14,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcTransportEncoding",
+        "local": "WebRpcTransportEncoding",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 2,
+        "column": 14,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcPlatform",
+        "local": "WebRpcPlatform",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 26,
+        "column": 14,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcTransportTopology",
+        "local": "WebRpcTransportTopology",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 33,
+        "column": 14,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcEndpointStatus",
+        "local": "WebRpcEndpointStatus",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 36,
+        "column": 14,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcOperation",
+        "local": "WebRpcOperation",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 43,
+        "column": 14,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcControlKind",
+        "local": "WebRpcControlKind",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 51,
+        "column": 14,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcCandidateStatus",
+        "local": "WebRpcCandidateStatus",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 58,
+        "column": 14,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcContractFailureKind",
+        "local": "WebRpcContractFailureKind",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 61,
+        "column": 14,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcDebugPhase",
+        "local": "WebRpcDebugPhase",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 64,
+        "column": 14,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcChunkEvent",
+        "local": "WebRpcChunkEvent",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 69,
+        "column": 13,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "IWebRpcChunkEvent",
+        "local": "IWebRpcChunkEvent",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 69,
+        "column": 41,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcChunkEvent",
+        "local": "WebRpcChunkEvent",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 69,
+        "column": 72,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcChunkEvent",
+        "local": "WebRpcChunkEvent",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 70,
+        "column": 13,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "IWebRpcPlatformValue",
+        "local": "IWebRpcPlatformValue",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 70,
+        "column": 44,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcPlatform",
+        "local": "WebRpcPlatform",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 70,
+        "column": 73,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcPlatform",
+        "local": "WebRpcPlatform",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 71,
+        "column": 13,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "IWebRpcTransportOwnershipValue",
+        "local": "IWebRpcTransportOwnershipValue",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 72,
+        "column": 11,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcTransportOwnership",
+        "local": "WebRpcTransportOwnership",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 72,
+        "column": 50,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcTransportOwnership",
+        "local": "WebRpcTransportOwnership",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 73,
+        "column": 13,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "IWebRpcTransportEncodingValue",
+        "local": "IWebRpcTransportEncodingValue",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 74,
+        "column": 11,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcTransportEncoding",
+        "local": "WebRpcTransportEncoding",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 74,
+        "column": 49,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcTransportEncoding",
+        "local": "WebRpcTransportEncoding",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 75,
+        "column": 13,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "IWebRpcTransportTopologyValue",
+        "local": "IWebRpcTransportTopologyValue",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 76,
+        "column": 11,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcTransportTopology",
+        "local": "WebRpcTransportTopology",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 76,
+        "column": 49,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcTransportTopology",
+        "local": "WebRpcTransportTopology",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 77,
+        "column": 13,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "IWebRpcOperation",
+        "local": "IWebRpcOperation",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 77,
+        "column": 40,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcOperation",
+        "local": "WebRpcOperation",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 77,
+        "column": 70,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcOperation",
+        "local": "WebRpcOperation",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 78,
+        "column": 13,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "IWebRpcControlKind",
+        "local": "IWebRpcControlKind",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 78,
+        "column": 42,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcControlKind",
+        "local": "WebRpcControlKind",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 78,
+        "column": 74,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcControlKind",
+        "local": "WebRpcControlKind",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 79,
+        "column": 13,
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "IWebRpcCandidateStatus",
+        "local": "IWebRpcCandidateStatus",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 80,
+        "column": 11,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcCandidateStatus",
+        "local": "WebRpcCandidateStatus",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 80,
+        "column": 47,
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcCandidateStatus",
+        "local": "WebRpcCandidateStatus",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/provider.ts",
+        "line": 15,
+        "column": 25,
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/web-rpc/src/feature.ts",
+        "symbol": "IWebRpcFiniteFeatureTuple",
+        "local": "import('./feature.js').IWebRpcFiniteFeatureTuple<TFeatures>",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/test/duplicate-owner-contract.test.ts",
+        "line": 27,
+        "column": 3,
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/capability/dist/graph/topology.ts",
+        "symbol": "buildCapabilityTopology",
+        "local": "typeof import('@migaia/capability/graph/topology').buildCapabilityTopology",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/test/duplicate-owner-contract.test.ts",
+        "line": 35,
+        "column": 40,
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/capability/dist/graph/topology.ts",
+        "symbol": "<import-type>",
+        "local": "typeof import('@migaia/capability/graph/topology')",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/test/packed-export-smoke.mjs",
+        "line": 52,
+        "column": 27,
+        "kind": "GENERATED_PACKED_NEGATIVE",
+        "owner": "@migaia/web-rpc/memory",
+        "symbol": "expectNotExported",
+        "local": "./memory",
+        "listHash": "b8f4999d75d5cc4f5acf89f4b77c254f4264f3e41d98f2020181f588507f7a0e",
+        "initializerHash": "f60f0098e3f7d5eebd982bf7bbf9935f10e02e4e00b190de43392c44b6f8607a",
+        "templateHash": "95769f784e62d222fb8a37984dc6be2ff9b5ff6935c947b50d0ad559450dd18b",
+        "pipelineHash": "1a8e5b59215d65637a150b3e111929e404cc2d639ed2308bdabdb6fcd7081612",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17/T22"
+      },
+      {
+        "reader": "packages/web-rpc/test/packed-export-smoke.mjs",
+        "line": 52,
+        "column": 39,
+        "kind": "GENERATED_PACKED_NEGATIVE",
+        "owner": "@migaia/web-rpc/message-port",
+        "symbol": "expectNotExported",
+        "local": "./message-port",
+        "listHash": "b8f4999d75d5cc4f5acf89f4b77c254f4264f3e41d98f2020181f588507f7a0e",
+        "initializerHash": "f60f0098e3f7d5eebd982bf7bbf9935f10e02e4e00b190de43392c44b6f8607a",
+        "templateHash": "95769f784e62d222fb8a37984dc6be2ff9b5ff6935c947b50d0ad559450dd18b",
+        "pipelineHash": "1a8e5b59215d65637a150b3e111929e404cc2d639ed2308bdabdb6fcd7081612",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17/T22"
+      },
+      {
+        "reader": "packages/web-rpc/test/packed-export-smoke.mjs",
+        "line": 52,
+        "column": 57,
+        "kind": "GENERATED_PACKED_NEGATIVE",
+        "owner": "@migaia/web-rpc/web-worker",
+        "symbol": "expectNotExported",
+        "local": "./web-worker",
+        "listHash": "b8f4999d75d5cc4f5acf89f4b77c254f4264f3e41d98f2020181f588507f7a0e",
+        "initializerHash": "f60f0098e3f7d5eebd982bf7bbf9935f10e02e4e00b190de43392c44b6f8607a",
+        "templateHash": "95769f784e62d222fb8a37984dc6be2ff9b5ff6935c947b50d0ad559450dd18b",
+        "pipelineHash": "1a8e5b59215d65637a150b3e111929e404cc2d639ed2308bdabdb6fcd7081612",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17/T22"
+      },
+      {
+        "reader": "packages/web-rpc/test/provider-feature-red.test.ts",
+        "line": 206,
+        "column": 28,
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/web-rpc/src/typing.ts",
+        "symbol": "IWebRpcConnectConfig",
+        "local": "import('../src/typing.js').IWebRpcConnectConfig",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/test/provider-feature-red.test.ts",
+        "line": 210,
+        "column": 29,
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/web-rpc/src/typing.ts",
+        "symbol": "IWebRpcContractConfig",
+        "local": "import('../src/typing.js').IWebRpcContractConfig",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/test/transaction-contract.test.ts",
+        "line": 48,
+        "column": 40,
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/web-rpc/src/internal/web-rpc-plugin-host.ts",
+        "symbol": "<import-type>",
+        "local": "typeof import('../src/internal/web-rpc-plugin-host.js')",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 32,
+        "column": 28,
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/client.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/client.js",
+        "importOrdinal": 0,
+        "candidateOrdinal": 1,
+        "allowlistHash": "eddd9e7629a0d80fe6dfb53b9505abfd698500760c0cfd912908a7f9da7c36da",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 32,
+        "column": 28,
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/core.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/core.js",
+        "importOrdinal": 0,
+        "candidateOrdinal": 0,
+        "allowlistHash": "eddd9e7629a0d80fe6dfb53b9505abfd698500760c0cfd912908a7f9da7c36da",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 32,
+        "column": 28,
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/full.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/full.js",
+        "importOrdinal": 0,
+        "candidateOrdinal": 3,
+        "allowlistHash": "eddd9e7629a0d80fe6dfb53b9505abfd698500760c0cfd912908a7f9da7c36da",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 32,
+        "column": 28,
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/provider.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/provider.js",
+        "importOrdinal": 0,
+        "candidateOrdinal": 2,
+        "allowlistHash": "eddd9e7629a0d80fe6dfb53b9505abfd698500760c0cfd912908a7f9da7c36da",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 38,
+        "column": 28,
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/features/canonical-chunk.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/features/canonical-chunk.js",
+        "importOrdinal": 1,
+        "candidateOrdinal": 4,
+        "allowlistHash": "10770b631ff4068762e69d05894ab57f9fb752a2b27ee3461112d1966628dcb4",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 38,
+        "column": 28,
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/features/control.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/features/control.js",
+        "importOrdinal": 1,
+        "candidateOrdinal": 3,
+        "allowlistHash": "10770b631ff4068762e69d05894ab57f9fb752a2b27ee3461112d1966628dcb4",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 38,
+        "column": 28,
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/features/discovery.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/features/discovery.js",
+        "importOrdinal": 1,
+        "candidateOrdinal": 2,
+        "allowlistHash": "10770b631ff4068762e69d05894ab57f9fb752a2b27ee3461112d1966628dcb4",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 38,
+        "column": 28,
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/features/outbound.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/features/outbound.js",
+        "importOrdinal": 1,
+        "candidateOrdinal": 0,
+        "allowlistHash": "10770b631ff4068762e69d05894ab57f9fb752a2b27ee3461112d1966628dcb4",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 38,
+        "column": 28,
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/features/provider.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/features/provider.js",
+        "importOrdinal": 1,
+        "candidateOrdinal": 1,
+        "allowlistHash": "10770b631ff4068762e69d05894ab57f9fb752a2b27ee3461112d1966628dcb4",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 44,
+        "column": 24,
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/core.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/core.js",
+        "importOrdinal": 2,
+        "candidateOrdinal": 0,
+        "allowlistHash": "d421c9593594c0117644b31da85596dfee40ee31930def615e983f71e56713a1",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 59,
+        "column": 24,
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/core.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/core.js",
+        "importOrdinal": 3,
+        "candidateOrdinal": 0,
+        "allowlistHash": "d421c9593594c0117644b31da85596dfee40ee31930def615e983f71e56713a1",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 60,
+        "column": 28,
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/features/outbound.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/features/outbound.js",
+        "importOrdinal": 4,
+        "candidateOrdinal": 0,
+        "allowlistHash": "74d1e920b90693ecc4574360c496c977e72eec25025744d4281468ed7057647c",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 928,
+        "column": 3,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcPlatform",
+        "local": "WebRpcPlatform",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 929,
+        "column": 3,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcTransportTopology",
+        "local": "WebRpcTransportTopology",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 930,
+        "column": 3,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcTransportOwnership",
+        "local": "WebRpcTransportOwnership",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 931,
+        "column": 3,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcTransportEncoding",
+        "local": "WebRpcTransportEncoding",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 932,
+        "column": 3,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcEndpointStatus",
+        "local": "WebRpcEndpointStatus",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 933,
+        "column": 3,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcDebugPhase",
+        "local": "WebRpcDebugPhase",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 937,
+        "column": 13,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcPlatform",
+        "local": "WebRpcPlatform",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 938,
+        "column": 13,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcTransportTopology",
+        "local": "WebRpcTransportTopology",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 939,
+        "column": 14,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcTransportOwnership",
+        "local": "WebRpcTransportOwnership",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 940,
+        "column": 16,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcTransportEncoding",
+        "local": "WebRpcTransportEncoding",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 950,
+        "column": 4,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcPlatform",
+        "local": "WebRpcPlatform",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 951,
+        "column": 4,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcTransportTopology",
+        "local": "WebRpcTransportTopology",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 952,
+        "column": 4,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcTransportOwnership",
+        "local": "WebRpcTransportOwnership",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 953,
+        "column": 4,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcTransportEncoding",
+        "local": "WebRpcTransportEncoding",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 954,
+        "column": 4,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcOperation",
+        "local": "WebRpcOperation",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 955,
+        "column": 4,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcControlKind",
+        "local": "WebRpcControlKind",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 956,
+        "column": 4,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcCandidateStatus",
+        "local": "WebRpcCandidateStatus",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 957,
+        "column": 4,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcEndpointStatus",
+        "local": "WebRpcEndpointStatus",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 958,
+        "column": 4,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcDebugPhase",
+        "local": "WebRpcDebugPhase",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 959,
+        "column": 4,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcContractFailureKind",
+        "local": "WebRpcContractFailureKind",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 960,
+        "column": 4,
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcChunkEvent",
+        "local": "WebRpcChunkEvent",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      }
+    ],
+    "semantic": [
+      {
+        "reader": "packages/store-worker/test/provider-fluent-red.test.ts",
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/store-worker/src/worker.ts",
+        "symbol": "<import-type>",
+        "local": "typeof import('../src/worker.js')",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/store-worker/test/provider-fluent-red.test.ts",
+        "kind": "IMPORT_TYPE",
+        "owner": "@migaia/web-rpc/provider",
+        "symbol": "<import-type>",
+        "local": "typeof import('@migaia/web-rpc/provider')",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/README.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcPlatform",
+        "local": "WebRpcPlatform",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/client.ts",
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/web-rpc/src/feature.ts",
+        "symbol": "IWebRpcFiniteFeatureTuple",
+        "local": "import('./feature.js').IWebRpcFiniteFeatureTuple<TFeatures>",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/core.ts",
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/plugin-host/dist/index.ts",
+        "symbol": "IPluginHostView",
+        "local": "import('@migaia/plugin-host').IPluginHostView<WebRpcPluginHost>",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/core.ts",
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/web-rpc/src/feature.ts",
+        "symbol": "IWebRpcFiniteFeatureTuple",
+        "local": "import('./feature.js').IWebRpcFiniteFeatureTuple<TFeatures>",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/full.ts",
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/web-rpc/src/feature.ts",
+        "symbol": "IWebRpcFiniteFeatureTuple",
+        "local": "import('./feature.js').IWebRpcFiniteFeatureTuple<TFeatures>",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/contract.ts",
+        "kind": "IMPORT",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcContractFailureKind",
+        "local": "WebRpcContractFailureKind",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/contract.ts",
+        "kind": "MODULE_IMPORT",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "<mixed-module>",
+        "local": "../protocol-constants.js",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/contract.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcContractFailureKind",
+        "local": "WebRpcContractFailureKind",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/outbound-attachment.ts",
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/web-rpc/src/transport.ts",
+        "symbol": "IWebRpcInboundMessage",
+        "local": "import('../transport.js').IWebRpcInboundMessage",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/outbound-attachment.ts",
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/web-rpc/src/semantic-constants.ts",
+        "symbol": "IWebRpcVariation",
+        "local": "import('../semantic-constants.js').IWebRpcVariation",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/test-observer.ts",
+        "kind": "IMPORT",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcDebugPhase",
+        "local": "WebRpcDebugPhase",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/test-observer.ts",
+        "kind": "MODULE_IMPORT",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "<mixed-module>",
+        "local": "../protocol-constants.js",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/test-observer.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcDebugPhase",
+        "local": "WebRpcDebugPhase",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/test-observer.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcDebugPhase",
+        "local": "WebRpcDebugPhase",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcTransportOwnership",
+        "local": "WebRpcTransportOwnership",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcTransportEncoding",
+        "local": "WebRpcTransportEncoding",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcPlatform",
+        "local": "WebRpcPlatform",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcTransportTopology",
+        "local": "WebRpcTransportTopology",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcEndpointStatus",
+        "local": "WebRpcEndpointStatus",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcOperation",
+        "local": "WebRpcOperation",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcControlKind",
+        "local": "WebRpcControlKind",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcCandidateStatus",
+        "local": "WebRpcCandidateStatus",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcContractFailureKind",
+        "local": "WebRpcContractFailureKind",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcDebugPhase",
+        "local": "WebRpcDebugPhase",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcChunkEvent",
+        "local": "WebRpcChunkEvent",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "IWebRpcChunkEvent",
+        "local": "IWebRpcChunkEvent",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcChunkEvent",
+        "local": "WebRpcChunkEvent",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcChunkEvent",
+        "local": "WebRpcChunkEvent",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "IWebRpcPlatformValue",
+        "local": "IWebRpcPlatformValue",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcPlatform",
+        "local": "WebRpcPlatform",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcPlatform",
+        "local": "WebRpcPlatform",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "IWebRpcTransportOwnershipValue",
+        "local": "IWebRpcTransportOwnershipValue",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcTransportOwnership",
+        "local": "WebRpcTransportOwnership",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcTransportOwnership",
+        "local": "WebRpcTransportOwnership",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "IWebRpcTransportEncodingValue",
+        "local": "IWebRpcTransportEncodingValue",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcTransportEncoding",
+        "local": "WebRpcTransportEncoding",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcTransportEncoding",
+        "local": "WebRpcTransportEncoding",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "IWebRpcTransportTopologyValue",
+        "local": "IWebRpcTransportTopologyValue",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcTransportTopology",
+        "local": "WebRpcTransportTopology",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcTransportTopology",
+        "local": "WebRpcTransportTopology",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "IWebRpcOperation",
+        "local": "IWebRpcOperation",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcOperation",
+        "local": "WebRpcOperation",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcOperation",
+        "local": "WebRpcOperation",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "IWebRpcControlKind",
+        "local": "IWebRpcControlKind",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcControlKind",
+        "local": "WebRpcControlKind",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcControlKind",
+        "local": "WebRpcControlKind",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "OWNER_DEFINITION",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "IWebRpcCandidateStatus",
+        "local": "IWebRpcCandidateStatus",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcCandidateStatus",
+        "local": "WebRpcCandidateStatus",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "kind": "READ",
+        "owner": "packages/web-rpc/src/protocol-constants.ts",
+        "symbol": "WebRpcCandidateStatus",
+        "local": "WebRpcCandidateStatus",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/src/provider.ts",
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/web-rpc/src/feature.ts",
+        "symbol": "IWebRpcFiniteFeatureTuple",
+        "local": "import('./feature.js').IWebRpcFiniteFeatureTuple<TFeatures>",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/test/duplicate-owner-contract.test.ts",
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/capability/dist/graph/topology.ts",
+        "symbol": "buildCapabilityTopology",
+        "local": "typeof import('@migaia/capability/graph/topology').buildCapabilityTopology",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/test/duplicate-owner-contract.test.ts",
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/capability/dist/graph/topology.ts",
+        "symbol": "<import-type>",
+        "local": "typeof import('@migaia/capability/graph/topology')",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/test/packed-export-smoke.mjs",
+        "kind": "GENERATED_PACKED_NEGATIVE",
+        "owner": "@migaia/web-rpc/memory",
+        "symbol": "expectNotExported",
+        "local": "./memory",
+        "listHash": "b8f4999d75d5cc4f5acf89f4b77c254f4264f3e41d98f2020181f588507f7a0e",
+        "initializerHash": "f60f0098e3f7d5eebd982bf7bbf9935f10e02e4e00b190de43392c44b6f8607a",
+        "templateHash": "95769f784e62d222fb8a37984dc6be2ff9b5ff6935c947b50d0ad559450dd18b",
+        "pipelineHash": "1a8e5b59215d65637a150b3e111929e404cc2d639ed2308bdabdb6fcd7081612",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17/T22"
+      },
+      {
+        "reader": "packages/web-rpc/test/packed-export-smoke.mjs",
+        "kind": "GENERATED_PACKED_NEGATIVE",
+        "owner": "@migaia/web-rpc/message-port",
+        "symbol": "expectNotExported",
+        "local": "./message-port",
+        "listHash": "b8f4999d75d5cc4f5acf89f4b77c254f4264f3e41d98f2020181f588507f7a0e",
+        "initializerHash": "f60f0098e3f7d5eebd982bf7bbf9935f10e02e4e00b190de43392c44b6f8607a",
+        "templateHash": "95769f784e62d222fb8a37984dc6be2ff9b5ff6935c947b50d0ad559450dd18b",
+        "pipelineHash": "1a8e5b59215d65637a150b3e111929e404cc2d639ed2308bdabdb6fcd7081612",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17/T22"
+      },
+      {
+        "reader": "packages/web-rpc/test/packed-export-smoke.mjs",
+        "kind": "GENERATED_PACKED_NEGATIVE",
+        "owner": "@migaia/web-rpc/web-worker",
+        "symbol": "expectNotExported",
+        "local": "./web-worker",
+        "listHash": "b8f4999d75d5cc4f5acf89f4b77c254f4264f3e41d98f2020181f588507f7a0e",
+        "initializerHash": "f60f0098e3f7d5eebd982bf7bbf9935f10e02e4e00b190de43392c44b6f8607a",
+        "templateHash": "95769f784e62d222fb8a37984dc6be2ff9b5ff6935c947b50d0ad559450dd18b",
+        "pipelineHash": "1a8e5b59215d65637a150b3e111929e404cc2d639ed2308bdabdb6fcd7081612",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17/T22"
+      },
+      {
+        "reader": "packages/web-rpc/test/provider-feature-red.test.ts",
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/web-rpc/src/typing.ts",
+        "symbol": "IWebRpcConnectConfig",
+        "local": "import('../src/typing.js').IWebRpcConnectConfig",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/test/provider-feature-red.test.ts",
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/web-rpc/src/typing.ts",
+        "symbol": "IWebRpcContractConfig",
+        "local": "import('../src/typing.js').IWebRpcContractConfig",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/test/transaction-contract.test.ts",
+        "kind": "IMPORT_TYPE",
+        "owner": "packages/web-rpc/src/internal/web-rpc-plugin-host.ts",
+        "symbol": "<import-type>",
+        "local": "typeof import('../src/internal/web-rpc-plugin-host.js')",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/client.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/client.js",
+        "importOrdinal": 0,
+        "candidateOrdinal": 1,
+        "allowlistHash": "eddd9e7629a0d80fe6dfb53b9505abfd698500760c0cfd912908a7f9da7c36da",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/core.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/core.js",
+        "importOrdinal": 0,
+        "candidateOrdinal": 0,
+        "allowlistHash": "eddd9e7629a0d80fe6dfb53b9505abfd698500760c0cfd912908a7f9da7c36da",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/full.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/full.js",
+        "importOrdinal": 0,
+        "candidateOrdinal": 3,
+        "allowlistHash": "eddd9e7629a0d80fe6dfb53b9505abfd698500760c0cfd912908a7f9da7c36da",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/provider.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/provider.js",
+        "importOrdinal": 0,
+        "candidateOrdinal": 2,
+        "allowlistHash": "eddd9e7629a0d80fe6dfb53b9505abfd698500760c0cfd912908a7f9da7c36da",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/features/canonical-chunk.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/features/canonical-chunk.js",
+        "importOrdinal": 1,
+        "candidateOrdinal": 4,
+        "allowlistHash": "10770b631ff4068762e69d05894ab57f9fb752a2b27ee3461112d1966628dcb4",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/features/control.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/features/control.js",
+        "importOrdinal": 1,
+        "candidateOrdinal": 3,
+        "allowlistHash": "10770b631ff4068762e69d05894ab57f9fb752a2b27ee3461112d1966628dcb4",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/features/discovery.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/features/discovery.js",
+        "importOrdinal": 1,
+        "candidateOrdinal": 2,
+        "allowlistHash": "10770b631ff4068762e69d05894ab57f9fb752a2b27ee3461112d1966628dcb4",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/features/outbound.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/features/outbound.js",
+        "importOrdinal": 1,
+        "candidateOrdinal": 0,
+        "allowlistHash": "10770b631ff4068762e69d05894ab57f9fb752a2b27ee3461112d1966628dcb4",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/features/provider.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/features/provider.js",
+        "importOrdinal": 1,
+        "candidateOrdinal": 1,
+        "allowlistHash": "10770b631ff4068762e69d05894ab57f9fb752a2b27ee3461112d1966628dcb4",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/core.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/core.js",
+        "importOrdinal": 2,
+        "candidateOrdinal": 0,
+        "allowlistHash": "d421c9593594c0117644b31da85596dfee40ee31930def615e983f71e56713a1",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/core.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/core.js",
+        "importOrdinal": 3,
+        "candidateOrdinal": 0,
+        "allowlistHash": "d421c9593594c0117644b31da85596dfee40ee31930def615e983f71e56713a1",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "kind": "FIXTURE_DYNAMIC_CANDIDATE",
+        "owner": "packages/web-rpc/src/features/outbound.ts",
+        "symbol": "dynamic-import",
+        "local": "../../src/features/outbound.js",
+        "importOrdinal": 4,
+        "candidateOrdinal": 0,
+        "allowlistHash": "74d1e920b90693ecc4574360c496c977e72eec25025744d4281468ed7057647c",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-ZERO-POSTSMOKE-006",
+        "verification": "RPCC-T17"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcPlatform",
+        "local": "WebRpcPlatform",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcTransportTopology",
+        "local": "WebRpcTransportTopology",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcTransportOwnership",
+        "local": "WebRpcTransportOwnership",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcTransportEncoding",
+        "local": "WebRpcTransportEncoding",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcEndpointStatus",
+        "local": "WebRpcEndpointStatus",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcDebugPhase",
+        "local": "WebRpcDebugPhase",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcPlatform",
+        "local": "WebRpcPlatform",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcTransportTopology",
+        "local": "WebRpcTransportTopology",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcTransportOwnership",
+        "local": "WebRpcTransportOwnership",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcTransportEncoding",
+        "local": "WebRpcTransportEncoding",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcPlatform",
+        "local": "WebRpcPlatform",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcTransportTopology",
+        "local": "WebRpcTransportTopology",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcTransportOwnership",
+        "local": "WebRpcTransportOwnership",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcTransportEncoding",
+        "local": "WebRpcTransportEncoding",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcOperation",
+        "local": "WebRpcOperation",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcControlKind",
+        "local": "WebRpcControlKind",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcCandidateStatus",
+        "local": "WebRpcCandidateStatus",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcEndpointStatus",
+        "local": "WebRpcEndpointStatus",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcDebugPhase",
+        "local": "WebRpcDebugPhase",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcContractFailureKind",
+        "local": "WebRpcContractFailureKind",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "kind": "DOC",
+        "owner": "TEXTUAL_RETAINED_CONTRACT",
+        "symbol": "WebRpcChunkEvent",
+        "local": "WebRpcChunkEvent",
+        "disposition": "RETAIN_NEGATIVE",
+        "packet": "PKT-DELIVERY-006",
+        "verification": "RPCC-T22"
+      }
+    ],
+    "coordinate": [
+      {
+        "reader": "packages/store-worker/test/provider-fluent-red.test.ts",
+        "line": 100,
+        "column": 31
+      },
+      {
+        "reader": "packages/store-worker/test/provider-fluent-red.test.ts",
+        "line": 9,
+        "column": 39
+      },
+      {
+        "reader": "packages/web-rpc/README.md",
+        "line": 689,
+        "column": 99
+      },
+      {
+        "reader": "packages/web-rpc/src/client.ts",
+        "line": 15,
+        "column": 25
+      },
+      {
+        "reader": "packages/web-rpc/src/core.ts",
+        "line": 139,
+        "column": 17
+      },
+      {
+        "reader": "packages/web-rpc/src/core.ts",
+        "line": 83,
+        "column": 25
+      },
+      {
+        "reader": "packages/web-rpc/src/full.ts",
+        "line": 54,
+        "column": 25
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/contract.ts",
+        "line": 4,
+        "column": 10
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/contract.ts",
+        "line": 4,
+        "column": 43
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/contract.ts",
+        "line": 67,
+        "column": 15
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/outbound-attachment.ts",
+        "line": 239,
+        "column": 17
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/outbound-attachment.ts",
+        "line": 259,
+        "column": 31
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/test-observer.ts",
+        "line": 248,
+        "column": 10
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/test-observer.ts",
+        "line": 248,
+        "column": 34
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/test-observer.ts",
+        "line": 5,
+        "column": 27
+      },
+      {
+        "reader": "packages/web-rpc/src/internal/test-observer.ts",
+        "line": 5,
+        "column": 58
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 13,
+        "column": 14
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 19,
+        "column": 14
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 2,
+        "column": 14
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 26,
+        "column": 14
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 33,
+        "column": 14
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 36,
+        "column": 14
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 43,
+        "column": 14
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 51,
+        "column": 14
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 58,
+        "column": 14
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 61,
+        "column": 14
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 64,
+        "column": 14
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 69,
+        "column": 13
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 69,
+        "column": 41
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 69,
+        "column": 72
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 70,
+        "column": 13
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 70,
+        "column": 44
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 70,
+        "column": 73
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 71,
+        "column": 13
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 72,
+        "column": 11
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 72,
+        "column": 50
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 73,
+        "column": 13
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 74,
+        "column": 11
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 74,
+        "column": 49
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 75,
+        "column": 13
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 76,
+        "column": 11
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 76,
+        "column": 49
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 77,
+        "column": 13
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 77,
+        "column": 40
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 77,
+        "column": 70
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 78,
+        "column": 13
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 78,
+        "column": 42
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 78,
+        "column": 74
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 79,
+        "column": 13
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 80,
+        "column": 11
+      },
+      {
+        "reader": "packages/web-rpc/src/protocol-constants.ts",
+        "line": 80,
+        "column": 47
+      },
+      {
+        "reader": "packages/web-rpc/src/provider.ts",
+        "line": 15,
+        "column": 25
+      },
+      {
+        "reader": "packages/web-rpc/test/duplicate-owner-contract.test.ts",
+        "line": 27,
+        "column": 3
+      },
+      {
+        "reader": "packages/web-rpc/test/duplicate-owner-contract.test.ts",
+        "line": 35,
+        "column": 40
+      },
+      {
+        "reader": "packages/web-rpc/test/packed-export-smoke.mjs",
+        "line": 52,
+        "column": 27
+      },
+      {
+        "reader": "packages/web-rpc/test/packed-export-smoke.mjs",
+        "line": 52,
+        "column": 39
+      },
+      {
+        "reader": "packages/web-rpc/test/packed-export-smoke.mjs",
+        "line": 52,
+        "column": 57
+      },
+      {
+        "reader": "packages/web-rpc/test/provider-feature-red.test.ts",
+        "line": 206,
+        "column": 28
+      },
+      {
+        "reader": "packages/web-rpc/test/provider-feature-red.test.ts",
+        "line": 210,
+        "column": 29
+      },
+      {
+        "reader": "packages/web-rpc/test/transaction-contract.test.ts",
+        "line": 48,
+        "column": 40
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 32,
+        "column": 28
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 32,
+        "column": 28
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 32,
+        "column": 28
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 32,
+        "column": 28
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 38,
+        "column": 28
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 38,
+        "column": 28
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 38,
+        "column": 28
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 38,
+        "column": 28
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 38,
+        "column": 28
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 44,
+        "column": 24
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 59,
+        "column": 24
+      },
+      {
+        "reader": "packages/web-rpc/test/tree-shaking/b01-contracts.test.ts",
+        "line": 60,
+        "column": 28
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 928,
+        "column": 3
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 929,
+        "column": 3
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 930,
+        "column": 3
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 931,
+        "column": 3
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 932,
+        "column": 3
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 933,
+        "column": 3
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 937,
+        "column": 13
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 938,
+        "column": 13
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 939,
+        "column": 14
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 940,
+        "column": 16
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 950,
+        "column": 4
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 951,
+        "column": 4
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 952,
+        "column": 4
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 953,
+        "column": 4
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 954,
+        "column": 4
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 955,
+        "column": 4
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 956,
+        "column": 4
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 957,
+        "column": 4
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 958,
+        "column": 4
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 959,
+        "column": 4
+      },
+      {
+        "reader": "packages/web-rpc/USEGUIDE.md",
+        "line": 960,
+        "column": 4
+      }
+    ]
+  },
+  "controls": {
+    "canonicalSerialization": "JSON.stringify with fixed array/object insertion order",
+    "coordinateAnchor": {
+      "fields": ["reader", "line", "column"],
+      "digest": "615f9aab6eb2a3620fa13302571307b4ba0be04f6e8d4d2bc19bb080def93f8d",
+      "computedDigest": "615f9aab6eb2a3620fa13302571307b4ba0be04f6e8d4d2bc19bb080def93f8d",
+      "independent": true
+    },
+    "independentReproduction": true,
+    "antiLaundering": [
+      "semantic-field-substitution",
+      "coordinate-only-separation",
+      "count-preserving-remove-add",
+      "duplicate",
+      "omission",
+      "reorder",
+      "historical-delta-rejection"
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 import { WebRpcErrorCode, WebRpcTransportError } from '../errors.js'
 import type { IWebRpcTransport } from '../transport.js'
-import { WebRpcPlatform, WebRpcTransportOwnership } from '../protocol-constants.js'
+import { WebRpcPlatform, WebRpcTransportOwnership } from '../transport-constants.js'
 import {
   createListenerFailureState,
   drainListenerFailures,

@@ -5,6 +5,7 @@
  */
 export * from './core.js'
 export * from './plugins.js'
+export type { ICodec, ICodecValue } from './codec.js'
 export { chunkToBytes, chunkToText, createSerializeRegistry } from './registry.js'
 export type {
   ISerializeCleanupError,
