@@ -883,6 +883,7 @@
           "errors": ["No documented errors are declared for assertEnvelope."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertEnvelope.",
           "examples": [],
+          "members": [],
           "aliasOf": "assertEnvelope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1044,6 +1045,7 @@
           "errors": ["No documented errors are declared for createStorePersistAbortError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStorePersistAbortError.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStorePersistAbortError(code: IStorePersistErrorCode, message: string, cause?: unknown): DOMException;"
@@ -1209,6 +1211,7 @@
           "errors": ["No documented errors are declared for createStorePersistAggregateError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStorePersistAggregateError.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStorePersistAggregateError(code: IStorePersistErrorCode, errors: readonly unknown[], message: string): AggregateError;"
@@ -1374,6 +1377,7 @@
           "errors": ["No documented errors are declared for createStorePersistError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStorePersistError.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStorePersistError(code: IStorePersistErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
@@ -1539,6 +1543,7 @@
           "errors": ["No documented errors are declared for createStorePersistTypeError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStorePersistTypeError.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStorePersistTypeError(code: IStorePersistErrorCode, message: string, options?: { readonly cause?: unknown; }): TypeError;"
@@ -1687,6 +1692,7 @@
             "import {\n  assertEnvelope,\n  PersistEnvelopeError,\n  type IEnvelope,\n  defaultJsonCodec,\n  writeEnvelope,\n  readEnvelope,\n  removeEnvelope,\n  PersistState,\n  PersistCodecOutput,\n  STORE_PERSIST_SOURCE,\n  createStorePersistError,\n  createStorePersistAbortError,\n  createStorePersistTypeError,\n  createStorePersistAggregateError\n} from '@migaia/store-persist';",
             "const defaultJsonCodec: ICodec; // { name: 'json', output: 'text', encode(value): Promise<string>, decode(raw): Promise<unknown> }"
           ],
+          "members": [],
           "aliasOf": "defaultJsonCodec",
           "exportPath": ".",
           "overloadSignatures": ["export declare const defaultJsonCodec: ICodec;"],
@@ -1907,6 +1913,7 @@
             "import {\n  assertEnvelope,\n  PersistEnvelopeError,\n  type IEnvelope,\n  defaultJsonCodec,\n  writeEnvelope,\n  readEnvelope,\n  removeEnvelope,\n  PersistState,\n  PersistCodecOutput,\n  STORE_PERSIST_SOURCE,\n  createStorePersistError,\n  createStorePersistAbortError,\n  createStorePersistTypeError,\n  createStorePersistAggregateError\n} from '@migaia/store-persist';",
             "function assertEnvelope<TState>(value: unknown, key: string): IEnvelope<TState>;\nclass PersistEnvelopeError extends TypeError {}"
           ],
+          "members": [],
           "aliasOf": "IEnvelope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2035,6 +2042,7 @@
           "errors": ["No documented errors are declared for IHydrationStatus."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IHydrationStatus.",
           "examples": [],
+          "members": [],
           "aliasOf": "IHydrationStatus",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2163,6 +2171,7 @@
           "errors": ["No documented errors are declared for IPersistCodecOutput."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPersistCodecOutput.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPersistCodecOutput",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2230,6 +2239,7 @@
             "function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle;\n\ntype IPersistableStore = {\n  readonly $runtime: IRuntime;\n  $plain(): Record<string, unknown>;\n  $subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean }): IDisposer;\n  $hydrate(\n    partial: Record<string, unknown>,\n    options?: { unknown?: 'ignore' | 'report' | 'strict'; onUnknown?: (key: string) => void }\n  ): void;\n};\n\ntype IPersistOptions = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;\n  partialize?: (state: Record<string, unknown>) => Record<string, unknown>;\n  debounceMs?: number;\n};",
             "function persistCollection<TState>(\n  collection: IPersistableCollection<TState>,\n  options: IPersistCollectionOptions<TState>\n): IPersistHandle;\n\ntype IPersistableCollection<TState> = {\n  readonly runtime: IRuntime;\n  snapshot(): TState;\n  replace(state: TState): void;\n};\n\ntype IPersistCollectionOptions<TState> = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n  debounceMs?: number;\n};"
           ],
+          "members": [],
           "aliasOf": "IPersistHandle",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2358,6 +2368,7 @@
           "errors": ["No documented errors are declared for IPersistState."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPersistState.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPersistState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2421,6 +2432,7 @@
           "errors": ["No documented errors are declared for IPersistStatus."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPersistStatus.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPersistStatus",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2551,6 +2563,7 @@
           "examples": [
             "type IPersistUnit<TState> = {\n  snapshot(): TState; // 同步读当前可持久化状态\n  restore(state: TState): void; // 同步写回一份状态（hydrate 用）\n  subscribe(onChange: () => void): IDisposer; // 注册变化通知\n};\n\nfunction persistUnit<TState>(\n  unit: IPersistUnit<TState>,\n  options: IPersistUnitOptions<TState>\n): IPersistHandle;"
           ],
+          "members": [],
           "aliasOf": "IPersistUnit",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2681,6 +2694,7 @@
           "examples": [
             "type IPersistUnit<TState> = {\n  snapshot(): TState; // 同步读当前可持久化状态\n  restore(state: TState): void; // 同步写回一份状态（hydrate 用）\n  subscribe(onChange: () => void): IDisposer; // 注册变化通知\n};\n\nfunction persistUnit<TState>(\n  unit: IPersistUnit<TState>,\n  options: IPersistUnitOptions<TState>\n): IPersistHandle;"
           ],
+          "members": [],
           "aliasOf": "IPersistUnitOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2744,6 +2758,7 @@
           "errors": ["No documented errors are declared for IReadonlyPersistValue."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReadonlyPersistValue.",
           "examples": [],
+          "members": [],
           "aliasOf": "IReadonlyPersistValue",
           "exportPath": ".",
           "overloadSignatures": ["export type IReadonlyPersistValue<T> = { readonly value: T; };"],
@@ -2805,6 +2820,7 @@
           "errors": ["No documented errors are declared for IWriteStatus."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWriteStatus.",
           "examples": [],
+          "members": [],
           "aliasOf": "IWriteStatus",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2936,6 +2952,7 @@
             "import {\n  assertEnvelope,\n  PersistEnvelopeError,\n  type IEnvelope,\n  defaultJsonCodec,\n  writeEnvelope,\n  readEnvelope,\n  removeEnvelope,\n  PersistState,\n  PersistCodecOutput,\n  STORE_PERSIST_SOURCE,\n  createStorePersistError,\n  createStorePersistAbortError,\n  createStorePersistTypeError,\n  createStorePersistAggregateError\n} from '@migaia/store-persist';",
             "const PersistState: { idle; active; loading; writing; ready; success; error; disposed }; // 见下\nconst PersistCodecOutput: { text: 'text'; structured: 'structured'; binary: 'binary' };"
           ],
+          "members": [],
           "aliasOf": "PersistCodecOutput",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3070,6 +3087,7 @@
           "errors": ["No documented errors are declared for PersistEnvelopeError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for PersistEnvelopeError.",
           "examples": [],
+          "members": [],
           "aliasOf": "PersistEnvelopeError",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3300,6 +3318,7 @@
             "import {\n  assertEnvelope,\n  PersistEnvelopeError,\n  type IEnvelope,\n  defaultJsonCodec,\n  writeEnvelope,\n  readEnvelope,\n  removeEnvelope,\n  PersistState,\n  PersistCodecOutput,\n  STORE_PERSIST_SOURCE,\n  createStorePersistError,\n  createStorePersistAbortError,\n  createStorePersistTypeError,\n  createStorePersistAggregateError\n} from '@migaia/store-persist';",
             "const PersistState: { idle; active; loading; writing; ready; success; error; disposed }; // 见下\nconst PersistCodecOutput: { text: 'text'; structured: 'structured'; binary: 'binary' };"
           ],
+          "members": [],
           "aliasOf": "PersistState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3439,6 +3458,7 @@
           "errors": ["No documented errors are declared for persistUnit."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for persistUnit.",
           "examples": [],
+          "members": [],
           "aliasOf": "persistUnit",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3606,6 +3626,7 @@
           "errors": ["No documented errors are declared for readEnvelope."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for readEnvelope.",
           "examples": [],
+          "members": [],
           "aliasOf": "readEnvelope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3777,6 +3798,7 @@
           "errors": ["No documented errors are declared for removeEnvelope."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for removeEnvelope.",
           "examples": [],
+          "members": [],
           "aliasOf": "removeEnvelope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3926,6 +3948,7 @@
             "import {\n  assertEnvelope,\n  PersistEnvelopeError,\n  type IEnvelope,\n  defaultJsonCodec,\n  writeEnvelope,\n  readEnvelope,\n  removeEnvelope,\n  PersistState,\n  PersistCodecOutput,\n  STORE_PERSIST_SOURCE,\n  createStorePersistError,\n  createStorePersistAbortError,\n  createStorePersistTypeError,\n  createStorePersistAggregateError\n} from '@migaia/store-persist';",
             "const STORE_PERSIST_SOURCE: '@migaia/store-persist';\nfunction createStorePersistError(code, message, options?: { cause?: unknown }): Error;\nfunction createStorePersistAbortError(code, message, cause?: unknown): DOMException;\nfunction createStorePersistTypeError(code, message, options?: { cause?: unknown }): TypeError;\nfunction createStorePersistAggregateError(\n  code,\n  errors: readonly unknown[],\n  message: string\n): AggregateError;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const STORE_PERSIST_SOURCE = \"@migaia/store-persist\";"
@@ -4085,6 +4108,7 @@
           "errors": ["No documented errors are declared for writeEnvelope."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for writeEnvelope.",
           "examples": [],
+          "members": [],
           "aliasOf": "writeEnvelope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4262,6 +4286,7 @@
           "examples": [
             "function persistCollection<TState>(\n  collection: IPersistableCollection<TState>,\n  options: IPersistCollectionOptions<TState>\n): IPersistHandle;\n\ntype IPersistableCollection<TState> = {\n  readonly runtime: IRuntime;\n  snapshot(): TState;\n  replace(state: TState): void;\n};\n\ntype IPersistCollectionOptions<TState> = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n  debounceMs?: number;\n};"
           ],
+          "members": [],
           "aliasOf": "IPersistableCollection",
           "exportPath": "./indexed",
           "overloadSignatures": [
@@ -4327,6 +4352,7 @@
           "examples": [
             "function persistCollection<TState>(\n  collection: IPersistableCollection<TState>,\n  options: IPersistCollectionOptions<TState>\n): IPersistHandle;\n\ntype IPersistableCollection<TState> = {\n  readonly runtime: IRuntime;\n  snapshot(): TState;\n  replace(state: TState): void;\n};\n\ntype IPersistCollectionOptions<TState> = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n  debounceMs?: number;\n};"
           ],
+          "members": [],
           "aliasOf": "IPersistCollectionOptions",
           "exportPath": "./indexed",
           "overloadSignatures": [
@@ -4410,6 +4436,7 @@
             "import { observableMap } from '@migaia/store-indexed';\nimport { localStorage } from '@migaia/storage-web/local-storage';\n\nconst cart = observableMap<string, number>(); // sku -> 数量\nconst handle = persistCollection(cart, { key: 'cart:v1', storage: localStorage() });\ncart.set('sku-123', 2); // 默认 debounceMs: 0，下一次写队列排空即写",
             "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDb({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}"
           ],
+          "members": [],
           "aliasOf": "persistCollection",
           "exportPath": "./indexed",
           "overloadSignatures": [
@@ -4586,6 +4613,7 @@
             "const deletedCount = await clearFamily(storage, 'sessions');",
             "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDb({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}"
           ],
+          "members": [],
           "aliasOf": "clearFamily",
           "exportPath": "./keyed",
           "overloadSignatures": [
@@ -4664,6 +4692,7 @@
           "examples": [
             "function persistKeyed<T>(\n  atomStore: IAtomStore,\n  def: IWritableAtomDefinition<T>,\n  id: string,\n  options: IPersistKeyedOptions<T>\n): IPersistKeyedHandle<T>;\nfunction clearFamily(storage: IKeyValueStore, namespace: string): Promise<number>;\n\ntype IPersistKeyedOptions<T> = {\n  namespace: string; // 必填——storage key 格式 `${namespace}:${id}`\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  debounceMs?: number;\n  partialize?: (value: T) => Partial<T>;\n  merge?: (persisted: Partial<T>, current: T) => T;\n};\n\ntype IPersistKeyedHandle<T> = { readonly value: T; dispose(): void };"
           ],
+          "members": [],
           "aliasOf": "IPersistKeyedHandle",
           "exportPath": "./keyed",
           "overloadSignatures": [
@@ -4729,6 +4758,7 @@
           "examples": [
             "function persistKeyed<T>(\n  atomStore: IAtomStore,\n  def: IWritableAtomDefinition<T>,\n  id: string,\n  options: IPersistKeyedOptions<T>\n): IPersistKeyedHandle<T>;\nfunction clearFamily(storage: IKeyValueStore, namespace: string): Promise<number>;\n\ntype IPersistKeyedOptions<T> = {\n  namespace: string; // 必填——storage key 格式 `${namespace}:${id}`\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  debounceMs?: number;\n  partialize?: (value: T) => Partial<T>;\n  merge?: (persisted: Partial<T>, current: T) => T;\n};\n\ntype IPersistKeyedHandle<T> = { readonly value: T; dispose(): void };"
           ],
+          "members": [],
           "aliasOf": "IPersistKeyedOptions",
           "exportPath": "./keyed",
           "overloadSignatures": [
@@ -4823,6 +4853,7 @@
             "import { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\n\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nconst atomStore = createAtomStore(runtime);\nconst storage = indexedDb({ dbName: 'app' });\n\nconst { value, dispose } = persistKeyed(atomStore, session('u1'), 'u1', {\n  namespace: 'sessions',\n  storage,\n  partialize: (v) => ({ refreshToken: v.refreshToken }),\n  merge: (persisted, current) => ({ ...current, ...persisted })\n});",
             "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDb({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}"
           ],
+          "members": [],
           "aliasOf": "persistKeyed",
           "exportPath": "./keyed",
           "overloadSignatures": [
@@ -5086,6 +5117,7 @@
           "examples": [
             "function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle;\n\ntype IPersistableStore = {\n  readonly $runtime: IRuntime;\n  $plain(): Record<string, unknown>;\n  $subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean }): IDisposer;\n  $hydrate(\n    partial: Record<string, unknown>,\n    options?: { unknown?: 'ignore' | 'report' | 'strict'; onUnknown?: (key: string) => void }\n  ): void;\n};\n\ntype IPersistOptions = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;\n  partialize?: (state: Record<string, unknown>) => Record<string, unknown>;\n  debounceMs?: number;\n};"
           ],
+          "members": [],
           "aliasOf": "IPersistableStore",
           "exportPath": "./light",
           "overloadSignatures": [
@@ -5151,6 +5183,7 @@
           "examples": [
             "function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle;\n\ntype IPersistableStore = {\n  readonly $runtime: IRuntime;\n  $plain(): Record<string, unknown>;\n  $subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean }): IDisposer;\n  $hydrate(\n    partial: Record<string, unknown>,\n    options?: { unknown?: 'ignore' | 'report' | 'strict'; onUnknown?: (key: string) => void }\n  ): void;\n};\n\ntype IPersistOptions = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;\n  partialize?: (state: Record<string, unknown>) => Record<string, unknown>;\n  debounceMs?: number;\n};"
           ],
+          "members": [],
           "aliasOf": "IPersistOptions",
           "exportPath": "./light",
           "overloadSignatures": [
@@ -5231,6 +5264,7 @@
             "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDb } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDb({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}",
             "const handle = persist(store, {\n  key: 'settings',\n  storage,\n  version: 2,\n  migrate: (persisted, fromVersion) => {\n    if (fromVersion === 1)\n      return { ...persisted, fontSize: (persisted as { size?: number }).size ?? 14 };\n    return persisted;\n  }\n});"
           ],
+          "members": [],
           "aliasOf": "persist",
           "exportPath": "./light",
           "overloadSignatures": [

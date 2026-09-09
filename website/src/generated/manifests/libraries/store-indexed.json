@@ -1195,6 +1195,7 @@
           "examples": [
             "import { createStoreIndexedError, StoreIndexedErrorCode } from '@migaia/store-indexed';\n\nfunction assertNonEmptyName(name: string): void {\n  if (name.length === 0) {\n    throw createStoreIndexedError(\n      StoreIndexedErrorCode.invalidOption,\n      '[store] name must not be empty'\n    );\n  }\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreIndexedError(code: IStoreIndexedErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
@@ -1389,6 +1390,7 @@
           "errors": ["No documented errors are declared for createStoreIndexedRangeError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreIndexedRangeError.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError;"
@@ -1578,6 +1580,7 @@
           "examples": [
             "throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidOption,\n  'custom guard rejected the mutation'\n);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreIndexedTypeError(code: IStoreIndexedErrorCode, message: string, options?: { readonly cause?: unknown; }): TypeError;"
@@ -1753,6 +1756,7 @@
             "import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed';",
             "const IndexedOperation = {\n  read: 'read',\n  write: 'write',\n  delete: 'delete'\n} as const;\ntype IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation];"
           ],
+          "members": [],
           "aliasOf": "IIndexedOperation",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1820,6 +1824,7 @@
             "const IndexedOperation = {\n  read: 'read',\n  write: 'write',\n  delete: 'delete'\n} as const;\ntype IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation];",
             "if (event.operation === IndexedOperation.write) reportMutation(event);"
           ],
+          "members": [],
           "aliasOf": "IndexedOperation",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1888,6 +1893,7 @@
             "type IObservableCollectionOptions = {\n  readonly mutationGuard?: IMutationGuard; // 来自 @migaia/store-light\n  readonly debugName?: string;\n};",
             "function observableObject<T extends Record<string, unknown>>(\n  initial: T,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableObject<T>;\n\nfunction observableArray<T>(\n  initial?: Iterable<T>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableArray<T>;\n\nfunction observableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableMap<K, V>;\n\nfunction observableSet<T>(\n  initial?: Iterable<T>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableSet<T>;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IObservableCollectionOptions = { readonly mutationGuard?: IMutationGuard; readonly debugName?: string; };"
@@ -1973,6 +1979,7 @@
             "// 错误示范：把 runtime 当成第二个参数传给工厂函数\nobservableArray([1, 2, 3], myRuntime); // myRuntime 被当成了 options！\n\n// 正确写法\nobservableArray([1, 2, 3], {}, myRuntime);\n// 或者直接用类构造函数，参数顺序是 (initial, runtime, options)\nnew ObservableArray([1, 2, 3], myRuntime);",
             "import { observableArray } from '@migaia/store-indexed';\n\nconst rows = observableArray([{ id: 'a' }], {}, myRuntime);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function observableArray<T>(initial?: Iterable<T>, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableArray<T>;"
@@ -2109,6 +2116,141 @@
             "import { Effect } from '@migaia/reactive';\nimport { ObservableArray } from '@migaia/store-indexed';\nimport { MutationPolicy } from '@migaia/store-middleware';\n\nconst guard = new MutationPolicy('actions-only');\nconst rows = new ObservableArray<{ id: string }>(\n  [{ id: 'a' }, { id: 'b' }, { id: 'c' }],\n  undefined,\n  { mutationGuard: guard, debugName: 'rows' }\n);\n\n// 只订阅索引 0：改其余索引不会让这个 effect 重算\nconst effect = new Effect(() => console.log('row0', rows.at(0)), rows.runtime);\n\nguard.runInAction(() => {\n  rows.splice(0, 1); // 删除首行，触发结构信号与修订信号\n});\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\neffect.dispose();\nrows.dispose();",
             "const rows = new ObservableArray([{ id: 'a' }, { id: 'b' }, { id: 'c' }]);\nrows.at(1); // 只读了索引 1，只订阅索引 1\nrows.set(1, { id: 'b2' }); // 触发依赖索引 1 的订阅者\nrows.push({ id: 'd' }); // 改变 length，触发依赖 length/结构 的订阅者\nrows.dispose();",
             "import { ObservableArray } from '@migaia/store-indexed';\nimport { Effect } from '@migaia/reactive';\n\nconst rows = new ObservableArray<{ id: string; name: string }>(\n  Array.from({ length: 100_000 }, (_, i) => ({ id: String(i), name: `row-${i}` }))\n);\n\n// 只有被订阅的 5 行才会实体化 cell，其余 99995 行不占用任何 Signal\nconst watched = [0, 1, 2, 3, 4].map(\n  (index) => new Effect(() => render(index, rows.at(index)), rows.runtime)\n);\n\nrows.splice(0, 1); // 索引语义整体后移一位\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\nfor (const effect of watched) effect.dispose();\nrows.dispose();"
+          ],
+          "members": [
+            {
+              "name": "length",
+              "kind": "get",
+              "signature": "get length(): number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "at",
+              "kind": "method",
+              "signature": "at(index: number): T | undefined;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "index",
+                  "type": "number",
+                  "optional": false
+                }
+              ],
+              "returns": "T | undefined"
+            },
+            {
+              "name": "snapshot",
+              "kind": "method",
+              "signature": "snapshot(): readonly T[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly T[]"
+            },
+            {
+              "name": "peek",
+              "kind": "method",
+              "signature": "peek(): readonly T[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly T[]"
+            },
+            {
+              "name": "set",
+              "kind": "method",
+              "signature": "set(index: number, value: T): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "index",
+                  "type": "number",
+                  "optional": false
+                },
+                {
+                  "name": "value",
+                  "type": "T",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "push",
+              "kind": "method",
+              "signature": "push(...values: readonly T[]): number;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "...values: readonly T[]",
+                  "type": "unknown",
+                  "optional": false
+                }
+              ],
+              "returns": "number"
+            },
+            {
+              "name": "pop",
+              "kind": "method",
+              "signature": "pop(): T | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T | undefined"
+            },
+            {
+              "name": "splice",
+              "kind": "method",
+              "signature": "splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[];",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "start",
+                  "type": "number",
+                  "optional": false
+                },
+                {
+                  "name": "deleteCount",
+                  "type": "number",
+                  "optional": true
+                },
+                {
+                  "name": "...items: readonly T[]",
+                  "type": "unknown",
+                  "optional": false
+                }
+              ],
+              "returns": "readonly T[]"
+            },
+            {
+              "name": "replace",
+              "kind": "method",
+              "signature": "replace(values: Iterable<T>): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "values",
+                  "type": "Iterable<T>",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "clear",
+              "kind": "method",
+              "signature": "clear(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "prune",
+              "kind": "method",
+              "signature": "prune(): number;",
+              "description": "Release unobserved cells left behind by removals/high churn.",
+              "parameterDetails": [],
+              "returns": "number"
+            }
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -2306,6 +2448,7 @@
           "errors": ["No documented errors are declared for observableMap."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for observableMap.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function observableMap<K, V>(initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableMap<K, V>;"
@@ -2441,6 +2584,153 @@
             "import { MutationPolicy } from '@migaia/store-middleware';\nimport { ObservableMap } from '@migaia/store-indexed';\n\nconst guard = new MutationPolicy('actions-only');\nconst users = new ObservableMap<string, { name: string }>(\n  [],\n  undefined, // 使用默认 Runtime\n  { mutationGuard: guard, debugName: 'users' }\n);\n\nusers.set('u1', { name: 'Ann' }); // 抛错：不在 action 内\nguard.runInAction(() => users.set('u1', { name: 'Ann' })); // 成功",
             "const users = new ObservableMap<string, { name: string }>();\nusers.set('u1', { name: 'Ann' }); // 键不存在，触发结构信号 + 迭代信号\nusers.get('u1'); // 追踪读，惰性建 'u1' 的 cell\nusers.dispose();",
             "import { ObservableMap } from '@migaia/store-indexed';\nimport { MutationPolicy } from '@migaia/store-middleware';\n\nconst guard = new MutationPolicy('actions-only');\nconst users = new ObservableMap<string, { name: string }>(\n  [],\n  undefined, // 使用默认 Runtime\n  { mutationGuard: guard, debugName: 'users' }\n);\n\ntry {\n  users.set('u1', { name: 'Ann' }); // 抛错：不在 action 内\n} catch {\n  guard.runInAction(() => users.set('u1', { name: 'Ann' })); // 成功\n}"
+          ],
+          "members": [
+            {
+              "name": "size",
+              "kind": "get",
+              "signature": "get size(): number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "get",
+              "kind": "method",
+              "signature": "get(key: K): V | undefined;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                }
+              ],
+              "returns": "V | undefined"
+            },
+            {
+              "name": "peek",
+              "kind": "method",
+              "signature": "peek(key: K): V | undefined;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                }
+              ],
+              "returns": "V | undefined"
+            },
+            {
+              "name": "has",
+              "kind": "method",
+              "signature": "has(key: K): boolean;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "set",
+              "kind": "method",
+              "signature": "set(key: K, value: V): this;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                },
+                {
+                  "name": "value",
+                  "type": "V",
+                  "optional": false
+                }
+              ],
+              "returns": "this"
+            },
+            {
+              "name": "delete",
+              "kind": "method",
+              "signature": "delete(key: K): boolean;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "clear",
+              "kind": "method",
+              "signature": "clear(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "replace",
+              "kind": "method",
+              "signature": "replace(next: ReadonlyMap<K, V> | Iterable<readonly [K, V]>): void;",
+              "description": "Atomically swap the whole map for `next`. Fires at most one structural (`#structure`) and one iteration (`#iteration`) notification for the entire swap, unlike `clear()` + per-entry `set()` which would fire one per key.",
+              "parameterDetails": [
+                {
+                  "name": "next",
+                  "type": "ReadonlyMap<K, V> | Iterable<readonly [K, V]>",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "keys",
+              "kind": "method",
+              "signature": "keys(): readonly K[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly K[]"
+            },
+            {
+              "name": "valuesArray",
+              "kind": "method",
+              "signature": "valuesArray(): readonly V[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly V[]"
+            },
+            {
+              "name": "entries",
+              "kind": "method",
+              "signature": "entries(): readonly (readonly [K, V])[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly (readonly [K, V])[]"
+            },
+            {
+              "name": "snapshot",
+              "kind": "method",
+              "signature": "snapshot(): ReadonlyMap<K, V>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ReadonlyMap<K, V>"
+            },
+            {
+              "name": "prune",
+              "kind": "method",
+              "signature": "prune(): number;",
+              "description": "Release cells for deleted keys that no observer still references.",
+              "parameterDetails": [],
+              "returns": "number"
+            }
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -2638,6 +2928,7 @@
           "errors": ["No documented errors are declared for observableObject."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for observableObject.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function observableObject<T extends Record<string, unknown>>(initial: T, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableObject<T>;"
@@ -2771,6 +3062,140 @@
             "new ObservableObject<T extends Record<string, unknown>>(\n  initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableArray<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableSet<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);",
             "const user = new ObservableObject({ name: 'Ada', age: 30 });\nuser.get('name'); // 追踪读：处在 effect/computed 内时只订阅 'name' 这个 cell\nuser.set('age', 31); // 值变化：触发修订信号，已建 cell 的 'age' 同步更新\nuser.snapshot(); // 冻结的、Object.create(null) 起始的浅拷贝快照\nuser.dispose(); // 用完必须释放，级联 dispose 全部内部 Signal",
             "import { ObservableObject } from '@migaia/store-indexed';\n\nconst bigTable = new ObservableObject(\n  Object.fromEntries(Array.from({ length: 100_000 }, (_, i) => [`k${i}`, i]))\n);\n\n// peek() 不建 cell，适合一次性批量导出\nlet sum = 0;\nfor (const key of bigTable.keys()) sum += bigTable.peek(key);\nbigTable.dispose();"
+          ],
+          "members": [
+            {
+              "name": "get",
+              "kind": "method",
+              "signature": "get<K extends keyof T & string>(key: K): T[K];",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                }
+              ],
+              "returns": "T[K]"
+            },
+            {
+              "name": "peek",
+              "kind": "method",
+              "signature": "peek<K extends keyof T & string>(key: K): T[K];",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                }
+              ],
+              "returns": "T[K]"
+            },
+            {
+              "name": "has",
+              "kind": "method",
+              "signature": "has(key: keyof T & string): boolean;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "keyof T & string",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "set",
+              "kind": "method",
+              "signature": "set<K extends keyof T & string>(key: K, value: T[K]): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                },
+                {
+                  "name": "value",
+                  "type": "T[K]",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "update",
+              "kind": "method",
+              "signature": "update<K extends keyof T & string>(key: K, updater: (value: T[K]) => T[K]): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                },
+                {
+                  "name": "updater",
+                  "type": "(value: T[K]) => T[K]",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "delete",
+              "kind": "method",
+              "signature": "delete(key: keyof T & string): boolean;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "keyof T & string",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "keys",
+              "kind": "method",
+              "signature": "keys(): readonly (keyof T & string)[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly (keyof T & string)[]"
+            },
+            {
+              "name": "snapshot",
+              "kind": "method",
+              "signature": "snapshot(): Readonly<T>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<T>"
+            },
+            {
+              "name": "replace",
+              "kind": "method",
+              "signature": "replace(next: T): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "next",
+                  "type": "T",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "prune",
+              "kind": "method",
+              "signature": "prune(): number;",
+              "description": "Release cells for deleted keys that no observer still references.",
+              "parameterDetails": [],
+              "returns": "number"
+            }
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -2968,6 +3393,7 @@
           "errors": ["No documented errors are declared for observableSet."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for observableSet.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function observableSet<T>(initial?: Iterable<T>, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableSet<T>;"
@@ -3101,6 +3527,104 @@
             "new ObservableObject<T extends Record<string, unknown>>(\n  initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableArray<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableSet<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);",
             "const tags = new ObservableSet(['a', 'b']);\ntags.has('a'); // 追踪读，惰性建 'a' 的 membership cell\ntags.add('c'); // 触发结构信号\ntags.dispose();",
             "import { createRuntime, Effect } from '@migaia/reactive';\nimport { ObservableSet, StoreIndexedErrorCode } from '@migaia/store-indexed';\n\nconst runtimeA = createRuntime();\nconst runtimeB = createRuntime();\nconst tagsInA = new ObservableSet(['a', 'b'], runtimeA);\n\nnew Effect(() => {\n  try {\n    tagsInA.has('a'); // 当前 effect 属于 runtimeB，读了 runtimeA 的集合\n  } catch (error) {\n    if ((error as { code?: string }).code === StoreIndexedErrorCode.crossRuntime) {\n      // 预期内的跨 Runtime 保护\n    }\n  }\n}, runtimeB);"
+          ],
+          "members": [
+            {
+              "name": "size",
+              "kind": "get",
+              "signature": "get size(): number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "has",
+              "kind": "method",
+              "signature": "has(value: T): boolean;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "value",
+                  "type": "T",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "add",
+              "kind": "method",
+              "signature": "add(value: T): this;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "value",
+                  "type": "T",
+                  "optional": false
+                }
+              ],
+              "returns": "this"
+            },
+            {
+              "name": "delete",
+              "kind": "method",
+              "signature": "delete(value: T): boolean;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "value",
+                  "type": "T",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "clear",
+              "kind": "method",
+              "signature": "clear(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "replace",
+              "kind": "method",
+              "signature": "replace(next: Iterable<T>): void;",
+              "description": "Atomically swap the whole set for `next`. Fires at most one structural (`#structure`) notification for the entire swap, unlike `clear()` + per-value `add()` which would fire one per value.",
+              "parameterDetails": [
+                {
+                  "name": "next",
+                  "type": "Iterable<T>",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "valuesArray",
+              "kind": "method",
+              "signature": "valuesArray(): readonly T[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly T[]"
+            },
+            {
+              "name": "snapshot",
+              "kind": "method",
+              "signature": "snapshot(): ReadonlySet<T>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ReadonlySet<T>"
+            },
+            {
+              "name": "prune",
+              "kind": "method",
+              "signature": "prune(): number;",
+              "description": "Release cells for deleted values that no observer still references.",
+              "parameterDetails": [],
+              "returns": "number"
+            }
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -3282,6 +3806,7 @@
             "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const;\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode];\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed';",
             "STORE_INDEXED_SOURCE; // '@migaia/store-indexed'"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const STORE_INDEXED_SOURCE = \"@migaia/store-indexed\";"

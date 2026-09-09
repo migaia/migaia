@@ -1318,6 +1318,7 @@
             "const style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()",
             "type IEvent = { readonly data: { readonly id: number } }\nconst valueConfig = { readPath: 'data.id', alias: 'resource' } as const\nconst channel = createEventChannel<IEvent, void, undefined, typeof valueConfig>({ valueConfig })\n\nchannel.subscribe((event) => {\n  event.value // 原始 IEvent，identity 保留\n  event.resource // number | undefined；alias 可任意命名\n  event.abort()\n})"
           ],
+          "members": [],
           "aliasOf": "createCanonicalChannel",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1858,6 +1859,7 @@
             "type IEvents = { ready: { readonly at: number }; warning: { readonly message: string } }\nconst hub = createEventHub<IEvents>()\nconst stop = hub.subscribe('warning', (event) => console.warn(event.value.message))\nhub.publish('warning', { message: 'cache is stale' })",
             "import { createEventHub } from '@migaia/event-subscriber'\n\ntype IAppEvents = { ready: { readonly at: number }; warning: { readonly message: string } }\n\nconst events = createEventHub<IAppEvents>({\n  report: ({ key, event, error }) => monitoring.capture(error, { key, payload: event.value })\n})\n\nevents.subscribe('warning', (event) => console.warn(event.value.message))\nevents.publish('warning', { message: 'cache is stale' })"
           ],
+          "members": [],
           "aliasOf": "createEventHub",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2093,6 +2095,7 @@
             "const events = createEventChannel<number>({ style: 'on-trigger' })\nconst off = events.on((event) => console.log(event.value))\nevents.trigger(1)\noff.off()\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()",
             "const style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
           ],
+          "members": [],
           "aliasOf": "defineEventApiStyle",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2245,6 +2248,7 @@
             "import {\n  EventSubscriberErrorCode,\n  EVENT_SUBSCRIBER_SOURCE,\n  type IEventSubscriberErrorCode\n} from '@migaia/event-subscriber'",
             "import {\n  EventSubscriberState,\n  EventSubscriberErrorCode,\n  EVENT_SUBSCRIBER_SOURCE,\n  type IEventSubscriberErrorCode\n} from '@migaia/event-subscriber'"
           ],
+          "members": [],
           "aliasOf": "EVENT_SUBSCRIBER_SOURCE",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2447,6 +2451,7 @@
           "errors": ["No documented errors are declared for EventApiStyle."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for EventApiStyle.",
           "examples": [],
+          "members": [],
           "aliasOf": "EventApiStyle",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2599,6 +2604,7 @@
           "examples": [
             "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
           ],
+          "members": [],
           "aliasOf": "EventDispatchPolicy",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2666,6 +2672,7 @@
             "import {\n  EventSubscriberState,\n  EventSubscriberErrorCode,\n  EVENT_SUBSCRIBER_SOURCE,\n  type IEventSubscriberErrorCode\n} from '@migaia/event-subscriber'",
             "if (error.code === EventSubscriberErrorCode.publishFailed) {\n  /* ... */\n}"
           ],
+          "members": [],
           "aliasOf": "EventSubscriberErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2873,6 +2880,7 @@
             "import {\n  EventSubscriberState,\n  EventSubscriberErrorCode,\n  EVENT_SUBSCRIBER_SOURCE,\n  type IEventSubscriberErrorCode\n} from '@migaia/event-subscriber'",
             "EventSubscriberState.abort // 'abort'\nEventSubscriberState.fulfilled // 'fulfilled'\nEventSubscriberState.rejected // 'rejected'"
           ],
+          "members": [],
           "aliasOf": "EventSubscriberState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2988,6 +2996,7 @@
             "function invokeSerialSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly IListenerResult<R>[]>\nfunction invokeSerial<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly Awaited<R>[]>",
             "function invokeTaskSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R>,\n  taskId: string,\n  value: T\n): Promise<IListenerResult<R>>\nfunction invokeTask<T, R>(\n  channel: ICanonicalEventChannel<T, R>,\n  taskId: string,\n  value: T\n): Promise<Awaited<R>>"
           ],
+          "members": [],
           "aliasOf": "ICanonicalEventChannel",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3053,6 +3062,7 @@
           "examples": [
             "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
           ],
+          "members": [],
           "aliasOf": "IEventApiStyle",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3118,6 +3128,7 @@
           "examples": [
             "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
           ],
+          "members": [],
           "aliasOf": "IEventApiStyleNames",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3185,6 +3196,7 @@
             "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IEventAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
             "import {\n  createEventChannel,\n  type IEventChannel,\n  type IEventContext\n} from '@migaia/event-subscriber'"
           ],
+          "members": [],
           "aliasOf": "IEventChannel",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3251,6 +3263,7 @@
             "import {\n  createEventChannel,\n  type ICanonicalEventChannel,\n  type IEventChannel,\n  type IEventChannelLike,\n  type IEventChannelOptions,\n  type IEventContext,\n  type IEventListener,\n  type IFilteredEventChannel,\n  type IUnsubscribe\n} from '@migaia/event-subscriber'",
             "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
           ],
+          "members": [],
           "aliasOf": "IEventChannelOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3317,6 +3330,7 @@
             "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IEventAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
             "import type { IEventChannelSubscription, IEventHubSubscription } from '@migaia/event-subscriber'"
           ],
+          "members": [],
           "aliasOf": "IEventChannelSubscription",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3380,6 +3394,7 @@
           "errors": ["No documented errors are declared for IEventDispatchPolicy."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventDispatchPolicy.",
           "examples": [],
+          "members": [],
           "aliasOf": "IEventDispatchPolicy",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3448,6 +3463,7 @@
             "type IEventHub<C extends IEventMap> = {\n  subscribe<K extends keyof C>(key: K, listener: IEventListener<C[K]>): IEventHubSubscription<C, K>\n  publish<K extends keyof C>(key: K, value: C[K]): void\n  clear(key?: keyof C): void\n  size(key?: keyof C): number\n}",
             "import { createEventHub, type IEventHub, type IEventHubOptions } from '@migaia/event-subscriber'"
           ],
+          "members": [],
           "aliasOf": "IEventHub",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3515,6 +3531,7 @@
             "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]",
             "import { createEventHub, type IEventHub, type IEventHubOptions } from '@migaia/event-subscriber'"
           ],
+          "members": [],
           "aliasOf": "IEventHubOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3581,6 +3598,7 @@
             "import {\n  createEventHub,\n  type IEventHub,\n  type IEventHubOptions,\n  type IEventMap,\n  type IEventHubReport\n} from '@migaia/event-subscriber'",
             "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]"
           ],
+          "members": [],
           "aliasOf": "IEventHubReport",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3647,6 +3665,7 @@
             "type IEventHub<C extends IEventMap> = {\n  subscribe<K extends keyof C>(key: K, listener: IEventListener<C[K]>): IEventHubSubscription<C, K>\n  publish<K extends keyof C>(key: K, value: C[K]): void\n  clear(key?: keyof C): void\n  size(key?: keyof C): number\n}",
             "import type { IEventChannelSubscription, IEventHubSubscription } from '@migaia/event-subscriber'"
           ],
+          "members": [],
           "aliasOf": "IEventHubSubscription",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3710,6 +3729,7 @@
           "errors": ["No documented errors are declared for IEventInvocation."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventInvocation.",
           "examples": [],
+          "members": [],
           "aliasOf": "IEventInvocation",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3773,6 +3793,7 @@
           "errors": ["No documented errors are declared for IEventInvocationVisitor."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventInvocationVisitor.",
           "examples": [],
+          "members": [],
           "aliasOf": "IEventInvocationVisitor",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3840,6 +3861,7 @@
             "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]",
             "type IEventHub<C extends IEventMap> = {\n  subscribe<K extends keyof C>(key: K, listener: IEventListener<C[K]>): IEventHubSubscription<C, K>\n  publish<K extends keyof C>(key: K, value: C[K]): void\n  clear(key?: keyof C): void\n  size(key?: keyof C): number\n}"
           ],
+          "members": [],
           "aliasOf": "IEventMap",
           "exportPath": ".",
           "overloadSignatures": ["export type IEventMap = object;"],
@@ -3903,6 +3925,7 @@
           "examples": [
             "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
           ],
+          "members": [],
           "aliasOf": "IEventReport",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3969,6 +3992,7 @@
             "import {\n  EventSubscriberErrorCode,\n  EVENT_SUBSCRIBER_SOURCE,\n  type IEventSubscriberErrorCode\n} from '@migaia/event-subscriber'",
             "import {\n  EventSubscriberState,\n  EventSubscriberErrorCode,\n  EVENT_SUBSCRIBER_SOURCE,\n  type IEventSubscriberErrorCode\n} from '@migaia/event-subscriber'"
           ],
+          "members": [],
           "aliasOf": "IEventSubscriberErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4171,6 +4195,7 @@
           "errors": ["No documented errors are declared for IEventValueConfig."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventValueConfig.",
           "examples": [],
+          "members": [],
           "aliasOf": "IEventValueConfig",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4239,6 +4264,7 @@
             "function invokeParallelSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly IListenerResult<R>[]>\nfunction invokeParallel<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly Awaited<R>[]>",
             "function invokeSerialSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly IListenerResult<R>[]>\nfunction invokeSerial<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly Awaited<R>[]>"
           ],
+          "members": [],
           "aliasOf": "IFilteredEventChannel",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4309,6 +4335,7 @@
             "function invokeTaskSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R>,\n  taskId: string,\n  value: T\n): Promise<IListenerResult<R>>\nfunction invokeTask<T, R>(\n  channel: ICanonicalEventChannel<T, R>,\n  taskId: string,\n  value: T\n): Promise<Awaited<R>>",
             "EventSubscriberState.abort // 'abort' —— IEventAbortSignal 的事件类型\nEventSubscriberState.fulfilled // 'fulfilled' —— IListenerResult 的状态判别值\nEventSubscriberState.rejected // 'rejected'"
           ],
+          "members": [],
           "aliasOf": "IListenerResult",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4372,6 +4399,7 @@
           "errors": ["No documented errors are declared for invokeEachLive."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for invokeEachLive.",
           "examples": [],
+          "members": [],
           "aliasOf": "invokeEachLive",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4450,6 +4478,7 @@
             "function invokeParallelSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly IListenerResult<R>[]>\nfunction invokeParallel<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly Awaited<R>[]>",
             "const values = await invokeParallel(channel, payload) // Awaited<R>[]"
           ],
+          "members": [],
           "aliasOf": "invokeParallel",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4612,6 +4641,7 @@
             "const results = await invokeParallelSettled(channel, payload)\n// [{ status: 'fulfilled', value }, { status: 'rejected', reason }, ...]",
             "import { createEventChannel, invokeParallelSettled } from '@migaia/event-subscriber'\n\nconst checks = createEventChannel<string, boolean>({\n  terminalReport: (diagnostic) => emergencySink.capture(diagnostic)\n})\nchecks.subscribe(async (event) => event.value.length > 0)\nchecks.subscribe(async (event) => event.value.startsWith('usr_'))\n\nconst results = await invokeParallelSettled(checks, 'usr_42')"
           ],
+          "members": [],
           "aliasOf": "invokeParallelSettled",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4680,6 +4710,7 @@
             "import { createEventChannel, subscribeSubscriber, invokeSerial } from '@migaia/event-subscriber'\n\nconst pipeline = createEventChannel<string, void>()\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => writeAuditLog(event.value)\n})\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => notifyDownstream(event.value)\n})\n\nawait invokeSerial(pipeline, 'order-created')",
             "const values = await invokeSerial(channel, payload)"
           ],
+          "members": [],
           "aliasOf": "invokeSerial",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4841,6 +4872,7 @@
             "function invokeSerialSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly IListenerResult<R>[]>\nfunction invokeSerial<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly Awaited<R>[]>",
             "const results = await invokeSerialSettled(channel, payload)"
           ],
+          "members": [],
           "aliasOf": "invokeSerialSettled",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4909,6 +4941,7 @@
             "import { createEventChannel, invokeTask } from '@migaia/event-subscriber'\n\nconst jobs = createEventChannel<string, string>()\njobs.subscribe((event) => `email:${event.value}`, { taskId: 'email' })\njobs.subscribe((event) => `audit:${event.value}`, { taskId: 'audit' })\n\nconst emailResult = await invokeTask(jobs, 'email', 'created')",
             "const value = await invokeTask(tasks, 'email', job) // Awaited<R>"
           ],
+          "members": [],
           "aliasOf": "invokeTask",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5070,6 +5103,7 @@
             "function invokeTaskSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R>,\n  taskId: string,\n  value: T\n): Promise<IListenerResult<R>>\nfunction invokeTask<T, R>(\n  channel: ICanonicalEventChannel<T, R>,\n  taskId: string,\n  value: T\n): Promise<Awaited<R>>",
             "import { createEventChannel, invokeTaskSettled } from '@migaia/event-subscriber'\n\ntype IEmailJob = { readonly recipient: string; readonly template: 'welcome' }\ntype IEmailReceipt = { readonly messageId: string }\n\nconst tasks = createEventChannel<IEmailJob, IEmailReceipt>()\ntasks.subscribe(\n  async ({ value: job }) => {\n    const response = await fetch('/api/email', {\n      method: 'POST',\n      headers: { 'content-type': 'application/json' },\n      body: JSON.stringify(job)\n    })\n    return response.json() as Promise<IEmailReceipt>\n  },\n  { taskId: 'email' }\n)\n\nconst job: IEmailJob = { recipient: 'ada@example.com', template: 'welcome' }\nconst result = await invokeTaskSettled(tasks, 'email', job)\n// result 是 { status: 'fulfilled', value: { messageId } }\n// 或 { status: 'rejected', reason }"
           ],
+          "members": [],
           "aliasOf": "invokeTaskSettled",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5227,6 +5261,7 @@
           "errors": ["No documented errors are declared for IStyledEventChannel."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStyledEventChannel.",
           "examples": [],
+          "members": [],
           "aliasOf": "IStyledEventChannel",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5290,6 +5325,7 @@
           "errors": ["No documented errors are declared for IStyledEventHub."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStyledEventHub.",
           "examples": [],
+          "members": [],
           "aliasOf": "IStyledEventHub",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5355,6 +5391,7 @@
           "examples": [
             "import {\n  invokeParallel,\n  invokeParallelSettled,\n  invokeSerial,\n  invokeSerialSettled,\n  invokeTask,\n  invokeTaskSettled,\n  withSnapshotEntries,\n  type IListenerResult\n} from '@migaia/event-subscriber'"
           ],
+          "members": [],
           "aliasOf": "withSnapshotEntries",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5543,6 +5580,7 @@
             "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IEventAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IEventAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}",
             "EventSubscriberState.abort // 'abort' —— IEventAbortSignal 的事件类型\nEventSubscriberState.fulfilled // 'fulfilled' —— IListenerResult 的状态判别值\nEventSubscriberState.rejected // 'rejected'"
           ],
+          "members": [],
           "aliasOf": "IEventAbortSignal",
           "exportPath": "./subscriber",
           "overloadSignatures": [
@@ -5611,6 +5649,7 @@
             "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IEventAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IEventAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}",
             "function subscribeSubscriber<T, R>(\n  channel: IEventChannelLike<T, R>,\n  subscriber: IEventSubscriber<T, R>\n): IUnsubscribe\n\ntype IEventSubscriber<T, R = void> = { handle(event: IEventContext<T>): R | PromiseLike<R> }"
           ],
+          "members": [],
           "aliasOf": "IEventChannelLike",
           "exportPath": "./subscriber",
           "overloadSignatures": [
@@ -5681,6 +5720,7 @@
             "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]",
             "import {\n  createEventChannel,\n  type IEventChannel,\n  type IEventContext\n} from '@migaia/event-subscriber'"
           ],
+          "members": [],
           "aliasOf": "IEventContext",
           "exportPath": "./subscriber",
           "overloadSignatures": [
@@ -5750,6 +5790,7 @@
             "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IEventAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IEventAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}",
             "type IEventHub<C extends IEventMap> = {\n  subscribe<K extends keyof C>(key: K, listener: IEventListener<C[K]>): IEventHubSubscription<C, K>\n  publish<K extends keyof C>(key: K, value: C[K]): void\n  clear(key?: keyof C): void\n  size(key?: keyof C): number\n}"
           ],
+          "members": [],
           "aliasOf": "IEventListener",
           "exportPath": "./subscriber",
           "overloadSignatures": [
@@ -5817,6 +5858,7 @@
             "function subscribeSubscriber<T, R>(\n  channel: IEventChannelLike<T, R>,\n  subscriber: IEventSubscriber<T, R>\n): IUnsubscribe\n\ntype IEventSubscriber<T, R = void> = { handle(event: IEventContext<T>): R | PromiseLike<R> }",
             "import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeSubscriber, type IEventSubscriber } from '@migaia/event-subscriber/subscriber'\n\nclass Counter implements IEventSubscriber<number> {\n  total = 0\n  handle(event: { readonly value: number }) {\n    this.total += event.value\n  }\n}\nconst channel = createEventChannel<number>()\nsubscribeSubscriber(channel, new Counter())"
           ],
+          "members": [],
           "aliasOf": "IEventSubscriber",
           "exportPath": "./subscriber",
           "overloadSignatures": [
@@ -6025,6 +6067,7 @@
             "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IEventAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IEventAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}",
             "function subscribeSubscriber<T, R>(\n  channel: IEventChannelLike<T, R>,\n  subscriber: IEventSubscriber<T, R>\n): IUnsubscribe\n\ntype IEventSubscriber<T, R = void> = { handle(event: IEventContext<T>): R | PromiseLike<R> }"
           ],
+          "members": [],
           "aliasOf": "IUnsubscribe",
           "exportPath": "./subscriber",
           "overloadSignatures": ["export type IUnsubscribe = () => void;"],
@@ -6091,6 +6134,7 @@
             "function subscribeOnce<T, R>(\n  channel: IEventChannelLike<T, R>,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe",
             "subscribeOnce(channel, (event) => console.log('only once', event.value))"
           ],
+          "members": [],
           "aliasOf": "subscribeOnce",
           "exportPath": "./subscriber",
           "overloadSignatures": [
@@ -6224,6 +6268,7 @@
             "import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeSubscriber, type IEventSubscriber } from '@migaia/event-subscriber/subscriber'\n\nclass Counter implements IEventSubscriber<number> {\n  total = 0\n  handle(event: { readonly value: number }) {\n    this.total += event.value\n  }\n}\nconst channel = createEventChannel<number>()\nsubscribeSubscriber(channel, new Counter())",
             "import { createEventChannel, subscribeSubscriber, invokeSerial } from '@migaia/event-subscriber'\n\nconst pipeline = createEventChannel<string, void>()\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => writeAuditLog(event.value)\n})\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => notifyDownstream(event.value)\n})\n\nawait invokeSerial(pipeline, 'order-created')"
           ],
+          "members": [],
           "aliasOf": "subscribeSubscriber",
           "exportPath": "./subscriber",
           "overloadSignatures": [
@@ -6419,6 +6464,7 @@
             "const controller = new AbortController()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\ncontroller.abort('owner closed')",
             "import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'\n\nconst controller = new AbortController()\nconst channel = createEventChannel<number>()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\n// 组件卸载 / 请求结束时统一中止\ncontroller.abort('scope closed')"
           ],
+          "members": [],
           "aliasOf": "subscribeUntil",
           "exportPath": "./subscriber",
           "overloadSignatures": [

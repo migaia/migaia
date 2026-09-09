@@ -54,6 +54,20 @@ export type IApiAlias = {
   readonly ownerFragment: string
 }
 
+/** Public instance member extracted from a class declaration. */
+export type IApiMember = {
+  readonly name: string
+  readonly kind: string
+  readonly signature: string
+  readonly description: string | null
+  readonly parameterDetails: readonly {
+    readonly name: string
+    readonly type: string
+    readonly optional: boolean
+  }[]
+  readonly returns: string
+}
+
 /** Source-backed public symbol projection shown under its owning module. */
 export type IApiSymbol = {
   readonly name: string
@@ -73,6 +87,7 @@ export type IApiSymbol = {
     readonly type: string
     readonly optional: boolean
   }[]
+  readonly members: readonly IApiMember[]
   readonly examples: readonly string[]
   readonly guidance: readonly {
     readonly id: string
@@ -102,7 +117,25 @@ export type IApiSymbol = {
 
 /** Converts an export path into a readable module slug without exposing repository terms. */
 export function moduleSlug(exportPath: string): string {
-  return exportPath === '.' ? 'index' : exportPath.replace(/^\.\//, '').replace(/\//g, '-')
+  return exportPath === '.' ? 'index' : exportPath.replace(/^\.\//, '')
+}
+
+/** Resolves a docs URL against public module paths without confusing nested modules with symbols. */
+export function resolveDocsSelection(segments: readonly string[], apis: readonly IApi[]) {
+  /** Nested candidates are checked deepest-first so `plugins/reactive` wins over `plugins`. */
+  const candidates = apis
+    .filter((api) => api.module !== 'index')
+    .sort((left, right) => right.module.split('/').length - left.module.split('/').length)
+  /** The selected module must consume a complete public-path prefix. */
+  const selectedApi = candidates.find((api) => {
+    /** Public module segments retain the package export hierarchy. */
+    const moduleSegments = api.module.split('/')
+    return moduleSegments.every((segment, index) => segments[index] === segment)
+  })
+  if (!selectedApi) return { moduleName: 'index', symbolPath: segments[0] }
+  /** The symbol begins immediately after every segment owned by the selected module. */
+  const symbolOffset = selectedApi.module.split('/').length
+  return { moduleName: selectedApi.module, symbolPath: segments[symbolOffset] }
 }
 
 /** Produces a stable semantic path, adding a readable kind only for case-folding collisions. */

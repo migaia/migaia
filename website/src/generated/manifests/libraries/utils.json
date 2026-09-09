@@ -2200,6 +2200,7 @@
             "const collector = collect(users)\n  .fieldBy('profile.name-zh', 'profile.name-en')\n  .like(' World ')\n  .distinctBy('id')\n  .skip(10)\n  .take(20);\n\nconst result = collector.result;",
             "import { collect } from '@migaia/utils';\n\nconst collector = collect(users)\n  .fieldBy('profile.name-zh', 'profile.name-en')\n  .like(' world ')\n  .where((user) => user.active)\n  .take(20);\n\nconst result = collector.result;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function collect<T>(dataSource: readonly T[]): ICollector<T>;"
@@ -2392,6 +2393,7 @@
           "examples": [
             "type ICollectorActions<T, Self> = {\n  readonly result: readonly T[];\n  fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(\n    ...paths: P\n  ): IFieldCollector<T, P[number]>;\n  where(predicate: (source: T) => boolean): Self;\n  distinctBy<P extends IObjectPathInput<T>>(path: P): Self;\n  skip(count: number): Self;\n  take(count: number): Self;\n};\n\ninterface ICollector<T> extends ICollectorActions<T, ICollector<T>> {}\n\ninterface IFieldCollector<T, P extends IObjectPathInput<T>>\n  extends ICollectorActions<T, IFieldCollector<T, P>> {\n  like(query: string): IFieldCollector<T, P>;\n  equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>;\n  oneOf(\n    value: IObjectPathValue<T, P>,\n    ...values: IObjectPathValue<T, P>[]\n  ): IFieldCollector<T, P>;\n}\n\nfunction collect<T>(dataSource: readonly T[]): ICollector<T>;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export interface ICollector<T> extends ICollectorActions<T, ICollector<T>> { }"
@@ -2456,6 +2458,7 @@
           "examples": [
             "type ICollectorActions<T, Self> = {\n  readonly result: readonly T[];\n  fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(\n    ...paths: P\n  ): IFieldCollector<T, P[number]>;\n  where(predicate: (source: T) => boolean): Self;\n  distinctBy<P extends IObjectPathInput<T>>(path: P): Self;\n  skip(count: number): Self;\n  take(count: number): Self;\n};\n\ninterface ICollector<T> extends ICollectorActions<T, ICollector<T>> {}\n\ninterface IFieldCollector<T, P extends IObjectPathInput<T>>\n  extends ICollectorActions<T, IFieldCollector<T, P>> {\n  like(query: string): IFieldCollector<T, P>;\n  equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>;\n  oneOf(\n    value: IObjectPathValue<T, P>,\n    ...values: IObjectPathValue<T, P>[]\n  ): IFieldCollector<T, P>;\n}\n\nfunction collect<T>(dataSource: readonly T[]): ICollector<T>;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ICollectorActions<T, Self> = { readonly result: readonly T[]; fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(...paths: P): IFieldCollector<T, P[number]>; where(predicate: (source: T) => boolean): Self; distinctBy<P extends IObjectPathInput<T>>(path: P): Self; skip(count: number): Self; take(count: number): Self; };"
@@ -2520,6 +2523,7 @@
           "examples": [
             "type ICollectorActions<T, Self> = {\n  readonly result: readonly T[];\n  fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(\n    ...paths: P\n  ): IFieldCollector<T, P[number]>;\n  where(predicate: (source: T) => boolean): Self;\n  distinctBy<P extends IObjectPathInput<T>>(path: P): Self;\n  skip(count: number): Self;\n  take(count: number): Self;\n};\n\ninterface ICollector<T> extends ICollectorActions<T, ICollector<T>> {}\n\ninterface IFieldCollector<T, P extends IObjectPathInput<T>>\n  extends ICollectorActions<T, IFieldCollector<T, P>> {\n  like(query: string): IFieldCollector<T, P>;\n  equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>;\n  oneOf(\n    value: IObjectPathValue<T, P>,\n    ...values: IObjectPathValue<T, P>[]\n  ): IFieldCollector<T, P>;\n}\n\nfunction collect<T>(dataSource: readonly T[]): ICollector<T>;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export interface IFieldCollector<T, P extends IObjectPathInput<T>> extends ICollectorActions<T, IFieldCollector<T, P>> { like(query: string): IFieldCollector<T, P>; equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>; oneOf(value: IObjectPathValue<T, P>, ...values: IObjectPathValue<T, P>[]): IFieldCollector<T, P>; }"
@@ -3891,6 +3895,7 @@
             "bytesToBase64(new Uint8Array([1, 2, 3])); // 'AQID'\nbase64ToBytes('AQID'); // Uint8Array [1, 2, 3]\nbase64ToBytes('AQID-_'); // 抛 TypeError（URL-safe 字符不被接受）",
             "bytesToBase64(new Uint8Array([1, 2, 3])); // 'AQID'\nbase64ToBytes('AQID'); // Uint8Array [1, 2, 3]（只接受规范 RFC 4648 形式，非规范输入抛 TypeError）"
           ],
+          "members": [],
           "exportPath": "./bytes",
           "overloadSignatures": [
             "export declare function base64ToBytes(value: string): Uint8Array;"
@@ -4015,6 +4020,7 @@
             "bytesToBase64(new Uint8Array([1, 2, 3])); // 'AQID'\nbase64ToBytes('AQID'); // Uint8Array [1, 2, 3]\nbase64ToBytes('AQID-_'); // 抛 TypeError（URL-safe 字符不被接受）",
             "bytesToBase64(new Uint8Array([1, 2, 3])); // 'AQID'\nbase64ToBytes('AQID'); // Uint8Array [1, 2, 3]（只接受规范 RFC 4648 形式，非规范输入抛 TypeError）"
           ],
+          "members": [],
           "exportPath": "./bytes",
           "overloadSignatures": [
             "export declare function bytesToBase64(value: Uint8Array): string;"
@@ -4098,6 +4104,7 @@
           "examples": [
             "decodeUtf8(bytes); // '你好'\ndecodeUtf8(badBytes, { fatal: true }); // 非法字节序列时抛错，而不是替换成 U+FFFD"
           ],
+          "members": [],
           "exportPath": "./bytes",
           "overloadSignatures": [
             "export declare function decodeUtf8(value: Uint8Array, options?: { readonly fatal?: boolean; }): string;"
@@ -4179,6 +4186,7 @@
           "errors": ["No documented errors are declared for encodeUtf8."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for encodeUtf8.",
           "examples": ["const bytes = encodeUtf8('你好');"],
+          "members": [],
           "exportPath": "./bytes",
           "overloadSignatures": ["export declare function encodeUtf8(value: string): Uint8Array;"],
           "overloadParameterDetails": [
@@ -4251,6 +4259,7 @@
             "import {\n  isArrayBuffer,\n  isUint8Array,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  utf8ByteLength,\n  encodeUtf8,\n  decodeUtf8,\n  splitUtf8\n} from '@migaia/utils/bytes';",
             "isUint8Array(new Uint8Array()); // true\nisArrayBuffer(new ArrayBuffer(1)); // true\nisUint8Array(new Uint8ClampedArray(1)); // false\nisArrayBuffer(new SharedArrayBuffer(1)); // false"
           ],
+          "members": [],
           "exportPath": "./bytes",
           "overloadSignatures": [
             "export declare const isArrayBuffer: (value: unknown) => value is ArrayBuffer;"
@@ -4317,6 +4326,7 @@
             "import {\n  isArrayBuffer,\n  isUint8Array,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  utf8ByteLength,\n  encodeUtf8,\n  decodeUtf8,\n  splitUtf8\n} from '@migaia/utils/bytes';",
             "isUint8Array(new Uint8Array()); // true\nisArrayBuffer(new ArrayBuffer(1)); // true\nisUint8Array(new Uint8ClampedArray(1)); // false\nisArrayBuffer(new SharedArrayBuffer(1)); // false"
           ],
+          "members": [],
           "exportPath": "./bytes",
           "overloadSignatures": [
             "export declare const isUint8Array: (value: unknown) => value is Uint8Array;"
@@ -4393,6 +4403,7 @@
             "splitUtf8('你好世界', 6); // 每个汉字 3 字节 → ['你好', '世界']",
             "splitUtf8('你好世界', 6); // ['你好', '世界']"
           ],
+          "members": [],
           "exportPath": "./bytes",
           "overloadSignatures": [
             "export declare function splitUtf8(value: string, maxBytes: number): readonly string[];"
@@ -4482,6 +4493,7 @@
             "function* streamBase64Chunks(value: Uint8Array, maxChunkBytes?: number): Iterable<string>;",
             "for (const chunk of streamBase64Chunks(bigBytes, 4096)) send(chunk);"
           ],
+          "members": [],
           "exportPath": "./bytes",
           "overloadSignatures": [
             "export declare function streamBase64Chunks(value: Uint8Array, maxChunkBytes?: number): Iterable<string>;"
@@ -4563,6 +4575,7 @@
           "errors": ["No documented errors are declared for utf8ByteLength."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for utf8ByteLength.",
           "examples": ["utf8ByteLength('你好'); // 6"],
+          "members": [],
           "exportPath": "./bytes",
           "overloadSignatures": ["export declare function utf8ByteLength(value: string): number;"],
           "overloadParameterDetails": [
@@ -4666,6 +4679,7 @@
           "examples": [
             "const defaults = ownConfig({\n  retries: 1,\n  tags: ['default'],\n  transport: { timeoutMs: 1_000, keepAlive: true },\n});\nconst override = ownConfig({\n  retries: 3,\n  tags: ['custom'],\n  transport: { timeoutMs: 2_500 },\n});\n\nconst merged = combineConfig([defaults, override], {\n  strategies: { record: 'merge', array: 'concat' },\n});\n\n// merged 是新配置；defaults 和 override 都不会被修改。\nmerged;\n// {\n//   retries: 3,\n//   tags: ['default', 'custom'],\n//   transport: { timeoutMs: 2500, keepAlive: true },\n// }\n\n// 这里的 diff 只是把结果变化写明，不是 combineConfig 的额外返回值。\nconst diff = {\n  retries: { before: defaults.retries, after: merged.retries },\n  tags: { before: defaults.tags, after: merged.tags },\n  timeoutMs: { before: defaults.transport.timeoutMs, after: merged.transport.timeoutMs },\n};"
           ],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export declare function combineConfig(sources: readonly IOwnedConfig<IConfigRecord>[], options?: IConfigCombineOptions): IOwnedConfig<IConfigRecord>;"
@@ -5092,6 +5106,7 @@
             "const next = patchConfig(config, { retries: 3, debug: CONFIG_DELETE });",
             "import { createManualScheduler, retry, withTimeout } from '@migaia/utils/promise';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst config = readonlyConfig(\n  patchConfig(ownConfig({ endpoint: '/v1', retries: 2, debug: true }), { debug: CONFIG_DELETE })\n);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return config.endpoint;\n      },\n      { maxAttempts: config.retries, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\nscheduler.advance(100);\nawait request.catch(() => undefined);"
           ],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": ["export declare const CONFIG_DELETE: unique symbol;"],
           "overloadParameterDetails": [[]],
@@ -5456,6 +5471,7 @@
             "import {\n  ConfigProfile,\n  CONFIG_DELETE,\n  ownConfig,\n  readonlyConfig,\n  patchConfig,\n  parseConfigPath,\n  readConfigPath,\n  combineConfig\n} from '@migaia/utils/config';",
             "ownConfig({ onReady: () => {} }, { profile: ConfigProfile.richRuntime });"
           ],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export declare const ConfigProfile: { readonly data: \"data\"; readonly richRuntime: \"richRuntime\"; };"
@@ -5784,6 +5800,7 @@
           "errors": ["No documented errors are declared for IConfigCombineOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IConfigCombineOptions.",
           "examples": [],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export type IConfigCombineOptions = IOwnConfigOptions & { readonly strategies?: Partial<IConfigMergeStrategies>; readonly pathRules?: readonly IConfigPathRule[]; readonly onConflict?: (context: IConfigConflictContext) => IConfigConflictDecision; };"
@@ -5849,6 +5866,7 @@
             "function combineConfig(\n  sources: readonly IOwnedConfig<IConfigRecord>[],\n  options?: {\n    readonly profile?: IConfigProfile;\n    readonly limits?: Partial<IConfigLimits>;\n    readonly strategies?: Partial<IConfigMergeStrategies>;\n    readonly pathRules?: readonly IConfigPathRule[];\n    readonly onConflict?: (context: IConfigConflictContext) => IConfigConflictDecision;\n  }\n): IOwnedConfig<IConfigRecord>;",
             "type IConfigMergeStrategies = {\n  readonly record: 'merge' | 'replace'; // 默认 'merge'：普通对象递归合并；'replace'：整体覆盖\n  readonly array: 'replace' | 'concat' | 'mergeByIndex'; // 默认 'replace'\n  readonly map: 'replace' | 'merge'; // 默认 'replace'\n  readonly set: 'replace' | 'union'; // 默认 'replace'\n  readonly undefined: 'ignore' | 'assign'; // 默认 'ignore'：右侧显式 undefined 不覆盖左侧\n};\n\ntype IConfigPathRule = {\n  readonly prefix: readonly PropertyKey[];\n  readonly strategies: Partial<IConfigMergeStrategies>;\n};\n\ntype IConfigConflictContext = {\n  readonly path: readonly PropertyKey[];\n  readonly left: unknown;\n  readonly right: unknown;\n};\ntype IConfigConflictDecision =\n  | { readonly kind: 'left' }\n  | { readonly kind: 'right' }\n  | { readonly kind: 'delete' }\n  | { readonly kind: 'value'; readonly value: unknown };"
           ],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export type IConfigConflictContext = { readonly path: readonly PropertyKey[]; readonly left: unknown; readonly right: unknown; };"
@@ -6050,6 +6068,7 @@
             "function combineConfig(\n  sources: readonly IOwnedConfig<IConfigRecord>[],\n  options?: {\n    readonly profile?: IConfigProfile;\n    readonly limits?: Partial<IConfigLimits>;\n    readonly strategies?: Partial<IConfigMergeStrategies>;\n    readonly pathRules?: readonly IConfigPathRule[];\n    readonly onConflict?: (context: IConfigConflictContext) => IConfigConflictDecision;\n  }\n): IOwnedConfig<IConfigRecord>;",
             "type IConfigMergeStrategies = {\n  readonly record: 'merge' | 'replace'; // 默认 'merge'：普通对象递归合并；'replace'：整体覆盖\n  readonly array: 'replace' | 'concat' | 'mergeByIndex'; // 默认 'replace'\n  readonly map: 'replace' | 'merge'; // 默认 'replace'\n  readonly set: 'replace' | 'union'; // 默认 'replace'\n  readonly undefined: 'ignore' | 'assign'; // 默认 'ignore'：右侧显式 undefined 不覆盖左侧\n};\n\ntype IConfigPathRule = {\n  readonly prefix: readonly PropertyKey[];\n  readonly strategies: Partial<IConfigMergeStrategies>;\n};\n\ntype IConfigConflictContext = {\n  readonly path: readonly PropertyKey[];\n  readonly left: unknown;\n  readonly right: unknown;\n};\ntype IConfigConflictDecision =\n  | { readonly kind: 'left' }\n  | { readonly kind: 'right' }\n  | { readonly kind: 'delete' }\n  | { readonly kind: 'value'; readonly value: unknown };"
           ],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export type IConfigConflictDecision = { readonly kind: 'left'; } | { readonly kind: 'right'; } | { readonly kind: 'delete'; } | { readonly kind: 'value'; readonly value: unknown; };"
@@ -6254,6 +6273,7 @@
             "function parseConfigPath(\n  path: string,\n  limits?: Pick<IConfigLimits, 'maxPathLength' | 'maxSegmentLength'>\n): readonly string[];",
             "function combineConfig(\n  sources: readonly IOwnedConfig<IConfigRecord>[],\n  options?: {\n    readonly profile?: IConfigProfile;\n    readonly limits?: Partial<IConfigLimits>;\n    readonly strategies?: Partial<IConfigMergeStrategies>;\n    readonly pathRules?: readonly IConfigPathRule[];\n    readonly onConflict?: (context: IConfigConflictContext) => IConfigConflictDecision;\n  }\n): IOwnedConfig<IConfigRecord>;"
           ],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export type IConfigLimits = { readonly maxDepth: number; readonly maxNodes: number; readonly maxKeys: number; readonly maxPathLength: number; readonly maxSegmentLength: number; };"
@@ -6585,6 +6605,7 @@
             "function combineConfig(\n  sources: readonly IOwnedConfig<IConfigRecord>[],\n  options?: {\n    readonly profile?: IConfigProfile;\n    readonly limits?: Partial<IConfigLimits>;\n    readonly strategies?: Partial<IConfigMergeStrategies>;\n    readonly pathRules?: readonly IConfigPathRule[];\n    readonly onConflict?: (context: IConfigConflictContext) => IConfigConflictDecision;\n  }\n): IOwnedConfig<IConfigRecord>;",
             "type IConfigMergeStrategies = {\n  readonly record: 'merge' | 'replace'; // 默认 'merge'：普通对象递归合并；'replace'：整体覆盖\n  readonly array: 'replace' | 'concat' | 'mergeByIndex'; // 默认 'replace'\n  readonly map: 'replace' | 'merge'; // 默认 'replace'\n  readonly set: 'replace' | 'union'; // 默认 'replace'\n  readonly undefined: 'ignore' | 'assign'; // 默认 'ignore'：右侧显式 undefined 不覆盖左侧\n};\n\ntype IConfigPathRule = {\n  readonly prefix: readonly PropertyKey[];\n  readonly strategies: Partial<IConfigMergeStrategies>;\n};\n\ntype IConfigConflictContext = {\n  readonly path: readonly PropertyKey[];\n  readonly left: unknown;\n  readonly right: unknown;\n};\ntype IConfigConflictDecision =\n  | { readonly kind: 'left' }\n  | { readonly kind: 'right' }\n  | { readonly kind: 'delete' }\n  | { readonly kind: 'value'; readonly value: unknown };"
           ],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export type IConfigMergeStrategies = { readonly record: 'merge' | 'replace'; readonly array: 'replace' | 'concat' | 'mergeByIndex'; readonly map: 'replace' | 'merge'; readonly set: 'replace' | 'union'; readonly undefined: 'ignore' | 'assign'; };"
@@ -6915,6 +6936,7 @@
           "examples": [
             "function patchConfig<T extends IConfigRecord>(\n  base: IOwnedConfig<T>,\n  patch: IConfigPatch<T>,\n  options?: {\n    readonly profile?: IConfigProfile;\n    readonly limits?: Partial<IConfigLimits>;\n    readonly reuseUnchangedRoot?: boolean;\n  }\n): IOwnedConfig<T>;"
           ],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export type IConfigPatch<T extends IConfigRecord> = { readonly [K in keyof T]?: T[K] | typeof CONFIG_DELETE; } & Readonly<Record<PropertyKey, unknown>>;"
@@ -7113,6 +7135,7 @@
           "errors": ["No documented errors are declared for IConfigPatchOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IConfigPatchOptions.",
           "examples": [],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export type IConfigPatchOptions = IOwnConfigOptions & { readonly reuseUnchangedRoot?: boolean; };"
@@ -7178,6 +7201,7 @@
             "function combineConfig(\n  sources: readonly IOwnedConfig<IConfigRecord>[],\n  options?: {\n    readonly profile?: IConfigProfile;\n    readonly limits?: Partial<IConfigLimits>;\n    readonly strategies?: Partial<IConfigMergeStrategies>;\n    readonly pathRules?: readonly IConfigPathRule[];\n    readonly onConflict?: (context: IConfigConflictContext) => IConfigConflictDecision;\n  }\n): IOwnedConfig<IConfigRecord>;",
             "type IConfigMergeStrategies = {\n  readonly record: 'merge' | 'replace'; // 默认 'merge'：普通对象递归合并；'replace'：整体覆盖\n  readonly array: 'replace' | 'concat' | 'mergeByIndex'; // 默认 'replace'\n  readonly map: 'replace' | 'merge'; // 默认 'replace'\n  readonly set: 'replace' | 'union'; // 默认 'replace'\n  readonly undefined: 'ignore' | 'assign'; // 默认 'ignore'：右侧显式 undefined 不覆盖左侧\n};\n\ntype IConfigPathRule = {\n  readonly prefix: readonly PropertyKey[];\n  readonly strategies: Partial<IConfigMergeStrategies>;\n};\n\ntype IConfigConflictContext = {\n  readonly path: readonly PropertyKey[];\n  readonly left: unknown;\n  readonly right: unknown;\n};\ntype IConfigConflictDecision =\n  | { readonly kind: 'left' }\n  | { readonly kind: 'right' }\n  | { readonly kind: 'delete' }\n  | { readonly kind: 'value'; readonly value: unknown };"
           ],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export type IConfigPathRule = { readonly prefix: readonly PropertyKey[]; readonly strategies: Partial<IConfigMergeStrategies>; };"
@@ -7381,6 +7405,7 @@
             "function patchConfig<T extends IConfigRecord>(\n  base: IOwnedConfig<T>,\n  patch: IConfigPatch<T>,\n  options?: {\n    readonly profile?: IConfigProfile;\n    readonly limits?: Partial<IConfigLimits>;\n    readonly reuseUnchangedRoot?: boolean;\n  }\n): IOwnedConfig<T>;",
             "function combineConfig(\n  sources: readonly IOwnedConfig<IConfigRecord>[],\n  options?: {\n    readonly profile?: IConfigProfile;\n    readonly limits?: Partial<IConfigLimits>;\n    readonly strategies?: Partial<IConfigMergeStrategies>;\n    readonly pathRules?: readonly IConfigPathRule[];\n    readonly onConflict?: (context: IConfigConflictContext) => IConfigConflictDecision;\n  }\n): IOwnedConfig<IConfigRecord>;"
           ],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export type IConfigProfile = (typeof ConfigProfile)[keyof typeof ConfigProfile];"
@@ -7581,6 +7606,7 @@
           "examples": [
             "type IConfigReadResult =\n  { readonly kind: 'missing' } | { readonly kind: 'value'; readonly value: unknown };\nfunction readConfigPath(\n  config: IOwnedConfig<IConfigRecord>,\n  path: string | readonly string[]\n): IConfigReadResult;"
           ],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export type IConfigReadResult = { readonly kind: 'missing'; } | { readonly kind: 'value'; readonly value: unknown; };"
@@ -7785,6 +7811,7 @@
             "type IConfigReadResult =\n  { readonly kind: 'missing' } | { readonly kind: 'value'; readonly value: unknown };\nfunction readConfigPath(\n  config: IOwnedConfig<IConfigRecord>,\n  path: string | readonly string[]\n): IConfigReadResult;",
             "function combineConfig(\n  sources: readonly IOwnedConfig<IConfigRecord>[],\n  options?: {\n    readonly profile?: IConfigProfile;\n    readonly limits?: Partial<IConfigLimits>;\n    readonly strategies?: Partial<IConfigMergeStrategies>;\n    readonly pathRules?: readonly IConfigPathRule[];\n    readonly onConflict?: (context: IConfigConflictContext) => IConfigConflictDecision;\n  }\n): IOwnedConfig<IConfigRecord>;"
           ],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": ["export type IConfigRecord = Record<PropertyKey, unknown>;"],
           "overloadParameterDetails": [[]],
@@ -7981,6 +8008,7 @@
           "errors": ["No documented errors are declared for IOwnConfigOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IOwnConfigOptions.",
           "examples": [],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export type IOwnConfigOptions = { readonly profile?: IConfigProfile; readonly limits?: Partial<IConfigLimits>; };"
@@ -8049,6 +8077,7 @@
             "type IConfigReadResult =\n  { readonly kind: 'missing' } | { readonly kind: 'value'; readonly value: unknown };\nfunction readConfigPath(\n  config: IOwnedConfig<IConfigRecord>,\n  path: string | readonly string[]\n): IConfigReadResult;",
             "function combineConfig(\n  sources: readonly IOwnedConfig<IConfigRecord>[],\n  options?: {\n    readonly profile?: IConfigProfile;\n    readonly limits?: Partial<IConfigLimits>;\n    readonly strategies?: Partial<IConfigMergeStrategies>;\n    readonly pathRules?: readonly IConfigPathRule[];\n    readonly onConflict?: (context: IConfigConflictContext) => IConfigConflictDecision;\n  }\n): IOwnedConfig<IConfigRecord>;"
           ],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export type IOwnedConfig<T extends IConfigRecord> = T & { readonly __utilsOwnedConfigBrand?: unique symbol; };"
@@ -8266,6 +8295,7 @@
             "import { createManualScheduler, retry, withTimeout } from '@migaia/utils/promise';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst config = readonlyConfig(\n  patchConfig(ownConfig({ endpoint: '/v1', retries: 2, debug: true }), { debug: CONFIG_DELETE })\n);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return config.endpoint;\n      },\n      { maxAttempts: config.retries, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\nscheduler.advance(100);\nawait request.catch(() => undefined);",
             "import { get, set } from '@migaia/utils/object';\nimport { ownConfig, patchConfig } from '@migaia/utils/config';\n\nconst config = ownConfig({ server: { host: 'localhost', port: 8080 } });\n// patchConfig 只在根一层生效，嵌套修改先在应用层用 set() 算好整棵子树\nconst nextServer = set(get(config, 'server')!, 'port', 9090);\nconst next = patchConfig(config, { server: nextServer });"
           ],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export declare function ownConfig<T extends IConfigRecord>(value: T, options?: IOwnConfigOptions): IOwnedConfig<T>;"
@@ -8702,6 +8732,7 @@
           "errors": ["No documented errors are declared for parseConfigPath."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for parseConfigPath.",
           "examples": ["parseConfigPath('a.b.c'); // ['a', 'b', 'c']"],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export declare function parseConfigPath(path: string, limits?: Pick<IConfigLimits, 'maxPathLength' | 'maxSegmentLength'>): readonly string[];"
@@ -9070,6 +9101,7 @@
             "import { createManualScheduler, retry, withTimeout } from '@migaia/utils/promise';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst config = readonlyConfig(\n  patchConfig(ownConfig({ endpoint: '/v1', retries: 2, debug: true }), { debug: CONFIG_DELETE })\n);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return config.endpoint;\n      },\n      { maxAttempts: config.retries, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\nscheduler.advance(100);\nawait request.catch(() => undefined);",
             "import { get, set } from '@migaia/utils/object';\nimport { ownConfig, patchConfig } from '@migaia/utils/config';\n\nconst config = ownConfig({ server: { host: 'localhost', port: 8080 } });\n// patchConfig 只在根一层生效，嵌套修改先在应用层用 set() 算好整棵子树\nconst nextServer = set(get(config, 'server')!, 'port', 9090);\nconst next = patchConfig(config, { server: nextServer });"
           ],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export declare function patchConfig<T extends IConfigRecord>(base: IOwnedConfig<T>, patch: IConfigPatch<T>, options?: IConfigPatchOptions): IOwnedConfig<T>;"
@@ -9525,6 +9557,7 @@
             "const callerOptions = {\n  endpoint: '/v1',\n  retry: { attempts: 2 },\n  tags: new Set(['stable'])\n};\nconst config = ownConfig(callerOptions);\n\ncallerOptions.retry.attempts = 99;\ncallerOptions.tags.add('caller-mutated');\nconfig.retry.attempts; // 2：接纳后不再受调用方修改影响\nconfig.tags.has('caller-mutated'); // false：Set 也已复制\n\nconst publicView = readonlyConfig(config); // 可公开读取，任何层级的写入都会明确报错\nconst next = patchConfig(config, { retry: { attempts: 3 } }); // 从已拥有配置派生新根\nreadConfigPath(next, 'retry.attempts'); // { kind: 'value', value: 3 }",
             "readConfigPath(config, 'nested.value'); // { kind: 'missing' } | { kind: 'value', value }"
           ],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export declare function readConfigPath(config: IOwnedConfig<IConfigRecord>, path: string | readonly string[]): IConfigReadResult;"
@@ -9884,6 +9917,7 @@
             "const view = readonlyConfig(config);\nview.endpoint; // 正常读取；没有复制第二份配置\nview.retries = 5; // 抛 TypeError（CONFIG_READONLY）",
             "import { createManualScheduler, retry, withTimeout } from '@migaia/utils/promise';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst config = readonlyConfig(\n  patchConfig(ownConfig({ endpoint: '/v1', retries: 2, debug: true }), { debug: CONFIG_DELETE })\n);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return config.endpoint;\n      },\n      { maxAttempts: config.retries, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\nscheduler.advance(100);\nawait request.catch(() => undefined);"
           ],
+          "members": [],
           "exportPath": "./config",
           "overloadSignatures": [
             "export declare function readonlyConfig<T extends IConfigRecord>(value: IOwnedConfig<T>): T;"
@@ -10298,6 +10332,7 @@
             "attachErrorIdentity(new Error('boom'), { source: 'my-module', code: 'FETCH_FAILED' });",
             "import { once } from '@migaia/utils/function';\nimport { attachErrorIdentity } from '@migaia/utils/error';\n\nconst initOnce = once(() => {\n  try {\n    return dangerousInit();\n  } catch (error) {\n    throw attachErrorIdentity(error as Error, { source: 'my-module', code: 'INIT_FAILED' });\n  }\n});"
           ],
+          "members": [],
           "exportPath": "./error",
           "overloadSignatures": [
             "export declare function attachErrorIdentity<T extends Error>(error: T, identity: { readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; }): T;"
@@ -10589,6 +10624,7 @@
           "errors": ["No documented errors are declared for attachSecondaryErrors."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for attachSecondaryErrors.",
           "examples": [],
+          "members": [],
           "exportPath": "./error",
           "overloadSignatures": [
             "export declare function attachSecondaryErrors(primary: unknown, secondaryErrors: readonly unknown[]): unknown;"
@@ -10678,6 +10714,7 @@
             "combineErrors([err1, err2], 'batch failed'); // 0 个→undefined，1 个→原样，多个→AggregateError",
             "import { createConcurrencyLimiter, retry } from '@migaia/utils/promise';\nimport { combineErrors, toError } from '@migaia/utils/error';\n\nconst limiter = createConcurrencyLimiter({ concurrency: 4 });\nconst outcomes = await Promise.allSettled(\n  urls.map((url) =>\n    limiter.run(() =>\n      retry(() => fetch(url).then((r) => r.json()), { maxAttempts: 3, shouldRetry: () => true })\n    )\n  )\n);\nawait limiter.dispose();\n\nconst failed = combineErrors(\n  outcomes.filter((o) => o.status === 'rejected').map((o) => (o as PromiseRejectedResult).reason),\n  'some URLs failed'\n);\nif (failed) throw failed;"
           ],
+          "members": [],
           "exportPath": "./error",
           "overloadSignatures": [
             "export declare function combineErrors(errors: Iterable<unknown>, message: string): Error | undefined;"
@@ -10964,6 +11001,7 @@
           "errors": ["No documented errors are declared for isUtilsAbortError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isUtilsAbortError.",
           "examples": [],
+          "members": [],
           "exportPath": "./error",
           "overloadSignatures": [
             "export declare function isUtilsAbortError(value: unknown): value is UtilsAbortError;"
@@ -11234,6 +11272,7 @@
           "errors": ["No documented errors are declared for isUtilsError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isUtilsError.",
           "examples": [],
+          "members": [],
           "exportPath": "./error",
           "overloadSignatures": [
             "export declare function isUtilsError(value: unknown): value is UtilsError;"
@@ -11506,6 +11545,7 @@
           "examples": [
             "if (isUtilsTimeoutError(error)) console.log(error.scope, error.timeoutMs);"
           ],
+          "members": [],
           "exportPath": "./error",
           "overloadSignatures": [
             "export declare function isUtilsTimeoutError(value: unknown): value is UtilsTimeoutError;"
@@ -11781,6 +11821,7 @@
           "errors": ["No documented errors are declared for safeErrorReason."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for safeErrorReason.",
           "examples": [],
+          "members": [],
           "exportPath": "./error",
           "overloadSignatures": [
             "export declare function safeErrorReason(error: unknown, fallback: string): string;"
@@ -11867,6 +11908,7 @@
           "errors": ["No documented errors are declared for toError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for toError.",
           "examples": ["catch (value) { const error = toError(value); }"],
+          "members": [],
           "exportPath": "./error",
           "overloadSignatures": [
             "export declare function toError(value: unknown, options?: { readonly message?: string; }): Error;"
@@ -12199,6 +12241,16 @@
           "examples": [
             "throw new UtilsAbortError('user cancelled'); // 构造参数：reason?: unknown（存入 cause）\nthrow new UtilsTimeoutError('operation', 500); // 构造参数：scope: 'operation' | 'attempt' | 'total', timeoutMs: number（两者均必填）"
           ],
+          "members": [
+            {
+              "name": "name",
+              "kind": "property",
+              "signature": "readonly name: \"AbortError\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"AbortError\""
+            }
+          ],
           "exportPath": "./error",
           "overloadSignatures": [
             "export declare class UtilsAbortError extends UtilsError { readonly name: \"AbortError\"; constructor(reason?: unknown); }"
@@ -12483,6 +12535,24 @@
           "errors": ["No documented errors are declared for UtilsError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for UtilsError.",
           "examples": [],
+          "members": [
+            {
+              "name": "source",
+              "kind": "property",
+              "signature": "readonly source: \"@migaia/utils\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"@migaia/utils\""
+            },
+            {
+              "name": "code",
+              "kind": "property",
+              "signature": "readonly code: IUtilsErrorCode;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IUtilsErrorCode"
+            }
+          ],
           "exportPath": "./error",
           "overloadSignatures": [
             "export declare abstract class UtilsError extends Error { readonly source: \"@migaia/utils\"; readonly code: IUtilsErrorCode; protected constructor(code: IUtilsErrorCode, message: string, options?: { readonly cause?: unknown; }); }"
@@ -12814,6 +12884,32 @@
           "examples": [
             "throw new UtilsAbortError('user cancelled'); // 构造参数：reason?: unknown（存入 cause）\nthrow new UtilsTimeoutError('operation', 500); // 构造参数：scope: 'operation' | 'attempt' | 'total', timeoutMs: number（两者均必填）"
           ],
+          "members": [
+            {
+              "name": "scope",
+              "kind": "property",
+              "signature": "readonly scope: 'operation' | 'attempt' | 'total';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'operation' | 'attempt' | 'total'"
+            },
+            {
+              "name": "timeoutMs",
+              "kind": "property",
+              "signature": "readonly timeoutMs: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "name",
+              "kind": "property",
+              "signature": "readonly name: \"TimeoutError\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"TimeoutError\""
+            }
+          ],
           "exportPath": "./error",
           "overloadSignatures": [
             "export declare class UtilsTimeoutError extends UtilsError { readonly scope: 'operation' | 'attempt' | 'total'; readonly timeoutMs: number; readonly name: \"TimeoutError\"; constructor(scope: 'operation' | 'attempt' | 'total', timeoutMs: number); }"
@@ -13097,6 +13193,7 @@
             "try {\n  throw new Error('outer', { cause: new Error('inner') });\n} catch (error) {\n  walkErrorCauses(error); // [outerError, innerError]\n}",
             "walkErrorCauses(error); // [error, ...每一层 cause / AggregateError.errors]"
           ],
+          "members": [],
           "exportPath": "./error",
           "overloadSignatures": [
             "export declare function walkErrorCauses(error: unknown, options?: { readonly maxDepth?: number; }): readonly unknown[];"
@@ -13399,6 +13496,7 @@
           "errors": ["No documented errors are declared for assimilateCapturedThen."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assimilateCapturedThen.",
           "examples": [],
+          "members": [],
           "exportPath": "./function",
           "overloadSignatures": [
             "export declare function assimilateCapturedThen<T>(thenFn: (resolve: unknown, reject: unknown) => void, thenable: unknown): Promise<T>;"
@@ -13480,6 +13578,7 @@
           "errors": ["No documented errors are declared for inspectThenable."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for inspectThenable.",
           "examples": [],
+          "members": [],
           "exportPath": "./function",
           "overloadSignatures": [
             "export declare function inspectThenable(value: unknown): IThenableInspection;"
@@ -13550,6 +13649,7 @@
           "errors": ["No documented errors are declared for IThenableInspection."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThenableInspection.",
           "examples": [],
+          "members": [],
           "exportPath": "./function",
           "overloadSignatures": [
             "export type IThenableInspection = { readonly then: undefined; } | { readonly then: (resolve: unknown, reject: unknown) => void; } | { readonly error: unknown; };"
@@ -13612,6 +13712,7 @@
           "errors": ["No documented errors are declared for IThenableProbe."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThenableProbe.",
           "examples": [],
+          "members": [],
           "exportPath": "./function",
           "overloadSignatures": [
             "export type IThenableProbe = { readonly kind: typeof ThenableProbeKind.notThenable; } | { readonly kind: typeof ThenableProbeKind.thenable; readonly thenFn: (resolve: unknown, reject: unknown) => void; } | { readonly kind: typeof ThenableProbeKind.failed; readonly error: unknown; };"
@@ -13674,6 +13775,7 @@
           "errors": ["No documented errors are declared for IThenableProbeKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThenableProbeKind.",
           "examples": [],
+          "members": [],
           "exportPath": "./function",
           "overloadSignatures": [
             "export type IThenableProbeKind = (typeof ThenableProbeKind)[keyof typeof ThenableProbeKind];"
@@ -13740,6 +13842,7 @@
             "import { noop, once, onceAsync } from '@migaia/utils/function';",
             "const handler = options.onChange ?? noop;"
           ],
+          "members": [],
           "exportPath": "./function",
           "overloadSignatures": ["export declare const noop: () => undefined;"],
           "overloadParameterDetails": [[]],
@@ -13820,6 +13923,7 @@
           "errors": ["No documented errors are declared for observeThenableRejection."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for observeThenableRejection.",
           "examples": [],
+          "members": [],
           "exportPath": "./function",
           "overloadSignatures": [
             "export declare function observeThenableRejection(value: unknown, inspection: IThenableInspection, onRejected: (error: unknown) => void): void;"
@@ -13909,6 +14013,7 @@
             "// runtime.ts：整个模块只创建并导出这一份包装函数。\nexport const getRuntime = once(() => {\n  const registry = buildCommandRegistry();\n  return { registry, startedAt: Date.now() };\n});\n\nconst first = getRuntime(); // 创建 registry\nconst second = getRuntime(); // 直接返回 first\nfirst === second; // true",
             "import { once } from '@migaia/utils/function';\nimport { attachErrorIdentity } from '@migaia/utils/error';\n\nconst initOnce = once(() => {\n  try {\n    return dangerousInit();\n  } catch (error) {\n    throw attachErrorIdentity(error as Error, { source: 'my-module', code: 'INIT_FAILED' });\n  }\n});"
           ],
+          "members": [],
           "exportPath": "./function",
           "overloadSignatures": [
             "export declare function once<T extends (...args: never[]) => unknown>(functionValue: T): T;"
@@ -14000,6 +14105,7 @@
             "// app-config.ts：路由和埋点会同时读取启动配置，但网络请求只能发起一次。\nexport const loadAppConfig = onceAsync(async () => {\n  const response = await fetch('/config');\n  if (!response.ok) throw new Error(`config request failed: ${response.status}`);\n  return response.json() as Promise<{ apiBaseUrl: string }>;\n});\n\nconst [routerConfig, telemetryConfig] = await Promise.all([\n  loadAppConfig(),\n  loadAppConfig()\n]); // 两处共享同一次请求",
             "// app-config.ts：多个组件启动时都可能读取配置，但网络请求只能发起一次。\nexport const loadAppConfig = onceAsync(async () => {\n  const response = await fetch('/config');\n  if (!response.ok) throw new Error(`config request failed: ${response.status}`);\n  return response.json() as Promise<{ apiBaseUrl: string }>;\n});\n\nconst [routerConfig, telemetryConfig] = await Promise.all([\n  loadAppConfig(),\n  loadAppConfig()\n]); // 两处拿到同一次请求的结果"
           ],
+          "members": [],
           "exportPath": "./function",
           "overloadSignatures": [
             "export declare function onceAsync<T>(functionValue: () => Promise<T>): () => Promise<T>;"
@@ -14076,6 +14182,7 @@
           "errors": ["No documented errors are declared for probeThenable."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for probeThenable.",
           "examples": [],
+          "members": [],
           "exportPath": "./function",
           "overloadSignatures": [
             "export declare function probeThenable(value: unknown): IThenableProbe;"
@@ -14146,6 +14253,7 @@
           "errors": ["No documented errors are declared for ThenableProbeKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ThenableProbeKind.",
           "examples": [],
+          "members": [],
           "exportPath": "./function",
           "overloadSignatures": [
             "export declare const ThenableProbeKind: { readonly notThenable: \"not-thenable\"; readonly thenable: \"thenable\"; readonly failed: \"failed\"; };"
@@ -14233,6 +14341,7 @@
           "errors": ["No documented errors are declared for createNumberFormatter."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNumberFormatter.",
           "examples": [],
+          "members": [],
           "exportPath": "./number",
           "overloadSignatures": [
             "export declare function createNumberFormatter(options?: INumberFormatOptions): INumberFormatter;"
@@ -14344,6 +14453,7 @@
           "errors": ["No documented errors are declared for formatCompactNumber."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for formatCompactNumber.",
           "examples": [],
+          "members": [],
           "exportPath": "./number",
           "overloadSignatures": [
             "export declare function formatCompactNumber(value: INumericValue, options?: INumberFormatOptions): string;"
@@ -14471,6 +14581,7 @@
           "examples": [
             "import { format, formatCurrency, isEmptyValue, isPrimitive } from '@migaia/utils';\n\nisEmptyValue('  '); // true；0、false、0n 均为 false\nisPrimitive(Symbol('id')); // true\nformat('库存 {stock}，金额 {money}', { stock: 0, money: '¥12.00' });\nformatCurrency(1234.5, 'CNY', {\n  locales: 'zh',\n  format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }\n});"
           ],
+          "members": [],
           "exportPath": "./number",
           "overloadSignatures": [
             "export declare function formatCurrency(value: INumericValue, currency: string, options?: INumberFormatOptions): string;"
@@ -14592,6 +14703,7 @@
           "errors": ["No documented errors are declared for formatInteger."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for formatInteger.",
           "examples": [],
+          "members": [],
           "exportPath": "./number",
           "overloadSignatures": [
             "export declare function formatInteger(value: INumericValue, options?: INumberFormatOptions): string;"
@@ -14708,6 +14820,7 @@
           "errors": ["No documented errors are declared for formatNumber."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for formatNumber.",
           "examples": [],
+          "members": [],
           "exportPath": "./number",
           "overloadSignatures": [
             "export declare function formatNumber(value: INumericValue, options?: INumberFormatOptions): string;"
@@ -14824,6 +14937,7 @@
           "errors": ["No documented errors are declared for formatPercent."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for formatPercent.",
           "examples": [],
+          "members": [],
           "exportPath": "./number",
           "overloadSignatures": [
             "export declare function formatPercent(value: INumericValue, options?: INumberFormatOptions): string;"
@@ -14929,6 +15043,7 @@
           "errors": ["No documented errors are declared for INumberFormatOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for INumberFormatOptions.",
           "examples": [],
+          "members": [],
           "exportPath": "./number",
           "overloadSignatures": [
             "export type INumberFormatOptions = { /** Locale preference passed through canonical `Intl.getCanonicalLocales` normalization. */ readonly locales?: Intl.LocalesArgument; /** Native `Intl.NumberFormat` policy merged with the helper-specific defaults. */ readonly format?: Intl.NumberFormatOptions; };"
@@ -14991,6 +15106,7 @@
           "errors": ["No documented errors are declared for INumberFormatter."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for INumberFormatter.",
           "examples": [],
+          "members": [],
           "exportPath": "./number",
           "overloadSignatures": [
             "export type INumberFormatter = (value: INumericValue) => string;"
@@ -15053,6 +15169,7 @@
           "errors": ["No documented errors are declared for INumericValue."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for INumericValue.",
           "examples": [],
+          "members": [],
           "exportPath": "./number",
           "overloadSignatures": ["export type INumericValue = number | bigint;"],
           "overloadParameterDetails": [[]],
@@ -15140,6 +15257,7 @@
           "examples": [
             "const callback = () => 1;\nconst source = {\n  safe: { count: 1 },\n  callback,\n  get status() {\n    return 'ready';\n  }\n};\nconst { value, diagnostics } = diagnosticSnapshot(source);\n\nvalue.safe !== source.safe; // true：普通对象已复制\nvalue.callback === callback; // true：不支持的函数保留原引用\nvalue.status; // 'ready'：accessor 被读取并投影为普通值\ndiagnostics;\n// [\n//   { path: ['callback'], reason: 'unsupported', cause: callback },\n//   { path: ['status'], reason: 'accessor', cause: 'ready' }\n// ]"
           ],
+          "members": [],
           "exportPath": "./object",
           "overloadSignatures": [
             "export declare function diagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;"
@@ -15216,6 +15334,7 @@
           "errors": ["No documented errors are declared for identitySnapshot."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for identitySnapshot.",
           "examples": [],
+          "members": [],
           "exportPath": "./object",
           "overloadSignatures": ["export declare function identitySnapshot<T>(value: T): T;"],
           "overloadParameterDetails": [
@@ -15286,6 +15405,7 @@
           "examples": [
             "type ISnapshotDiagnostic = {\n  readonly path: readonly PropertyKey[];\n  readonly reason: 'accessor' | 'read-failed' | 'unsupported';\n  readonly cause: unknown;\n};\ntype IDiagnosticSnapshot<T> = {\n  readonly value: T;\n  readonly diagnostics: readonly ISnapshotDiagnostic[];\n};\nfunction diagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;\nfunction structuredDiagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;"
           ],
+          "members": [],
           "exportPath": "./object",
           "overloadSignatures": [
             "export type IDiagnosticSnapshot<T> = { readonly value: T; readonly diagnostics: readonly ISnapshotDiagnostic[]; };"
@@ -15357,6 +15477,7 @@
             "const shared = { count: 1 };\nconst source = {\n  primary: shared,\n  alias: shared,\n  createdAt: new Date('2026-01-01T00:00:00Z')\n};\nconst copy = immutableSnapshot(source);\n\nsource.primary.count = 2;\ncopy.primary.count; // 1\ncopy.primary === copy.alias; // true\ncopy.createdAt instanceof Date; // true\nObject.isFrozen(copy); // false",
             "const shared = { count: 1 };\nconst source = {\n  primary: shared,\n  alias: shared,\n  createdAt: new Date('2026-01-01T00:00:00Z'),\n  labels: new Map([['lang', 'zh']])\n};\nconst copy = immutableSnapshot(source);\n\nsource.primary.count = 2;\ncopy.primary.count; // 1：源对象修改不会回写快照\ncopy.primary === copy.alias; // true：共享引用关系被保留\ncopy.createdAt instanceof Date; // true：不是 JSON 字符串\nObject.isFrozen(copy); // false：独立副本不等于冻结对象"
           ],
+          "members": [],
           "exportPath": "./object",
           "overloadSignatures": ["export declare function immutableSnapshot<T>(value: T): T;"],
           "overloadParameterDetails": [
@@ -15425,6 +15546,7 @@
           "errors": ["No documented errors are declared for IOwnDescriptorsSnapshot."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IOwnDescriptorsSnapshot.",
           "examples": [],
+          "members": [],
           "exportPath": "./object",
           "overloadSignatures": [
             "export type IOwnDescriptorsSnapshot = { readonly kind: 'captured'; readonly ok: true; readonly descriptors: Readonly<Record<PropertyKey, PropertyDescriptor>>; } | { readonly kind: 'failed'; readonly ok: false; readonly error: unknown; };"
@@ -15490,6 +15612,7 @@
             "type IProbePropertyResult<T> =\n  | { readonly kind: 'missing' }\n  | { readonly kind: 'value'; readonly value: T }\n  | { readonly kind: 'failed'; readonly error: unknown };\nfunction probeProperty<T>(value: object, key: PropertyKey): IProbePropertyResult<T>;",
             "import type {\n  IDiscriminatedByField,\n  IDiscriminatedByPath,\n  IObjectPath,\n  IObjectPathInput,\n  IObjectPathSegment,\n  IObjectPathTuple,\n  IObjectPathTupleFor,\n  IObjectPathValue,\n  IObjectPathWriteValue,\n  IProbePropertyResult,\n  IAbortSignal,\n  IDeferred\n} from '@migaia/utils/typing';"
           ],
+          "members": [],
           "exportPath": "./object",
           "overloadSignatures": [
             "export type IProbePropertyResult<T> = { readonly kind: 'missing'; } | { readonly kind: 'value'; readonly value: T; } | { readonly kind: 'failed'; readonly error: unknown; };"
@@ -15554,6 +15677,7 @@
           "examples": [
             "type ISnapshotDiagnostic = {\n  readonly path: readonly PropertyKey[];\n  readonly reason: 'accessor' | 'read-failed' | 'unsupported';\n  readonly cause: unknown;\n};\ntype IDiagnosticSnapshot<T> = {\n  readonly value: T;\n  readonly diagnostics: readonly ISnapshotDiagnostic[];\n};\nfunction diagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;\nfunction structuredDiagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;"
           ],
+          "members": [],
           "exportPath": "./object",
           "overloadSignatures": [
             "export type ISnapshotDiagnostic = { readonly path: readonly PropertyKey[]; readonly reason: 'accessor' | 'read-failed' | 'unsupported'; readonly cause: unknown; };"
@@ -15624,6 +15748,7 @@
           "examples": [
             "isPlainObject({}); // true\nisPlainObject([]); // false\nisPlainObject(new Date()); // false"
           ],
+          "members": [],
           "exportPath": "./object",
           "overloadSignatures": [
             "export declare function isPlainObject(value: unknown): value is Record<PropertyKey, unknown>;"
@@ -15708,6 +15833,7 @@
             "const profileUnavailable = new Error('profile unavailable');\nlet profileReads = 0;\nconst user = {\n  name: 'Ada',\n  get profile(): never {\n    profileReads += 1;\n    throw profileUnavailable;\n  }\n};\n\nfunction readLabel(value: object, key: PropertyKey): string {\n  const result = probeProperty<string>(value, key);\n  switch (result.kind) {\n    case 'value':\n      return result.value;\n    case 'missing':\n      return 'Anonymous';\n    case 'failed':\n      console.error('property read failed', result.error);\n      return 'Unavailable';\n  }\n}\n\nreadLabel(user, 'name'); // 'Ada'\nreadLabel(user, 'email'); // 'Anonymous'\nreadLabel(user, 'profile'); // 'Unavailable'\nprofileReads; // 1：getter 只被读取一次",
             "const profileUnavailable = new Error('profile unavailable');\nlet profileReads = 0;\nconst user = {\n  name: 'Ada',\n  get profile(): never {\n    profileReads += 1;\n    throw profileUnavailable;\n  }\n};\n\nfunction readLabel(value: object, key: PropertyKey): string {\n  const result = probeProperty<string>(value, key);\n  switch (result.kind) {\n    case 'value':\n      return result.value;\n    case 'missing':\n      return 'Anonymous';\n    case 'failed':\n      console.error('property read failed', result.error);\n      return 'Unavailable';\n  }\n}\n\nreadLabel(user, 'name'); // 'Ada'：读取成功，消费 value\nreadLabel(user, 'email'); // 'Anonymous'：字段不存在，走业务默认值\nreadLabel(user, 'profile'); // 'Unavailable'：getter 异常被显式上报\nprofileReads; // 1：probeProperty 没有为了判断结果而重复触发 getter"
           ],
+          "members": [],
           "exportPath": "./object",
           "overloadSignatures": [
             "export declare function probeProperty<T>(value: object, key: PropertyKey): IProbePropertyResult<T>;"
@@ -15789,6 +15915,7 @@
           "errors": ["No documented errors are declared for snapshotOwnDescriptors."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for snapshotOwnDescriptors.",
           "examples": [],
+          "members": [],
           "exportPath": "./object",
           "overloadSignatures": [
             "export declare function snapshotOwnDescriptors(value: unknown): IOwnDescriptorsSnapshot;"
@@ -15865,6 +15992,7 @@
           "errors": ["No documented errors are declared for structuredDiagnosticSnapshot."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for structuredDiagnosticSnapshot.",
           "examples": [],
+          "members": [],
           "exportPath": "./object",
           "overloadSignatures": [
             "export declare function structuredDiagnosticSnapshot<T>(value: T): IDiagnosticSnapshot<T>;"
@@ -16189,6 +16317,7 @@
             "const accessor = createPathAccessor(\n  { count: 0 },\n  { onSet: (event) => console.log('write', event.originKey, event.value) }\n);\naccessor.set('count', 5); // 打印 write count 5\naccessor.value; // { count: 5 }",
             "const accessor = createPathAccessor({ count: 0 });\naccessor.set('count', 5);\naccessor.value; // { count: 5 }"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export declare function createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>;"
@@ -16353,6 +16482,7 @@
             "const data = {\n  user: { name: 'Ada' },\n  settings: { theme: 'dark' }\n};\nget(data, 'user.name'); // 'Ada'：只读，不修改 data\n\nconst next = set(data, 'user.name', 'Grace');\nnext !== data; // true：值发生变化时，每次 set 都返回新根对象\nnext.user !== data.user; // true：路径上的对象被浅拷贝\nnext.settings === data.settings; // true：未修改分支继续共享引用\ndata.user.name; // 'Ada'：原对象保持不变\nObject.isFrozen(next); // false：immutable update 不等于 freeze",
             "import { get, set } from '@migaia/utils/object';\nimport { ownConfig, patchConfig } from '@migaia/utils/config';\n\nconst config = ownConfig({ server: { host: 'localhost', port: 8080 } });\n// patchConfig 只在根一层生效，嵌套修改先在应用层用 set() 算好整棵子树\nconst nextServer = set(get(config, 'server')!, 'port', 9090);\nconst next = patchConfig(config, { server: nextServer });"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export declare function get<T, P extends IObjectPathInput<T>>(object: T, path: P): IObjectPathValue<T, P> | undefined;"
@@ -16578,6 +16708,7 @@
             "/** 按一个 string 或 tuple 对象路径对联合类型分组，路径解析规则与 /object 模块的 IObjectPath 完全一致。 */\ntype IDiscriminatedByPath<T, P extends IObjectPathInput<T>> = {\n  [K in Extract<IObjectPathValue<T, P>, PropertyKey>]: IExtractDiscriminatedByPath<T, P, K>;\n};",
             "import type {\n  IDiscriminatedByField,\n  IDiscriminatedByPath,\n  IObjectPath,\n  IObjectPathInput,\n  IObjectPathSegment,\n  IObjectPathTuple,\n  IObjectPathTupleFor,\n  IObjectPathValue,\n  IObjectPathWriteValue,\n  IProbePropertyResult,\n  IAbortSignal,\n  IDeferred\n} from '@migaia/utils/typing';"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export type IObjectPath<T, D extends readonly unknown[] = IPathDepth> = D extends readonly [] ? never : T extends readonly unknown[] ? `[${number}]` | `[${number}].${IObjectPath<IArrayValue<T>, IShift<D>>}` : T extends object ? { [K in IStringKey<T>]: K | (IObjectPath<T[K], IShift<D>> extends infer P extends string ? IJoinPath<K, P> : never); }[IStringKey<T>] : never;"
@@ -16648,6 +16779,7 @@
             "type ICollectorActions<T, Self> = {\n  readonly result: readonly T[];\n  fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(\n    ...paths: P\n  ): IFieldCollector<T, P[number]>;\n  where(predicate: (source: T) => boolean): Self;\n  distinctBy<P extends IObjectPathInput<T>>(path: P): Self;\n  skip(count: number): Self;\n  take(count: number): Self;\n};\n\ninterface ICollector<T> extends ICollectorActions<T, ICollector<T>> {}\n\ninterface IFieldCollector<T, P extends IObjectPathInput<T>>\n  extends ICollectorActions<T, IFieldCollector<T, P>> {\n  like(query: string): IFieldCollector<T, P>;\n  equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>;\n  oneOf(\n    value: IObjectPathValue<T, P>,\n    ...values: IObjectPathValue<T, P>[]\n  ): IFieldCollector<T, P>;\n}\n\nfunction collect<T>(dataSource: readonly T[]): ICollector<T>;",
             "import type {\n  IDiscriminatedByField,\n  IDiscriminatedByPath,\n  IObjectPath,\n  IObjectPathInput,\n  IObjectPathSegment,\n  IObjectPathTuple,\n  IObjectPathTupleFor,\n  IObjectPathValue,\n  IObjectPathWriteValue,\n  IProbePropertyResult,\n  IAbortSignal,\n  IDeferred\n} from '@migaia/utils/typing';"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export type IObjectPathInput<T> = IObjectPath<T> | IObjectPathTupleFor<T>;"
@@ -16713,6 +16845,7 @@
             "type IPathValueProbe<T, P extends IObjectPathInput<T>> = {\n  readonly kind: 'value';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly value: IObjectPathValue<T, P>;\n};\ntype IPathMissingProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {\n  readonly kind: 'missing';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly failedAt: number;\n  readonly failedKey: IObjectPathSegment;\n  readonly resolvedPath: IObjectPathTuple;\n  readonly parent: unknown;\n};\ntype IPathBlockedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {\n  readonly kind: 'blocked';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly failedAt: number;\n  readonly failedKey: IObjectPathSegment;\n  readonly resolvedPath: IObjectPathTuple;\n  readonly parent: unknown;\n};\ntype IPathFailedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {\n  readonly kind: 'failed';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly failedAt: number;\n  readonly failedKey: IObjectPathSegment;\n  readonly resolvedPath: IObjectPathTuple;\n  readonly parent: unknown;\n  readonly error: unknown;\n};\ntype IPathProbe<T, P extends IObjectPathInput<T>> =\n  | IPathValueProbe<T, P>\n  | IPathMissingProbe<P>\n  | IPathBlockedProbe<P>\n  | IPathFailedProbe<P>;\n\nfunction probeObjectPath<T, P extends IObjectPathInput<T>>(object: T, path: P): IPathProbe<T, P>;\nfunction probeObjectPathSegments<T, P extends IObjectPathInput<T>>(\n  object: T,\n  segments: P\n): IPathProbe<T, P>;",
             "import type {\n  IDiscriminatedByField,\n  IDiscriminatedByPath,\n  IObjectPath,\n  IObjectPathInput,\n  IObjectPathSegment,\n  IObjectPathTuple,\n  IObjectPathTupleFor,\n  IObjectPathValue,\n  IObjectPathWriteValue,\n  IProbePropertyResult,\n  IAbortSignal,\n  IDeferred\n} from '@migaia/utils/typing';"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": ["export type IObjectPathSegment = string | number | symbol;"],
           "overloadParameterDetails": [[]],
@@ -16778,6 +16911,7 @@
             "type IPathGetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathValue<T, P>;\n  replace(value: IObjectPathValue<T, P>): void;\n};\ntype IPathSetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathWriteValue<T, P>;\n  replace(value: IObjectPathWriteValue<T, P>): void;\n};\ntype IPathAccessorOptions<T> = {\n  readonly ifMissing?: (probe: IPathMissingProbe) => void;\n  readonly ifBlocked?: (probe: IPathBlockedProbe) => void;\n  readonly ifFailed?: (probe: IPathFailedProbe) => void;\n  readonly onGet?: (event: IPathGetEvent<T>) => void;\n  readonly onSet?: (event: IPathSetEvent<T>) => void;\n};\ntype IPathAccessor<T> = {\n  readonly value: T;\n  get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined;\n  set<P extends IObjectPathInput<T>>(path: P, value: IObjectPathWriteValue<T, P>): T;\n  probeValue<P extends IObjectPathInput<T>>(path: P): IPathProbe<T, P>;\n  parsePath(path: string | IObjectPathTuple): IObjectPathTuple;\n};\nfunction createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>;",
             "import type {\n  IDiscriminatedByField,\n  IDiscriminatedByPath,\n  IObjectPath,\n  IObjectPathInput,\n  IObjectPathSegment,\n  IObjectPathTuple,\n  IObjectPathTupleFor,\n  IObjectPathValue,\n  IObjectPathWriteValue,\n  IProbePropertyResult,\n  IAbortSignal,\n  IDeferred\n} from '@migaia/utils/typing';"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": ["export type IObjectPathTuple = readonly IObjectPathSegment[];"],
           "overloadParameterDetails": [[]],
@@ -16840,6 +16974,7 @@
           "examples": [
             "import type {\n  IDiscriminatedByField,\n  IDiscriminatedByPath,\n  IObjectPath,\n  IObjectPathInput,\n  IObjectPathSegment,\n  IObjectPathTuple,\n  IObjectPathTupleFor,\n  IObjectPathValue,\n  IObjectPathWriteValue,\n  IProbePropertyResult,\n  IAbortSignal,\n  IDeferred\n} from '@migaia/utils/typing';"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export type IObjectPathTupleFor<T, D extends readonly unknown[] = IPathDepth> = D extends readonly [] ? never : T extends readonly (infer V)[] ? readonly [number] | IPrefixTuple<number, IObjectPathTupleFor<NonNullable<V>, IShift<D>>> : T extends object ? { [K in keyof T]: readonly [K] | IPrefixTuple<K, IObjectPathTupleFor<NonNullable<T[K]>, IShift<D>>>; }[keyof T] : never;"
@@ -16909,6 +17044,7 @@
             "type ICollectorActions<T, Self> = {\n  readonly result: readonly T[];\n  fieldBy<const P extends readonly [IObjectPathInput<T>, ...IObjectPathInput<T>[]]>(\n    ...paths: P\n  ): IFieldCollector<T, P[number]>;\n  where(predicate: (source: T) => boolean): Self;\n  distinctBy<P extends IObjectPathInput<T>>(path: P): Self;\n  skip(count: number): Self;\n  take(count: number): Self;\n};\n\ninterface ICollector<T> extends ICollectorActions<T, ICollector<T>> {}\n\ninterface IFieldCollector<T, P extends IObjectPathInput<T>>\n  extends ICollectorActions<T, IFieldCollector<T, P>> {\n  like(query: string): IFieldCollector<T, P>;\n  equals(value: IObjectPathValue<T, P>): IFieldCollector<T, P>;\n  oneOf(\n    value: IObjectPathValue<T, P>,\n    ...values: IObjectPathValue<T, P>[]\n  ): IFieldCollector<T, P>;\n}\n\nfunction collect<T>(dataSource: readonly T[]): ICollector<T>;",
             "import type {\n  IDiscriminatedByField,\n  IDiscriminatedByPath,\n  IObjectPath,\n  IObjectPathInput,\n  IObjectPathSegment,\n  IObjectPathTuple,\n  IObjectPathTupleFor,\n  IObjectPathValue,\n  IObjectPathWriteValue,\n  IProbePropertyResult,\n  IAbortSignal,\n  IDeferred\n} from '@migaia/utils/typing';"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export type IObjectPathValue<T, P extends IObjectPath<T> | IObjectPathTuple> = P extends string ? IStringPathValue<T, P> : P extends IObjectPathTuple ? ITuplePathValue<T, P> : never;"
@@ -16975,6 +17111,7 @@
             "type IPathGetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathValue<T, P>;\n  replace(value: IObjectPathValue<T, P>): void;\n};\ntype IPathSetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathWriteValue<T, P>;\n  replace(value: IObjectPathWriteValue<T, P>): void;\n};\ntype IPathAccessorOptions<T> = {\n  readonly ifMissing?: (probe: IPathMissingProbe) => void;\n  readonly ifBlocked?: (probe: IPathBlockedProbe) => void;\n  readonly ifFailed?: (probe: IPathFailedProbe) => void;\n  readonly onGet?: (event: IPathGetEvent<T>) => void;\n  readonly onSet?: (event: IPathSetEvent<T>) => void;\n};\ntype IPathAccessor<T> = {\n  readonly value: T;\n  get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined;\n  set<P extends IObjectPathInput<T>>(path: P, value: IObjectPathWriteValue<T, P>): T;\n  probeValue<P extends IObjectPathInput<T>>(path: P): IPathProbe<T, P>;\n  parsePath(path: string | IObjectPathTuple): IObjectPathTuple;\n};\nfunction createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>;",
             "import type {\n  IDiscriminatedByField,\n  IDiscriminatedByPath,\n  IObjectPath,\n  IObjectPathInput,\n  IObjectPathSegment,\n  IObjectPathTuple,\n  IObjectPathTupleFor,\n  IObjectPathValue,\n  IObjectPathWriteValue,\n  IProbePropertyResult,\n  IAbortSignal,\n  IDeferred\n} from '@migaia/utils/typing';"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export type IObjectPathWriteValue<T, P extends IObjectPath<T> | IObjectPathTuple> = IObjectPathWritableLeaf<IObjectPathValue<T, P>>;"
@@ -17039,6 +17176,7 @@
           "examples": [
             "type IPathGetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathValue<T, P>;\n  replace(value: IObjectPathValue<T, P>): void;\n};\ntype IPathSetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathWriteValue<T, P>;\n  replace(value: IObjectPathWriteValue<T, P>): void;\n};\ntype IPathAccessorOptions<T> = {\n  readonly ifMissing?: (probe: IPathMissingProbe) => void;\n  readonly ifBlocked?: (probe: IPathBlockedProbe) => void;\n  readonly ifFailed?: (probe: IPathFailedProbe) => void;\n  readonly onGet?: (event: IPathGetEvent<T>) => void;\n  readonly onSet?: (event: IPathSetEvent<T>) => void;\n};\ntype IPathAccessor<T> = {\n  readonly value: T;\n  get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined;\n  set<P extends IObjectPathInput<T>>(path: P, value: IObjectPathWriteValue<T, P>): T;\n  probeValue<P extends IObjectPathInput<T>>(path: P): IPathProbe<T, P>;\n  parsePath(path: string | IObjectPathTuple): IObjectPathTuple;\n};\nfunction createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>;"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export type IPathAccessor<T> = { readonly value: T; get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined; set<P extends IObjectPathInput<T>>(path: P, value: IObjectPathWriteValue<T, P>): T; probeValue<P extends IObjectPathInput<T>>(path: P): IPathProbe<T, P>; parsePath(path: string | IObjectPathTuple): IObjectPathTuple; };"
@@ -17103,6 +17241,7 @@
           "examples": [
             "type IPathGetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathValue<T, P>;\n  replace(value: IObjectPathValue<T, P>): void;\n};\ntype IPathSetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathWriteValue<T, P>;\n  replace(value: IObjectPathWriteValue<T, P>): void;\n};\ntype IPathAccessorOptions<T> = {\n  readonly ifMissing?: (probe: IPathMissingProbe) => void;\n  readonly ifBlocked?: (probe: IPathBlockedProbe) => void;\n  readonly ifFailed?: (probe: IPathFailedProbe) => void;\n  readonly onGet?: (event: IPathGetEvent<T>) => void;\n  readonly onSet?: (event: IPathSetEvent<T>) => void;\n};\ntype IPathAccessor<T> = {\n  readonly value: T;\n  get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined;\n  set<P extends IObjectPathInput<T>>(path: P, value: IObjectPathWriteValue<T, P>): T;\n  probeValue<P extends IObjectPathInput<T>>(path: P): IPathProbe<T, P>;\n  parsePath(path: string | IObjectPathTuple): IObjectPathTuple;\n};\nfunction createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>;"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export type IPathAccessorOptions<T> = { readonly ifMissing?: (probe: IPathMissingProbe) => void; readonly ifBlocked?: (probe: IPathBlockedProbe) => void; readonly ifFailed?: (probe: IPathFailedProbe) => void; readonly onGet?: (event: IStringGetEvent<T> | ITupleGetEvent<T>) => void; readonly onSet?: (event: IStringSetEvent<T> | ITupleSetEvent<T>) => void; };"
@@ -17168,6 +17307,7 @@
             "type IPathValueProbe<T, P extends IObjectPathInput<T>> = {\n  readonly kind: 'value';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly value: IObjectPathValue<T, P>;\n};\ntype IPathMissingProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {\n  readonly kind: 'missing';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly failedAt: number;\n  readonly failedKey: IObjectPathSegment;\n  readonly resolvedPath: IObjectPathTuple;\n  readonly parent: unknown;\n};\ntype IPathBlockedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {\n  readonly kind: 'blocked';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly failedAt: number;\n  readonly failedKey: IObjectPathSegment;\n  readonly resolvedPath: IObjectPathTuple;\n  readonly parent: unknown;\n};\ntype IPathFailedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {\n  readonly kind: 'failed';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly failedAt: number;\n  readonly failedKey: IObjectPathSegment;\n  readonly resolvedPath: IObjectPathTuple;\n  readonly parent: unknown;\n  readonly error: unknown;\n};\ntype IPathProbe<T, P extends IObjectPathInput<T>> =\n  | IPathValueProbe<T, P>\n  | IPathMissingProbe<P>\n  | IPathBlockedProbe<P>\n  | IPathFailedProbe<P>;\n\nfunction probeObjectPath<T, P extends IObjectPathInput<T>>(object: T, path: P): IPathProbe<T, P>;\nfunction probeObjectPathSegments<T, P extends IObjectPathInput<T>>(\n  object: T,\n  segments: P\n): IPathProbe<T, P>;",
             "type IPathGetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathValue<T, P>;\n  replace(value: IObjectPathValue<T, P>): void;\n};\ntype IPathSetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathWriteValue<T, P>;\n  replace(value: IObjectPathWriteValue<T, P>): void;\n};\ntype IPathAccessorOptions<T> = {\n  readonly ifMissing?: (probe: IPathMissingProbe) => void;\n  readonly ifBlocked?: (probe: IPathBlockedProbe) => void;\n  readonly ifFailed?: (probe: IPathFailedProbe) => void;\n  readonly onGet?: (event: IPathGetEvent<T>) => void;\n  readonly onSet?: (event: IPathSetEvent<T>) => void;\n};\ntype IPathAccessor<T> = {\n  readonly value: T;\n  get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined;\n  set<P extends IObjectPathInput<T>>(path: P, value: IObjectPathWriteValue<T, P>): T;\n  probeValue<P extends IObjectPathInput<T>>(path: P): IPathProbe<T, P>;\n  parsePath(path: string | IObjectPathTuple): IObjectPathTuple;\n};\nfunction createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>;"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export type IPathBlockedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = { readonly kind: 'blocked'; readonly originKey: P; readonly segments: IObjectPathTuple; readonly failedAt: number; readonly failedKey: IObjectPathSegment; readonly resolvedPath: IObjectPathTuple; readonly parent: unknown; };"
@@ -17233,6 +17373,7 @@
             "type IPathValueProbe<T, P extends IObjectPathInput<T>> = {\n  readonly kind: 'value';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly value: IObjectPathValue<T, P>;\n};\ntype IPathMissingProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {\n  readonly kind: 'missing';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly failedAt: number;\n  readonly failedKey: IObjectPathSegment;\n  readonly resolvedPath: IObjectPathTuple;\n  readonly parent: unknown;\n};\ntype IPathBlockedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {\n  readonly kind: 'blocked';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly failedAt: number;\n  readonly failedKey: IObjectPathSegment;\n  readonly resolvedPath: IObjectPathTuple;\n  readonly parent: unknown;\n};\ntype IPathFailedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {\n  readonly kind: 'failed';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly failedAt: number;\n  readonly failedKey: IObjectPathSegment;\n  readonly resolvedPath: IObjectPathTuple;\n  readonly parent: unknown;\n  readonly error: unknown;\n};\ntype IPathProbe<T, P extends IObjectPathInput<T>> =\n  | IPathValueProbe<T, P>\n  | IPathMissingProbe<P>\n  | IPathBlockedProbe<P>\n  | IPathFailedProbe<P>;\n\nfunction probeObjectPath<T, P extends IObjectPathInput<T>>(object: T, path: P): IPathProbe<T, P>;\nfunction probeObjectPathSegments<T, P extends IObjectPathInput<T>>(\n  object: T,\n  segments: P\n): IPathProbe<T, P>;",
             "type IPathGetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathValue<T, P>;\n  replace(value: IObjectPathValue<T, P>): void;\n};\ntype IPathSetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathWriteValue<T, P>;\n  replace(value: IObjectPathWriteValue<T, P>): void;\n};\ntype IPathAccessorOptions<T> = {\n  readonly ifMissing?: (probe: IPathMissingProbe) => void;\n  readonly ifBlocked?: (probe: IPathBlockedProbe) => void;\n  readonly ifFailed?: (probe: IPathFailedProbe) => void;\n  readonly onGet?: (event: IPathGetEvent<T>) => void;\n  readonly onSet?: (event: IPathSetEvent<T>) => void;\n};\ntype IPathAccessor<T> = {\n  readonly value: T;\n  get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined;\n  set<P extends IObjectPathInput<T>>(path: P, value: IObjectPathWriteValue<T, P>): T;\n  probeValue<P extends IObjectPathInput<T>>(path: P): IPathProbe<T, P>;\n  parsePath(path: string | IObjectPathTuple): IObjectPathTuple;\n};\nfunction createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>;"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export type IPathFailedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = { readonly kind: 'failed'; readonly originKey: P; readonly segments: IObjectPathTuple; readonly failedAt: number; readonly failedKey: IObjectPathSegment; readonly resolvedPath: IObjectPathTuple; readonly parent: unknown; readonly error: unknown; };"
@@ -17297,6 +17438,7 @@
           "examples": [
             "type IPathGetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathValue<T, P>;\n  replace(value: IObjectPathValue<T, P>): void;\n};\ntype IPathSetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathWriteValue<T, P>;\n  replace(value: IObjectPathWriteValue<T, P>): void;\n};\ntype IPathAccessorOptions<T> = {\n  readonly ifMissing?: (probe: IPathMissingProbe) => void;\n  readonly ifBlocked?: (probe: IPathBlockedProbe) => void;\n  readonly ifFailed?: (probe: IPathFailedProbe) => void;\n  readonly onGet?: (event: IPathGetEvent<T>) => void;\n  readonly onSet?: (event: IPathSetEvent<T>) => void;\n};\ntype IPathAccessor<T> = {\n  readonly value: T;\n  get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined;\n  set<P extends IObjectPathInput<T>>(path: P, value: IObjectPathWriteValue<T, P>): T;\n  probeValue<P extends IObjectPathInput<T>>(path: P): IPathProbe<T, P>;\n  parsePath(path: string | IObjectPathTuple): IObjectPathTuple;\n};\nfunction createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>;"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export type IPathGetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = { readonly originKey: P; readonly segments: IObjectPathTuple; readonly probe: IPathValueProbe<T, P>; readonly value: IObjectPathValue<T, P>; replace(value: IObjectPathValue<T, P>): void; };"
@@ -17362,6 +17504,7 @@
             "type IPathValueProbe<T, P extends IObjectPathInput<T>> = {\n  readonly kind: 'value';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly value: IObjectPathValue<T, P>;\n};\ntype IPathMissingProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {\n  readonly kind: 'missing';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly failedAt: number;\n  readonly failedKey: IObjectPathSegment;\n  readonly resolvedPath: IObjectPathTuple;\n  readonly parent: unknown;\n};\ntype IPathBlockedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {\n  readonly kind: 'blocked';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly failedAt: number;\n  readonly failedKey: IObjectPathSegment;\n  readonly resolvedPath: IObjectPathTuple;\n  readonly parent: unknown;\n};\ntype IPathFailedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {\n  readonly kind: 'failed';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly failedAt: number;\n  readonly failedKey: IObjectPathSegment;\n  readonly resolvedPath: IObjectPathTuple;\n  readonly parent: unknown;\n  readonly error: unknown;\n};\ntype IPathProbe<T, P extends IObjectPathInput<T>> =\n  | IPathValueProbe<T, P>\n  | IPathMissingProbe<P>\n  | IPathBlockedProbe<P>\n  | IPathFailedProbe<P>;\n\nfunction probeObjectPath<T, P extends IObjectPathInput<T>>(object: T, path: P): IPathProbe<T, P>;\nfunction probeObjectPathSegments<T, P extends IObjectPathInput<T>>(\n  object: T,\n  segments: P\n): IPathProbe<T, P>;",
             "type IPathGetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathValue<T, P>;\n  replace(value: IObjectPathValue<T, P>): void;\n};\ntype IPathSetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathWriteValue<T, P>;\n  replace(value: IObjectPathWriteValue<T, P>): void;\n};\ntype IPathAccessorOptions<T> = {\n  readonly ifMissing?: (probe: IPathMissingProbe) => void;\n  readonly ifBlocked?: (probe: IPathBlockedProbe) => void;\n  readonly ifFailed?: (probe: IPathFailedProbe) => void;\n  readonly onGet?: (event: IPathGetEvent<T>) => void;\n  readonly onSet?: (event: IPathSetEvent<T>) => void;\n};\ntype IPathAccessor<T> = {\n  readonly value: T;\n  get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined;\n  set<P extends IObjectPathInput<T>>(path: P, value: IObjectPathWriteValue<T, P>): T;\n  probeValue<P extends IObjectPathInput<T>>(path: P): IPathProbe<T, P>;\n  parsePath(path: string | IObjectPathTuple): IObjectPathTuple;\n};\nfunction createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>;"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export type IPathMissingProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = { readonly kind: 'missing'; readonly originKey: P; readonly segments: IObjectPathTuple; readonly failedAt: number; readonly failedKey: IObjectPathSegment; readonly resolvedPath: IObjectPathTuple; readonly parent: unknown; };"
@@ -17427,6 +17570,7 @@
             "type IPathValueProbe<T, P extends IObjectPathInput<T>> = {\n  readonly kind: 'value';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly value: IObjectPathValue<T, P>;\n};\ntype IPathMissingProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {\n  readonly kind: 'missing';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly failedAt: number;\n  readonly failedKey: IObjectPathSegment;\n  readonly resolvedPath: IObjectPathTuple;\n  readonly parent: unknown;\n};\ntype IPathBlockedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {\n  readonly kind: 'blocked';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly failedAt: number;\n  readonly failedKey: IObjectPathSegment;\n  readonly resolvedPath: IObjectPathTuple;\n  readonly parent: unknown;\n};\ntype IPathFailedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {\n  readonly kind: 'failed';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly failedAt: number;\n  readonly failedKey: IObjectPathSegment;\n  readonly resolvedPath: IObjectPathTuple;\n  readonly parent: unknown;\n  readonly error: unknown;\n};\ntype IPathProbe<T, P extends IObjectPathInput<T>> =\n  | IPathValueProbe<T, P>\n  | IPathMissingProbe<P>\n  | IPathBlockedProbe<P>\n  | IPathFailedProbe<P>;\n\nfunction probeObjectPath<T, P extends IObjectPathInput<T>>(object: T, path: P): IPathProbe<T, P>;\nfunction probeObjectPathSegments<T, P extends IObjectPathInput<T>>(\n  object: T,\n  segments: P\n): IPathProbe<T, P>;",
             "type IPathGetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathValue<T, P>;\n  replace(value: IObjectPathValue<T, P>): void;\n};\ntype IPathSetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathWriteValue<T, P>;\n  replace(value: IObjectPathWriteValue<T, P>): void;\n};\ntype IPathAccessorOptions<T> = {\n  readonly ifMissing?: (probe: IPathMissingProbe) => void;\n  readonly ifBlocked?: (probe: IPathBlockedProbe) => void;\n  readonly ifFailed?: (probe: IPathFailedProbe) => void;\n  readonly onGet?: (event: IPathGetEvent<T>) => void;\n  readonly onSet?: (event: IPathSetEvent<T>) => void;\n};\ntype IPathAccessor<T> = {\n  readonly value: T;\n  get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined;\n  set<P extends IObjectPathInput<T>>(path: P, value: IObjectPathWriteValue<T, P>): T;\n  probeValue<P extends IObjectPathInput<T>>(path: P): IPathProbe<T, P>;\n  parsePath(path: string | IObjectPathTuple): IObjectPathTuple;\n};\nfunction createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>;"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export type IPathProbe<T, P extends IObjectPathInput<T>> = IPathValueProbe<T, P> | IPathMissingProbe<P> | IPathBlockedProbe<P> | IPathFailedProbe<P>;"
@@ -17491,6 +17635,7 @@
           "examples": [
             "type IPathGetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathValue<T, P>;\n  replace(value: IObjectPathValue<T, P>): void;\n};\ntype IPathSetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathWriteValue<T, P>;\n  replace(value: IObjectPathWriteValue<T, P>): void;\n};\ntype IPathAccessorOptions<T> = {\n  readonly ifMissing?: (probe: IPathMissingProbe) => void;\n  readonly ifBlocked?: (probe: IPathBlockedProbe) => void;\n  readonly ifFailed?: (probe: IPathFailedProbe) => void;\n  readonly onGet?: (event: IPathGetEvent<T>) => void;\n  readonly onSet?: (event: IPathSetEvent<T>) => void;\n};\ntype IPathAccessor<T> = {\n  readonly value: T;\n  get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined;\n  set<P extends IObjectPathInput<T>>(path: P, value: IObjectPathWriteValue<T, P>): T;\n  probeValue<P extends IObjectPathInput<T>>(path: P): IPathProbe<T, P>;\n  parsePath(path: string | IObjectPathTuple): IObjectPathTuple;\n};\nfunction createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>;"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export type IPathSetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = { readonly originKey: P; readonly segments: IObjectPathTuple; readonly probe: IPathValueProbe<T, P>; readonly value: IObjectPathWriteValue<T, P>; replace(value: IObjectPathWriteValue<T, P>): void; };"
@@ -17556,6 +17701,7 @@
             "type IPathValueProbe<T, P extends IObjectPathInput<T>> = {\n  readonly kind: 'value';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly value: IObjectPathValue<T, P>;\n};\ntype IPathMissingProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {\n  readonly kind: 'missing';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly failedAt: number;\n  readonly failedKey: IObjectPathSegment;\n  readonly resolvedPath: IObjectPathTuple;\n  readonly parent: unknown;\n};\ntype IPathBlockedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {\n  readonly kind: 'blocked';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly failedAt: number;\n  readonly failedKey: IObjectPathSegment;\n  readonly resolvedPath: IObjectPathTuple;\n  readonly parent: unknown;\n};\ntype IPathFailedProbe<P extends string | IObjectPathTuple = string | IObjectPathTuple> = {\n  readonly kind: 'failed';\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly failedAt: number;\n  readonly failedKey: IObjectPathSegment;\n  readonly resolvedPath: IObjectPathTuple;\n  readonly parent: unknown;\n  readonly error: unknown;\n};\ntype IPathProbe<T, P extends IObjectPathInput<T>> =\n  | IPathValueProbe<T, P>\n  | IPathMissingProbe<P>\n  | IPathBlockedProbe<P>\n  | IPathFailedProbe<P>;\n\nfunction probeObjectPath<T, P extends IObjectPathInput<T>>(object: T, path: P): IPathProbe<T, P>;\nfunction probeObjectPathSegments<T, P extends IObjectPathInput<T>>(\n  object: T,\n  segments: P\n): IPathProbe<T, P>;",
             "type IPathGetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathValue<T, P>;\n  replace(value: IObjectPathValue<T, P>): void;\n};\ntype IPathSetEvent<T, P extends IObjectPathInput<T> = IObjectPathInput<T>> = {\n  readonly originKey: P;\n  readonly segments: IObjectPathTuple;\n  readonly probe: IPathValueProbe<T, P>;\n  readonly value: IObjectPathWriteValue<T, P>;\n  replace(value: IObjectPathWriteValue<T, P>): void;\n};\ntype IPathAccessorOptions<T> = {\n  readonly ifMissing?: (probe: IPathMissingProbe) => void;\n  readonly ifBlocked?: (probe: IPathBlockedProbe) => void;\n  readonly ifFailed?: (probe: IPathFailedProbe) => void;\n  readonly onGet?: (event: IPathGetEvent<T>) => void;\n  readonly onSet?: (event: IPathSetEvent<T>) => void;\n};\ntype IPathAccessor<T> = {\n  readonly value: T;\n  get<P extends IObjectPathInput<T>>(path: P): IObjectPathValue<T, P> | undefined;\n  set<P extends IObjectPathInput<T>>(path: P, value: IObjectPathWriteValue<T, P>): T;\n  probeValue<P extends IObjectPathInput<T>>(path: P): IPathProbe<T, P>;\n  parsePath(path: string | IObjectPathTuple): IObjectPathTuple;\n};\nfunction createPathAccessor<T>(object: T, options?: IPathAccessorOptions<T>): IPathAccessor<T>;"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export type IPathValueProbe<T, P extends IObjectPathInput<T>> = { readonly kind: 'value'; readonly originKey: P; readonly segments: IObjectPathTuple; readonly value: IObjectPathValue<T, P>; };"
@@ -17626,6 +17772,7 @@
           "examples": [
             "parseObjectPath('user.tags.[0]'); // ['user', 'tags', 0]\nprobeObjectPath(data, 'user.x.y'); // { kind: 'missing' | 'blocked' | 'failed' | 'value', ... }"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export declare function parseObjectPath(path: string | IObjectPathTuple): IObjectPathTuple;"
@@ -17845,6 +17992,7 @@
           "examples": [
             "parseObjectPath('user.tags.[0]'); // ['user', 'tags', 0]\nprobeObjectPath(data, 'user.x.y'); // { kind: 'missing' | 'blocked' | 'failed' | 'value', ... }"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export declare function probeObjectPath<T, P extends IObjectPathInput<T>>(object: T, path: P): IPathProbe<T, P>;"
@@ -17931,6 +18079,7 @@
           "errors": ["No documented errors are declared for probeObjectPathSegments."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for probeObjectPathSegments.",
           "examples": [],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export declare function probeObjectPathSegments<T, P extends IObjectPathInput<T>>(object: T, segments: P): IPathProbe<T, P>;"
@@ -18028,6 +18177,7 @@
             "const accessor = createPathAccessor({ count: 0 });\naccessor.set('count', 5);\naccessor.value; // { count: 5 }",
             "import { get, set } from '@migaia/utils/object';\nimport { ownConfig, patchConfig } from '@migaia/utils/config';\n\nconst config = ownConfig({ server: { host: 'localhost', port: 8080 } });\n// patchConfig 只在根一层生效，嵌套修改先在应用层用 set() 算好整棵子树\nconst nextServer = set(get(config, 'server')!, 'port', 9090);\nconst next = patchConfig(config, { server: nextServer });"
           ],
+          "members": [],
           "exportPath": "./object-path",
           "overloadSignatures": [
             "export declare function set<T, P extends IObjectPathInput<T>>(object: T, path: P, nextValue: IObjectPathWriteValue<T, P>): T;"
@@ -18413,6 +18563,7 @@
             "const merged = createAbortTimeoutSignal({\n  signal: controller.signal as any,\n  timeoutMs: 500,\n  timeoutReason: () => new Error('deadline')\n});\ntry {\n  await Promise.all([requestA(merged.signal), requestB(merged.signal)]);\n} finally {\n  merged.dispose();\n}",
             "const merged = createAbortTimeoutSignal({\n  signal: controller.signal,\n  timeoutMs: 500,\n  timeoutReason: () => new Error('deadline')\n});\ntry {\n  await Promise.all([requestA(merged.signal), requestB(merged.signal)]);\n} finally {\n  merged.dispose();\n}"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export declare function createAbortTimeoutSignal(options?: IAbortTimeoutSignalOptions): IAbortTimeoutSignal;"
@@ -18592,6 +18743,7 @@
             "const limiter = createConcurrencyLimiter({ concurrency: 2 });\nawait Promise.all(urls.map((u) => limiter.run(() => fetch(u))));\nawait limiter.dispose(); // 等待在途任务结束后关闭",
             "import { createConcurrencyLimiter, retry } from '@migaia/utils/promise';\nimport { combineErrors, toError } from '@migaia/utils/error';\n\nconst limiter = createConcurrencyLimiter({ concurrency: 4 });\nconst outcomes = await Promise.allSettled(\n  urls.map((url) =>\n    limiter.run(() =>\n      retry(() => fetch(url).then((r) => r.json()), { maxAttempts: 3, shouldRetry: () => true })\n    )\n  )\n);\nawait limiter.dispose();\n\nconst failed = combineErrors(\n  outcomes.filter((o) => o.status === 'rejected').map((o) => (o as PromiseRejectedResult).reason),\n  'some URLs failed'\n);\nif (failed) throw failed;"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export declare function createConcurrencyLimiter(options: { readonly concurrency: number; readonly report?: IUtilsReporter; }): IConcurrencyLimiter;"
@@ -18713,6 +18865,7 @@
             "const scheduler = createManualScheduler();\nconst p = withTimeout(op, { timeoutMs: 100, scheduler });\nscheduler.advance(100); // 手动触发超时，无需真实等待",
             "import { createManualScheduler, retry, withTimeout } from '@migaia/utils/promise';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst config = readonlyConfig(\n  patchConfig(ownConfig({ endpoint: '/v1', retries: 2, debug: true }), { debug: CONFIG_DELETE })\n);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return config.endpoint;\n      },\n      { maxAttempts: config.retries, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\nscheduler.advance(100);\nawait request.catch(() => undefined);"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export declare function createManualScheduler(): IManualScheduler;"
@@ -18813,6 +18966,7 @@
             "const { promise, resolve } = deferred<number>();\nsetTimeout(() => resolve(42), 0);\nawait promise; // 42",
             "const { promise, resolve } = deferred<number>();\nresolve(42);"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": ["export declare function deferred<T>(): IDeferred<T>;"],
           "overloadParameterDetails": [[]],
@@ -18910,6 +19064,7 @@
             "type IUtilsReporter = (\n  error: unknown,\n  context: {\n    readonly operation: 'withTimeout' | 'raceWithAbort' | 'retry' | 'sleep' | 'limiter';\n    readonly phase: 'late-rejection' | 'cleanup' | 'reporter';\n    readonly attempt?: number;\n  }\n) => void;\nconst hostRethrowReporter: IUtilsReporter;",
             "import {\n  sleep,\n  createAbortTimeoutSignal,\n  withTimeout,\n  raceWithAbort,\n  retry,\n  createConcurrencyLimiter,\n  deferred,\n  toPromise,\n  createManualScheduler,\n  systemScheduler,\n  hostRethrowReporter\n} from '@migaia/utils/promise';"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": ["export declare const hostRethrowReporter: IUtilsReporter;"],
           "overloadParameterDetails": [[]],
@@ -18972,6 +19127,7 @@
           "examples": [
             "type IAbortOperation<T> = ITimeoutOperation<T>;\n\nfunction raceWithAbort<T>(\n  operation: IAbortOperation<T>,\n  options?: Pick<IAsyncControls, 'signal' | 'signals'> & {\n    readonly report?: IUtilsReporter;\n    readonly cleanupPolicy?: 'reject' | 'report';\n  }\n): Promise<T>;"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": ["export type IAbortOperation<T> = ITimeoutOperation<T>;"],
           "overloadParameterDetails": [[]],
@@ -19039,6 +19195,7 @@
             "type IConcurrencyLimiter = {\n  run<T>(\n    task: (context: { readonly signal?: IAbortSignal }) => T | PromiseLike<T>,\n    options?: { readonly signal?: IAbortSignal }\n  ): Promise<T>;\n  readonly activeCount: number;\n  readonly pendingCount: number;\n  whenIdle(): Promise<void>;\n  close(reason?: unknown): void;\n  dispose(reason?: unknown): Promise<void>;\n};\nfunction createConcurrencyLimiter(options: {\n  readonly concurrency: number;\n  readonly report?: IUtilsReporter;\n}): IConcurrencyLimiter;",
             "import type {\n  IDiscriminatedByField,\n  IDiscriminatedByPath,\n  IObjectPath,\n  IObjectPathInput,\n  IObjectPathSegment,\n  IObjectPathTuple,\n  IObjectPathTupleFor,\n  IObjectPathValue,\n  IObjectPathWriteValue,\n  IProbePropertyResult,\n  IAbortSignal,\n  IDeferred\n} from '@migaia/utils/typing';"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export type IAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean; }): void; removeEventListener(type: 'abort', listener: () => void): void; };"
@@ -19103,6 +19260,7 @@
           "examples": [
             "type IAbortTimeoutSignalOptions = {\n  readonly signal?: IAbortSignal;\n  readonly timeoutMs?: number;\n  readonly scheduler?: IUtilsScheduler;\n  readonly timeoutReason?: () => unknown;\n  readonly report?: IUtilsReporter;\n};\ntype IAbortTimeoutSignal = {\n  readonly signal: IAbortSignal | undefined;\n  readonly dispose: () => void;\n};\nfunction createAbortTimeoutSignal(options?: IAbortTimeoutSignalOptions): IAbortTimeoutSignal;"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export type IAbortTimeoutSignal = { readonly signal: IAbortSignal | undefined; readonly dispose: () => void; };"
@@ -19167,6 +19325,7 @@
           "examples": [
             "type IAbortTimeoutSignalOptions = {\n  readonly signal?: IAbortSignal;\n  readonly timeoutMs?: number;\n  readonly scheduler?: IUtilsScheduler;\n  readonly timeoutReason?: () => unknown;\n  readonly report?: IUtilsReporter;\n};\ntype IAbortTimeoutSignal = {\n  readonly signal: IAbortSignal | undefined;\n  readonly dispose: () => void;\n};\nfunction createAbortTimeoutSignal(options?: IAbortTimeoutSignalOptions): IAbortTimeoutSignal;"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export type IAbortTimeoutSignalOptions = { readonly signal?: IAbortSignal; readonly timeoutMs?: number; readonly scheduler?: IUtilsScheduler; readonly timeoutReason?: () => unknown; readonly report?: IUtilsReporter; };"
@@ -19234,6 +19393,7 @@
             "type ITimeoutOperation<T> = (context: { readonly signal: IAbortSignal }) => T | PromiseLike<T>;\n\nfunction withTimeout<T>(\n  operation: ITimeoutOperation<T>,\n  options: IAsyncControls & {\n    readonly timeoutMs: number;\n    readonly report?: IUtilsReporter;\n    readonly zeroTimeoutBehavior?: 'skip' | 'start';\n    readonly cooperativeCancellation?: boolean;\n  }\n): Promise<T>;",
             "type IAbortOperation<T> = ITimeoutOperation<T>;\n\nfunction raceWithAbort<T>(\n  operation: IAbortOperation<T>,\n  options?: Pick<IAsyncControls, 'signal' | 'signals'> & {\n    readonly report?: IUtilsReporter;\n    readonly cleanupPolicy?: 'reject' | 'report';\n  }\n): Promise<T>;"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export type IAsyncControls = { readonly signal?: IAbortSignal; readonly signals?: readonly IAbortSignal[]; readonly scheduler?: IUtilsScheduler; readonly unref?: boolean; };"
@@ -19298,6 +19458,7 @@
           "examples": [
             "type IConcurrencyLimiter = {\n  run<T>(\n    task: (context: { readonly signal?: IAbortSignal }) => T | PromiseLike<T>,\n    options?: { readonly signal?: IAbortSignal }\n  ): Promise<T>;\n  readonly activeCount: number;\n  readonly pendingCount: number;\n  whenIdle(): Promise<void>;\n  close(reason?: unknown): void;\n  dispose(reason?: unknown): Promise<void>;\n};\nfunction createConcurrencyLimiter(options: {\n  readonly concurrency: number;\n  readonly report?: IUtilsReporter;\n}): IConcurrencyLimiter;"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export type IConcurrencyLimiter = { run<T>(task: (context: { readonly signal?: IAbortSignal; }) => T | PromiseLike<T>, options?: { readonly signal?: IAbortSignal; }): Promise<T>; readonly activeCount: number; readonly pendingCount: number; whenIdle(): Promise<void>; close(reason?: unknown): void; dispose(reason?: unknown): Promise<void>; };"
@@ -19363,6 +19524,7 @@
             "type IDeferred<T> = {\n  readonly promise: Promise<T>;\n  readonly resolve: (value: T | PromiseLike<T>) => void;\n  readonly reject: (reason?: unknown) => void;\n};\nfunction deferred<T>(): IDeferred<T>;",
             "import type {\n  IDiscriminatedByField,\n  IDiscriminatedByPath,\n  IObjectPath,\n  IObjectPathInput,\n  IObjectPathSegment,\n  IObjectPathTuple,\n  IObjectPathTupleFor,\n  IObjectPathValue,\n  IObjectPathWriteValue,\n  IProbePropertyResult,\n  IAbortSignal,\n  IDeferred\n} from '@migaia/utils/typing';"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export type IDeferred<T> = { readonly promise: Promise<T>; readonly resolve: (value: T | PromiseLike<T>) => void; readonly reject: (reason?: unknown) => void; };"
@@ -19428,6 +19590,7 @@
             "type IScheduledTask = { cancel(): void; unref?(): void };\ntype IUtilsScheduler = {\n  now(): number;\n  schedule(callback: () => void, delayMs: number): IScheduledTask;\n};\ntype IManualScheduler = IUtilsScheduler & {\n  advance(ms: number): void;\n  readonly pendingCount: number;\n};",
             "function createManualScheduler(): IManualScheduler;"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export type IManualScheduler = IUtilsScheduler & { advance(ms: number): void; readonly pendingCount: number; };"
@@ -19492,6 +19655,7 @@
           "examples": [
             "type IRetryContext = {\n  readonly attempt: number;\n  readonly signal: IAbortSignal;\n  readonly remainingMs?: number;\n};\ntype IRetryFailureContext = IRetryContext & { readonly maxAttempts: number };\n\nfunction retry<T>(\n  operation: (context: IRetryContext) => T | PromiseLike<T>,\n  options: {\n    readonly maxAttempts: number;\n    readonly shouldRetry: (\n      error: unknown,\n      context: IRetryFailureContext\n    ) => boolean | PromiseLike<boolean>;\n    readonly delay?: number | ((error: unknown, context: IRetryFailureContext) => number);\n    readonly totalTimeoutMs?: number;\n    readonly attemptTimeoutMs?: number;\n    readonly signal?: IAbortSignal;\n    readonly signals?: readonly IAbortSignal[];\n    readonly zeroTimeoutBehavior?: 'skip' | 'start';\n    readonly report?: IUtilsReporter;\n    readonly unref?: boolean;\n    readonly scheduler?: IUtilsScheduler;\n  }\n): Promise<T>;"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export type IRetryContext = { readonly attempt: number; readonly signal: IAbortSignal; readonly remainingMs?: number; };"
@@ -19556,6 +19720,7 @@
           "examples": [
             "type IRetryContext = {\n  readonly attempt: number;\n  readonly signal: IAbortSignal;\n  readonly remainingMs?: number;\n};\ntype IRetryFailureContext = IRetryContext & { readonly maxAttempts: number };\n\nfunction retry<T>(\n  operation: (context: IRetryContext) => T | PromiseLike<T>,\n  options: {\n    readonly maxAttempts: number;\n    readonly shouldRetry: (\n      error: unknown,\n      context: IRetryFailureContext\n    ) => boolean | PromiseLike<boolean>;\n    readonly delay?: number | ((error: unknown, context: IRetryFailureContext) => number);\n    readonly totalTimeoutMs?: number;\n    readonly attemptTimeoutMs?: number;\n    readonly signal?: IAbortSignal;\n    readonly signals?: readonly IAbortSignal[];\n    readonly zeroTimeoutBehavior?: 'skip' | 'start';\n    readonly report?: IUtilsReporter;\n    readonly unref?: boolean;\n    readonly scheduler?: IUtilsScheduler;\n  }\n): Promise<T>;"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export type IRetryFailureContext = IRetryContext & { readonly maxAttempts: number; };"
@@ -19620,6 +19785,7 @@
           "examples": [
             "type IScheduledTask = { cancel(): void; unref?(): void };\ntype IUtilsScheduler = {\n  now(): number;\n  schedule(callback: () => void, delayMs: number): IScheduledTask;\n};\ntype IManualScheduler = IUtilsScheduler & {\n  advance(ms: number): void;\n  readonly pendingCount: number;\n};"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export type IScheduledTask = { cancel(): void; unref?(): void; };"
@@ -19685,6 +19851,7 @@
             "type ITimeoutOperation<T> = (context: { readonly signal: IAbortSignal }) => T | PromiseLike<T>;\n\nfunction withTimeout<T>(\n  operation: ITimeoutOperation<T>,\n  options: IAsyncControls & {\n    readonly timeoutMs: number;\n    readonly report?: IUtilsReporter;\n    readonly zeroTimeoutBehavior?: 'skip' | 'start';\n    readonly cooperativeCancellation?: boolean;\n  }\n): Promise<T>;",
             "type IAbortOperation<T> = ITimeoutOperation<T>;\n\nfunction raceWithAbort<T>(\n  operation: IAbortOperation<T>,\n  options?: Pick<IAsyncControls, 'signal' | 'signals'> & {\n    readonly report?: IUtilsReporter;\n    readonly cleanupPolicy?: 'reject' | 'report';\n  }\n): Promise<T>;"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export type ITimeoutOperation<T> = (context: { readonly signal: IAbortSignal; }) => T | PromiseLike<T>;"
@@ -19754,6 +19921,7 @@
             "type IUtilsReporter = (\n  error: unknown,\n  context: {\n    readonly operation: 'withTimeout' | 'raceWithAbort' | 'retry' | 'sleep' | 'limiter';\n    readonly phase: 'late-rejection' | 'cleanup' | 'reporter';\n    readonly attempt?: number;\n  }\n) => void;\nconst hostRethrowReporter: IUtilsReporter;",
             "type IConcurrencyLimiter = {\n  run<T>(\n    task: (context: { readonly signal?: IAbortSignal }) => T | PromiseLike<T>,\n    options?: { readonly signal?: IAbortSignal }\n  ): Promise<T>;\n  readonly activeCount: number;\n  readonly pendingCount: number;\n  whenIdle(): Promise<void>;\n  close(reason?: unknown): void;\n  dispose(reason?: unknown): Promise<void>;\n};\nfunction createConcurrencyLimiter(options: {\n  readonly concurrency: number;\n  readonly report?: IUtilsReporter;\n}): IConcurrencyLimiter;"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export type IUtilsReporter = (error: unknown, context: { readonly operation: 'abort-timeout-signal' | 'withTimeout' | 'raceWithAbort' | 'retry' | 'sleep' | 'limiter'; readonly phase: 'late-rejection' | 'cleanup' | 'reporter'; readonly attempt?: number; }) => void;"
@@ -19822,6 +19990,7 @@
             "type IAbortTimeoutSignalOptions = {\n  readonly signal?: IAbortSignal;\n  readonly timeoutMs?: number;\n  readonly scheduler?: IUtilsScheduler;\n  readonly timeoutReason?: () => unknown;\n  readonly report?: IUtilsReporter;\n};\ntype IAbortTimeoutSignal = {\n  readonly signal: IAbortSignal | undefined;\n  readonly dispose: () => void;\n};\nfunction createAbortTimeoutSignal(options?: IAbortTimeoutSignalOptions): IAbortTimeoutSignal;",
             "type IRetryContext = {\n  readonly attempt: number;\n  readonly signal: IAbortSignal;\n  readonly remainingMs?: number;\n};\ntype IRetryFailureContext = IRetryContext & { readonly maxAttempts: number };\n\nfunction retry<T>(\n  operation: (context: IRetryContext) => T | PromiseLike<T>,\n  options: {\n    readonly maxAttempts: number;\n    readonly shouldRetry: (\n      error: unknown,\n      context: IRetryFailureContext\n    ) => boolean | PromiseLike<boolean>;\n    readonly delay?: number | ((error: unknown, context: IRetryFailureContext) => number);\n    readonly totalTimeoutMs?: number;\n    readonly attemptTimeoutMs?: number;\n    readonly signal?: IAbortSignal;\n    readonly signals?: readonly IAbortSignal[];\n    readonly zeroTimeoutBehavior?: 'skip' | 'start';\n    readonly report?: IUtilsReporter;\n    readonly unref?: boolean;\n    readonly scheduler?: IUtilsScheduler;\n  }\n): Promise<T>;"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export type IUtilsScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; };"
@@ -19901,6 +20070,7 @@
             "const controller = new AbortController();\nconst result = raceWithAbort(({ signal }) => fetchSomething({ signal }), {\n  signal: controller.signal as any\n});",
             "await raceWithAbort(({ signal }) => fetch(url, { signal }), { signal: controller.signal });"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export declare function raceWithAbort<T>(operation: IAbortOperation<T>, options?: Pick<IAsyncControls, 'signal' | 'signals'> & { readonly report?: IUtilsReporter; readonly cleanupPolicy?: 'reject' | 'report'; }): Promise<T>;"
@@ -20017,6 +20187,7 @@
             "import { createManualScheduler, retry, withTimeout } from '@migaia/utils/promise';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst config = readonlyConfig(\n  patchConfig(ownConfig({ endpoint: '/v1', retries: 2, debug: true }), { debug: CONFIG_DELETE })\n);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return config.endpoint;\n      },\n      { maxAttempts: config.retries, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\nscheduler.advance(100);\nawait request.catch(() => undefined);",
             "import { createConcurrencyLimiter, retry } from '@migaia/utils/promise';\nimport { combineErrors, toError } from '@migaia/utils/error';\n\nconst limiter = createConcurrencyLimiter({ concurrency: 4 });\nconst outcomes = await Promise.allSettled(\n  urls.map((url) =>\n    limiter.run(() =>\n      retry(() => fetch(url).then((r) => r.json()), { maxAttempts: 3, shouldRetry: () => true })\n    )\n  )\n);\nawait limiter.dispose();\n\nconst failed = combineErrors(\n  outcomes.filter((o) => o.status === 'rejected').map((o) => (o as PromiseRejectedResult).reason),\n  'some URLs failed'\n);\nif (failed) throw failed;"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export declare function retry<T>(operation: (context: IRetryContext) => T | PromiseLike<T>, options: Parameters<typeof retryCore<T>>[1]): Promise<T>;"
@@ -20313,6 +20484,7 @@
             "const controller = new AbortController();\nconst p = sleep(1000, { signal: controller.signal as any });\ncontroller.abort('cancelled');\nawait p; // 抛 UtilsAbortError，cause 为 'cancelled'",
             "await sleep(1000); // 1 秒后 resolve\nawait sleep(1000, { signal: controller.signal }); // 中止时 reject UtilsAbortError"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export declare function sleep(delayMs: number, options?: IAsyncControls): Promise<void>;"
@@ -20422,6 +20594,7 @@
             "import {\n  sleep,\n  createAbortTimeoutSignal,\n  withTimeout,\n  raceWithAbort,\n  retry,\n  createConcurrencyLimiter,\n  deferred,\n  toPromise,\n  createManualScheduler,\n  systemScheduler,\n  hostRethrowReporter\n} from '@migaia/utils/promise';",
             "const now = systemScheduler.now();"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": ["export declare const systemScheduler: IUtilsScheduler;"],
           "overloadParameterDetails": [[]],
@@ -20491,6 +20664,7 @@
             "const found = await toPromise(() => cache.get('key'));\nconst pending = toPromise(() => {\n  throw new Error('read failed');\n});\nawait pending; // 异步观察 rejection",
             "const value = await toPromise(() => cache.get('key'));\nawait toPromise(() => {\n  throw new Error('failed'); // 不会从 toPromise 调用点同步抛出，而是返回 rejected Promise\n});"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export declare function toPromise<T>(run: () => T): Promise<Awaited<T>>;"
@@ -20616,6 +20790,7 @@
             "withTimeout(op, { timeoutMs: 100, report: myLogger }); // 用自定义 reporter 替换默认行为",
             "import { createManualScheduler, retry, withTimeout } from '@migaia/utils/promise';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst config = readonlyConfig(\n  patchConfig(ownConfig({ endpoint: '/v1', retries: 2, debug: true }), { debug: CONFIG_DELETE })\n);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return config.endpoint;\n      },\n      { maxAttempts: config.retries, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\nscheduler.advance(100);\nawait request.catch(() => undefined);"
           ],
+          "members": [],
           "exportPath": "./promise",
           "overloadSignatures": [
             "export declare function withTimeout<T>(operation: ITimeoutOperation<T>, options: IWithTimeoutOptions): Promise<T>;"
@@ -20807,6 +20982,7 @@
           "examples": [
             "import { format, formatCurrency, isEmptyValue, isPrimitive } from '@migaia/utils';\n\nisEmptyValue('  '); // true；0、false、0n 均为 false\nisPrimitive(Symbol('id')); // true\nformat('库存 {stock}，金额 {money}', { stock: 0, money: '¥12.00' });\nformatCurrency(1234.5, 'CNY', {\n  locales: 'zh',\n  format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }\n});"
           ],
+          "members": [],
           "exportPath": "./string",
           "overloadSignatures": [
             "export declare function format(source: string, values: Readonly<Record<string, unknown>>, options?: IFormatOptions): string;"
@@ -21095,6 +21271,7 @@
           "errors": ["No documented errors are declared for IFormatOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFormatOptions.",
           "examples": [],
+          "members": [],
           "exportPath": "./string",
           "overloadSignatures": [
             "export type IFormatOptions = { readonly placeholder?: IFormatPlaceholder; readonly missing?: 'preserve' | 'empty' | 'throw'; readonly nullish?: 'empty' | 'stringify'; };"
@@ -21157,6 +21334,7 @@
           "errors": ["No documented errors are declared for IFormatPlaceholder."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFormatPlaceholder.",
           "examples": [],
+          "members": [],
           "exportPath": "./string",
           "overloadSignatures": [
             "export type IFormatPlaceholder = { readonly open: string; readonly close: string; };"
@@ -21244,6 +21422,7 @@
             "import type {\n  IDiscriminatedByField,\n  IDiscriminatedByPath,\n  IObjectPath,\n  IObjectPathInput,\n  IObjectPathSegment,\n  IObjectPathTuple,\n  IObjectPathTupleFor,\n  IObjectPathValue,\n  IObjectPathWriteValue,\n  IProbePropertyResult,\n  IAbortSignal,\n  IDeferred\n} from '@migaia/utils/typing';",
             "type IEvent =\n  | { readonly type: 'created'; readonly payload: { readonly userId: string } }\n  | { readonly type: 'deleted'; readonly payload: { readonly reason: string } };\n\ntype IByType = IDiscriminatedByField<'type', IEvent>;\n// { created: Extract<IEvent, { type: 'created' }>; deleted: Extract<IEvent, { type: 'deleted' }> }"
           ],
+          "members": [],
           "exportPath": "./typing",
           "overloadSignatures": [
             "export type IDiscriminatedByField<F extends PropertyKey, T extends Record<F, PropertyKey>> = { [K in T[F]]: Extract<T, Record<F, K>>; };"
@@ -21312,6 +21491,7 @@
             "import type {\n  IDiscriminatedByField,\n  IDiscriminatedByPath,\n  IObjectPath,\n  IObjectPathInput,\n  IObjectPathSegment,\n  IObjectPathTuple,\n  IObjectPathTupleFor,\n  IObjectPathValue,\n  IObjectPathWriteValue,\n  IProbePropertyResult,\n  IAbortSignal,\n  IDeferred\n} from '@migaia/utils/typing';",
             "type IEvent =\n  | { readonly meta: { readonly category: 'write' }; readonly payload: { readonly userId: string } }\n  | { readonly meta: { readonly category: 'read' }; readonly payload: { readonly cache: boolean } };\n\ntype IByCategory = IDiscriminatedByPath<IEvent, 'meta.category'>;\n// 等价于 IDiscriminatedByPath<IEvent, readonly ['meta', 'category']>"
           ],
+          "members": [],
           "exportPath": "./typing",
           "overloadSignatures": [
             "export type IDiscriminatedByPath<T, P extends IObjectPathInput<T>> = { [K in Extract<IObjectPathValue<T, P>, PropertyKey>]: IExtractDiscriminatedByPath<T, P, K>; };"
@@ -21494,6 +21674,7 @@
           "errors": ["No documented errors are declared for IPrimitive."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPrimitive.",
           "examples": [],
+          "members": [],
           "exportPath": "./value",
           "overloadSignatures": [
             "export type IPrimitive = undefined | null | string | number | bigint | boolean | symbol;"
@@ -21556,6 +21737,7 @@
           "errors": ["No documented errors are declared for isBlankString."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isBlankString.",
           "examples": [],
+          "members": [],
           "exportPath": "./value",
           "overloadSignatures": [
             "export declare const isBlankString: (value: unknown) => value is string;"
@@ -21620,6 +21802,7 @@
           "examples": [
             "import { format, formatCurrency, isEmptyValue, isPrimitive } from '@migaia/utils';\n\nisEmptyValue('  '); // true；0、false、0n 均为 false\nisPrimitive(Symbol('id')); // true\nformat('库存 {stock}，金额 {money}', { stock: 0, money: '¥12.00' });\nformatCurrency(1234.5, 'CNY', {\n  locales: 'zh',\n  format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }\n});"
           ],
+          "members": [],
           "exportPath": "./value",
           "overloadSignatures": [
             "export declare const isEmptyValue: (value: unknown) => value is null | undefined | string | number;"
@@ -21682,6 +21865,7 @@
           "errors": ["No documented errors are declared for isNullish."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isNullish.",
           "examples": [],
+          "members": [],
           "exportPath": "./value",
           "overloadSignatures": [
             "export declare const isNullish: (value: unknown) => value is null | undefined;"
@@ -21746,6 +21930,7 @@
           "examples": [
             "import { format, formatCurrency, isEmptyValue, isPrimitive } from '@migaia/utils';\n\nisEmptyValue('  '); // true；0、false、0n 均为 false\nisPrimitive(Symbol('id')); // true\nformat('库存 {stock}，金额 {money}', { stock: 0, money: '¥12.00' });\nformatCurrency(1234.5, 'CNY', {\n  locales: 'zh',\n  format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }\n});"
           ],
+          "members": [],
           "exportPath": "./value",
           "overloadSignatures": [
             "export declare const isPrimitive: (value: unknown) => value is IPrimitive;"

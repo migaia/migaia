@@ -1435,6 +1435,7 @@
           "errors": ["No documented errors are declared for assertSSRState."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertSSRState.",
           "examples": ["assertSSRState(value); // 通过则收窄类型为 ISSRState，不通过则抛错"],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function assertSSRState(value: unknown): asserts value is ISSRState;"
@@ -1516,6 +1517,7 @@
             "import { createStore } from '@migaia/store-light';\n\nconst scope = createSSRRequestScope();\nconst app = createStore({ count: 1 }, { runtime: scope.runtime });\nscope.register('app', app);\n\nconst state = scope.dehydrate();\nawait scope.disposeAsync(); // 请求结束，等待 owned store 的异步 cleanup",
             "import { createStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\nimport { createSSRRequestScope, createSSRStateScript } from '@migaia/store-ssr';\n\nexport async function renderPage(userId: string): Promise<string> {\n  const scope = createSSRRequestScope();\n  try {\n    const app = createStore({ theme: 'dark' }, { runtime: scope.runtime });\n    scope.register('app', app);\n\n    const user = new Resource(\n      async ({ signal }) => {\n        const response = await fetch(`/api/users/${userId}`, { signal });\n        if (!response.ok) throw new Error('加载用户失败');\n        return response.json();\n      },\n      scope.runtime,\n      { ttl: 30_000 }\n    );\n    scope.registerResource('user', user);\n\n    const state = await scope.dehydrateAsync({\n      timeoutMs: 3000,\n      onResourceError: (failure) =>\n        console.warn(`[ssr] resource \"${failure.key}\" failed`, failure.error)\n    });\n\n    return `<!doctype html><html><body>${createSSRStateScript(state)}<div id=\"root\"></div></body></html>`;\n  } finally {\n    scope.dispose();\n  }\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createSSRRequestScope(options?: ISSRRequestScopeOptions): SSRRequestScope;"
@@ -1632,6 +1634,7 @@
             "const html = createSSRStateScript(state); // 默认 elementId = '__STORE_STATE__'",
             "import { createStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\nimport { createSSRRequestScope, createSSRStateScript } from '@migaia/store-ssr';\n\nexport async function renderPage(userId: string): Promise<string> {\n  const scope = createSSRRequestScope();\n  try {\n    const app = createStore({ theme: 'dark' }, { runtime: scope.runtime });\n    scope.register('app', app);\n\n    const user = new Resource(\n      async ({ signal }) => {\n        const response = await fetch(`/api/users/${userId}`, { signal });\n        if (!response.ok) throw new Error('加载用户失败');\n        return response.json();\n      },\n      scope.runtime,\n      { ttl: 30_000 }\n    );\n    scope.registerResource('user', user);\n\n    const state = await scope.dehydrateAsync({\n      timeoutMs: 3000,\n      onResourceError: (failure) =>\n        console.warn(`[ssr] resource \"${failure.key}\" failed`, failure.error)\n    });\n\n    return `<!doctype html><html><body>${createSSRStateScript(state)}<div id=\"root\"></div></body></html>`;\n  } finally {\n    scope.dispose();\n  }\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createSSRStateScript(state: ISSRState, elementId?: string): string;"
@@ -1722,6 +1725,7 @@
             "const codecs = createSerializeRegistry([jsonPlugin()]);\nconst html = await createSSRStateScriptWith(state, { codecs });",
             "import { createSerializeRegistry } from '@migaia/serialize';\nimport { createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/store-ssr';\nimport { binaryPlugin } from './binary-plugin.js';\n\nconst codecs = createSerializeRegistry([binaryPlugin()]);\nconst html = await createSSRStateScriptWith(state, { codecs, elementId: 'app-state' });\n\n// 浏览器端，读取时必须用同一份 codecs 配置\nconst restored = await readSSRStateFromDocumentWith({ codecs, elementId: 'app-state', document });"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createSSRStateScriptWith(state: ISSRState, options: ISSRScriptOptions): Promise<string>;"
@@ -1859,6 +1863,7 @@
           "examples": [
             "throw createStoreSsrAggregateError(StoreSsrErrorCode.hydrateFailed, [err1, err2], '批量失败');"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreSsrAggregateError(code: IStoreSsrErrorCode, errors: unknown[], message: string): AggregateError;"
@@ -2140,6 +2145,7 @@
           "examples": [
             "throw createStoreSsrError(StoreSsrErrorCode.invalidOption, '自定义消息');\nthrow createStoreSsrRangeError(StoreSsrErrorCode.invalidOption, '自定义消息');\nthrow createStoreSsrTypeError(StoreSsrErrorCode.invalidOption, '自定义消息');"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreSsrError(code: IStoreSsrErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
@@ -2412,6 +2418,7 @@
           "examples": [
             "throw createStoreSsrError(StoreSsrErrorCode.invalidOption, '自定义消息');\nthrow createStoreSsrRangeError(StoreSsrErrorCode.invalidOption, '自定义消息');\nthrow createStoreSsrTypeError(StoreSsrErrorCode.invalidOption, '自定义消息');"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreSsrRangeError(code: IStoreSsrErrorCode, message: string): RangeError;"
@@ -2679,6 +2686,7 @@
           "examples": [
             "throw createStoreSsrError(StoreSsrErrorCode.invalidOption, '自定义消息');\nthrow createStoreSsrRangeError(StoreSsrErrorCode.invalidOption, '自定义消息');\nthrow createStoreSsrTypeError(StoreSsrErrorCode.invalidOption, '自定义消息');"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreSsrTypeError(code: IStoreSsrErrorCode, message: string): TypeError;"
@@ -2941,6 +2949,7 @@
           "examples": [
             "const state = deserializeSSRState(text); // JSON.parse + assertSSRState，格式不对直接抛错"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function deserializeSSRState(serialized: string): ISSRState;"
@@ -3013,6 +3022,7 @@
           "examples": [
             "import {\n  SSRRequestScope,\n  createSSRRequestScope,\n  serializeSSRState,\n  deserializeSSRState,\n  createSSRStateScript,\n  readSSRStateFromDocument,\n  createSSRStateScriptWith,\n  readSSRStateFromDocumentWith,\n  assertSSRState\n} from '@migaia/store-ssr';\nimport type {\n  ISSRState,\n  ISSRStore,\n  ISSRResource,\n  ISSRRequestScopeOptions,\n  ISSRRegistrationOptions,\n  IDehydrateAsyncOptions,\n  IAwaitResourcesOptions,\n  ISSRResourceFailure,\n  ISSRDocument,\n  ISSRScriptOptions,\n  ISSRReadOptions,\n  ITrustedSSRState\n} from '@migaia/store-ssr';"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IAwaitResourcesOptions = { readonly timeoutMs?: number; };"
@@ -3077,6 +3087,7 @@
           "examples": [
             "import {\n  SSRRequestScope,\n  createSSRRequestScope,\n  serializeSSRState,\n  deserializeSSRState,\n  createSSRStateScript,\n  readSSRStateFromDocument,\n  createSSRStateScriptWith,\n  readSSRStateFromDocumentWith,\n  assertSSRState\n} from '@migaia/store-ssr';\nimport type {\n  ISSRState,\n  ISSRStore,\n  ISSRResource,\n  ISSRRequestScopeOptions,\n  ISSRRegistrationOptions,\n  IDehydrateAsyncOptions,\n  IAwaitResourcesOptions,\n  ISSRResourceFailure,\n  ISSRDocument,\n  ISSRScriptOptions,\n  ISSRReadOptions,\n  ITrustedSSRState\n} from '@migaia/store-ssr';"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IDehydrateAsyncOptions = { /** 覆盖默认的「报给 Runtime.onError」行为。 */ readonly onResourceError?: (failure: ISSRResourceFailure) => void; /** 整个等待过程的总预算；超时的 resource 各记一条 failure，不无限期挂起渲染。 */ readonly timeoutMs?: number; };"
@@ -3139,6 +3150,7 @@
           "errors": ["No documented errors are declared for IJSONPrimitive."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IJSONPrimitive.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": ["export type IJSONPrimitive = string | number | boolean | null;"],
           "overloadParameterDetails": [[]],
@@ -3201,6 +3213,7 @@
           "examples": [
             "type ISSRState = {\n  readonly version: 1;\n  readonly stores: Readonly<Record<string, Readonly<Record<string, IJSONValue>>>>;\n  readonly resources?: Readonly<Record<string, IResourceCacheSnapshot<IJSONValue>>>;\n};"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IJSONValue = IJSONPrimitive | readonly IJSONValue[] | { readonly [key: string]: IJSONValue; };"
@@ -3265,6 +3278,7 @@
           "examples": [
             "import {\n  SSRRequestScope,\n  createSSRRequestScope,\n  serializeSSRState,\n  deserializeSSRState,\n  createSSRStateScript,\n  readSSRStateFromDocument,\n  createSSRStateScriptWith,\n  readSSRStateFromDocumentWith,\n  assertSSRState\n} from '@migaia/store-ssr';\nimport type {\n  ISSRState,\n  ISSRStore,\n  ISSRResource,\n  ISSRRequestScopeOptions,\n  ISSRRegistrationOptions,\n  IDehydrateAsyncOptions,\n  IAwaitResourcesOptions,\n  ISSRResourceFailure,\n  ISSRDocument,\n  ISSRScriptOptions,\n  ISSRReadOptions,\n  ITrustedSSRState\n} from '@migaia/store-ssr';"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ISSRDocument = { getElementById(elementId: string): { readonly textContent: string | null; getAttribute(name: string): string | null; } | null; };"
@@ -3329,6 +3343,7 @@
           "examples": [
             "import {\n  SSRRequestScope,\n  createSSRRequestScope,\n  serializeSSRState,\n  deserializeSSRState,\n  createSSRStateScript,\n  readSSRStateFromDocument,\n  createSSRStateScriptWith,\n  readSSRStateFromDocumentWith,\n  assertSSRState\n} from '@migaia/store-ssr';\nimport type {\n  ISSRState,\n  ISSRStore,\n  ISSRResource,\n  ISSRRequestScopeOptions,\n  ISSRRegistrationOptions,\n  IDehydrateAsyncOptions,\n  IAwaitResourcesOptions,\n  ISSRResourceFailure,\n  ISSRDocument,\n  ISSRScriptOptions,\n  ISSRReadOptions,\n  ITrustedSSRState\n} from '@migaia/store-ssr';"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ISSRReadOptions = { readonly codecs: ISerializeRegistry; readonly elementId?: string; readonly document?: ISSRDocument; readonly signal?: AbortSignal; };"
@@ -3393,6 +3408,7 @@
           "examples": [
             "import {\n  SSRRequestScope,\n  createSSRRequestScope,\n  serializeSSRState,\n  deserializeSSRState,\n  createSSRStateScript,\n  readSSRStateFromDocument,\n  createSSRStateScriptWith,\n  readSSRStateFromDocumentWith,\n  assertSSRState\n} from '@migaia/store-ssr';\nimport type {\n  ISSRState,\n  ISSRStore,\n  ISSRResource,\n  ISSRRequestScopeOptions,\n  ISSRRegistrationOptions,\n  IDehydrateAsyncOptions,\n  IAwaitResourcesOptions,\n  ISSRResourceFailure,\n  ISSRDocument,\n  ISSRScriptOptions,\n  ISSRReadOptions,\n  ITrustedSSRState\n} from '@migaia/store-ssr';"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ISSRRegistrationOptions = { /** Request scopes own registered stores by default. */ readonly owned?: boolean; };"
@@ -3457,6 +3473,7 @@
           "examples": [
             "import {\n  SSRRequestScope,\n  createSSRRequestScope,\n  serializeSSRState,\n  deserializeSSRState,\n  createSSRStateScript,\n  readSSRStateFromDocument,\n  createSSRStateScriptWith,\n  readSSRStateFromDocumentWith,\n  assertSSRState\n} from '@migaia/store-ssr';\nimport type {\n  ISSRState,\n  ISSRStore,\n  ISSRResource,\n  ISSRRequestScopeOptions,\n  ISSRRegistrationOptions,\n  IDehydrateAsyncOptions,\n  IAwaitResourcesOptions,\n  ISSRResourceFailure,\n  ISSRDocument,\n  ISSRScriptOptions,\n  ISSRReadOptions,\n  ITrustedSSRState\n} from '@migaia/store-ssr';"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ISSRRequestScopeOptions = { readonly runtime?: IRuntime; readonly runtimeOptions?: IRuntimeOptions; };"
@@ -3523,6 +3540,7 @@
             "type ISSRResource = {\n  readonly runtime: IRuntime;\n  readonly disposed: boolean;\n  readonly promise: Promise<unknown>; // 当前在途/缓存的请求\n  dehydrate(): IResourceCacheSnapshot<unknown> | undefined; // 无成功值时返回 undefined\n  hydrate(snapshot: IResourceCacheSnapshot<unknown>): void;\n  dispose(): void;\n};",
             "import { createStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\n\nconst app = createStore({ count: 0 }, { runtime: scope.runtime }); // 满足 ISSRStore\nconst user = new Resource(fetchUser, scope.runtime, { ttl: 30_000 }); // 满足 ISSRResource"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ISSRResource = { readonly runtime: IRuntime; readonly disposed: boolean; readonly promise: Promise<unknown>; dehydrate(): IResourceCacheSnapshot<unknown> | undefined; hydrate(snapshot: IResourceCacheSnapshot<unknown>): void; dispose(): void; };"
@@ -3723,6 +3741,7 @@
             "import {\n  SSRRequestScope,\n  createSSRRequestScope,\n  serializeSSRState,\n  deserializeSSRState,\n  createSSRStateScript,\n  readSSRStateFromDocument,\n  createSSRStateScriptWith,\n  readSSRStateFromDocumentWith,\n  assertSSRState\n} from '@migaia/store-ssr';\nimport type {\n  ISSRState,\n  ISSRStore,\n  ISSRResource,\n  ISSRRequestScopeOptions,\n  ISSRRegistrationOptions,\n  IDehydrateAsyncOptions,\n  IAwaitResourcesOptions,\n  ISSRResourceFailure,\n  ISSRDocument,\n  ISSRScriptOptions,\n  ISSRReadOptions,\n  ITrustedSSRState\n} from '@migaia/store-ssr';",
             "const failures: readonly ISSRResourceFailure[] = await scope.awaitResources({ timeoutMs: 3000 });"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ISSRResourceFailure = { readonly key: string; readonly error: unknown; };"
@@ -3836,6 +3855,7 @@
           "examples": [
             "import {\n  SSRRequestScope,\n  createSSRRequestScope,\n  serializeSSRState,\n  deserializeSSRState,\n  createSSRStateScript,\n  readSSRStateFromDocument,\n  createSSRStateScriptWith,\n  readSSRStateFromDocumentWith,\n  assertSSRState\n} from '@migaia/store-ssr';\nimport type {\n  ISSRState,\n  ISSRStore,\n  ISSRResource,\n  ISSRRequestScopeOptions,\n  ISSRRegistrationOptions,\n  IDehydrateAsyncOptions,\n  IAwaitResourcesOptions,\n  ISSRResourceFailure,\n  ISSRDocument,\n  ISSRScriptOptions,\n  ISSRReadOptions,\n  ITrustedSSRState\n} from '@migaia/store-ssr';"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ISSRScriptOptions = { readonly codecs: ISerializeRegistry; readonly elementId?: string; readonly signal?: AbortSignal; };"
@@ -3906,6 +3926,7 @@
             "const text = serializeSSRState(state); // state: ISSRState",
             "assertSSRState(value); // 通过则收窄类型为 ISSRState，不通过则抛错"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ISSRState = { readonly version: 1; readonly stores: Readonly<Record<string, Readonly<Record<string, IJSONValue>>>>; readonly resources?: Readonly<Record<string, IResourceCacheSnapshot<IJSONValue>>>; };"
@@ -4093,6 +4114,7 @@
             "type ISSRStore = {\n  readonly $runtime: IRuntime;\n  readonly $disposed: boolean;\n  $plain(): Record<string, unknown>; // 导出可脱水的纯数据快照\n  $hydrate(state: Record<string, unknown>): void; // 应用一份快照\n  $dispose(): void | PromiseLike<void>;\n};",
             "import { createStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\n\nconst app = createStore({ count: 0 }, { runtime: scope.runtime }); // 满足 ISSRStore\nconst user = new Resource(fetchUser, scope.runtime, { ttl: 30_000 }); // 满足 ISSRResource"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ISSRStore = { readonly $runtime: IRuntime; readonly $disposed: boolean; $plain(): Record<string, unknown>; $hydrate(state: Record<string, unknown>): void; $dispose(): void | PromiseLike<void>; };"
@@ -4244,6 +4266,7 @@
           "examples": [
             "const SsrWireType = { json: 'json', text: 'text', bytes: 'bytes' } as const;\ntype ISsrWireType = 'json' | 'text' | 'bytes';"
           ],
+          "members": [],
           "aliasOf": "ISsrWireType",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4309,6 +4332,7 @@
           "examples": [
             "const SsrWorkOutcome = { value: 'value', disposed: 'disposed', timeout: 'timeout' } as const;\ntype ISsrWorkOutcome = 'value' | 'disposed' | 'timeout';"
           ],
+          "members": [],
           "aliasOf": "ISsrWorkOutcome",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4375,6 +4399,7 @@
             "import {\n  SSRRequestScope,\n  createSSRRequestScope,\n  serializeSSRState,\n  deserializeSSRState,\n  createSSRStateScript,\n  readSSRStateFromDocument,\n  createSSRStateScriptWith,\n  readSSRStateFromDocumentWith,\n  assertSSRState\n} from '@migaia/store-ssr';\nimport type {\n  ISSRState,\n  ISSRStore,\n  ISSRResource,\n  ISSRRequestScopeOptions,\n  ISSRRegistrationOptions,\n  IDehydrateAsyncOptions,\n  IAwaitResourcesOptions,\n  ISSRResourceFailure,\n  ISSRDocument,\n  ISSRScriptOptions,\n  ISSRReadOptions,\n  ITrustedSSRState\n} from '@migaia/store-ssr';",
             "const trusted: ITrustedSSRState = scope.dehydrateTrusted();\nconst text = serializeTrustedSSRState(trusted); // 必须紧跟着调用,中间不能有别的异步/mutation"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ITrustedSSRState = ISSRState & { readonly [trustedSSRBrand]: true; };"
@@ -4453,6 +4478,7 @@
             "const state = readSSRStateFromDocument(); // 默认同一个 elementId，浏览器端传 window.document",
             "import { createRuntime } from '@migaia/reactive';\nimport { createStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\nimport { readSSRStateFromDocument } from '@migaia/store-ssr';\n\nconst runtime = createRuntime();\nconst app = createStore({ theme: 'dark' }, { runtime });\nconst user = new Resource(fetchUser, runtime, { ttl: 30_000, autoStart: false });\n\nconst state = readSSRStateFromDocument();\nif (state) {\n  if (state.stores.app) app.$hydrate(state.stores.app);\n  if (state.resources?.user) user.hydrate(state.resources.user);\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function readSSRStateFromDocument(elementId?: string, documentValue?: ISSRDocument): ISSRState | undefined;"
@@ -4538,6 +4564,7 @@
             "const state = await readSSRStateFromDocumentWith({ codecs, document });",
             "import { createSerializeRegistry } from '@migaia/serialize';\nimport { createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/store-ssr';\nimport { binaryPlugin } from './binary-plugin.js';\n\nconst codecs = createSerializeRegistry([binaryPlugin()]);\nconst html = await createSSRStateScriptWith(state, { codecs, elementId: 'app-state' });\n\n// 浏览器端，读取时必须用同一份 codecs 配置\nconst restored = await readSSRStateFromDocumentWith({ codecs, elementId: 'app-state', document });"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function readSSRStateFromDocumentWith(options: ISSRReadOptions): Promise<ISSRState | undefined>;"
@@ -4672,6 +4699,7 @@
           "errors": ["No documented errors are declared for serializeSSRState."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for serializeSSRState.",
           "examples": ["const text = serializeSSRState(state); // state: ISSRState"],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function serializeSSRState(state: ISSRState): string;"
@@ -4751,6 +4779,7 @@
             "const trusted: ITrustedSSRState = scope.dehydrateTrusted();\nconst text = serializeTrustedSSRState(trusted); // 必须紧跟着调用,中间不能有别的异步/mutation",
             "const trusted = scope.dehydrateTrusted();\nconst text = serializeTrustedSSRState(trusted); // 必须紧跟调用，中间不能有其他异步/mutation"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function serializeTrustedSSRState(state: ITrustedSSRState): string;"
@@ -4827,6 +4856,212 @@
           "errors": ["No documented errors are declared for SSRRequestScope."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for SSRRequestScope.",
           "examples": [],
+          "members": [
+            {
+              "name": "runtime",
+              "kind": "property",
+              "signature": "readonly runtime: IRuntime;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "disposed",
+              "kind": "get",
+              "signature": "get disposed(): boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "register",
+              "kind": "method",
+              "signature": "register(key: string, store: ISSRStore, options?: ISSRRegistrationOptions): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "store",
+                  "type": "ISSRStore",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "ISSRRegistrationOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "unregister",
+              "kind": "method",
+              "signature": "unregister(key: string, disposeOwned?: boolean): boolean;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "disposeOwned",
+                  "type": "boolean",
+                  "optional": true
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "detach",
+              "kind": "method",
+              "signature": "detach(key: string): ISSRStore | undefined;",
+              "description": "Remove a registration without disposing it; ownership transfers to the caller.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "ISSRStore | undefined"
+            },
+            {
+              "name": "registerResource",
+              "kind": "method",
+              "signature": "registerResource(key: string, resource: ISSRResource, options?: ISSRRegistrationOptions): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "resource",
+                  "type": "ISSRResource",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "ISSRRegistrationOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "unregisterResource",
+              "kind": "method",
+              "signature": "unregisterResource(key: string, disposeOwned?: boolean): boolean;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "disposeOwned",
+                  "type": "boolean",
+                  "optional": true
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "detachResource",
+              "kind": "method",
+              "signature": "detachResource(key: string): ISSRResource | undefined;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "ISSRResource | undefined"
+            },
+            {
+              "name": "hydrate",
+              "kind": "method",
+              "signature": "hydrate(state: ISSRState): void;",
+              "description": "Best-effort, NOT atomic. `assertSSRState()` already rejected anything that isn't well-formed JSON before this runs, but an individual store's or resource's own `$hydrate()`/`hydrate()` can still throw for reasons outside this method's control (its own validation, a computed constraint, whatever). Doing true all-or-nothing commit across an arbitrary set of stores would need each one to support a stage/commit/ rollback protocol — `ISSRStore`/`ISSRResource` don't have one, and adding one is a real interface change, not a local fix. So instead: every entry is attempted regardless of an earlier one failing (same pattern as `dispose()` below), so \"hydrate() threw\" always means \"every entry that _could_ apply, did — here's what couldn't,\" never \"stopped partway through for reasons that depend on object-key iteration order.\" Pending-hydration bookkeeping is always updated to reflect what was actually consumed, never left stale from before this call just because something later in the same call failed.",
+              "parameterDetails": [
+                {
+                  "name": "state",
+                  "type": "ISSRState",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "dehydrate",
+              "kind": "method",
+              "signature": "dehydrate(): ISSRState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ISSRState"
+            },
+            {
+              "name": "dehydrateTrusted",
+              "kind": "method",
+              "signature": "dehydrateTrusted(): ITrustedSSRState;",
+              "description": "Internal fast path — NOT a snapshot. Every value in the returned state (`store.$plain()`'s object, each resource's `dehydrate()` result) is whatever live reference those calls happen to return; this method does not copy, freeze deeply, or validate it. If the store mutates between this call and whenever the caller actually serializes the result (an await, a later tick, a queued write), the payload can change out from under the caller without warning — there is no point-in-time guarantee here the way there is with `dehydrate()`. Only correct when every value is already known-safe, already-JSON, already-immutable-for-the-duration-of-the-call data — e.g. this library's own bundled documentation/demo content, never anything derived from request input or a store that might mutate concurrently. `dehydrate()` is almost certainly the method you want; reach for this one only when the validation/copy cost of `dehydrate()` is the thing you're specifically trying to avoid, and you can actually justify why skipping it is safe here.",
+              "parameterDetails": [],
+              "returns": "ITrustedSSRState"
+            },
+            {
+              "name": "awaitResources",
+              "kind": "method",
+              "signature": "awaitResources(options?: IAwaitResourcesOptions): Promise<readonly ISSRResourceFailure[]>;",
+              "description": "等待所有已注册的异步派生，返回失败清单。 之前是一趟 `Promise.all`，两个后果： - 任何一个 resource reject，整个 await 就 reject，页面拿不到**任何** payload——一份可选的预取数据挂掉，把其余全部预取一起赔进去； - 瀑布式的 resource（A resolve 之后才注册 B）根本不在那一趟里， dehydrate 时 B 还没好，SSR 缓存白做。 现在逐轮 settle：每轮只等**这一轮新出现的 promise**，直到不再有新的。 按 promise 身份去重，不按 key——同一个 key 在首次 settle 后又发起 retry/refetch 换了一个新 promise，仍然要被等到，而不是因为 key 已经 \"见过\"就永久跳过。失败不抛出，而是作为清单返回——调用方决定是整页 失败，还是发出去让客户端重取。 三种失败旁路都要收进清单，不能让任何一种绕过 try/catch 直接终止整个 等待：`.promise` getter 同步抛错、真正超时、以及等待期间 scope 被 dispose（这一种直接返回已有结果，不算这一轮里剩下 resource 的错）。",
+              "parameterDetails": [
+                {
+                  "name": "options",
+                  "type": "IAwaitResourcesOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<readonly ISSRResourceFailure[]>"
+            },
+            {
+              "name": "dehydrateAsync",
+              "kind": "method",
+              "signature": "dehydrateAsync(options?: IDehydrateAsyncOptions): Promise<ISSRState>;",
+              "description": "预取后取快照。失败的 resource 不进 payload，其余照常。 缺省把失败报给 Runtime 的 onError（phase `ssr-resource`）——静默吞掉会让 「客户端为什么又发了一遍请求」无从查起。给了 onResourceError 就以它为准。",
+              "parameterDetails": [
+                {
+                  "name": "options",
+                  "type": "IDehydrateAsyncOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<ISSRState>"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "signature": "dispose(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "disposeAsync",
+              "kind": "method",
+              "signature": "disposeAsync(): Promise<void>;",
+              "description": "Awaitable teardown boundary for real Store Light instances whose `$dispose()` is asynchronous. Concurrent and repeated callers share the same completion and failure replay.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            }
+          ],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare class SSRRequestScope { #private; readonly runtime: IRuntime; constructor(options?: ISSRRequestScopeOptions); get disposed(): boolean; register(key: string, store: ISSRStore, options?: ISSRRegistrationOptions): void; unregister(key: string, disposeOwned?: boolean): boolean; /** Remove a registration without disposing it; ownership transfers to the caller. */ detach(key: string): ISSRStore | undefined; registerResource(key: string, resource: ISSRResource, options?: ISSRRegistrationOptions): void; unregisterResource(key: string, disposeOwned?: boolean): boolean; detachResource(key: string): ISSRResource | undefined; /** * Best-effort, NOT atomic. `assertSSRState()` already rejected anything that isn't well-formed * JSON before this runs, but an individual store's or resource's own `$hydrate()`/`hydrate()` can * still throw for reasons outside this method's control (its own validation, a computed * constraint, whatever). Doing true all-or-nothing commit across an arbitrary set of stores would * need each one to support a stage/commit/ rollback protocol — `ISSRStore`/`ISSRResource` don't * have one, and adding one is a real interface change, not a local fix. * * So instead: every entry is attempted regardless of an earlier one failing (same pattern as * `dispose()` below), so \"hydrate() threw\" always means \"every entry that _could_ apply, did — * here's what couldn't,\" never \"stopped partway through for reasons that depend on object-key * iteration order.\" Pending-hydration bookkeeping is always updated to reflect what was actually * consumed, never left stale from before this call just because something later in the same call * failed. */ hydrate(state: ISSRState): void; dehydrate(): ISSRState; /** * Internal fast path — NOT a snapshot. Every value in the returned state (`store.$plain()`'s * object, each resource's `dehydrate()` result) is whatever live reference those calls happen to * return; this method does not copy, freeze deeply, or validate it. If the store mutates between * this call and whenever the caller actually serializes the result (an await, a later tick, a * queued write), the payload can change out from under the caller without warning — there is no * point-in-time guarantee here the way there is with `dehydrate()`. * * Only correct when every value is already known-safe, already-JSON, * already-immutable-for-the-duration-of-the-call data — e.g. this library's own bundled * documentation/demo content, never anything derived from request input or a store that might * mutate concurrently. `dehydrate()` is almost certainly the method you want; reach for this one * only when the validation/copy cost of `dehydrate()` is the thing you're specifically trying to * avoid, and you can actually justify why skipping it is safe here. */ dehydrateTrusted(): ITrustedSSRState; /** * 等待所有已注册的异步派生，返回失败清单。 * * 之前是一趟 `Promise.all`，两个后果： * * - 任何一个 resource reject，整个 await 就 reject，页面拿不到**任何** payload——一份可选的预取数据挂掉，把其余全部预取一起赔进去； * - 瀑布式的 resource（A resolve 之后才注册 B）根本不在那一趟里， dehydrate 时 B 还没好，SSR 缓存白做。 * * 现在逐轮 settle：每轮只等**这一轮新出现的 promise**，直到不再有新的。 按 promise 身份去重，不按 key——同一个 key 在首次 settle 后又发起 * retry/refetch 换了一个新 promise，仍然要被等到，而不是因为 key 已经 \"见过\"就永久跳过。失败不抛出，而是作为清单返回——调用方决定是整页 * 失败，还是发出去让客户端重取。 * * 三种失败旁路都要收进清单，不能让任何一种绕过 try/catch 直接终止整个 等待：`.promise` getter 同步抛错、真正超时、以及等待期间 scope 被 * dispose（这一种直接返回已有结果，不算这一轮里剩下 resource 的错）。 */ awaitResources(options?: IAwaitResourcesOptions): Promise<readonly ISSRResourceFailure[]>; /** * 预取后取快照。失败的 resource 不进 payload，其余照常。 * * 缺省把失败报给 Runtime 的 onError（phase `ssr-resource`）——静默吞掉会让 「客户端为什么又发了一遍请求」无从查起。给了 onResourceError * 就以它为准。 */ dehydrateAsync(options?: IDehydrateAsyncOptions): Promise<ISSRState>; dispose(): void; /** * Awaitable teardown boundary for real Store Light instances whose `$dispose()` is asynchronous. * Concurrent and repeated callers share the same completion and failure replay. */ disposeAsync(): Promise<void>; }"
@@ -5020,6 +5255,7 @@
             "const SsrWireType = { json: 'json', text: 'text', bytes: 'bytes' } as const;\ntype ISsrWireType = 'json' | 'text' | 'bytes';",
             "SsrWireType.json; // 'json'\nSsrWireType.text; // 'text'\nSsrWireType.bytes; // 'bytes'"
           ],
+          "members": [],
           "aliasOf": "SsrWireType",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5087,6 +5323,7 @@
             "const SsrWorkOutcome = { value: 'value', disposed: 'disposed', timeout: 'timeout' } as const;\ntype ISsrWorkOutcome = 'value' | 'disposed' | 'timeout';",
             "SsrWorkOutcome.value; // 'value'\nSsrWorkOutcome.disposed; // 'disposed'\nSsrWorkOutcome.timeout; // 'timeout'"
           ],
+          "members": [],
           "aliasOf": "SsrWorkOutcome",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5150,6 +5387,7 @@
           "errors": ["No documented errors are declared for STORE_SSR_SOURCE."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for STORE_SSR_SOURCE.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": ["export declare const STORE_SSR_SOURCE = \"@migaia/store-ssr\";"],
           "overloadParameterDetails": [[]],

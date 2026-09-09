@@ -71,6 +71,12 @@
       "library": "resource"
     },
     {
+      "path": "/en/architecture/rpc-contract",
+      "locale": "en",
+      "domain": "architecture",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/en/architecture/serialize",
       "locale": "en",
       "domain": "architecture",
@@ -299,114 +305,6 @@
       "library": "capability"
     },
     {
-      "path": "/en/docs/capability/graph-dynamic",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/graph-dynamic/IDynamicCapabilityGraph",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/graph-dynamic/IDynamicCapabilityGraphOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/graph-dynamic/IGraphBindingLease",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/graph-dynamic/IGraphBindingReleaseEntry",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/graph-dynamic/IGraphBindingReleaseReason",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/graph-dynamic/IGraphMutationResult",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/graph-dynamic/IGraphReleaseEntry",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/graph-dynamic/IGraphStartEntry",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/graph-dynamic/IGraphTraversalMetrics",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/graph-dynamic/createDynamicCapabilityGraph",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/graph-topology",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/graph-topology/ICapabilityTopology",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/graph-topology/ITopologyDependency",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/graph-topology/ITopologyInvalidReason",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/graph-topology/ITopologyNode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/graph-topology/TopologyInvalidReason",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/graph-topology/buildCapabilityTopology",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
       "path": "/en/docs/capability/graph/CAPABILITY_GRAPH_SOURCE",
       "locale": "en",
       "domain": "docs",
@@ -510,6 +408,114 @@
     },
     {
       "path": "/en/docs/capability/graph/createCapabilityGraph",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph/dynamic",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph/dynamic/IDynamicCapabilityGraph",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph/dynamic/IDynamicCapabilityGraphOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph/dynamic/IGraphBindingLease",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph/dynamic/IGraphBindingReleaseEntry",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph/dynamic/IGraphBindingReleaseReason",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph/dynamic/IGraphMutationResult",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph/dynamic/IGraphReleaseEntry",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph/dynamic/IGraphStartEntry",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph/dynamic/IGraphTraversalMetrics",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph/dynamic/createDynamicCapabilityGraph",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph/topology",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph/topology/ICapabilityTopology",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph/topology/ITopologyDependency",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph/topology/ITopologyInvalidReason",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph/topology/ITopologyNode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph/topology/TopologyInvalidReason",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/graph/topology/buildCapabilityTopology",
       "locale": "en",
       "domain": "docs",
       "library": "capability"
@@ -3209,6 +3215,222 @@
       "library": "resource"
     },
     {
+      "path": "/en/docs/rpc-contract",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/IRpcBinaryFrame",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/IRpcContractError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/IRpcContractErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/IRpcDescriptor",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/IRpcDiscoveryEnvelope",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/IRpcEncodedType",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/IRpcEnvelope",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/IRpcFramerOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/IRpcPortableBytes",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/IRpcPortableRecord",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/IRpcPortableValue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/IRpcProtocol",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/IRpcRequestEnvelope",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/IRpcResponseFailure",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/IRpcResponseSuccess",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/IRpcSerializedError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/IRpcStringFrame",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/IRpcVariationEnvelope",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/RpcContractErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/createDescriptor",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/deserializeRpcError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/framing",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/framing/IRpcFrameAcceptResult",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/framing/IRpcFrameContext",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/framing/IRpcFramer",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/framing/IRpcReassembler",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/framing/createBinaryFramer",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/framing/createReassembler",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/framing/createStringFramer",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/framing/messageFramerV1",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/normalizePortable",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/normalizeRpcEnvelope",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/overview",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/rpcProtocolV1",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/serializeRpcError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/en/docs/serialize",
       "locale": "en",
       "domain": "docs",
@@ -3282,6 +3504,162 @@
     },
     {
       "path": "/en/docs/serialize/SerializePluginType",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codec",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codec/CodecErrorText",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codec/ICodec",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codec/ICodecValue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codec/asCodecValue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codec/assertCodecVersion",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codec/assertPortableValue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codec/createCodecError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codec/normalizeCodecFailure",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codec/toPortableValue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codecs/cbor",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codecs/cbor/ICborCodecOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codecs/cbor/defineCBORCodec",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codecs/identity",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codecs/identity/identityCodecV1",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codecs/json",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codecs/json/IJsonCodecOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codecs/json/defineJsonCodec",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codecs/message-pack",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codecs/message-pack/IMessagePackCodecOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codecs/message-pack/defineMessagePackCodec",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codecs/protobuf",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codecs/protobuf/IProtobufBinding",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codecs/protobuf/IProtobufCodecOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codecs/protobuf/IProtobufSchema",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/codecs/protobuf/defineProtobufCodec",
       "locale": "en",
       "domain": "docs",
       "library": "serialize"
@@ -4469,127 +4847,127 @@
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-cookies",
+      "path": "/en/docs/storage-web/plugins/cookies",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-cookies/cookieBackendPlugin",
+      "path": "/en/docs/storage-web/plugins/cookies/cookieBackendPlugin",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-indexed-db",
+      "path": "/en/docs/storage-web/plugins/indexed-db",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-indexed-db/indexedDbBackendPlugin",
+      "path": "/en/docs/storage-web/plugins/indexed-db/indexedDbBackendPlugin",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-local-storage",
+      "path": "/en/docs/storage-web/plugins/local-storage",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-local-storage/localStorageBackendPlugin",
+      "path": "/en/docs/storage-web/plugins/local-storage/localStorageBackendPlugin",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-memory",
+      "path": "/en/docs/storage-web/plugins/memory",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-memory/memoryBackendPlugin",
+      "path": "/en/docs/storage-web/plugins/memory/memoryBackendPlugin",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-reactive",
+      "path": "/en/docs/storage-web/plugins/reactive",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-reactive-cookies",
+      "path": "/en/docs/storage-web/plugins/reactive/cookies",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-reactive-cookies/cookiesReactive",
+      "path": "/en/docs/storage-web/plugins/reactive/cookies/cookiesReactive",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-reactive-indexed-db",
+      "path": "/en/docs/storage-web/plugins/reactive/indexed-db",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-reactive-indexed-db/indexedDbReactive",
+      "path": "/en/docs/storage-web/plugins/reactive/indexed-db/indexedDbReactive",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-reactive-local-storage",
+      "path": "/en/docs/storage-web/plugins/reactive/local-storage",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-reactive-local-storage/localStorageReactive",
+      "path": "/en/docs/storage-web/plugins/reactive/local-storage/localStorageReactive",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-reactive-memory",
+      "path": "/en/docs/storage-web/plugins/reactive/memory",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-reactive-memory/memoryReactive",
+      "path": "/en/docs/storage-web/plugins/reactive/memory/memoryReactive",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-reactive-session-storage",
+      "path": "/en/docs/storage-web/plugins/reactive/session-storage",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-reactive-session-storage/sessionStorageReactive",
+      "path": "/en/docs/storage-web/plugins/reactive/session-storage/sessionStorageReactive",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-session-storage",
+      "path": "/en/docs/storage-web/plugins/session-storage",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/en/docs/storage-web/plugins-session-storage/sessionStorageBackendPlugin",
+      "path": "/en/docs/storage-web/plugins/session-storage/sessionStorageBackendPlugin",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
@@ -4991,139 +5369,139 @@
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition",
+      "path": "/en/docs/store-keyed/atom/definition",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition/IAtomDefinition",
+      "path": "/en/docs/store-keyed/atom/definition/IAtomDefinition",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition/IAtomGet",
+      "path": "/en/docs/store-keyed/atom/definition/IAtomGet",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition/IAtomRead",
+      "path": "/en/docs/store-keyed/atom/definition/IAtomRead",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition/IAtomSet",
+      "path": "/en/docs/store-keyed/atom/definition/IAtomSet",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition/IAtomUpdate",
+      "path": "/en/docs/store-keyed/atom/definition/IAtomUpdate",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition/IAtomWriter",
+      "path": "/en/docs/store-keyed/atom/definition/IAtomWriter",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition/IDerivedDefinition",
+      "path": "/en/docs/store-keyed/atom/definition/IDerivedDefinition",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition/IPrimitiveDefinition",
+      "path": "/en/docs/store-keyed/atom/definition/IPrimitiveDefinition",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition/IPrimitiveFactoryDefinition",
+      "path": "/en/docs/store-keyed/atom/definition/IPrimitiveFactoryDefinition",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition/IWritableAtomDefinition",
+      "path": "/en/docs/store-keyed/atom/definition/IWritableAtomDefinition",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition/IWritableDerivedDefinition",
+      "path": "/en/docs/store-keyed/atom/definition/IWritableDerivedDefinition",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition/assertNotThenable",
+      "path": "/en/docs/store-keyed/atom/definition/assertNotThenable",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition/atomDef",
+      "path": "/en/docs/store-keyed/atom/definition/atomDef",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition/atomDefFactory",
+      "path": "/en/docs/store-keyed/atom/definition/atomDefFactory",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition/derivedDef",
+      "path": "/en/docs/store-keyed/atom/definition/derivedDef",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition/isAtomDefinition",
+      "path": "/en/docs/store-keyed/atom/definition/isAtomDefinition",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition/previewSafeAtomDefFactory",
+      "path": "/en/docs/store-keyed/atom/definition/previewSafeAtomDefFactory",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-definition/writableDef",
+      "path": "/en/docs/store-keyed/atom/definition/writableDef",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-store",
+      "path": "/en/docs/store-keyed/atom/store",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-store/IAtomStore",
+      "path": "/en/docs/store-keyed/atom/store/IAtomStore",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-store/createAtomStore",
+      "path": "/en/docs/store-keyed/atom/store/createAtomStore",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/atom-store/defaultAtomStore",
+      "path": "/en/docs/store-keyed/atom/store/defaultAtomStore",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
@@ -5201,61 +5579,61 @@
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/reactive-atom",
+      "path": "/en/docs/store-keyed/reactive/atom",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/reactive-atom/IAtomGetter",
+      "path": "/en/docs/store-keyed/reactive/atom/IAtomGetter",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/reactive-atom/IAtomRead",
+      "path": "/en/docs/store-keyed/reactive/atom/IAtomRead",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/reactive-atom/IAtomSetter",
+      "path": "/en/docs/store-keyed/reactive/atom/IAtomSetter",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/reactive-atom/IAtomUpdate",
+      "path": "/en/docs/store-keyed/reactive/atom/IAtomUpdate",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/reactive-atom/IAtomWrite",
+      "path": "/en/docs/store-keyed/reactive/atom/IAtomWrite",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/reactive-atom/IReadableAtom",
+      "path": "/en/docs/store-keyed/reactive/atom/IReadableAtom",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/reactive-atom/IWritableAtom",
+      "path": "/en/docs/store-keyed/reactive/atom/IWritableAtom",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/reactive-atom/atomGetter",
+      "path": "/en/docs/store-keyed/reactive/atom/atomGetter",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/en/docs/store-keyed/reactive-atom/atomSetter",
+      "path": "/en/docs/store-keyed/reactive/atom/atomSetter",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
@@ -8387,7 +8765,31 @@
       "library": "web-rpc"
     },
     {
+      "path": "/en/docs/web-rpc/IWebRpcFeature",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
       "path": "/en/docs/web-rpc/IWebRpcFeatureConfig",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/IWebRpcFeatureDefinition",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/IWebRpcFeatureInstallScope",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/IWebRpcFeatureSurface",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
@@ -8681,205 +9083,205 @@
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-broadcast-channel",
+      "path": "/en/docs/web-rpc/adapters/broadcast-channel",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-broadcast-channel/createBroadcastChannelTransport",
+      "path": "/en/docs/web-rpc/adapters/broadcast-channel/createBroadcastChannelTransport",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-memory",
+      "path": "/en/docs/web-rpc/adapters/memory",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-memory/IMemoryTransport",
+      "path": "/en/docs/web-rpc/adapters/memory/IMemoryTransport",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-memory/createMemoryTransportPair",
+      "path": "/en/docs/web-rpc/adapters/memory/createMemoryTransportPair",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-message-port",
+      "path": "/en/docs/web-rpc/adapters/message-port",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-message-port/IBrowserMessagePortLike",
+      "path": "/en/docs/web-rpc/adapters/message-port/IBrowserMessagePortLike",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-message-port/IBrowserMessagePortTransportOptions",
+      "path": "/en/docs/web-rpc/adapters/message-port/IBrowserMessagePortTransportOptions",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-message-port/INodeMessagePortLike",
+      "path": "/en/docs/web-rpc/adapters/message-port/INodeMessagePortLike",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-message-port/createBrowserMessagePortTransport",
+      "path": "/en/docs/web-rpc/adapters/message-port/createBrowserMessagePortTransport",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-message-port/createNodeMessagePortTransport",
+      "path": "/en/docs/web-rpc/adapters/message-port/createNodeMessagePortTransport",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-rtc-data-channel",
+      "path": "/en/docs/web-rpc/adapters/rtc-data-channel",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-rtc-data-channel/IRTCDataChannel",
+      "path": "/en/docs/web-rpc/adapters/rtc-data-channel/IRTCDataChannel",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-rtc-data-channel/createRtcDataChannelTransport",
+      "path": "/en/docs/web-rpc/adapters/rtc-data-channel/createRtcDataChannelTransport",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-service-worker",
+      "path": "/en/docs/web-rpc/adapters/service-worker",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-service-worker/IServiceWorkerMessageReceiver",
+      "path": "/en/docs/web-rpc/adapters/service-worker/IServiceWorkerMessageReceiver",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-service-worker/IServiceWorkerMessageTarget",
+      "path": "/en/docs/web-rpc/adapters/service-worker/IServiceWorkerMessageTarget",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-service-worker/IServiceWorkerTransportOptions",
+      "path": "/en/docs/web-rpc/adapters/service-worker/IServiceWorkerTransportOptions",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-service-worker/createServiceWorkerTransport",
+      "path": "/en/docs/web-rpc/adapters/service-worker/createServiceWorkerTransport",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-shared-worker",
+      "path": "/en/docs/web-rpc/adapters/shared-worker",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-shared-worker/ISharedWorkerPort",
+      "path": "/en/docs/web-rpc/adapters/shared-worker/ISharedWorkerPort",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-shared-worker/createSharedWorkerTransport",
+      "path": "/en/docs/web-rpc/adapters/shared-worker/createSharedWorkerTransport",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-web-transport",
+      "path": "/en/docs/web-rpc/adapters/web-transport",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-web-transport/IWebTransportDatagrams",
+      "path": "/en/docs/web-rpc/adapters/web-transport/IWebTransportDatagrams",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-web-transport/createWebTransportDatagramTransport",
+      "path": "/en/docs/web-rpc/adapters/web-transport/createWebTransportDatagramTransport",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-web-worker",
+      "path": "/en/docs/web-rpc/adapters/web-worker",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-web-worker/IWebWorkerLikePort",
+      "path": "/en/docs/web-rpc/adapters/web-worker/IWebWorkerLikePort",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-web-worker/IWebWorkerTransportOptions",
+      "path": "/en/docs/web-rpc/adapters/web-worker/IWebWorkerTransportOptions",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-web-worker/createWebWorkerTransport",
+      "path": "/en/docs/web-rpc/adapters/web-worker/createWebWorkerTransport",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-window",
+      "path": "/en/docs/web-rpc/adapters/window",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-window/IWindowMessageReceiver",
+      "path": "/en/docs/web-rpc/adapters/window/IWindowMessageReceiver",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-window/IWindowMessageTarget",
+      "path": "/en/docs/web-rpc/adapters/window/IWindowMessageTarget",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-window/IWindowMessageTransportOptions",
+      "path": "/en/docs/web-rpc/adapters/window/IWindowMessageTransportOptions",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/adapters-window/createWindowMessageTransport",
+      "path": "/en/docs/web-rpc/adapters/window/createWindowMessageTransport",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
@@ -8909,6 +9311,12 @@
       "library": "web-rpc"
     },
     {
+      "path": "/en/docs/web-rpc/codec",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
       "path": "/en/docs/web-rpc/connect",
       "locale": "en",
       "domain": "docs",
@@ -8916,6 +9324,48 @@
     },
     {
       "path": "/en/docs/web-rpc/contract",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/contract-endpoint",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/contract-endpoint/IWebRpcComponentShadowDiagnostic",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/contract-endpoint/IWebRpcContractEndpoint",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/contract-endpoint/IWebRpcContractEndpointConfig",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/contract-endpoint/IWebRpcContractPlugin",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/contract-endpoint/IWebRpcFrameAuthentication",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/contract-endpoint/createContractEndpoint",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
@@ -8969,97 +9419,91 @@
       "library": "web-rpc"
     },
     {
+      "path": "/en/docs/web-rpc/defineFeature",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
       "path": "/en/docs/web-rpc/deserializeError",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/features-chunk",
+      "path": "/en/docs/web-rpc/features/control",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/features-chunk/IChunkSurface",
+      "path": "/en/docs/web-rpc/features/control/IControlSurface",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/features-chunk/chunk",
+      "path": "/en/docs/web-rpc/features/control/control",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/features-control",
+      "path": "/en/docs/web-rpc/features/discovery",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/features-control/IControlSurface",
+      "path": "/en/docs/web-rpc/features/discovery/IDiscoverySurface",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/features-control/control",
+      "path": "/en/docs/web-rpc/features/discovery/discovery",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/features-discovery",
+      "path": "/en/docs/web-rpc/features/outbound",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/features-discovery/IDiscoverySurface",
+      "path": "/en/docs/web-rpc/features/outbound/IOutboundSurface",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/features-discovery/discovery",
+      "path": "/en/docs/web-rpc/features/outbound/outbound",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/features-outbound",
+      "path": "/en/docs/web-rpc/features/provider",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/features-outbound/IOutboundSurface",
+      "path": "/en/docs/web-rpc/features/provider/IProviderSurface",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/features-outbound/outbound",
+      "path": "/en/docs/web-rpc/features/provider/provider",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/features-provider",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/features-provider/IProviderSurface",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/features-provider/provider",
+      "path": "/en/docs/web-rpc/framer",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
@@ -9107,150 +9551,6 @@
       "library": "web-rpc"
     },
     {
-      "path": "/en/docs/web-rpc/protocol-constants",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/IWebRpcCandidateStatus",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/IWebRpcChunkEvent",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/IWebRpcControlKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/IWebRpcMessageKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/IWebRpcOperation",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/IWebRpcPlatformValue",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/IWebRpcTransportEncodingValue",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/IWebRpcTransportOwnershipValue",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/IWebRpcTransportTopologyValue",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/IWebRpcVariation",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/WebRpcCandidateStatus",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/WebRpcChunkEvent",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/WebRpcContractFailureKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/WebRpcControlKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/WebRpcDebugPhase",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/WebRpcEndpointStatus",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/WebRpcMessageKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/WebRpcOperation",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/WebRpcPlatform",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/WebRpcTransportEncoding",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/WebRpcTransportOwnership",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/WebRpcTransportTopology",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/en/docs/web-rpc/protocol-constants/WebRpcVariation",
-      "locale": "en",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
       "path": "/en/docs/web-rpc/provider",
       "locale": "en",
       "domain": "docs",
@@ -9276,6 +9576,90 @@
     },
     {
       "path": "/en/docs/web-rpc/timeout",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/transport-constants",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/transport-constants/IWebRpcCandidateStatus",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/transport-constants/IWebRpcOperation",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/transport-constants/IWebRpcPlatformValue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/transport-constants/IWebRpcTransportEncodingValue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/transport-constants/IWebRpcTransportOwnershipValue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/transport-constants/IWebRpcTransportTopologyValue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/transport-constants/WebRpcCandidateStatus",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/transport-constants/WebRpcEndpointStatus",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/transport-constants/WebRpcOperation",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/transport-constants/WebRpcPlatform",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/transport-constants/WebRpcTransportEncoding",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/transport-constants/WebRpcTransportOwnership",
+      "locale": "en",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/en/docs/web-rpc/transport-constants/WebRpcTransportTopology",
       "locale": "en",
       "domain": "docs",
       "library": "web-rpc"
@@ -9402,6 +9786,12 @@
     },
     {
       "path": "/en/guides/logger",
+      "locale": "en",
+      "domain": "guides",
+      "library": "logger"
+    },
+    {
+      "path": "/en/guides/logger/custom-plugin",
       "locale": "en",
       "domain": "guides",
       "library": "logger"
@@ -9561,6 +9951,18 @@
       "locale": "en",
       "domain": "guides",
       "library": "resource"
+    },
+    {
+      "path": "/en/guides/rpc-contract",
+      "locale": "en",
+      "domain": "guides",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/guides/rpc-contract/getting-started",
+      "locale": "en",
+      "domain": "guides",
+      "library": "rpc-contract"
     },
     {
       "path": "/en/guides/serialize",
@@ -10475,6 +10877,12 @@
       "library": "web-rpc"
     },
     {
+      "path": "/en/guides/web-rpc/extension-authoring",
+      "locale": "en",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
       "path": "/en/guides/web-rpc/getting-started",
       "locale": "en",
       "domain": "guides",
@@ -10551,6 +10959,12 @@
       "locale": "zh",
       "domain": "architecture",
       "library": "resource"
+    },
+    {
+      "path": "/zh/architecture/rpc-contract",
+      "locale": "zh",
+      "domain": "architecture",
+      "library": "rpc-contract"
     },
     {
       "path": "/zh/architecture/serialize",
@@ -10781,114 +11195,6 @@
       "library": "capability"
     },
     {
-      "path": "/zh/docs/capability/graph-dynamic",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/graph-dynamic/IDynamicCapabilityGraph",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/graph-dynamic/IDynamicCapabilityGraphOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/graph-dynamic/IGraphBindingLease",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/graph-dynamic/IGraphBindingReleaseEntry",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/graph-dynamic/IGraphBindingReleaseReason",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/graph-dynamic/IGraphMutationResult",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/graph-dynamic/IGraphReleaseEntry",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/graph-dynamic/IGraphStartEntry",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/graph-dynamic/IGraphTraversalMetrics",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/graph-dynamic/createDynamicCapabilityGraph",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/graph-topology",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/graph-topology/ICapabilityTopology",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/graph-topology/ITopologyDependency",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/graph-topology/ITopologyInvalidReason",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/graph-topology/ITopologyNode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/graph-topology/TopologyInvalidReason",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/graph-topology/buildCapabilityTopology",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
       "path": "/zh/docs/capability/graph/CAPABILITY_GRAPH_SOURCE",
       "locale": "zh",
       "domain": "docs",
@@ -10992,6 +11298,114 @@
     },
     {
       "path": "/zh/docs/capability/graph/createCapabilityGraph",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph/dynamic",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph/dynamic/IDynamicCapabilityGraph",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph/dynamic/IDynamicCapabilityGraphOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph/dynamic/IGraphBindingLease",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph/dynamic/IGraphBindingReleaseEntry",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph/dynamic/IGraphBindingReleaseReason",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph/dynamic/IGraphMutationResult",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph/dynamic/IGraphReleaseEntry",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph/dynamic/IGraphStartEntry",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph/dynamic/IGraphTraversalMetrics",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph/dynamic/createDynamicCapabilityGraph",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph/topology",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph/topology/ICapabilityTopology",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph/topology/ITopologyDependency",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph/topology/ITopologyInvalidReason",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph/topology/ITopologyNode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph/topology/TopologyInvalidReason",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/graph/topology/buildCapabilityTopology",
       "locale": "zh",
       "domain": "docs",
       "library": "capability"
@@ -13817,6 +14231,222 @@
       "library": "resource"
     },
     {
+      "path": "/zh/docs/rpc-contract",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/IRpcBinaryFrame",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/IRpcContractError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/IRpcContractErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/IRpcDescriptor",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/IRpcDiscoveryEnvelope",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/IRpcEncodedType",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/IRpcEnvelope",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/IRpcFramerOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/IRpcPortableBytes",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/IRpcPortableRecord",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/IRpcPortableValue",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/IRpcProtocol",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/IRpcRequestEnvelope",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/IRpcResponseFailure",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/IRpcResponseSuccess",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/IRpcSerializedError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/IRpcStringFrame",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/IRpcVariationEnvelope",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/RpcContractErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/createDescriptor",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/deserializeRpcError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/framing",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/framing/IRpcFrameAcceptResult",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/framing/IRpcFrameContext",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/framing/IRpcFramer",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/framing/IRpcReassembler",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/framing/createBinaryFramer",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/framing/createReassembler",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/framing/createStringFramer",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/framing/messageFramerV1",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/normalizePortable",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/normalizeRpcEnvelope",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/overview",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/rpcProtocolV1",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/serializeRpcError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/zh/docs/serialize",
       "locale": "zh",
       "domain": "docs",
@@ -13902,6 +14532,162 @@
     },
     {
       "path": "/zh/docs/serialize/api",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codec/CodecErrorText",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codec/ICodec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codec/ICodecValue",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codec/asCodecValue",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codec/assertCodecVersion",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codec/assertPortableValue",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codec/createCodecError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codec/normalizeCodecFailure",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codec/toPortableValue",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codecs/cbor",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codecs/cbor/ICborCodecOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codecs/cbor/defineCBORCodec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codecs/identity",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codecs/identity/identityCodecV1",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codecs/json",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codecs/json/IJsonCodecOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codecs/json/defineJsonCodec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codecs/message-pack",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codecs/message-pack/IMessagePackCodecOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codecs/message-pack/defineMessagePackCodec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codecs/protobuf",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codecs/protobuf/IProtobufBinding",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codecs/protobuf/IProtobufCodecOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codecs/protobuf/IProtobufSchema",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/codecs/protobuf/defineProtobufCodec",
       "locale": "zh",
       "domain": "docs",
       "library": "serialize"
@@ -15125,127 +15911,127 @@
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-cookies",
+      "path": "/zh/docs/storage-web/plugins/cookies",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-cookies/cookieBackendPlugin",
+      "path": "/zh/docs/storage-web/plugins/cookies/cookieBackendPlugin",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-indexed-db",
+      "path": "/zh/docs/storage-web/plugins/indexed-db",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-indexed-db/indexedDbBackendPlugin",
+      "path": "/zh/docs/storage-web/plugins/indexed-db/indexedDbBackendPlugin",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-local-storage",
+      "path": "/zh/docs/storage-web/plugins/local-storage",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-local-storage/localStorageBackendPlugin",
+      "path": "/zh/docs/storage-web/plugins/local-storage/localStorageBackendPlugin",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-memory",
+      "path": "/zh/docs/storage-web/plugins/memory",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-memory/memoryBackendPlugin",
+      "path": "/zh/docs/storage-web/plugins/memory/memoryBackendPlugin",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-reactive",
+      "path": "/zh/docs/storage-web/plugins/reactive",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-reactive-cookies",
+      "path": "/zh/docs/storage-web/plugins/reactive/cookies",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-reactive-cookies/cookiesReactive",
+      "path": "/zh/docs/storage-web/plugins/reactive/cookies/cookiesReactive",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-reactive-indexed-db",
+      "path": "/zh/docs/storage-web/plugins/reactive/indexed-db",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-reactive-indexed-db/indexedDbReactive",
+      "path": "/zh/docs/storage-web/plugins/reactive/indexed-db/indexedDbReactive",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-reactive-local-storage",
+      "path": "/zh/docs/storage-web/plugins/reactive/local-storage",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-reactive-local-storage/localStorageReactive",
+      "path": "/zh/docs/storage-web/plugins/reactive/local-storage/localStorageReactive",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-reactive-memory",
+      "path": "/zh/docs/storage-web/plugins/reactive/memory",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-reactive-memory/memoryReactive",
+      "path": "/zh/docs/storage-web/plugins/reactive/memory/memoryReactive",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-reactive-session-storage",
+      "path": "/zh/docs/storage-web/plugins/reactive/session-storage",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-reactive-session-storage/sessionStorageReactive",
+      "path": "/zh/docs/storage-web/plugins/reactive/session-storage/sessionStorageReactive",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-session-storage",
+      "path": "/zh/docs/storage-web/plugins/session-storage",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
     },
     {
-      "path": "/zh/docs/storage-web/plugins-session-storage/sessionStorageBackendPlugin",
+      "path": "/zh/docs/storage-web/plugins/session-storage/sessionStorageBackendPlugin",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
@@ -15653,139 +16439,139 @@
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition",
+      "path": "/zh/docs/store-keyed/atom/definition",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition/IAtomDefinition",
+      "path": "/zh/docs/store-keyed/atom/definition/IAtomDefinition",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition/IAtomGet",
+      "path": "/zh/docs/store-keyed/atom/definition/IAtomGet",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition/IAtomRead",
+      "path": "/zh/docs/store-keyed/atom/definition/IAtomRead",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition/IAtomSet",
+      "path": "/zh/docs/store-keyed/atom/definition/IAtomSet",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition/IAtomUpdate",
+      "path": "/zh/docs/store-keyed/atom/definition/IAtomUpdate",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition/IAtomWriter",
+      "path": "/zh/docs/store-keyed/atom/definition/IAtomWriter",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition/IDerivedDefinition",
+      "path": "/zh/docs/store-keyed/atom/definition/IDerivedDefinition",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition/IPrimitiveDefinition",
+      "path": "/zh/docs/store-keyed/atom/definition/IPrimitiveDefinition",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition/IPrimitiveFactoryDefinition",
+      "path": "/zh/docs/store-keyed/atom/definition/IPrimitiveFactoryDefinition",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition/IWritableAtomDefinition",
+      "path": "/zh/docs/store-keyed/atom/definition/IWritableAtomDefinition",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition/IWritableDerivedDefinition",
+      "path": "/zh/docs/store-keyed/atom/definition/IWritableDerivedDefinition",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition/assertNotThenable",
+      "path": "/zh/docs/store-keyed/atom/definition/assertNotThenable",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition/atomDef",
+      "path": "/zh/docs/store-keyed/atom/definition/atomDef",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition/atomDefFactory",
+      "path": "/zh/docs/store-keyed/atom/definition/atomDefFactory",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition/derivedDef",
+      "path": "/zh/docs/store-keyed/atom/definition/derivedDef",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition/isAtomDefinition",
+      "path": "/zh/docs/store-keyed/atom/definition/isAtomDefinition",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition/previewSafeAtomDefFactory",
+      "path": "/zh/docs/store-keyed/atom/definition/previewSafeAtomDefFactory",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-definition/writableDef",
+      "path": "/zh/docs/store-keyed/atom/definition/writableDef",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-store",
+      "path": "/zh/docs/store-keyed/atom/store",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-store/IAtomStore",
+      "path": "/zh/docs/store-keyed/atom/store/IAtomStore",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-store/createAtomStore",
+      "path": "/zh/docs/store-keyed/atom/store/createAtomStore",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/atom-store/defaultAtomStore",
+      "path": "/zh/docs/store-keyed/atom/store/defaultAtomStore",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
@@ -15863,61 +16649,61 @@
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/reactive-atom",
+      "path": "/zh/docs/store-keyed/reactive/atom",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/reactive-atom/IAtomGetter",
+      "path": "/zh/docs/store-keyed/reactive/atom/IAtomGetter",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/reactive-atom/IAtomRead",
+      "path": "/zh/docs/store-keyed/reactive/atom/IAtomRead",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/reactive-atom/IAtomSetter",
+      "path": "/zh/docs/store-keyed/reactive/atom/IAtomSetter",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/reactive-atom/IAtomUpdate",
+      "path": "/zh/docs/store-keyed/reactive/atom/IAtomUpdate",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/reactive-atom/IAtomWrite",
+      "path": "/zh/docs/store-keyed/reactive/atom/IAtomWrite",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/reactive-atom/IReadableAtom",
+      "path": "/zh/docs/store-keyed/reactive/atom/IReadableAtom",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/reactive-atom/IWritableAtom",
+      "path": "/zh/docs/store-keyed/reactive/atom/IWritableAtom",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/reactive-atom/atomGetter",
+      "path": "/zh/docs/store-keyed/reactive/atom/atomGetter",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
     },
     {
-      "path": "/zh/docs/store-keyed/reactive-atom/atomSetter",
+      "path": "/zh/docs/store-keyed/reactive/atom/atomSetter",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
@@ -19067,7 +19853,31 @@
       "library": "web-rpc"
     },
     {
+      "path": "/zh/docs/web-rpc/IWebRpcFeature",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
       "path": "/zh/docs/web-rpc/IWebRpcFeatureConfig",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/IWebRpcFeatureDefinition",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/IWebRpcFeatureInstallScope",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/IWebRpcFeatureSurface",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
@@ -19361,205 +20171,205 @@
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-broadcast-channel",
+      "path": "/zh/docs/web-rpc/adapters/broadcast-channel",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-broadcast-channel/createBroadcastChannelTransport",
+      "path": "/zh/docs/web-rpc/adapters/broadcast-channel/createBroadcastChannelTransport",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-memory",
+      "path": "/zh/docs/web-rpc/adapters/memory",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-memory/IMemoryTransport",
+      "path": "/zh/docs/web-rpc/adapters/memory/IMemoryTransport",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-memory/createMemoryTransportPair",
+      "path": "/zh/docs/web-rpc/adapters/memory/createMemoryTransportPair",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-message-port",
+      "path": "/zh/docs/web-rpc/adapters/message-port",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-message-port/IBrowserMessagePortLike",
+      "path": "/zh/docs/web-rpc/adapters/message-port/IBrowserMessagePortLike",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-message-port/IBrowserMessagePortTransportOptions",
+      "path": "/zh/docs/web-rpc/adapters/message-port/IBrowserMessagePortTransportOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-message-port/INodeMessagePortLike",
+      "path": "/zh/docs/web-rpc/adapters/message-port/INodeMessagePortLike",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-message-port/createBrowserMessagePortTransport",
+      "path": "/zh/docs/web-rpc/adapters/message-port/createBrowserMessagePortTransport",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-message-port/createNodeMessagePortTransport",
+      "path": "/zh/docs/web-rpc/adapters/message-port/createNodeMessagePortTransport",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-rtc-data-channel",
+      "path": "/zh/docs/web-rpc/adapters/rtc-data-channel",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-rtc-data-channel/IRTCDataChannel",
+      "path": "/zh/docs/web-rpc/adapters/rtc-data-channel/IRTCDataChannel",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-rtc-data-channel/createRtcDataChannelTransport",
+      "path": "/zh/docs/web-rpc/adapters/rtc-data-channel/createRtcDataChannelTransport",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-service-worker",
+      "path": "/zh/docs/web-rpc/adapters/service-worker",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-service-worker/IServiceWorkerMessageReceiver",
+      "path": "/zh/docs/web-rpc/adapters/service-worker/IServiceWorkerMessageReceiver",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-service-worker/IServiceWorkerMessageTarget",
+      "path": "/zh/docs/web-rpc/adapters/service-worker/IServiceWorkerMessageTarget",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-service-worker/IServiceWorkerTransportOptions",
+      "path": "/zh/docs/web-rpc/adapters/service-worker/IServiceWorkerTransportOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-service-worker/createServiceWorkerTransport",
+      "path": "/zh/docs/web-rpc/adapters/service-worker/createServiceWorkerTransport",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-shared-worker",
+      "path": "/zh/docs/web-rpc/adapters/shared-worker",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-shared-worker/ISharedWorkerPort",
+      "path": "/zh/docs/web-rpc/adapters/shared-worker/ISharedWorkerPort",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-shared-worker/createSharedWorkerTransport",
+      "path": "/zh/docs/web-rpc/adapters/shared-worker/createSharedWorkerTransport",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-web-transport",
+      "path": "/zh/docs/web-rpc/adapters/web-transport",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-web-transport/IWebTransportDatagrams",
+      "path": "/zh/docs/web-rpc/adapters/web-transport/IWebTransportDatagrams",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-web-transport/createWebTransportDatagramTransport",
+      "path": "/zh/docs/web-rpc/adapters/web-transport/createWebTransportDatagramTransport",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-web-worker",
+      "path": "/zh/docs/web-rpc/adapters/web-worker",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-web-worker/IWebWorkerLikePort",
+      "path": "/zh/docs/web-rpc/adapters/web-worker/IWebWorkerLikePort",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-web-worker/IWebWorkerTransportOptions",
+      "path": "/zh/docs/web-rpc/adapters/web-worker/IWebWorkerTransportOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-web-worker/createWebWorkerTransport",
+      "path": "/zh/docs/web-rpc/adapters/web-worker/createWebWorkerTransport",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-window",
+      "path": "/zh/docs/web-rpc/adapters/window",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-window/IWindowMessageReceiver",
+      "path": "/zh/docs/web-rpc/adapters/window/IWindowMessageReceiver",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-window/IWindowMessageTarget",
+      "path": "/zh/docs/web-rpc/adapters/window/IWindowMessageTarget",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-window/IWindowMessageTransportOptions",
+      "path": "/zh/docs/web-rpc/adapters/window/IWindowMessageTransportOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/adapters-window/createWindowMessageTransport",
+      "path": "/zh/docs/web-rpc/adapters/window/createWindowMessageTransport",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
@@ -19601,6 +20411,12 @@
       "library": "web-rpc"
     },
     {
+      "path": "/zh/docs/web-rpc/codec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
       "path": "/zh/docs/web-rpc/connect",
       "locale": "zh",
       "domain": "docs",
@@ -19608,6 +20424,48 @@
     },
     {
       "path": "/zh/docs/web-rpc/contract",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/contract-endpoint",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/contract-endpoint/IWebRpcComponentShadowDiagnostic",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/contract-endpoint/IWebRpcContractEndpoint",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/contract-endpoint/IWebRpcContractEndpointConfig",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/contract-endpoint/IWebRpcContractPlugin",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/contract-endpoint/IWebRpcFrameAuthentication",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/contract-endpoint/createContractEndpoint",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
@@ -19661,97 +20519,91 @@
       "library": "web-rpc"
     },
     {
+      "path": "/zh/docs/web-rpc/defineFeature",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
       "path": "/zh/docs/web-rpc/deserializeError",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/features-chunk",
+      "path": "/zh/docs/web-rpc/features/control",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/features-chunk/IChunkSurface",
+      "path": "/zh/docs/web-rpc/features/control/IControlSurface",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/features-chunk/chunk",
+      "path": "/zh/docs/web-rpc/features/control/control",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/features-control",
+      "path": "/zh/docs/web-rpc/features/discovery",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/features-control/IControlSurface",
+      "path": "/zh/docs/web-rpc/features/discovery/IDiscoverySurface",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/features-control/control",
+      "path": "/zh/docs/web-rpc/features/discovery/discovery",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/features-discovery",
+      "path": "/zh/docs/web-rpc/features/outbound",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/features-discovery/IDiscoverySurface",
+      "path": "/zh/docs/web-rpc/features/outbound/IOutboundSurface",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/features-discovery/discovery",
+      "path": "/zh/docs/web-rpc/features/outbound/outbound",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/features-outbound",
+      "path": "/zh/docs/web-rpc/features/provider",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/features-outbound/IOutboundSurface",
+      "path": "/zh/docs/web-rpc/features/provider/IProviderSurface",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/features-outbound/outbound",
+      "path": "/zh/docs/web-rpc/features/provider/provider",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/features-provider",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/features-provider/IProviderSurface",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/features-provider/provider",
+      "path": "/zh/docs/web-rpc/framer",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
@@ -19799,150 +20651,6 @@
       "library": "web-rpc"
     },
     {
-      "path": "/zh/docs/web-rpc/protocol-constants",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/IWebRpcCandidateStatus",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/IWebRpcChunkEvent",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/IWebRpcControlKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/IWebRpcMessageKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/IWebRpcOperation",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/IWebRpcPlatformValue",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/IWebRpcTransportEncodingValue",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/IWebRpcTransportOwnershipValue",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/IWebRpcTransportTopologyValue",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/IWebRpcVariation",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/WebRpcCandidateStatus",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/WebRpcChunkEvent",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/WebRpcContractFailureKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/WebRpcControlKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/WebRpcDebugPhase",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/WebRpcEndpointStatus",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/WebRpcMessageKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/WebRpcOperation",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/WebRpcPlatform",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/WebRpcTransportEncoding",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/WebRpcTransportOwnership",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/WebRpcTransportTopology",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
-      "path": "/zh/docs/web-rpc/protocol-constants/WebRpcVariation",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "web-rpc"
-    },
-    {
       "path": "/zh/docs/web-rpc/provider",
       "locale": "zh",
       "domain": "docs",
@@ -19974,6 +20682,90 @@
     },
     {
       "path": "/zh/docs/web-rpc/timeout",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/transport-constants",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/transport-constants/IWebRpcCandidateStatus",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/transport-constants/IWebRpcOperation",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/transport-constants/IWebRpcPlatformValue",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/transport-constants/IWebRpcTransportEncodingValue",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/transport-constants/IWebRpcTransportOwnershipValue",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/transport-constants/IWebRpcTransportTopologyValue",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/transport-constants/WebRpcCandidateStatus",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/transport-constants/WebRpcEndpointStatus",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/transport-constants/WebRpcOperation",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/transport-constants/WebRpcPlatform",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/transport-constants/WebRpcTransportEncoding",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/transport-constants/WebRpcTransportOwnership",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/docs/web-rpc/transport-constants/WebRpcTransportTopology",
       "locale": "zh",
       "domain": "docs",
       "library": "web-rpc"
@@ -20100,6 +20892,12 @@
     },
     {
       "path": "/zh/guides/logger",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "logger"
+    },
+    {
+      "path": "/zh/guides/logger/custom-plugin",
       "locale": "zh",
       "domain": "guides",
       "library": "logger"
@@ -20259,6 +21057,18 @@
       "locale": "zh",
       "domain": "guides",
       "library": "resource"
+    },
+    {
+      "path": "/zh/guides/rpc-contract",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/guides/rpc-contract/getting-started",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "rpc-contract"
     },
     {
       "path": "/zh/guides/serialize",
@@ -21168,6 +21978,12 @@
     },
     {
       "path": "/zh/guides/web-rpc/endpoint-composition",
+      "locale": "zh",
+      "domain": "guides",
+      "library": "web-rpc"
+    },
+    {
+      "path": "/zh/guides/web-rpc/extension-authoring",
       "locale": "zh",
       "domain": "guides",
       "library": "web-rpc"

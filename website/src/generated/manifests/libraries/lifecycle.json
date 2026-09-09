@@ -2256,6 +2256,7 @@
             "const won = await boundedWait(task, deadlineAt) // true=task 先完成；false=截止时间先到（task 仍在跑）",
             "import {\n  systemScheduler,\n  createManualScheduler,\n  snapshotScheduler,\n  validateSchedulerDelay,\n  validateSchedulerTime,\n  createAbortController,\n  boundedWait,\n  createTerminalController\n} from '@migaia/lifecycle'"
           ],
+          "members": [],
           "aliasOf": "boundedWait",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2352,6 +2353,7 @@
           "examples": [
             "const unit = createLifecycleUnit<Config>()\nunit.start(() => fetchConfig()) // thenable → 先进 'loading'，settle 后进 'loaded'/'failed'\nunit.state // 'loading'\nunit.value // undefined（settle 前）\nunit.restart(() => fetchConfig()) // 新 generation，旧一次的迟到结果被静默丢弃"
           ],
+          "members": [],
           "aliasOf": "createLifecycleUnit",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2483,6 +2485,7 @@
             "import { createPendingTracker, createMutationQueue } from '@migaia/lifecycle'\n\nconst pending = createPendingTracker()\nconst queue = createMutationQueue({ queueAdmissionTimeoutMs: 3000 })\n\nasync function applyBatch(mutations: Array<() => Promise<void>>) {\n  for (const mutation of mutations) {\n    pending.track(queue.enqueue(mutation, { owner: 'batch' }))\n  }\n  await pending.drain() // 等到本批（含批内动态追加的）全部落地\n}",
             "const queue = createMutationQueue({ queueAdmissionTimeoutMs: 5000 })\nconst result = await queue.enqueue(() => applyMutation(), { owner: 'sync-loop' })\nqueue.size // 排队中 + 正在执行的任务数"
           ],
+          "members": [],
           "aliasOf": "createMutationQueue",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2656,6 +2659,7 @@
             "import { createLifecycleScope, createProvisionalScope } from '@migaia/lifecycle'\n\nconst rootScope = createLifecycleScope()\n\nasync function setupModule() {\n  const provisional = createProvisionalScope()\n  try {\n    const db = provisional.own(await connectDb(), { force: (ctx) => closeDb(db) })\n    const cache = provisional.own(await connectCache(), { force: (ctx) => closeCache(cache) })\n    await provisional.commitTo(rootScope) // 全部转移给 rootScope，之后随 rootScope.dispose() 释放\n  } catch (error) {\n    await provisional.rollback() // 任一步失败：已注册的资源逆序释放，冒泡原错误\n    throw error\n  }\n}",
             "const provisional = createProvisionalScope()\nconst db = provisional.own(await connect(), { force: (ctx) => db.close() })\ntry {\n  await provisional.commitTo(outerScope) // 按注册顺序逐个 own() 到 parent\n} catch (error) {\n  // parent 中途拒绝（如已在 closing）：已转移部分留在 parent 名下，剩余部分已被自动释放并 await 完成\n}"
           ],
+          "members": [],
           "aliasOf": "createProvisionalScope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2788,6 +2792,7 @@
             "import { createSyncLifecycleScope } from '@migaia/lifecycle'\n\nfunction withListeners() {\n  using scope = createSyncLifecycleScope() // 环境支持 `[Symbol.dispose]` 时可用 `using`\n  const handler = () => console.log('tick')\n  window.addEventListener('tick', handler)\n  scope.own(handler, { syncSafe: true, force: () => window.removeEventListener('tick', handler) })\n  // 作用域结束时自动 dispose()，移除监听器\n}",
             "const scope = createSyncLifecycleScope()\nscope.own(node, { syncSafe: true, force: () => node.detach() })\nscope.close()\nconst failures = scope.dispose() // 同步返回，不可能有异步资源"
           ],
+          "members": [],
           "aliasOf": "createSyncLifecycleScope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3113,6 +3118,7 @@
           "examples": [
             "const terminal = createTerminalController()\nterminal.close() // open → closing，幂等\nterminal.forceTerminal() // 直接进 terminal，resolve whenTerminal()\nawait terminal.whenTerminal()"
           ],
+          "members": [],
           "aliasOf": "createTerminalController",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3203,6 +3209,7 @@
           "examples": [
             "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  ThenableProbeKind,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'"
           ],
+          "members": [],
           "aliasOf": "DisposeTransactionKind",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3274,6 +3281,7 @@
             "function createErrorCollector(\n  policy: 'throw' | 'collect' | 'report' | 'firstError',\n  report: ((error: unknown) => void) | undefined\n): IErrorCollector\n\ntype IErrorCollector = {\n  readonly policy: IErrorPolicy\n  add(source: string, error: unknown): void\n  finalize(message: string): readonly ICollectedError[]\n}",
             "const collector = createErrorCollector('collect', undefined)\ncollector.add('item-1', error)\nconst collected = collector.finalize('teardown failed') // 'collect' 策略下返回 ICollectedError[]"
           ],
+          "members": [],
           "aliasOf": "ICollectedError",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3596,6 +3604,7 @@
             "type IDisposer = () => void\ntype ILifecycleState = 'open' | 'closing' | 'terminal'\ntype IUnitState = 'idle' | 'loading' | 'loaded' | 'failed'\n\ntype ILifecycleOwner = {\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n}\n\ntype ICollectedError = Readonly<{\n  source: string\n  error: unknown\n}>\n\ntype IErrorPolicy = 'throw' | 'collect' | 'report' | 'firstError'",
             "function createQuiescenceTracker<TKey extends object>(): IQuiescenceTracker<TKey>\nfunction createStringQuiescenceTracker(): IQuiescenceTracker<string>\n\ntype IQuiescenceTracker<TKey> = {\n  retain(key: TKey): IDisposer // IDisposer = () => void\n  count(key: TKey): number\n  whenZero(key: TKey): Promise<void> // 严格独占等待\n  whenZeroOnce(key: TKey): Promise<void> // 非独占等待\n  seal(key: TKey): void\n  isSealed(key: TKey): boolean\n  forget(key: TKey): boolean\n}"
           ],
+          "members": [],
           "aliasOf": "IDisposer",
           "exportPath": ".",
           "overloadSignatures": ["export type IDisposer = () => void;"],
@@ -3660,6 +3669,7 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  type IDisposerContext,\n  type IReleaseDescriptor,\n  type IReleaseContext\n} from '@migaia/lifecycle'"
           ],
+          "members": [],
           "aliasOf": "IDisposerContext",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3723,6 +3733,7 @@
           "errors": ["No documented errors are declared for IDisposeTransactionKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDisposeTransactionKind.",
           "examples": [],
+          "members": [],
           "aliasOf": "IDisposeTransactionKind",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3789,6 +3800,7 @@
             "import {\n  createMutationQueue,\n  type IMutationQueue,\n  type IMutationQueueOptions,\n  type IEnqueueOptions\n} from '@migaia/lifecycle'",
             "function createMutationQueue(options?: IMutationQueueOptions): IMutationQueue\n\ntype IMutationQueueOptions = {\n  readonly queueAdmissionTimeoutMs?: number | false // 默认 undefined（只诊断，从不因排队超时而拒绝）\n  readonly admissionDiagnosticMs?: number | false // 默认 1000\n  readonly onAdmissionDiagnostic?: (info: { owner: string | undefined; waitedMs: number }) => void\n  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler\n}\n\ntype IEnqueueOptions = {\n  readonly owner?: string\n  readonly queueAdmissionTimeoutMs?: number | false // 覆盖本次任务的队列默认值\n}\n\ntype IMutationQueue = {\n  enqueue<T>(task: () => T | PromiseLike<T>, options?: IEnqueueOptions): Promise<T>\n  readonly size: number\n}"
           ],
+          "members": [],
           "aliasOf": "IEnqueueOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3855,6 +3867,7 @@
             "type IDisposer = () => void\ntype ILifecycleState = 'open' | 'closing' | 'terminal'\ntype IUnitState = 'idle' | 'loading' | 'loaded' | 'failed'\n\ntype ILifecycleOwner = {\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n}\n\ntype ICollectedError = Readonly<{\n  source: string\n  error: unknown\n}>\n\ntype IErrorPolicy = 'throw' | 'collect' | 'report' | 'firstError'",
             "function createErrorCollector(\n  policy: 'throw' | 'collect' | 'report' | 'firstError',\n  report: ((error: unknown) => void) | undefined\n): IErrorCollector\n\ntype IErrorCollector = {\n  readonly policy: IErrorPolicy\n  add(source: string, error: unknown): void\n  finalize(message: string): readonly ICollectedError[]\n}"
           ],
+          "members": [],
           "aliasOf": "IErrorPolicy",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3945,6 +3958,7 @@
           "examples": [
             "import { LifecycleErrorCode, type ILifecycleErrorCode } from '@migaia/lifecycle'"
           ],
+          "members": [],
           "aliasOf": "ILifecycleErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4135,6 +4149,7 @@
           "errors": ["No documented errors are declared for ILifecycleErrorPolicy."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILifecycleErrorPolicy.",
           "examples": [],
+          "members": [],
           "aliasOf": "ILifecycleErrorPolicy",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4200,6 +4215,7 @@
           "examples": [
             "import { LifecycleErrorText, type ILifecycleErrorText } from '@migaia/lifecycle'"
           ],
+          "members": [],
           "aliasOf": "ILifecycleErrorText",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4269,6 +4285,7 @@
             "function createProvisionalScope(options?: IProvisionalScopeOptions): IProvisionalScope\n\ntype IProvisionalScopeOptions = { readonly parentSignal?: IAbortSignal }\n\ntype IProvisionalScope = {\n  readonly signal: IAbortSignal\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  commitTo(parent: ILifecycleOwner): Promise<void>\n  rollback(): Promise<void>\n}\n\ntype ILifecycleOwner = { own<T>(resource: T, descriptor: IReleaseDescriptor): T }",
             "import { createProvisionalScope, type ILifecycleOwner } from '@migaia/lifecycle'"
           ],
+          "members": [],
           "aliasOf": "ILifecycleOwner",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4369,6 +4386,7 @@
           "examples": [
             "type IDisposer = () => void\ntype ILifecycleState = 'open' | 'closing' | 'terminal'\ntype IUnitState = 'idle' | 'loading' | 'loaded' | 'failed'\n\ntype ILifecycleOwner = {\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n}\n\ntype ICollectedError = Readonly<{\n  source: string\n  error: unknown\n}>\n\ntype IErrorPolicy = 'throw' | 'collect' | 'report' | 'firstError'"
           ],
+          "members": [],
           "aliasOf": "ILifecycleState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4432,6 +4450,7 @@
           "errors": ["No documented errors are declared for ILifecycleStateValue."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILifecycleStateValue.",
           "examples": [],
+          "members": [],
           "aliasOf": "ILifecycleStateValue",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4498,6 +4517,7 @@
             "import {\n  createLifecycleUnit,\n  type ILifecycleUnit,\n  type ILifecycleUnitOptions,\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
             "function createLifecycleUnit<T>(options?: ILifecycleUnitOptions): ILifecycleUnit<T>\n\ntype ILifecycleUnitOptions = { readonly report?: (error: unknown) => void }\n\ntype ILifecycleUnit<T> = {\n  readonly state: 'idle' | 'loading' | 'loaded' | 'failed'\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly value: T | undefined\n  readonly error: unknown\n  start(factory: () => T | PromiseLike<T>): void\n  restart(factory: () => T | PromiseLike<T>): void // start 的别名\n  close(): void\n  dispose(): void // 永远同步\n}"
           ],
+          "members": [],
           "aliasOf": "ILifecycleUnit",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4598,6 +4618,7 @@
             "import {\n  createLifecycleUnit,\n  type ILifecycleUnit,\n  type ILifecycleUnitOptions,\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
             "function createLifecycleUnit<T>(options?: ILifecycleUnitOptions): ILifecycleUnit<T>\n\ntype ILifecycleUnitOptions = { readonly report?: (error: unknown) => void }\n\ntype ILifecycleUnit<T> = {\n  readonly state: 'idle' | 'loading' | 'loaded' | 'failed'\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly value: T | undefined\n  readonly error: unknown\n  start(factory: () => T | PromiseLike<T>): void\n  restart(factory: () => T | PromiseLike<T>): void // start 的别名\n  close(): void\n  dispose(): void // 永远同步\n}"
           ],
+          "members": [],
           "aliasOf": "ILifecycleUnitOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4695,6 +4716,7 @@
           "errors": ["No documented errors are declared for ILifecycleUnitStateValue."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILifecycleUnitStateValue.",
           "examples": [],
+          "members": [],
           "aliasOf": "ILifecycleUnitStateValue",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4761,6 +4783,7 @@
             "import {\n  createMutationQueue,\n  type IMutationQueue,\n  type IMutationQueueOptions,\n  type IEnqueueOptions\n} from '@migaia/lifecycle'",
             "function createMutationQueue(options?: IMutationQueueOptions): IMutationQueue\n\ntype IMutationQueueOptions = {\n  readonly queueAdmissionTimeoutMs?: number | false // 默认 undefined（只诊断，从不因排队超时而拒绝）\n  readonly admissionDiagnosticMs?: number | false // 默认 1000\n  readonly onAdmissionDiagnostic?: (info: { owner: string | undefined; waitedMs: number }) => void\n  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler\n}\n\ntype IEnqueueOptions = {\n  readonly owner?: string\n  readonly queueAdmissionTimeoutMs?: number | false // 覆盖本次任务的队列默认值\n}\n\ntype IMutationQueue = {\n  enqueue<T>(task: () => T | PromiseLike<T>, options?: IEnqueueOptions): Promise<T>\n  readonly size: number\n}"
           ],
+          "members": [],
           "aliasOf": "IMutationQueue",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4827,6 +4850,7 @@
             "import {\n  createMutationQueue,\n  type IMutationQueue,\n  type IMutationQueueOptions,\n  type IEnqueueOptions\n} from '@migaia/lifecycle'",
             "function createMutationQueue(options?: IMutationQueueOptions): IMutationQueue\n\ntype IMutationQueueOptions = {\n  readonly queueAdmissionTimeoutMs?: number | false // 默认 undefined（只诊断，从不因排队超时而拒绝）\n  readonly admissionDiagnosticMs?: number | false // 默认 1000\n  readonly onAdmissionDiagnostic?: (info: { owner: string | undefined; waitedMs: number }) => void\n  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler\n}\n\ntype IEnqueueOptions = {\n  readonly owner?: string\n  readonly queueAdmissionTimeoutMs?: number | false // 覆盖本次任务的队列默认值\n}\n\ntype IMutationQueue = {\n  enqueue<T>(task: () => T | PromiseLike<T>, options?: IEnqueueOptions): Promise<T>\n  readonly size: number\n}"
           ],
+          "members": [],
           "aliasOf": "IMutationQueueOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4893,6 +4917,7 @@
             "import {\n  createProvisionalScope,\n  type IProvisionalScope,\n  type IProvisionalScopeOptions,\n  type ILifecycleOwner\n} from '@migaia/lifecycle'",
             "function createProvisionalScope(options?: IProvisionalScopeOptions): IProvisionalScope\n\ntype IProvisionalScopeOptions = { readonly parentSignal?: IAbortSignal }\n\ntype IProvisionalScope = {\n  readonly signal: IAbortSignal\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  commitTo(parent: ILifecycleOwner): Promise<void>\n  rollback(): Promise<void>\n}\n\ntype ILifecycleOwner = { own<T>(resource: T, descriptor: IReleaseDescriptor): T }"
           ],
+          "members": [],
           "aliasOf": "IProvisionalScope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4959,6 +4984,7 @@
             "import {\n  createProvisionalScope,\n  type IProvisionalScope,\n  type IProvisionalScopeOptions,\n  type ILifecycleOwner\n} from '@migaia/lifecycle'",
             "function createProvisionalScope(options?: IProvisionalScopeOptions): IProvisionalScope\n\ntype IProvisionalScopeOptions = { readonly parentSignal?: IAbortSignal }\n\ntype IProvisionalScope = {\n  readonly signal: IAbortSignal\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  commitTo(parent: ILifecycleOwner): Promise<void>\n  rollback(): Promise<void>\n}\n\ntype ILifecycleOwner = { own<T>(resource: T, descriptor: IReleaseDescriptor): T }"
           ],
+          "members": [],
           "aliasOf": "IProvisionalScopeOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5027,6 +5053,7 @@
             "function executeReleaseDescriptor(\n  descriptor: IReleaseDescriptor,\n  context: IReleaseContext\n): Promise<readonly unknown[]>",
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  type IDisposerContext,\n  type IReleaseDescriptor,\n  type IReleaseContext\n} from '@migaia/lifecycle'"
           ],
+          "members": [],
           "aliasOf": "IReleaseContext",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5100,6 +5127,7 @@
             "function createProvisionalScope(options?: IProvisionalScopeOptions): IProvisionalScope\n\ntype IProvisionalScopeOptions = { readonly parentSignal?: IAbortSignal }\n\ntype IProvisionalScope = {\n  readonly signal: IAbortSignal\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  commitTo(parent: ILifecycleOwner): Promise<void>\n  rollback(): Promise<void>\n}\n\ntype ILifecycleOwner = { own<T>(resource: T, descriptor: IReleaseDescriptor): T }",
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  type IDisposerContext,\n  type IReleaseDescriptor,\n  type IReleaseContext\n} from '@migaia/lifecycle'"
           ],
+          "members": [],
           "aliasOf": "IReleaseDescriptor",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5236,6 +5264,7 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n}"
           ],
+          "members": [],
           "aliasOf": "ISyncLifecycleScope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5338,6 +5367,7 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n}"
           ],
+          "members": [],
           "aliasOf": "ISyncLifecycleScopeOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5440,6 +5470,7 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n}"
           ],
+          "members": [],
           "aliasOf": "ISyncReleaseDescriptor",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5542,6 +5573,7 @@
             "import {\n  systemScheduler,\n  createManualScheduler,\n  snapshotScheduler,\n  validateSchedulerDelay,\n  validateSchedulerTime,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type ILifecycleScheduler,\n  type IScheduledTask,\n  type ISchedulerSnapshot,\n  type IManualScheduler,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'",
             "function createTerminalController(): ITerminalController\n\ntype ITerminalController = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  close(): void\n  forceTerminal(): void\n  whenTerminal(): Promise<void>\n}"
           ],
+          "members": [],
           "aliasOf": "ITerminalController",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5605,6 +5637,7 @@
           "errors": ["No documented errors are declared for IThenableProbeKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThenableProbeKind.",
           "examples": [],
+          "members": [],
           "aliasOf": "IThenableProbeKind",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5670,6 +5703,7 @@
           "examples": [
             "type IDisposer = () => void\ntype ILifecycleState = 'open' | 'closing' | 'terminal'\ntype IUnitState = 'idle' | 'loading' | 'loaded' | 'failed'\n\ntype ILifecycleOwner = {\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n}\n\ntype ICollectedError = Readonly<{\n  source: string\n  error: unknown\n}>\n\ntype IErrorPolicy = 'throw' | 'collect' | 'report' | 'firstError'"
           ],
+          "members": [],
           "aliasOf": "IUnitState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5741,6 +5775,7 @@
             "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'",
             "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
           ],
+          "members": [],
           "aliasOf": "LifecycleErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6167,6 +6202,7 @@
           "examples": [
             "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  ThenableProbeKind,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'"
           ],
+          "members": [],
           "aliasOf": "LifecycleErrorPolicy",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6234,6 +6270,7 @@
             "error.message === LifecycleErrorText.disposeTransactionFailed",
             "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'"
           ],
+          "members": [],
           "aliasOf": "LifecycleErrorText",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6462,6 +6499,7 @@
           "examples": [
             "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  ThenableProbeKind,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'"
           ],
+          "members": [],
           "aliasOf": "LifecycleState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6527,6 +6565,7 @@
           "examples": [
             "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  ThenableProbeKind,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'"
           ],
+          "members": [],
           "aliasOf": "LifecycleUnitState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6592,6 +6631,7 @@
           "examples": [
             "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  ThenableProbeKind,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'"
           ],
+          "members": [],
           "aliasOf": "ThenableProbeKind",
           "exportPath": ".",
           "overloadSignatures": [
@@ -7127,6 +7167,7 @@
           "examples": [
             "const controller = createAbortController()\ncontroller.signal.addEventListener('abort', () => console.log('aborted'))\ncontroller.abort('reason')"
           ],
+          "members": [],
           "exportPath": "./abort",
           "overloadSignatures": [
             "export declare function createAbortController(): IAbortController;"
@@ -7235,6 +7276,7 @@
             "import {\n  systemScheduler,\n  createManualScheduler,\n  snapshotScheduler,\n  validateSchedulerDelay,\n  validateSchedulerTime,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type ILifecycleScheduler,\n  type IScheduledTask,\n  type ISchedulerSnapshot,\n  type IManualScheduler,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'",
             "function createAbortController(): IAbortController\n// type IAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(...); removeEventListener(...) };\n// type IAbortController = { readonly signal: IAbortSignal; abort(reason?: unknown): void };"
           ],
+          "members": [],
           "exportPath": "./abort",
           "overloadSignatures": [
             "export type IAbortController = { readonly signal: IAbortSignal; abort(reason?: unknown): void; };"
@@ -7303,6 +7345,7 @@
             "import {\n  systemScheduler,\n  createManualScheduler,\n  snapshotScheduler,\n  validateSchedulerDelay,\n  validateSchedulerTime,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type ILifecycleScheduler,\n  type IScheduledTask,\n  type ISchedulerSnapshot,\n  type IManualScheduler,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'",
             "function createAbortController(): IAbortController\n// type IAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(...); removeEventListener(...) };\n// type IAbortController = { readonly signal: IAbortSignal; abort(reason?: unknown): void };"
           ],
+          "members": [],
           "exportPath": "./abort",
           "overloadSignatures": [
             "export type IAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean; }): void; removeEventListener(type: 'abort', listener: () => void): void; };"
@@ -7367,6 +7410,7 @@
           "examples": [
             "import {\n  createAbortController,\n  observeAbortSubscription,\n  type IObservedAbortFailureSink,\n  type IObservedAbortSubscription\n} from '@migaia/lifecycle/abort'\nimport { snapshotScheduler } from '@migaia/lifecycle/scheduler'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createLifecycleScope } from '@migaia/lifecycle/scope'\nimport { createGenerationController } from '@migaia/lifecycle/generation'\nimport { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'\nimport { probeThenable } from '@migaia/lifecycle/errors'"
           ],
+          "members": [],
           "aliasOf": "IObservedAbortFailureSink",
           "exportPath": "./abort",
           "overloadSignatures": [
@@ -7432,6 +7476,7 @@
           "examples": [
             "import {\n  createAbortController,\n  observeAbortSubscription,\n  type IObservedAbortFailureSink,\n  type IObservedAbortSubscription\n} from '@migaia/lifecycle/abort'\nimport { snapshotScheduler } from '@migaia/lifecycle/scheduler'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createLifecycleScope } from '@migaia/lifecycle/scope'\nimport { createGenerationController } from '@migaia/lifecycle/generation'\nimport { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'\nimport { probeThenable } from '@migaia/lifecycle/errors'"
           ],
+          "members": [],
           "aliasOf": "IObservedAbortSubscription",
           "exportPath": "./abort",
           "overloadSignatures": [
@@ -7515,6 +7560,7 @@
           "errors": ["No documented errors are declared for observeAbortSubscription."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for observeAbortSubscription.",
           "examples": [],
+          "members": [],
           "aliasOf": "observeAbortSubscription",
           "exportPath": "./abort",
           "overloadSignatures": [
@@ -7632,6 +7678,7 @@
             "const transaction = createDisposeTransaction(\n  { kind: 'plan' },\n  { errorPolicy: 'collect', signal: controller.signal }\n)\nconst failures = await transaction.run([\n  { source: 'db', descriptor: dbDescriptor },\n  { source: 'socket', descriptor: socketDescriptor }\n])",
             "import {\n  createDisposeTransaction,\n  createManualScheduler,\n  type IDisposeItem\n} from '@migaia/lifecycle'\n\nconst scheduler = createManualScheduler()\nconst items: IDisposeItem[] = [\n  {\n    source: 'socket',\n    descriptor: {\n      order: 10,\n      graceful: (ctx) => flushSocket(),\n      gracefulTimeoutMs: 100,\n      force: () => forceCloseSocket()\n    }\n  },\n  { source: 'db', descriptor: { order: 5, force: () => closeDb() } }\n]\nconst transaction = createDisposeTransaction(\n  { kind: 'order' },\n  { errorPolicy: 'collect', scheduler }\n)\nconst runPromise = transaction.run(items)\nscheduler.advance(100) // 驱动 socket 的 graceful 超时降级到 force\nconst failures = await runPromise"
           ],
+          "members": [],
           "aliasOf": "createDisposeTransaction",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -8035,6 +8082,7 @@
             "import { createSyncStartedDisposalLedger } from '@migaia/lifecycle'\n\nconst ledger = createSyncStartedDisposalLedger()\n\nfunction disposeRegistry(): void {\n  ledger.start('cache', () => cache.dispose())\n  ledger.start('worker', () => worker.dispose())\n  ledger.seal()\n}\n\ndisposeRegistry()\nconst { synchronousErrors, completion } = ledger.seal()\nconst allErrors = await completion",
             "import { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'\n\nconst ledger = createSyncStartedDisposalLedger()\nledger.start('socket', () => socket.close()) // callback 在当前 stack 立即执行\nledger.start('cache', () => cache.flush())\n\nconst outcome = ledger.seal() // open → closing；之后不再接受 start()\nif (outcome.synchronousErrors.length > 0) {\n  // 领域层决定 throw、report、firstError 或 AggregateError 投影。\n}\nconst allErrors = await outcome.completion // 永远 resolve raw error ledger，不因 item failure reject\nawait ledger.whenTerminal()"
           ],
+          "members": [],
           "aliasOf": "createSyncStartedDisposalLedger",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -8174,6 +8222,7 @@
           "examples": [
             "const errors = await executeReleaseDescriptor(descriptor, {\n  signal: controller.signal,\n  deadlineAt: undefined,\n  report: (e) => console.error(e)\n})"
           ],
+          "members": [],
           "aliasOf": "executeReleaseDescriptor",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -8279,6 +8328,7 @@
             "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}",
             "import {\n  createDisposeTransaction,\n  createManualScheduler,\n  type IDisposeItem\n} from '@migaia/lifecycle'\n\nconst scheduler = createManualScheduler()\nconst items: IDisposeItem[] = [\n  {\n    source: 'socket',\n    descriptor: {\n      order: 10,\n      graceful: (ctx) => flushSocket(),\n      gracefulTimeoutMs: 100,\n      force: () => forceCloseSocket()\n    }\n  },\n  { source: 'db', descriptor: { order: 5, force: () => closeDb() } }\n]\nconst transaction = createDisposeTransaction(\n  { kind: 'order' },\n  { errorPolicy: 'collect', scheduler }\n)\nconst runPromise = transaction.run(items)\nscheduler.advance(100) // 驱动 socket 的 graceful 超时降级到 force\nconst failures = await runPromise"
           ],
+          "members": [],
           "aliasOf": "IDisposeItem",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -8345,6 +8395,7 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}"
           ],
+          "members": [],
           "aliasOf": "IDisposeTransaction",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -8410,6 +8461,7 @@
           "examples": [
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'"
           ],
+          "members": [],
           "aliasOf": "IDisposeTransactionMode",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -8476,6 +8528,7 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}"
           ],
+          "members": [],
           "aliasOf": "IDisposeTransactionOptions",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -8542,6 +8595,7 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ISyncStartedDisposalOutcome = Readonly<{\n  synchronousErrors: readonly ICollectedError[]\n  completion: Promise<readonly ICollectedError[]>\n}>"
           ],
+          "members": [],
           "aliasOf": "ISyncStartedDisposalLedger",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -8608,6 +8662,7 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ISyncStartedDisposalOutcome = Readonly<{\n  synchronousErrors: readonly ICollectedError[]\n  completion: Promise<readonly ICollectedError[]>\n}>"
           ],
+          "members": [],
           "aliasOf": "ISyncStartedDisposalOutcome",
           "exportPath": "./disposal",
           "overloadSignatures": [
@@ -8701,6 +8756,7 @@
           "errors": ["No documented errors are declared for containAsyncRejection."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for containAsyncRejection.",
           "examples": ["containAsyncRejection(maybeAsyncCallbackResult, (error) => report(error))"],
+          "members": [],
           "exportPath": "./errors",
           "overloadSignatures": [
             "export declare function containAsyncRejection(value: unknown, onRejected: (error: unknown) => void): void;"
@@ -8987,6 +9043,7 @@
           "examples": [
             "const collector = createErrorCollector('collect', undefined)\ncollector.add('item-1', error)\nconst collected = collector.finalize('teardown failed') // 'collect' 策略下返回 ICollectedError[]"
           ],
+          "members": [],
           "exportPath": "./errors",
           "overloadSignatures": [
             "export declare function createErrorCollector(policy: IErrorPolicy, report: ((error: unknown) => void) | undefined): IErrorCollector;"
@@ -9282,6 +9339,7 @@
           "examples": [
             "throw createLifecycleError(LifecycleErrorCode.scopeClosed, '[lifecycle] scope is closing')"
           ],
+          "members": [],
           "exportPath": "./errors",
           "overloadSignatures": [
             "export declare function createLifecycleError(code: string, message: string, options?: { readonly cause?: unknown; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; readonly errors?: readonly unknown[]; }): ILifecycleError;"
@@ -9578,6 +9636,7 @@
           "examples": [
             "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
           ],
+          "members": [],
           "exportPath": "./errors",
           "overloadSignatures": [
             "export declare function createLifecycleFailure(code: string, message: string, error: unknown): ILifecycleError;"
@@ -9862,6 +9921,7 @@
           "examples": [
             "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
           ],
+          "members": [],
           "exportPath": "./errors",
           "overloadSignatures": [
             "export declare function createLifecycleRangeError(code: string, message: string, options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>>; }): RangeError;"
@@ -10162,6 +10222,7 @@
           "examples": [
             "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
           ],
+          "members": [],
           "exportPath": "./errors",
           "overloadSignatures": [
             "export declare function createLifecycleTypeError(code: string, message: string, options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>>; }): TypeError;"
@@ -10427,6 +10488,7 @@
             "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  type ILifecycleError,\n  type IThenableProbe,\n  type IErrorCollector\n} from '@migaia/lifecycle'",
             "function createErrorCollector(\n  policy: 'throw' | 'collect' | 'report' | 'firstError',\n  report: ((error: unknown) => void) | undefined\n): IErrorCollector\n\ntype IErrorCollector = {\n  readonly policy: IErrorPolicy\n  add(source: string, error: unknown): void\n  finalize(message: string): readonly ICollectedError[]\n}"
           ],
+          "members": [],
           "exportPath": "./errors",
           "overloadSignatures": [
             "export type IErrorCollector = { readonly policy: IErrorPolicy; /** Records one item's failure. For `report`, this is also where the reporter is invoked. */ add(source: string, error: unknown): void; /** * Finalizes collection. `collect`/`report`/`firstError`-with-no-error return the collected list * (empty for `report`, since those were already handed to the reporter per `add`); `throw` and * `firstError`-with-an-error throw instead of returning. */ finalize(message: string): readonly ICollectedError[]; };"
@@ -10530,6 +10592,7 @@
             "function createLifecycleError(\n  code: string,\n  message: string,\n  options?: {\n    readonly cause?: unknown\n    readonly phase?: string\n    readonly detail?: Readonly<Record<string, unknown>>\n    readonly errors?: readonly unknown[]\n  }\n): ILifecycleError // Error & { source, code, phase?, detail?, cause?, errors? }",
             "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nfunction createLifecycleTypeError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>> }\n): TypeError\n\nfunction createLifecycleFailure(code: string, message: string, error: unknown): ILifecycleError"
           ],
+          "members": [],
           "exportPath": "./errors",
           "overloadSignatures": [
             "export type ILifecycleError = Error & { readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; readonly cause?: unknown; /** 冻结的次要失败快照（如 cleanup 失败），不与 `cause` 混用；primary 保持原错误身份。 */ readonly errors?: readonly unknown[]; };"
@@ -10778,6 +10841,7 @@
             "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'",
             "LIFECYCLE_SOURCE // '@migaia/lifecycle'"
           ],
+          "members": [],
           "exportPath": "./errors",
           "overloadSignatures": ["export declare const LIFECYCLE_SOURCE = \"@migaia/lifecycle\";"],
           "overloadParameterDetails": [[]],
@@ -11040,6 +11104,7 @@
           "examples": [
             "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
           ],
+          "members": [],
           "exportPath": "./errors",
           "overloadSignatures": [
             "export declare function tagLifecycleError<E extends Error>(error: E, code: string): E;"
@@ -11341,6 +11406,7 @@
             "const shutdown = new AbortController()\nconst generations = createGenerationController({ parentSignal: shutdown.signal })\nconst request = generations.begin({ timeoutMs: 5000 }) // 超过 5s 自动 abort 当前代\nconst result = await fetchWithSignal(request.signal)\nif (generations.adopt(request.token, result, (v) => v.close())) {\n  use(result) // 仍是当前代，安全采用\n} // 否则内部已调用 release() 回收 result，返回 false",
             "import { createLifecycleScope, createGenerationController } from '@migaia/lifecycle'\n\nconst scope = createLifecycleScope({ errorPolicy: 'collect' })\nconst generations = createGenerationController()\n\nasync function loadUser(id: string) {\n  const request = generations.begin({ timeoutMs: 5000 })\n  const user = await fetchUser(id, { signal: request.signal })\n  if (!generations.adopt(request.token, user, (u) => u.dispose?.())) return // 已过期，静默丢弃\n  scope.own(user, { force: () => user.dispose?.() })\n}"
           ],
+          "members": [],
           "exportPath": "./generation",
           "overloadSignatures": [
             "export declare function createGenerationController(options?: IGenerationControllerOptions): IGenerationController;"
@@ -11494,6 +11560,7 @@
             "import {\n  createLifecycleUnit,\n  type ILifecycleUnit,\n  type ILifecycleUnitOptions,\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
             "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
           ],
+          "members": [],
           "exportPath": "./generation",
           "overloadSignatures": [
             "export type IGenerationController = { readonly generation: number; readonly disposed: boolean; /** * Starts a new generation, superseding whatever was active. Optionally auto-aborts after * `timeoutMs`. */ begin(options?: { readonly timeoutMs?: number; }): IGenerationRequest; isCurrent(token: IGenerationToken): boolean; /** * Invalidates the current generation without disposing the controller — a later `begin()` still * works. */ supersede(reason?: unknown): void; /** * Adopts `value` under `token`'s generation. Returns `true` and keeps `value` with the caller if * that generation is still current. Otherwise releases `value` via `release` and returns `false` * (L-T6) — a release failure is funneled to `onReleaseError` and never mutates controller state, * so it cannot poison whichever generation is current now (L-T30). */ adopt<T>(token: IGenerationToken, value: T, release: (value: T) => void | PromiseLike<void>, onReleaseError?: (error: unknown) => void): boolean; dispose(reason?: unknown): void; };"
@@ -11559,6 +11626,7 @@
             "import {\n  createLifecycleUnit,\n  type ILifecycleUnit,\n  type ILifecycleUnitOptions,\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
             "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
           ],
+          "members": [],
           "exportPath": "./generation",
           "overloadSignatures": [
             "export type IGenerationControllerOptions = { /** When this aborts, the currently-active generation's `signal` aborts too (L-T31). */ readonly parentSignal?: IAbortSignal; /** * Diagnostic channel fired from `adopt()` whenever `token` is no longer current — before the * release attempt, regardless of whether it succeeds. The value is a * `GENERATION_SUPERSEDED`-tagged error used purely as a `(source, code)`-bearing carrier; this is * explicitly _not_ a failure signal (§4.10.2), just an observability hook for callers that want * to notice the race without treating it as an error. */ readonly onSuperseded?: (info: ILifecycleError) => void; /** Runtime-neutral scheduler（默认 `systemScheduler`）；`begin({ timeoutMs })` 的超时计时经它。 */ readonly scheduler?: ILifecycleScheduler; };"
@@ -11624,6 +11692,7 @@
             "import {\n  createLifecycleUnit,\n  type ILifecycleUnit,\n  type ILifecycleUnitOptions,\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
             "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
           ],
+          "members": [],
           "exportPath": "./generation",
           "overloadSignatures": [
             "export type IGenerationRequest = { readonly generation: number; readonly token: IGenerationToken; readonly signal: IAbortSignal; };"
@@ -11689,6 +11758,7 @@
             "import {\n  createLifecycleUnit,\n  type ILifecycleUnit,\n  type ILifecycleUnitOptions,\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
             "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
           ],
+          "members": [],
           "exportPath": "./generation",
           "overloadSignatures": ["export type IGenerationToken = object;"],
           "overloadParameterDetails": [[]],
@@ -11770,6 +11840,7 @@
           "examples": [
             "const leases = createObjectLeaseRegistry<object>() // 内部就是 createQuiescenceTracker()"
           ],
+          "members": [],
           "exportPath": "./quiescence",
           "overloadSignatures": [
             "export declare function createObjectLeaseRegistry<TKey extends object>(): ILeaseRegistry<TKey>;"
@@ -11836,6 +11907,7 @@
             "import { createPendingTracker, createMutationQueue } from '@migaia/lifecycle'\n\nconst pending = createPendingTracker()\nconst queue = createMutationQueue({ queueAdmissionTimeoutMs: 3000 })\n\nasync function applyBatch(mutations: Array<() => Promise<void>>) {\n  for (const mutation of mutations) {\n    pending.track(queue.enqueue(mutation, { owner: 'batch' }))\n  }\n  await pending.drain() // 等到本批（含批内动态追加的）全部落地\n}",
             "import { createLifecycleScope, createPendingTracker } from '@migaia/lifecycle'\n\nconst scope = createLifecycleScope({ errorPolicy: 'collect' })\nconst pending = createPendingTracker()\n\nfunction handle(request: Request): Promise<Response> {\n  return pending.track(route(request))\n}\n\nasync function shutdown() {\n  await pending.drain()\n  return scope.dispose()\n}"
           ],
+          "members": [],
           "exportPath": "./quiescence",
           "overloadSignatures": [
             "export declare function createPendingTracker(): IPendingTracker;"
@@ -11926,6 +11998,7 @@
             "const tracker = createQuiescenceTracker<object>() // 或 createStringQuiescenceTracker()\nconst release = tracker.retain(key)\ntracker.count(key) // 1\ntracker.seal(key) // 之后 retain(key) 抛 QUIESCENCE_SEALED\nrelease()\nawait tracker.whenZero(key) // 必须先 seal，否则同步抛 QUIESCENCE_UNSEALED_WAIT",
             "const leases = createObjectLeaseRegistry<object>() // 内部就是 createQuiescenceTracker()"
           ],
+          "members": [],
           "exportPath": "./quiescence",
           "overloadSignatures": [
             "export declare function createQuiescenceTracker<TKey extends object>(): IQuiescenceTracker<TKey>;"
@@ -11988,6 +12061,7 @@
           "errors": ["No documented errors are declared for createStringLeaseRegistry."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStringLeaseRegistry.",
           "examples": [],
+          "members": [],
           "exportPath": "./quiescence",
           "overloadSignatures": [
             "export declare function createStringLeaseRegistry(): ILeaseRegistry<string>;"
@@ -12052,6 +12126,7 @@
           "examples": [
             "const tracker = createQuiescenceTracker<object>() // 或 createStringQuiescenceTracker()\nconst release = tracker.retain(key)\ntracker.count(key) // 1\ntracker.seal(key) // 之后 retain(key) 抛 QUIESCENCE_SEALED\nrelease()\nawait tracker.whenZero(key) // 必须先 seal，否则同步抛 QUIESCENCE_UNSEALED_WAIT"
           ],
+          "members": [],
           "exportPath": "./quiescence",
           "overloadSignatures": [
             "export declare function createStringQuiescenceTracker(): IQuiescenceTracker<string>;"
@@ -12117,6 +12192,7 @@
             "import {\n  createQuiescenceTracker,\n  createStringQuiescenceTracker,\n  createObjectLeaseRegistry,\n  createStringLeaseRegistry,\n  createPendingTracker,\n  type IQuiescenceTracker,\n  type ILeaseRegistry,\n  type IPendingTracker\n} from '@migaia/lifecycle'",
             "function createObjectLeaseRegistry<TKey extends object>(): ILeaseRegistry<TKey>\nfunction createStringLeaseRegistry(): ILeaseRegistry<string>\n// type ILeaseRegistry<TKey> = IQuiescenceTracker<TKey>"
           ],
+          "members": [],
           "exportPath": "./quiescence",
           "overloadSignatures": ["export type ILeaseRegistry<TKey> = IQuiescenceTracker<TKey>;"],
           "overloadParameterDetails": [[]],
@@ -12180,6 +12256,7 @@
             "import {\n  createQuiescenceTracker,\n  createStringQuiescenceTracker,\n  createObjectLeaseRegistry,\n  createStringLeaseRegistry,\n  createPendingTracker,\n  type IQuiescenceTracker,\n  type ILeaseRegistry,\n  type IPendingTracker\n} from '@migaia/lifecycle'",
             "function createPendingTracker(): IPendingTracker\n\ntype IPendingTracker = {\n  track<T>(promise: Promise<T>): Promise<T>\n  drain(): Promise<void>\n  readonly size: number\n}"
           ],
+          "members": [],
           "exportPath": "./quiescence",
           "overloadSignatures": [
             "export type IPendingTracker = { /** Registers `promise` as in-flight; auto-releases on settle. Returns `promise` unchanged. */ track<T>(promise: Promise<T>): Promise<T>; /** * Waits until nothing is in flight, looping via `whenZeroOnce()` so work started while draining * is never missed (L-T10). */ drain(): Promise<void>; readonly size: number; };"
@@ -12246,6 +12323,7 @@
             "function createQuiescenceTracker<TKey extends object>(): IQuiescenceTracker<TKey>\nfunction createStringQuiescenceTracker(): IQuiescenceTracker<string>\n\ntype IQuiescenceTracker<TKey> = {\n  retain(key: TKey): IDisposer // IDisposer = () => void\n  count(key: TKey): number\n  whenZero(key: TKey): Promise<void> // 严格独占等待\n  whenZeroOnce(key: TKey): Promise<void> // 非独占等待\n  seal(key: TKey): void\n  isSealed(key: TKey): boolean\n  forget(key: TKey): boolean\n}",
             "function createObjectLeaseRegistry<TKey extends object>(): ILeaseRegistry<TKey>\nfunction createStringLeaseRegistry(): ILeaseRegistry<string>\n// type ILeaseRegistry<TKey> = IQuiescenceTracker<TKey>"
           ],
+          "members": [],
           "exportPath": "./quiescence",
           "overloadSignatures": [
             "export type IQuiescenceTracker<TKey> = { retain(key: TKey): IDisposer; count(key: TKey): number; /** Strict, exclusive drain: throws synchronously (not a rejected Promise) unless `isSealed(key)`. */ whenZero(key: TKey): Promise<void>; /** Non-exclusive: resolves the next time count reaches zero; does not block new `retain()` calls. */ whenZeroOnce(key: TKey): Promise<void>; /** Blocks further `retain()` calls for `key`. Idempotent. */ seal(key: TKey): void; isSealed(key: TKey): boolean; /** Removes a zero-count key and returns whether a state entry was removed. */ forget(key: TKey): boolean; };"
@@ -12346,6 +12424,7 @@
             "validateSchedulerTime(value, 'deadlineAt') // 非 number 抛 TypeError，非有限抛 RangeError\nvalidateSchedulerDelay(value) // 在上面基础上还要求 >= 0，否则抛 RangeError\naddSchedulerTime(now, delayMs, 'deadlineAt') // 结果溢出为 Infinity 时抛 RangeError",
             "validateSchedulerTime(value, 'deadlineAt') // 非 number 抛 TypeError，非有限抛 RangeError\nvalidateSchedulerDelay(value) // 在上面基础上还要求 >= 0，否则抛 RangeError\naddSchedulerTime(now, delayMs, 'deadlineAt') // 两个有限数相加；溢出 Infinity 时抛 RangeError"
           ],
+          "members": [],
           "exportPath": "./scheduler",
           "overloadSignatures": [
             "export declare function addSchedulerTime(base: number, delta: number, label: string): number;"
@@ -12429,6 +12508,7 @@
             "const scheduler = createManualScheduler()\nconst task = scheduler.schedule(() => console.log('fired'), 100)\nscheduler.advance(100) // 一次性 flush 所有到期回调（含到期回调内部再排的到期任务）",
             "import {\n  createDisposeTransaction,\n  createManualScheduler,\n  type IDisposeItem\n} from '@migaia/lifecycle'\n\nconst scheduler = createManualScheduler()\nconst items: IDisposeItem[] = [\n  {\n    source: 'socket',\n    descriptor: {\n      order: 10,\n      graceful: (ctx) => flushSocket(),\n      gracefulTimeoutMs: 100,\n      force: () => forceCloseSocket()\n    }\n  },\n  { source: 'db', descriptor: { order: 5, force: () => closeDb() } }\n]\nconst transaction = createDisposeTransaction(\n  { kind: 'order' },\n  { errorPolicy: 'collect', scheduler }\n)\nconst runPromise = transaction.run(items)\nscheduler.advance(100) // 驱动 socket 的 graceful 超时降级到 force\nconst failures = await runPromise"
           ],
+          "members": [],
           "exportPath": "./scheduler",
           "overloadSignatures": [
             "export declare function createManualScheduler(): IManualScheduler;"
@@ -12525,6 +12605,7 @@
             "function createManualScheduler(): IManualScheduler\n// type IManualScheduler = ILifecycleScheduler & { advance(ms: number): void };",
             "function boundedWait(\n  task: PromiseLike<unknown>,\n  deadlineAt: number,\n  options?: { readonly scheduler?: ILifecycleScheduler } // 默认 systemScheduler\n): Promise<boolean>"
           ],
+          "members": [],
           "exportPath": "./scheduler",
           "overloadSignatures": [
             "export type ILifecycleScheduler = { /** 单调不递减毫秒（连续两次可相等）；只比较差值，不解释为 Unix epoch。 */ now(): number; /** 排程一个回调；`delayMs` 有限、非负；回调至多执行一次。 */ schedule(callback: () => void, delayMs: number): IScheduledTask; };"
@@ -12625,6 +12706,7 @@
             "import {\n  systemScheduler,\n  createManualScheduler,\n  snapshotScheduler,\n  validateSchedulerDelay,\n  validateSchedulerTime,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type ILifecycleScheduler,\n  type IScheduledTask,\n  type ISchedulerSnapshot,\n  type IManualScheduler,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'",
             "function createManualScheduler(): IManualScheduler\n// type IManualScheduler = ILifecycleScheduler & { advance(ms: number): void };"
           ],
+          "members": [],
           "exportPath": "./scheduler",
           "overloadSignatures": [
             "export type IManualScheduler = ILifecycleScheduler & { advance(ms: number): void; };"
@@ -12690,6 +12772,7 @@
             "import {\n  systemScheduler,\n  createManualScheduler,\n  snapshotScheduler,\n  validateSchedulerDelay,\n  validateSchedulerTime,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type ILifecycleScheduler,\n  type IScheduledTask,\n  type ISchedulerSnapshot,\n  type IManualScheduler,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'",
             "const systemScheduler: ILifecycleScheduler // { now(): number; schedule(cb, delayMs): IScheduledTask }"
           ],
+          "members": [],
           "exportPath": "./scheduler",
           "overloadSignatures": ["export type IScheduledTask = { cancel(): void; };"],
           "overloadParameterDetails": [[]],
@@ -12754,6 +12837,7 @@
             "function snapshotScheduler(value: unknown): ISchedulerSnapshot | undefined",
             "function resolveScheduler(value: unknown): ISchedulerSnapshot\nfunction resolveSchedulerOption(\n  options: { readonly scheduler?: unknown } | null | undefined,\n  fallback: ISchedulerSnapshot\n): ISchedulerSnapshot\nfunction resolveSchedulerOption(\n  options: { readonly scheduler?: unknown } | null | undefined\n): ISchedulerSnapshot | undefined"
           ],
+          "members": [],
           "exportPath": "./scheduler",
           "overloadSignatures": ["export type ISchedulerSnapshot = ILifecycleScheduler;"],
           "overloadParameterDetails": [[]],
@@ -12836,6 +12920,7 @@
           "errors": ["No documented errors are declared for resolveScheduler."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for resolveScheduler.",
           "examples": [],
+          "members": [],
           "exportPath": "./scheduler",
           "overloadSignatures": [
             "export declare function resolveScheduler(value: unknown): ISchedulerSnapshot;"
@@ -12936,6 +13021,7 @@
           "errors": ["No documented errors are declared for resolveSchedulerOption."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for resolveSchedulerOption.",
           "examples": [],
+          "members": [],
           "exportPath": "./scheduler",
           "overloadSignatures": [
             "export declare function resolveSchedulerOption(options: { readonly scheduler?: unknown; } | null | undefined, fallback: ISchedulerSnapshot): ISchedulerSnapshot;",
@@ -13043,6 +13129,7 @@
           "examples": [
             "const snap = snapshotScheduler(candidate) // 不是合法 scheduler 时返回 undefined，而不是抛错"
           ],
+          "members": [],
           "exportPath": "./scheduler",
           "overloadSignatures": [
             "export declare function snapshotScheduler(value: unknown): ISchedulerSnapshot | undefined;"
@@ -13163,6 +13250,7 @@
             "function boundedWait(\n  task: PromiseLike<unknown>,\n  deadlineAt: number,\n  options?: { readonly scheduler?: ILifecycleScheduler } // 默认 systemScheduler\n): Promise<boolean>",
             "import {\n  systemScheduler,\n  createManualScheduler,\n  snapshotScheduler,\n  validateSchedulerDelay,\n  validateSchedulerTime,\n  createAbortController,\n  boundedWait,\n  createTerminalController\n} from '@migaia/lifecycle'"
           ],
+          "members": [],
           "exportPath": "./scheduler",
           "overloadSignatures": ["export declare const systemScheduler: ILifecycleScheduler;"],
           "overloadParameterDetails": [[]],
@@ -13422,6 +13510,7 @@
             "validateSchedulerTime(value, 'deadlineAt') // 非 number 抛 TypeError，非有限抛 RangeError\nvalidateSchedulerDelay(value) // 在上面基础上还要求 >= 0，否则抛 RangeError\naddSchedulerTime(now, delayMs, 'deadlineAt') // 结果溢出为 Infinity 时抛 RangeError",
             "validateSchedulerTime(value, 'deadlineAt') // 非 number 抛 TypeError，非有限抛 RangeError\nvalidateSchedulerDelay(value) // 在上面基础上还要求 >= 0，否则抛 RangeError\naddSchedulerTime(now, delayMs, 'deadlineAt') // 两个有限数相加；溢出 Infinity 时抛 RangeError"
           ],
+          "members": [],
           "exportPath": "./scheduler",
           "overloadSignatures": [
             "export declare function validateSchedulerDelay(value: unknown, label?: string): number;"
@@ -13511,6 +13600,7 @@
             "validateSchedulerTime(value, 'deadlineAt') // 非 number 抛 TypeError，非有限抛 RangeError\nvalidateSchedulerDelay(value) // 在上面基础上还要求 >= 0，否则抛 RangeError\naddSchedulerTime(now, delayMs, 'deadlineAt') // 结果溢出为 Infinity 时抛 RangeError",
             "validateSchedulerTime(value, 'deadlineAt') // 非 number 抛 TypeError，非有限抛 RangeError\nvalidateSchedulerDelay(value) // 在上面基础上还要求 >= 0，否则抛 RangeError\naddSchedulerTime(now, delayMs, 'deadlineAt') // 两个有限数相加；溢出 Infinity 时抛 RangeError"
           ],
+          "members": [],
           "exportPath": "./scheduler",
           "overloadSignatures": [
             "export declare function validateSchedulerTime(value: unknown, label: string): number;"
@@ -13616,6 +13706,7 @@
             "import { createLifecycleScope, createProvisionalScope } from '@migaia/lifecycle'\n\nconst rootScope = createLifecycleScope()\n\nasync function setupModule() {\n  const provisional = createProvisionalScope()\n  try {\n    const db = provisional.own(await connectDb(), { force: (ctx) => closeDb(db) })\n    const cache = provisional.own(await connectCache(), { force: (ctx) => closeCache(cache) })\n    await provisional.commitTo(rootScope) // 全部转移给 rootScope，之后随 rootScope.dispose() 释放\n  } catch (error) {\n    await provisional.rollback() // 任一步失败：已注册的资源逆序释放，冒泡原错误\n    throw error\n  }\n}",
             "import { createLifecycleScope, createPendingTracker } from '@migaia/lifecycle'\n\nconst scope = createLifecycleScope({ errorPolicy: 'collect' })\nconst pending = createPendingTracker()\n\nfunction handle(request: Request): Promise<Response> {\n  return pending.track(route(request))\n}\n\nasync function shutdown() {\n  await pending.drain()\n  return scope.dispose()\n}"
           ],
+          "members": [],
           "exportPath": "./scope",
           "overloadSignatures": [
             "export declare function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope;"
@@ -13782,6 +13873,7 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n}"
           ],
+          "members": [],
           "exportPath": "./scope",
           "overloadSignatures": [
             "export type ILifecycleScope = ILifecycleOwner & { readonly lifecycle: ILifecycleState; /** Unregisters a resource without releasing it — the caller has already released it independently. */ release(resource: unknown): boolean; /** Synchronous, idempotent, never calls user code (L-T27). */ close(): void; /** * Always asynchronous (D-1) — there is no synchronous `dispose()` on this type. Resolves to the * collected errors for the `collect` policy (empty for the other three, which throw/report * internally instead). * * Concurrent external calls reuse the same published Promise even while release is in flight. * Only a synchronous call from an active disposer callback is rejected as reentrant, preventing * that callback from self-awaiting the Promise it is currently helping to settle. */ dispose(): Promise<readonly ICollectedError[]>; };"
@@ -13882,6 +13974,7 @@
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: ILifecycleScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n}"
           ],
+          "members": [],
           "exportPath": "./scope",
           "overloadSignatures": [
             "export type ILifecycleScopeOptions = { readonly errorPolicy?: IErrorPolicy; readonly report?: (error: unknown) => void; /** Shared absolute deadline forwarded to every owned resource's release (L-T32). */ readonly deadlineAt?: number; /** * 时间域来源（R-9）：graceful timeout / deadline 经它驱动，缺省 `systemScheduler`。透传给 * `DisposeTransaction`，使注入方（如 plugin-host）的 teardown 与 mutation queue 处于同一时间域。 */ readonly scheduler?: ILifecycleScheduler; };"

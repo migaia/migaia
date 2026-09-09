@@ -1016,6 +1016,7 @@
             "import {\n  Signal,\n  Computed,\n  Effect,\n  type IComputedConfig,\n  createRuntime,\n  defaultRuntime,\n  type Runtime,\n  ReactiveErrorCode,\n  type IReactiveErrorCode,\n  ReactiveErrorText,\n  type IReactiveErrorText,\n  REACTIVE_SOURCE,\n  type IReactiveError,\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IDisposable,\n  type IDisposer,\n  type IComputedValue,\n  type IObservable,\n  type IObserver,\n  type IRuntime,\n  type IRuntimeOptions,\n  type ISignal,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';",
             "function createRuntime(options?: IRuntimeOptions): Runtime;\nconst defaultRuntime: Runtime;"
           ],
+          "members": [],
           "aliasOf": "defaultRuntime",
           "exportPath": ".",
           "overloadSignatures": ["export declare const defaultRuntime: Runtime;"],
@@ -1098,6 +1099,7 @@
           "examples": [
             "import {\n  Signal,\n  Computed,\n  Effect,\n  type IComputedConfig,\n  createRuntime,\n  defaultRuntime,\n  type Runtime,\n  ReactiveErrorCode,\n  type IReactiveErrorCode,\n  ReactiveErrorText,\n  type IReactiveErrorText,\n  REACTIVE_SOURCE,\n  type IReactiveError,\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IDisposable,\n  type IDisposer,\n  type IComputedValue,\n  type IObservable,\n  type IObserver,\n  type IRuntime,\n  type IRuntimeOptions,\n  type ISignal,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';"
           ],
+          "members": [],
           "aliasOf": "IReactiveError",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1266,6 +1268,7 @@
             "import {\n  Signal,\n  Computed,\n  Effect,\n  type IComputedConfig,\n  createRuntime,\n  defaultRuntime,\n  type Runtime,\n  ReactiveErrorCode,\n  type IReactiveErrorCode,\n  ReactiveErrorText,\n  type IReactiveErrorText,\n  REACTIVE_SOURCE,\n  type IReactiveError,\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IDisposable,\n  type IDisposer,\n  type IComputedValue,\n  type IObservable,\n  type IObserver,\n  type IRuntime,\n  type IRuntimeOptions,\n  type ISignal,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';",
             "import { ReactiveErrorCode, type IReactiveErrorCode } from '@migaia/reactive';"
           ],
+          "members": [],
           "aliasOf": "IReactiveErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1433,6 +1436,7 @@
           "examples": [
             "import {\n  Signal,\n  Computed,\n  Effect,\n  type IComputedConfig,\n  createRuntime,\n  defaultRuntime,\n  type Runtime,\n  ReactiveErrorCode,\n  type IReactiveErrorCode,\n  ReactiveErrorText,\n  type IReactiveErrorText,\n  REACTIVE_SOURCE,\n  type IReactiveError,\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IDisposable,\n  type IDisposer,\n  type IComputedValue,\n  type IObservable,\n  type IObserver,\n  type IRuntime,\n  type IRuntimeOptions,\n  type ISignal,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';"
           ],
+          "members": [],
           "aliasOf": "IReactiveErrorText",
           "exportPath": ".",
           "overloadSignatures": ["export type IReactiveErrorText = string;"],
@@ -1496,6 +1500,7 @@
           "examples": [
             "import {\n  Signal,\n  Computed,\n  Effect,\n  type IComputedConfig,\n  createRuntime,\n  defaultRuntime,\n  type Runtime,\n  ReactiveErrorCode,\n  type IReactiveErrorCode,\n  ReactiveErrorText,\n  type IReactiveErrorText,\n  REACTIVE_SOURCE,\n  type IReactiveError,\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IDisposable,\n  type IDisposer,\n  type IComputedValue,\n  type IObservable,\n  type IObserver,\n  type IRuntime,\n  type IRuntimeOptions,\n  type ISignal,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';"
           ],
+          "members": [],
           "aliasOf": "REACTIVE_SOURCE",
           "exportPath": ".",
           "overloadSignatures": ["export declare const REACTIVE_SOURCE = \"@migaia/reactive\";"],
@@ -1560,6 +1565,7 @@
             "import {\n  Signal,\n  Computed,\n  Effect,\n  type IComputedConfig,\n  createRuntime,\n  defaultRuntime,\n  type Runtime,\n  ReactiveErrorCode,\n  type IReactiveErrorCode,\n  ReactiveErrorText,\n  type IReactiveErrorText,\n  REACTIVE_SOURCE,\n  type IReactiveError,\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IDisposable,\n  type IDisposer,\n  type IComputedValue,\n  type IObservable,\n  type IObserver,\n  type IRuntime,\n  type IRuntimeOptions,\n  type ISignal,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';",
             "import { ReactiveErrorCode, type IReactiveErrorCode } from '@migaia/reactive';"
           ],
+          "members": [],
           "aliasOf": "ReactiveErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1728,6 +1734,7 @@
             "import {\n  Signal,\n  Computed,\n  Effect,\n  type IComputedConfig,\n  createRuntime,\n  defaultRuntime,\n  type Runtime,\n  ReactiveErrorCode,\n  type IReactiveErrorCode,\n  ReactiveErrorText,\n  type IReactiveErrorText,\n  REACTIVE_SOURCE,\n  type IReactiveError,\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IDisposable,\n  type IDisposer,\n  type IComputedValue,\n  type IObservable,\n  type IObserver,\n  type IRuntime,\n  type IRuntimeOptions,\n  type ISignal,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';",
             "import { ReactiveErrorText } from '@migaia/reactive';"
           ],
+          "members": [],
           "aliasOf": "ReactiveErrorText",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1997,6 +2004,7 @@
           "errors": ["No documented errors are declared for assertNoForeignOwnershipBrand."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertNoForeignOwnershipBrand.",
           "examples": [],
+          "members": [],
           "exportPath": "./copy-check",
           "overloadSignatures": [
             "export declare function assertNoForeignOwnershipBrand(value: object): void;"
@@ -2067,6 +2075,7 @@
           "errors": ["No documented errors are declared for assertSingleRuntimeCopy."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertSingleRuntimeCopy.",
           "examples": [],
+          "members": [],
           "exportPath": "./copy-check",
           "overloadSignatures": ["export declare function assertSingleRuntimeCopy(): void;"],
           "overloadParameterDetails": [[]],
@@ -2235,6 +2244,7 @@
           "errors": ["No documented errors are declared for brandOwnedValue."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for brandOwnedValue.",
           "examples": [],
+          "members": [],
           "exportPath": "./copy-check",
           "overloadSignatures": ["export declare function brandOwnedValue(value: object): void;"],
           "overloadParameterDetails": [
@@ -2305,6 +2315,7 @@
           "examples": [
             "import {\n  brandOwnedValue,\n  assertNoForeignOwnershipBrand,\n  consumePendingCopyWarning,\n  noteRuntimeCopy,\n  runtimeCopyCount,\n  assertSingleRuntimeCopy,\n  resetRuntimeCopiesForTest\n} from '@migaia/reactive/copy-check';"
           ],
+          "members": [],
           "exportPath": "./copy-check",
           "overloadSignatures": [
             "export declare const consumePendingCopyWarning: () => string | undefined;"
@@ -2373,6 +2384,7 @@
           "errors": ["No documented errors are declared for noteRuntimeCopy."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for noteRuntimeCopy.",
           "examples": [],
+          "members": [],
           "exportPath": "./copy-check",
           "overloadSignatures": ["export declare function noteRuntimeCopy(copy?: symbol): void;"],
           "overloadParameterDetails": [
@@ -2441,6 +2453,7 @@
           "errors": ["No documented errors are declared for resetRuntimeCopiesForTest."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for resetRuntimeCopiesForTest.",
           "examples": [],
+          "members": [],
           "exportPath": "./copy-check",
           "overloadSignatures": ["export declare function resetRuntimeCopiesForTest(): void;"],
           "overloadParameterDetails": [[]],
@@ -2503,6 +2516,7 @@
           "examples": [
             "import {\n  brandOwnedValue,\n  assertNoForeignOwnershipBrand,\n  consumePendingCopyWarning,\n  noteRuntimeCopy,\n  runtimeCopyCount,\n  assertSingleRuntimeCopy,\n  resetRuntimeCopiesForTest\n} from '@migaia/reactive/copy-check';"
           ],
+          "members": [],
           "exportPath": "./copy-check",
           "overloadSignatures": ["export declare const runtimeCopyCount: () => number;"],
           "overloadParameterDetails": [[]],
@@ -2588,6 +2602,7 @@
           "errors": ["No documented errors are declared for internalsOf."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for internalsOf.",
           "examples": [],
+          "members": [],
           "exportPath": "./internals",
           "overloadSignatures": [
             "export declare function internalsOf(runtime: IRuntime): IRuntimeInternals;"
@@ -2660,6 +2675,7 @@
           "examples": [
             "import {\n  registerInternals,\n  internalsOf,\n  isRuntime,\n  type IRuntimeInternals\n} from '@migaia/reactive/internals';"
           ],
+          "members": [],
           "exportPath": "./internals",
           "overloadSignatures": [
             "export type IRuntimeInternals = { readonly clock: VersionClock; readonly tracker: DependencyTracker; readonly scheduler: Scheduler; /** 单调 duration 时钟（adapter.now）。 */ now(): number; /** 事件时间戳（adapter.timestamp），用于 trace。 */ timestamp(): number; /** 诊断写通道留在内部面，外部只能订阅，不能伪造 action/依赖事件。 */ traceEnabled(): boolean; emitTrace(event: IRuntimeTraceEvent): void; /** Bump 版本 + 向下游标脏（wasm 字段等自定义 Source 复用同一条通知管线）。 */ notify(source: IObservable): void; /** Reserve a version, perform a source write, then publish exactly once. */ commitSource<T>(source: IObservable, write: () => T): T; /** * 「稍后回收」的时机通道：无观察者的 Computed 靠它排挂起。 * * 与 flush 时机刻意分开。挂起不是冲刷：同步 flush 策略是完全合法的测试配置， 若两者共用一条通道，一次读完就立刻断掉上游边，同 tick 内的第二次读会白算。 但它也不该是写死的 * `queueMicrotask`——那样 `IRuntimeOptions` 就管不到它。 */ deferIdle(task: () => void): void; };"
@@ -2724,6 +2740,7 @@
           "examples": [
             "import {\n  registerInternals,\n  internalsOf,\n  isRuntime,\n  type IRuntimeInternals\n} from '@migaia/reactive/internals';"
           ],
+          "members": [],
           "exportPath": "./internals",
           "overloadSignatures": [
             "export declare const isRuntime: (candidate: unknown) => candidate is IRuntime;"
@@ -2797,6 +2814,7 @@
           "errors": ["No documented errors are declared for registerInternals."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for registerInternals.",
           "examples": [],
+          "members": [],
           "exportPath": "./internals",
           "overloadSignatures": [
             "export declare function registerInternals(runtime: IRuntime, internals: IRuntimeInternals): void;"
@@ -2995,6 +3013,7 @@
           "examples": [
             "import {\n  internalRuntimeOf,\n  isRuntimeTracking,\n  isAnyRuntimeTracking,\n  type IInternalRuntime\n} from '@migaia/reactive/node-factories';"
           ],
+          "members": [],
           "exportPath": "./node-factories",
           "overloadSignatures": [
             "export type IInternalRuntime = Omit<IRuntime, 'signal' | 'computed'> & { signal<T>(value: T, options?: IReactiveNodeOptions): Signal<T>; computed<T>(fn: () => T, config?: IComputedConfig<T>): Computed<T>; };"
@@ -3063,6 +3082,7 @@
           "errors": ["No documented errors are declared for internalRuntimeOf."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for internalRuntimeOf.",
           "examples": [],
+          "members": [],
           "exportPath": "./node-factories",
           "overloadSignatures": [
             "export declare function internalRuntimeOf(runtime: IRuntime): IInternalRuntime;"
@@ -3133,6 +3153,7 @@
           "errors": ["No documented errors are declared for isAnyRuntimeTracking."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isAnyRuntimeTracking.",
           "examples": [],
+          "members": [],
           "exportPath": "./node-factories",
           "overloadSignatures": ["export declare function isAnyRuntimeTracking(): boolean;"],
           "overloadParameterDetails": [[]],
@@ -3199,6 +3220,7 @@
           "errors": ["No documented errors are declared for isRuntimeTracking."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isRuntimeTracking.",
           "examples": [],
+          "members": [],
           "exportPath": "./node-factories",
           "overloadSignatures": [
             "export declare function isRuntimeTracking(runtime: IRuntime): boolean;"
@@ -3299,6 +3321,7 @@
           "errors": ["No documented errors are declared for mutableDeps."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for mutableDeps.",
           "examples": [],
+          "members": [],
           "exportPath": "./node-internals",
           "overloadSignatures": [
             "export declare function mutableDeps<T extends object>(node: object, fallback: ReadonlySet<T>): Set<T>;"
@@ -3385,6 +3408,7 @@
           "errors": ["No documented errors are declared for mutableDepVersions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for mutableDepVersions.",
           "examples": [],
+          "members": [],
           "exportPath": "./node-internals",
           "overloadSignatures": [
             "export declare function mutableDepVersions<T extends object>(node: object, fallback: ReadonlyMap<T, number>): Map<T, number>;"
@@ -3471,6 +3495,7 @@
           "errors": ["No documented errors are declared for mutableSubs."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for mutableSubs.",
           "examples": [],
+          "members": [],
           "exportPath": "./node-internals",
           "overloadSignatures": [
             "export declare function mutableSubs(node: object, fallback: ReadonlySet<IObserver>): Set<IObserver>;"
@@ -3557,6 +3582,7 @@
           "errors": ["No documented errors are declared for readVersion."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for readVersion.",
           "examples": [],
+          "members": [],
           "exportPath": "./node-internals",
           "overloadSignatures": [
             "export declare function readVersion(node: object, fallback: number): number;"
@@ -3643,6 +3669,7 @@
           "errors": ["No documented errors are declared for registerDeps."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for registerDeps.",
           "examples": [],
+          "members": [],
           "exportPath": "./node-internals",
           "overloadSignatures": [
             "export declare function registerDeps<T extends object>(node: object, deps: Set<T>): ReadonlySet<T>;"
@@ -3729,6 +3756,7 @@
           "errors": ["No documented errors are declared for registerDepVersions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for registerDepVersions.",
           "examples": [],
+          "members": [],
           "exportPath": "./node-internals",
           "overloadSignatures": [
             "export declare function registerDepVersions<T extends object>(node: object, versions: Map<T, number>): ReadonlyMap<T, number>;"
@@ -3815,6 +3843,7 @@
           "errors": ["No documented errors are declared for registerSubs."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for registerSubs.",
           "examples": [],
+          "members": [],
           "exportPath": "./node-internals",
           "overloadSignatures": [
             "export declare function registerSubs(node: object, subs: Set<IObserver>): ReadonlySet<IObserver>;"
@@ -3901,6 +3930,7 @@
           "errors": ["No documented errors are declared for registerVersion."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for registerVersion.",
           "examples": [],
+          "members": [],
           "exportPath": "./node-internals",
           "overloadSignatures": [
             "export declare function registerVersion(node: object, initial: number): void;"
@@ -3987,6 +4017,7 @@
           "errors": ["No documented errors are declared for setVersion."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for setVersion.",
           "examples": [],
+          "members": [],
           "exportPath": "./node-internals",
           "overloadSignatures": [
             "export declare function setVersion(node: object, value: number): void;"
@@ -4099,6 +4130,7 @@
           "examples": [
             "const runtime = createRuntime();\nconst node = {};\nclaimOwnership(node, runtime);\nassertOwnedBy(node, runtime, 'my-node'); // 通过\nassertOwnedBy(node, otherRuntime, 'my-node'); // 抛 CROSS_RUNTIME"
           ],
+          "members": [],
           "exportPath": "./ownership",
           "overloadSignatures": [
             "export declare function assertOwnedBy(value: unknown, runtime: IRuntime, what: string): void;"
@@ -4195,6 +4227,7 @@
           "errors": ["No documented errors are declared for assertReactiveOwnedBy."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertReactiveOwnedBy.",
           "examples": [],
+          "members": [],
           "exportPath": "./ownership",
           "overloadSignatures": [
             "export declare function assertReactiveOwnedBy(value: object, runtime: IRuntime, what: string): void;"
@@ -4288,6 +4321,7 @@
           "examples": [
             "const runtime = createRuntime();\nconst node = {};\nclaimOwnership(node, runtime);\nassertOwnedBy(node, runtime, 'my-node'); // 通过\nassertOwnedBy(node, otherRuntime, 'my-node'); // 抛 CROSS_RUNTIME"
           ],
+          "members": [],
           "exportPath": "./ownership",
           "overloadSignatures": [
             "export declare function claimOwnership(value: object, runtime: IRuntime): void;"
@@ -4369,6 +4403,7 @@
           "errors": ["No documented errors are declared for ownerOf."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ownerOf.",
           "examples": [],
+          "members": [],
           "exportPath": "./ownership",
           "overloadSignatures": [
             "export declare function ownerOf(value: unknown): IRuntime | undefined;"
@@ -4482,6 +4517,152 @@
             "import { Signal, Computed, Effect, createRuntime } from '@migaia/reactive';\n\nfunction renderOnce() {\n  const runtime = createRuntime(); // 每次请求/每个用例独立一份，互不污染\n  const count = new Signal(1, runtime);\n  const doubled = new Computed(() => count.value * 2, runtime);\n  const seen: number[] = [];\n  const dispose = runtime.effect(() => {\n    seen.push(doubled.value);\n  });\n  count.value = 5;\n  runtime.flush(); // 手动同步冲刷，SSR 场景不依赖微任务时机\n  dispose();\n  return seen; // [2, 10]\n}",
             "import { createObserverBinding } from '@migaia/reactive/runtime';\nimport { createRuntime, Computed, Signal } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst count = new Signal(0, runtime);\nconst doubled = new Computed(() => count.value * 2, runtime);\n\nfunction useReactiveValue<T>(read: () => T): T {\n  const binding = createObserverBinding(runtime);\n  const capture = binding.capture(read); // 渲染期：只读捕获，可能被丢弃\n  // ……渲染真正提交时：\n  const result = binding.commit(capture);\n  if (result === 'stale') {\n    // 依赖已变，重新求值（真实框架适配层这里会触发一次重渲染）\n  }\n  binding.observe(() => {\n    // 订阅变化后触发重渲染\n  });\n  return capture.result;\n}",
             "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\n\nconst count = new Signal(1, runtime);\nconst doubled = new Computed(() => count.value * 2, runtime);\n\nconst seen: number[] = [];\nconst effect = new Effect(() => {\n  seen.push(doubled.value);\n}, runtime); // 构造时立即同步跑一次：seen = [2]\n\ncount.value = 3;\nruntime.flush(); // 手动冲刷待处理的副作用：seen = [2, 6]\n\neffect.dispose();\ndoubled.dispose();\ncount.dispose();"
+          ],
+          "members": [
+            {
+              "name": "subs",
+              "kind": "property",
+              "signature": "readonly subs: ReadonlySet<IObserver>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ReadonlySet<IObserver>"
+            },
+            {
+              "name": "deps",
+              "kind": "property",
+              "signature": "readonly deps: ReadonlySet<IObservable>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ReadonlySet<IObservable>"
+            },
+            {
+              "name": "depVersions",
+              "kind": "property",
+              "signature": "readonly depVersions: ReadonlyMap<IObservable, number>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ReadonlyMap<IObservable, number>"
+            },
+            {
+              "name": "version",
+              "kind": "get",
+              "signature": "get version(): number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "runtime",
+              "kind": "property",
+              "signature": "readonly runtime: IRuntime;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "debugName",
+              "kind": "property",
+              "signature": "debugName?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "disposed",
+              "kind": "get",
+              "signature": "get disposed(): boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "observed",
+              "kind": "get",
+              "signature": "get observed(): boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "signature": "dispose(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "markDirty",
+              "kind": "method",
+              "signature": "markDirty(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "isStale",
+              "kind": "method",
+              "signature": "isStale(): boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "onObserved",
+              "kind": "method",
+              "signature": "onObserved(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "onUnobserved",
+              "kind": "method",
+              "signature": "onUnobserved(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "onDependencyDisconnected",
+              "kind": "method",
+              "signature": "onDependencyDisconnected(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "value",
+              "kind": "get",
+              "signature": "get value(): T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "peek",
+              "kind": "method",
+              "signature": "peek(): T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "preview",
+              "kind": "method",
+              "signature": "preview(): T;",
+              "description": "Evaluate a speculative snapshot without publishing a cache or dependency edges. React may abandon getSnapshot renders; those reads must not warm a Computed that was never committed. A committed subscription still uses `value`/`peek` and receives the normal cached reactive path.",
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "pull",
+              "kind": "method",
+              "signature": "pull(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            }
           ],
           "exportPath": "./reactive/*",
           "overloadSignatures": [
@@ -4767,6 +4948,88 @@
             "const seen: number[] = [];\nconst effect = new Effect(() => {\n  seen.push(doubled.value);\n  return () => console.log('cleanup'); // 可选：返回值作为下次重跑/dispose 前的清理回调\n}, runtime); // 构造时立即同步跑一次\neffect.dispose(); // 释放：清理依赖边 + 跑最后一次 cleanup（untracked 执行，不建立依赖）",
             "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\n\nconst count = new Signal(1, runtime);\nconst doubled = new Computed(() => count.value * 2, runtime);\n\nconst seen: number[] = [];\nconst effect = new Effect(() => {\n  seen.push(doubled.value);\n}, runtime); // 构造时立即同步跑一次：seen = [2]\n\ncount.value = 3;\nruntime.flush(); // 手动冲刷待处理的副作用：seen = [2, 6]\n\neffect.dispose();\ndoubled.dispose();\ncount.dispose();"
           ],
+          "members": [
+            {
+              "name": "deps",
+              "kind": "property",
+              "signature": "readonly deps: ReadonlySet<IObservable>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ReadonlySet<IObservable>"
+            },
+            {
+              "name": "depVersions",
+              "kind": "property",
+              "signature": "readonly depVersions: ReadonlyMap<IObservable, number>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ReadonlyMap<IObservable, number>"
+            },
+            {
+              "name": "runtime",
+              "kind": "property",
+              "signature": "readonly runtime: IRuntime;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "debugName",
+              "kind": "property",
+              "signature": "debugName?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "disposed",
+              "kind": "get",
+              "signature": "get disposed(): boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "markDirty",
+              "kind": "method",
+              "signature": "markDirty(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "tick",
+              "kind": "method",
+              "signature": "tick(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "onDependencyDisconnected",
+              "kind": "method",
+              "signature": "onDependencyDisconnected(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "run",
+              "kind": "method",
+              "signature": "run(): void;",
+              "description": "Runs cleanup and the effect body as one terminal-aware transaction. Cleanup may synchronously dispose this effect; that terminal transition must prevent both a rerun and dependency commit.",
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "signature": "dispose(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            }
+          ],
           "exportPath": "./reactive/*",
           "overloadSignatures": [
             "export declare class Effect implements IObserver, IDisposable { #private; readonly deps: ReadonlySet<IObservable>; readonly depVersions: ReadonlyMap<IObservable, number>; readonly runtime: IRuntime; debugName?: string; constructor(fn: () => void | IDisposer, runtime: IRuntime, options?: IReactiveNodeOptions); get disposed(): boolean; markDirty(): void; tick(): void; onDependencyDisconnected(): void; /** * Runs cleanup and the effect body as one terminal-aware transaction. Cleanup may synchronously * dispose this effect; that terminal transition must prevent both a rerun and dependency commit. */ run(): void; dispose(): void; }"
@@ -4937,6 +5200,7 @@
             "class Runtime implements IRuntime {\n  signal<T>(value: T, options?: { debugName?: string }): Signal<T>;\n  computed<T>(fn: () => T, config?: IComputedConfig<T>): Computed<T>;\n  effect(fn: () => void | IDisposer, options?: { debugName?: string }): IDisposer; // 返回 dispose 函数，不是 Effect 实例\n  batch<T>(fn: () => T): T;\n  untracked<T>(fn: () => T): T;\n  flush(): 'completed' | 'deferred';\n  setSchedulerStrategy(strategy: (flush: () => void) => void): void;\n  currentVersion(): number;\n  runTracedAction<T>(name: string, fn: () => T): T;\n  reportError(\n    error: unknown,\n    context: { phase: string; observer?: object; observable?: object }\n  ): void;\n  subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer;\n}",
             "import { Signal } from '@migaia/reactive/reactive/signal.class';\nimport { Computed, type IComputedConfig } from '@migaia/reactive/reactive/computed.class';\nimport { Effect } from '@migaia/reactive/reactive/effect.class';"
           ],
+          "members": [],
           "exportPath": "./reactive/*",
           "overloadSignatures": [
             "export type IComputedConfig<T> = IComputedOptions<T> | ((a: T, b: T) => boolean);"
@@ -5001,6 +5265,7 @@
           "examples": [
             "type IComputedOptions<T> = {\n  equals?: (a: T, b: T) => boolean;\n  keepAlive?: boolean;\n  debugName?: string;\n};\ntype IComputedConfig<T> = IComputedOptions<T> | ((a: T, b: T) => boolean);\n\nclass Computed<T> implements IObservable, IObserver, IDisposable {\n  constructor(fn: () => T, runtime: IRuntime, config?: IComputedConfig<T>);\n  readonly runtime: IRuntime;\n  debugName?: string;\n  readonly version: number;\n  readonly disposed: boolean;\n  readonly observed: boolean;\n  readonly subs: ReadonlySet<IObserver>;\n  readonly deps: ReadonlySet<IObservable>;\n  readonly depVersions: ReadonlyMap<IObservable, number>;\n  readonly value: T; // 读建立依赖 + 惰性重算\n  peek(): T; // 读、重算，但不建立依赖\n  preview(): T; // 推测性求值：不发布缓存、不建立依赖边（供 React getSnapshot 一类可能被丢弃的渲染使用）\n  pull(): void; // 若脏则重算并落定版本；所有读取路径的统一入口\n  isStale(): boolean;\n  dispose(): void;\n}"
           ],
+          "members": [],
           "exportPath": "./reactive/*",
           "overloadSignatures": [
             "export type IComputedOptions<T> = { equals?: (a: T, b: T) => boolean; keepAlive?: boolean; debugName?: string; };"
@@ -5083,6 +5348,124 @@
             "import { Signal, Computed, Effect, createRuntime } from '@migaia/reactive';\n\nfunction renderOnce() {\n  const runtime = createRuntime(); // 每次请求/每个用例独立一份，互不污染\n  const count = new Signal(1, runtime);\n  const doubled = new Computed(() => count.value * 2, runtime);\n  const seen: number[] = [];\n  const dispose = runtime.effect(() => {\n    seen.push(doubled.value);\n  });\n  count.value = 5;\n  runtime.flush(); // 手动同步冲刷，SSR 场景不依赖微任务时机\n  dispose();\n  return seen; // [2, 10]\n}",
             "import { createObserverBinding } from '@migaia/reactive/runtime';\nimport { createRuntime, Computed, Signal } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst count = new Signal(0, runtime);\nconst doubled = new Computed(() => count.value * 2, runtime);\n\nfunction useReactiveValue<T>(read: () => T): T {\n  const binding = createObserverBinding(runtime);\n  const capture = binding.capture(read); // 渲染期：只读捕获，可能被丢弃\n  // ……渲染真正提交时：\n  const result = binding.commit(capture);\n  if (result === 'stale') {\n    // 依赖已变，重新求值（真实框架适配层这里会触发一次重渲染）\n  }\n  binding.observe(() => {\n    // 订阅变化后触发重渲染\n  });\n  return capture.result;\n}",
             "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\n\nconst count = new Signal(1, runtime);\nconst doubled = new Computed(() => count.value * 2, runtime);\n\nconst seen: number[] = [];\nconst effect = new Effect(() => {\n  seen.push(doubled.value);\n}, runtime); // 构造时立即同步跑一次：seen = [2]\n\ncount.value = 3;\nruntime.flush(); // 手动冲刷待处理的副作用：seen = [2, 6]\n\neffect.dispose();\ndoubled.dispose();\ncount.dispose();"
+          ],
+          "members": [
+            {
+              "name": "subs",
+              "kind": "property",
+              "signature": "readonly subs: ReadonlySet<IObserver>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ReadonlySet<IObserver>"
+            },
+            {
+              "name": "version",
+              "kind": "get",
+              "signature": "get version(): number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "onObserved",
+              "kind": "get",
+              "signature": "get onObserved(): (() => void) | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(() => void) | undefined"
+            },
+            {
+              "name": "onUnobserved",
+              "kind": "get",
+              "signature": "get onUnobserved(): (() => void) | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(() => void) | undefined"
+            },
+            {
+              "name": "runtime",
+              "kind": "property",
+              "signature": "readonly runtime: IRuntime;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "debugName",
+              "kind": "property",
+              "signature": "debugName?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "disposed",
+              "kind": "get",
+              "signature": "get disposed(): boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "observed",
+              "kind": "get",
+              "signature": "get observed(): boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "value",
+              "kind": "get",
+              "signature": "get value(): T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "value",
+              "kind": "set",
+              "signature": "set value(next: T);",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "next",
+                  "type": "T",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "peek",
+              "kind": "method",
+              "signature": "peek(): T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "signature": "dispose(): void;",
+              "description": "释放：断开全部下游边。 Computed 与 Effect 一直有 dispose，Signal 没有——于是任何「我建的源节点用完了」 的场景（collections 的 per-cell、AtomStore 的实例释放）只能去 import `runtime/internals` 拿 tracker 自己断边，也就是为了一个本该公开的操作而拿到 整张图的权限。补齐这个对称性之后，那些豁免就不必要了。 语义与 Computed 一致：释放是终态。先标记 disposed 再通知下游，强制重跑的 Effect 因此会读到明确错误，而不会重新订阅这个已释放节点。",
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "addObservedHooks",
+              "kind": "method",
+              "signature": "addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void; }): () => void;",
+              "description": "Compose an owner lifecycle callback without silently replacing one.",
+              "parameterDetails": [
+                {
+                  "name": "hooks",
+                  "type": "{ onObserved?: () => void; onUnobserved?: () => void; }",
+                  "optional": false
+                }
+              ],
+              "returns": "() => void"
+            }
           ],
           "aliasOf": "Signal",
           "exportPath": "./reactive/*",
@@ -5346,6 +5729,7 @@
             "const binding = createObserverBinding(runtime);\nconst dispose = binding.observe(() => {\n  // 真正的订阅者体；依赖变化后被正常调度重跑\n});\n\n// 渲染期（可能被丢弃）：\nconst capture = binding.capture(() => doubled.value); // 只记录读了谁、当时版本，不建边\n\n// 提交期：\nconst result = binding.commit(capture); // 'committed' | 'stale' | 'no-observer'\nif (result === 'stale') {\n  // 捕获后依赖已变化：调用方应重新求值，不要复用同一个 capture token\n}\n\nbinding.retrack(); // 强制当前订阅者重跑一次，返回其依赖集合是否发生变化\ndispose();",
             "import { createObserverBinding } from '@migaia/reactive/runtime';\nimport { createRuntime, Computed, Signal } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst count = new Signal(0, runtime);\nconst doubled = new Computed(() => count.value * 2, runtime);\n\nfunction useReactiveValue<T>(read: () => T): T {\n  const binding = createObserverBinding(runtime);\n  const capture = binding.capture(read); // 渲染期：只读捕获，可能被丢弃\n  // ……渲染真正提交时：\n  const result = binding.commit(capture);\n  if (result === 'stale') {\n    // 依赖已变，重新求值（真实框架适配层这里会触发一次重渲染）\n  }\n  binding.observe(() => {\n    // 订阅变化后触发重渲染\n  });\n  return capture.result;\n}"
           ],
+          "members": [],
           "aliasOf": "createObserverBinding",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -5465,6 +5849,7 @@
             "const runtime = createRuntime();\ntry {\n  runtime.batch(() => {\n    signalA.value = 1;\n    signalB.value = 2;\n    throw new Error('business failure');\n  });\n} catch (error) {\n  // error 就是 'business failure' 本身；若收尾 flush 也失败，flush 错误挂在 error.cause 上\n}",
             "import { Computed, Effect, Signal, createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\n\nconst count = new Signal(1, runtime);\nconst doubled = new Computed(() => count.value * 2, runtime);\n\nconst seen: number[] = [];\nconst effect = new Effect(() => {\n  seen.push(doubled.value);\n}, runtime); // 构造时立即同步跑一次：seen = [2]\n\ncount.value = 3;\nruntime.flush(); // 手动冲刷待处理的副作用：seen = [2, 6]\n\neffect.dispose();\ndoubled.dispose();\ncount.dispose();"
           ],
+          "members": [],
           "aliasOf": "createRuntime",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -5745,6 +6130,151 @@
           "errors": ["No documented errors are declared for DependencyTracker."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for DependencyTracker.",
           "examples": [],
+          "members": [
+            {
+              "name": "isTracking",
+              "kind": "method",
+              "signature": "isTracking(): boolean;",
+              "description": "Whether this tracker is currently collecting dependencies.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "isAnyTracking",
+              "kind": "method",
+              "signature": "static isAnyTracking(): boolean;",
+              "description": "Whether any Runtime is currently collecting a dependency frame.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "track",
+              "kind": "method",
+              "signature": "track(observable: IObservable): void;",
+              "description": "记一条依赖——只暂存到当前帧；跨 runtime 读取立即抛错",
+              "parameterDetails": [
+                {
+                  "name": "observable",
+                  "type": "IObservable",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "clearDependencies",
+              "kind": "method",
+              "signature": "clearDependencies(observer: IObserver): void;",
+              "description": "断开某 observer 的全部依赖边——仅供 dispose 用",
+              "parameterDetails": [
+                {
+                  "name": "observer",
+                  "type": "IObserver",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "disconnectObservable",
+              "kind": "method",
+              "signature": "disconnectObservable(observable: IObservable, reason: typeof ReactiveTraceReason.invalidate | typeof ReactiveTraceReason.dispose): void;",
+              "description": "原子删除 Observable 的全部反向边，再通知下游失效。 `invalidate` 用于仍可继续使用的节点（例如 Atom override）；`dispose` 是终态。 两者都更换独立的 topology token 使在途 capture 过期，不消耗全局值版本， 因此在 VersionClock 已耗尽时仍能完整释放或撤销路由。",
+              "parameterDetails": [
+                {
+                  "name": "observable",
+                  "type": "IObservable",
+                  "optional": false
+                },
+                {
+                  "name": "reason",
+                  "type": "typeof ReactiveTraceReason.invalidate | typeof ReactiveTraceReason.dispose",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "runTracked",
+              "kind": "method",
+              "signature": "runTracked<R>(observer: IObserver, fn: () => R): R;",
+              "description": "事务化重算：成功才 commit 差异，失败丢弃临时集合。",
+              "parameterDetails": [
+                {
+                  "name": "observer",
+                  "type": "IObserver",
+                  "optional": false
+                },
+                {
+                  "name": "fn",
+                  "type": "() => R",
+                  "optional": false
+                }
+              ],
+              "returns": "R"
+            },
+            {
+              "name": "capture",
+              "kind": "method",
+              "signature": "capture<R>(fn: () => R): ICapture<R>;",
+              "description": "Render 阶段只采集依赖与版本，不修改正式订阅边。调用方可在提交阶段交回 token，因而被 Concurrent React 丢弃的 render 不会泄漏订阅。",
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "() => R",
+                  "optional": false
+                }
+              ],
+              "returns": "ICapture<R>"
+            },
+            {
+              "name": "commitCapture",
+              "kind": "method",
+              "signature": "commitCapture(observer: IObserver, capture: ICapture<unknown>): boolean;",
+              "description": "原子验证并提交一次 capture。返回 false 表示捕获后依赖已变化，调用方必须重新求值； token 单次使用，且 observer 必须属于当前 Tracker。",
+              "parameterDetails": [
+                {
+                  "name": "observer",
+                  "type": "IObserver",
+                  "optional": false
+                },
+                {
+                  "name": "capture",
+                  "type": "ICapture<unknown>",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "untracked",
+              "kind": "method",
+              "signature": "untracked<R>(fn: () => R): R;",
+              "description": "在 fn 执行期间关闭依赖收集——action 内读取、cleanup 回调等场景用",
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "() => R",
+                  "optional": false
+                }
+              ],
+              "returns": "R"
+            },
+            {
+              "name": "hasStaleDependencies",
+              "kind": "method",
+              "signature": "hasStaleDependencies(observer: IObserver): boolean;",
+              "description": "依赖是否真的变了（先惰性 pull 使版本落定再比较）",
+              "parameterDetails": [
+                {
+                  "name": "observer",
+                  "type": "IObserver",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            }
+          ],
           "aliasOf": "DependencyTracker",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -5836,6 +6366,7 @@
             "function createObserverBinding(runtime: IRuntime): IObserverBinding;\n\ntype IObserverBinding = {\n  capture<R>(read: () => R): ICapture<R>;\n  observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer;\n  commit(capture: ICapture<unknown>): IObserverCommitResult;\n  retrack(): IObserverRetrackResult;\n};\n\ntype IObserverCommitResult = 'committed' | 'stale' | 'no-observer';\ntype IObserverRetrackResult = 'changed' | 'unchanged' | 'no-observer';",
             "class DependencyTracker {\n  constructor(runtime: IRuntime);\n  isTracking(): boolean;\n  static isAnyTracking(): boolean;\n  track(observable: IObservable): void;\n  clearDependencies(observer: IObserver): void;\n  disconnectObservable(observable: IObservable, reason: 'invalidate' | 'dispose'): void;\n  runTracked<R>(observer: IObserver, fn: () => R): R;\n  capture<R>(fn: () => R): ICapture<R>;\n  commitCapture(observer: IObserver, capture: ICapture<unknown>): boolean;\n  untracked<R>(fn: () => R): R;\n  hasStaleDependencies(observer: IObserver): boolean;\n}"
           ],
+          "members": [],
           "aliasOf": "ICapture",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -5901,6 +6432,7 @@
           "examples": [
             "import {\n  Signal,\n  Computed,\n  Effect,\n  type IComputedConfig,\n  createRuntime,\n  defaultRuntime,\n  type Runtime,\n  ReactiveErrorCode,\n  type IReactiveErrorCode,\n  ReactiveErrorText,\n  type IReactiveErrorText,\n  REACTIVE_SOURCE,\n  type IReactiveError,\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IDisposable,\n  type IDisposer,\n  type IComputedValue,\n  type IObservable,\n  type IObserver,\n  type IRuntime,\n  type IRuntimeOptions,\n  type ISignal,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IComputedValue<T> = IDisposable & { readonly runtime: IRuntime; readonly debugName?: string; readonly observed: boolean; readonly value: T; peek(): T; };"
@@ -5968,6 +6500,7 @@
             "type IComputedOptions<T> = {\n  equals?: (a: T, b: T) => boolean;\n  keepAlive?: boolean;\n  debugName?: string;\n};\ntype IComputedConfig<T> = IComputedOptions<T> | ((a: T, b: T) => boolean);\n\nclass Computed<T> implements IObservable, IObserver, IDisposable {\n  constructor(fn: () => T, runtime: IRuntime, config?: IComputedConfig<T>);\n  readonly runtime: IRuntime;\n  debugName?: string;\n  readonly version: number;\n  readonly disposed: boolean;\n  readonly observed: boolean;\n  readonly subs: ReadonlySet<IObserver>;\n  readonly deps: ReadonlySet<IObservable>;\n  readonly depVersions: ReadonlyMap<IObservable, number>;\n  readonly value: T; // 读建立依赖 + 惰性重算\n  peek(): T; // 读、重算，但不建立依赖\n  preview(): T; // 推测性求值：不发布缓存、不建立依赖边（供 React getSnapshot 一类可能被丢弃的渲染使用）\n  pull(): void; // 若脏则重算并落定版本；所有读取路径的统一入口\n  isStale(): boolean;\n  dispose(): void;\n}",
             "class Effect implements IObserver, IDisposable {\n  constructor(fn: () => void | IDisposer, runtime: IRuntime, options?: { debugName?: string });\n  readonly runtime: IRuntime;\n  debugName?: string;\n  readonly disposed: boolean;\n  readonly deps: ReadonlySet<IObservable>;\n  readonly depVersions: ReadonlyMap<IObservable, number>;\n  run(): void;\n  dispose(): void;\n}"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IDisposable = { dispose(): void; readonly disposed: boolean; };"
@@ -6035,6 +6568,7 @@
             "class Runtime implements IRuntime {\n  signal<T>(value: T, options?: { debugName?: string }): Signal<T>;\n  computed<T>(fn: () => T, config?: IComputedConfig<T>): Computed<T>;\n  effect(fn: () => void | IDisposer, options?: { debugName?: string }): IDisposer; // 返回 dispose 函数，不是 Effect 实例\n  batch<T>(fn: () => T): T;\n  untracked<T>(fn: () => T): T;\n  flush(): 'completed' | 'deferred';\n  setSchedulerStrategy(strategy: (flush: () => void) => void): void;\n  currentVersion(): number;\n  runTracedAction<T>(name: string, fn: () => T): T;\n  reportError(\n    error: unknown,\n    context: { phase: string; observer?: object; observable?: object }\n  ): void;\n  subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer;\n}",
             "function createObserverBinding(runtime: IRuntime): IObserverBinding;\n\ntype IObserverBinding = {\n  capture<R>(read: () => R): ICapture<R>;\n  observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer;\n  commit(capture: ICapture<unknown>): IObserverCommitResult;\n  retrack(): IObserverRetrackResult;\n};\n\ntype IObserverCommitResult = 'committed' | 'stale' | 'no-observer';\ntype IObserverRetrackResult = 'changed' | 'unchanged' | 'no-observer';"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": ["export type IDisposer = () => void;"],
           "overloadParameterDetails": [[]],
@@ -6097,6 +6631,7 @@
           "examples": [
             "class Scheduler {\n  constructor(\n    onAsyncError?: (error: unknown) => void,\n    maxFlushPasses?: number,\n    scheduleMicrotask?: (task: () => void) => void\n  );\n  batchDepth: number;\n  setStrategy(strategy: ISchedulerStrategy): void;\n  enqueue(item: IFlushable): void;\n  dequeue(item: IFlushable): void;\n  requestFlush(): void;\n  flush(): IFlushResult;\n  runBatched<T>(fn: () => T): T;\n  runDeferred<T>(fn: () => T): T;\n}"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IFlushable = { tick(): void; /** 环保护触发时要如实报出被丢弃的待办，靠这个名字定位。 */ readonly debugName?: string; };"
@@ -6162,6 +6697,7 @@
             "import {\n  createObserverBinding,\n  type IObserverBinding,\n  type IObserverCommitResult,\n  type IObserverRetrackResult,\n  Runtime,\n  createRuntime,\n  VersionClock,\n  DependencyTracker,\n  Scheduler,\n  type ICapture,\n  type IRuntime,\n  type IRuntimeOptions,\n  type IReactiveNodeOptions,\n  type ISchedulerStrategy,\n  type IFlushResult\n} from '@migaia/reactive/runtime';",
             "class Scheduler {\n  constructor(\n    onAsyncError?: (error: unknown) => void,\n    maxFlushPasses?: number,\n    scheduleMicrotask?: (task: () => void) => void\n  );\n  batchDepth: number;\n  setStrategy(strategy: ISchedulerStrategy): void;\n  enqueue(item: IFlushable): void;\n  dequeue(item: IFlushable): void;\n  requestFlush(): void;\n  flush(): IFlushResult;\n  runBatched<T>(fn: () => T): T;\n  runDeferred<T>(fn: () => T): T;\n}"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": ["export type IFlushResult = 'completed' | 'deferred';"],
           "overloadParameterDetails": [[]],
@@ -6228,6 +6764,7 @@
             "class Effect implements IObserver, IDisposable {\n  constructor(fn: () => void | IDisposer, runtime: IRuntime, options?: { debugName?: string });\n  readonly runtime: IRuntime;\n  debugName?: string;\n  readonly disposed: boolean;\n  readonly deps: ReadonlySet<IObservable>;\n  readonly depVersions: ReadonlyMap<IObservable, number>;\n  run(): void;\n  dispose(): void;\n}",
             "class DependencyTracker {\n  constructor(runtime: IRuntime);\n  isTracking(): boolean;\n  static isAnyTracking(): boolean;\n  track(observable: IObservable): void;\n  clearDependencies(observer: IObserver): void;\n  disconnectObservable(observable: IObservable, reason: 'invalidate' | 'dispose'): void;\n  runTracked<R>(observer: IObserver, fn: () => R): R;\n  capture<R>(fn: () => R): ICapture<R>;\n  commitCapture(observer: IObserver, capture: ICapture<unknown>): boolean;\n  untracked<R>(fn: () => R): R;\n  hasStaleDependencies(observer: IObserver): boolean;\n}"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IObservable = { readonly runtime: IRuntime; debugName?: string; /** Reverse edges are maintained by the Runtime tracker, not extension code. */ readonly subs: ReadonlySet<IObserver>; readonly version: number; pull?(): void; isStale?(): boolean; onObserved?(): void; onUnobserved?(): void; };"
@@ -6296,6 +6833,7 @@
             "class Effect implements IObserver, IDisposable {\n  constructor(fn: () => void | IDisposer, runtime: IRuntime, options?: { debugName?: string });\n  readonly runtime: IRuntime;\n  debugName?: string;\n  readonly disposed: boolean;\n  readonly deps: ReadonlySet<IObservable>;\n  readonly depVersions: ReadonlyMap<IObservable, number>;\n  run(): void;\n  dispose(): void;\n}",
             "class DependencyTracker {\n  constructor(runtime: IRuntime);\n  isTracking(): boolean;\n  static isAnyTracking(): boolean;\n  track(observable: IObservable): void;\n  clearDependencies(observer: IObserver): void;\n  disconnectObservable(observable: IObservable, reason: 'invalidate' | 'dispose'): void;\n  runTracked<R>(observer: IObserver, fn: () => R): R;\n  capture<R>(fn: () => R): ICapture<R>;\n  commitCapture(observer: IObserver, capture: ICapture<unknown>): boolean;\n  untracked<R>(fn: () => R): R;\n  hasStaleDependencies(observer: IObserver): boolean;\n}"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IObserver = { readonly runtime: IRuntime; readonly disposed: boolean; debugName?: string; readonly deps: ReadonlySet<IObservable>; readonly depVersions: ReadonlyMap<IObservable, number>; markDirty(): void; onDependencyDisconnected(observable: IObservable): void; };"
@@ -6463,6 +7001,7 @@
             "import {\n  createObserverBinding,\n  type IObserverBinding,\n  type IObserverCommitResult,\n  type IObserverRetrackResult,\n  Runtime,\n  createRuntime,\n  VersionClock,\n  DependencyTracker,\n  Scheduler,\n  type ICapture,\n  type IRuntime,\n  type IRuntimeOptions,\n  type IReactiveNodeOptions,\n  type ISchedulerStrategy,\n  type IFlushResult\n} from '@migaia/reactive/runtime';",
             "function createObserverBinding(runtime: IRuntime): IObserverBinding;\n\ntype IObserverBinding = {\n  capture<R>(read: () => R): ICapture<R>;\n  observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer;\n  commit(capture: ICapture<unknown>): IObserverCommitResult;\n  retrack(): IObserverRetrackResult;\n};\n\ntype IObserverCommitResult = 'committed' | 'stale' | 'no-observer';\ntype IObserverRetrackResult = 'changed' | 'unchanged' | 'no-observer';"
           ],
+          "members": [],
           "aliasOf": "IObserverBinding",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -6631,6 +7170,7 @@
             "import {\n  createObserverBinding,\n  type IObserverBinding,\n  type IObserverCommitResult,\n  type IObserverRetrackResult,\n  Runtime,\n  createRuntime,\n  VersionClock,\n  DependencyTracker,\n  Scheduler,\n  type ICapture,\n  type IRuntime,\n  type IRuntimeOptions,\n  type IReactiveNodeOptions,\n  type ISchedulerStrategy,\n  type IFlushResult\n} from '@migaia/reactive/runtime';",
             "function createObserverBinding(runtime: IRuntime): IObserverBinding;\n\ntype IObserverBinding = {\n  capture<R>(read: () => R): ICapture<R>;\n  observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer;\n  commit(capture: ICapture<unknown>): IObserverCommitResult;\n  retrack(): IObserverRetrackResult;\n};\n\ntype IObserverCommitResult = 'committed' | 'stale' | 'no-observer';\ntype IObserverRetrackResult = 'changed' | 'unchanged' | 'no-observer';"
           ],
+          "members": [],
           "aliasOf": "IObserverCommitResult",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -6697,6 +7237,7 @@
             "import {\n  createObserverBinding,\n  type IObserverBinding,\n  type IObserverCommitResult,\n  type IObserverRetrackResult,\n  Runtime,\n  createRuntime,\n  VersionClock,\n  DependencyTracker,\n  Scheduler,\n  type ICapture,\n  type IRuntime,\n  type IRuntimeOptions,\n  type IReactiveNodeOptions,\n  type ISchedulerStrategy,\n  type IFlushResult\n} from '@migaia/reactive/runtime';",
             "function createObserverBinding(runtime: IRuntime): IObserverBinding;\n\ntype IObserverBinding = {\n  capture<R>(read: () => R): ICapture<R>;\n  observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer;\n  commit(capture: ICapture<unknown>): IObserverCommitResult;\n  retrack(): IObserverRetrackResult;\n};\n\ntype IObserverCommitResult = 'committed' | 'stale' | 'no-observer';\ntype IObserverRetrackResult = 'changed' | 'unchanged' | 'no-observer';"
           ],
+          "members": [],
           "aliasOf": "IObserverRetrackResult",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -6760,6 +7301,7 @@
           "errors": ["No documented errors are declared for IReactiveDependencyKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReactiveDependencyKind.",
           "examples": [],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IReactiveDependencyKind = (typeof ReactiveDependencyKind)[keyof typeof ReactiveDependencyKind];"
@@ -6822,6 +7364,7 @@
           "errors": ["No documented errors are declared for IReactiveErrorPhase."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReactiveErrorPhase.",
           "examples": [],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IReactiveErrorPhase = (typeof ReactiveErrorPhase)[keyof typeof ReactiveErrorPhase];"
@@ -6887,6 +7430,7 @@
             "import {\n  createObserverBinding,\n  type IObserverBinding,\n  type IObserverCommitResult,\n  type IObserverRetrackResult,\n  Runtime,\n  createRuntime,\n  VersionClock,\n  DependencyTracker,\n  Scheduler,\n  type ICapture,\n  type IRuntime,\n  type IRuntimeOptions,\n  type IReactiveNodeOptions,\n  type ISchedulerStrategy,\n  type IFlushResult\n} from '@migaia/reactive/runtime';",
             "function createObserverBinding(runtime: IRuntime): IObserverBinding;\n\ntype IObserverBinding = {\n  capture<R>(read: () => R): ICapture<R>;\n  observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer;\n  commit(capture: ICapture<unknown>): IObserverCommitResult;\n  retrack(): IObserverRetrackResult;\n};\n\ntype IObserverCommitResult = 'committed' | 'stale' | 'no-observer';\ntype IObserverRetrackResult = 'changed' | 'unchanged' | 'no-observer';"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": ["export type IReactiveNodeOptions = { debugName?: string; };"],
           "overloadParameterDetails": [[]],
@@ -6949,6 +7493,7 @@
           "examples": [
             "type IRuntimeOptions = {\n  adapter?: Partial<IReactiveRuntimeAdapter>; // scheduleMicrotask/now/timestamp/reportError\n  onError?: (error: unknown, context: IRuntimeErrorContext) => void;\n  onTrace?: (event: IRuntimeTraceEvent) => void;\n  maxFlushPasses?: number; // 默认 100，须为正整数\n  scheduleIdle?: (task: () => void) => void; // 默认走 adapter.scheduleMicrotask\n};"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IReactiveRuntimeAdapter = { /** 调度一次微任务。 */ scheduleMicrotask(task: () => void): void; /** 单调时间，用于 duration。 */ now(): number; /** 事件时间戳，可与 duration 分离。 */ timestamp(): number; /** 默认错误出口。 */ reportError(error: unknown, context: IRuntimeErrorContext): void; };"
@@ -7011,6 +7556,7 @@
           "errors": ["No documented errors are declared for IReactiveTracePhase."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReactiveTracePhase.",
           "examples": [],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IReactiveTracePhase = (typeof ReactiveTracePhase)[keyof typeof ReactiveTracePhase];"
@@ -7073,6 +7619,7 @@
           "errors": ["No documented errors are declared for IReactiveTraceReason."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReactiveTraceReason.",
           "examples": [],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IReactiveTraceReason = (typeof ReactiveTraceReason)[keyof typeof ReactiveTraceReason];"
@@ -7135,6 +7682,7 @@
           "errors": ["No documented errors are declared for IReactiveTraceType."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReactiveTraceType.",
           "examples": [],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IReactiveTraceType = (typeof ReactiveTraceType)[keyof typeof ReactiveTraceType];"
@@ -7207,6 +7755,7 @@
             "class DependencyTracker {\n  constructor(runtime: IRuntime);\n  isTracking(): boolean;\n  static isAnyTracking(): boolean;\n  track(observable: IObservable): void;\n  clearDependencies(observer: IObserver): void;\n  disconnectObservable(observable: IObservable, reason: 'invalidate' | 'dispose'): void;\n  runTracked<R>(observer: IObserver, fn: () => R): R;\n  capture<R>(fn: () => R): ICapture<R>;\n  commitCapture(observer: IObserver, capture: ICapture<unknown>): boolean;\n  untracked<R>(fn: () => R): R;\n  hasStaleDependencies(observer: IObserver): boolean;\n}",
             "function createFieldSource(\n  runtime: IRuntime,\n  debugName?: string\n): {\n  track(): void;\n  notify(): void;\n  commit<T>(write: () => T): T;\n  readonly observed: boolean;\n  readonly disposed: boolean;\n  dispose(): void;\n};"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IRuntime = { readonly [RUNTIME_BRAND]: true; /** Bump 版本 + 向下游标脏（wasm 字段等自定义 Source 复用同一条通知管线） */ signal<T>(value: T, options?: IReactiveNodeOptions): ISignal<T>; computed<T>(fn: () => T, config?: IComputedConfig<T>): IComputedValue<T>; effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer; batch<T>(fn: () => T): T; untracked<T>(fn: () => T): T; /** 同步冲刷当前队列。observer 内重入时外层 flush 仍拥有队列，返回 `deferred`； 最外层调用完成并排空队列时返回 `completed`。 */ flush(): IFlushResult; /** 受控地替换冲刷策略；只改变何时 flush，不交出 Scheduler 队列本身。 */ setSchedulerStrategy(strategy: ISchedulerStrategy): void; /** 只读版本观测；不交出可递增的 VersionClock。 */ currentVersion(): number; /** 执行并追踪一段真实 action。调用方只能提供 name 与函数，不能伪造 start/end/error 阶段或任意注入 trace event。 */ runTracedAction<T>(name: string, fn: () => T): T; reportError(error: unknown, context: IRuntimeErrorReportContext): void; /** 诊断面只读：事件只能由受信内核产生，调用方不能伪造 action/依赖记录。 */ subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer; };"
@@ -7271,6 +7820,7 @@
           "examples": [
             "type IRuntimeOptions = {\n  adapter?: Partial<IReactiveRuntimeAdapter>; // scheduleMicrotask/now/timestamp/reportError\n  onError?: (error: unknown, context: IRuntimeErrorContext) => void;\n  onTrace?: (event: IRuntimeTraceEvent) => void;\n  maxFlushPasses?: number; // 默认 100，须为正整数\n  scheduleIdle?: (task: () => void) => void; // 默认走 adapter.scheduleMicrotask\n};"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IRuntimeErrorContext = { phase: IRuntimeErrorPhase; observer?: IRuntimeNodeDescriptor; observable?: IRuntimeNodeDescriptor; };"
@@ -7333,6 +7883,7 @@
           "errors": ["No documented errors are declared for IRuntimeErrorPhase."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeErrorPhase.",
           "examples": [],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IRuntimeErrorPhase = (typeof ReactiveErrorPhase)[keyof typeof ReactiveErrorPhase];"
@@ -7395,6 +7946,7 @@
           "errors": ["No documented errors are declared for IRuntimeErrorReportContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeErrorReportContext.",
           "examples": [],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IRuntimeErrorReportContext = { phase: IRuntimeErrorPhase; observer?: object; observable?: object; };"
@@ -7459,6 +8011,7 @@
           "examples": [
             "type IRuntimeTraceEvent =\n  | {\n      type: 'observable-change';\n      timestamp: number;\n      observable: IRuntimeNodeDescriptor;\n      reason: 'set' | 'notify';\n    }\n  | {\n      type: 'dependency';\n      timestamp: number;\n      phase: 'connect' | 'disconnect';\n      observable: IRuntimeNodeDescriptor;\n      observer: IRuntimeNodeDescriptor;\n      reason?: 'retrack' | 'invalidate' | 'dispose';\n    }\n  | {\n      type: 'observer-run';\n      timestamp: number;\n      phase: 'start' | 'end' | 'error';\n      observer: IRuntimeNodeDescriptor;\n      durationMs?: number;\n      error?: unknown;\n    }\n  | {\n      type: 'action';\n      timestamp: number;\n      phase: 'start' | 'end' | 'error';\n      name: string;\n      durationMs?: number;\n      error?: unknown;\n    };"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IRuntimeNodeDescriptor = Readonly<{ id: string; kind: IRuntimeNodeKind; debugName?: string; }>;"
@@ -7521,6 +8074,7 @@
           "errors": ["No documented errors are declared for IRuntimeNodeKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeNodeKind.",
           "examples": [],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IRuntimeNodeKind = 'observable' | 'observer' | 'computed';"
@@ -7588,6 +8142,7 @@
             "type IRuntimeOptions = {\n  adapter?: Partial<IReactiveRuntimeAdapter>; // scheduleMicrotask/now/timestamp/reportError\n  onError?: (error: unknown, context: IRuntimeErrorContext) => void;\n  onTrace?: (event: IRuntimeTraceEvent) => void;\n  maxFlushPasses?: number; // 默认 100，须为正整数\n  scheduleIdle?: (task: () => void) => void; // 默认走 adapter.scheduleMicrotask\n};",
             "import {\n  createObserverBinding,\n  type IObserverBinding,\n  type IObserverCommitResult,\n  type IObserverRetrackResult,\n  Runtime,\n  createRuntime,\n  VersionClock,\n  DependencyTracker,\n  Scheduler,\n  type ICapture,\n  type IRuntime,\n  type IRuntimeOptions,\n  type IReactiveNodeOptions,\n  type ISchedulerStrategy,\n  type IFlushResult\n} from '@migaia/reactive/runtime';"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IRuntimeOptions = { /** 宿主能力注入面；缺省项回落到 `defaultRuntimeAdapter`。 */ adapter?: Partial<IReactiveRuntimeAdapter>; onError?: (error: unknown, context: IRuntimeErrorContext) => void; onTrace?: (event: IRuntimeTraceEvent) => void; /** * 一次冲刷里单个 observer 允许的最大执行次数，默认 100。单个 observer 超限视为自触发环：抛错并清空队列。 * * 可配置，因为它是策略参数而非物理常数——很长的派生链每轮只推进一级也会吃轮次。 */ maxFlushPasses?: number; /** * 无观察者 Computed 的挂起时机，默认走 adapter 的 `scheduleMicrotask`。 * * 与调度策略分开：挂起是回收，不是冲刷。写死之后这条路径不受任何配置控制， rAF/idle 策略下时机对不上，测试也只能靠等微任务。 */ scheduleIdle?: (task: () => void) => void; };"
@@ -7656,6 +8211,7 @@
             "import {\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';",
             "type IRuntimeTraceEvent =\n  | {\n      type: 'observable-change';\n      timestamp: number;\n      observable: IRuntimeNodeDescriptor;\n      reason: 'set' | 'notify';\n    }\n  | {\n      type: 'dependency';\n      timestamp: number;\n      phase: 'connect' | 'disconnect';\n      observable: IRuntimeNodeDescriptor;\n      observer: IRuntimeNodeDescriptor;\n      reason?: 'retrack' | 'invalidate' | 'dispose';\n    }\n  | {\n      type: 'observer-run';\n      timestamp: number;\n      phase: 'start' | 'end' | 'error';\n      observer: IRuntimeNodeDescriptor;\n      durationMs?: number;\n      error?: unknown;\n    }\n  | {\n      type: 'action';\n      timestamp: number;\n      phase: 'start' | 'end' | 'error';\n      name: string;\n      durationMs?: number;\n      error?: unknown;\n    };"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type IRuntimeTraceEvent = { readonly type: typeof ReactiveTraceType.observableChange; readonly timestamp: number; readonly observable: IRuntimeNodeDescriptor; readonly reason: typeof ReactiveTraceReason.set | typeof ReactiveTraceReason.notify; } | { readonly type: typeof ReactiveTraceType.dependency; readonly timestamp: number; readonly phase: typeof ReactiveTracePhase.connect | typeof ReactiveTracePhase.disconnect; readonly observable: IRuntimeNodeDescriptor; readonly observer: IRuntimeNodeDescriptor; readonly reason?: typeof ReactiveTraceReason.retrack | typeof ReactiveTraceReason.invalidate | typeof ReactiveTraceReason.dispose; } | { readonly type: typeof ReactiveTraceType.observerRun; readonly timestamp: number; readonly phase: typeof ReactiveTracePhase.start | typeof ReactiveTracePhase.end | typeof ReactiveTracePhase.error; readonly observer: IRuntimeNodeDescriptor; readonly durationMs?: number; readonly error?: unknown; } | { readonly type: typeof ReactiveTraceType.action; readonly timestamp: number; readonly phase: typeof ReactiveTracePhase.start | typeof ReactiveTracePhase.end | typeof ReactiveTracePhase.error; readonly name: string; readonly durationMs?: number; readonly error?: unknown; };"
@@ -7721,6 +8277,7 @@
             "import {\n  createObserverBinding,\n  type IObserverBinding,\n  type IObserverCommitResult,\n  type IObserverRetrackResult,\n  Runtime,\n  createRuntime,\n  VersionClock,\n  DependencyTracker,\n  Scheduler,\n  type ICapture,\n  type IRuntime,\n  type IRuntimeOptions,\n  type IReactiveNodeOptions,\n  type ISchedulerStrategy,\n  type IFlushResult\n} from '@migaia/reactive/runtime';",
             "class Scheduler {\n  constructor(\n    onAsyncError?: (error: unknown) => void,\n    maxFlushPasses?: number,\n    scheduleMicrotask?: (task: () => void) => void\n  );\n  batchDepth: number;\n  setStrategy(strategy: ISchedulerStrategy): void;\n  enqueue(item: IFlushable): void;\n  dequeue(item: IFlushable): void;\n  requestFlush(): void;\n  flush(): IFlushResult;\n  runBatched<T>(fn: () => T): T;\n  runDeferred<T>(fn: () => T): T;\n}"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": ["export type ISchedulerStrategy = (flush: () => void) => void;"],
           "overloadParameterDetails": [[]],
@@ -7783,6 +8340,7 @@
           "examples": [
             "import {\n  Signal,\n  Computed,\n  Effect,\n  type IComputedConfig,\n  createRuntime,\n  defaultRuntime,\n  type Runtime,\n  ReactiveErrorCode,\n  type IReactiveErrorCode,\n  ReactiveErrorText,\n  type IReactiveErrorText,\n  REACTIVE_SOURCE,\n  type IReactiveError,\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IDisposable,\n  type IDisposer,\n  type IComputedValue,\n  type IObservable,\n  type IObserver,\n  type IRuntime,\n  type IRuntimeOptions,\n  type ISignal,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export type ISignal<T> = IDisposable & { readonly runtime: IRuntime; readonly debugName?: string; readonly observed: boolean; value: T; peek(): T; };"
@@ -7845,6 +8403,7 @@
           "errors": ["No documented errors are declared for ReactiveDependencyKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ReactiveDependencyKind.",
           "examples": [],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export declare const ReactiveDependencyKind: { readonly observer: \"observer\"; readonly capture: \"capture\"; };"
@@ -7910,6 +8469,7 @@
             "import {\n  Signal,\n  Computed,\n  Effect,\n  type IComputedConfig,\n  createRuntime,\n  defaultRuntime,\n  type Runtime,\n  ReactiveErrorCode,\n  type IReactiveErrorCode,\n  ReactiveErrorText,\n  type IReactiveErrorText,\n  REACTIVE_SOURCE,\n  type IReactiveError,\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IDisposable,\n  type IDisposer,\n  type IComputedValue,\n  type IObservable,\n  type IObserver,\n  type IRuntime,\n  type IRuntimeOptions,\n  type ISignal,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';",
             "import {\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export declare const ReactiveErrorPhase: { readonly asyncFlush: \"async-flush\"; readonly dependencyDisconnect: \"dependency-disconnect\"; readonly lifecycleHook: \"lifecycle-hook\"; readonly ssrResource: \"ssr-resource\"; readonly subscriptionListener: \"subscription-listener\"; readonly traceListener: \"trace-listener\"; };"
@@ -7975,6 +8535,7 @@
             "import {\n  Signal,\n  Computed,\n  Effect,\n  type IComputedConfig,\n  createRuntime,\n  defaultRuntime,\n  type Runtime,\n  ReactiveErrorCode,\n  type IReactiveErrorCode,\n  ReactiveErrorText,\n  type IReactiveErrorText,\n  REACTIVE_SOURCE,\n  type IReactiveError,\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IDisposable,\n  type IDisposer,\n  type IComputedValue,\n  type IObservable,\n  type IObserver,\n  type IRuntime,\n  type IRuntimeOptions,\n  type ISignal,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';",
             "import {\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export declare const ReactiveTracePhase: { readonly start: \"start\"; readonly end: \"end\"; readonly error: \"error\"; readonly connect: \"connect\"; readonly disconnect: \"disconnect\"; };"
@@ -8037,6 +8598,7 @@
           "errors": ["No documented errors are declared for ReactiveTraceReason."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ReactiveTraceReason.",
           "examples": [],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export declare const ReactiveTraceReason: { readonly set: \"set\"; readonly notify: \"notify\"; readonly retrack: \"retrack\"; readonly invalidate: \"invalidate\"; readonly dispose: \"dispose\"; };"
@@ -8102,6 +8664,7 @@
             "import {\n  Signal,\n  Computed,\n  Effect,\n  type IComputedConfig,\n  createRuntime,\n  defaultRuntime,\n  type Runtime,\n  ReactiveErrorCode,\n  type IReactiveErrorCode,\n  ReactiveErrorText,\n  type IReactiveErrorText,\n  REACTIVE_SOURCE,\n  type IReactiveError,\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IDisposable,\n  type IDisposer,\n  type IComputedValue,\n  type IObservable,\n  type IObserver,\n  type IRuntime,\n  type IRuntimeOptions,\n  type ISignal,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';",
             "import {\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';"
           ],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": [
             "export declare const ReactiveTraceType: { readonly observableChange: \"observable-change\"; readonly dependency: \"dependency\"; readonly observerRun: \"observer-run\"; readonly action: \"action\"; };"
@@ -8170,6 +8733,175 @@
           "errors": ["No documented errors are declared for Runtime."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for Runtime.",
           "examples": [],
+          "members": [
+            {
+              "name": "signal",
+              "kind": "method",
+              "signature": "signal<T>(value: T, options?: IReactiveNodeOptions): Signal<T>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "value",
+                  "type": "T",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IReactiveNodeOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Signal<T>"
+            },
+            {
+              "name": "computed",
+              "kind": "method",
+              "signature": "computed<T>(fn: () => T, config?: IComputedConfig<T>): Computed<T>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "() => T",
+                  "optional": false
+                },
+                {
+                  "name": "config",
+                  "type": "IComputedConfig<T>",
+                  "optional": true
+                }
+              ],
+              "returns": "Computed<T>"
+            },
+            {
+              "name": "effect",
+              "kind": "method",
+              "signature": "effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "() => void | IDisposer",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IReactiveNodeOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "IDisposer"
+            },
+            {
+              "name": "batch",
+              "kind": "method",
+              "signature": "batch<T>(fn: () => T): T;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "() => T",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            },
+            {
+              "name": "untracked",
+              "kind": "method",
+              "signature": "untracked<T>(fn: () => T): T;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "() => T",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            },
+            {
+              "name": "flush",
+              "kind": "method",
+              "signature": "flush(): IFlushResult;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IFlushResult"
+            },
+            {
+              "name": "setSchedulerStrategy",
+              "kind": "method",
+              "signature": "setSchedulerStrategy(strategy: ISchedulerStrategy): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "strategy",
+                  "type": "ISchedulerStrategy",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "currentVersion",
+              "kind": "method",
+              "signature": "currentVersion(): number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "runTracedAction",
+              "kind": "method",
+              "signature": "runTracedAction<T>(name: string, fn: () => T): T;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "fn",
+                  "type": "() => T",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            },
+            {
+              "name": "reportError",
+              "kind": "method",
+              "signature": "reportError(error: unknown, context: IRuntimeErrorReportContext): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "error",
+                  "type": "unknown",
+                  "optional": false
+                },
+                {
+                  "name": "context",
+                  "type": "IRuntimeErrorReportContext",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "subscribeTrace",
+              "kind": "method",
+              "signature": "subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "listener",
+                  "type": "(event: IRuntimeTraceEvent) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "IDisposer"
+            }
+          ],
           "aliasOf": "Runtime",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -8444,6 +9176,7 @@
           "errors": ["No documented errors are declared for RUNTIME_BRAND."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RUNTIME_BRAND.",
           "examples": [],
+          "members": [],
           "exportPath": "./runtime",
           "overloadSignatures": ["export declare const RUNTIME_BRAND: unique symbol;"],
           "overloadParameterDetails": [[]],
@@ -8524,6 +9257,102 @@
           "errors": ["No documented errors are declared for Scheduler."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for Scheduler.",
           "examples": [],
+          "members": [
+            {
+              "name": "batchDepth",
+              "kind": "property",
+              "signature": "batchDepth: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "setStrategy",
+              "kind": "method",
+              "signature": "setStrategy(strategy: ISchedulerStrategy): void;",
+              "description": "Replaces trigger strategy; rejects non-callable runtime values before changing current strategy.",
+              "parameterDetails": [
+                {
+                  "name": "strategy",
+                  "type": "ISchedulerStrategy",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "enqueue",
+              "kind": "method",
+              "signature": "enqueue(item: IFlushable): void;",
+              "description": "把一项加入待冲刷队列；不在批处理里就立刻申请一次冲刷",
+              "parameterDetails": [
+                {
+                  "name": "item",
+                  "type": "IFlushable",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "dequeue",
+              "kind": "method",
+              "signature": "dequeue(item: IFlushable): void;",
+              "description": "从队列移除（比如 effect dispose 时，避免已销毁的实例还留在队列里）",
+              "parameterDetails": [
+                {
+                  "name": "item",
+                  "type": "IFlushable",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "requestFlush",
+              "kind": "method",
+              "signature": "requestFlush(): void;",
+              "description": "申请一次冲刷——signal 写入/notifySource 也会各自调用它； 重复调用是安全的，scheduled/flushing 两个标记天然去重，不会重复触发",
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "flush",
+              "kind": "method",
+              "signature": "flush(): IFlushResult;",
+              "description": "冲刷全部待执行项（合并为一轮）。 冲刷期间重入返回 `deferred`。最外层 while 最终仍会排空新加入的队列，但内层 `flush()` 无法兑现「返回时本次待办已经执行」；返回判别值让调用方看见这个 差异，同时不把合法的 action/devtools 重入升级成 observer 错误。",
+              "parameterDetails": [],
+              "returns": "IFlushResult"
+            },
+            {
+              "name": "runBatched",
+              "kind": "method",
+              "signature": "runBatched<T>(fn: () => T): T;",
+              "description": "显式批处理：进入时计深度，最外层退出才真正冲刷一次。 错误优先级：若 fn（业务动作）抛错 A，且随后 flush 又抛错 B，优先抛出业务错误 A（B 附在 cause 上）， 避免原始业务错误被 finally 里的 flush 错误覆盖掉。",
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "() => T",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            },
+            {
+              "name": "runDeferred",
+              "kind": "method",
+              "signature": "runDeferred<T>(fn: () => T): T;",
+              "description": "Delay scheduling until a notification fan-out has marked every subscriber. Unlike a user batch, this preserves the configured async/sync strategy.",
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "() => T",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            }
+          ],
           "aliasOf": "Scheduler",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -8728,6 +9557,24 @@
           "errors": ["No documented errors are declared for VersionClock."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for VersionClock.",
           "examples": [],
+          "members": [
+            {
+              "name": "next",
+              "kind": "method",
+              "signature": "next(): number;",
+              "description": "领取下一个版本号——signal/computed 的值真的变了就调一次",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "current",
+              "kind": "method",
+              "signature": "current(): number;",
+              "description": "当前版本号——只读查看，不消耗",
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
           "aliasOf": "VersionClock",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -8948,6 +9795,7 @@
           "examples": [
             "const field = createFieldSource(runtime, 'wasm-counter');\nfunction read(): number {\n  field.track(); // 建立依赖，不返回值——真实值由外部存储持有\n  return wasmMemory.getValue();\n}\nfunction write(v: number): void {\n  field.commit(() => wasmMemory.setValue(v)); // 领取版本、执行写入、再发布，三步原子\n}\nfield.dispose();"
           ],
+          "members": [],
           "exportPath": "./source",
           "overloadSignatures": [
             "export declare function createFieldSource(runtime: IRuntime, debugName?: string): IRuntimeFieldSource;"

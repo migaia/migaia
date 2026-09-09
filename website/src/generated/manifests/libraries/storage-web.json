@@ -2182,6 +2182,7 @@
           "errors": ["No documented errors are declared for IExtensionStage."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IExtensionStage.",
           "examples": [],
+          "members": [],
           "aliasOf": "IExtensionStage",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2249,6 +2250,7 @@
             "function cookies(options?: ICookiesOptions): ISyncCapableStore<ICookieStore>\n\ntype ICookiesOptions = {\n  readonly namespace?: string\n  readonly namespaceCodec?: INamespaceCodec\n  readonly scope?: ICookieScope\n  readonly document?: ICookieDocument // { cookie: string }\n}\n\ntype ICookieScope = {\n  readonly path?: string\n  readonly domain?: string\n  readonly sameSite?: 'strict' | 'lax' | 'none'\n  readonly secure?: boolean\n  readonly partitioned?: boolean\n}",
             "type INamespaceCodec = {\n  encode(namespace: string, key: string): string\n  decode(namespace: string, physicalKey: string): string | undefined\n}\nconst lengthPrefixedNamespaceCodec: INamespaceCodec"
           ],
+          "members": [],
           "aliasOf": "INamespaceCodec",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2314,6 +2316,7 @@
           "examples": [
             "// 内部签名（非导出，仅用于理解行为）\nfunction planChannelWrite(\n  key: IStorageKey,\n  attempted: 'value' | 'bytes' | 'record',\n  existing: ReadonlySet<'value' | 'bytes' | 'record'>,\n  policy?: IConflictPolicy, // 默认 'conflict'\n  backend?: IBackendKind\n): { readonly remove: readonly IStorageChannel[] }"
           ],
+          "members": [],
           "aliasOf": "IStorageChannel",
           "exportPath": ".",
           "overloadSignatures": ["export type IStorageChannel = 'value' | 'bytes' | 'record';"],
@@ -2375,6 +2378,7 @@
           "errors": ["No documented errors are declared for IStorageErrorDetails."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageErrorDetails.",
           "examples": [],
+          "members": [],
           "aliasOf": "IStorageErrorDetails",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2443,6 +2447,7 @@
             "import { isRecordStore, asRecordStore, ConflictPolicy } from '@migaia/storage-contract'\nimport { lengthPrefixedNamespaceCodec } from '@migaia/storage-web'",
             "lengthPrefixedNamespaceCodec.encode('app', 'theme') // 'sw1:3:app:theme'\nlengthPrefixedNamespaceCodec.decode('app', 'sw1:3:app:theme') // 'theme'"
           ],
+          "members": [],
           "aliasOf": "lengthPrefixedNamespaceCodec",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2508,6 +2513,7 @@
           "examples": [
             "import {\n  STORAGE_WEB_SOURCE,\n  StorageError,\n  StorageErrorCode,\n  StorageErrorText\n} from '@migaia/storage-web'\nimport {\n  StorageContractError,\n  StorageContractErrorCode,\n  isStorageContractError\n} from '@migaia/storage-contract'"
           ],
+          "members": [],
           "aliasOf": "STORAGE_WEB_SOURCE",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2813,6 +2819,80 @@
           "errors": ["No documented errors are declared for StorageError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StorageError.",
           "examples": [],
+          "members": [
+            {
+              "name": "source",
+              "kind": "property",
+              "signature": "readonly source: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "code",
+              "kind": "property",
+              "signature": "readonly code: IStorageErrorCode;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IStorageErrorCode"
+            },
+            {
+              "name": "backend",
+              "kind": "property",
+              "signature": "readonly backend?: IBackendKind;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IBackendKind"
+            },
+            {
+              "name": "key",
+              "kind": "property",
+              "signature": "readonly key?: string | IStorageKey;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string | IStorageKey"
+            },
+            {
+              "name": "existingChannel",
+              "kind": "property",
+              "signature": "readonly existingChannel?: IStorageChannel;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IStorageChannel"
+            },
+            {
+              "name": "attemptedChannel",
+              "kind": "property",
+              "signature": "readonly attemptedChannel?: IStorageChannel;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IStorageChannel"
+            },
+            {
+              "name": "extensionStage",
+              "kind": "property",
+              "signature": "readonly extensionStage?: IExtensionStage;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IExtensionStage"
+            },
+            {
+              "name": "operation",
+              "kind": "property",
+              "signature": "readonly operation?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "stage",
+              "kind": "property",
+              "signature": "readonly stage?: 'decode' | 'migrate' | 'validate';",
+              "description": "Internal repository stage used to apply invalid-record policy.",
+              "parameterDetails": [],
+              "returns": "'decode' | 'migrate' | 'validate'"
+            }
+          ],
           "aliasOf": "StorageError",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3209,6 +3289,7 @@
           "examples": [
             "import {\n  STORAGE_WEB_SOURCE,\n  StorageError,\n  StorageErrorCode,\n  StorageErrorText\n} from '@migaia/storage-web'\nimport {\n  StorageContractError,\n  StorageContractErrorCode,\n  isStorageContractError\n} from '@migaia/storage-contract'"
           ],
+          "members": [],
           "aliasOf": "StorageErrorText",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3513,6 +3594,7 @@
             "import { cookies } from '@migaia/storage-web/cookies'",
             "const jar = cookies({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })\nawait jar.set('session', 'abc123', { maxAge: 3600 })\nawait jar.get('session') // 'abc123'\nawait jar.remove('session')"
           ],
+          "members": [],
           "aliasOf": "cookies",
           "exportPath": "./cookies",
           "overloadSignatures": [
@@ -3636,6 +3718,7 @@
           "examples": [
             "function cookies(options?: ICookiesOptions): ISyncCapableStore<ICookieStore>\n\ntype ICookiesOptions = {\n  readonly namespace?: string\n  readonly namespaceCodec?: INamespaceCodec\n  readonly scope?: ICookieScope\n  readonly document?: ICookieDocument // { cookie: string }\n}\n\ntype ICookieScope = {\n  readonly path?: string\n  readonly domain?: string\n  readonly sameSite?: 'strict' | 'lax' | 'none'\n  readonly secure?: boolean\n  readonly partitioned?: boolean\n}"
           ],
+          "members": [],
           "aliasOf": "ICookieDocument",
           "exportPath": "./cookies",
           "overloadSignatures": ["export type ICookieDocument = { cookie: string; };"],
@@ -3699,6 +3782,7 @@
           "examples": [
             "function cookies(options?: ICookiesOptions): ISyncCapableStore<ICookieStore>\n\ntype ICookiesOptions = {\n  readonly namespace?: string\n  readonly namespaceCodec?: INamespaceCodec\n  readonly scope?: ICookieScope\n  readonly document?: ICookieDocument // { cookie: string }\n}\n\ntype ICookieScope = {\n  readonly path?: string\n  readonly domain?: string\n  readonly sameSite?: 'strict' | 'lax' | 'none'\n  readonly secure?: boolean\n  readonly partitioned?: boolean\n}"
           ],
+          "members": [],
           "aliasOf": "ICookiesOptions",
           "exportPath": "./cookies",
           "overloadSignatures": [
@@ -3796,6 +3880,7 @@
             "type IPreference = { id: string; theme: 'light' | 'dark' }\n\nconst definition = defineEntity<IPreference>({\n  name: 'preferences',\n  key: 'id',\n  version: 2,\n  migrations: { 2: async (previous) => ({ ...(previous as { id: string }), theme: 'light' }) }\n})\n\nconst preferences = definition.connect(indexedDb({ dbName: 'app-data' }))\nawait preferences.put({ id: 'appearance', theme: 'dark' })\nawait preferences.get('appearance') // { id: 'appearance', theme: 'dark' }",
             "import { defineEntity } from '@migaia/storage-web/entity'\nimport { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { StorageError, StorageErrorCode } from '@migaia/storage-web'\n\nconst orders = defineEntity<{ id: string; total: number }>({ name: 'orders', key: 'id' }).connect(\n  indexedDb()\n)\n\nconst applyBatch = async (items: Array<{ id: string; total: number }>) => {\n  try {\n    await orders.batch(async (tx) => {\n      for (const item of items) await tx.put(item)\n    })\n  } catch (error) {\n    if (error instanceof StorageError && error.code === StorageErrorCode.transactionConflict) {\n      await applyBatch(items) // 并发冲突：重读后重试整个回调\n    } else {\n      throw error\n    }\n  }\n}"
           ],
+          "members": [],
           "aliasOf": "defineEntity",
           "exportPath": "./entity",
           "overloadSignatures": [
@@ -4080,6 +4165,7 @@
           "examples": [
             "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n}"
           ],
+          "members": [],
           "aliasOf": "IEntityDefinition",
           "exportPath": "./entity",
           "overloadSignatures": [
@@ -4143,6 +4229,7 @@
           "errors": ["No documented errors are declared for IEntityIndex."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEntityIndex.",
           "examples": [],
+          "members": [],
           "aliasOf": "IEntityIndex",
           "exportPath": "./entity",
           "overloadSignatures": [
@@ -4206,6 +4293,7 @@
           "errors": ["No documented errors are declared for IEntityIndexMap."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEntityIndexMap.",
           "examples": [],
+          "members": [],
           "aliasOf": "IEntityIndexMap",
           "exportPath": "./entity",
           "overloadSignatures": [
@@ -4271,6 +4359,7 @@
           "examples": [
             "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n}"
           ],
+          "members": [],
           "aliasOf": "IEntityOptions",
           "exportPath": "./entity",
           "overloadSignatures": [
@@ -4337,6 +4426,7 @@
             "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}",
             "type IEntityTransactionScope<TDomain> = {\n  get(id: IStorageKey): Promise<TDomain | undefined>\n  put(value: TDomain): Promise<IStorageKey>\n  remove(id: IStorageKey): Promise<void>\n}"
           ],
+          "members": [],
           "aliasOf": "IEntityTransactionScope",
           "exportPath": "./entity",
           "overloadSignatures": [
@@ -4400,6 +4490,7 @@
           "errors": ["No documented errors are declared for IIndexedListOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IIndexedListOptions.",
           "examples": [],
+          "members": [],
           "aliasOf": "IIndexedListOptions",
           "exportPath": "./entity",
           "overloadSignatures": [
@@ -4463,6 +4554,7 @@
           "errors": ["No documented errors are declared for IInvalidRecordAction."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IInvalidRecordAction.",
           "examples": [],
+          "members": [],
           "aliasOf": "IInvalidRecordAction",
           "exportPath": "./entity",
           "overloadSignatures": ["export type IInvalidRecordAction = IStorageInvalidRecordAction;"],
@@ -4524,6 +4616,7 @@
           "errors": ["No documented errors are declared for IInvalidRecordHandler."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IInvalidRecordHandler.",
           "examples": [],
+          "members": [],
           "aliasOf": "IInvalidRecordHandler",
           "exportPath": "./entity",
           "overloadSignatures": [
@@ -4590,6 +4683,7 @@
             "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}",
             "type IMigrateOptions<TRecord = unknown> = {\n  readonly batchSize?: number // 默认 100，正安全整数\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IMigrateResult = {\n  readonly scanned: number\n  readonly eligible: number\n  readonly migrated: number\n  readonly skipped: number\n  readonly alreadyCurrent: number\n  readonly conflicted: number\n}"
           ],
+          "members": [],
           "aliasOf": "IInvalidRecordIssue",
           "exportPath": "./entity",
           "overloadSignatures": [
@@ -4707,6 +4801,7 @@
             "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}",
             "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}"
           ],
+          "members": [],
           "aliasOf": "IListOptions",
           "exportPath": "./entity",
           "overloadSignatures": [
@@ -4796,6 +4891,7 @@
             "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}",
             "type IMigrateOptions<TRecord = unknown> = {\n  readonly batchSize?: number // 默认 100，正安全整数\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IMigrateResult = {\n  readonly scanned: number\n  readonly eligible: number\n  readonly migrated: number\n  readonly skipped: number\n  readonly alreadyCurrent: number\n  readonly conflicted: number\n}"
           ],
+          "members": [],
           "aliasOf": "IMigrateOptions",
           "exportPath": "./entity",
           "overloadSignatures": [
@@ -4891,6 +4987,7 @@
             "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}",
             "type IMigrateOptions<TRecord = unknown> = {\n  readonly batchSize?: number // 默认 100，正安全整数\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IMigrateResult = {\n  readonly scanned: number\n  readonly eligible: number\n  readonly migrated: number\n  readonly skipped: number\n  readonly alreadyCurrent: number\n  readonly conflicted: number\n}"
           ],
+          "members": [],
           "aliasOf": "IMigrateResult",
           "exportPath": "./entity",
           "overloadSignatures": [
@@ -4983,6 +5080,7 @@
           "errors": ["No documented errors are declared for IRecordComparator."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRecordComparator.",
           "examples": [],
+          "members": [],
           "aliasOf": "IRecordComparator",
           "exportPath": "./entity",
           "overloadSignatures": [
@@ -5049,6 +5147,7 @@
             "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n}",
             "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}"
           ],
+          "members": [],
           "aliasOf": "IRepository",
           "exportPath": "./entity",
           "overloadSignatures": [
@@ -5131,6 +5230,7 @@
           "errors": ["No documented errors are declared for assertStorageBackendId."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertStorageBackendId.",
           "examples": [],
+          "members": [],
           "aliasOf": "assertStorageBackendId",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -5194,6 +5294,7 @@
           "errors": ["No documented errors are declared for compileStorageFeatureTopology."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for compileStorageFeatureTopology.",
           "examples": [],
+          "members": [],
           "aliasOf": "compileStorageFeatureTopology",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -5262,6 +5363,7 @@
             "import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { indexedDbReactive } from '@migaia/storage-web/plugins/reactive/indexed-db'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [indexedDbReactive({ id: 'primary', dbName: 'app-data' })] as const\n})\n\nconst handle = host.reactiveBackend('primary')\nconst query = host.liveQuery({\n  backendId: 'primary',\n  runtime,\n  scope: 'users',\n  query: ({ store, signal }) => store.getRecord(['users', 'ada'], { signal }),\n  matches: (change) => change.scope === 'users',\n  keepPreviousData: true,\n  timeoutMs: 5_000,\n  report: (error) => console.error('late reactive failure', error)\n})\n\nawait query.ready\nconsole.log(query.state.value)\nawait query.refresh()\nawait query.dispose()\nawait host.dispose()",
             "import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { indexedDbReactive } from '@migaia/storage-web/plugins/reactive/indexed-db'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [indexedDbReactive({ id: 'app', dbName: 'app-data' })] as const\n})\nconst query = host.liveQuery({\n  backendId: 'app',\n  runtime,\n  scope: 'users',\n  query: ({ store, signal }) => store.getRecord(['users', 'ada'], { signal }),\n  keepPreviousData: true,\n  timeoutMs: 5_000\n})\n\nawait query.ready\nconsole.log(query.state.value)\nawait query.refresh()\nawait query.dispose()\nawait host.dispose()"
           ],
+          "members": [],
           "aliasOf": "createStorageHost",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -5383,6 +5485,7 @@
           "errors": ["No documented errors are declared for defineStorageBackendFeature."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineStorageBackendFeature.",
           "examples": [],
+          "members": [],
           "aliasOf": "defineStorageBackendFeature",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -5446,6 +5549,7 @@
           "errors": ["No documented errors are declared for defineStorageBackendKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineStorageBackendKind.",
           "examples": [],
+          "members": [],
           "aliasOf": "defineStorageBackendKind",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -5509,6 +5613,7 @@
           "errors": ["No documented errors are declared for defineStorageBackendPlugin."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineStorageBackendPlugin.",
           "examples": [],
+          "members": [],
           "aliasOf": "defineStorageBackendPlugin",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -5572,6 +5677,7 @@
           "errors": ["No documented errors are declared for IFeatureCapability."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFeatureCapability.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IFeatureCapability<TFeature> = TFeature extends { readonly [storageBackendFeatureBrand]: { readonly capability: infer TCapability extends string; }; } ? TCapability : never;"
@@ -5634,6 +5740,7 @@
           "errors": ["No documented errors are declared for IFeaturesEnableReactive."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFeaturesEnableReactive.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IFeaturesEnableReactive<TFeatures extends readonly unknown[]> = string extends IFeatureCapability<TFeatures[number]> ? false : 'reactive' extends IFeatureCapability<TFeatures[number]> ? true : false;"
@@ -5696,6 +5803,7 @@
           "errors": ["No documented errors are declared for ILiveQuery."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILiveQuery.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type ILiveQuery<T> = { readonly state: ILiveQueryStateView<T>; readonly consistency: IReactiveConsistency; readonly ready: Promise<void>; refresh(): Promise<void>; dispose(): Promise<void>; };"
@@ -5758,6 +5866,7 @@
           "errors": ["No documented errors are declared for ILiveQueryOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILiveQueryOptions.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type ILiveQueryOptions<TStores extends Record<string, IKeyValueStore>, TBackendId extends keyof TStores & string, T> = { readonly backendId: TBackendId; readonly runtime: IRuntime; readonly query: (context: { readonly store: TStores[TBackendId]; readonly signal: IAbortSignal; readonly scope?: string; }) => T | PromiseLike<T>; /** Optional entity scope used only to prove that an invalidation cannot be unrelated. */ readonly scope?: string; /** Optional change predicate; failures are reported and conservatively refresh the query. */ readonly matches?: (change: IStorageChange) => boolean; /** Preserve the last visible value while Resource refreshes in the background. */ readonly keepPreviousData?: boolean; /** Compare settled values before replacing the visible value projection. */ readonly equals?: (previous: T, next: T) => boolean; /** Per-generation deadline, driven by the Host scheduler. */ readonly timeoutMs?: number; /** External cancellation for the whole query instance. */ readonly signal?: IAbortSignal; /** Report-only sink for stale settlement and cleanup failures. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };"
@@ -5820,6 +5929,7 @@
           "errors": ["No documented errors are declared for ILiveQueryState."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILiveQueryState.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type ILiveQueryState<T> = { readonly status: 'loading'; readonly value?: T; } | { readonly status: 'ready'; readonly value: T; } | { readonly status: 'refreshing'; readonly value: T; } | { readonly status: 'error'; readonly value?: T; readonly error: unknown; } | { readonly status: 'disposed'; readonly value?: T; readonly error?: unknown; };"
@@ -5882,6 +5992,7 @@
           "errors": ["No documented errors are declared for ILiveQueryStateView."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILiveQueryStateView.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type ILiveQueryStateView<T> = Pick<IComputedValue<ILiveQueryState<T>>, 'runtime' | 'debugName' | 'observed' | 'value' | 'peek'>;"
@@ -5944,6 +6055,7 @@
           "errors": ["No documented errors are declared for IPluginStoreMap."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginStoreMap.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IPluginStoreMap<TPlugins extends readonly IStorageBackendPluginHandle[]> = { readonly [TPlugin in TPlugins[number] as IStoragePluginId<TPlugin>]: IStoragePluginStore<TPlugin>; };"
@@ -6006,6 +6118,7 @@
           "errors": ["No documented errors are declared for IReactiveBackendHandle."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReactiveBackendHandle.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IReactiveBackendHandle<TStore extends IKeyValueStore, TId extends string> = { readonly id: TId; readonly store: TStore; liveQuery<T>(options: Omit<ILiveQueryOptions<{ readonly [TKey in TId]: TStore; }, TId, T>, 'backendId'>): ILiveQuery<T>; };"
@@ -6068,6 +6181,7 @@
           "errors": ["No documented errors are declared for IReactiveConsistency."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReactiveConsistency.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IReactiveConsistency = Readonly<{ readonly mode: 'push' | 'hybrid' | 'polling'; readonly pollIntervalMs?: number; readonly visibility: IStorageReactiveVisibility; }>;"
@@ -6130,6 +6244,7 @@
           "errors": ["No documented errors are declared for IRejectInstalledOrDuplicateIds."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRejectInstalledOrDuplicateIds.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IRejectInstalledOrDuplicateIds<TStores extends Record<string, IKeyValueStore>, TPlugins extends readonly IStorageBackendPluginHandle[]> = Extract<IStoragePluginId<TPlugins[number]>, keyof TStores & string> extends never ? IHasDuplicatePluginIds<TPlugins> extends true ? never : TPlugins : never;"
@@ -6192,6 +6307,7 @@
           "errors": ["No documented errors are declared for IStorageBackendFeature."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageBackendFeature.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageBackendFeature<TStore extends IKeyValueStore, TBackendKind extends IStorageBackendKind<string, IKeyValueStore>, TCapability extends string> = { readonly [storageBackendFeatureBrand]: { readonly store: TStore; readonly backendKind: TBackendKind; readonly capability: TCapability; }; };"
@@ -6254,6 +6370,7 @@
           "errors": ["No documented errors are declared for IStorageBackendKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageBackendKind.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageBackendKind<TName extends string, TStore extends IKeyValueStore> = { readonly name: TName; readonly [storageBackendKindBrand]: TStore; };"
@@ -6316,6 +6433,7 @@
           "errors": ["No documented errors are declared for IStorageBackendKindStore."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageBackendKindStore.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageBackendKindStore<TBackendKind extends IStorageBackendKind<string, IKeyValueStore>> = TBackendKind extends IStorageBackendKind<string, infer TStore> ? TStore : never;"
@@ -6378,6 +6496,7 @@
           "errors": ["No documented errors are declared for IStorageBackendPlugin."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageBackendPlugin.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageBackendPlugin<TStore extends IKeyValueStore, TBackendKind extends IStorageBackendKind<string, IKeyValueStore>, TId extends string, TReactive extends boolean = false> = IStorageBackendPluginHandle & { readonly id: TId; readonly [storageBackendPluginBrand]: TStore; readonly [storageBackendPluginKindBrand]: TBackendKind; readonly [storageBackendReactiveBrand]: TReactive; };"
@@ -6440,6 +6559,7 @@
           "errors": ["No documented errors are declared for IStorageBackendPluginContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageBackendPluginContext.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageBackendPluginContext = { readonly signal: IAbortSignal; readonly report: (error: unknown) => void; };"
@@ -6502,6 +6622,7 @@
           "errors": ["No documented errors are declared for IStorageBackendPluginDefinition."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageBackendPluginDefinition.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageBackendPluginDefinition<TStore extends IKeyValueStore, TBackendKind extends IStorageBackendKind<string, IKeyValueStore>, TId extends string, TFeatures extends readonly IStorageBackendFeature<TStore, TBackendKind, string>[]> = { readonly backendKind: TBackendKind; readonly id: TId; readonly timeoutMs?: number; readonly features?: TFeatures; readonly create: (context: IStorageBackendPluginContext) => TStore | PromiseLike<TStore>; readonly prepare?: IStorageBackendPluginPrepare<TStore>; };"
@@ -6564,6 +6685,7 @@
           "errors": ["No documented errors are declared for IStorageBackendPluginHandle."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageBackendPluginHandle.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageBackendPluginHandle = { readonly id: string; readonly [storageBackendPluginBrand]: IKeyValueStore; readonly [storageBackendPluginKindBrand]: unknown; readonly [storageBackendReactiveBrand]: boolean; };"
@@ -6626,6 +6748,7 @@
           "errors": ["No documented errors are declared for IStorageBackendPluginPrepare."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageBackendPluginPrepare.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageBackendPluginPrepare<TStore extends IKeyValueStore> = (store: TStore, context: IStorageBackendPluginContext) => void | PromiseLike<void>;"
@@ -6688,6 +6811,7 @@
           "errors": ["No documented errors are declared for IStorageFeatureCompilation."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageFeatureCompilation.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageFeatureCompilation = { readonly ordered: readonly IStorageFeatureNode[]; readonly materialized: readonly IStorageFeatureNode[]; };"
@@ -6750,6 +6874,7 @@
           "errors": ["No documented errors are declared for IStorageFeatureMetadata."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageFeatureMetadata.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageFeatureMetadata = { readonly backendKind: IStorageBackendKind<string, IKeyValueStore>; readonly capability: string; readonly reactive?: IStorageReactiveFeatureMetadata; };"
@@ -6812,6 +6937,7 @@
           "errors": ["No documented errors are declared for IStorageFeatureNode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageFeatureNode.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageFeatureNode = { readonly id: string; readonly dependencies: readonly { readonly provider: string; readonly required: true; }[]; readonly ordinal: number; readonly materialize: boolean; readonly feature?: IStorageFeatureMetadata; };"
@@ -6874,6 +7000,7 @@
           "errors": ["No documented errors are declared for IStorageHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageHost.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageHost<TStores extends Record<string, IKeyValueStore>, TReactiveIds extends keyof TStores & string = never> = IStorageHostBase<TStores, TReactiveIds> & ([TReactiveIds] extends [never] ? Record<never, never> : IStorageHostReactiveApi<TStores, TReactiveIds>);"
@@ -6936,6 +7063,7 @@
           "errors": ["No documented errors are declared for IStorageHostBase."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageHostBase.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageHostBase<TStores extends Record<string, IKeyValueStore>, TReactiveIds extends keyof TStores & string = never> = { use<const TPlugins extends readonly IStorageBackendPluginHandle[]>(...plugins: IRejectInstalledOrDuplicateIds<TStores, TPlugins>): Promise<IStorageHost<TStores & IPluginStoreMap<TPlugins>, TReactiveIds | IStoragePluginReactiveId<TPlugins[number]>>>; backend<TId extends keyof TStores & string>(id: TId): TStores[TId]; hasBackend(id: string): id is keyof TStores & string; backends(): ReadonlyMap<keyof TStores & string, TStores[keyof TStores]>; hasReactiveBackend(id: string): id is TReactiveIds; reactiveBackend<TId extends keyof TStores & string>(id: TId): IReactiveBackendHandle<TStores[TId], TId> | undefined; reactiveBackend(id: string): IReactiveBackendHandle<IKeyValueStore, string> | undefined; dispose(): Promise<void>; };"
@@ -6998,6 +7126,7 @@
           "errors": ["No documented errors are declared for IStorageHostCreateOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageHostCreateOptions.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageHostCreateOptions<TPlugins extends readonly IStorageBackendPluginHandle[]> = IStorageHostOptions & { /** Initial plugin tuple installed atomically before the host is returned. */ readonly plugins?: IRejectInstalledOrDuplicateIds<Record<never, never>, TPlugins>; };"
@@ -7060,6 +7189,7 @@
           "errors": ["No documented errors are declared for IStorageHostOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageHostOptions.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageHostOptions = { /** Bounds one complete plugin installation batch; defaults to 30 seconds. */ readonly installTimeoutMs?: number; /** Supplies deterministic lifecycle time for installation, rollback, and cleanup. */ readonly scheduler?: ILifecycleScheduler; /** * Receives contained late rejection and cleanup diagnostics without replacing the primary * failure. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };"
@@ -7122,6 +7252,7 @@
           "errors": ["No documented errors are declared for IStorageHostReactiveApi."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageHostReactiveApi.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageHostReactiveApi<TStores extends Record<string, IKeyValueStore>, TReactiveIds extends keyof TStores & string> = { liveQuery<TBackendId extends TReactiveIds, _T>(options: ILiveQueryOptions<TStores, TBackendId, _T>): ILiveQuery<_T>; };"
@@ -7184,6 +7315,7 @@
           "errors": ["No documented errors are declared for IStoragePluginId."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoragePluginId.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStoragePluginId<TPlugin> = TPlugin extends { readonly id: infer TId extends string; } ? IIsSingletonString<TId> extends true ? TId : never : never;"
@@ -7246,6 +7378,7 @@
           "errors": ["No documented errors are declared for IStoragePluginReactiveId."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoragePluginReactiveId.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStoragePluginReactiveId<TPlugin> = TPlugin extends { readonly id: infer TId extends string; readonly [storageBackendReactiveBrand]: true; } ? IIsSingletonString<TId> extends true ? TId : never : never;"
@@ -7308,6 +7441,7 @@
           "errors": ["No documented errors are declared for IStoragePluginStore."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoragePluginStore.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStoragePluginStore<TPlugin> = TPlugin extends { readonly [storageBackendPluginBrand]: infer TStore extends IKeyValueStore; } ? TStore : never;"
@@ -7370,6 +7504,7 @@
           "errors": ["No documented errors are declared for IStorageReactiveFeatureMetadata."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageReactiveFeatureMetadata.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageReactiveFeatureMetadata<TStore extends IKeyValueStore = IKeyValueStore> = { readonly mode: 'push' | 'hybrid' | 'polling'; readonly visibility: IStorageReactiveVisibility; readonly pollIntervalMs?: number; readonly subscribe?: (context: IStorageReactiveSubscribeContext<TStore>) => IStorageReactiveSourceDisposer | PromiseLike<unknown>; };"
@@ -7432,6 +7567,7 @@
           "errors": ["No documented errors are declared for IStorageReactiveSourceDisposer."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageReactiveSourceDisposer.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageReactiveSourceDisposer = () => void | Promise<void>;"
@@ -7494,6 +7630,7 @@
           "errors": ["No documented errors are declared for IStorageReactiveSubscribeContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageReactiveSubscribeContext.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKeyValueStore> = { readonly store: TStore; readonly signal: IAbortSignal; readonly report: (error: unknown) => void; /** Invalidates Resource-owned query generations after an admitted backend change. */ readonly onChange: (change: IStorageChange) => void; };"
@@ -7556,6 +7693,7 @@
           "errors": ["No documented errors are declared for IStorageReactiveVisibility."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageReactiveVisibility.",
           "examples": [],
+          "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
             "export type IStorageReactiveVisibility = 'instance' | 'document-eventual' | 'top-level-context-eventual' | 'origin-js-visible-eventual' | 'origin-eventual';"
@@ -7618,6 +7756,7 @@
           "errors": ["No documented errors are declared for pluginNameFromBackendId."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for pluginNameFromBackendId.",
           "examples": [],
+          "members": [],
           "aliasOf": "pluginNameFromBackendId",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -7681,6 +7820,7 @@
           "errors": ["No documented errors are declared for reactiveAdapterNameFromBackendId."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for reactiveAdapterNameFromBackendId.",
           "examples": [],
+          "members": [],
           "aliasOf": "reactiveAdapterNameFromBackendId",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -7744,6 +7884,7 @@
           "errors": ["No documented errors are declared for readStorageBackendFeatureMetadata."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for readStorageBackendFeatureMetadata.",
           "examples": [],
+          "members": [],
           "aliasOf": "readStorageBackendFeatureMetadata",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -7807,6 +7948,7 @@
           "errors": ["No documented errors are declared for readStorageBackendPluginMetadata."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for readStorageBackendPluginMetadata.",
           "examples": [],
+          "members": [],
           "aliasOf": "readStorageBackendPluginMetadata",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -7870,6 +8012,7 @@
           "errors": ["No documented errors are declared for STORAGE_LIVE_QUERY_SERVICE_NAME."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for STORAGE_LIVE_QUERY_SERVICE_NAME.",
           "examples": [],
+          "members": [],
           "aliasOf": "STORAGE_LIVE_QUERY_SERVICE_NAME",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -7940,6 +8083,94 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StorageHostFacade.",
           "examples": [
             "const host = new StorageHostFacade({\n  installTimeoutMs: 10_000,\n  report: (error) => diagnostics.capture(error)\n})\nawait host.use(memoryBackendPlugin({ id: 'cache' }))\nconst cache = host.backend('cache')"
+          ],
+          "members": [
+            {
+              "name": "use",
+              "kind": "method",
+              "signature": "use<const TPlugins extends readonly IStorageBackendPluginHandle[]>(...plugins: IRejectInstalledOrDuplicateIds<TStores, TPlugins>): Promise<IStorageHost<TStores & IPluginStoreMap<TPlugins>, TReactiveIds | IStoragePluginReactiveId<TPlugins[number]>>>;",
+              "description": "Materializes one immutable plugin tuple through the canonical PluginHost batch.",
+              "parameterDetails": [
+                {
+                  "name": "...plugins: IRejectInstalledOrDuplicateIds<TStores, TPlugins>",
+                  "type": "unknown",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<IStorageHost<TStores & IPluginStoreMap<TPlugins>, TReactiveIds | IStoragePluginReactiveId<TPlugins[number]>>>"
+            },
+            {
+              "name": "backend",
+              "kind": "method",
+              "signature": "backend<TId extends keyof TStores & string>(id: TId): TStores[TId];",
+              "description": "Looks up an exact store from the last atomically published registry snapshot.",
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "TId",
+                  "optional": false
+                }
+              ],
+              "returns": "TStores[TId]"
+            },
+            {
+              "name": "hasBackend",
+              "kind": "method",
+              "signature": "hasBackend(id: string): id is keyof TStores & string;",
+              "description": "Narrows a lookup to IDs in the current immutable registry snapshot.",
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "id is keyof TStores & string"
+            },
+            {
+              "name": "backends",
+              "kind": "method",
+              "signature": "backends(): ReadonlyMap<keyof TStores & string, TStores[keyof TStores]>;",
+              "description": "Returns a mutation-incapable copy of the current store registry.",
+              "parameterDetails": [],
+              "returns": "ReadonlyMap<keyof TStores & string, TStores[keyof TStores]>"
+            },
+            {
+              "name": "hasReactiveBackend",
+              "kind": "method",
+              "signature": "hasReactiveBackend(id: string): id is TReactiveIds;",
+              "description": "Reports whether the committed Host registry contains an exact reactive adapter.",
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "id is TReactiveIds"
+            },
+            {
+              "name": "reactiveBackend",
+              "kind": "method",
+              "signature": "reactiveBackend<TId extends keyof TStores & string>(id: TId): IReactiveBackendHandle<TStores[TId], TId> | undefined;",
+              "description": "Returns exact adapter-bound store shell and delegates query state to Resource.",
+              "parameterDetails": [
+                {
+                  "name": "id",
+                  "type": "TId",
+                  "optional": false
+                }
+              ],
+              "returns": "IReactiveBackendHandle<TStores[TId], TId> | undefined"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "signature": "dispose(): Promise<void>;",
+              "description": "Seals the facade once and delegates lifecycle cleanup to PluginHost.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            }
           ],
           "aliasOf": "StorageHostFacade",
           "exportPath": "./host",
@@ -8097,6 +8328,7 @@
           "examples": [
             "function indexedDb<TValue = unknown>(options?: IIndexedDbOptions): IRecordStore<TValue>\n\ntype IIndexedDbOptions = {\n  readonly dbName?: string\n  readonly kvStoreName?: string\n  readonly bytesStoreName?: string\n  readonly recordsStoreName?: string\n  readonly cleanupLegacyRecords?: boolean\n  readonly factory?: IDBFactory\n  readonly keyRange?: typeof IDBKeyRange\n}"
           ],
+          "members": [],
           "aliasOf": "IIndexedDbOptions",
           "exportPath": "./indexed-db",
           "overloadSignatures": [
@@ -8176,6 +8408,7 @@
             "type IPreference = { id: string; theme: 'light' | 'dark' }\n\nconst definition = defineEntity<IPreference>({\n  name: 'preferences',\n  key: 'id',\n  version: 2,\n  migrations: { 2: async (previous) => ({ ...(previous as { id: string }), theme: 'light' }) }\n})\n\nconst preferences = definition.connect(indexedDb({ dbName: 'app-data' }))\nawait preferences.put({ id: 'appearance', theme: 'dark' })\nawait preferences.get('appearance') // { id: 'appearance', theme: 'dark' }",
             "import { defineEntity } from '@migaia/storage-web/entity'\nimport { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { StorageError, StorageErrorCode } from '@migaia/storage-web'\n\nconst orders = defineEntity<{ id: string; total: number }>({ name: 'orders', key: 'id' }).connect(\n  indexedDb()\n)\n\nconst applyBatch = async (items: Array<{ id: string; total: number }>) => {\n  try {\n    await orders.batch(async (tx) => {\n      for (const item of items) await tx.put(item)\n    })\n  } catch (error) {\n    if (error instanceof StorageError && error.code === StorageErrorCode.transactionConflict) {\n      await applyBatch(items) // 并发冲突：重读后重试整个回调\n    } else {\n      throw error\n    }\n  }\n}"
           ],
+          "members": [],
           "aliasOf": "indexedDb",
           "exportPath": "./indexed-db",
           "overloadSignatures": [
@@ -8360,6 +8593,7 @@
           "examples": [
             "function localStorage(options?: ILocalStorageOptions): ISyncCapableStore<IKeyValueStore>\n\ntype ILocalStorageOptions = IWebStorageOptions & {\n  readonly storage?: IWebStorageLike\n}\ntype IWebStorageOptions = {\n  readonly namespace?: string\n  readonly namespaceCodec?: INamespaceCodec\n}"
           ],
+          "members": [],
           "aliasOf": "ILocalStorageOptions",
           "exportPath": "./local-storage",
           "overloadSignatures": [
@@ -8431,6 +8665,7 @@
             "const store = localStorage({ namespace: 'settings' })\nawait store.set('theme', 'dark')\nawait store.get('theme') // 'dark'\nstore.sync.set('theme', 'light') // 同步 API，Web Storage 天然同步",
             "const store = localStorage({ storage: myFakeStorage }) // 测试环境注入"
           ],
+          "members": [],
           "aliasOf": "localStorage",
           "exportPath": "./local-storage",
           "overloadSignatures": [
@@ -8828,6 +9063,7 @@
             "const store = memoryStorage<{ id: string }>()\nawait store.putRecord({ id: '1' }, '1')",
             "import { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\nimport { memoryStorage } from '@migaia/storage-web/memory'\nimport { sessionStorage } from '@migaia/storage-web/session-storage'\n\nconst textOnly = sessionStorage()\nconst selected = selectCodec(binaryCodec, textOnly.capabilities, (message) =>\n  console.warn('[codec fallback]', message)\n)\nconst encoded = await selected.encode(new Uint8Array([1, 2, 3])) // base64 字符串，触发一次诊断\n\nconst recordBackend = memoryStorage()\nconst direct = selectCodec(binaryCodec, recordBackend.capabilities)\nawait direct.encode(new Uint8Array([1, 2, 3])) // 原样透传，无降级"
           ],
+          "members": [],
           "aliasOf": "memoryStorage",
           "exportPath": "./memory",
           "overloadSignatures": [
@@ -8909,9 +9145,9 @@
       "aliases": []
     },
     {
-      "id": "storage-web:plugins-cookies",
+      "id": "storage-web:plugins/cookies",
       "library": "storage-web",
-      "module": "plugins-cookies",
+      "module": "plugins/cookies",
       "exportPath": "./plugins/cookies",
       "sections": [
         "introduction",
@@ -8939,6 +9175,7 @@
           "errors": ["No documented errors are declared for cookieBackendPlugin."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for cookieBackendPlugin.",
           "examples": [],
+          "members": [],
           "exportPath": "./plugins/cookies",
           "overloadSignatures": [
             "export declare const cookieBackendPlugin: <const TId extends string = \"cookies\">(options?: ICookiesOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId>;"
@@ -9042,15 +9279,15 @@
               "descriptionZh": "注入点：测试环境用。默认为 globalThis.document。"
             }
           ],
-          "fragment": "storage-web-plugins-cookies--cookieBackendPlugin"
+          "fragment": "storage-web-plugins/cookies--cookieBackendPlugin"
         }
       ],
       "aliases": []
     },
     {
-      "id": "storage-web:plugins-indexed-db",
+      "id": "storage-web:plugins/indexed-db",
       "library": "storage-web",
-      "module": "plugins-indexed-db",
+      "module": "plugins/indexed-db",
       "exportPath": "./plugins/indexed-db",
       "sections": [
         "introduction",
@@ -9080,6 +9317,7 @@
           "examples": [
             "import { createStorageHost } from '@migaia/storage-web/host'\nimport { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/plugins/indexed-db'\n\nconst host = await createStorageHost({\n  installTimeoutMs: 30_000,\n  plugins: [\n    memoryBackendPlugin({ id: 'cache' }),\n    indexedDbBackendPlugin({ id: 'primary', dbName: 'app-data' })\n  ] as const\n})\n\nhost.backend('cache') // 精确推导 memory store\nhost.backend('primary') // 精确推导 IndexedDB record store\nhost.hasBackend('cache')\nhost.backends() // mutation-incapable snapshot"
           ],
+          "members": [],
           "exportPath": "./plugins/indexed-db",
           "overloadSignatures": [
             "export declare const indexedDbBackendPlugin: <const TId extends string = \"indexed-db\">(options?: IIndexedDbOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId>;"
@@ -9225,15 +9463,15 @@
               "descriptionZh": "注入点：`IDBKeyRange` 构造器。jsdom 完全不提供 IndexedDB，测试环境下 必须和 `factory` 一起从 fake-indexeddb * 显式传入；真实浏览器默认取 `globalThis.IDBKeyRange`。"
             }
           ],
-          "fragment": "storage-web-plugins-indexed-db--indexedDbBackendPlugin"
+          "fragment": "storage-web-plugins/indexed-db--indexedDbBackendPlugin"
         }
       ],
       "aliases": []
     },
     {
-      "id": "storage-web:plugins-local-storage",
+      "id": "storage-web:plugins/local-storage",
       "library": "storage-web",
-      "module": "plugins-local-storage",
+      "module": "plugins/local-storage",
       "exportPath": "./plugins/local-storage",
       "sections": [
         "introduction",
@@ -9261,6 +9499,7 @@
           "errors": ["No documented errors are declared for localStorageBackendPlugin."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for localStorageBackendPlugin.",
           "examples": [],
+          "members": [],
           "exportPath": "./plugins/local-storage",
           "overloadSignatures": [
             "export declare const localStorageBackendPlugin: <const TId extends string = \"local\">(options?: ILocalStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId>;"
@@ -9322,15 +9561,15 @@
               "descriptionZh": "注入点：测试环境与非浏览器环境用。默认为 globalThis.localStorage。"
             }
           ],
-          "fragment": "storage-web-plugins-local-storage--localStorageBackendPlugin"
+          "fragment": "storage-web-plugins/local-storage--localStorageBackendPlugin"
         }
       ],
       "aliases": []
     },
     {
-      "id": "storage-web:plugins-memory",
+      "id": "storage-web:plugins/memory",
       "library": "storage-web",
-      "module": "plugins-memory",
+      "module": "plugins/memory",
       "exportPath": "./plugins/memory",
       "sections": [
         "introduction",
@@ -9362,6 +9601,7 @@
             "import { createStorageHost } from '@migaia/storage-web/host'\nimport { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/plugins/indexed-db'\n\nconst host = await createStorageHost({\n  installTimeoutMs: 30_000,\n  plugins: [\n    memoryBackendPlugin({ id: 'cache' }),\n    indexedDbBackendPlugin({ id: 'primary', dbName: 'app-data' })\n  ] as const\n})\n\nhost.backend('cache') // 精确推导 memory store\nhost.backend('primary') // 精确推导 IndexedDB record store\nhost.hasBackend('cache')\nhost.backends() // mutation-incapable snapshot",
             "const host = new StorageHostFacade({\n  installTimeoutMs: 10_000,\n  report: (error) => diagnostics.capture(error)\n})\nawait host.use(memoryBackendPlugin({ id: 'cache' }))\nconst cache = host.backend('cache')"
           ],
+          "members": [],
           "exportPath": "./plugins/memory",
           "overloadSignatures": [
             "export declare const memoryBackendPlugin: <const TId extends string = \"memory\">(options?: IBuiltInPluginId<TId>) => IStorageBackendPlugin<IMemoryBackendStore, typeof memoryBackendKind, TId>;"
@@ -9407,15 +9647,15 @@
           "guidance": [],
           "usageScore": 52,
           "configuration": [],
-          "fragment": "storage-web-plugins-memory--memoryBackendPlugin"
+          "fragment": "storage-web-plugins/memory--memoryBackendPlugin"
         }
       ],
       "aliases": []
     },
     {
-      "id": "storage-web:plugins-reactive",
+      "id": "storage-web:plugins/reactive",
       "library": "storage-web",
-      "module": "plugins-reactive",
+      "module": "plugins/reactive",
       "exportPath": "./plugins/reactive",
       "sections": [
         "introduction",
@@ -9436,8 +9676,8 @@
           "source": "packages/storage-web/dist/plugins/reactive/cookies.d.ts",
           "exportPath": "./plugins/reactive",
           "ownerExportPath": "./plugins/reactive/cookies",
-          "ownerModule": "plugins-reactive-cookies",
-          "ownerFragment": "storage-web-plugins-reactive-cookies--cookiesReactive"
+          "ownerModule": "plugins/reactive/cookies",
+          "ownerFragment": "storage-web-plugins/reactive/cookies--cookiesReactive"
         },
         {
           "identity": "packages/storage-web/dist/plugins/reactive/indexed-db.d.ts:indexedDbReactive:export declare function indexedDbReactive<const TId extends string = 'indexed-db'>(options?: IIndexedDbOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId, true>;",
@@ -9446,8 +9686,8 @@
           "source": "packages/storage-web/dist/plugins/reactive/indexed-db.d.ts",
           "exportPath": "./plugins/reactive",
           "ownerExportPath": "./plugins/reactive/indexed-db",
-          "ownerModule": "plugins-reactive-indexed-db",
-          "ownerFragment": "storage-web-plugins-reactive-indexed-db--indexedDbReactive"
+          "ownerModule": "plugins/reactive/indexed-db",
+          "ownerFragment": "storage-web-plugins/reactive/indexed-db--indexedDbReactive"
         },
         {
           "identity": "packages/storage-web/dist/plugins/reactive/local-storage.d.ts:localStorageReactive:export declare function localStorageReactive<const TId extends string = 'local'>(options?: ILocalStorageOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId, true>;",
@@ -9456,8 +9696,8 @@
           "source": "packages/storage-web/dist/plugins/reactive/local-storage.d.ts",
           "exportPath": "./plugins/reactive",
           "ownerExportPath": "./plugins/reactive/local-storage",
-          "ownerModule": "plugins-reactive-local-storage",
-          "ownerFragment": "storage-web-plugins-reactive-local-storage--localStorageReactive"
+          "ownerModule": "plugins/reactive/local-storage",
+          "ownerFragment": "storage-web-plugins/reactive/local-storage--localStorageReactive"
         },
         {
           "identity": "packages/storage-web/dist/plugins/reactive/memory.d.ts:memoryReactive:export declare function memoryReactive<const TId extends string = 'memory'>(options?: IBuiltInPluginId<TId>): IStorageBackendPlugin<IMemoryBackendStore, typeof memoryBackendKind, TId, true>;",
@@ -9466,8 +9706,8 @@
           "source": "packages/storage-web/dist/plugins/reactive/memory.d.ts",
           "exportPath": "./plugins/reactive",
           "ownerExportPath": "./plugins/reactive/memory",
-          "ownerModule": "plugins-reactive-memory",
-          "ownerFragment": "storage-web-plugins-reactive-memory--memoryReactive"
+          "ownerModule": "plugins/reactive/memory",
+          "ownerFragment": "storage-web-plugins/reactive/memory--memoryReactive"
         },
         {
           "identity": "packages/storage-web/dist/plugins/reactive/session-storage.d.ts:sessionStorageReactive:export declare function sessionStorageReactive<const TId extends string = 'session'>(options?: ISessionStorageOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId, true>;",
@@ -9476,15 +9716,15 @@
           "source": "packages/storage-web/dist/plugins/reactive/session-storage.d.ts",
           "exportPath": "./plugins/reactive",
           "ownerExportPath": "./plugins/reactive/session-storage",
-          "ownerModule": "plugins-reactive-session-storage",
-          "ownerFragment": "storage-web-plugins-reactive-session-storage--sessionStorageReactive"
+          "ownerModule": "plugins/reactive/session-storage",
+          "ownerFragment": "storage-web-plugins/reactive/session-storage--sessionStorageReactive"
         }
       ]
     },
     {
-      "id": "storage-web:plugins-reactive-cookies",
+      "id": "storage-web:plugins/reactive/cookies",
       "library": "storage-web",
-      "module": "plugins-reactive-cookies",
+      "module": "plugins/reactive/cookies",
       "exportPath": "./plugins/reactive/cookies",
       "sections": [
         "introduction",
@@ -9518,6 +9758,7 @@
           "errors": ["No documented errors are declared for cookiesReactive."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for cookiesReactive.",
           "examples": [],
+          "members": [],
           "exportPath": "./plugins/reactive/cookies",
           "overloadSignatures": [
             "export declare function cookiesReactive<const TId extends string = 'cookies'>(options?: ICookiesOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ICookieBackendStore, typeof cookieBackendKind, TId, true>;"
@@ -9631,15 +9872,15 @@
               "descriptionZh": "注入点：测试环境用。默认为 globalThis.document。"
             }
           ],
-          "fragment": "storage-web-plugins-reactive-cookies--cookiesReactive"
+          "fragment": "storage-web-plugins/reactive/cookies--cookiesReactive"
         }
       ],
       "aliases": []
     },
     {
-      "id": "storage-web:plugins-reactive-indexed-db",
+      "id": "storage-web:plugins/reactive/indexed-db",
       "library": "storage-web",
-      "module": "plugins-reactive-indexed-db",
+      "module": "plugins/reactive/indexed-db",
       "exportPath": "./plugins/reactive/indexed-db",
       "sections": [
         "introduction",
@@ -9676,6 +9917,7 @@
             "import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { indexedDbReactive } from '@migaia/storage-web/plugins/reactive/indexed-db'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [indexedDbReactive({ id: 'primary', dbName: 'app-data' })] as const\n})\n\nconst handle = host.reactiveBackend('primary')\nconst query = host.liveQuery({\n  backendId: 'primary',\n  runtime,\n  scope: 'users',\n  query: ({ store, signal }) => store.getRecord(['users', 'ada'], { signal }),\n  matches: (change) => change.scope === 'users',\n  keepPreviousData: true,\n  timeoutMs: 5_000,\n  report: (error) => console.error('late reactive failure', error)\n})\n\nawait query.ready\nconsole.log(query.state.value)\nawait query.refresh()\nawait query.dispose()\nawait host.dispose()",
             "import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { indexedDbReactive } from '@migaia/storage-web/plugins/reactive/indexed-db'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [indexedDbReactive({ id: 'app', dbName: 'app-data' })] as const\n})\nconst query = host.liveQuery({\n  backendId: 'app',\n  runtime,\n  scope: 'users',\n  query: ({ store, signal }) => store.getRecord(['users', 'ada'], { signal }),\n  keepPreviousData: true,\n  timeoutMs: 5_000\n})\n\nawait query.ready\nconsole.log(query.state.value)\nawait query.refresh()\nawait query.dispose()\nawait host.dispose()"
           ],
+          "members": [],
           "exportPath": "./plugins/reactive/indexed-db",
           "overloadSignatures": [
             "export declare function indexedDbReactive<const TId extends string = 'indexed-db'>(options?: IIndexedDbOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<IIndexedDbBackendStore, typeof indexedDbBackendKind, TId, true>;"
@@ -9831,15 +10073,15 @@
               "descriptionZh": "注入点：`IDBKeyRange` 构造器。jsdom 完全不提供 IndexedDB，测试环境下 必须和 `factory` 一起从 fake-indexeddb * 显式传入；真实浏览器默认取 `globalThis.IDBKeyRange`。"
             }
           ],
-          "fragment": "storage-web-plugins-reactive-indexed-db--indexedDbReactive"
+          "fragment": "storage-web-plugins/reactive/indexed-db--indexedDbReactive"
         }
       ],
       "aliases": []
     },
     {
-      "id": "storage-web:plugins-reactive-local-storage",
+      "id": "storage-web:plugins/reactive/local-storage",
       "library": "storage-web",
-      "module": "plugins-reactive-local-storage",
+      "module": "plugins/reactive/local-storage",
       "exportPath": "./plugins/reactive/local-storage",
       "sections": [
         "introduction",
@@ -9873,6 +10115,7 @@
           "errors": ["No documented errors are declared for localStorageReactive."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for localStorageReactive.",
           "examples": [],
+          "members": [],
           "exportPath": "./plugins/reactive/local-storage",
           "overloadSignatures": [
             "export declare function localStorageReactive<const TId extends string = 'local'>(options?: ILocalStorageOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ILocalStorageBackendStore, typeof localStorageBackendKind, TId, true>;"
@@ -9944,15 +10187,15 @@
               "descriptionZh": "自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`，但必须把 adapter 绑定到同一个 opaque backend-kind token。该 API 只定义 storage-domain 的 source/visibility；generation、refresh、取消、quiescence 和 fanout 仍分别由 Resource、lifecycle 与 event-subscriber 持有，不允许自建第二套状态机或资源注册表。"
             }
           ],
-          "fragment": "storage-web-plugins-reactive-local-storage--localStorageReactive"
+          "fragment": "storage-web-plugins/reactive/local-storage--localStorageReactive"
         }
       ],
       "aliases": []
     },
     {
-      "id": "storage-web:plugins-reactive-memory",
+      "id": "storage-web:plugins/reactive/memory",
       "library": "storage-web",
-      "module": "plugins-reactive-memory",
+      "module": "plugins/reactive/memory",
       "exportPath": "./plugins/reactive/memory",
       "sections": [
         "introduction",
@@ -9986,6 +10229,7 @@
           "errors": ["No documented errors are declared for memoryReactive."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for memoryReactive.",
           "examples": [],
+          "members": [],
           "exportPath": "./plugins/reactive/memory",
           "overloadSignatures": [
             "export declare function memoryReactive<const TId extends string = 'memory'>(options?: IBuiltInPluginId<TId>): IStorageBackendPlugin<IMemoryBackendStore, typeof memoryBackendKind, TId, true>;"
@@ -10041,15 +10285,15 @@
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
-          "fragment": "storage-web-plugins-reactive-memory--memoryReactive"
+          "fragment": "storage-web-plugins/reactive/memory--memoryReactive"
         }
       ],
       "aliases": []
     },
     {
-      "id": "storage-web:plugins-reactive-session-storage",
+      "id": "storage-web:plugins/reactive/session-storage",
       "library": "storage-web",
-      "module": "plugins-reactive-session-storage",
+      "module": "plugins/reactive/session-storage",
       "exportPath": "./plugins/reactive/session-storage",
       "sections": [
         "introduction",
@@ -10083,6 +10327,7 @@
           "errors": ["No documented errors are declared for sessionStorageReactive."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for sessionStorageReactive.",
           "examples": [],
+          "members": [],
           "exportPath": "./plugins/reactive/session-storage",
           "overloadSignatures": [
             "export declare function sessionStorageReactive<const TId extends string = 'session'>(options?: ISessionStorageOptions & IBuiltInPluginId<TId>): IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId, true>;"
@@ -10154,15 +10399,15 @@
               "descriptionZh": "自定义 backend 可从 `@migaia/storage-web/reactive-adapter` 导入 `defineReactiveAdapterFeature`，但必须把 adapter 绑定到同一个 opaque backend-kind token。该 API 只定义 storage-domain 的 source/visibility；generation、refresh、取消、quiescence 和 fanout 仍分别由 Resource、lifecycle 与 event-subscriber 持有，不允许自建第二套状态机或资源注册表。"
             }
           ],
-          "fragment": "storage-web-plugins-reactive-session-storage--sessionStorageReactive"
+          "fragment": "storage-web-plugins/reactive/session-storage--sessionStorageReactive"
         }
       ],
       "aliases": []
     },
     {
-      "id": "storage-web:plugins-session-storage",
+      "id": "storage-web:plugins/session-storage",
       "library": "storage-web",
-      "module": "plugins-session-storage",
+      "module": "plugins/session-storage",
       "exportPath": "./plugins/session-storage",
       "sections": [
         "introduction",
@@ -10190,6 +10435,7 @@
           "errors": ["No documented errors are declared for sessionStorageBackendPlugin."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for sessionStorageBackendPlugin.",
           "examples": [],
+          "members": [],
           "exportPath": "./plugins/session-storage",
           "overloadSignatures": [
             "export declare const sessionStorageBackendPlugin: <const TId extends string = \"session\">(options?: ISessionStorageOptions & IBuiltInPluginId<TId>) => IStorageBackendPlugin<ISessionStorageBackendStore, typeof sessionStorageBackendKind, TId>;"
@@ -10251,7 +10497,7 @@
               "descriptionZh": "注入点：测试环境与非浏览器环境用。默认为 globalThis.sessionStorage。"
             }
           ],
-          "fragment": "storage-web-plugins-session-storage--sessionStorageBackendPlugin"
+          "fragment": "storage-web-plugins/session-storage--sessionStorageBackendPlugin"
         }
       ],
       "aliases": []
@@ -10287,6 +10533,7 @@
           "errors": ["No documented errors are declared for defineReactiveAdapterFeature."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineReactiveAdapterFeature.",
           "examples": [],
+          "members": [],
           "exportPath": "./reactive-adapter",
           "overloadSignatures": [
             "export declare const defineReactiveAdapterFeature: <TBackendKind extends IStorageBackendKind<string, IKeyValueStore>>(definition: IReactiveAdapterDefinition<TBackendKind>) => IStorageBackendFeature<IStorageBackendKindStore<TBackendKind>, TBackendKind, \"reactive\">;"
@@ -10349,6 +10596,7 @@
           "errors": ["No documented errors are declared for IReactiveAdapterContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReactiveAdapterContext.",
           "examples": [],
+          "members": [],
           "exportPath": "./reactive-adapter",
           "overloadSignatures": [
             "export type IReactiveAdapterContext<TStore extends IKeyValueStore> = { readonly store: TStore; readonly scheduler: ILifecycleScheduler; readonly signal: IAbortSignal; readonly invalidate: (change?: IStorageChange) => void; readonly report: (error: unknown) => void; };"
@@ -10411,6 +10659,7 @@
           "errors": ["No documented errors are declared for IReactiveAdapterDefinition."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReactiveAdapterDefinition.",
           "examples": [],
+          "members": [],
           "exportPath": "./reactive-adapter",
           "overloadSignatures": [
             "export type IReactiveAdapterDefinition<TBackendKind extends IStorageBackendKind<string, IKeyValueStore>> = { readonly backendKind: TBackendKind; readonly mode: 'push' | 'hybrid' | 'polling'; readonly pollIntervalMs?: number; readonly visibility: 'instance' | 'document-eventual' | 'top-level-context-eventual' | 'origin-js-visible-eventual' | 'origin-eventual'; readonly subscribe: (context: IReactiveAdapterContext<IStorageBackendKindStore<TBackendKind>>) => IStorageReactiveSourceDisposer | PromiseLike<unknown>; };"
@@ -10549,6 +10798,7 @@
             "import { passthrough, fromStandardSchema, runMigrations } from '@migaia/storage-web/schema'",
             "import { z } from 'zod'\nconst schema = fromStandardSchema(z.object({ id: z.string() }))"
           ],
+          "members": [],
           "aliasOf": "fromStandardSchema",
           "exportPath": "./schema",
           "overloadSignatures": [
@@ -10648,6 +10898,7 @@
             "function runMigrations(\n  value: unknown,\n  fromVersion: number,\n  toVersion: number,\n  migrations: Record<number, IMigration> | undefined,\n  signal?: IAbortSignal\n): Promise<unknown>\n\ntype IMigration = (previous: unknown, ctx: IMigrationContext) => Promise<unknown>\ntype IMigrationContext = {\n  readonly fromVersion: number\n  readonly toVersion: number\n  readonly signal?: IAbortSignal\n}",
             "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n}"
           ],
+          "members": [],
           "aliasOf": "IMigration",
           "exportPath": "./schema",
           "overloadSignatures": [
@@ -10713,6 +10964,7 @@
           "examples": [
             "function runMigrations(\n  value: unknown,\n  fromVersion: number,\n  toVersion: number,\n  migrations: Record<number, IMigration> | undefined,\n  signal?: IAbortSignal\n): Promise<unknown>\n\ntype IMigration = (previous: unknown, ctx: IMigrationContext) => Promise<unknown>\ntype IMigrationContext = {\n  readonly fromVersion: number\n  readonly toVersion: number\n  readonly signal?: IAbortSignal\n}"
           ],
+          "members": [],
           "aliasOf": "IMigrationContext",
           "exportPath": "./schema",
           "overloadSignatures": [
@@ -10781,6 +11033,7 @@
             "function fromStandardSchema<T>(schema: IStandardSchemaV1<unknown, T>): ISchemaAdapter<T, T>",
             "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n}"
           ],
+          "members": [],
           "aliasOf": "ISchemaAdapter",
           "exportPath": "./schema",
           "overloadSignatures": [
@@ -10846,6 +11099,7 @@
           "examples": [
             "function fromStandardSchema<T>(schema: IStandardSchemaV1<unknown, T>): ISchemaAdapter<T, T>"
           ],
+          "members": [],
           "aliasOf": "IStandardSchemaV1",
           "exportPath": "./schema",
           "overloadSignatures": [
@@ -10914,6 +11168,7 @@
             "import { passthrough, fromStandardSchema, runMigrations } from '@migaia/storage-web/schema'",
             "const schema = passthrough<{ id: string }>()"
           ],
+          "members": [],
           "aliasOf": "passthrough",
           "exportPath": "./schema",
           "overloadSignatures": [
@@ -11003,6 +11258,7 @@
             "import { passthrough, fromStandardSchema, runMigrations } from '@migaia/storage-web/schema'",
             "await runMigrations(oldValue, 1, 3, {\n  2: async (value) => ({ ...value, addedInV2: true }),\n  3: async (value) => ({ ...value, addedInV3: true })\n})"
           ],
+          "members": [],
           "aliasOf": "runMigrations",
           "exportPath": "./schema",
           "overloadSignatures": [
@@ -11126,6 +11382,7 @@
             "const selected = selectCodec(binaryCodec, store.capabilities, (msg) => console.warn(msg))\nawait selected.encode(bytes) // text-only 后端上自动转 base64",
             "import { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\nimport { memoryStorage } from '@migaia/storage-web/memory'\nimport { sessionStorage } from '@migaia/storage-web/session-storage'\n\nconst textOnly = sessionStorage()\nconst selected = selectCodec(binaryCodec, textOnly.capabilities, (message) =>\n  console.warn('[codec fallback]', message)\n)\nconst encoded = await selected.encode(new Uint8Array([1, 2, 3])) // base64 字符串，触发一次诊断\n\nconst recordBackend = memoryStorage()\nconst direct = selectCodec(binaryCodec, recordBackend.capabilities)\nawait direct.encode(new Uint8Array([1, 2, 3])) // 原样透传，无降级"
           ],
+          "members": [],
           "aliasOf": "binaryCodec",
           "exportPath": "./serialize",
           "overloadSignatures": [
@@ -11212,6 +11469,7 @@
           "examples": [
             "function selectCodec(\n  codec: ICodec,\n  capabilities: IStorageCapabilities,\n  onDiagnostic?: (message: string) => void\n): ISelectedCodec\n\ntype ISelectedCodec = {\n  encode(value: unknown, ctx?: { signal?: IAbortSignal }): Promise<string | Uint8Array | unknown>\n  decode(raw: string | Uint8Array | unknown, ctx?: { signal?: IAbortSignal }): Promise<unknown>\n}"
           ],
+          "members": [],
           "aliasOf": "ISelectedCodec",
           "exportPath": "./serialize",
           "overloadSignatures": [
@@ -11280,6 +11538,7 @@
             "import { jsonCodec, structuredCodec, binaryCodec, selectCodec } from '@migaia/storage-web/serialize'",
             "await jsonCodec.encode({ a: 1 }) // '{\"a\":1}'\nawait jsonCodec.decode('{\"a\":1}') // { a: 1 }"
           ],
+          "members": [],
           "aliasOf": "jsonCodec",
           "exportPath": "./serialize",
           "overloadSignatures": ["export declare const jsonCodec: ICodec<unknown, string>;"],
@@ -11376,6 +11635,7 @@
             "const selected = selectCodec(binaryCodec, store.capabilities, (msg) => console.warn(msg))\nawait selected.encode(bytes) // text-only 后端上自动转 base64",
             "import { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\nimport { memoryStorage } from '@migaia/storage-web/memory'\nimport { sessionStorage } from '@migaia/storage-web/session-storage'\n\nconst textOnly = sessionStorage()\nconst selected = selectCodec(binaryCodec, textOnly.capabilities, (message) =>\n  console.warn('[codec fallback]', message)\n)\nconst encoded = await selected.encode(new Uint8Array([1, 2, 3])) // base64 字符串，触发一次诊断\n\nconst recordBackend = memoryStorage()\nconst direct = selectCodec(binaryCodec, recordBackend.capabilities)\nawait direct.encode(new Uint8Array([1, 2, 3])) // 原样透传，无降级"
           ],
+          "members": [],
           "aliasOf": "selectCodec",
           "exportPath": "./serialize",
           "overloadSignatures": [
@@ -11481,6 +11741,7 @@
             "import { jsonCodec, structuredCodec, binaryCodec, selectCodec } from '@migaia/storage-web/serialize'",
             "import { indexedDb } from '@migaia/storage-web/indexed-db'\nimport { selectCodec, structuredCodec } from '@migaia/storage-web/serialize'\n\nconst db = indexedDb({ dbName: 'app-data', recordsStoreName: 'snapshots' })\nconst codec = selectCodec(structuredCodec, db.capabilities)\n\nconst snapshot: Record<string, unknown> = {\n  createdAt: new Date('2026-01-01T00:00:00Z'),\n  tags: new Set(['stable', 'offline']),\n  counters: new Map([['orders', 3]]),\n  bytes: new Uint8Array([1, 2, 3])\n}\nsnapshot.self = snapshot\n\nconst encoded = await codec.encode(snapshot) // === snapshot：codec 不复制\nawait db.putRecord(encoded, 'latest') // IndexedDB 在这里执行 structured clone\nconst stored = await db.getRecord('latest')\nconst decoded = await codec.decode(stored) // Date/Map/Set/bytes/循环引用仍保留\n\nawait db.dispose()"
           ],
+          "members": [],
           "aliasOf": "structuredCodec",
           "exportPath": "./serialize",
           "overloadSignatures": ["export declare const structuredCodec: ICodec<unknown, unknown>;"],
@@ -11584,6 +11845,7 @@
           "examples": [
             "function sessionStorage(options?: ISessionStorageOptions): ISyncCapableStore<IKeyValueStore>\n\ntype ISessionStorageOptions = IWebStorageOptions & {\n  readonly storage?: IWebStorageLike\n}"
           ],
+          "members": [],
           "aliasOf": "ISessionStorageOptions",
           "exportPath": "./session-storage",
           "overloadSignatures": [
@@ -11653,6 +11915,7 @@
             "import { localStorage } from '@migaia/storage-web/local-storage'\nimport { sessionStorage } from '@migaia/storage-web/session-storage'",
             "import { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\nimport { memoryStorage } from '@migaia/storage-web/memory'\nimport { sessionStorage } from '@migaia/storage-web/session-storage'\n\nconst textOnly = sessionStorage()\nconst selected = selectCodec(binaryCodec, textOnly.capabilities, (message) =>\n  console.warn('[codec fallback]', message)\n)\nconst encoded = await selected.encode(new Uint8Array([1, 2, 3])) // base64 字符串，触发一次诊断\n\nconst recordBackend = memoryStorage()\nconst direct = selectCodec(binaryCodec, recordBackend.capabilities)\nawait direct.encode(new Uint8Array([1, 2, 3])) // 原样透传，无降级"
           ],
+          "members": [],
           "aliasOf": "sessionStorage",
           "exportPath": "./session-storage",
           "overloadSignatures": [

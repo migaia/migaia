@@ -1176,6 +1176,7 @@
             "throw createStoreWorkerAggregateError(\n  StoreWorkerErrorCode.cleanupFailed,\n  [endpointDisposeError, terminateError],\n  '清理失败'\n);",
             "throw createStoreWorkerAggregateError(StoreWorkerErrorCode.cleanupFailed, [err1, err2], '清理失败');"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreWorkerAggregateError(code: IStoreWorkerErrorCode, errors: readonly unknown[], message: string): AggregateError;"
@@ -1429,6 +1430,7 @@
             "throw createStoreWorkerError(StoreWorkerErrorCode.invalidOption, '自定义消息');\nthrow createStoreWorkerError(StoreWorkerErrorCode.invalidOption, '自定义消息', {\n  cause: originalError\n});",
             "throw createStoreWorkerError(StoreWorkerErrorCode.invalidOption, '自定义消息');"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreWorkerError(code: IStoreWorkerErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
@@ -1682,6 +1684,7 @@
             "const handler = createWorkerHandler(compute, postMessage);\n\nhandler.pendingCount; // 0 —— 当前正在处理中的消息数\nhandler.disposed; // false\n\nawait handler(incomingMessage); // 处理一条消息；disposed 时直接返回，静默丢弃\n\nhandler.close(); // 同步标记不可用；不执行底层清理\nawait handler.dispose(); // 先 close()，再等底层端点初始化并 dispose；失败会 reject",
             "declare const self: DedicatedWorkerGlobalScope;\n\nconst handler = createWorkerHandler<number[], number>(\n  (values) => values.reduce((sum, value) => sum + value, 0),\n  (message) => self.postMessage(message)\n);\nself.onmessage = (event) => {\n  void handler(event.data);\n};"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createWorkerHandler<Input, Output>(compute: (payload: Input, context: { signal: IWebRpcAbortSignal; }) => Output | Promise<Output>, postMessage: (message: unknown) => void, options?: { readonly timeoutMs?: number; }): IManagedRpcHandler;"
@@ -1771,7 +1774,7 @@
           "name": "IByteOwnership",
           "kind": "type",
           "signature": "export type IByteOwnership = (typeof WorkerByteOwnership)[keyof typeof WorkerByteOwnership];",
-          "declarationLine": 33,
+          "declarationLine": 35,
           "source": "packages/store-worker/dist/worker-constants.d.ts",
           "purpose": "IByteOwnership is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IByteOwnership.",
@@ -1786,6 +1789,7 @@
             "const WorkerByteOwnership = { copy: 'copy', transfer: 'transfer' } as const;\ntype IByteOwnership = 'copy' | 'transfer';",
             "type IByteOwnership = 'copy' | 'transfer';"
           ],
+          "members": [],
           "aliasOf": "IByteOwnership",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1884,6 +1888,7 @@
           "errors": ["No documented errors are declared for IManagedRpcHandler."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IManagedRpcHandler.",
           "examples": [],
+          "members": [],
           "aliasOf": "IManagedRpcHandler",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1949,6 +1954,7 @@
           "examples": [
             "type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & {\n  readonly runtime?: IRuntime;\n  readonly transfer?: (input: Input) => readonly Transferable[];\n};\n\nfunction workerComputed<Input, Output>(\n  adapter: WorkerAdapter,\n  selectInput: () => Input,\n  options?: IWorkerComputedOptions<Input, Output>\n): Resource<Output>;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & { readonly runtime?: IRuntime; readonly transfer?: (input: Input) => readonly Transferable[]; };"
@@ -2000,7 +2006,7 @@
           "name": "IWorkerDiagnosticType",
           "kind": "type",
           "signature": "export type IWorkerDiagnosticType = (typeof WorkerDiagnosticType)[keyof typeof WorkerDiagnosticType];",
-          "declarationLine": 32,
+          "declarationLine": 34,
           "source": "packages/store-worker/dist/worker-constants.d.ts",
           "purpose": "IWorkerDiagnosticType is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWorkerDiagnosticType.",
@@ -2013,6 +2019,7 @@
           "examples": [
             "const WorkerDiagnosticType = { worker: 'worker' } as const;\ntype IWorkerDiagnosticType = 'worker';"
           ],
+          "members": [],
           "aliasOf": "IWorkerDiagnosticType",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2078,6 +2085,7 @@
           "examples": [
             "class WorkerAdapter {\n  constructor(\n    port: IWorkerPort,\n    options?: { readonly clientId?: string; readonly timeoutMs?: number }\n  );\n  readonly disposed: boolean;\n  request<Input, Output>(\n    payload: Input,\n    options?: { signal?: AbortSignal; transfer?: readonly Transferable[] }\n  ): Promise<Output>;\n  close(): void;\n  dispose(): Promise<void>;\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": ["export type IWorkerPort = IWebWorkerLikePort;"],
           "overloadParameterDetails": [[]],
@@ -2138,6 +2146,7 @@
           "errors": ["No documented errors are declared for STORE_WORKER_SOURCE."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for STORE_WORKER_SOURCE.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const STORE_WORKER_SOURCE = \"@migaia/store-worker\";"
@@ -2368,6 +2377,51 @@
             "const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker);\n\nconst result = await adapter.request<number[], number>([1, 2, 3]);\nadapter.dispose();",
             "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { Signal, defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = new Signal<readonly Row[]>([], defaultRuntime);\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000,\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();"
           ],
+          "members": [
+            {
+              "name": "disposed",
+              "kind": "get",
+              "signature": "get disposed(): boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "request",
+              "kind": "method",
+              "signature": "request<Input, Output>(payload: Input, options?: { signal?: IWebRpcAbortSignal; transfer?: readonly Transferable[]; }): Promise<Output>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "payload",
+                  "type": "Input",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "{ signal?: IWebRpcAbortSignal; transfer?: readonly Transferable[]; }",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<Output>"
+            },
+            {
+              "name": "close",
+              "kind": "method",
+              "signature": "close(): void;",
+              "description": "同步标记不可用：仅置 `disposed = true`，不释放底层 endpoint。幂等。",
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "signature": "dispose(): Promise<void>;",
+              "description": "唯一异步释放入口：先 `close()`，再等待 endpoint 初始化并执行 `endpoint.dispose()`。 不吞清理错误（失败会 reject），重复调用复用同一个 Promise。",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            }
+          ],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IWebRpcAbortSignal; transfer?: readonly Transferable[]; }): Promise<Output>; /** 同步标记不可用：仅置 `disposed = true`，不释放底层 endpoint。幂等。 */ close(): void; /** * 唯一异步释放入口：先 `close()`，再等待 endpoint 初始化并执行 `endpoint.dispose()`。 不吞清理错误（失败会 reject），重复调用复用同一个 * Promise。 */ dispose(): Promise<void>; }"
@@ -2458,6 +2512,7 @@
             "const WorkerByteOwnership = { copy: 'copy', transfer: 'transfer' } as const;\ntype IByteOwnership = 'copy' | 'transfer';",
             "WorkerByteOwnership.copy; // 'copy'\nWorkerByteOwnership.transfer; // 'transfer'"
           ],
+          "members": [],
           "aliasOf": "WorkerByteOwnership",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2545,6 +2600,7 @@
             "import { Signal, defaultRuntime } from '@migaia/reactive';\n\nconst values = new Signal([1, 2, 3], defaultRuntime);\nconst sum = workerComputed(adapter, () => values.value);\n\nconsole.log(await sum.refetch()); // 6\nsum.dispose();",
             "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { Signal, defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = new Signal<readonly Row[]>([], defaultRuntime);\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000,\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function workerComputed<Input, Output>(adapter: WorkerAdapter, selectInput: () => Input, options?: IWorkerComputedOptions<Input, Output>): Resource<Output>;"
@@ -2670,6 +2726,7 @@
             "const WorkerDiagnosticType = { worker: 'worker' } as const;\ntype IWorkerDiagnosticType = 'worker';",
             "WorkerDiagnosticType.worker; // 'worker'"
           ],
+          "members": [],
           "aliasOf": "WorkerDiagnosticType",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2802,6 +2859,7 @@
             "const handler = createSerializeWorkerHandler(parser, (message, transfer) =>\n  self.postMessage(message, { transfer })\n);",
             "// encode.worker.ts\nimport { createSerializeWorkerHandler } from '@migaia/store-worker/serialize/worker';\nimport { jsonParser } from '@migaia/serialize';\n\ndeclare const self: DedicatedWorkerGlobalScope;\n\nconst handler = createSerializeWorkerHandler(jsonParser(), (message, transfer) =>\n  self.postMessage(message, { transfer })\n);\nself.onmessage = (event) => {\n  void handler(event.data);\n};"
           ],
+          "members": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
             "export declare function createSerializeWorkerHandler(parser: ISerializeParser, post: (message: unknown, transfer?: readonly Transferable[]) => void): IManagedRpcHandler;"
@@ -2894,6 +2952,7 @@
           "errors": ["No documented errors are declared for decodeWorkerValue."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for decodeWorkerValue.",
           "examples": [],
+          "members": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
             "export declare function decodeWorkerValue(value: unknown): ISerializeChunk;"
@@ -2970,6 +3029,7 @@
           "errors": ["No documented errors are declared for encodeWorkerValue."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for encodeWorkerValue.",
           "examples": [],
+          "members": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
             "export declare function encodeWorkerValue(value: unknown): ISerializeChunk;"
@@ -3040,6 +3100,7 @@
           "errors": ["No documented errors are declared for IWorkerFailureEvent."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWorkerFailureEvent.",
           "examples": [],
+          "members": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": ["export type IWorkerFailureEvent = 'error' | 'messageerror';"],
           "overloadParameterDetails": [[]],
@@ -3102,6 +3163,7 @@
           "examples": [
             "type IWorkerPluginOptions = {\n  readonly worker: IWorkerLike;\n  readonly type?: string;\n  readonly terminateOnDispose?: boolean;\n  readonly ownership?: IByteOwnership;\n  readonly clientId?: string;\n};"
           ],
+          "members": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
             "export type IWorkerLike = IWebWorkerLikePort & { terminate?(): void; };"
@@ -3202,6 +3264,7 @@
             "type IWorkerPluginOptions = {\n  readonly worker: IWorkerLike;\n  readonly type?: string;\n  readonly terminateOnDispose?: boolean;\n  readonly ownership?: IByteOwnership;\n  readonly clientId?: string;\n};",
             "const workerPlugin = (options: IWorkerPluginOptions): ISerializePlugin => ({\n  type: options.type ?? 'worker',\n  parser: workerParser(options)\n});"
           ],
+          "members": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
             "export type IWorkerPluginOptions = { readonly worker: IWorkerLike; /** 注册到 registry 的格式标签，需与 worker 侧实际使用的编码一致。 */ readonly type?: string; /** 卸载时是否顺带终止 worker。外部传入的 worker 默认归调用方所有。 */ readonly terminateOnDispose?: boolean; /** 默认 'copy'：安全但要复制一遍。只有当调用方确认这段字节独占、且交出去之后 不再使用时，才该选 'transfer' 换取零拷贝。 */ readonly ownership?: IByteOwnership; /** Overrides the default client id (a fixed value rather than a factory — see `src/rpc`). */ readonly clientId?: string; };"
@@ -3325,6 +3388,7 @@
           "errors": ["No documented errors are declared for transferablesOf."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for transferablesOf.",
           "examples": [],
+          "members": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
             "export declare function transferablesOf(chunk: ISerializeChunk, ownership: IByteOwnership): Transferable[];"
@@ -3409,6 +3473,7 @@
             "const workerPlugin = (options: IWorkerPluginOptions): ISerializePlugin => ({\n  type: options.type ?? 'worker',\n  parser: workerParser(options)\n});",
             "const parser = workerParser({ worker });"
           ],
+          "members": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
             "export declare function workerParser(options: IWorkerPluginOptions): ISerializeParser;"
@@ -3690,6 +3755,7 @@
             "// main.ts\nimport { createSerializeRegistry } from '@migaia/serialize';\n\nconst worker = new Worker(new URL('./serialize.worker.ts', import.meta.url), { type: 'module' });\nconst registry = createSerializeRegistry([workerPlugin({ worker })]);\nconst chunk = await registry.encode(largeBytePayload);",
             "// main.ts\nimport { workerPlugin } from '@migaia/store-worker/serialize/worker';\nimport { createSerializeRegistry } from '@migaia/serialize';\n\nconst worker = new Worker(new URL('./encode.worker.ts', import.meta.url), { type: 'module' });\nconst registry = createSerializeRegistry([workerPlugin({ worker, terminateOnDispose: true })]);\n\nconst chunk = await registry.encode({ id: 1, name: 'demo' });\nconst value = await registry.decode(chunk);\n\nregistry.dispose(); // 连带 dispose workerParser 的端点，并 terminate worker"
           ],
+          "members": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
             "export declare const workerPlugin: (options: IWorkerPluginOptions) => ISerializePlugin;"

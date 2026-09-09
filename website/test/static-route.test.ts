@@ -8,9 +8,13 @@ const websiteRoot = fileURLToPath(new URL('../', import.meta.url))
 const buildRoot = join(websiteRoot, 'build/client')
 const routeConfig = readFileSync(join(websiteRoot, 'react-router.config.ts'), 'utf8')
 const rootSource = readFileSync(join(websiteRoot, 'app/root.tsx'), 'utf8')
+const homeSource = readFileSync(join(websiteRoot, 'app/routes/home.tsx'), 'utf8')
+const languageSource = readFileSync(join(websiteRoot, 'app/routes/language.tsx'), 'utf8')
+const copySource = readFileSync(join(websiteRoot, 'app/copy.ts'), 'utf8')
 const docsSource = readFileSync(join(websiteRoot, 'app/routes/docs.tsx'), 'utf8')
 const styleSource = readFileSync(join(websiteRoot, 'app/app.css'), 'utf8')
 const guideSource = readFileSync(join(websiteRoot, 'app/guide-journeys.ts'), 'utf8')
+const webRpcGuideSource = readFileSync(join(websiteRoot, 'app/web-rpc-api-guides.ts'), 'utf8')
 const routeManifest = JSON.parse(
   readFileSync(join(websiteRoot, 'src/generated/manifests/routes.json'), 'utf8')
 ) as {
@@ -82,6 +86,140 @@ function emittedFiles(directory: string): string[] {
   })
 }
 
+test('SITE-T-HOME uses the header language control and explains the documentation paths', () => {
+  assert.doesNotMatch(homeSource, />\s*English\s*</)
+  assert.doesNotMatch(homeSource, />\s*中文\s*</)
+  assert.match(homeSource, /API reference/)
+  assert.match(homeSource, /Task guides/)
+  assert.match(homeSource, /Architecture/)
+  assert.match(styleSource, /\.button:not\(\.button-primary\):hover/)
+  assert.match(
+    styleSource,
+    /\.button\.button-primary:hover[\s\S]*?background:[\s\S]*?color:\s*var\(--canvas\)/
+  )
+})
+
+test('SITE-T-LANGUAGE-HOME presents concrete production library combinations', () => {
+  assert.doesNotMatch(languageSource, /copy\.chooseGoal|copy\.architecturePreview/)
+  assert.match(languageSource, /copy\.reactiveResource/)
+  assert.match(languageSource, /copy\.capabilityPluginHost/)
+  assert.match(languageSource, /copy\.webRpcSerialize/)
+  assert.match(copySource, /跟踪变化的输入，取消过期请求/)
+  assert.match(copySource, /按策略启用可选能力/)
+  assert.match(copySource, /定义类型安全的远程调用/)
+})
+
+test('SITE-T-DOCS-NAV classifies public symbols by developer-facing role', () => {
+  for (const label of [
+    '根包 API',
+    '端点 API',
+    '功能插件',
+    '中间件插件',
+    '协议与数据规范',
+    'Hooks 与生命周期',
+    '宿主与传输适配器'
+  ])
+    assert.match(docsSource, new RegExp(label))
+  assert.doesNotMatch(docsSource, /核心 API|Core API/)
+  assert.match(docsSource, /moduleGroupLabel\(locale, groupName\)/)
+  assert.match(docsSource, /runtimeSymbolGroupKey\(symbol\)/)
+  assert.doesNotMatch(docsSource, /promotedEntryNames/)
+  assert.match(docsSource, /apiLinks\.some\(\(link\) => link\.module === candidate\.module\)/)
+  assert.match(
+    docsSource,
+    /apiLinks[\s\S]*?filter\(\(link\) => link\.module === candidate\.module\)/
+  )
+  for (const middleware of [
+    'abort',
+    'authentication',
+    'chunk',
+    'codec',
+    'connect',
+    'contract',
+    'framer',
+    'hooks',
+    'ping',
+    'protocol',
+    'timeout'
+  ])
+    assert.match(docsSource, new RegExp(`'${middleware}'`))
+  assert.match(docsSource, /middlewarePluginLinks\.map/)
+  assert.doesNotMatch(docsSource, /candidate === api\s*\? apiLinks/)
+})
+
+test('SITE-T-STORAGE-WEB-NAV groups APIs by caller task instead of export module', () => {
+  for (const label of [
+    '存储后端',
+    '实体、Schema 与序列化',
+    '宿主创建与运行',
+    'Feature 定义与拓扑',
+    '插件与 Backend Kind 定义',
+    'Backend 插件',
+    '响应式适配插件',
+    '错误与基础契约'
+  ])
+    assert.match(docsSource, new RegExp(label))
+  assert.match(docsSource, /groupStorageWebApiLinks\(apiLinks, locale\)/)
+  assert.match(docsSource, /librarySlug !== 'storage-web' && rootApis\.map/)
+  assert.match(docsSource, /librarySlug !== 'storage-web' && nestedGroups\.map/)
+})
+
+test('SITE-T-DOCS-RAIL keeps the expanded API navigation visible below the sticky header', () => {
+  assert.match(styleSource, /\.left-rail-sticky\s*\{[\s\S]*?align-self: start;/)
+  assert.match(styleSource, /height: calc\(100dvh - 6\.5rem\);/)
+  assert.match(styleSource, /max-height: calc\(100dvh - 6\.5rem\);/)
+  assert.match(styleSource, /position: sticky;/)
+  assert.match(styleSource, /top: 6\.5rem;/)
+  assert.equal(docsSource.match(/className="left-rail-sticky"/g)?.length, 2)
+})
+
+test('SITE-T-API-SCENARIOS renders maintained multi-host examples as separate sections', () => {
+  assert.match(docsSource, /guide\?\.examples\?\.length/)
+  assert.match(docsSource, /className="api-scenario-example"/)
+  assert.match(docsSource, /在不同宿主中使用/)
+  assert.match(docsSource, /examples: \['Production scenarios', '场景实战'\]/)
+})
+
+test('SITE-T-WEBRPC-CONTRACT-TRANSPORTS documents contract use across host boundaries', () => {
+  for (const scenario of [
+    'createWindowMessageTransport',
+    'createWebWorkerTransport',
+    'createBroadcastChannelTransport',
+    'createServiceWorkerTransport'
+  ])
+    assert.match(webRpcGuideSource, new RegExp(scenario))
+  for (const exampleId of [
+    'iframe-transport',
+    'worker-transport',
+    'broadcast-transport',
+    'service-worker-transport'
+  ])
+    assert.match(webRpcGuideSource, new RegExp(`id: '${exampleId}'`))
+})
+
+test('SITE-T-WEBRPC-MIDDLEWARE-TRANSPORTS applies real-host examples to every middleware guide', () => {
+  assert.match(webRpcGuideSource, /function middlewareTransportExamples/)
+  assert.match(
+    webRpcGuideSource,
+    /examplesEn: input\.examplesEn \?\? middlewareTransportExamples\(input\.name, input\.code, 'en'\)/
+  )
+  assert.match(
+    webRpcGuideSource,
+    /examplesZh: input\.examplesZh \?\? middlewareTransportExamples\(input\.name, input\.code, 'zh'\)/
+  )
+})
+
+test('SITE-T-WEBRPC-PING-SCENARIOS documents operational liveness decisions', () => {
+  for (const exampleId of [
+    'preflight-liveness',
+    'fanout-liveness',
+    'cancel-liveness',
+    'periodic-liveness'
+  ])
+    assert.match(webRpcGuideSource, new RegExp(`id: '${exampleId}'`))
+  assert.match(webRpcGuideSource, /\.\.\.pingUsageExamples\('zh'\)/)
+})
+
 test('SITE-T01 emits the admitted nested static route set', () => {
   const routePaths = ['index.html', 'en/index.html', 'zh/index.html', 'en/docs/utils/index.html']
 
@@ -99,6 +237,16 @@ test('SITE-T-NO-INDEX keeps repository entry names out of public docs routes', (
   const html = readFileSync(join(buildRoot, 'zh/docs/event-subscriber/index.html'), 'utf8')
   assert.match(html, /createEventChannel/)
   assert.doesNotMatch(html, /href=\x22\/zh\/docs\/event-subscriber\/index(?:\/|\x22)/)
+
+  for (const api of apiManifest.apis.filter((candidate) => candidate.module === 'index')) {
+    const rootHtml = readFileSync(
+      join(buildRoot, artifactPath(publicModulePath('zh', api.library, api.module))),
+      'utf8'
+    )
+    assert.doesNotMatch(rootHtml, />index 模块解决什么问题/)
+    assert.doesNotMatch(rootHtml, /<h3>Index<\/h3>/)
+    assert.doesNotMatch(rootHtml, /模块与 API[^<]*·[^<]*index/)
+  }
 })
 
 test('SITE-T-TOC renders only right-rail anchors backed by real page sections', () => {
@@ -151,6 +299,38 @@ test('SITE-T-SEMANTIC-ROUTES keeps API links stable, readable, and collision-saf
   const moduleHtml = readFileSync(join(buildRoot, 'zh/docs/event-subscriber/index.html'), 'utf8')
   assert.match(moduleHtml, /href="\/zh\/docs\/event-subscriber\/createEventChannel"/)
   assert.doesNotMatch(moduleHtml, /href="[^"]+-[a-f0-9]{10}"/)
+})
+
+test('SITE-T-NESTED-MODULES preserves export hierarchy in routes and navigation', () => {
+  const routes = new Set(routeManifest.entries.map((entry) => entry.path))
+  /** Every nested export must retain its slash-delimited module identity. */
+  const nestedApis = apiManifest.apis.filter((api) => api.module.includes('/'))
+  assert.ok(nestedApis.length > 0, 'expected nested public modules')
+  for (const api of nestedApis) {
+    const canonicalPath = publicModulePath('zh', api.library, api.module)
+    const flattenedPath = publicModulePath('zh', api.library, api.module.replaceAll('/', '-'))
+    assert.ok(routes.has(canonicalPath), `missing nested module route: ${canonicalPath}`)
+    assert.equal(routes.has(flattenedPath), false, `redundant flattened route: ${flattenedPath}`)
+  }
+
+  /** Current WebRPC features come from package exports rather than a hard-coded plugin inventory. */
+  const webRpcFeatures = nestedApis.filter(
+    (api) => api.library === 'web-rpc' && api.module.startsWith('features/')
+  )
+  assert.ok(webRpcFeatures.length > 0, 'expected WebRPC feature modules')
+  const webRpcFeatureHtml = readFileSync(
+    join(buildRoot, artifactPath(publicModulePath('zh', 'web-rpc', webRpcFeatures[0].module))),
+    'utf8'
+  )
+  const featureRail = stableLeftRail(webRpcFeatureHtml)
+  assert.match(featureRail, />功能插件</)
+  assert.doesNotMatch(featureRail, />features</)
+  for (const feature of webRpcFeatures)
+    assert.match(
+      featureRail,
+      new RegExp(`href="${publicModulePath('zh', 'web-rpc', feature.module)}"`)
+    )
+  assert.doesNotMatch(featureRail, /web-rpc\/features-[^/"]+/)
 })
 
 test('SITE-T-LEFT-RAIL-INVARIANT keeps every module tree stable across all API routes', () => {
@@ -273,6 +453,19 @@ test('SITE-T-RESOURCE-OPTIONS renders maintained constructor fields omitted by d
   }
   assert.match(renderedText(resourceHtml), /IResourceCacheSnapshot<T>/)
   assert.match(resourceHtml, /systemScheduler/)
+})
+
+test('SITE-T-RESOURCE-OVERVIEW renders the maintained learning path before its API index', () => {
+  const html = readFileSync(join(buildRoot, 'zh/docs/resource/index.html'), 'utf8')
+  const text = renderedText(html)
+
+  assert.match(text, /从场景到生产组合/)
+  assert.match(text, /需要缓存过期与后台刷新/)
+  assert.match(text, /new Resource/)
+  assert.match(text, /userId 写入 → Resource 标脏 → 新请求状态写入 → Effect 重跑/)
+  assert.match(text, /generation 校验.*?旧结果/s)
+  assert.match(text, /高阶用法教程/)
+  assert.ok(text.indexOf('从场景到生产组合') < text.indexOf('选择一个入口'))
 })
 
 test('SITE-T-RESOURCE-START explains request generations, observation, and terminal cleanup', () => {
@@ -613,6 +806,17 @@ test('SITE-T-CONTRACT-LAYOUT separates signatures, fields, validation, and neigh
   assert.match(capabilityArchitecture, /class="contract-field"/)
   assert.match(capabilityArchitecture, /class="contract-validation"/)
   assert.match(capabilityArchitecture, /data-slot="separator"/)
+
+  const storeLightArchitecture = readFileSync(
+    join(buildRoot, artifactPath('/zh/architecture/store-light')),
+    'utf8'
+  )
+  assert.match(
+    storeLightArchitecture,
+    /class="contract-signature-code">\(shape: IStoreDefinition&lt;S&gt;, options\?: ICreateStoreOptions\) =&gt; IReactiveStore&lt;S&gt;<\//
+  )
+  assert.match(storeLightArchitecture, /class="contract-signature-description"/)
+  assert.doesNotMatch(storeLightArchitecture, /<div class="contract-signature">[\s\S]{0,500}签名：/)
 })
 
 test('SITE-T-CAPABILITY-LIFECYCLE shows when to enable, consume, disable, and dispose', () => {
@@ -676,6 +880,13 @@ test('SITE-T-PLUGIN-HOST-GENERATOR-CONTINUE explains the control signal and tran
 test('SITE-T-HEADER-RADIUS softens both lower navigation corners', () => {
   assert.match(styleSource, /border-radius: 1rem 1rem 1\.5rem 1\.5rem/)
   assert.match(styleSource, /border-radius: 0 0 1\.25rem 1\.25rem/)
+})
+
+test('SITE-T-ROOT-LANGUAGE-SWITCH sends the unprefixed landing page to Chinese', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/')), 'utf8')
+
+  assert.match(html, /aria-label="Switch to Chinese"[^>]+href="\/zh"/)
+  assert.doesNotMatch(html, /aria-label="Switch to Chinese"[^>]+href="\/"/)
 })
 
 test('SITE-T01 uses one static React Router pipeline without legacy framework leftovers', () => {
@@ -873,7 +1084,7 @@ test('SITE-T-ARCHITECTURE-API-NAV exposes library API shortcuts beside architect
 
   assert.match(html, /class="architecture-reading-layout"/)
   assert.match(html, /class="architecture-api-rail"/)
-  assert.match(html, /API 分类与列表/)
+  assert.match(html, /分类导航/)
   assert.match(html, /href="\/zh\/docs\/utils\/function\/onceAsync"/)
 })
 
@@ -882,6 +1093,58 @@ test('SITE-T-CODE-EXPLANATION-PROSE renders explanations without decorative numb
 
   assert.match(html, /class="code-walkthrough-notes"><p>/)
   assert.doesNotMatch(html, /class="code-walkthrough"><ol>/)
+})
+
+test('SITE-T-CODE-SURFACES gives inline and block code a consistent themed hierarchy', () => {
+  assert.match(styleSource, /--inline-code-background:/)
+  assert.match(styleSource, /--inline-code-border:/)
+  assert.match(styleSource, /--inline-code-text:/)
+  assert.match(
+    styleSource,
+    /:not\(pre\) > code \{[\s\S]*?background: var\(--inline-code-background\);[\s\S]*?border-radius: 0\.42rem;[\s\S]*?font-weight: 600;/
+  )
+  assert.match(styleSource, /:not\(pre\) > code::selection/)
+  assert.match(styleSource, /\.code-frame \{[\s\S]*?border-radius: 0\.78rem;/)
+  assert.match(styleSource, /\.code-block \{[\s\S]*?scrollbar-color: var\(--code-border\)/)
+  assert.match(
+    styleSource,
+    /\.option-heading h3 code,[\s\S]*?\.type-declaration > h3 code \{[\s\S]*?box-shadow: none;/
+  )
+})
+
+test('SITE-T-GUIDE-API-NAV renders symbols as plain navigation text', () => {
+  assert.match(
+    styleSource,
+    /\.guide-api-menu \.guide-api-group code \{[\s\S]*?background: transparent;[\s\S]*?border: 0;[\s\S]*?box-shadow: none;[\s\S]*?padding: 0;/
+  )
+  assert.match(
+    styleSource,
+    /\.guide-api-menu \.guide-api-group nav a:hover > code,[\s\S]*?color: var\(--accent-default\);/
+  )
+})
+
+test('SITE-T-CONTENT-LISTS renders API and re-export entries as responsive cards', () => {
+  assert.match(
+    styleSource,
+    /\.api-reference-list,[\s\S]*?\.reexport-list ul \{[\s\S]*?grid-template-columns: repeat\(auto-fit,[\s\S]*?list-style: none;/
+  )
+  assert.match(
+    styleSource,
+    /\.api-reference-list li,[\s\S]*?\.reexport-list li \{[\s\S]*?border-radius: 0\.72rem;[\s\S]*?transition:/
+  )
+  assert.match(styleSource, /\.reexport-list li:hover \{[\s\S]*?transform: translateY\(-1px\);/)
+})
+
+test('SITE-T-DOMAIN-INDEX-SPACING keeps catalogue introductions compact', () => {
+  assert.match(docsSource, /className="page-shell content-page domain-index-page"/)
+  assert.match(
+    styleSource,
+    /\.domain-index-page \{[\s\S]*?padding-block: clamp\(2rem, 4vw, 4rem\);/
+  )
+  assert.match(
+    styleSource,
+    /\.domain-index-page > \.section-block \{[\s\S]*?margin-top: clamp\(2\.75rem, 4vw, 3\.5rem\);/
+  )
 })
 
 test('SITE-T-CODE-EXPLANATION-QUALITY rejects generated filler across every rendered page', () => {
@@ -932,6 +1195,70 @@ test('SITE-T-CODE-EXPLANATION-REPETITION rejects site-wide fallback commentary',
 
   for (const [explanation, count] of occurrences)
     assert.ok(count <= 10, `commentary repeated ${count} times: ${explanation}`)
+})
+
+test('SITE-T-API-EXAMPLE-COMMENTARY requires concrete guidance on every primary API example', () => {
+  const detailPages = emittedFiles(join(buildRoot, 'zh/docs')).filter((path) =>
+    path.endsWith('index.html')
+  )
+
+  for (const path of detailPages) {
+    const html = readFileSync(path, 'utf8')
+    for (const section of html.matchAll(
+      /<section[^>]*data-primary-api-example="([^"]+)"[^>]*>([\s\S]*?)<\/section>/g
+    )) {
+      const apiName = section[1]
+      assert.match(
+        section[2],
+        /data-comment-count="[1-9]\d*"/,
+        `${apiName} has no code-specific explanation: ${path}`
+      )
+      assert.match(
+        section[2],
+        /class="code-walkthrough"/,
+        `${apiName} has no reader-visible walkthrough: ${path}`
+      )
+    }
+  }
+})
+
+test('SITE-T-API-SIGNATURE-COMMENTARY explains every public declaration and overload set', () => {
+  const detailPages = emittedFiles(join(buildRoot, 'zh/docs')).filter((path) =>
+    path.endsWith('index.html')
+  )
+
+  for (const path of detailPages) {
+    const html = readFileSync(path, 'utf8')
+    for (const section of html.matchAll(
+      /<section class="api-signature"[^>]*>([\s\S]*?)<\/section>/g
+    )) {
+      assert.match(
+        section[1],
+        /data-comment-count="[1-9]\d*"/,
+        `public signature has no explanation: ${path}`
+      )
+      assert.match(
+        section[1],
+        /class="code-walkthrough"/,
+        `public signature has no reader-visible walkthrough: ${path}`
+      )
+    }
+  }
+})
+
+test('SITE-T-CAPABILITY-HOST-EXAMPLE explains its complete production lifecycle', () => {
+  const html = readFileSync(
+    join(buildRoot, 'zh/docs/capability/createCapabilityHost/index.html'),
+    'utf8'
+  )
+  const text = renderedText(html)
+
+  assert.match(text, /flags\.persistence 只允许这一项能力启用/)
+  assert.match(text, /undefined（未配置错误接收回调）/)
+  assert.doesNotMatch(text, /诊断 sink/)
+  assert.match(text, /并不会立即下载或打开存储/)
+  assert.match(text, /只有 enabled 才能从 handle\('persistence'\)/)
+  assert.match(text, /作废在途激活并释放已经打开或迟到返回的 handle/)
 })
 
 test('SITE-T-EVENT-STYLE explains the exact subscription, delivery, and removal behavior', () => {
@@ -1987,6 +2314,16 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
       'Declare the real topology first'
     ],
     [
+      '/zh/guides/web-rpc/extension-authoring',
+      '扩展 WebRPC：Feature 边界与自定义 Middleware',
+      '编写一个可释放的自定义 Middleware'
+    ],
+    [
+      '/en/guides/web-rpc/extension-authoring',
+      'Extend WebRPC: Feature boundaries and custom middleware',
+      'Author disposable custom middleware'
+    ],
+    [
       '/zh/guides/web-rpc/discovery-and-control',
       '发现远端能力，并显式启用控制面',
       '把自动发现与手动发现当成不同策略'
@@ -2580,6 +2917,7 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
     'getting-started',
     'entries-hooks-and-sinks',
     'plugins-and-batching',
+    'custom-plugin',
     'pipelines',
     'flush-and-shutdown',
     'runtime-and-forwarding'
@@ -2798,6 +3136,7 @@ test('SITE-T-WEBRPC-LINKS keeps every maintained WebRPC continuation resolvable'
     '',
     'getting-started',
     'endpoint-composition',
+    'extension-authoring',
     'calls-and-cancellation',
     'providers-and-contracts',
     'transports-and-security',
@@ -2857,6 +3196,7 @@ test('SITE-T-WEBRPC-NAV exposes primary endpoints and every guide from the left 
     ])
       assert.ok(docsPage.includes(`>${endpoint}</a>`), `${docsPath} hides ${endpoint}`)
     assert.ok(docsPage.includes(`/${locale}/guides/web-rpc/transports-and-security`))
+    assert.ok(docsPage.includes(`/${locale}/guides/web-rpc/endpoint-composition`))
 
     const guidePath = `/${locale}/guides/web-rpc/transports-and-security`
     const guidePage = readFileSync(join(buildRoot, artifactPath(guidePath)), 'utf8')
@@ -2872,6 +3212,7 @@ test('SITE-T-WEBRPC-NAV exposes primary endpoints and every guide from the left 
     for (const topic of [
       'getting-started',
       'endpoint-composition',
+      'extension-authoring',
       'calls-and-cancellation',
       'providers-and-contracts',
       'transports-and-security',
@@ -2882,6 +3223,63 @@ test('SITE-T-WEBRPC-NAV exposes primary endpoints and every guide from the left 
       assert.ok(guidePage.includes(`/${locale}/guides/web-rpc/${topic}`))
     assert.ok(guidePage.includes('href="#memory-transport"'))
     assert.ok(guidePage.includes('href="#web-transport-datagram-transport"'))
+  }
+})
+
+test('SITE-T-WEBRPC-ENDPOINT-SELECTION explains all factories and the universal entry', () => {
+  for (const locale of ['en', 'zh']) {
+    const path = `/${locale}/guides/web-rpc/endpoint-composition`
+    const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
+    for (const factory of [
+      'createEndpoint',
+      'createClientEndpoint',
+      'createProviderEndpoint',
+      'createFullEndpoint',
+      'createComposedEndpoint'
+    ])
+      assert.ok(page.includes(factory), `${path} misses ${factory}`)
+    assert.ok(page.includes('createEndpoint'))
+    assert.ok(page.includes('createFullEndpoint'))
+    assert.match(page, locale === 'zh' ? /万能 API/ : /universal API/)
+    assert.match(page, locale === 'zh' ? /同一个函数引用/ : /same function reference/)
+    for (const feature of ['outbound()', 'provider()', 'discovery()', 'control()'])
+      assert.ok(page.includes(feature), `${path} does not explain built-in ${feature}`)
+    assert.ok(page.includes(`/${locale}/guides/web-rpc/extension-authoring`))
+  }
+})
+
+test('SITE-T-WEBRPC-EXTENSIONS documents the public Feature boundary and custom middleware', () => {
+  for (const locale of ['en', 'zh']) {
+    const path = `/${locale}/guides/web-rpc/extension-authoring`
+    const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
+    for (const contract of [
+      'IWebRpcPlugin',
+      'reportTransportErrors',
+      'scope.own',
+      'IWebRpcEndpointModule',
+      'defineEndpointModule'
+    ])
+      assert.ok(page.includes(contract), `${path} misses ${contract}`)
+    assert.ok(page.includes(`/${locale}/guides/web-rpc/endpoint-composition`))
+  }
+})
+
+test('SITE-T-WEBRPC-GUIDE-NAV separates APIs, plugins, specifications, adapters, and errors', () => {
+  const expectations = {
+    en: ['APIs', 'Plugins', 'Specifications', 'Host adapters', 'Errors and diagnostics'],
+    zh: ['API', '插件', '规范', '宿主适配器', '错误与诊断']
+  } as const
+  for (const locale of ['en', 'zh'] as const) {
+    const path = `/${locale}/guides/web-rpc/extension-authoring`
+    const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
+    for (const heading of expectations[locale])
+      assert.ok(page.includes(`<h3>${heading}</h3>`), `${path} misses ${heading}`)
+    assert.ok(!page.includes('公开入口、插件与规范'))
+    assert.ok(!page.includes('APIs, plugins, and contracts'))
+    assert.match(page, /<h3>插件<\/h3>|<h3>Plugins<\/h3>/)
+    assert.match(page, /<code>connect<\/code>/)
+    assert.match(page, /<h3>规范<\/h3>|<h3>Specifications<\/h3>/)
+    assert.match(page, /<code>WebRpcTransportTopology<\/code>/)
   }
 })
 
@@ -3627,6 +4025,7 @@ test('SITE-T-LOGGER-LINKS keeps every maintained Logger continuation resolvable'
     'getting-started',
     'entries-hooks-and-sinks',
     'plugins-and-batching',
+    'custom-plugin',
     'pipelines',
     'flush-and-shutdown',
     'runtime-and-forwarding'

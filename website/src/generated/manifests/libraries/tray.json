@@ -563,6 +563,7 @@
           "examples": [
             "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTray(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
           ],
+          "members": [],
           "aliasOf": "createTray",
           "exportPath": ".",
           "overloadSignatures": [
@@ -638,6 +639,7 @@
             "function createTray(entries: readonly ITrayEntryDefinition<unknown>[]): ITray",
             "type ITray = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}"
           ],
+          "members": [],
           "aliasOf": "ITray",
           "exportPath": ".",
           "overloadSignatures": [
@@ -704,6 +706,7 @@
             "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
             "type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
           ],
+          "members": [],
           "aliasOf": "ITrayEntryContext",
           "exportPath": ".",
           "overloadSignatures": [
@@ -772,6 +775,7 @@
             "function createTray(entries: readonly ITrayEntryDefinition<unknown>[]): ITray",
             "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTray(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
           ],
+          "members": [],
           "aliasOf": "ITrayEntryDefinition",
           "exportPath": ".",
           "overloadSignatures": [
@@ -838,6 +842,7 @@
             "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
             "type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
           ],
+          "members": [],
           "aliasOf": "ITrayEntryInstance",
           "exportPath": ".",
           "overloadSignatures": [
@@ -904,6 +909,7 @@
             "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
             "type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
           ],
+          "members": [],
           "aliasOf": "ITrayEntryKind",
           "exportPath": ".",
           "overloadSignatures": [
@@ -969,6 +975,7 @@
           "examples": [
             "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'"
           ],
+          "members": [],
           "aliasOf": "ITrayErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1038,6 +1045,7 @@
             "type ITray = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}",
             "import { createTray, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTray(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
           ],
+          "members": [],
           "aliasOf": "ITrayKey",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1104,6 +1112,7 @@
             "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
             "type ITray = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}"
           ],
+          "members": [],
           "aliasOf": "ITrayState",
           "exportPath": ".",
           "overloadSignatures": ["export type ITrayState = 'open' | ICapabilityGraphState;"],
@@ -1168,6 +1177,7 @@
             "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
             "import { TRAY_SOURCE, TrayErrorCode } from '@migaia/tray'\n\ntry {\n  tray.get(apiKey)\n} catch (error) {\n  const diagnostic = error as { source?: string; code?: string }\n  if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n    // 等待 ready()，或处理启动/就绪门失败。\n  } else {\n    throw error\n  }\n}"
           ],
+          "members": [],
           "aliasOf": "TRAY_SOURCE",
           "exportPath": ".",
           "overloadSignatures": ["export declare const TRAY_SOURCE = \"@migaia/tray\";"],
@@ -1362,6 +1372,7 @@
             "import {\n  createTray,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITray,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
             "import { TRAY_SOURCE, TrayErrorCode } from '@migaia/tray'\n\ntry {\n  tray.get(apiKey)\n} catch (error) {\n  const diagnostic = error as { source?: string; code?: string }\n  if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n    // 等待 ready()，或处理启动/就绪门失败。\n  } else {\n    throw error\n  }\n}"
           ],
+          "members": [],
           "aliasOf": "TrayErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1580,6 +1591,7 @@
           "errors": ["No documented errors are declared for defineAdapter."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineAdapter.",
           "examples": [],
+          "members": [],
           "aliasOf": "defineAdapter",
           "exportPath": "./adapter",
           "overloadSignatures": [
@@ -1653,6 +1665,7 @@
           "errors": ["No documented errors are declared for IAdapter."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAdapter.",
           "examples": [],
+          "members": [],
           "aliasOf": "IAdapter",
           "exportPath": "./adapter",
           "overloadSignatures": [
@@ -1716,6 +1729,7 @@
           "errors": ["No documented errors are declared for IAdapterContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAdapterContext.",
           "examples": [],
+          "members": [],
           "aliasOf": "IAdapterContext",
           "exportPath": "./adapter",
           "overloadSignatures": [
@@ -1806,6 +1820,7 @@
           "examples": [
             "import { PluginHost, type IPlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\n\nconst provider = {\n  name: 'provider',\n  install: () => ({ providerValue: 1 })\n} satisfies IPlugin<AppHost, { readonly providerValue: number }>\n\nawait using host = await createHost({\n  create: () =>\n    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' }\n})\n\nawait host.use({ name: 'late', requires: ['provider'], install: () => ({ late: true }) })\nawait host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。"
           ],
+          "members": [],
           "aliasOf": "createHost",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -1977,6 +1992,7 @@
           "errors": ["No documented errors are declared for ICanResolveReadyDefinitions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICanResolveReadyDefinitions.",
           "examples": [],
+          "members": [],
           "aliasOf": "ICanResolveReadyDefinitions",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -2042,6 +2058,7 @@
           "examples": [
             "import { createHost, type ICreateHostOptions, type ITrayResolvedHost } from '@migaia/tray/host'"
           ],
+          "members": [],
           "aliasOf": "ICreateHostOptions",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -2105,6 +2122,7 @@
           "errors": ["No documented errors are declared for IHostBaselinePlugins."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IHostBaselinePlugins.",
           "examples": [],
+          "members": [],
           "aliasOf": "IHostBaselinePlugins",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -2168,6 +2186,7 @@
           "errors": ["No documented errors are declared for IPluginWithSynchronousShared."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginWithSynchronousShared.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginWithSynchronousShared",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -2231,6 +2250,7 @@
           "errors": ["No documented errors are declared for IResolveReadyTrayPlugins."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IResolveReadyTrayPlugins.",
           "examples": [],
+          "members": [],
           "aliasOf": "IResolveReadyTrayPlugins",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -2294,6 +2314,7 @@
           "errors": ["No documented errors are declared for ITrayHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayHost.",
           "examples": [],
+          "members": [],
           "aliasOf": "ITrayHost",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -2357,6 +2378,7 @@
           "errors": ["No documented errors are declared for ITrayHostCreationError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayHostCreationError.",
           "examples": [],
+          "members": [],
           "aliasOf": "ITrayHostCreationError",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -2420,6 +2442,7 @@
           "errors": ["No documented errors are declared for ITrayHostCreationFailureDetail."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayHostCreationFailureDetail.",
           "examples": [],
+          "members": [],
           "aliasOf": "ITrayHostCreationFailureDetail",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -2483,6 +2506,7 @@
           "errors": ["No documented errors are declared for ITrayHostDisposalResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayHostDisposalResult.",
           "examples": [],
+          "members": [],
           "aliasOf": "ITrayHostDisposalResult",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -2546,6 +2570,7 @@
           "errors": ["No documented errors are declared for ITrayHostDynamic."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayHostDynamic.",
           "examples": [],
+          "members": [],
           "aliasOf": "ITrayHostDynamic",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -2609,6 +2634,7 @@
           "errors": ["No documented errors are declared for ITrayHostEventMap."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayHostEventMap.",
           "examples": [],
+          "members": [],
           "aliasOf": "ITrayHostEventMap",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -2672,6 +2698,7 @@
           "errors": ["No documented errors are declared for ITrayHostState."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayHostState.",
           "examples": [],
+          "members": [],
           "aliasOf": "ITrayHostState",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -2735,6 +2762,7 @@
           "errors": ["No documented errors are declared for ITrayPluginConstraint."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayPluginConstraint.",
           "examples": [],
+          "members": [],
           "aliasOf": "ITrayPluginConstraint",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -2798,6 +2826,7 @@
           "errors": ["No documented errors are declared for ITrayPluginMutationObservation."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayPluginMutationObservation.",
           "examples": [],
+          "members": [],
           "aliasOf": "ITrayPluginMutationObservation",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -2861,6 +2890,7 @@
           "errors": ["No documented errors are declared for ITrayPluginMutationResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayPluginMutationResult.",
           "examples": [],
+          "members": [],
           "aliasOf": "ITrayPluginMutationResult",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -2924,6 +2954,7 @@
           "errors": ["No documented errors are declared for ITrayPluginPhysicalCleanupResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayPluginPhysicalCleanupResult.",
           "examples": [],
+          "members": [],
           "aliasOf": "ITrayPluginPhysicalCleanupResult",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -2987,6 +3018,7 @@
           "errors": ["No documented errors are declared for ITrayPluginRemovalObservation."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayPluginRemovalObservation.",
           "examples": [],
+          "members": [],
           "aliasOf": "ITrayPluginRemovalObservation",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -3050,6 +3082,7 @@
           "errors": ["No documented errors are declared for ITrayPluginRemovalResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayPluginRemovalResult.",
           "examples": [],
+          "members": [],
           "aliasOf": "ITrayPluginRemovalResult",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -3115,6 +3148,7 @@
           "examples": [
             "import { createHost, type ICreateHostOptions, type ITrayResolvedHost } from '@migaia/tray/host'"
           ],
+          "members": [],
           "aliasOf": "ITrayResolvedHost",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -3178,6 +3212,7 @@
           "errors": ["No documented errors are declared for IUnsubscribe."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IUnsubscribe.",
           "examples": [],
+          "members": [],
           "aliasOf": "IUnsubscribe",
           "exportPath": "./host",
           "overloadSignatures": ["export type IUnsubscribe = () => void;"],
@@ -3239,6 +3274,7 @@
           "errors": ["No documented errors are declared for TrayHostState."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for TrayHostState.",
           "examples": [],
+          "members": [],
           "aliasOf": "TrayHostState",
           "exportPath": "./host",
           "overloadSignatures": [
@@ -3327,6 +3363,7 @@
           "errors": ["No documented errors are declared for defineLoader."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineLoader.",
           "examples": [],
+          "members": [],
           "aliasOf": "defineLoader",
           "exportPath": "./loader",
           "overloadSignatures": [
@@ -3398,6 +3435,7 @@
           "errors": ["No documented errors are declared for ILoadedArtifact."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoadedArtifact.",
           "examples": [],
+          "members": [],
           "aliasOf": "ILoadedArtifact",
           "exportPath": "./loader",
           "overloadSignatures": [
@@ -3461,6 +3499,7 @@
           "errors": ["No documented errors are declared for ILoader."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoader.",
           "examples": [],
+          "members": [],
           "aliasOf": "ILoader",
           "exportPath": "./loader",
           "overloadSignatures": [
@@ -3524,6 +3563,7 @@
           "errors": ["No documented errors are declared for ILoaderContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoaderContext.",
           "examples": [],
+          "members": [],
           "aliasOf": "ILoaderContext",
           "exportPath": "./loader",
           "overloadSignatures": [
@@ -3587,6 +3627,7 @@
           "errors": ["No documented errors are declared for ILoadIntoHostOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoadIntoHostOptions.",
           "examples": [],
+          "members": [],
           "aliasOf": "ILoadIntoHostOptions",
           "exportPath": "./loader",
           "overloadSignatures": [
@@ -3650,6 +3691,7 @@
           "errors": ["No documented errors are declared for ILoadIntoHostResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoadIntoHostResult.",
           "examples": [],
+          "members": [],
           "aliasOf": "ILoadIntoHostResult",
           "exportPath": "./loader",
           "overloadSignatures": [
@@ -3719,6 +3761,7 @@
           "errors": ["No documented errors are declared for loadIntoHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for loadIntoHost.",
           "examples": [],
+          "members": [],
           "aliasOf": "loadIntoHost",
           "exportPath": "./loader",
           "overloadSignatures": [
@@ -3939,6 +3982,7 @@
           "errors": ["No documented errors are declared for createRuntime."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRuntime.",
           "examples": [],
+          "members": [],
           "aliasOf": "createRuntime",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -4045,6 +4089,7 @@
           "errors": ["No documented errors are declared for IRuntime."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntime.",
           "examples": [],
+          "members": [],
           "aliasOf": "IRuntime",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -4108,6 +4153,7 @@
           "errors": ["No documented errors are declared for IRuntimeDisposalResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeDisposalResult.",
           "examples": [],
+          "members": [],
           "aliasOf": "IRuntimeDisposalResult",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -4171,6 +4217,7 @@
           "errors": ["No documented errors are declared for IRuntimeExtensionsFor."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeExtensionsFor.",
           "examples": [],
+          "members": [],
           "aliasOf": "IRuntimeExtensionsFor",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -4234,6 +4281,7 @@
           "errors": ["No documented errors are declared for IRuntimeRunContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeRunContext.",
           "examples": [],
+          "members": [],
           "aliasOf": "IRuntimeRunContext",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -4297,6 +4345,7 @@
           "errors": ["No documented errors are declared for IRuntimeRunOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeRunOptions.",
           "examples": [],
+          "members": [],
           "aliasOf": "IRuntimeRunOptions",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -4360,6 +4409,7 @@
           "errors": ["No documented errors are declared for IRuntimeSelfMutation."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeSelfMutation.",
           "examples": [],
+          "members": [],
           "aliasOf": "IRuntimeSelfMutation",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -4423,6 +4473,7 @@
           "errors": ["No documented errors are declared for IRuntimeSelfMutationTicket."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeSelfMutationTicket.",
           "examples": [],
+          "members": [],
           "aliasOf": "IRuntimeSelfMutationTicket",
           "exportPath": "./runtime",
           "overloadSignatures": [
@@ -4486,6 +4537,7 @@
           "errors": ["No documented errors are declared for IRuntimeShutdownOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeShutdownOptions.",
           "examples": [],
+          "members": [],
           "aliasOf": "IRuntimeShutdownOptions",
           "exportPath": "./runtime",
           "overloadSignatures": [

@@ -16,9 +16,7 @@ function Language({ params }: ILanguageRouteProps) {
     <main id="main-content" className="page-shell language-home" lang={locale} data-pagefind-body>
       <p className="eyebrow">{chinese ? 'Migaia 文档' : 'Migaia documentation'}</p>
       <h1>
-        {chinese
-          ? '用清晰、可组合的类库构建系统。'
-          : 'Build with clear, composable libraries.'}
+        {chinese ? '用清晰、可组合的类库构建系统。' : 'Build with clear, composable libraries.'}
       </h1>
       <p className="lede">
         {chinese
@@ -71,22 +69,23 @@ function Language({ params }: ILanguageRouteProps) {
           <span>{copy.readQuickstart}</span>
         </Link>
       </section>
-      <section className="section-block" aria-labelledby="goals">
-        <p className="eyebrow">{copy.chooseGoal}</p>
-        <h2 id="goals">{copy.oneDestination}</h2>
-        <div className="goal-list">
-          <Link to={domainPath(locale, 'docs')}>{copy.apiQuestion}</Link>
-          <Link to={domainPath(locale, 'guides')}>{copy.taskQuestion}</Link>
-          <Link to={domainPath(locale, 'architecture')}>{copy.designQuestion}</Link>
+      <section className="section-block" aria-labelledby="combinations">
+        <p className="eyebrow">{copy.commonCombinations}</p>
+        <h2 id="combinations">{copy.combinationTitle}</h2>
+        <div className="capability-grid">
+          <Link className="capability-item" to={domainPath(locale, 'architecture', 'resource')}>
+            <strong>{copy.reactiveResource}</strong>
+            <span>{copy.reactiveResourceText}</span>
+          </Link>
+          <Link className="capability-item" to={domainPath(locale, 'architecture', 'plugin-host')}>
+            <strong>{copy.capabilityPluginHost}</strong>
+            <span>{copy.capabilityPluginHostText}</span>
+          </Link>
+          <Link className="capability-item" to={domainPath(locale, 'architecture', 'web-rpc')}>
+            <strong>{copy.webRpcSerialize}</strong>
+            <span>{copy.webRpcSerializeText}</span>
+          </Link>
         </div>
-      </section>
-      <section className="section-block architecture-preview">
-        <p className="eyebrow">{copy.architecturePreview}</p>
-        <h2>{copy.architectureTitle}</h2>
-        <p>{copy.architectureBody}</p>
-        <Link className="text-link" to={domainPath(locale, 'architecture')}>
-          {copy.layerMap}
-        </Link>
       </section>
     </main>
   )

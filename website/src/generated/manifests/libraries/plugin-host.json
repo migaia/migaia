@@ -1556,6 +1556,7 @@
             "import {\n  adaptSyncStageToAsync,\n  adaptSyncStageToGenerator,\n  adaptGeneratorStageToAsyncGenerator,\n  adaptSyncStageToAsyncGenerator,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'",
             "import {\n  PluginHost,\n  GENERATOR_CONTINUE,\n  adaptGeneratorStageToAsyncGenerator,\n  type IGeneratorPipelineStage\n} from '@migaia/plugin-host'\n\n// 已有的一个同步 generator stage（比如从 generator 模式的 Host 上迁移过来的）\nconst trimStage: IGeneratorPipelineStage<string> = function* (value) {\n  yield value.trim()\n  return GENERATOR_CONTINUE\n}\n\nclass TextHost extends PluginHost<{}, string> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  run(value: string): Promise<string> {\n    let result = value\n    return Promise.resolve(\n      this.runPipeline(value, (final) => {\n        result = final\n      })\n    ).then(() => result)\n  }\n}\n\nconst host = new TextHost({ pipeline: { mode: 'async-generator' } })\n\n// 不用重写：直接把同步 generator stage 提升为 async-generator stage\nhost.useAsyncGeneratorPipeline(adaptGeneratorStageToAsyncGenerator(trimStage))\n\n// 第二个 stage 真正做异步工作\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  await new Promise((resolve) => setTimeout(resolve, 0))\n  yield value.toUpperCase()\n  return GENERATOR_CONTINUE\n})\n\nawait host.run('  migaia  ') // 'MIGAIA'"
           ],
+          "members": [],
           "aliasOf": "adaptGeneratorStageToAsyncGenerator",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1623,6 +1624,7 @@
             "import { adaptSyncStageToAsync } from '@migaia/plugin-host'\n\n// 直接对接 @migaia/middleware-pipeline 的 async runner，复用同一个 sync stage 实现\nconst asyncStage = adaptSyncStageToAsync<string>((value, next) => next(value.trim()))",
             "import {\n  adaptSyncStageToAsync,\n  adaptSyncStageToGenerator,\n  adaptGeneratorStageToAsyncGenerator,\n  adaptSyncStageToAsyncGenerator,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
           ],
+          "members": [],
           "aliasOf": "adaptSyncStageToAsync",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1689,6 +1691,7 @@
             "import {\n  adaptSyncStageToAsync,\n  adaptSyncStageToGenerator,\n  adaptGeneratorStageToAsyncGenerator,\n  adaptSyncStageToAsyncGenerator,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  PluginHostDisposalNodeKind,\n  invokeCaptured,\n  readPluginHostDisposalProvenance,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'",
             "import {\n  adaptSyncStageToAsync,\n  adaptSyncStageToGenerator,\n  adaptGeneratorStageToAsyncGenerator,\n  adaptSyncStageToAsyncGenerator,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
           ],
+          "members": [],
           "aliasOf": "adaptSyncStageToAsyncGenerator",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1755,6 +1758,7 @@
             "import {\n  adaptSyncStageToAsync,\n  adaptSyncStageToGenerator,\n  adaptGeneratorStageToAsyncGenerator,\n  adaptSyncStageToAsyncGenerator,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  PluginHostDisposalNodeKind,\n  invokeCaptured,\n  readPluginHostDisposalProvenance,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'",
             "import {\n  adaptSyncStageToAsync,\n  adaptSyncStageToGenerator,\n  adaptGeneratorStageToAsyncGenerator,\n  adaptSyncStageToAsyncGenerator,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
           ],
+          "members": [],
           "aliasOf": "adaptSyncStageToGenerator",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1818,6 +1822,7 @@
           "errors": ["No documented errors are declared for createRegistrationView."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRegistrationView.",
           "examples": [],
+          "members": [],
           "aliasOf": "createRegistrationView",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1881,6 +1886,7 @@
           "errors": ["No documented errors are declared for IAsyncGeneratorPipelineStage."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAsyncGeneratorPipelineStage.",
           "examples": [],
+          "members": [],
           "aliasOf": "IAsyncGeneratorPipelineStage",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1944,6 +1950,7 @@
           "errors": ["No documented errors are declared for IAsyncPipelineStage."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAsyncPipelineStage.",
           "examples": [],
+          "members": [],
           "aliasOf": "IAsyncPipelineStage",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2007,6 +2014,7 @@
           "errors": ["No documented errors are declared for IExtractPluginConfig."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IExtractPluginConfig.",
           "examples": [],
+          "members": [],
           "aliasOf": "IExtractPluginConfig",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2070,6 +2078,7 @@
           "errors": ["No documented errors are declared for IExtractPluginExt."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IExtractPluginExt.",
           "examples": [],
+          "members": [],
           "aliasOf": "IExtractPluginExt",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2133,6 +2142,7 @@
           "errors": ["No documented errors are declared for IExtractPluginShared."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IExtractPluginShared.",
           "examples": [],
+          "members": [],
           "aliasOf": "IExtractPluginShared",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2198,6 +2208,7 @@
           "examples": [
             "import {\n  PluginHost,\n  GENERATOR_CONTINUE,\n  adaptGeneratorStageToAsyncGenerator,\n  type IGeneratorPipelineStage\n} from '@migaia/plugin-host'\n\n// 已有的一个同步 generator stage（比如从 generator 模式的 Host 上迁移过来的）\nconst trimStage: IGeneratorPipelineStage<string> = function* (value) {\n  yield value.trim()\n  return GENERATOR_CONTINUE\n}\n\nclass TextHost extends PluginHost<{}, string> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  run(value: string): Promise<string> {\n    let result = value\n    return Promise.resolve(\n      this.runPipeline(value, (final) => {\n        result = final\n      })\n    ).then(() => result)\n  }\n}\n\nconst host = new TextHost({ pipeline: { mode: 'async-generator' } })\n\n// 不用重写：直接把同步 generator stage 提升为 async-generator stage\nhost.useAsyncGeneratorPipeline(adaptGeneratorStageToAsyncGenerator(trimStage))\n\n// 第二个 stage 真正做异步工作\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  await new Promise((resolve) => setTimeout(resolve, 0))\n  yield value.toUpperCase()\n  return GENERATOR_CONTINUE\n})\n\nawait host.run('  migaia  ') // 'MIGAIA'"
           ],
+          "members": [],
           "aliasOf": "IGeneratorPipelineStage",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2263,6 +2274,7 @@
           "examples": [
             "import {\n  PluginHostError,\n  ERROR_TEXT,\n  type ILocaleKey,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostPipelineMode,\n  PluginHostRegistrationLifecycle,\n  PluginHostPipelineViolation\n} from '@migaia/plugin-host'"
           ],
+          "members": [],
           "aliasOf": "ILocaleKey",
           "exportPath": ".",
           "overloadSignatures": ["export type ILocaleKey = 'en' | 'zh';"],
@@ -2350,6 +2362,7 @@
           "errors": ["No documented errors are declared for IMergePluginExts."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMergePluginExts.",
           "examples": [],
+          "members": [],
           "aliasOf": "IMergePluginExts",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2413,6 +2426,7 @@
           "errors": ["No documented errors are declared for IMergePluginShared."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMergePluginShared.",
           "examples": [],
+          "members": [],
           "aliasOf": "IMergePluginShared",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2478,6 +2492,7 @@
           "examples": [
             "import {\n  adaptSyncStageToAsync,\n  adaptSyncStageToGenerator,\n  adaptGeneratorStageToAsyncGenerator,\n  adaptSyncStageToAsyncGenerator,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  PluginHostDisposalNodeKind,\n  invokeCaptured,\n  readPluginHostDisposalProvenance,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
           ],
+          "members": [],
           "aliasOf": "invokeCaptured",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2541,6 +2556,7 @@
           "errors": ["No documented errors are declared for IPipelineConfig."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPipelineConfig.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPipelineConfig",
           "exportPath": ".",
           "overloadSignatures": ["export type IPipelineConfig = { mode?: IPipelineMode; };"],
@@ -2602,6 +2618,7 @@
           "errors": ["No documented errors are declared for IPipelineMode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPipelineMode.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPipelineMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2673,6 +2690,7 @@
             "import { PluginHost, type IPlugin } from '@migaia/plugin-host'\n\ntype ICore = { write(text: string): void }\ntype IFormatterConfig = { prefix?: string }\ntype IFormatterShared = { format: (value: string) => string }\n\nconst formatter: IPlugin<ICore, {}, IFormatterConfig, IFormatterShared> = {\n  name: 'formatter',\n  config: { prefix: '[app]' },\n  install: () => ({}),\n  shared: (core) => ({ format: (value: string) => `${core.config.get().prefix} ${value}` })\n}\n\nconst writer: IPlugin<ICore, { log(msg: string): void }> = {\n  name: 'writer',\n  install: (core) => ({\n    log: (msg: string) => core.write(core.getShared<IFormatterShared['format']>('format')!(msg))\n  })\n}\n\nclass Host extends PluginHost<ICore, never> {\n  protected createPluginDomainCore(): ICore {\n    return { write: (text) => console.log(text) }\n  }\n}\n\nconst host = await new Host().use(formatter, writer)\nhost.log('server started') // \"[app] server started\"\n\nawait host.config.update('formatter', () => ({ prefix: '[api]' }))\nhost.log('request handled') // \"[api] request handled\"\n\nawait host.dispose()",
             "import { PluginHost, PluginHostError, type IPlugin } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<{}, never> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n}\n\nconst broken: IPlugin<{}, {}> = {\n  name: 'broken',\n  install: () => {\n    throw new Error('boom')\n  }\n}\n\ntry {\n  await new Host().use(broken)\n} catch (error) {\n  if (error instanceof PluginHostError && error.code === 'PLUGIN_INSTALL_FAILED') {\n    console.error('安装失败，原始错误:', (error.cause as Error).message) // 'boom'\n  }\n}"
           ],
+          "members": [],
           "aliasOf": "IPlugin",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3019,6 +3037,7 @@
           "errors": ["No documented errors are declared for IPluginAdmission."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginAdmission.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginAdmission",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3082,6 +3101,7 @@
           "errors": ["No documented errors are declared for IPluginAdmissionRequest."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginAdmissionRequest.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginAdmissionRequest",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3145,6 +3165,7 @@
           "errors": ["No documented errors are declared for IPluginAwaitable."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginAwaitable.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginAwaitable",
           "exportPath": ".",
           "overloadSignatures": ["export type IPluginAwaitable<T> = T | PromiseLike<T>;"],
@@ -3206,6 +3227,7 @@
           "errors": ["No documented errors are declared for IPluginBatchRemovalLeaf."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginBatchRemovalLeaf.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginBatchRemovalLeaf",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3269,6 +3291,7 @@
           "errors": ["No documented errors are declared for IPluginBatchRemovalOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginBatchRemovalOptions.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginBatchRemovalOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3332,6 +3355,7 @@
           "errors": ["No documented errors are declared for IPluginBatchRemovalResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginBatchRemovalResult.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginBatchRemovalResult",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3398,6 +3422,7 @@
             "import type { IPlugin, IPluginConfig, IPluginDisposer, IPluginResource } from '@migaia/plugin-host'",
             "type IPluginConfig = { prefix?: string }\ntype IPluginCore = { emit(value: string): void }\n\nconst prefix: IPlugin<IPluginCore, { greet(name: string): void }, IPluginConfig> = {\n  name: 'prefix',\n  config: { prefix: 'hello' },\n  install(core) {\n    const config = core.config.get()\n    return { greet: (name) => core.emit(`${config.prefix} ${name}`) }\n  },\n  update(next) {},\n  dispose() {}\n}"
           ],
+          "members": [],
           "aliasOf": "IPluginConfig",
           "exportPath": ".",
           "overloadSignatures": ["export type IPluginConfig = Record<string, unknown>;"],
@@ -3459,6 +3484,7 @@
           "errors": ["No documented errors are declared for IPluginDataOrderSlot."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginDataOrderSlot.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginDataOrderSlot",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3522,6 +3548,7 @@
           "errors": ["No documented errors are declared for IPluginDisposalContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginDisposalContext.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginDisposalContext",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3587,6 +3614,7 @@
           "examples": [
             "import type { IPlugin, IPluginConfig, IPluginDisposer, IPluginResource } from '@migaia/plugin-host'"
           ],
+          "members": [],
           "aliasOf": "IPluginDisposer",
           "exportPath": ".",
           "overloadSignatures": ["export type IPluginDisposer = () => IPluginAwaitable<void>;"],
@@ -3648,6 +3676,7 @@
           "errors": ["No documented errors are declared for IPluginHostCompositionIntegration."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginHostCompositionIntegration.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginHostCompositionIntegration",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3711,6 +3740,7 @@
           "errors": ["No documented errors are declared for IPluginHostConfigFor."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginHostConfigFor.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginHostConfigFor",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3774,6 +3804,7 @@
           "errors": ["No documented errors are declared for IPluginHostDisposalResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginHostDisposalResult.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginHostDisposalResult",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3837,6 +3868,7 @@
           "errors": ["No documented errors are declared for IPluginHostDynamicView."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginHostDynamicView.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginHostDynamicView",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3905,6 +3937,7 @@
             "import {\n  PluginHostError,\n  ERROR_TEXT,\n  type ILocaleKey,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostPipelineMode,\n  PluginHostRegistrationLifecycle,\n  PluginHostPipelineViolation\n} from '@migaia/plugin-host'",
             "import { PluginHost, type IPluginHostErrorCode } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<{}, never> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n}\n\nconst events: { message: string; code?: IPluginHostErrorCode }[] = []\nconst host = new Host({\n  diagnostic: (message, code) => events.push({ message, code }),\n  queueAdmissionTimeoutMs: 2000, // 显式开启拒绝阈值——默认是\"只诊断不拒绝\"\n  queueAdmissionDiagnosticMs: 200, // 排队超过 200ms 先打一条诊断\n  disposeStepTimeoutMs: 3000 // 单个 disposer 最多等 3 秒\n})\n\nawait host.use({\n  name: 'slow',\n  install: (core) => {\n    core.onDispose(async () => new Promise((resolve) => setTimeout(resolve, 10)))\n    return {}\n  }\n})\nawait host.dispose()\n// events 里可能包含排队等待、非枚举扩展被忽略等诊断，取决于实际时序"
           ],
+          "members": [],
           "aliasOf": "IPluginHostErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4229,6 +4262,7 @@
           "errors": ["No documented errors are declared for IPluginHostErrorDetail."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginHostErrorDetail.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginHostErrorDetail",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4292,6 +4326,7 @@
           "errors": ["No documented errors are declared for IPluginHostInstalledPlugins."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginHostInstalledPlugins.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginHostInstalledPlugins",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4355,6 +4390,7 @@
           "errors": ["No documented errors are declared for IPluginHostPhysicalCleanupResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginHostPhysicalCleanupResult.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginHostPhysicalCleanupResult",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4418,6 +4454,7 @@
           "errors": ["No documented errors are declared for IPluginHostPipelineMode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginHostPipelineMode.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginHostPipelineMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4481,6 +4518,7 @@
           "errors": ["No documented errors are declared for IPluginHostPipelineViolation."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginHostPipelineViolation.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginHostPipelineViolation",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4544,6 +4582,7 @@
           "errors": ["No documented errors are declared for IPluginHostRegistrationLifecycle."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginHostRegistrationLifecycle.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginHostRegistrationLifecycle",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4607,6 +4646,7 @@
           "errors": ["No documented errors are declared for IPluginHostStatus."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginHostStatus.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginHostStatus",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4670,6 +4710,7 @@
           "errors": ["No documented errors are declared for IPluginHostView."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginHostView.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginHostView",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4733,6 +4774,7 @@
           "errors": ["No documented errors are declared for IPluginInstaller."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginInstaller.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginInstaller",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4796,6 +4838,7 @@
           "errors": ["No documented errors are declared for IPluginInstallFailureDetail."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginInstallFailureDetail.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginInstallFailureDetail",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4859,6 +4902,7 @@
           "errors": ["No documented errors are declared for IPluginLifecycleConfig."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginLifecycleConfig.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginLifecycleConfig",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4922,6 +4966,7 @@
           "errors": ["No documented errors are declared for IPluginLifecycleCore."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginLifecycleCore.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginLifecycleCore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4985,6 +5030,7 @@
           "errors": ["No documented errors are declared for IPluginOperationContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginOperationContext.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginOperationContext",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5048,6 +5094,7 @@
           "errors": ["No documented errors are declared for IPluginPreparedAdmissions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginPreparedAdmissions.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginPreparedAdmissions",
           "exportPath": ".",
           "overloadSignatures": ["export type IPluginPreparedAdmissions = object;"],
@@ -5109,6 +5156,7 @@
           "errors": ["No documented errors are declared for IPluginPreparedRemovalBatch."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginPreparedRemovalBatch.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginPreparedRemovalBatch",
           "exportPath": ".",
           "overloadSignatures": ["export type IPluginPreparedRemovalBatch = object;"],
@@ -5170,6 +5218,7 @@
           "errors": ["No documented errors are declared for IPluginRegistrationContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginRegistrationContext.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginRegistrationContext",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5233,6 +5282,7 @@
           "errors": ["No documented errors are declared for IPluginRegistrationReceipt."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginRegistrationReceipt.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginRegistrationReceipt",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5296,6 +5346,7 @@
           "errors": ["No documented errors are declared for IPluginRemovalResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginRemovalResult.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginRemovalResult",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5361,6 +5412,7 @@
           "examples": [
             "import type { IPlugin, IPluginConfig, IPluginDisposer, IPluginResource } from '@migaia/plugin-host'"
           ],
+          "members": [],
           "aliasOf": "IPluginResource",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5424,6 +5476,7 @@
           "errors": ["No documented errors are declared for ISyncPipelineStage."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISyncPipelineStage.",
           "examples": [],
+          "members": [],
           "aliasOf": "ISyncPipelineStage",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5493,6 +5546,7 @@
           "errors": ["No documented errors are declared for PluginHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for PluginHost.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare abstract class PluginHost<TDomainCore extends object, TValue = never, TInstalled extends readonly import('./typing.js').IPluginConstraint<any>[] = readonly []> extends RuntimePluginHost<TDomainCore, TValue, TInstalled> { /** Installs the trusted reader while preserving the canonical Host runtime implementation. */ constructor(options: import('./typing.js').IPluginHostOptions); }"
@@ -6008,6 +6062,7 @@
           "examples": [
             "import {\n  PluginHostError,\n  ERROR_TEXT,\n  type ILocaleKey,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostPipelineMode,\n  PluginHostRegistrationLifecycle,\n  PluginHostPipelineViolation\n} from '@migaia/plugin-host'"
           ],
+          "members": [],
           "aliasOf": "PluginHostPipelineMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6099,6 +6154,7 @@
           "examples": [
             "import {\n  PluginHostError,\n  ERROR_TEXT,\n  type ILocaleKey,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostPipelineMode,\n  PluginHostRegistrationLifecycle,\n  PluginHostPipelineViolation\n} from '@migaia/plugin-host'"
           ],
+          "members": [],
           "aliasOf": "PluginHostPipelineViolation",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6190,6 +6246,7 @@
           "examples": [
             "import {\n  PluginHostError,\n  ERROR_TEXT,\n  type ILocaleKey,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostPipelineMode,\n  PluginHostRegistrationLifecycle,\n  PluginHostPipelineViolation\n} from '@migaia/plugin-host'"
           ],
+          "members": [],
           "aliasOf": "PluginHostRegistrationLifecycle",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6281,6 +6338,7 @@
           "examples": [
             "import {\n  PluginHostError,\n  ERROR_TEXT,\n  type ILocaleKey,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostPipelineMode,\n  PluginHostRegistrationLifecycle,\n  PluginHostPipelineViolation\n} from '@migaia/plugin-host'"
           ],
+          "members": [],
           "aliasOf": "PluginHostStatus",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6592,6 +6650,7 @@
           "examples": [
             "import {\n  createView,\n  type IRegistrationToken,\n  type IRegistrationView\n} from '@migaia/plugin-host/composition'"
           ],
+          "members": [],
           "exportPath": "./composition",
           "overloadSignatures": [
             "export declare const createView: <TPlugin extends IPluginConstraint<any>>(token: IRegistrationToken<TPlugin>) => IRegistrationView<TPlugin>;"
@@ -6656,6 +6715,7 @@
           "examples": [
             "import {\n  createView,\n  type IRegistrationToken,\n  type IRegistrationView\n} from '@migaia/plugin-host/composition'"
           ],
+          "members": [],
           "aliasOf": "IRegistrationToken",
           "exportPath": "./composition",
           "overloadSignatures": [
@@ -6721,6 +6781,7 @@
           "examples": [
             "import {\n  createView,\n  type IRegistrationToken,\n  type IRegistrationView\n} from '@migaia/plugin-host/composition'"
           ],
+          "members": [],
           "aliasOf": "IRegistrationView",
           "exportPath": "./composition",
           "overloadSignatures": [
@@ -6806,6 +6867,7 @@
             "import {\n  adaptSyncStageToAsync,\n  adaptSyncStageToGenerator,\n  adaptGeneratorStageToAsyncGenerator,\n  adaptSyncStageToAsyncGenerator,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  PluginHostDisposalNodeKind,\n  invokeCaptured,\n  readPluginHostDisposalProvenance,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'",
             "import {\n  adaptSyncStageToAsync,\n  adaptSyncStageToGenerator,\n  adaptGeneratorStageToAsyncGenerator,\n  adaptSyncStageToAsyncGenerator,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
           ],
+          "members": [],
           "aliasOf": "asyncDisposeKey",
           "exportPath": "./defined",
           "overloadSignatures": [
@@ -7001,6 +7063,7 @@
             "import { definePlugin } from '@migaia/plugin-host/defined'\n\nconst health = definePlugin('health', () => ({\n  check: () => ({ ok: true as const })\n}))\n\nconst configurable = definePlugin({\n  name: 'configurable',\n  config: { prefix: '[app]' },\n  install: (core) => ({ readPrefix: () => core.config.get().prefix }),\n  dispose: () => undefined\n})",
             "import { definePlugin } from '@migaia/plugin-host/defined'\nimport { PluginHost } from '@migaia/plugin-host/structural'\n\n// 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能\ntype ICore = { emit(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { emit: (value) => console.log(value) }\n  }\n}\n\n// 第二步：definePlugin(name, install) 定义插件；这里只定义，不会立刻安装\nconst upper = definePlugin<ICore, { upper(value: string): string }>(\n  'upper',\n  (core) => ({\n    upper: (value: string) => {\n      const result = value.toUpperCase()\n      core.emit(result) // 插件可以调用领域能力\n      return result\n    }\n  })\n)\n\n// 第三步：安装、使用、卸载\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst view = await host.use(upper)\nview.extensions.upper('migaia') // 扩展只出现在成功安装后返回的 committed view 上\nawait view.unUse('upper')\nawait host.dispose()"
           ],
+          "members": [],
           "aliasOf": "definePlugin",
           "exportPath": "./defined",
           "overloadSignatures": [
@@ -7091,6 +7154,7 @@
             "import {\n  adaptSyncStageToAsync,\n  adaptSyncStageToGenerator,\n  adaptGeneratorStageToAsyncGenerator,\n  adaptSyncStageToAsyncGenerator,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  PluginHostDisposalNodeKind,\n  invokeCaptured,\n  readPluginHostDisposalProvenance,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'",
             "import {\n  adaptSyncStageToAsync,\n  adaptSyncStageToGenerator,\n  adaptGeneratorStageToAsyncGenerator,\n  adaptSyncStageToAsyncGenerator,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
           ],
+          "members": [],
           "aliasOf": "disposeKey",
           "exportPath": "./defined",
           "overloadSignatures": ["export declare const disposeKey: unique symbol;"],
@@ -7261,6 +7325,7 @@
           "errors": ["No documented errors are declared for IDefinedPluginConstraint."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDefinedPluginConstraint.",
           "examples": [],
+          "members": [],
           "aliasOf": "IDefinedPluginConstraint",
           "exportPath": "./defined",
           "overloadSignatures": [
@@ -7324,6 +7389,7 @@
           "errors": ["No documented errors are declared for IHostSetupContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IHostSetupContext.",
           "examples": [],
+          "members": [],
           "aliasOf": "IHostSetupContext",
           "exportPath": "./defined",
           "overloadSignatures": [
@@ -7387,6 +7453,7 @@
           "errors": ["No documented errors are declared for ISetupHostOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISetupHostOptions.",
           "examples": [],
+          "members": [],
           "aliasOf": "ISetupHostOptions",
           "exportPath": "./defined",
           "overloadSignatures": [
@@ -7450,6 +7517,7 @@
           "errors": ["No documented errors are declared for ISetupHostView."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISetupHostView.",
           "examples": [],
+          "members": [],
           "aliasOf": "ISetupHostView",
           "exportPath": "./defined",
           "overloadSignatures": [
@@ -7513,6 +7581,7 @@
           "errors": ["No documented errors are declared for ISetupPluginHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISetupPluginHost.",
           "examples": [],
+          "members": [],
           "aliasOf": "ISetupPluginHost",
           "exportPath": "./defined",
           "overloadSignatures": [
@@ -7596,6 +7665,32 @@
           "errors": ["No documented errors are declared for PluginHostError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for PluginHostError.",
           "examples": [],
+          "members": [
+            {
+              "name": "source",
+              "kind": "property",
+              "signature": "readonly source: string;",
+              "description": "`(source, code)` 二元组的 source 部分，恒为 `'@migaia/plugin-host'`（`docs/contracts/error-codes.md` §2）。",
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "code",
+              "kind": "property",
+              "signature": "readonly code: IPluginHostErrorCode;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IPluginHostErrorCode"
+            },
+            {
+              "name": "detail",
+              "kind": "property",
+              "signature": "readonly detail?: TDetail;",
+              "description": "结构化诊断（如 queue timeout 的 `owner`/`waitedMs`）；不与 `cause` 混用。",
+              "parameterDetails": [],
+              "returns": "TDetail"
+            }
+          ],
           "aliasOf": "PluginHostError",
           "exportPath": "./defined",
           "overloadSignatures": [
@@ -7959,6 +8054,7 @@
             "import { PluginHostErrorCode, type IPluginHostErrorCode } from '@migaia/plugin-host'\n\nPluginHostErrorCode.mutationQueueTimeout // 'MUTATION_QUEUE_TIMEOUT'",
             "import {\n  PluginHostError,\n  ERROR_TEXT,\n  type ILocaleKey,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostPipelineMode,\n  PluginHostRegistrationLifecycle,\n  PluginHostPipelineViolation\n} from '@migaia/plugin-host'"
           ],
+          "members": [],
           "aliasOf": "PluginHostErrorCode",
           "exportPath": "./defined",
           "overloadSignatures": [
@@ -8297,6 +8393,7 @@
           "errors": ["No documented errors are declared for setupHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for setupHost.",
           "examples": [],
+          "members": [],
           "aliasOf": "setupHost",
           "exportPath": "./defined",
           "overloadSignatures": [
@@ -8610,6 +8707,7 @@
           "errors": ["No documented errors are declared for IPluginConstraint."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginConstraint.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginConstraint",
           "exportPath": "./structural",
           "overloadSignatures": [
@@ -8673,6 +8771,7 @@
           "errors": ["No documented errors are declared for IPluginHostCore."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginHostCore.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginHostCore",
           "exportPath": "./structural",
           "overloadSignatures": [
@@ -8736,6 +8835,7 @@
           "errors": ["No documented errors are declared for IPluginHostDisposalNodeKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginHostDisposalNodeKind.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginHostDisposalNodeKind",
           "exportPath": "./structural",
           "overloadSignatures": [
@@ -8799,6 +8899,7 @@
           "errors": ["No documented errors are declared for IPluginHostDisposalProvenance."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginHostDisposalProvenance.",
           "examples": [],
+          "members": [],
           "aliasOf": "IPluginHostDisposalProvenance",
           "exportPath": "./structural",
           "overloadSignatures": [
@@ -8862,6 +8963,7 @@
           "errors": ["No documented errors are declared for IPluginHostOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPluginHostOptions.",
           "examples": ["import { PluginHost, type IPluginHostOptions } from '@migaia/plugin-host'"],
+          "members": [],
           "aliasOf": "IPluginHostOptions",
           "exportPath": "./structural",
           "overloadSignatures": [
@@ -9067,6 +9169,263 @@
           "errors": ["No documented errors are declared for PluginHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for PluginHost.",
           "examples": [],
+          "members": [
+            {
+              "name": "pipelineMode",
+              "kind": "get",
+              "signature": "get pipelineMode(): IPipelineMode;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IPipelineMode"
+            },
+            {
+              "name": "revision",
+              "kind": "get",
+              "signature": "get revision(): number;",
+              "description": "Current committed Host mutation receipt; it changes only at publication boundaries.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "getCurrentView",
+              "kind": "method",
+              "signature": "getCurrentView(): IPluginHostDynamicView<this>;",
+              "description": "Returns a fresh dynamic view over the currently committed registrations.",
+              "parameterDetails": [],
+              "returns": "IPluginHostDynamicView<this>"
+            },
+            {
+              "name": "usePipeline",
+              "kind": "method",
+              "signature": "usePipeline(stage: ISyncPipelineStage<TValue>): this;",
+              "description": "Host-side pipeline registration for application composition.",
+              "parameterDetails": [
+                {
+                  "name": "stage",
+                  "type": "ISyncPipelineStage<TValue>",
+                  "optional": false
+                }
+              ],
+              "returns": "this"
+            },
+            {
+              "name": "useAsyncPipeline",
+              "kind": "method",
+              "signature": "useAsyncPipeline(stage: IAsyncPipelineStage<TValue>): this;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "stage",
+                  "type": "IAsyncPipelineStage<TValue>",
+                  "optional": false
+                }
+              ],
+              "returns": "this"
+            },
+            {
+              "name": "useGeneratorPipeline",
+              "kind": "method",
+              "signature": "useGeneratorPipeline(stage: IGeneratorPipelineStage<TValue>): this;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "stage",
+                  "type": "IGeneratorPipelineStage<TValue>",
+                  "optional": false
+                }
+              ],
+              "returns": "this"
+            },
+            {
+              "name": "useAsyncGeneratorPipeline",
+              "kind": "method",
+              "signature": "useAsyncGeneratorPipeline(stage: IAsyncGeneratorPipelineStage<TValue>): this;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "stage",
+                  "type": "IAsyncGeneratorPipelineStage<TValue>",
+                  "optional": false
+                }
+              ],
+              "returns": "this"
+            },
+            {
+              "name": "getShared",
+              "kind": "method",
+              "signature": "getShared<T = unknown>(key: PropertyKey): T | undefined;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "PropertyKey",
+                  "optional": false
+                }
+              ],
+              "returns": "T | undefined"
+            },
+            {
+              "name": "use",
+              "kind": "method",
+              "signature": "use<const TPlugins extends readonly IPluginConstraint<TDomainCore & IPluginHostCore<TValue, IMergePluginShared<TInstalled>>>[]>(...plugins: TPlugins): Promise<IPluginHostView<this, [...TInstalled, ...TPlugins]>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "...plugins: TPlugins",
+                  "type": "unknown",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<IPluginHostView<this, [...TInstalled, ...TPlugins]>>"
+            },
+            {
+              "name": "createPluginAdmission",
+              "kind": "method",
+              "signature": "createPluginAdmission<TPlugin extends IPluginConstraint<any>>(plugin: TPlugin): import('./typing.js').IPluginAdmission<TPlugin>;",
+              "description": "Creates one immutable admission snapshot through the canonical Host validator.",
+              "parameterDetails": [
+                {
+                  "name": "plugin",
+                  "type": "TPlugin",
+                  "optional": false
+                }
+              ],
+              "returns": "import('./typing.js').IPluginAdmission<TPlugin>"
+            },
+            {
+              "name": "createDataOrderSlot",
+              "kind": "method",
+              "signature": "createDataOrderSlot(name: string): import('./typing.js').IPluginDataOrderSlot;",
+              "description": "Reserves a Host-owned opaque ordering slot for one composition definition name.",
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "import('./typing.js').IPluginDataOrderSlot"
+            },
+            {
+              "name": "retireDataOrderSlot",
+              "kind": "method",
+              "signature": "retireDataOrderSlot(slot: import('./typing.js').IPluginDataOrderSlot): void;",
+              "description": "Permanently retires the exact definition ordering lane after definition deletion.",
+              "parameterDetails": [
+                {
+                  "name": "slot",
+                  "type": "import('./typing.js').IPluginDataOrderSlot",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "prepareAdmissions",
+              "kind": "method",
+              "signature": "prepareAdmissions(requestsInPublicationOrder: readonly IPluginAdmissionRequest[]): Promise<IPluginPreparedAdmissions>;",
+              "description": "Prepares an admission batch for a composition owner without publishing candidate state.",
+              "parameterDetails": [
+                {
+                  "name": "requestsInPublicationOrder",
+                  "type": "readonly IPluginAdmissionRequest[]",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<IPluginPreparedAdmissions>"
+            },
+            {
+              "name": "commitPreparedAdmissions",
+              "kind": "method",
+              "signature": "commitPreparedAdmissions(prepared: IPluginPreparedAdmissions): readonly IPluginRegistrationReceipt[];",
+              "description": "Commits a prepared admission in one synchronous publication point.",
+              "parameterDetails": [
+                {
+                  "name": "prepared",
+                  "type": "IPluginPreparedAdmissions",
+                  "optional": false
+                }
+              ],
+              "returns": "readonly IPluginRegistrationReceipt[]"
+            },
+            {
+              "name": "discardPreparedAdmissions",
+              "kind": "method",
+              "signature": "discardPreparedAdmissions(prepared: IPluginPreparedAdmissions): Promise<IPluginHostPhysicalCleanupResult>;",
+              "description": "Discards a prepared candidate and resolves with exact rollback observations.",
+              "parameterDetails": [
+                {
+                  "name": "prepared",
+                  "type": "IPluginPreparedAdmissions",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<IPluginHostPhysicalCleanupResult>"
+            },
+            {
+              "name": "prepareUnUseBatch",
+              "kind": "method",
+              "signature": "prepareUnUseBatch(receiptsInCleanupOrder: readonly IPluginRegistrationReceipt[]): IPluginPreparedRemovalBatch;",
+              "description": "Validates exact live receipts before a composition removal critical section.",
+              "parameterDetails": [
+                {
+                  "name": "receiptsInCleanupOrder",
+                  "type": "readonly IPluginRegistrationReceipt[]",
+                  "optional": false
+                }
+              ],
+              "returns": "IPluginPreparedRemovalBatch"
+            },
+            {
+              "name": "commitPreparedUnUseBatch",
+              "kind": "method",
+              "signature": "commitPreparedUnUseBatch<TView>(prepared: IPluginPreparedRemovalBatch, options: IPluginBatchRemovalOptions): Promise<IPluginBatchRemovalResult<TView>>;",
+              "description": "Revokes a prepared receipt batch synchronously, then drains its cleanup fence.",
+              "parameterDetails": [
+                {
+                  "name": "prepared",
+                  "type": "IPluginPreparedRemovalBatch",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IPluginBatchRemovalOptions",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<IPluginBatchRemovalResult<TView>>"
+            },
+            {
+              "name": "config",
+              "kind": "get",
+              "signature": "get config(): IPluginHostConfigFor<TInstalled>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IPluginHostConfigFor<TInstalled>"
+            },
+            {
+              "name": "unUse",
+              "kind": "method",
+              "signature": "unUse(name: string): Promise<IPluginRemovalResult<IPluginHostDynamicView<this>>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<IPluginRemovalResult<IPluginHostDynamicView<this>>>"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "signature": "dispose(): Promise<import('./typing.js').IPluginHostDisposalResult>;",
+              "description": "Completes logical host disposal; concrete consumer facades may narrow the observed result.",
+              "parameterDetails": [],
+              "returns": "Promise<import('./typing.js').IPluginHostDisposalResult>"
+            }
+          ],
           "aliasOf": "PluginHost",
           "exportPath": "./structural",
           "overloadSignatures": [
@@ -9588,6 +9947,7 @@
           "examples": [
             "import {\n  adaptSyncStageToAsync,\n  adaptSyncStageToGenerator,\n  adaptGeneratorStageToAsyncGenerator,\n  adaptSyncStageToAsyncGenerator,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  PluginHostDisposalNodeKind,\n  invokeCaptured,\n  readPluginHostDisposalProvenance,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
           ],
+          "members": [],
           "aliasOf": "PluginHostDisposalNodeKind",
           "exportPath": "./structural",
           "overloadSignatures": [
@@ -9653,6 +10013,7 @@
           "examples": [
             "import {\n  adaptSyncStageToAsync,\n  adaptSyncStageToGenerator,\n  adaptGeneratorStageToAsyncGenerator,\n  adaptSyncStageToAsyncGenerator,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  PluginHostDisposalNodeKind,\n  invokeCaptured,\n  readPluginHostDisposalProvenance,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
           ],
+          "members": [],
           "aliasOf": "readPluginHostDisposalProvenance",
           "exportPath": "./structural",
           "overloadSignatures": [

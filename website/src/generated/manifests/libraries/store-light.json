@@ -1357,6 +1357,7 @@
           "examples": [
             "const store = await createAsyncStore({\n  count: 0,\n  wasmField: someAsyncFieldBuilder() // mode: 'async'\n});"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createAsyncStore<S extends Record<string, unknown>>(shape: IStoreDefinition<S>, options?: ICreateStoreOptions): Promise<IReactiveStore<S>>;"
@@ -1580,6 +1581,7 @@
           "examples": [
             "const store = createLegacyStore(shapeWithAsyncField);\nawait storeReady(store); // 或检查 store.$async"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createLegacyStore<S extends Record<string, unknown>>(shape: IStoreDefinition<S>, options?: ICreateStoreOptions): IReactiveStore<S>;"
@@ -1814,6 +1816,7 @@
             "import { createStore } from '@migaia/store-light';\nimport { createObjectLeaseRegistry } from '@migaia/lifecycle';\n\nconst store = createStore({ items: [] as string[] });\nconst registry = store.$own(createObjectLeaseRegistry());\n// registry 会在 store.$dispose() 时一并释放，无需单独管理",
             "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light';\nimport type { IDisposable } from '@migaia/reactive';\n\ntype ICounterField = IDisposable & { value: number };\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField');\n      let value = initial;\n      return {\n        get value() {\n          source.track();\n          return value;\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v;\n          });\n        },\n        dispose() {\n          source.dispose();\n        }\n      };\n    }\n  };\n}\n\nconst store = createStore({ counter: counterField(0) });\nstore.counter.value; // 0"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStore<S extends Record<string, unknown>>(shape: IStoreDefinition<S> & { [K in keyof S]: S[K] extends IAsyncFieldBuilder<IDisposable> | ILegacyFieldBuilder<IDisposable> ? never : S[K]; }, options?: ICreateStoreOptions): IReactiveStore<S>;"
@@ -2138,6 +2141,7 @@
           "errors": ["No documented errors are declared for createStoreLightAggregateError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreLightAggregateError.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreLightAggregateError(code: IStoreLightErrorCode, errors: unknown[], message: string): AggregateError;"
@@ -2281,6 +2285,7 @@
           "errors": ["No documented errors are declared for createStoreLightError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreLightError.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreLightError(code: IStoreLightErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
@@ -2415,6 +2420,7 @@
           "errors": ["No documented errors are declared for createStoreLightRangeError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreLightRangeError.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError;"
@@ -2553,6 +2559,7 @@
           "errors": ["No documented errors are declared for createStoreLightTypeError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreLightTypeError.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreLightTypeError(code: IStoreLightErrorCode, message: string, options?: { readonly cause?: unknown; }): TypeError;"
@@ -2692,6 +2699,7 @@
           "examples": [
             "const userResource = createStoreResource(\n  async ({ signal }) => {\n    const res = await fetch('/api/user', { signal });\n    return res.json();\n  },\n  { keepAliveMs: 30_000 }\n);\n\nuserResource.preload(); // 提前触发加载\n// 组件渲染路径中：const user = userResource.read(); // loading 时 throw Promise"
           ],
+          "members": [],
           "aliasOf": "createStoreResource",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2773,6 +2781,7 @@
             "const scope = createStoreResourceScope();\nconst profile = scope.resource((ctx) => fetchProfile(ctx.signal));\nscope.dispose(); // 强制释放该 scope 内全部资源，不等待持有者",
             "import { createStore, createStoreResourceScope } from '@migaia/store-light';\nimport { createMutationPolicy } from '@migaia/store-middleware';\n\nconst settingsStore = createStore(\n  {\n    theme: 'light' as 'light' | 'dark',\n    setTheme(theme: 'light' | 'dark') {\n      this.theme = theme;\n    }\n  },\n  { debugName: 'settings', mutationPolicy: createMutationPolicy('actions-only') }\n);\n\nconst scope = createStoreResourceScope();\nconst profileResource = scope.resource(\n  async ({ signal }) => (await fetch('/api/profile', { signal })).json(),\n  { keepAliveMs: 30_000, onError: (error, phase) => console.error(`[profile] ${phase}`, error) }\n);\n\nfunction teardown() {\n  scope.dispose();\n  void settingsStore.$dispose();\n}"
           ],
+          "members": [],
           "aliasOf": "createStoreResourceScope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2840,6 +2849,7 @@
             "import {\n  createStore,\n  createStoreSync,\n  createAsyncStore,\n  createLegacyStore,\n  storeReady\n} from '@migaia/store-light';",
             "const store = createStoreSync({ count: 0 });"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": ["export declare const createStoreSync: typeof createStore;"],
           "overloadParameterDetails": [[]],
@@ -2907,6 +2917,7 @@
             "const myBuilder: IFieldBuilder<MyField> = {\n  [FIELD_BUILDER]: true,\n  mode: 'sync',\n  create(context: IFieldContext) {\n    /* ... */\n  }\n};",
             "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light';\nimport type { IDisposable } from '@migaia/reactive';\n\ntype ICounterField = IDisposable & { value: number };\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField');\n      let value = initial;\n      return {\n        get value() {\n          source.track();\n          return value;\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v;\n          });\n        },\n        dispose() {\n          source.dispose();\n        }\n      };\n    }\n  };\n}\n\nconst store = createStore({ counter: counterField(0) });\nstore.counter.value; // 0"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": ["export declare const FIELD_BUILDER: unique symbol;"],
           "overloadParameterDetails": [[]],
@@ -2969,6 +2980,7 @@
           "examples": [
             "export type IFieldContext = {\n  runtime: IRuntime;\n  signal: AbortSignal; // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource;\n};\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  readonly mode: 'sync';\n  create(context: IFieldContext): F;\n};\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  readonly mode: 'async';\n  create(context: IFieldContext): Promise<F>;\n};"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IAsyncFieldBuilder<F extends IDisposable> = { readonly [FIELD_BUILDER]: true; readonly mode: typeof StoreFieldMode.async; create(context: IFieldContext): Promise<F>; };"
@@ -3031,6 +3043,7 @@
           "errors": ["No documented errors are declared for ICreateStoreOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICreateStoreOptions.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ICreateStoreOptions = { /** * 显式隔离运行时；缺省用 defaultRuntime。 * * 收 `IRuntime` 而不是 `Runtime` 具体类：门面只用得到接口上的东西 * （signal/computed/effect/batch/createScope…），收具体类等于要求第三方 必须继承本库的类才能替换运行时。 */ runtime?: IRuntime; debugName?: string; warnAsyncActions?: boolean; /** * Optional MobX-style strict mutation policy. Direct field writes must run inside an * action/$batch/$set/$hydrate; Store methods are actions. */ mutationPolicy?: IMutationPolicy; };"
@@ -3145,6 +3158,7 @@
             "const myBuilder: IFieldBuilder<MyField> = {\n  [FIELD_BUILDER]: true,\n  mode: 'sync',\n  create(context: IFieldContext) {\n    /* ... */\n  }\n};",
             "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light';\nimport type { IDisposable } from '@migaia/reactive';\n\ntype ICounterField = IDisposable & { value: number };\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField');\n      let value = initial;\n      return {\n        get value() {\n          source.track();\n          return value;\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v;\n          });\n        },\n        dispose() {\n          source.dispose();\n        }\n      };\n    }\n  };\n}\n\nconst store = createStore({ counter: counterField(0) });\nstore.counter.value; // 0"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IFieldBuilder<F extends IDisposable> = ISyncFieldBuilder<F> | IAsyncFieldBuilder<F> | ILegacyFieldBuilder<F>;"
@@ -3213,6 +3227,7 @@
             "const myBuilder: IFieldBuilder<MyField> = {\n  [FIELD_BUILDER]: true,\n  mode: 'sync',\n  create(context: IFieldContext) {\n    /* ... */\n  }\n};",
             "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light';\nimport type { IDisposable } from '@migaia/reactive';\n\ntype ICounterField = IDisposable & { value: number };\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField');\n      let value = initial;\n      return {\n        get value() {\n          source.track();\n          return value;\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v;\n          });\n        },\n        dispose() {\n          source.dispose();\n        }\n      };\n    }\n  };\n}\n\nconst store = createStore({ counter: counterField(0) });\nstore.counter.value; // 0"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IFieldContext = { runtime: IRuntime; signal: IAbortSignal; createSource(debugName?: string): IFieldSource; };"
@@ -3278,6 +3293,7 @@
             "export type IFieldContext = {\n  runtime: IRuntime;\n  signal: AbortSignal; // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource;\n};\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  readonly mode: 'sync';\n  create(context: IFieldContext): F;\n};\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  readonly mode: 'async';\n  create(context: IFieldContext): Promise<F>;\n};",
             "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light';\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light';"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IFieldSource = IDisposable & { track(): void; notify(): void; /** Reserve the Runtime version before mutating external storage, then publish once. */ commit<T>(write: () => T): T; readonly observed: boolean; };"
@@ -3340,6 +3356,7 @@
           "errors": ["No documented errors are declared for IHydrateOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IHydrateOptions.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IHydrateOptions = { /** Unknown keys are ignored by default for backwards-compatible partial hydration. */ readonly unknown?: 'ignore' | 'report' | 'strict'; readonly onUnknown?: (key: string) => void; };"
@@ -3402,6 +3419,7 @@
           "errors": ["No documented errors are declared for ILegacyFieldBuilder."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILegacyFieldBuilder.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ILegacyFieldBuilder<F extends IDisposable> = { readonly [FIELD_BUILDER]: true; create(context: IFieldContext): Promise<F>; };"
@@ -3467,6 +3485,7 @@
             "export type IMutationGuard = { assertMutationAllowed(operation?: string): void };\nexport type IMutationPolicy = IMutationGuard & { runInAction<T>(fn: () => T): T };",
             "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light';\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light';"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IMutationGuard = { assertMutationAllowed(operation?: string): void; };"
@@ -3532,6 +3551,7 @@
             "export type IMutationGuard = { assertMutationAllowed(operation?: string): void };\nexport type IMutationPolicy = IMutationGuard & { runInAction<T>(fn: () => T): T };",
             "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light';\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light';"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IMutationPolicy = IMutationGuard & { runInAction<T>(fn: () => T): T; };"
@@ -3640,6 +3660,7 @@
           "errors": ["No documented errors are declared for IRaw."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRaw.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IRaw<T> = { readonly [RAW]: true; readonly value: T; };"
@@ -3702,6 +3723,7 @@
           "errors": ["No documented errors are declared for IReactiveStore."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReactiveStore.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IReactiveStore<S> = IStoreShape<S> & IReactiveStoreApi<S>;"
@@ -3764,6 +3786,7 @@
           "errors": ["No documented errors are declared for IReactiveStoreApi."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReactiveStoreApi.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IReactiveStoreApi<S> = { $runtime: IRuntime; $async: boolean; $snapshot(): IStoreShape<S>; $subscribe(fn: () => void, options?: ISubscribeOptions): IDisposer; $batch(recipe: (draft: IStoreShape<S>) => void): void; $set(patch: IWritableStorePatch<S>): void; $plain(): Record<string, unknown>; $hydrate(partial: Record<string, unknown>, options?: IHydrateOptions): void; readonly $disposed: boolean; /** * 把外部资源挂进本 store 的所有权作用域（典型：collections）。 * * 中型场景的正确拆法是「store 持根 UI/动作，collections 承载热路径结构」； 没有 $own 时两者共 Runtime 却各管 dispose，根一释放结构节点就泄漏。 * 资源必须未归属或已归属本 Runtime；跨 Runtime 直接拒绝。 */ $own<T extends IDisposable>(resource: T): T; /** * Always asynchronous (`docs/lifecycle/migration.sdd.md` §5.1 — the underlying * `@migaia/lifecycle` `LifecycleScope.dispose()` has no synchronous form). Resolves once every * owned Signal/Computed/Effect/wasm field has finished releasing. Callers that need \"started\" is * enough (fire React `useEffect` cleanup, tear down a request scope) may call this without * awaiting; `$disposed` already flips to `true` synchronously before any owned resource is * touched, so read-path guards observe the disposed state immediately regardless of whether the * caller awaits. */ $dispose(): Promise<void>; };"
@@ -3826,6 +3849,7 @@
           "errors": ["No documented errors are declared for IResourceCapture."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IResourceCapture.",
           "examples": [],
+          "members": [],
           "aliasOf": "IResourceCapture",
           "exportPath": ".",
           "overloadSignatures": ["export type IResourceCapture = object;"],
@@ -3895,6 +3919,7 @@
           "examples": [
             "isFieldBuilder(someValue); // 是否为 IFieldBuilder（sync/async/legacy 任一形态）"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function isFieldBuilder(value: unknown): value is IFieldBuilder<IDisposable>;"
@@ -3971,6 +3996,7 @@
           "errors": ["No documented errors are declared for isRaw."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isRaw.",
           "examples": ["isRaw(raw(() => {})); // true"],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function isRaw(value: unknown): value is IRaw<unknown>;"
@@ -4041,6 +4067,7 @@
           "errors": ["No documented errors are declared for IStoreDefinition."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreDefinition.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IStoreDefinition<S extends Record<string, unknown>> = S & ThisType<IReactiveStore<S>>;"
@@ -4105,6 +4132,7 @@
           "examples": [
             "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
           ],
+          "members": [],
           "aliasOf": "IStoreFieldMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4211,6 +4239,7 @@
           "errors": ["No documented errors are declared for IStoreResource."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreResource.",
           "examples": [],
+          "members": [],
           "aliasOf": "IStoreResource",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4317,6 +4346,7 @@
           "errors": ["No documented errors are declared for IStoreResourceConfig."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreResourceConfig.",
           "examples": [],
+          "members": [],
           "aliasOf": "IStoreResourceConfig",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4382,6 +4412,7 @@
           "examples": [
             "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
           ],
+          "members": [],
           "aliasOf": "IStoreResourceDataKind",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4488,6 +4519,7 @@
           "errors": ["No documented errors are declared for IStoreResourceErrorPhase."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreResourceErrorPhase.",
           "examples": [],
+          "members": [],
           "aliasOf": "IStoreResourceErrorPhase",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4551,6 +4583,7 @@
           "errors": ["No documented errors are declared for IStoreResourceFactory."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreResourceFactory.",
           "examples": [],
+          "members": [],
           "aliasOf": "IStoreResourceFactory",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4616,6 +4649,7 @@
           "examples": [
             "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
           ],
+          "members": [],
           "aliasOf": "IStoreResourceKind",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4722,6 +4756,7 @@
           "errors": ["No documented errors are declared for IStoreResourceLoadContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreResourceLoadContext.",
           "examples": [],
+          "members": [],
           "aliasOf": "IStoreResourceLoadContext",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4785,6 +4820,7 @@
           "errors": ["No documented errors are declared for IStoreResourceOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreResourceOptions.",
           "examples": [],
+          "members": [],
           "aliasOf": "IStoreResourceOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4848,6 +4884,7 @@
           "errors": ["No documented errors are declared for IStoreResourceScope."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreResourceScope.",
           "examples": [],
+          "members": [],
           "aliasOf": "IStoreResourceScope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4911,6 +4948,7 @@
           "errors": ["No documented errors are declared for IStoreShape."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreShape.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IStoreShape<S> = { readonly [K in IBuilderKeys<S>]: S[K] extends IFieldBuilder<infer F> ? F : never; } & { [K in Exclude<keyof S, IBuilderKeys<S>>]: S[K] extends IRaw<infer T> ? T : S[K] extends IFieldBuilder<infer F> ? F : S[K] extends (...args: infer A) => infer R ? (...args: A) => R : S[K]; };"
@@ -4973,6 +5011,7 @@
           "errors": ["No documented errors are declared for ISubscribeOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISubscribeOptions.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": ["export type ISubscribeOptions = { fireImmediately?: boolean; };"],
           "overloadParameterDetails": [[]],
@@ -5035,6 +5074,7 @@
           "examples": [
             "export type IFieldContext = {\n  runtime: IRuntime;\n  signal: AbortSignal; // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource;\n};\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  readonly mode: 'sync';\n  create(context: IFieldContext): F;\n};\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  readonly mode: 'async';\n  create(context: IFieldContext): Promise<F>;\n};"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ISyncFieldBuilder<F extends IDisposable> = { readonly [FIELD_BUILDER]: true; readonly mode: typeof StoreFieldMode.sync; create(context: IFieldContext): F; };"
@@ -5097,6 +5137,7 @@
           "errors": ["No documented errors are declared for IWritableStorePatch."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWritableStorePatch.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IWritableStorePatch<S> = Partial<Pick<IStoreShape<S>, ISettableKey<S> & keyof IStoreShape<S>>>;"
@@ -5168,6 +5209,7 @@
             "const store = createStore({\n  onSubmit: raw((data: FormData) => console.log(data))\n});\nstore.onSubmit = (data) => save(data); // 可读可写可整体替换",
             "isRaw(raw(() => {})); // true"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": ["export declare function raw<T>(value: T): IRaw<T>;"],
           "overloadParameterDetails": [
@@ -5238,6 +5280,7 @@
           "examples": [
             "export const STORE_LIGHT_SOURCE = '@migaia/store-light';\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError;\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const STORE_LIGHT_SOURCE = \"@migaia/store-light\";"
@@ -5345,6 +5388,7 @@
           "examples": [
             "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
           ],
+          "members": [],
           "aliasOf": "StoreFieldMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5460,6 +5504,7 @@
             "const store = createLegacyStore(shapeWithAsyncField);\nawait storeReady(store); // 或检查 store.$async",
             "await storeReady(store);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function storeReady(store: object): Promise<void>;"
@@ -5689,6 +5734,7 @@
           "examples": [
             "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
           ],
+          "members": [],
           "aliasOf": "StoreResourceDataKind",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5797,6 +5843,7 @@
           "examples": [
             "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
           ],
+          "members": [],
           "aliasOf": "StoreResourceKind",
           "exportPath": ".",
           "overloadSignatures": [

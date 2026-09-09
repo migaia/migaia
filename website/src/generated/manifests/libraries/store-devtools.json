@@ -821,6 +821,7 @@
             "import { createStoreDevTools } from '@migaia/store-devtools';\n\nconst tools = createStoreDevTools(highFrequencyStore, {\n  captureRuntimeTrace: false, // trace 恒为空，actions 也不再自动填充\n  maxHistory: 50\n});\n\n// 仍然可以手动记录关心的 action\ntools.recordAction({ name: 'manual-batch', durationMs: 12 });",
             "import { createStoreDevTools } from '@migaia/store-devtools';\nimport { ClonePolicy } from '@migaia/store-middleware/tolerant-clone';\n\nconst tools = createStoreDevTools(authStore, {\n  clone: (state) => {\n    const snapshot = ClonePolicy.diagnostic(state) as Record<string, unknown>;\n    if ('token' in snapshot) snapshot.token = '[redacted]';\n    return snapshot;\n  }\n});"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreDevTools<S extends Record<string, unknown>>(store: IReactiveStore<S>, options?: IStoreDevToolsOptions): IStoreDevTools;"
@@ -960,6 +961,7 @@
           "examples": [
             "throw createStoreDevtoolsError(StoreDevtoolsErrorCode.invalidOption, 'bad option');\nthrow createStoreDevtoolsRangeError(StoreDevtoolsErrorCode.invalidOption, 'bad option');\nthrow createStoreDevtoolsAggregateError(\n  StoreDevtoolsErrorCode.cleanupFailed,\n  [err1, err2],\n  'cleanup failed'\n);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreDevtoolsAggregateError(code: IStoreDevtoolsErrorCode, errors: readonly unknown[], message: string): AggregateError;"
@@ -1170,6 +1172,7 @@
             "const error = createStoreDevtoolsError(StoreDevtoolsErrorCode.invalidOption, 'bad option', {\n  cause: originalError\n});\nerror.message; // 'bad option'\n(error as { code?: string }).code; // 'INVALID_OPTION'\n(error as { source?: string }).source; // '@migaia/store-devtools'",
             "throw createStoreDevtoolsError(StoreDevtoolsErrorCode.invalidOption, 'bad option');\nthrow createStoreDevtoolsRangeError(StoreDevtoolsErrorCode.invalidOption, 'bad option');\nthrow createStoreDevtoolsAggregateError(\n  StoreDevtoolsErrorCode.cleanupFailed,\n  [err1, err2],\n  'cleanup failed'\n);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreDevtoolsError(code: IStoreDevtoolsErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
@@ -1370,6 +1373,7 @@
           "examples": [
             "throw createStoreDevtoolsError(StoreDevtoolsErrorCode.invalidOption, 'bad option');\nthrow createStoreDevtoolsRangeError(StoreDevtoolsErrorCode.invalidOption, 'bad option');\nthrow createStoreDevtoolsAggregateError(\n  StoreDevtoolsErrorCode.cleanupFailed,\n  [err1, err2],\n  'cleanup failed'\n);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreDevtoolsRangeError(code: IStoreDevtoolsErrorCode, message: string): RangeError;"
@@ -1567,6 +1571,7 @@
             "getDependencyTree(someEffect);\n// { kind: 'observer', label: 'someEffect', children: [{ kind: 'observable', label: 'count', version: 3, children: [] }] }",
             "import { getDependencyTree, getObserverTree } from '@migaia/store-devtools';\n\nconsole.log(JSON.stringify(getDependencyTree(someEffect, 5), null, 2));\nconsole.log(JSON.stringify(getObserverTree(someSignal, 5), null, 2));"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function getDependencyTree(observer: IObserver, maxDepth?: number): IDependencyTreeNode;"
@@ -1698,6 +1703,7 @@
             "getObserverTree(someSignal);\n// { kind: 'observable', label: 'count', version: 3, children: [{ kind: 'observer', label: 'someEffect', children: [] }] }",
             "import { getDependencyTree, getObserverTree } from '@migaia/store-devtools';\n\nconsole.log(JSON.stringify(getDependencyTree(someEffect, 5), null, 2));\nconsole.log(JSON.stringify(getObserverTree(someSignal, 5), null, 2));"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function getObserverTree(observable: IObservable, maxDepth?: number): IDependencyTreeNode;"
@@ -1819,6 +1825,7 @@
             "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive/runtime\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;",
             "recordAction(trace: Omit<IActionTrace, 'timestamp'>): void"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IActionTrace = { timestamp: number; name: string; payload?: unknown; durationMs?: number; error?: unknown; };"
@@ -1884,6 +1891,7 @@
             "import {\n  getDependencyTree,\n  getObserverTree,\n  type IDependencyTreeNode\n} from '@migaia/store-devtools';",
             "type IDependencyTreeNode = {\n  kind: 'observable' | 'observer';\n  label: string; // node.debugName ?? node.constructor?.name ?? 'AnonymousReactiveNode'\n  version?: number; // 仅 kind === 'observable' 的节点携带；对应该节点当前的版本号\n  children: IDependencyTreeNode[];\n  circular?: boolean; // 该节点在当前递归路径上被重复访问\n};\n\nfunction getDependencyTree(observer: IObserver, maxDepth?: number): IDependencyTreeNode;\nfunction getObserverTree(observable: IObservable, maxDepth?: number): IDependencyTreeNode;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IDependencyTreeNode = { kind: (typeof StoreDevtoolsNodeKind)[keyof typeof StoreDevtoolsNodeKind]; label: string; version?: number; children: IDependencyTreeNode[]; circular?: boolean; };"
@@ -1949,6 +1957,7 @@
             "import {\n  createStoreDevTools,\n  type IStoreDevTools,\n  type IStoreDevToolsOptions,\n  type IStoreHistoryEntry,\n  type IActionTrace\n} from '@migaia/store-devtools';",
             "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive/runtime\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IStoreDevTools = { readonly history: readonly IStoreHistoryEntry[]; readonly actions: readonly IActionTrace[]; readonly trace: readonly IRuntimeTraceEvent[]; record(label?: string): IStoreHistoryEntry; recordAction(trace: Omit<IActionTrace, 'timestamp'>): void; jumpTo(id: number): void; clear(): void; dispose(): void; };"
@@ -2014,6 +2023,7 @@
             "import { StoreDevtoolsCommand, type IStoreDevtoolsCommand } from '@migaia/store-devtools';",
             "const StoreDevtoolsCommand: {\n  readonly dispatch: 'DISPATCH';\n  readonly commit: 'COMMIT';\n  readonly jumpToState: 'JUMP_TO_STATE';\n  readonly jumpToAction: 'JUMP_TO_ACTION';\n  readonly rollback: 'ROLLBACK';\n  readonly reset: 'RESET';\n};\ntype IStoreDevtoolsCommand = (typeof StoreDevtoolsCommand)[keyof typeof StoreDevtoolsCommand];"
           ],
+          "members": [],
           "aliasOf": "IStoreDevtoolsCommand",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2080,6 +2090,7 @@
             "import {\n  createStoreDevTools,\n  type IStoreDevTools,\n  type IStoreDevToolsOptions,\n  type IStoreHistoryEntry,\n  type IActionTrace\n} from '@migaia/store-devtools';",
             "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive/runtime\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IStoreDevToolsOptions = { maxHistory?: number; maxTrace?: number; captureRuntimeTrace?: boolean; now?: () => number; clone?: (state: Record<string, unknown>) => Record<string, unknown>; };"
@@ -2146,6 +2157,7 @@
             "type IStoreDevToolsOptions = {\n  readonly maxHistory?: number;\n  readonly maxTrace?: number;\n  readonly captureRuntimeTrace?: boolean;\n  readonly now?: () => number;\n  readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>;\n};\n\ntype IStoreHistoryEntry = {\n  readonly id: number;\n  readonly timestamp: number;\n  readonly label: string;\n  readonly state: Record<string, unknown>;\n};\n\ntype IActionTrace = {\n  readonly timestamp: number;\n  readonly name: string;\n  readonly payload?: unknown;\n  readonly durationMs?: number;\n  readonly error?: unknown;\n};\n\ntype IStoreDevTools = {\n  readonly history: readonly IStoreHistoryEntry[];\n  readonly actions: readonly IActionTrace[];\n  readonly trace: readonly IRuntimeTraceEvent[]; // 来自 @migaia/reactive/runtime\n  record(label?: string): IStoreHistoryEntry;\n  recordAction(trace: Omit<IActionTrace, 'timestamp'>): void;\n  jumpTo(id: number): void;\n  clear(): void;\n  dispose(): void;\n};\n\nfunction createStoreDevTools<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options?: IStoreDevToolsOptions\n): IStoreDevTools;",
             "record(label: string = 'state change'): IStoreHistoryEntry"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IStoreHistoryEntry = { id: number; timestamp: number; label: string; state: Record<string, unknown>; };"
@@ -2213,6 +2225,7 @@
             "import {\n  StoreDevtoolsErrorCode,\n  STORE_DEVTOOLS_SOURCE,\n  createStoreDevtoolsError,\n  createStoreDevtoolsRangeError,\n  createStoreDevtoolsAggregateError,\n  type IStoreDevtoolsErrorCode\n} from '@migaia/store-devtools';",
             "STORE_DEVTOOLS_SOURCE; // '@migaia/store-devtools'"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const STORE_DEVTOOLS_SOURCE = \"@migaia/store-devtools\";"
@@ -2358,6 +2371,7 @@
             "const StoreDevtoolsCommand: {\n  readonly dispatch: 'DISPATCH';\n  readonly commit: 'COMMIT';\n  readonly jumpToState: 'JUMP_TO_STATE';\n  readonly jumpToAction: 'JUMP_TO_ACTION';\n  readonly rollback: 'ROLLBACK';\n  readonly reset: 'RESET';\n};\ntype IStoreDevtoolsCommand = (typeof StoreDevtoolsCommand)[keyof typeof StoreDevtoolsCommand];",
             "StoreDevtoolsCommand.jumpToState; // 'JUMP_TO_STATE'"
           ],
+          "members": [],
           "aliasOf": "StoreDevtoolsCommand",
           "exportPath": ".",
           "overloadSignatures": [

@@ -1077,6 +1077,7 @@
           "examples": [
             "throw createStoreSharedError(\n  StoreSharedErrorCode.invalidOption,\n  'entity slot must be preallocated'\n);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreSharedError(code: IStoreSharedErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
@@ -1292,6 +1293,7 @@
             "throw createStoreSharedRangeError(StoreSharedErrorCode.invalidOption, 'length must be >= 0');",
             "import {\n  StoreSharedErrorCode,\n  createStoreSharedRangeError,\n  sharedInt32Array\n} from '@migaia/store-shared';\n\nfunction createEntityGrid(runtime: IRuntime, entityCount: number) {\n  if (entityCount <= 0) {\n    throw createStoreSharedRangeError(\n      StoreSharedErrorCode.invalidOption,\n      'entityCount must be a positive integer'\n    );\n  }\n  return sharedInt32Array(runtime, entityCount * 2); // 每个实体占 [x, y] 两格\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreSharedRangeError(code: IStoreSharedErrorCode, message: string, options?: { readonly cause?: unknown; }): RangeError;"
@@ -1500,6 +1502,7 @@
             "import { SharedWaitMode, type ISharedWaitMode } from '@migaia/store-shared';",
             "function describeWaitMode(mode: ISharedWaitMode): string {\n  return mode === SharedWaitMode.async ? '基于 Atomics.waitAsync 的异步唤醒' : mode;\n}"
           ],
+          "members": [],
           "aliasOf": "ISharedWaitMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1570,6 +1573,7 @@
             "const runtime = createRuntime();\nconst counter = sharedInt32(runtime, 0);\n\nconst stop = new Effect(() => console.log('counter =', counter.value), runtime);\ncounter.value = 1; // 本地写入，Effect 自动重跑\n\nstop.dispose();\ncounter.dispose();",
             "import { createRuntime } from '@migaia/reactive';\nimport { sharedInt32 } from '@migaia/store-shared';\n\nconst mainRuntime = createRuntime();\nconst shared = sharedInt32(mainRuntime, 0);\nworker.postMessage({ buffer: shared.buffer }); // SharedArrayBuffer 可以直接传递，不会被拷贝\n\n// worker 内\nconst workerRuntime = createRuntime();\nconst mirror = sharedInt32(workerRuntime, 0, receivedBuffer); // initialValue 被忽略，附着已有数据\nmirror.watch();"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const sharedInt32: (runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer) => SharedInt32Signal;"
@@ -1668,6 +1672,7 @@
             "import { StoreSharedErrorCode, sharedInt32Array } from '@migaia/store-shared';\n\nconst positions = sharedInt32Array(runtime, 1000, { buffer: sharedBuffer });\n\nlet stopWatch: (() => void) | undefined;\ntry {\n  stopWatch = positions.watch();\n} catch (error) {\n  if ((error as { code?: string }).code === StoreSharedErrorCode.envUnsupported) {\n    const timer = setInterval(() => {\n      const changed = positions.sync();\n      if (changed > 0) console.log(`${changed} 个下标发生了远端变化`);\n    }, 100);\n    stopWatch = () => clearInterval(timer);\n  } else {\n    throw error;\n  }\n}",
             "import {\n  StoreSharedErrorCode,\n  createStoreSharedRangeError,\n  sharedInt32Array\n} from '@migaia/store-shared';\n\nfunction createEntityGrid(runtime: IRuntime, entityCount: number) {\n  if (entityCount <= 0) {\n    throw createStoreSharedRangeError(\n      StoreSharedErrorCode.invalidOption,\n      'entityCount must be a positive integer'\n    );\n  }\n  return sharedInt32Array(runtime, entityCount * 2); // 每个实体占 [x, y] 两格\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const sharedInt32Array: (runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }) => SharedInt32Array;"
@@ -1773,6 +1778,211 @@
           "errors": ["No documented errors are declared for SharedInt32Array."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for SharedInt32Array.",
           "examples": [],
+          "members": [
+            {
+              "name": "runtime",
+              "kind": "property",
+              "signature": "readonly runtime: IRuntime;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "buffer",
+              "kind": "property",
+              "signature": "readonly buffer: SharedArrayBuffer;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "SharedArrayBuffer"
+            },
+            {
+              "name": "length",
+              "kind": "property",
+              "signature": "readonly length: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "disposed",
+              "kind": "get",
+              "signature": "get disposed(): boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "get",
+              "kind": "method",
+              "signature": "get(index: number): number;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "index",
+                  "type": "number",
+                  "optional": false
+                }
+              ],
+              "returns": "number"
+            },
+            {
+              "name": "set",
+              "kind": "method",
+              "signature": "set(index: number, value: number): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "index",
+                  "type": "number",
+                  "optional": false
+                },
+                {
+                  "name": "value",
+                  "type": "number",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "update",
+              "kind": "method",
+              "signature": "update(index: number, update: (current: number) => number): number;",
+              "description": "读-改-写。 用户回调**在锁外**执行：持锁期间调用别人的代码，一旦它抛错就留下一把奇数的 死锁，之后所有读者都会自旋到上限然后抛。所以先一致读、锁外算、再带期望值写， 值被别人改掉就重来。 因此 `update` 回调必须纯且可重复执行；不要在回调中埋点、发请求或产生不可逆副作用。",
+              "parameterDetails": [
+                {
+                  "name": "index",
+                  "type": "number",
+                  "optional": false
+                },
+                {
+                  "name": "update",
+                  "type": "(current: number) => number",
+                  "optional": false
+                }
+              ],
+              "returns": "number"
+            },
+            {
+              "name": "sync",
+              "kind": "method",
+              "signature": "sync(index?: number): number;",
+              "description": "Scan for remote writes and notify only affected index observers. `watch()` 起了回路之后不必手动调；没有 waitAsync 的环境仍可从消息循环 pump。",
+              "parameterDetails": [
+                {
+                  "name": "index",
+                  "type": "number",
+                  "optional": true
+                }
+              ],
+              "returns": "number"
+            },
+            {
+              "name": "watch",
+              "kind": "method",
+              "signature": "watch(): IDisposer;",
+              "description": "起一条 waitAsync 回路覆盖整片。 等的是 epoch 而不是逐格的 seq：一格一个 waiter 在长数组上不可行。醒来后 `sync()` 扫描，只有真正变了的格会通知它自己的观察者。",
+              "parameterDetails": [],
+              "returns": "IDisposer"
+            },
+            {
+              "name": "snapshot",
+              "kind": "method",
+              "signature": "snapshot(): Int32Array;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Int32Array"
+            },
+            {
+              "name": "prune",
+              "kind": "method",
+              "signature": "prune(): number;",
+              "description": "Release cells that no longer have observers after high-churn access.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "signature": "dispose(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "assertActive",
+              "kind": "method",
+              "signature": "assertActive(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "readCell",
+              "kind": "method",
+              "signature": "readCell(index: number): { readonly value: number; readonly version: bigint; };",
+              "description": "一致读某一格：value 与 version 同源。",
+              "parameterDetails": [
+                {
+                  "name": "index",
+                  "type": "number",
+                  "optional": false
+                }
+              ],
+              "returns": "{ readonly value: number; readonly version: bigint; }"
+            },
+            {
+              "name": "writeCell",
+              "kind": "method",
+              "signature": "writeCell(index: number, value: number, expected?: number): bigint | undefined;",
+              "description": "写某一格；返回新版本，或 undefined 表示没写（值未变或期望值不符）。",
+              "parameterDetails": [
+                {
+                  "name": "index",
+                  "type": "number",
+                  "optional": false
+                },
+                {
+                  "name": "value",
+                  "type": "number",
+                  "optional": false
+                },
+                {
+                  "name": "expected",
+                  "type": "number",
+                  "optional": true
+                }
+              ],
+              "returns": "bigint | undefined"
+            },
+            {
+              "name": "notifyWaiters",
+              "kind": "method",
+              "signature": "notifyWaiters(): void;",
+              "description": "Advance the shared 64-bit generation and wake every independent reader cursor.",
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "recordObservedVersion",
+              "kind": "method",
+              "signature": "recordObservedVersion(index: number, version: bigint): void;",
+              "description": "Keep array-level pull bookkeeping aligned with local cell writes.",
+              "parameterDetails": [
+                {
+                  "name": "index",
+                  "type": "number",
+                  "optional": false
+                },
+                {
+                  "name": "version",
+                  "type": "bigint",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            }
+          ],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare class SharedInt32Array implements IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly length: number; constructor(runtime: IRuntime, length: number, options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number>; }); get disposed(): boolean; get(index: number): number; set(index: number, value: number): void; /** * 读-改-写。 * * 用户回调**在锁外**执行：持锁期间调用别人的代码，一旦它抛错就留下一把奇数的 死锁，之后所有读者都会自旋到上限然后抛。所以先一致读、锁外算、再带期望值写， 值被别人改掉就重来。 因此 * `update` 回调必须纯且可重复执行；不要在回调中埋点、发请求或产生不可逆副作用。 */ update(index: number, update: (current: number) => number): number; /** * Scan for remote writes and notify only affected index observers. * * `watch()` 起了回路之后不必手动调；没有 waitAsync 的环境仍可从消息循环 pump。 */ sync(index?: number): number; /** * 起一条 waitAsync 回路覆盖整片。 * * 等的是 epoch 而不是逐格的 seq：一格一个 waiter 在长数组上不可行。醒来后 `sync()` 扫描，只有真正变了的格会通知它自己的观察者。 */ watch(): IDisposer; snapshot(): Int32Array; /** Release cells that no longer have observers after high-churn access. */ prune(): number; dispose(): void; assertActive(): void; /** 一致读某一格：value 与 version 同源。 */ readCell(index: number): { readonly value: number; readonly version: bigint; }; /** 写某一格；返回新版本，或 undefined 表示没写（值未变或期望值不符）。 */ writeCell(index: number, value: number, expected?: number): bigint | undefined; /** Advance the shared 64-bit generation and wake every independent reader cursor. */ notifyWaiters(): void; /** Keep array-level pull bookkeeping aligned with local cell writes. */ recordObservedVersion(index: number, version: bigint): void; }"
@@ -2024,6 +2234,126 @@
           "errors": ["No documented errors are declared for SharedInt32Signal."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for SharedInt32Signal.",
           "examples": [],
+          "members": [
+            {
+              "name": "runtime",
+              "kind": "property",
+              "signature": "readonly runtime: IRuntime;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "buffer",
+              "kind": "property",
+              "signature": "readonly buffer: SharedArrayBuffer;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "SharedArrayBuffer"
+            },
+            {
+              "name": "subs",
+              "kind": "property",
+              "signature": "readonly subs: ReadonlySet<IObserver>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ReadonlySet<IObserver>"
+            },
+            {
+              "name": "version",
+              "kind": "get",
+              "signature": "get version(): number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "disposed",
+              "kind": "get",
+              "signature": "get disposed(): boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "value",
+              "kind": "get",
+              "signature": "get value(): number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "value",
+              "kind": "set",
+              "signature": "set value(next: number);",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "next",
+                  "type": "number",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "sync",
+              "kind": "method",
+              "signature": "sync(): boolean;",
+              "description": "Pull remote writes into this Runtime. `watch()` 起了回路之后就不必手动调它；没有 waitAsync 的环境仍可从自己的消息 循环里 pump。",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "watch",
+              "kind": "method",
+              "signature": "watch(): IDisposer;",
+              "description": "起一条 waitAsync 回路：远端写入直接推到本 Runtime，不必再 pump `sync()`。 返回停止函数；`dispose()` 也会停。",
+              "parameterDetails": [],
+              "returns": "IDisposer"
+            },
+            {
+              "name": "peek",
+              "kind": "method",
+              "signature": "peek(): number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "onObserved",
+              "kind": "method",
+              "signature": "onObserved(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "onUnobserved",
+              "kind": "method",
+              "signature": "onUnobserved(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "isStale",
+              "kind": "method",
+              "signature": "isStale(): boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "signature": "dispose(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            }
+          ],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare class SharedInt32Signal implements IObservable, IDisposable { #private; readonly runtime: IRuntime; readonly buffer: SharedArrayBuffer; readonly subs: ReadonlySet<IObserver>; get version(): number; constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer); get disposed(): boolean; get value(): number; set value(next: number); /** * Pull remote writes into this Runtime. * * `watch()` 起了回路之后就不必手动调它；没有 waitAsync 的环境仍可从自己的消息 循环里 pump。 */ sync(): boolean; /** * 起一条 waitAsync 回路：远端写入直接推到本 Runtime，不必再 pump `sync()`。 * * 返回停止函数；`dispose()` 也会停。 */ watch(): IDisposer; peek(): number; onObserved(): void; onUnobserved(): void; isStale(): boolean; dispose(): void; }"
@@ -2237,6 +2567,7 @@
             "import { SharedWaitMode, type ISharedWaitMode } from '@migaia/store-shared';",
             "function describeWaitMode(mode: ISharedWaitMode): string {\n  return mode === SharedWaitMode.async ? '基于 Atomics.waitAsync 的异步唤醒' : mode;\n}"
           ],
+          "members": [],
           "aliasOf": "SharedWaitMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2305,6 +2636,7 @@
             "const STORE_SHARED_SOURCE: '@migaia/store-shared';",
             "STORE_SHARED_SOURCE; // '@migaia/store-shared'"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const STORE_SHARED_SOURCE = \"@migaia/store-shared\";"

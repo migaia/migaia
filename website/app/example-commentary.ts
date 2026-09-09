@@ -5,8 +5,26 @@ type ICommentedExample = {
   readonly notes: readonly string[]
 }
 
+export type IExampleCommentaryContext = {
+  /** Public API whose maintained guide owns this example. */
+  readonly apiName: string
+  /** Distinguishes executable walkthroughs from compile-time declaration guidance. */
+  readonly kind?: 'example' | 'signature'
+  /** Public parameter names displayed beside a signature. */
+  readonly parameterNames?: readonly string[]
+  /** Concrete behavior promised by the maintained guide. */
+  readonly purpose: string
+  /** Representative production situation for this exact API. */
+  readonly scenario?: string
+}
+
 /** Adds only capability-specific comments without changing executable statements. */
-export function commentExample(code: string, language: string, locale: ILocale): ICommentedExample {
+export function commentExample(
+  code: string,
+  language: string,
+  locale: ILocale,
+  context?: IExampleCommentaryContext
+): ICommentedExample {
   /** Normalized language decides which comment syntax remains valid when copied. */
   const normalizedLanguage = language.toLowerCase()
   /** Only languages with line comments can safely receive inline annotations. */
@@ -22,22 +40,106 @@ export function commentExample(code: string, language: string, locale: ILocale):
   const segments = code.trim().split(/\n\s*\n/)
   /** Generated explanations are reused below the code as a compact walkthrough. */
   const notes: string[] = []
+  /** A maintained API guide may contribute one precise fallback when no handwritten rule matches. */
+  let usedContext = false
   /** Only stages with concrete capability semantics receive an explanation. */
   const commentedSegments = segments.map((segment) => {
     /** The stage explanation is derived from the first meaningful operation in the segment. */
-    const note = describeSegment(segment, locale)
+    const note =
+      describeSegment(segment, locale) ??
+      describeCapabilityHostStage(segment, locale) ??
+      (!usedContext && context && !isImportOnly(segment)
+        ? describeMaintainedApiExample(code, segment, context, locale)
+        : undefined)
     if (!note) return segment
+    if (context && !usedContext) usedContext = true
     notes.push(note)
     return `${commentPrefix} ${note}\n${segment}`
   })
   return { code: commentedSegments.join('\n\n'), notes }
 }
 
-/** Describes why a logical code segment exists rather than merely repeating its syntax. */
-function describeSegment(
+/** Keeps import declarations copyable without pretending they explain runtime behavior. */
+function isImportOnly(segment: string): boolean {
+  return segment
+    .split('\n')
+    .filter((line) => line.trim().length > 0 && !/^\s*(?:\/\/|#)/.test(line))
+    .every((line) => /^\s*import\b/.test(line))
+}
+
+/** Explains each distinct lifecycle stage in the Capability Host maintained example. */
+function describeCapabilityHostStage(segment: string, locale: ILocale): string | undefined {
+  if (/\bconst\s+host\s*=\s*createCapabilityHost\s*\(/.test(segment))
+    return locale === 'zh'
+      ? 'host 隔离 tenantId 对应的能力状态；flags.persistence 只允许这一项能力启用，onError 把激活与释放失败交给应用诊断系统。修改传入的 flags 对象不会改变已经创建的 Host。'
+      : 'host isolates capability state for this tenantId. flags.persistence admits only that capability, while onError forwards activation and release failures to application diagnostics. Mutating the input flags later does not change the created Host.'
+  if (/\bhost\.register\s*\(/.test(segment))
+    return locale === 'zh'
+      ? "这里仅登记 persistence 的启动方法，并不会立即下载或打开存储；enable('persistence') 真正执行时才动态导入实现，并用当前 Host 的 tenantId 创建 handle。"
+      : "This only registers how persistence starts; it neither downloads nor opens storage yet. The implementation is dynamically imported and receives this Host's tenantId only when enable('persistence') runs."
+  if (/\bhost\.enable\s*\(/.test(segment) && /\bhost\.dispose\s*\(/.test(segment))
+    return locale === 'zh'
+      ? "enable('persistence') 返回结构化状态；只有 enabled 才能从 handle('persistence') 取得已激活对象并调用 sync()。finally 中 dispose() 会作废在途激活并释放已经打开或迟到返回的 handle。"
+      : "enable('persistence') returns a structured status. Only enabled permits handle('persistence') to expose the activated object for sync(). The finally block invalidates in-flight activation and releases both current and late handles."
+  return undefined
+}
+
+/** Builds one API-specific explanation from maintained prose and identifiers visible in the code. */
+function describeMaintainedApiExample(
+  fullCode: string,
   segment: string,
+  context: IExampleCommentaryContext,
   locale: ILocale
-): string | undefined {
+): string {
+  if (context.kind === 'signature') return describeApiSignature(fullCode, context, locale)
+  /** Assignment name tells the reader which value carries this API's result. */
+  const resultName = segment.match(/\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=/)?.[1]
+  /** Later method names show how the returned owner is consumed or released. */
+  const methods = resultName
+    ? [...fullCode.matchAll(new RegExp(`\\b${resultName}\\.([A-Za-z_$][\\w$]*)\\s*\\(`, 'g'))]
+        .map((match) => match[1])
+        .filter((method, index, values) => values.indexOf(method) === index)
+    : []
+  const resultUse = resultName
+    ? locale === 'zh'
+      ? `${resultName} 保存 ${context.apiName}() 返回的本次实例${methods.length > 0 ? `，后续通过 ${methods.map((method) => `${method}()`).join('、')} 消费或结束它` : ''}。`
+      : `${resultName} holds this ${context.apiName}() result${methods.length > 0 ? `; later ${methods.map((method) => `${method}()`).join(', ')} calls consume or close it` : ''}.`
+    : locale === 'zh'
+      ? `这里直接执行 ${context.apiName}()，没有创建可供后续复用的实例。`
+      : `This invokes ${context.apiName}() directly without creating a reusable instance.`
+  if (locale === 'zh')
+    return `${resultUse}${context.purpose}${context.scenario ? ` 本例对应的生产场景是：${context.scenario}` : ''}`
+  return `${resultUse}${context.purpose}${context.scenario ? ` The production situation shown here is: ${context.scenario}` : ''}`
+}
+
+/** Explains how callers should read a declaration or overload set without narrating syntax. */
+function describeApiSignature(
+  code: string,
+  context: IExampleCommentaryContext,
+  locale: ILocale
+): string {
+  /** Repeated declarations of the same callable form its public overload set. */
+  const overloadCount = [
+    ...code.matchAll(new RegExp(`\\b(?:function|constructor)\\s+${context.apiName}\\b`, 'g'))
+  ].length
+  /** Only names backed by the extracted public contract are mentioned to readers. */
+  const inputs =
+    context.parameterNames
+      ?.filter((name) => name.trim().length > 0)
+      .filter((name, index, names) => names.indexOf(name) === index) ?? []
+  const inputText = inputs.length > 0 ? inputs.map((name) => `\`${name}\``).join('、') : undefined
+  if (locale === 'zh') {
+    if (overloadCount > 1)
+      return `${context.apiName} 共有 ${overloadCount} 个公开重载；它们是同一函数针对不同参数组合的类型分支。TypeScript 会根据调用时传入的${inputText ?? '参数'}选择匹配分支，并推导泛型与返回类型；调用方不需要手动选择某一行。`
+    return `这是 ${context.apiName} 的编译期契约，不是另一种调用写法。${inputText ? `调用方通过 ${inputText} 传入数据；` : ''}可选标记、泛型约束与返回类型共同限定哪些调用能够通过类型检查。`
+  }
+  if (overloadCount > 1)
+    return `${context.apiName} exposes ${overloadCount} overloads: type branches of the same function for different argument combinations. TypeScript selects a branch from the supplied ${inputs.join(', ') || 'arguments'} and infers its generics and return type; callers do not select a declaration manually.`
+  return `This is the compile-time contract for ${context.apiName}, not another invocation form. ${inputs.length > 0 ? `${inputs.join(', ')} are its public inputs; ` : ''}optional markers, generic constraints, and the return type determine which calls type-check.`
+}
+
+/** Describes why a logical code segment exists rather than merely repeating its syntax. */
+function describeSegment(segment: string, locale: ILocale): string | undefined {
   /** Comment-only file labels do not determine the behavior of the following statements. */
   const executable = segment
     .split('\n')
@@ -65,7 +167,9 @@ function describeSegment(
       : 'This returns the same value as Date.now(); reading through IUtilsScheduler lets tests replace now() and schedule() together with a virtual clock. Use Date.now() for ordinary wall-clock reads and scheduler.now() inside injectable scheduling logic.'
   if (/\bcreateAbortTimeoutSignal\s*\(/.test(executable)) {
     /** Assigned handle name makes the generated explanation traceable to this exact example. */
-    const handle = executable.match(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*createAbortTimeoutSignal/)?.[1]
+    const handle = executable.match(
+      /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*createAbortTimeoutSignal/
+    )?.[1]
     /** Literal deadline is quoted only when the example exposes one. */
     const timeoutMs = executable.match(/\btimeoutMs\s*:\s*([\d_]+)/)?.[1]
     const handleName = handle ?? '返回对象'
@@ -105,9 +209,7 @@ function describeSegment(
     return locale === 'zh'
       ? '这个查询会先读取一次结果；匹配的数据发生变化时自动重跑。ready 等首次结果，refresh 手动刷新，dispose 停止监听。'
       : 'This query reads once, then reruns when matching data changes. ready waits for the first result, refresh reruns manually, and dispose stops listening.'
-  if (
-    /\b(?:localStorage|createManualScheduler)\s*\(/.test(executable)
-  )
+  if (/\b(?:localStorage|createManualScheduler)\s*\(/.test(executable))
     return describeConstruction(executable, locale)
   return undefined
 }
@@ -124,10 +226,7 @@ function describeConstruction(executable: string, locale: ILocale): string | und
 }
 
 /** Explains the concrete namespace and owner visible in a Local Storage example. */
-function describeLocalStorageConstruction(
-  executable: string,
-  locale: ILocale
-): string | undefined {
+function describeLocalStorageConstruction(executable: string, locale: ILocale): string | undefined {
   /** Variable name identifies which object owns the generated backend resources. */
   const owner = executable.match(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*localStorage/)?.[1]
   /** Namespace literal identifies the exact key partition used by the example. */
