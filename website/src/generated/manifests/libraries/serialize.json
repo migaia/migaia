@@ -4,7 +4,18 @@
     "slug": "serialize",
     "description": "Store-neutral chunked serialization and codec registry.",
     "version": "0.0.4",
-    "exports": [".", "./core", "./plugins", "./registry"],
+    "exports": [
+      ".",
+      "./codec",
+      "./codecs/cbor",
+      "./codecs/identity",
+      "./codecs/json",
+      "./codecs/message-pack",
+      "./codecs/protobuf",
+      "./core",
+      "./plugins",
+      "./registry"
+    ],
     "documentation": {
       "readme": {
         "sections": [
@@ -1476,6 +1487,16 @@
                 "text": "Q：`base64ToBytes` 抛错时 `error.cause` 是 `undefined`，看不到底层失败原因。 这是刻意行为：`base64ToBytes` 捕获任意底层解析失败后统一抛出一个不带 `cause` 的 `TypeError`／`INVALID_OPTION`（\"invalid base64 input\"），不透传底层实现细节。"
               }
             ]
+          },
+          {
+            "id": "versioned-codec-boundaries",
+            "heading": "Versioned codec boundaries",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`@migaia/serialize/codec` defines the generic `ICodec<TValue, TEncoded, TId, TVersion>` shape and its identity implementation. Format implementations are intentionally split: `codecs/json`, `codecs/message-pack`, `codecs/cbor`, and `codecs/protobuf`. Importing the generic or identity path does not load binary format runtimes."
+              }
+            ]
           }
         ]
       }
@@ -1515,6 +1536,7 @@
           "examples": [
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  isChunkShape,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  SERIALIZE_SOURCE,\n  SerializeCodecError,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  jsonPlugin,\n  jsonParser,\n  SerializeChunkKind,\n  SerializeOutput,\n  SerializePhase,\n  SerializeCleanupPolicy,\n  SerializeCleanupKind,\n  SerializePluginType,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type ISerializeAbortSignal,\n  type ITextEncoder,\n  type ITextDecoder,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions,\n  type IJsonPluginOptions,\n  type ISerializeChunkKind,\n  type ISerializeOutputFormat,\n  type ISerializeCleanupPolicy,\n  type ISerializeCleanupKind,\n  type ISerializePluginType\n} from '@migaia/serialize';"
           ],
+          "members": [],
           "aliasOf": "ISerializeChunkKind",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1580,6 +1602,7 @@
           "examples": [
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  isChunkShape,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  SERIALIZE_SOURCE,\n  SerializeCodecError,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  jsonPlugin,\n  jsonParser,\n  SerializeChunkKind,\n  SerializeOutput,\n  SerializePhase,\n  SerializeCleanupPolicy,\n  SerializeCleanupKind,\n  SerializePluginType,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type ISerializeAbortSignal,\n  type ITextEncoder,\n  type ITextDecoder,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions,\n  type IJsonPluginOptions,\n  type ISerializeChunkKind,\n  type ISerializeOutputFormat,\n  type ISerializeCleanupPolicy,\n  type ISerializeCleanupKind,\n  type ISerializePluginType\n} from '@migaia/serialize';"
           ],
+          "members": [],
           "aliasOf": "ISerializeCleanupKind",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1645,6 +1668,7 @@
           "examples": [
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  isChunkShape,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  SERIALIZE_SOURCE,\n  SerializeCodecError,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  jsonPlugin,\n  jsonParser,\n  SerializeChunkKind,\n  SerializeOutput,\n  SerializePhase,\n  SerializeCleanupPolicy,\n  SerializeCleanupKind,\n  SerializePluginType,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type ISerializeAbortSignal,\n  type ITextEncoder,\n  type ITextDecoder,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions,\n  type IJsonPluginOptions,\n  type ISerializeChunkKind,\n  type ISerializeOutputFormat,\n  type ISerializeCleanupPolicy,\n  type ISerializeCleanupKind,\n  type ISerializePluginType\n} from '@migaia/serialize';"
           ],
+          "members": [],
           "aliasOf": "ISerializeCleanupPolicy",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1710,6 +1734,7 @@
           "examples": [
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  isChunkShape,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  SERIALIZE_SOURCE,\n  SerializeCodecError,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  jsonPlugin,\n  jsonParser,\n  SerializeChunkKind,\n  SerializeOutput,\n  SerializePhase,\n  SerializeCleanupPolicy,\n  SerializeCleanupKind,\n  SerializePluginType,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type ISerializeAbortSignal,\n  type ITextEncoder,\n  type ITextDecoder,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions,\n  type IJsonPluginOptions,\n  type ISerializeChunkKind,\n  type ISerializeOutputFormat,\n  type ISerializeCleanupPolicy,\n  type ISerializeCleanupKind,\n  type ISerializePluginType\n} from '@migaia/serialize';"
           ],
+          "members": [],
           "aliasOf": "ISerializeOutputFormat",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1777,6 +1802,7 @@
             "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeScheduler,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';",
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';"
           ],
+          "members": [],
           "aliasOf": "ISerializePhase",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1842,6 +1868,7 @@
           "examples": [
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  isChunkShape,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  SERIALIZE_SOURCE,\n  SerializeCodecError,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  jsonPlugin,\n  jsonParser,\n  SerializeChunkKind,\n  SerializeOutput,\n  SerializePhase,\n  SerializeCleanupPolicy,\n  SerializeCleanupKind,\n  SerializePluginType,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type ISerializeAbortSignal,\n  type ITextEncoder,\n  type ITextDecoder,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions,\n  type IJsonPluginOptions,\n  type ISerializeChunkKind,\n  type ISerializeOutputFormat,\n  type ISerializeCleanupPolicy,\n  type ISerializeCleanupKind,\n  type ISerializePluginType\n} from '@migaia/serialize';"
           ],
+          "members": [],
           "aliasOf": "ISerializePluginType",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1910,6 +1937,7 @@
             "if (chunk[0] === SerializeChunkKind.bytes) {\n  /* ... */\n}",
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  jsonPlugin,\n  jsonParser,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  SerializeCodecError,\n  SerializeErrorCode,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  tagSerializeError,\n  isChunkShape,\n  SerializeChunkKind\n} from '@migaia/serialize';"
           ],
+          "members": [],
           "aliasOf": "SerializeChunkKind",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1976,6 +2004,7 @@
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  isChunkShape,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  SERIALIZE_SOURCE,\n  SerializeCodecError,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  jsonPlugin,\n  jsonParser,\n  SerializeChunkKind,\n  SerializeOutput,\n  SerializePhase,\n  SerializeCleanupPolicy,\n  SerializeCleanupKind,\n  SerializePluginType,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type ISerializeAbortSignal,\n  type ITextEncoder,\n  type ITextDecoder,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions,\n  type IJsonPluginOptions,\n  type ISerializeChunkKind,\n  type ISerializeOutputFormat,\n  type ISerializeCleanupPolicy,\n  type ISerializeCleanupKind,\n  type ISerializePluginType\n} from '@migaia/serialize';",
             "const SerializeChunkKind: {\n  readonly value: 'value';\n  readonly text: 'text';\n  readonly bytes: 'bytes';\n};\nconst SerializeOutput: {\n  readonly text: 'text';\n  readonly structured: 'structured';\n  readonly binary: 'binary';\n};\nconst SerializePhase: { readonly encode: 'encode'; readonly decode: 'decode' };\nconst SerializeCleanupPolicy: { readonly throw: 'throw'; readonly report: 'report' };\nconst SerializeCleanupKind: {\n  readonly cleanupError: 'cleanup-error';\n  readonly drainTimeout: 'drain-timeout';\n};\nconst SerializePluginType: { readonly json: 'json' };"
           ],
+          "members": [],
           "aliasOf": "SerializeCleanupKind",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2042,6 +2071,7 @@
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  isChunkShape,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  SERIALIZE_SOURCE,\n  SerializeCodecError,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  jsonPlugin,\n  jsonParser,\n  SerializeChunkKind,\n  SerializeOutput,\n  SerializePhase,\n  SerializeCleanupPolicy,\n  SerializeCleanupKind,\n  SerializePluginType,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type ISerializeAbortSignal,\n  type ITextEncoder,\n  type ITextDecoder,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions,\n  type IJsonPluginOptions,\n  type ISerializeChunkKind,\n  type ISerializeOutputFormat,\n  type ISerializeCleanupPolicy,\n  type ISerializeCleanupKind,\n  type ISerializePluginType\n} from '@migaia/serialize';",
             "const SerializeChunkKind: {\n  readonly value: 'value';\n  readonly text: 'text';\n  readonly bytes: 'bytes';\n};\nconst SerializeOutput: {\n  readonly text: 'text';\n  readonly structured: 'structured';\n  readonly binary: 'binary';\n};\nconst SerializePhase: { readonly encode: 'encode'; readonly decode: 'decode' };\nconst SerializeCleanupPolicy: { readonly throw: 'throw'; readonly report: 'report' };\nconst SerializeCleanupKind: {\n  readonly cleanupError: 'cleanup-error';\n  readonly drainTimeout: 'drain-timeout';\n};\nconst SerializePluginType: { readonly json: 'json' };"
           ],
+          "members": [],
           "aliasOf": "SerializeCleanupPolicy",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2108,6 +2138,7 @@
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  isChunkShape,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  SERIALIZE_SOURCE,\n  SerializeCodecError,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  jsonPlugin,\n  jsonParser,\n  SerializeChunkKind,\n  SerializeOutput,\n  SerializePhase,\n  SerializeCleanupPolicy,\n  SerializeCleanupKind,\n  SerializePluginType,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type ISerializeAbortSignal,\n  type ITextEncoder,\n  type ITextDecoder,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions,\n  type IJsonPluginOptions,\n  type ISerializeChunkKind,\n  type ISerializeOutputFormat,\n  type ISerializeCleanupPolicy,\n  type ISerializeCleanupKind,\n  type ISerializePluginType\n} from '@migaia/serialize';",
             "const SerializeChunkKind: {\n  readonly value: 'value';\n  readonly text: 'text';\n  readonly bytes: 'bytes';\n};\nconst SerializeOutput: {\n  readonly text: 'text';\n  readonly structured: 'structured';\n  readonly binary: 'binary';\n};\nconst SerializePhase: { readonly encode: 'encode'; readonly decode: 'decode' };\nconst SerializeCleanupPolicy: { readonly throw: 'throw'; readonly report: 'report' };\nconst SerializeCleanupKind: {\n  readonly cleanupError: 'cleanup-error';\n  readonly drainTimeout: 'drain-timeout';\n};\nconst SerializePluginType: { readonly json: 'json' };"
           ],
+          "members": [],
           "aliasOf": "SerializeOutput",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2174,6 +2205,7 @@
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  isChunkShape,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  SERIALIZE_SOURCE,\n  SerializeCodecError,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  jsonPlugin,\n  jsonParser,\n  SerializeChunkKind,\n  SerializeOutput,\n  SerializePhase,\n  SerializeCleanupPolicy,\n  SerializeCleanupKind,\n  SerializePluginType,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type ISerializeAbortSignal,\n  type ITextEncoder,\n  type ITextDecoder,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions,\n  type IJsonPluginOptions,\n  type ISerializeChunkKind,\n  type ISerializeOutputFormat,\n  type ISerializeCleanupPolicy,\n  type ISerializeCleanupKind,\n  type ISerializePluginType\n} from '@migaia/serialize';",
             "const SerializeChunkKind: {\n  readonly value: 'value';\n  readonly text: 'text';\n  readonly bytes: 'bytes';\n};\nconst SerializeOutput: {\n  readonly text: 'text';\n  readonly structured: 'structured';\n  readonly binary: 'binary';\n};\nconst SerializePhase: { readonly encode: 'encode'; readonly decode: 'decode' };\nconst SerializeCleanupPolicy: { readonly throw: 'throw'; readonly report: 'report' };\nconst SerializeCleanupKind: {\n  readonly cleanupError: 'cleanup-error';\n  readonly drainTimeout: 'drain-timeout';\n};\nconst SerializePluginType: { readonly json: 'json' };"
           ],
+          "members": [],
           "aliasOf": "SerializePhase",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2240,6 +2272,7 @@
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  isChunkShape,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  SERIALIZE_SOURCE,\n  SerializeCodecError,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  jsonPlugin,\n  jsonParser,\n  SerializeChunkKind,\n  SerializeOutput,\n  SerializePhase,\n  SerializeCleanupPolicy,\n  SerializeCleanupKind,\n  SerializePluginType,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type ISerializeAbortSignal,\n  type ITextEncoder,\n  type ITextDecoder,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions,\n  type IJsonPluginOptions,\n  type ISerializeChunkKind,\n  type ISerializeOutputFormat,\n  type ISerializeCleanupPolicy,\n  type ISerializeCleanupKind,\n  type ISerializePluginType\n} from '@migaia/serialize';",
             "const SerializeChunkKind: {\n  readonly value: 'value';\n  readonly text: 'text';\n  readonly bytes: 'bytes';\n};\nconst SerializeOutput: {\n  readonly text: 'text';\n  readonly structured: 'structured';\n  readonly binary: 'binary';\n};\nconst SerializePhase: { readonly encode: 'encode'; readonly decode: 'decode' };\nconst SerializeCleanupPolicy: { readonly throw: 'throw'; readonly report: 'report' };\nconst SerializeCleanupKind: {\n  readonly cleanupError: 'cleanup-error';\n  readonly drainTimeout: 'drain-timeout';\n};\nconst SerializePluginType: { readonly json: 'json' };"
           ],
+          "members": [],
           "aliasOf": "SerializePluginType",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2409,6 +2442,26 @@
           "ownerExportPath": "./core",
           "ownerModule": "core",
           "ownerFragment": "serialize-core--encodeStream"
+        },
+        {
+          "identity": "packages/serialize/dist/codec.d.ts:ICodec:export type ICodec<TValue, TEncoded, TId extends string = string, TVersion extends number = number> = Readonly<{ id: TId; version: TVersion; encodedType: 'unknown' | 'string' | 'uint8array'; encode: (value: TValue) => TEncoded; decode: (value: TEncoded) => TValue; }>;",
+          "name": "ICodec",
+          "signature": "export type ICodec<TValue, TEncoded, TId extends string = string, TVersion extends number = number> = Readonly<{ id: TId; version: TVersion; encodedType: 'unknown' | 'string' | 'uint8array'; encode: (value: TValue) => TEncoded; decode: (value: TEncoded) => TValue; }>;",
+          "source": "packages/serialize/dist/codec.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./codec",
+          "ownerModule": "codec",
+          "ownerFragment": "serialize-codec--ICodec"
+        },
+        {
+          "identity": "packages/serialize/dist/codec.d.ts:ICodecValue:export type ICodecValue = null | boolean | number | string | readonly ICodecValue[] | Readonly<{ [key: string]: ICodecValue; }>;",
+          "name": "ICodecValue",
+          "signature": "export type ICodecValue = null | boolean | number | string | readonly ICodecValue[] | Readonly<{ [key: string]: ICodecValue; }>;",
+          "source": "packages/serialize/dist/codec.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./codec",
+          "ownerModule": "codec",
+          "ownerFragment": "serialize-codec--ICodecValue"
         },
         {
           "identity": "packages/serialize/dist/stream.d.ts:ICollectStreamOptions:export type ICollectStreamOptions = { readonly signal?: ISerializeAbortSignal; /** Chooses whether an empty stream returns empty text or rejects; defaults to `text`. */ readonly empty?: 'text' | 'reject'; readonly context?: string; };",
@@ -2733,6 +2786,1603 @@
       ]
     },
     {
+      "id": "serialize:codec",
+      "library": "serialize",
+      "module": "codec",
+      "exportPath": "./codec",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/serialize/getting-started",
+      "architecturePath": "/en/architecture/serialize",
+      "symbols": [
+        {
+          "name": "asCodecValue",
+          "kind": "function",
+          "signature": "export declare function asCodecValue(value: unknown): ICodecValue;",
+          "declarationLine": 29,
+          "source": "packages/serialize/dist/codec.d.ts",
+          "purpose": "Validate and narrow a decoded format value before it crosses the codec boundary.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for asCodecValue.",
+          "advanced": "No additional advanced behavior is declared for asCodecValue.",
+          "parameters": ["value: unknown"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "unknown",
+              "optional": false
+            }
+          ],
+          "returns": "ICodecValue",
+          "errors": ["No documented errors are declared for asCodecValue."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for asCodecValue.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codec",
+          "overloadSignatures": [
+            "export declare function asCodecValue(value: unknown): ICodecValue;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "unknown",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["ICodecValue"],
+          "whenToUse": "Use asCodecValue when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when asCodecValue does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Validate and narrow a decoded format value before it crosses the codec boundary."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import asCodecValue from @migaia/serialize/codec, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use asCodecValue when its function contract and declared inputs match the result you need. Choose a different public symbol when asCodecValue does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for asCodecValue."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for asCodecValue."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codec.d.ts:asCodecValue:export declare function asCodecValue(value: unknown): ICodecValue;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codec--asCodecValue"
+        },
+        {
+          "name": "assertCodecVersion",
+          "kind": "function",
+          "signature": "export declare function assertCodecVersion<const TVersion extends number>(version: TVersion): TVersion;",
+          "declarationLine": 33,
+          "source": "packages/serialize/dist/codec.d.ts",
+          "purpose": "Validate format version and retain its literal type for factory callers.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertCodecVersion.",
+          "advanced": "No additional advanced behavior is declared for assertCodecVersion.",
+          "parameters": ["version: TVersion"],
+          "parameterDetails": [
+            {
+              "name": "version",
+              "type": "TVersion",
+              "optional": false
+            }
+          ],
+          "returns": "TVersion",
+          "errors": ["No documented errors are declared for assertCodecVersion."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertCodecVersion.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codec",
+          "overloadSignatures": [
+            "export declare function assertCodecVersion<const TVersion extends number>(version: TVersion): TVersion;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "version",
+                "type": "TVersion",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["TVersion"],
+          "whenToUse": "Use assertCodecVersion when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when assertCodecVersion does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Validate format version and retain its literal type for factory callers."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import assertCodecVersion from @migaia/serialize/codec, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use assertCodecVersion when its function contract and declared inputs match the result you need. Choose a different public symbol when assertCodecVersion does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertCodecVersion."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for assertCodecVersion."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codec.d.ts:assertCodecVersion:export declare function assertCodecVersion<const TVersion extends number>(version: TVersion): TVersion;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codec--assertCodecVersion"
+        },
+        {
+          "name": "assertPortableValue",
+          "kind": "function",
+          "signature": "export declare function assertPortableValue(value: unknown, active?: Set<object>): void;",
+          "declarationLine": 27,
+          "source": "packages/serialize/dist/codec.d.ts",
+          "purpose": "Assert JSON-compatible portable data without importing the RPC contract module.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertPortableValue.",
+          "advanced": "No additional advanced behavior is declared for assertPortableValue.",
+          "parameters": ["value: unknown", "active: Set<object> (optional)"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "unknown",
+              "optional": false
+            },
+            {
+              "name": "active",
+              "type": "Set<object>",
+              "optional": true
+            }
+          ],
+          "returns": "void",
+          "errors": ["No documented errors are declared for assertPortableValue."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertPortableValue.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codec",
+          "overloadSignatures": [
+            "export declare function assertPortableValue(value: unknown, active?: Set<object>): void;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "unknown",
+                "optional": false
+              },
+              {
+                "name": "active",
+                "type": "Set<object>",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["void"],
+          "whenToUse": "Use assertPortableValue when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when assertPortableValue does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Assert JSON-compatible portable data without importing the RPC contract module."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import assertPortableValue from @migaia/serialize/codec, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use assertPortableValue when its function contract and declared inputs match the result you need. Choose a different public symbol when assertPortableValue does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertPortableValue."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for assertPortableValue."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codec.d.ts:assertPortableValue:export declare function assertPortableValue(value: unknown, active?: Set<object>): void;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codec--assertPortableValue"
+        },
+        {
+          "name": "CodecErrorText",
+          "kind": "const",
+          "signature": "export declare const CodecErrorText: { readonly invalidVersion: \"serialize codec version must be a positive safe integer\"; readonly invalidSchema: \"serialize protobuf schema descriptor is invalid\"; readonly encodeFailed: \"serialize codec encode failed\"; readonly decodeFailed: \"serialize codec decode failed\"; readonly portableValueInvalid: \"serialize codec value is outside the portable profile\"; };",
+          "declarationLine": 17,
+          "source": "packages/serialize/dist/codec.d.ts",
+          "purpose": "Stable codec diagnostics shared by all format-specific implementations.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for CodecErrorText.",
+          "advanced": "No additional advanced behavior is declared for CodecErrorText.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for CodecErrorText."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for CodecErrorText.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codec",
+          "overloadSignatures": [
+            "export declare const CodecErrorText: { readonly invalidVersion: \"serialize codec version must be a positive safe integer\"; readonly invalidSchema: \"serialize protobuf schema descriptor is invalid\"; readonly encodeFailed: \"serialize codec encode failed\"; readonly decodeFailed: \"serialize codec decode failed\"; readonly portableValueInvalid: \"serialize codec value is outside the portable profile\"; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use CodecErrorText when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when CodecErrorText does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Stable codec diagnostics shared by all format-specific implementations."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import CodecErrorText from @migaia/serialize/codec, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use CodecErrorText when its const contract and declared inputs match the result you need. Choose a different public symbol when CodecErrorText does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for CodecErrorText."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for CodecErrorText."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codec.d.ts:CodecErrorText:export declare const CodecErrorText: { readonly invalidVersion: \"serialize codec version must be a positive safe integer\"; readonly invalidSchema: \"serialize protobuf schema descriptor is invalid\"; readonly encodeFailed: \"serialize codec encode failed\"; readonly decodeFailed: \"serialize codec decode failed\"; readonly portableValueInvalid: \"serialize codec value is outside the portable profile\"; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codec--CodecErrorText"
+        },
+        {
+          "name": "createCodecError",
+          "kind": "function",
+          "signature": "export declare function createCodecError(code: (typeof SerializeErrorCode)[keyof typeof SerializeErrorCode], message: string, cause?: unknown): Error;",
+          "declarationLine": 25,
+          "source": "packages/serialize/dist/codec.d.ts",
+          "purpose": "Construct a native error with module identity while retaining the original cause.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createCodecError.",
+          "advanced": "No additional advanced behavior is declared for createCodecError.",
+          "parameters": [
+            "code: (typeof SerializeErrorCode)[keyof typeof SerializeErrorCode]",
+            "message: string",
+            "cause: unknown (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "code",
+              "type": "(typeof SerializeErrorCode)[keyof typeof SerializeErrorCode]",
+              "optional": false
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "optional": false
+            },
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true
+            }
+          ],
+          "returns": "Error",
+          "errors": ["No documented errors are declared for createCodecError."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createCodecError.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codec",
+          "overloadSignatures": [
+            "export declare function createCodecError(code: (typeof SerializeErrorCode)[keyof typeof SerializeErrorCode], message: string, cause?: unknown): Error;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "code",
+                "type": "(typeof SerializeErrorCode)[keyof typeof SerializeErrorCode]",
+                "optional": false
+              },
+              {
+                "name": "message",
+                "type": "string",
+                "optional": false
+              },
+              {
+                "name": "cause",
+                "type": "unknown",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["Error"],
+          "whenToUse": "Use createCodecError when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createCodecError does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Construct a native error with module identity while retaining the original cause."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createCodecError from @migaia/serialize/codec, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createCodecError when its function contract and declared inputs match the result you need. Choose a different public symbol when createCodecError does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createCodecError."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createCodecError."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codec.d.ts:createCodecError:export declare function createCodecError(code: (typeof SerializeErrorCode)[keyof typeof SerializeErrorCode], message: string, cause?: unknown): Error;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codec--createCodecError"
+        },
+        {
+          "name": "ICodec",
+          "kind": "type",
+          "signature": "export type ICodec<TValue, TEncoded, TId extends string = string, TVersion extends number = number> = Readonly<{ id: TId; version: TVersion; encodedType: 'unknown' | 'string' | 'uint8array'; encode: (value: TValue) => TEncoded; decode: (value: TEncoded) => TValue; }>;",
+          "declarationLine": 3,
+          "source": "packages/serialize/dist/codec.d.ts",
+          "purpose": "Generic codec contract; callback properties preserve strict function variance.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICodec.",
+          "advanced": "No additional advanced behavior is declared for ICodec.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ICodec."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICodec.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codec",
+          "overloadSignatures": [
+            "export type ICodec<TValue, TEncoded, TId extends string = string, TVersion extends number = number> = Readonly<{ id: TId; version: TVersion; encodedType: 'unknown' | 'string' | 'uint8array'; encode: (value: TValue) => TEncoded; decode: (value: TEncoded) => TValue; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ICodec when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ICodec does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Generic codec contract; callback properties preserve strict function variance."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICodec from @migaia/serialize/codec, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICodec when its type contract and declared inputs match the result you need. Choose a different public symbol when ICodec does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICodec."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ICodec."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codec.d.ts:ICodec:export type ICodec<TValue, TEncoded, TId extends string = string, TVersion extends number = number> = Readonly<{ id: TId; version: TVersion; encodedType: 'unknown' | 'string' | 'uint8array'; encode: (value: TValue) => TEncoded; decode: (value: TEncoded) => TValue; }>;",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "serialize-codec--ICodec"
+        },
+        {
+          "name": "ICodecValue",
+          "kind": "type",
+          "signature": "export type ICodecValue = null | boolean | number | string | readonly ICodecValue[] | Readonly<{ [key: string]: ICodecValue; }>;",
+          "declarationLine": 11,
+          "source": "packages/serialize/dist/codec.d.ts",
+          "purpose": "Runtime-neutral portable input accepted by the built-in format codecs.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICodecValue.",
+          "advanced": "No additional advanced behavior is declared for ICodecValue.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ICodecValue."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICodecValue.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codec",
+          "overloadSignatures": [
+            "export type ICodecValue = null | boolean | number | string | readonly ICodecValue[] | Readonly<{ [key: string]: ICodecValue; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ICodecValue when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ICodecValue does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Runtime-neutral portable input accepted by the built-in format codecs."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICodecValue from @migaia/serialize/codec, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICodecValue when its type contract and declared inputs match the result you need. Choose a different public symbol when ICodecValue does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICodecValue."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ICodecValue."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codec.d.ts:ICodecValue:export type ICodecValue = null | boolean | number | string | readonly ICodecValue[] | Readonly<{ [key: string]: ICodecValue; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codec--ICodecValue"
+        },
+        {
+          "name": "normalizeCodecFailure",
+          "kind": "function",
+          "signature": "export declare function normalizeCodecFailure(error: unknown, code: (typeof SerializeErrorCode)[keyof typeof SerializeErrorCode], message: string): Error;",
+          "declarationLine": 35,
+          "source": "packages/serialize/dist/codec.d.ts",
+          "purpose": "Wraps a format callback while retaining the module error code and original cause.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizeCodecFailure.",
+          "advanced": "No additional advanced behavior is declared for normalizeCodecFailure.",
+          "parameters": [
+            "error: unknown",
+            "code: (typeof SerializeErrorCode)[keyof typeof SerializeErrorCode]",
+            "message: string"
+          ],
+          "parameterDetails": [
+            {
+              "name": "error",
+              "type": "unknown",
+              "optional": false
+            },
+            {
+              "name": "code",
+              "type": "(typeof SerializeErrorCode)[keyof typeof SerializeErrorCode]",
+              "optional": false
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "optional": false
+            }
+          ],
+          "returns": "Error",
+          "errors": ["No documented errors are declared for normalizeCodecFailure."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for normalizeCodecFailure.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codec",
+          "overloadSignatures": [
+            "export declare function normalizeCodecFailure(error: unknown, code: (typeof SerializeErrorCode)[keyof typeof SerializeErrorCode], message: string): Error;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "error",
+                "type": "unknown",
+                "optional": false
+              },
+              {
+                "name": "code",
+                "type": "(typeof SerializeErrorCode)[keyof typeof SerializeErrorCode]",
+                "optional": false
+              },
+              {
+                "name": "message",
+                "type": "string",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["Error"],
+          "whenToUse": "Use normalizeCodecFailure when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when normalizeCodecFailure does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Wraps a format callback while retaining the module error code and original cause."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import normalizeCodecFailure from @migaia/serialize/codec, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use normalizeCodecFailure when its function contract and declared inputs match the result you need. Choose a different public symbol when normalizeCodecFailure does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizeCodecFailure."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for normalizeCodecFailure."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codec.d.ts:normalizeCodecFailure:export declare function normalizeCodecFailure(error: unknown, code: (typeof SerializeErrorCode)[keyof typeof SerializeErrorCode], message: string): Error;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codec--normalizeCodecFailure"
+        },
+        {
+          "name": "toPortableValue",
+          "kind": "function",
+          "signature": "export declare function toPortableValue(value: unknown, active?: Set<object>): unknown;",
+          "declarationLine": 31,
+          "source": "packages/serialize/dist/codec.d.ts",
+          "purpose": "Converts runtime byte views to the portable tagged representation without host APIs.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for toPortableValue.",
+          "advanced": "No additional advanced behavior is declared for toPortableValue.",
+          "parameters": ["value: unknown", "active: Set<object> (optional)"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "unknown",
+              "optional": false
+            },
+            {
+              "name": "active",
+              "type": "Set<object>",
+              "optional": true
+            }
+          ],
+          "returns": "unknown",
+          "errors": ["No documented errors are declared for toPortableValue."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for toPortableValue.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codec",
+          "overloadSignatures": [
+            "export declare function toPortableValue(value: unknown, active?: Set<object>): unknown;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "unknown",
+                "optional": false
+              },
+              {
+                "name": "active",
+                "type": "Set<object>",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["unknown"],
+          "whenToUse": "Use toPortableValue when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when toPortableValue does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Converts runtime byte views to the portable tagged representation without host APIs."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import toPortableValue from @migaia/serialize/codec, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use toPortableValue when its function contract and declared inputs match the result you need. Choose a different public symbol when toPortableValue does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for toPortableValue."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for toPortableValue."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codec.d.ts:toPortableValue:export declare function toPortableValue(value: unknown, active?: Set<object>): unknown;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codec--toPortableValue"
+        }
+      ],
+      "aliases": [
+        {
+          "identity": "packages/serialize/dist/codecs/identity.d.ts:identityCodecV1:export declare const identityCodecV1: ICodec<unknown, unknown, 'identity', 1>;",
+          "name": "identityCodecV1",
+          "signature": "export declare const identityCodecV1: ICodec<unknown, unknown, 'identity', 1>;",
+          "source": "packages/serialize/dist/codecs/identity.d.ts",
+          "exportPath": "./codec",
+          "ownerExportPath": "./codecs/identity",
+          "ownerModule": "codecs/identity",
+          "ownerFragment": "serialize-codecs/identity--identityCodecV1"
+        }
+      ]
+    },
+    {
+      "id": "serialize:codecs/cbor",
+      "library": "serialize",
+      "module": "codecs/cbor",
+      "exportPath": "./codecs/cbor",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/serialize/getting-started",
+      "architecturePath": "/en/architecture/serialize",
+      "symbols": [
+        {
+          "name": "defineCBORCodec",
+          "kind": "function",
+          "signature": "export declare function defineCBORCodec<const TVersion extends number>(options: ICborCodecOptions<TVersion>): ICodec<ICodecValue, Uint8Array, 'cbor', TVersion>;",
+          "declarationLine": 7,
+          "source": "packages/serialize/dist/codecs/cbor.d.ts",
+          "purpose": "Create an RFC-compatible CBOR codec for portable values.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineCBORCodec.",
+          "advanced": "No additional advanced behavior is declared for defineCBORCodec.",
+          "parameters": ["options: ICborCodecOptions<TVersion>"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "ICborCodecOptions<TVersion>",
+              "optional": false
+            }
+          ],
+          "returns": "ICodec<ICodecValue, Uint8Array, 'cbor', TVersion>",
+          "errors": ["No documented errors are declared for defineCBORCodec."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineCBORCodec.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codecs/cbor",
+          "overloadSignatures": [
+            "export declare function defineCBORCodec<const TVersion extends number>(options: ICborCodecOptions<TVersion>): ICodec<ICodecValue, Uint8Array, 'cbor', TVersion>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "ICborCodecOptions<TVersion>",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["ICodec<ICodecValue, Uint8Array, 'cbor', TVersion>"],
+          "whenToUse": "Use defineCBORCodec when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when defineCBORCodec does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Create an RFC-compatible CBOR codec for portable values."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import defineCBORCodec from @migaia/serialize/codecs/cbor, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use defineCBORCodec when its function contract and declared inputs match the result you need. Choose a different public symbol when defineCBORCodec does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineCBORCodec."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for defineCBORCodec."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codecs/cbor.d.ts:defineCBORCodec:export declare function defineCBORCodec<const TVersion extends number>(options: ICborCodecOptions<TVersion>): ICodec<ICodecValue, Uint8Array, 'cbor', TVersion>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codecs/cbor--defineCBORCodec"
+        },
+        {
+          "name": "ICborCodecOptions",
+          "kind": "type",
+          "signature": "export type ICborCodecOptions<TVersion extends number> = Readonly<{ version: TVersion; }>;",
+          "declarationLine": 3,
+          "source": "packages/serialize/dist/codecs/cbor.d.ts",
+          "purpose": "Options for the deterministic CBOR codec factory.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICborCodecOptions.",
+          "advanced": "No additional advanced behavior is declared for ICborCodecOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ICborCodecOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICborCodecOptions.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codecs/cbor",
+          "overloadSignatures": [
+            "export type ICborCodecOptions<TVersion extends number> = Readonly<{ version: TVersion; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ICborCodecOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ICborCodecOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Options for the deterministic CBOR codec factory."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICborCodecOptions from @migaia/serialize/codecs/cbor, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICborCodecOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when ICborCodecOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICborCodecOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ICborCodecOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codecs/cbor.d.ts:ICborCodecOptions:export type ICborCodecOptions<TVersion extends number> = Readonly<{ version: TVersion; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codecs/cbor--ICborCodecOptions"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "serialize:codecs/identity",
+      "library": "serialize",
+      "module": "codecs/identity",
+      "exportPath": "./codecs/identity",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/serialize/getting-started",
+      "architecturePath": "/en/architecture/serialize",
+      "symbols": [
+        {
+          "name": "identityCodecV1",
+          "kind": "const",
+          "signature": "export declare const identityCodecV1: ICodec<unknown, unknown, 'identity', 1>;",
+          "declarationLine": 3,
+          "source": "packages/serialize/dist/codecs/identity.d.ts",
+          "purpose": "Identity codec used by whole-frame transports; it never imports a format runtime.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for identityCodecV1.",
+          "advanced": "No additional advanced behavior is declared for identityCodecV1.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for identityCodecV1."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for identityCodecV1.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codecs/identity",
+          "overloadSignatures": [
+            "export declare const identityCodecV1: ICodec<unknown, unknown, 'identity', 1>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use identityCodecV1 when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when identityCodecV1 does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Identity codec used by whole-frame transports; it never imports a format runtime."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import identityCodecV1 from @migaia/serialize/codecs/identity, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use identityCodecV1 when its const contract and declared inputs match the result you need. Choose a different public symbol when identityCodecV1 does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for identityCodecV1."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for identityCodecV1."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codecs/identity.d.ts:identityCodecV1:export declare const identityCodecV1: ICodec<unknown, unknown, 'identity', 1>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codecs/identity--identityCodecV1"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "serialize:codecs/json",
+      "library": "serialize",
+      "module": "codecs/json",
+      "exportPath": "./codecs/json",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/serialize/getting-started",
+      "architecturePath": "/en/architecture/serialize",
+      "symbols": [
+        {
+          "name": "defineJsonCodec",
+          "kind": "function",
+          "signature": "export declare function defineJsonCodec<const TVersion extends number>(options: IJsonCodecOptions<TVersion>): ICodec<ICodecValue, string, 'json', TVersion>;",
+          "declarationLine": 7,
+          "source": "packages/serialize/dist/codecs/json.d.ts",
+          "purpose": "Create a deterministic JSON codec for the portable profile.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineJsonCodec.",
+          "advanced": "No additional advanced behavior is declared for defineJsonCodec.",
+          "parameters": ["options: IJsonCodecOptions<TVersion>"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IJsonCodecOptions<TVersion>",
+              "optional": false
+            }
+          ],
+          "returns": "ICodec<ICodecValue, string, 'json', TVersion>",
+          "errors": ["No documented errors are declared for defineJsonCodec."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineJsonCodec.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codecs/json",
+          "overloadSignatures": [
+            "export declare function defineJsonCodec<const TVersion extends number>(options: IJsonCodecOptions<TVersion>): ICodec<ICodecValue, string, 'json', TVersion>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IJsonCodecOptions<TVersion>",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["ICodec<ICodecValue, string, 'json', TVersion>"],
+          "whenToUse": "Use defineJsonCodec when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when defineJsonCodec does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Create a deterministic JSON codec for the portable profile."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import defineJsonCodec from @migaia/serialize/codecs/json, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use defineJsonCodec when its function contract and declared inputs match the result you need. Choose a different public symbol when defineJsonCodec does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineJsonCodec."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for defineJsonCodec."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codecs/json.d.ts:defineJsonCodec:export declare function defineJsonCodec<const TVersion extends number>(options: IJsonCodecOptions<TVersion>): ICodec<ICodecValue, string, 'json', TVersion>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codecs/json--defineJsonCodec"
+        },
+        {
+          "name": "IJsonCodecOptions",
+          "kind": "type",
+          "signature": "export type IJsonCodecOptions<TVersion extends number> = Readonly<{ version: TVersion; }>;",
+          "declarationLine": 3,
+          "source": "packages/serialize/dist/codecs/json.d.ts",
+          "purpose": "Options for the native JSON codec factory.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IJsonCodecOptions.",
+          "advanced": "No additional advanced behavior is declared for IJsonCodecOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IJsonCodecOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IJsonCodecOptions.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codecs/json",
+          "overloadSignatures": [
+            "export type IJsonCodecOptions<TVersion extends number> = Readonly<{ version: TVersion; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IJsonCodecOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IJsonCodecOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Options for the native JSON codec factory."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IJsonCodecOptions from @migaia/serialize/codecs/json, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IJsonCodecOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IJsonCodecOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IJsonCodecOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IJsonCodecOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codecs/json.d.ts:IJsonCodecOptions:export type IJsonCodecOptions<TVersion extends number> = Readonly<{ version: TVersion; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codecs/json--IJsonCodecOptions"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "serialize:codecs/message-pack",
+      "library": "serialize",
+      "module": "codecs/message-pack",
+      "exportPath": "./codecs/message-pack",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/serialize/getting-started",
+      "architecturePath": "/en/architecture/serialize",
+      "symbols": [
+        {
+          "name": "defineMessagePackCodec",
+          "kind": "function",
+          "signature": "export declare function defineMessagePackCodec<const TVersion extends number>(options: IMessagePackCodecOptions<TVersion>): ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion>;",
+          "declarationLine": 7,
+          "source": "packages/serialize/dist/codecs/message-pack.d.ts",
+          "purpose": "Create an extension-free MessagePack codec for portable values.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineMessagePackCodec.",
+          "advanced": "No additional advanced behavior is declared for defineMessagePackCodec.",
+          "parameters": ["options: IMessagePackCodecOptions<TVersion>"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IMessagePackCodecOptions<TVersion>",
+              "optional": false
+            }
+          ],
+          "returns": "ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion>",
+          "errors": ["No documented errors are declared for defineMessagePackCodec."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineMessagePackCodec.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codecs/message-pack",
+          "overloadSignatures": [
+            "export declare function defineMessagePackCodec<const TVersion extends number>(options: IMessagePackCodecOptions<TVersion>): ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IMessagePackCodecOptions<TVersion>",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion>"],
+          "whenToUse": "Use defineMessagePackCodec when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when defineMessagePackCodec does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Create an extension-free MessagePack codec for portable values."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import defineMessagePackCodec from @migaia/serialize/codecs/message-pack, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use defineMessagePackCodec when its function contract and declared inputs match the result you need. Choose a different public symbol when defineMessagePackCodec does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineMessagePackCodec."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for defineMessagePackCodec."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codecs/message-pack.d.ts:defineMessagePackCodec:export declare function defineMessagePackCodec<const TVersion extends number>(options: IMessagePackCodecOptions<TVersion>): ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codecs/message-pack--defineMessagePackCodec"
+        },
+        {
+          "name": "IMessagePackCodecOptions",
+          "kind": "type",
+          "signature": "export type IMessagePackCodecOptions<TVersion extends number> = Readonly<{ version: TVersion; }>;",
+          "declarationLine": 3,
+          "source": "packages/serialize/dist/codecs/message-pack.d.ts",
+          "purpose": "Options for the MessagePack codec factory.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMessagePackCodecOptions.",
+          "advanced": "No additional advanced behavior is declared for IMessagePackCodecOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IMessagePackCodecOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMessagePackCodecOptions.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codecs/message-pack",
+          "overloadSignatures": [
+            "export type IMessagePackCodecOptions<TVersion extends number> = Readonly<{ version: TVersion; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IMessagePackCodecOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IMessagePackCodecOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Options for the MessagePack codec factory."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IMessagePackCodecOptions from @migaia/serialize/codecs/message-pack, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IMessagePackCodecOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IMessagePackCodecOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMessagePackCodecOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IMessagePackCodecOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codecs/message-pack.d.ts:IMessagePackCodecOptions:export type IMessagePackCodecOptions<TVersion extends number> = Readonly<{ version: TVersion; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codecs/message-pack--IMessagePackCodecOptions"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "serialize:codecs/protobuf",
+      "library": "serialize",
+      "module": "codecs/protobuf",
+      "exportPath": "./codecs/protobuf",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/serialize/getting-started",
+      "architecturePath": "/en/architecture/serialize",
+      "symbols": [
+        {
+          "name": "defineProtobufCodec",
+          "kind": "function",
+          "signature": "export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, TValue>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TValue>): ICodec<TValue, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;",
+          "declarationLine": 17,
+          "source": "packages/serialize/dist/codecs/protobuf.d.ts",
+          "purpose": "Create a protobuf codec that keeps codec and schema identities independent.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineProtobufCodec.",
+          "advanced": "No additional advanced behavior is declared for defineProtobufCodec.",
+          "parameters": [
+            "options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TValue>"
+          ],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TValue>",
+              "optional": false
+            }
+          ],
+          "returns": "ICodec<TValue, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>",
+          "errors": ["No documented errors are declared for defineProtobufCodec."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineProtobufCodec.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codecs/protobuf",
+          "overloadSignatures": [
+            "export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, TValue>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TValue>): ICodec<TValue, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TValue>",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "ICodec<TValue, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>"
+          ],
+          "whenToUse": "Use defineProtobufCodec when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when defineProtobufCodec does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Create a protobuf codec that keeps codec and schema identities independent."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import defineProtobufCodec from @migaia/serialize/codecs/protobuf, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use defineProtobufCodec when its function contract and declared inputs match the result you need. Choose a different public symbol when defineProtobufCodec does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineProtobufCodec."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for defineProtobufCodec."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codecs/protobuf.d.ts:defineProtobufCodec:export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, TValue>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TValue>): ICodec<TValue, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codecs/protobuf--defineProtobufCodec"
+        },
+        {
+          "name": "IProtobufBinding",
+          "kind": "type",
+          "signature": "export type IProtobufBinding<TValue> = Readonly<{ encode: (value: TValue) => Uint8Array; decode: (value: Uint8Array) => TValue; }>;",
+          "declarationLine": 3,
+          "source": "packages/serialize/dist/codecs/protobuf.d.ts",
+          "purpose": "Minimal generated-binding boundary accepted by the Protobuf codec.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProtobufBinding.",
+          "advanced": "No additional advanced behavior is declared for IProtobufBinding.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IProtobufBinding."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IProtobufBinding.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codecs/protobuf",
+          "overloadSignatures": [
+            "export type IProtobufBinding<TValue> = Readonly<{ encode: (value: TValue) => Uint8Array; decode: (value: Uint8Array) => TValue; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IProtobufBinding when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IProtobufBinding does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Minimal generated-binding boundary accepted by the Protobuf codec."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IProtobufBinding from @migaia/serialize/codecs/protobuf, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IProtobufBinding when its type contract and declared inputs match the result you need. Choose a different public symbol when IProtobufBinding does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProtobufBinding."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IProtobufBinding."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codecs/protobuf.d.ts:IProtobufBinding:export type IProtobufBinding<TValue> = Readonly<{ encode: (value: TValue) => Uint8Array; decode: (value: Uint8Array) => TValue; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codecs/protobuf--IProtobufBinding"
+        },
+        {
+          "name": "IProtobufCodecOptions",
+          "kind": "type",
+          "signature": "export type IProtobufCodecOptions<TVersion extends number, TSchemaId extends string, TSchemaVersion extends number, TValue> = Readonly<{ version: TVersion; schema: IProtobufSchema<TSchemaId, TSchemaVersion>; binding: IProtobufBinding<TValue>; }>;",
+          "declarationLine": 11,
+          "source": "packages/serialize/dist/codecs/protobuf.d.ts",
+          "purpose": "IProtobufCodecOptions is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProtobufCodecOptions.",
+          "advanced": "No additional advanced behavior is declared for IProtobufCodecOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IProtobufCodecOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IProtobufCodecOptions.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codecs/protobuf",
+          "overloadSignatures": [
+            "export type IProtobufCodecOptions<TVersion extends number, TSchemaId extends string, TSchemaVersion extends number, TValue> = Readonly<{ version: TVersion; schema: IProtobufSchema<TSchemaId, TSchemaVersion>; binding: IProtobufBinding<TValue>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IProtobufCodecOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IProtobufCodecOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IProtobufCodecOptions is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IProtobufCodecOptions from @migaia/serialize/codecs/protobuf, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IProtobufCodecOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IProtobufCodecOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProtobufCodecOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IProtobufCodecOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codecs/protobuf.d.ts:IProtobufCodecOptions:export type IProtobufCodecOptions<TVersion extends number, TSchemaId extends string, TSchemaVersion extends number, TValue> = Readonly<{ version: TVersion; schema: IProtobufSchema<TSchemaId, TSchemaVersion>; binding: IProtobufBinding<TValue>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codecs/protobuf--IProtobufCodecOptions"
+        },
+        {
+          "name": "IProtobufSchema",
+          "kind": "type",
+          "signature": "export type IProtobufSchema<TId extends string, TVersion extends number> = Readonly<{ id: TId; version: TVersion; }>;",
+          "declarationLine": 7,
+          "source": "packages/serialize/dist/codecs/protobuf.d.ts",
+          "purpose": "IProtobufSchema is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProtobufSchema.",
+          "advanced": "No additional advanced behavior is declared for IProtobufSchema.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IProtobufSchema."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IProtobufSchema.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./codecs/protobuf",
+          "overloadSignatures": [
+            "export type IProtobufSchema<TId extends string, TVersion extends number> = Readonly<{ id: TId; version: TVersion; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IProtobufSchema when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IProtobufSchema does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IProtobufSchema is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IProtobufSchema from @migaia/serialize/codecs/protobuf, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IProtobufSchema when its type contract and declared inputs match the result you need. Choose a different public symbol when IProtobufSchema does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProtobufSchema."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IProtobufSchema."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codecs/protobuf.d.ts:IProtobufSchema:export type IProtobufSchema<TId extends string, TVersion extends number> = Readonly<{ id: TId; version: TVersion; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codecs/protobuf--IProtobufSchema"
+        }
+      ],
+      "aliases": []
+    },
+    {
       "id": "serialize:core",
       "library": "serialize",
       "module": "core",
@@ -2773,6 +4423,7 @@
             "SERIALIZE_TYPE_PATTERN.test('cbor-v2'); // true；/^[a-z0-9][a-z0-9._-]{0,63}$/i\nassertSerializeType('bad type!'); // 抛 RangeError／INVALID_OPTION",
             "import {\n  createSerializeRegistry,\n  jsonPlugin,\n  assertSerializeType,\n  type ISerializeParser,\n  type ISerializePlugin\n} from '@migaia/serialize';\n\nfunction makeCborPlugin(type: string): ISerializePlugin {\n  assertSerializeType(type); // 第三方格式名先做一次显式校验，早失败好过注册时才发现\n  const parser: ISerializeParser = {\n    name: 'cbor',\n    encode: (value) => ['bytes', encodeCbor(value)],\n    decode: (chunk) =>\n      decodeCbor(chunk[0] === 'bytes' ? chunk[1] : new TextEncoder().encode(chunk[1] as string)),\n    dispose: () => releaseCborResources()\n  };\n  return { type, parser };\n}\n\nconst registry = createSerializeRegistry([jsonPlugin(), makeCborPlugin('cbor')]);\nawait registry.encode(payload, { type: 'cbor' });"
           ],
+          "members": [],
           "aliasOf": "assertSerializeType",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -2853,6 +4504,7 @@
             "bytesToBase64(bytes); // string，一次性拼接完整结果\nbase64ToBytes(text); // Uint8Array；非法输入抛 TypeError／INVALID_OPTION（不保留原始 cause）\nfor (const part of streamBase64Chunks(bytes)) send(part); // 固定按 32763 字节（3 的倍数）分块 yield，不整段现造",
             "import {\n  createSerializeRegistry,\n  bytesToBase64,\n  base64ToBytes,\n  jsonPlugin\n} from '@migaia/serialize';\n\nconst registry = createSerializeRegistry([jsonPlugin()]);\nconst chunk = await registry.encode(largeObject);\nconst wire = chunk[0] === 'bytes' ? bytesToBase64(chunk[1]) : chunk[1];\n// ... 落 localStorage / 内联进 HTML ...\nconst restoredBytes = typeof wire === 'string' ? base64ToBytes(wire) : undefined;\n\n// 应用退出前：最多等待 500ms 排空在途操作，超时也强制释放 parser（不会永久挂起）\nawait registry.dispose({ deadlineAt: Date.now() + 500 });"
           ],
+          "members": [],
           "aliasOf": "base64ToBytes",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -3167,6 +4819,7 @@
             "bytesToBase64(bytes); // string，一次性拼接完整结果\nbase64ToBytes(text); // Uint8Array；非法输入抛 TypeError／INVALID_OPTION（不保留原始 cause）\nfor (const part of streamBase64Chunks(bytes)) send(part); // 固定按 32763 字节（3 的倍数）分块 yield，不整段现造",
             "import {\n  createSerializeRegistry,\n  bytesToBase64,\n  base64ToBytes,\n  jsonPlugin\n} from '@migaia/serialize';\n\nconst registry = createSerializeRegistry([jsonPlugin()]);\nconst chunk = await registry.encode(largeObject);\nconst wire = chunk[0] === 'bytes' ? bytesToBase64(chunk[1]) : chunk[1];\n// ... 落 localStorage / 内联进 HTML ...\nconst restoredBytes = typeof wire === 'string' ? base64ToBytes(wire) : undefined;\n\n// 应用退出前：最多等待 500ms 排空在途操作，超时也强制释放 parser（不会永久挂起）\nawait registry.dispose({ deadlineAt: Date.now() + 500 });"
           ],
+          "members": [],
           "aliasOf": "bytesToBase64",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -3261,6 +4914,7 @@
             "const stream = encodeStream(registry, hugeArrayOfRows, {\n  initialItems: 500,\n  maxInFlight: 2,\n  scheduler\n});\nconst chunk = await collectStream(stream, new TextEncoder()); // 只在流里可能出现 bytes 段时才需要传 encoder",
             "import { systemScheduler } from '@migaia/lifecycle';\n\nconst stream = encodeStream(registry, hugeArrayOfRows, {\n  initialItems: 500,\n  maxInFlight: 2,\n  scheduler: systemScheduler\n});\nconst chunk = await collectStream(stream);"
           ],
+          "members": [],
           "aliasOf": "collectStream",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -3587,6 +5241,7 @@
           "errors": ["No documented errors are declared for createSerializeError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createSerializeError.",
           "examples": [],
+          "members": [],
           "aliasOf": "createSerializeError",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -3742,6 +5397,7 @@
           "errors": ["No documented errors are declared for createSerializeRangeError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createSerializeRangeError.",
           "examples": [],
+          "members": [],
           "aliasOf": "createSerializeRangeError",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -3897,6 +5553,7 @@
           "errors": ["No documented errors are declared for createSerializeTypeError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createSerializeTypeError.",
           "examples": [],
+          "members": [],
           "aliasOf": "createSerializeTypeError",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -4055,6 +5712,7 @@
             "import {\n  createSerializeRegistry,\n  encodeStream,\n  decodeStream,\n  jsonPlugin,\n  SerializeCodecError\n} from '@migaia/serialize';\nimport { systemScheduler } from '@migaia/lifecycle';\n\n// 1. 建一个只认 JSON 的 registry\nconst registry = createSerializeRegistry([jsonPlugin({ space: 0 })]);\n\n// 2. 大数组分片编码，逐片写进某个 sink（这里用内存数组模拟）\nconst wire: unknown[] = [];\nconst controller = new AbortController();\n\ntry {\n  for await (const chunk of encodeStream(registry, hugeArrayOfRows, {\n    initialItems: 500,\n    maxInFlight: 2,\n    signal: controller.signal as never,\n    context: 'export-rows',\n    scheduler: systemScheduler\n  })) {\n    wire.push(chunk); // 换成 port.postMessage(chunk) / writable.write(chunk) 等真实 sink\n  }\n} catch (error) {\n  if (error instanceof SerializeCodecError) {\n    console.error(`导出在第 ${error.chunkIndex} 片失败：${error.message}`, { cause: error.cause });\n  }\n  throw error;\n}\n\n// 3. 接收端逐片解码\nconst restored: unknown[] = [];\nfor await (const rows of decodeStream(registry, wire as never, { context: 'export-rows' })) {\n  restored.push(...(rows as unknown[]));\n}\n\n// 4. 应用退出前：最多等待 500ms 排空在途操作，超时也强制释放 parser（不会永久挂起）\nawait registry.dispose({ deadlineAt: Date.now() + 500 });",
             "import {\n  createSerializeRegistry,\n  encodeStream,\n  decodeStream,\n  jsonPlugin,\n  SerializeCodecError\n} from '@migaia/serialize';\nimport { systemScheduler } from '@migaia/lifecycle';\n\nconst registry = createSerializeRegistry([jsonPlugin()]);\nconst controller = new AbortController();\nconst wire: unknown[] = [];\n\ntry {\n  for await (const chunk of encodeStream(registry, hugeArrayOfRows, {\n    initialItems: 500,\n    maxInFlight: 2,\n    signal: controller.signal as never,\n    context: 'export-rows',\n    scheduler: systemScheduler\n  })) {\n    wire.push(chunk); // 换成 writable.write(chunk) / port.postMessage(chunk) 等真实 sink\n  }\n} catch (error) {\n  if (error instanceof SerializeCodecError) {\n    console.error(`导出在第 ${error.chunkIndex} 片失败：${error.message}`, { cause: error.cause });\n  }\n  throw error;\n}\n\nconst restored: unknown[] = [];\nfor await (const rows of decodeStream(registry, wire as never, { context: 'export-rows' })) {\n  restored.push(...(rows as unknown[]));\n}\nawait registry.dispose();"
           ],
+          "members": [],
           "aliasOf": "decodeStream",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -4292,6 +5950,7 @@
             "import { systemScheduler } from '@migaia/lifecycle';\n\nconst stream = encodeStream(registry, hugeArrayOfRows, {\n  initialItems: 500,\n  maxInFlight: 2,\n  scheduler: systemScheduler\n});\nconst chunk = await collectStream(stream);",
             "import {\n  createSerializeRegistry,\n  encodeStream,\n  decodeStream,\n  jsonPlugin,\n  SerializeCodecError\n} from '@migaia/serialize';\nimport { systemScheduler } from '@migaia/lifecycle';\n\nconst registry = createSerializeRegistry([jsonPlugin()]);\nconst controller = new AbortController();\nconst wire: unknown[] = [];\n\ntry {\n  for await (const chunk of encodeStream(registry, hugeArrayOfRows, {\n    initialItems: 500,\n    maxInFlight: 2,\n    signal: controller.signal as never,\n    context: 'export-rows',\n    scheduler: systemScheduler\n  })) {\n    wire.push(chunk); // 换成 writable.write(chunk) / port.postMessage(chunk) 等真实 sink\n  }\n} catch (error) {\n  if (error instanceof SerializeCodecError) {\n    console.error(`导出在第 ${error.chunkIndex} 片失败：${error.message}`, { cause: error.cause });\n  }\n  throw error;\n}\n\nconst restored: unknown[] = [];\nfor await (const rows of decodeStream(registry, wire as never, { context: 'export-rows' })) {\n  restored.push(...(rows as unknown[]));\n}\nawait registry.dispose();"
           ],
+          "members": [],
           "aliasOf": "encodeStream",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -4646,6 +6305,7 @@
           "errors": ["No documented errors are declared for ICollectStreamOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICollectStreamOptions.",
           "examples": [],
+          "members": [],
           "aliasOf": "ICollectStreamOptions",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -4713,6 +6373,7 @@
             "type IEncodeStreamOptions = IFrameBudgetOptions & {\n  readonly type?: string;\n  readonly context?: string; // 默认 'stream'\n  readonly maxInFlight?: number; // 默认 1\n};\n\nfunction encodeStream<T>(\n  registry: ISerializeRegistry,\n  items: readonly T[],\n  options: IEncodeStreamOptions\n): AsyncGenerator<ISerializeChunk, void, undefined>;",
             "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeScheduler,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';"
           ],
+          "members": [],
           "aliasOf": "IEncodeStreamOptions",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -4781,6 +6442,7 @@
             "type IEncodeStreamOptions = IFrameBudgetOptions & {\n  readonly type?: string;\n  readonly context?: string; // 默认 'stream'\n  readonly maxInFlight?: number; // 默认 1\n};\n\nfunction encodeStream<T>(\n  registry: ISerializeRegistry,\n  items: readonly T[],\n  options: IEncodeStreamOptions\n): AsyncGenerator<ISerializeChunk, void, undefined>;",
             "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeScheduler,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';"
           ],
+          "members": [],
           "aliasOf": "IFrameBudgetOptions",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -4850,6 +6512,7 @@
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  jsonPlugin,\n  jsonParser,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  SerializeCodecError,\n  SerializeErrorCode,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  tagSerializeError,\n  isChunkShape,\n  SerializeChunkKind\n} from '@migaia/serialize';",
             "import {\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_TYPE_PATTERN,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget\n} from '@migaia/serialize/core';"
           ],
+          "members": [],
           "aliasOf": "isChunkShape",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -4921,6 +6584,7 @@
             "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeScheduler,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';",
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';"
           ],
+          "members": [],
           "aliasOf": "ISerializeAbortSignal",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -4999,6 +6663,7 @@
             "import { createSerializeRegistry, jsonPlugin, type ISerializeChunk } from '@migaia/serialize';\n\n// 数组第一项 (jsonPlugin) 是 primaryType，写入永远用它；legacyPlugin 只用于读旧存档。\nconst registry = createSerializeRegistry([jsonPlugin(), legacyPlugin]);\n\nasync function load(record: { type: string; chunk: ISerializeChunk }) {\n  return registry.decode(record.chunk, { type: record.type }); // 按存档记录的 type 找回对应 parser\n}\n\nasync function save(value: unknown) {\n  const chunk = await registry.encode(value); // 不传 type，永远用 primaryType（新格式）写入\n  return { type: registry.primaryType, chunk };\n}",
             "import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize';\n\n// 数组第一项 (jsonPlugin) 是 primaryType，写入永远用它；legacyPlugin 只用于读旧存档。\nconst registry = createSerializeRegistry([jsonPlugin(), legacyPlugin]);\n\nasync function load(record: { type: string; chunk: ISerializeChunk }) {\n  return registry.decode(record.chunk, { type: record.type }); // 按存档记录的 type 找回对应 parser\n}\n\nasync function save(value: unknown) {\n  const chunk = await registry.encode(value); // 不传 type，永远用 primaryType（新格式）写入\n  return { type: registry.primaryType, chunk };\n}"
           ],
+          "members": [],
           "aliasOf": "ISerializeChunk",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -5065,6 +6730,7 @@
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  isChunkShape,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  SERIALIZE_SOURCE,\n  SerializeCodecError,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  jsonPlugin,\n  jsonParser,\n  SerializeChunkKind,\n  SerializeOutput,\n  SerializePhase,\n  SerializeCleanupPolicy,\n  SerializeCleanupKind,\n  SerializePluginType,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type ISerializeAbortSignal,\n  type ITextEncoder,\n  type ITextDecoder,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions,\n  type IJsonPluginOptions,\n  type ISerializeChunkKind,\n  type ISerializeOutputFormat,\n  type ISerializeCleanupPolicy,\n  type ISerializeCleanupKind,\n  type ISerializePluginType\n} from '@migaia/serialize';",
             "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeScheduler,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';"
           ],
+          "members": [],
           "aliasOf": "ISerializeChunkType",
           "exportPath": "./core",
           "overloadSignatures": ["export type ISerializeChunkType = ISerializeChunk[0];"],
@@ -5132,6 +6798,7 @@
             "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeScheduler,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';",
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';"
           ],
+          "members": [],
           "aliasOf": "ISerializeContext",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -5199,6 +6866,7 @@
             "const SERIALIZE_SOURCE: '@migaia/serialize';\n\ntype ISerializeTaggedError<TError extends Error> = TError & {\n  readonly source: string;\n  readonly code: ISerializeErrorCode;\n  readonly context?: string;\n};\ntype ISerializeTypeError = ISerializeTaggedError<TypeError>;\ntype ISerializeRangeError = ISerializeTaggedError<RangeError>;\ntype ISerializeLifecycleError = ISerializeTaggedError<Error> & {\n  readonly errors?: readonly unknown[];\n};\n\nfunction tagSerializeError<E extends Error>(\n  error: E,\n  code: ISerializeErrorCode,\n  context?: string\n): ISerializeTaggedError<E>;\n\nfunction createSerializeError(\n  code: ISerializeErrorCode,\n  message: string,\n  options?: {\n    readonly cause?: unknown;\n    readonly context?: string;\n    readonly errors?: readonly unknown[];\n  }\n): ISerializeLifecycleError;\n\nfunction createSerializeTypeError(\n  code: ISerializeErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown; readonly context?: string }\n): ISerializeTypeError;\n\nfunction createSerializeRangeError(\n  code: ISerializeErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown; readonly context?: string }\n): ISerializeRangeError;",
             "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeScheduler,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';"
           ],
+          "members": [],
           "aliasOf": "ISerializeLifecycleError",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -5320,6 +6988,7 @@
             "type ISerializeOutput =\n  | ISerializeChunk\n  | Promise<ISerializeChunk>\n  | Iterable<ISerializeChunk>\n  | AsyncIterable<ISerializeChunk>;\n\ntype ISerializeParser = {\n  readonly name: string;\n  encode(value: unknown, context: ISerializeContext): ISerializeOutput;\n  decode(chunk: ISerializeChunk, context: ISerializeContext): unknown | Promise<unknown>;\n  dispose?(): void | Promise<void>;\n};",
             "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeScheduler,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';"
           ],
+          "members": [],
           "aliasOf": "ISerializeOutput",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -5392,6 +7061,7 @@
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';",
             "import {\n  createSerializeRegistry,\n  jsonPlugin,\n  assertSerializeType,\n  type ISerializeParser,\n  type ISerializePlugin\n} from '@migaia/serialize';\n\nfunction makeCborPlugin(type: string): ISerializePlugin {\n  assertSerializeType(type); // 第三方格式名先做一次显式校验，早失败好过注册时才发现\n  const parser: ISerializeParser = {\n    name: 'cbor',\n    encode: (value) => ['bytes', encodeCbor(value)],\n    decode: (chunk) =>\n      decodeCbor(chunk[0] === 'bytes' ? chunk[1] : new TextEncoder().encode(chunk[1] as string)),\n    dispose: () => releaseCborResources()\n  };\n  return { type, parser };\n}\n\nconst registry = createSerializeRegistry([jsonPlugin(), makeCborPlugin('cbor')]);\nawait registry.encode(payload, { type: 'cbor' });"
           ],
+          "members": [],
           "aliasOf": "ISerializeParser",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -5530,6 +7200,7 @@
             "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeScheduler,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';",
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';"
           ],
+          "members": [],
           "aliasOf": "ISerializePhase",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -5601,6 +7272,7 @@
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';",
             "import {\n  createSerializeRegistry,\n  jsonPlugin,\n  assertSerializeType,\n  type ISerializeParser,\n  type ISerializePlugin\n} from '@migaia/serialize';\n\nfunction makeCborPlugin(type: string): ISerializePlugin {\n  assertSerializeType(type); // 第三方格式名先做一次显式校验，早失败好过注册时才发现\n  const parser: ISerializeParser = {\n    name: 'cbor',\n    encode: (value) => ['bytes', encodeCbor(value)],\n    decode: (chunk) =>\n      decodeCbor(chunk[0] === 'bytes' ? chunk[1] : new TextEncoder().encode(chunk[1] as string)),\n    dispose: () => releaseCborResources()\n  };\n  return { type, parser };\n}\n\nconst registry = createSerializeRegistry([jsonPlugin(), makeCborPlugin('cbor')]);\nawait registry.encode(payload, { type: 'cbor' });"
           ],
+          "members": [],
           "aliasOf": "ISerializePlugin",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -5739,6 +7411,7 @@
             "const SERIALIZE_SOURCE: '@migaia/serialize';\n\ntype ISerializeTaggedError<TError extends Error> = TError & {\n  readonly source: string;\n  readonly code: ISerializeErrorCode;\n  readonly context?: string;\n};\ntype ISerializeTypeError = ISerializeTaggedError<TypeError>;\ntype ISerializeRangeError = ISerializeTaggedError<RangeError>;\ntype ISerializeLifecycleError = ISerializeTaggedError<Error> & {\n  readonly errors?: readonly unknown[];\n};\n\nfunction tagSerializeError<E extends Error>(\n  error: E,\n  code: ISerializeErrorCode,\n  context?: string\n): ISerializeTaggedError<E>;\n\nfunction createSerializeError(\n  code: ISerializeErrorCode,\n  message: string,\n  options?: {\n    readonly cause?: unknown;\n    readonly context?: string;\n    readonly errors?: readonly unknown[];\n  }\n): ISerializeLifecycleError;\n\nfunction createSerializeTypeError(\n  code: ISerializeErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown; readonly context?: string }\n): ISerializeTypeError;\n\nfunction createSerializeRangeError(\n  code: ISerializeErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown; readonly context?: string }\n): ISerializeRangeError;",
             "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeScheduler,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';"
           ],
+          "members": [],
           "aliasOf": "ISerializeRangeError",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -5865,6 +7538,7 @@
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';",
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic\n} from '@migaia/serialize/registry';"
           ],
+          "members": [],
           "aliasOf": "ISerializeRegistry",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -6005,6 +7679,7 @@
             "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeScheduler,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';",
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';"
           ],
+          "members": [],
           "aliasOf": "ISerializeScheduler",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -6143,6 +7818,7 @@
             "const SERIALIZE_SOURCE: '@migaia/serialize';\n\ntype ISerializeTaggedError<TError extends Error> = TError & {\n  readonly source: string;\n  readonly code: ISerializeErrorCode;\n  readonly context?: string;\n};\ntype ISerializeTypeError = ISerializeTaggedError<TypeError>;\ntype ISerializeRangeError = ISerializeTaggedError<RangeError>;\ntype ISerializeLifecycleError = ISerializeTaggedError<Error> & {\n  readonly errors?: readonly unknown[];\n};\n\nfunction tagSerializeError<E extends Error>(\n  error: E,\n  code: ISerializeErrorCode,\n  context?: string\n): ISerializeTaggedError<E>;\n\nfunction createSerializeError(\n  code: ISerializeErrorCode,\n  message: string,\n  options?: {\n    readonly cause?: unknown;\n    readonly context?: string;\n    readonly errors?: readonly unknown[];\n  }\n): ISerializeLifecycleError;\n\nfunction createSerializeTypeError(\n  code: ISerializeErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown; readonly context?: string }\n): ISerializeTypeError;\n\nfunction createSerializeRangeError(\n  code: ISerializeErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown; readonly context?: string }\n): ISerializeRangeError;",
             "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeScheduler,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';"
           ],
+          "members": [],
           "aliasOf": "ISerializeTaggedError",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -6264,6 +7940,7 @@
             "const SERIALIZE_SOURCE: '@migaia/serialize';\n\ntype ISerializeTaggedError<TError extends Error> = TError & {\n  readonly source: string;\n  readonly code: ISerializeErrorCode;\n  readonly context?: string;\n};\ntype ISerializeTypeError = ISerializeTaggedError<TypeError>;\ntype ISerializeRangeError = ISerializeTaggedError<RangeError>;\ntype ISerializeLifecycleError = ISerializeTaggedError<Error> & {\n  readonly errors?: readonly unknown[];\n};\n\nfunction tagSerializeError<E extends Error>(\n  error: E,\n  code: ISerializeErrorCode,\n  context?: string\n): ISerializeTaggedError<E>;\n\nfunction createSerializeError(\n  code: ISerializeErrorCode,\n  message: string,\n  options?: {\n    readonly cause?: unknown;\n    readonly context?: string;\n    readonly errors?: readonly unknown[];\n  }\n): ISerializeLifecycleError;\n\nfunction createSerializeTypeError(\n  code: ISerializeErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown; readonly context?: string }\n): ISerializeTypeError;\n\nfunction createSerializeRangeError(\n  code: ISerializeErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown; readonly context?: string }\n): ISerializeRangeError;",
             "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeScheduler,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';"
           ],
+          "members": [],
           "aliasOf": "ISerializeTypeError",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -6388,6 +8065,7 @@
             "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeScheduler,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';",
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';"
           ],
+          "members": [],
           "aliasOf": "ITextDecoder",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -6529,6 +8207,7 @@
             "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeScheduler,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';",
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';"
           ],
+          "members": [],
           "aliasOf": "ITextEncoder",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -6668,6 +8347,7 @@
             "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeScheduler,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';",
             "import {\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_TYPE_PATTERN,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget\n} from '@migaia/serialize/core';"
           ],
+          "members": [],
           "aliasOf": "SERIALIZE_SOURCE",
           "exportPath": "./core",
           "overloadSignatures": ["export declare const SERIALIZE_SOURCE: \"@migaia/serialize\";"],
@@ -6791,6 +8471,7 @@
             "SERIALIZE_TYPE_PATTERN.test('cbor-v2'); // true；/^[a-z0-9][a-z0-9._-]{0,63}$/i\nassertSerializeType('bad type!'); // 抛 RangeError／INVALID_OPTION",
             "import {\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_TYPE_PATTERN,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget\n} from '@migaia/serialize/core';"
           ],
+          "members": [],
           "aliasOf": "SERIALIZE_TYPE_PATTERN",
           "exportPath": "./core",
           "overloadSignatures": ["export declare const SERIALIZE_TYPE_PATTERN: RegExp;"],
@@ -6937,6 +8618,64 @@
           "errors": ["No documented errors are declared for SerializeCodecError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for SerializeCodecError.",
           "examples": [],
+          "members": [
+            {
+              "name": "source",
+              "kind": "property",
+              "signature": "readonly source: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "code",
+              "kind": "property",
+              "signature": "readonly code: TCode;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TCode"
+            },
+            {
+              "name": "context",
+              "kind": "property",
+              "signature": "readonly context?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "type",
+              "kind": "property",
+              "signature": "readonly type: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "phase",
+              "kind": "property",
+              "signature": "readonly phase: ISerializePhase;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ISerializePhase"
+            },
+            {
+              "name": "chunkIndex",
+              "kind": "property",
+              "signature": "readonly chunkIndex: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "bytesConsumed",
+              "kind": "property",
+              "signature": "readonly bytesConsumed: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
           "aliasOf": "SerializeCodecError",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -7298,6 +9037,7 @@
           "errors": ["No documented errors are declared for sliceByFrameBudget."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for sliceByFrameBudget.",
           "examples": [],
+          "members": [],
           "aliasOf": "sliceByFrameBudget",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -7602,6 +9342,7 @@
           "examples": [
             "bytesToBase64(bytes); // string，一次性拼接完整结果\nbase64ToBytes(text); // Uint8Array；非法输入抛 TypeError／INVALID_OPTION（不保留原始 cause）\nfor (const part of streamBase64Chunks(bytes)) send(part); // 固定按 32763 字节（3 的倍数）分块 yield，不整段现造"
           ],
+          "members": [],
           "aliasOf": "streamBase64Chunks",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -7689,6 +9430,7 @@
           "errors": ["No documented errors are declared for tagSerializeError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for tagSerializeError.",
           "examples": [],
+          "members": [],
           "aliasOf": "tagSerializeError",
           "exportPath": "./core",
           "overloadSignatures": [
@@ -7847,6 +9589,7 @@
             "type IJsonPluginOptions = {\n  readonly replacer?: (key: string, value: unknown) => unknown;\n  readonly reviver?: (key: string, value: unknown) => unknown;\n  readonly space?: number;\n  readonly decoder?: ITextDecoder;\n};\n\nfunction jsonParser(options?: IJsonPluginOptions): ISerializeParser; // name: 'json'\nfunction jsonPlugin(options?: IJsonPluginOptions): ISerializePlugin; // type: 'json'",
             "import { jsonParser, jsonPlugin, type IJsonPluginOptions } from '@migaia/serialize/plugins';"
           ],
+          "members": [],
           "aliasOf": "IJsonPluginOptions",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -7918,6 +9661,7 @@
           "examples": [
             "const parser = jsonParser({ reviver: (k, v) => (k === 'date' ? new Date(v as string) : v) });"
           ],
+          "members": [],
           "aliasOf": "jsonParser",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -8062,6 +9806,7 @@
             "import {\n  createSerializeRegistry,\n  bytesToBase64,\n  base64ToBytes,\n  jsonPlugin\n} from '@migaia/serialize';\n\nconst registry = createSerializeRegistry([jsonPlugin()]);\nconst chunk = await registry.encode(largeObject);\nconst wire = chunk[0] === 'bytes' ? bytesToBase64(chunk[1]) : chunk[1];\n// ... 落 localStorage / 内联进 HTML ...\nconst restoredBytes = typeof wire === 'string' ? base64ToBytes(wire) : undefined;\n\n// 应用退出前：最多等待 500ms 排空在途操作，超时也强制释放 parser（不会永久挂起）\nawait registry.dispose({ deadlineAt: Date.now() + 500 });",
             "import {\n  createSerializeRegistry,\n  jsonPlugin,\n  assertSerializeType,\n  type ISerializeParser,\n  type ISerializePlugin\n} from '@migaia/serialize';\n\nfunction makeCborPlugin(type: string): ISerializePlugin {\n  assertSerializeType(type); // 第三方格式名先做一次显式校验，早失败好过注册时才发现\n  const parser: ISerializeParser = {\n    name: 'cbor',\n    encode: (value) => ['bytes', encodeCbor(value)],\n    decode: (chunk) =>\n      decodeCbor(chunk[0] === 'bytes' ? chunk[1] : new TextEncoder().encode(chunk[1] as string)),\n    dispose: () => releaseCborResources()\n  };\n  return { type, parser };\n}\n\nconst registry = createSerializeRegistry([jsonPlugin(), makeCborPlugin('cbor')]);\nawait registry.encode(payload, { type: 'cbor' });"
           ],
+          "members": [],
           "aliasOf": "jsonPlugin",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -8228,6 +9973,7 @@
             "const text = chunkToText(chunk, new TextDecoder());\nconst bytes = chunkToBytes(chunk, new TextEncoder());",
             "chunkToText(chunk, new TextDecoder()); // text 原样返回；bytes 用 decoder 解码；value 抛 TypeError\nchunkToBytes(chunk, new TextEncoder()); // bytes 返回 .slice() 拷贝；text 用 encoder 编码；value 抛 TypeError"
           ],
+          "members": [],
           "exportPath": "./registry",
           "overloadSignatures": [
             "export declare function chunkToBytes(chunk: ISerializeChunk, encoder: ITextEncoder): Uint8Array;"
@@ -8498,6 +10244,7 @@
             "const text = chunkToText(chunk, new TextDecoder());\nconst bytes = chunkToBytes(chunk, new TextEncoder());",
             "chunkToText(chunk, new TextDecoder()); // text 原样返回；bytes 用 decoder 解码；value 抛 TypeError\nchunkToBytes(chunk, new TextEncoder()); // bytes 返回 .slice() 拷贝；text 用 encoder 编码；value 抛 TypeError"
           ],
+          "members": [],
           "exportPath": "./registry",
           "overloadSignatures": [
             "export declare function chunkToText(chunk: ISerializeChunk, decoder: ITextDecoder): string;"
@@ -8779,6 +10526,7 @@
             "import {\n  createSerializeRegistry,\n  bytesToBase64,\n  base64ToBytes,\n  jsonPlugin\n} from '@migaia/serialize';\n\nconst registry = createSerializeRegistry([jsonPlugin()]);\nconst chunk = await registry.encode(largeObject);\nconst wire = chunk[0] === 'bytes' ? bytesToBase64(chunk[1]) : chunk[1];\n// ... 落 localStorage / 内联进 HTML ...\nconst restoredBytes = typeof wire === 'string' ? base64ToBytes(wire) : undefined;\n\n// 应用退出前：最多等待 500ms 排空在途操作，超时也强制释放 parser（不会永久挂起）\nawait registry.dispose({ deadlineAt: Date.now() + 500 });",
             "import {\n  createSerializeRegistry,\n  jsonPlugin,\n  assertSerializeType,\n  type ISerializeParser,\n  type ISerializePlugin\n} from '@migaia/serialize';\n\nfunction makeCborPlugin(type: string): ISerializePlugin {\n  assertSerializeType(type); // 第三方格式名先做一次显式校验，早失败好过注册时才发现\n  const parser: ISerializeParser = {\n    name: 'cbor',\n    encode: (value) => ['bytes', encodeCbor(value)],\n    decode: (chunk) =>\n      decodeCbor(chunk[0] === 'bytes' ? chunk[1] : new TextEncoder().encode(chunk[1] as string)),\n    dispose: () => releaseCborResources()\n  };\n  return { type, parser };\n}\n\nconst registry = createSerializeRegistry([jsonPlugin(), makeCborPlugin('cbor')]);\nawait registry.encode(payload, { type: 'cbor' });"
           ],
+          "members": [],
           "exportPath": "./registry",
           "overloadSignatures": [
             "export declare function createSerializeRegistry(plugins: readonly ISerializePlugin[], options?: ISerializeRegistryOptions): ISerializeRegistry;"
@@ -9174,6 +10922,7 @@
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';",
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic\n} from '@migaia/serialize/registry';"
           ],
+          "members": [],
           "aliasOf": "ISerializeCleanupError",
           "exportPath": "./registry",
           "overloadSignatures": [
@@ -9313,6 +11062,7 @@
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';",
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic\n} from '@migaia/serialize/registry';"
           ],
+          "members": [],
           "aliasOf": "ISerializeRegistryOptions",
           "exportPath": "./registry",
           "overloadSignatures": [
@@ -9452,6 +11202,7 @@
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeScheduler,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';",
             "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic\n} from '@migaia/serialize/registry';"
           ],
+          "members": [],
           "aliasOf": "ISerializeTimeoutDiagnostic",
           "exportPath": "./registry",
           "overloadSignatures": [

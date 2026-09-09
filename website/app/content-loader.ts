@@ -49,6 +49,13 @@ function isGuideNavigationSymbol(api: IApi, symbol: IApiSymbol): boolean {
   ]).has(symbol.name)
 }
 
+/** Includes callable APIs plus WebRPC's runtime specification constants in guide navigation. */
+function isGuideApiLinkSymbol(slug: string, api: IApi, symbol: IApiSymbol): boolean {
+  if (!isGuideNavigationSymbol(api, symbol)) return false
+  if (isCallableApiSymbol(symbol)) return true
+  return slug === 'web-rpc' && api.module === 'transport-constants' && symbol.kind === 'const'
+}
+
 /** Projects complete lightweight API navigation without serializing documentation bodies. */
 export async function loadLibraryApiLinks(slug: string): Promise<readonly IGuideApiLink[]> {
   const loader = libraryShardLoaders[`../src/generated/manifests/libraries/${slug}.json`]
@@ -56,11 +63,11 @@ export async function loadLibraryApiLinks(slug: string): Promise<readonly IGuide
   const module = await loader()
   return module.default.apis.flatMap((api) =>
     api.symbols
-      .filter((symbol) => isCallableApiSymbol(symbol) && isGuideNavigationSymbol(api, symbol))
+      .filter((symbol) => isGuideApiLinkSymbol(slug, api, symbol))
       .map((symbol) => ({
-      module: api.module,
-      name: symbol.name,
-      symbolPath: symbolSlug(symbol, api.symbols)
+        module: api.module,
+        name: symbol.name,
+        symbolPath: symbolSlug(symbol, api.symbols)
       }))
   )
 }
@@ -113,9 +120,7 @@ function projectReaderDocument(document: ILibrary['documentation']['readme'], li
       const heading = section.heading.trim()
       const resourceDecisionContext =
         library === 'resource' &&
-        /^(?:\d+(?:\.\d+)?[.、]?\s*)?(?:这是什么|适合什么场景|用了之后能得到什么)$/.test(
-          heading
-        )
+        /^(?:\d+(?:\.\d+)?[.、]?\s*)?(?:这是什么|适合什么场景|用了之后能得到什么)$/.test(heading)
       if (resourceDecisionContext) return true
       return !/^(?:@|使用手册$|(?:\d+(?:\.\d+)?[.、]?\s*)?(?:这是什么|适合什么场景|安装|目录|构建门禁|核心概念一览|用了之后能得到什么|what (?:this is|it is for|you get)|install(?:ation)?|contents?|build gates?|core concepts?)$)/i.test(
         heading
@@ -233,6 +238,7 @@ function projectSelectedSymbol(symbol: IApiSymbol): IApiSymbol {
       ? ''
       : symbol.lifecycleConcurrency,
     parameterDetails: symbol.parameterDetails,
+    members: symbol.members,
     examples: symbol.examples,
     guidance: symbol.guidance,
     configuration: symbol.configuration,
@@ -296,6 +302,7 @@ function compactSymbol(symbol: IApiSymbol): IApiSymbol {
     errors: [],
     lifecycleConcurrency: '',
     parameterDetails: [],
+    members: [],
     examples: [],
     guidance: [],
     configuration: [],

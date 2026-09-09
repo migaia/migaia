@@ -13349,7 +13349,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '明确需要全部能力',
                     'createFullEndpoint',
-                    'outbound、provider、discovery、control、chunk'
+                    'outbound、provider、discovery、control'
                   ],
                   ['严格控制 bundle 与表面', 'createComposedEndpoint', '只投影显式 Feature']
                 ]
@@ -13425,7 +13425,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     'Explicitly need every capability',
                     'createFullEndpoint',
-                    'outbound, provider, discovery, control, chunk'
+                    'outbound, provider, discovery, control'
                   ],
                   [
                     'Control bundle and surface precisely',
@@ -13694,37 +13694,153 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'web-rpc:endpoint-composition': {
     zh: {
-      title: '选择预设，或组合最小 Endpoint',
-      lede: '先从业务真正需要的根方法反推入口；只有确实需要自定义公开表面时，才使用 Feature 组合器。',
+      title: '五种 Endpoint 创建 API：区别与选择',
+      lede: 'createEndpoint 是功能最全的兼容入口，但不等于所有项目都应该默认使用它。先按宿主角色选择预设，只有需要精确控制公开能力时才自行组合。',
       document: {
         sections: [
           {
-            id: 'presets',
-            heading: '优先选择最窄预设',
+            id: 'direct-answer',
+            heading: '先说结论：哪个是“万能 API”',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'createEndpoint 是“万能 API”。它与 createFullEndpoint 是同一个函数引用，运行结果没有区别：两者都会创建完整预设。createEndpoint 保留根包兼容入口；createFullEndpoint 用名字明确表达“这个宿主确实需要完整能力”。'
+              },
+              {
+                type: 'list',
+                items: [
+                  '新项目确实需要调用远端、提供本地方法、发现对端和控制能力时，优先写 createFullEndpoint，让意图一眼可见。',
+                  '迁移旧代码、暂时无法确定宿主角色，或需要兼容根入口时，可以继续使用 createEndpoint。',
+                  '只调用远端时不要为了“以后可能会用”而选万能入口；createClientEndpoint 更容易审查，也不会向业务代码暴露无关方法。',
+                  '完整预设不等于自动获得 transport、协议、心跳、契约或分片策略；这些行为仍由 transport 与 middleware 配置。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'comparison',
+            heading: '五个工厂到底有什么区别',
             blocks: [
               {
                 type: 'table',
-                headers: ['需要', '入口', '根对象方法'],
+                headers: ['API', '宿主得到的能力', '适合场景', '是否建议作为默认'],
                 rows: [
                   [
-                    '只调用或通知远端',
-                    '@migaia/web-rpc/client',
-                    'send、sendAll、dispatch、dispatchAll'
+                    'createClientEndpoint',
+                    'send、sendAll、dispatch、dispatchAll',
+                    '页面、Worker 或服务只调用别的宿主',
+                    '纯调用方首选'
                   ],
-                  ['同时暴露本地方法', '@migaia/web-rpc/provider', '调用侧方法 + provide'],
-                  ['发现、控制和分片全部需要', '@migaia/web-rpc/full', '完整公开表面'],
-                  ['精确控制能力与 bundle', '@migaia/web-rpc/core', '仅显式 Feature 的公开投影']
+                  [
+                    'createProviderEndpoint',
+                    '调用侧方法 + provide',
+                    '既提供业务方法，也可能回调其他宿主',
+                    '服务提供方首选'
+                  ],
+                  [
+                    'createFullEndpoint',
+                    'provider + discovery + control 的完整预设',
+                    '一个宿主明确需要完整内建表面',
+                    '全功能新代码首选'
+                  ],
+                  [
+                    'createEndpoint',
+                    '与 createFullEndpoint 完全相同',
+                    '旧代码兼容、迁移期、通用示例',
+                    '不是窄角色的默认'
+                  ],
+                  [
+                    'createComposedEndpoint',
+                    '只公开传入 Feature 的投影',
+                    '能力最小化、包体边界或自定义组合',
+                    '高级入口'
+                  ]
                 ]
               },
               {
                 type: 'paragraph',
-                text: '根入口 createEndpoint 与 createFullEndpoint 是同一函数引用。它是兼容性入口，不是所有调用方的最小默认选择。'
+                text: '这里的“provider + discovery + control”描述的是根对象公开能力。provider 会带上不可分割的 outbound 依赖，因此提供方也能主动调用远端。ping、contract、protocol、chunk 等是 middleware，不是另一个 Endpoint 工厂。'
+              }
+            ]
+          },
+          {
+            id: 'decision',
+            heading: '按这四个问题选择，不用背 API 名字',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '宿主只发起调用或通知？使用 createClientEndpoint。',
+                  '宿主要注册 provide(...) 接收远端调用？使用 createProviderEndpoint。',
+                  '宿主还要使用发现、控制等完整内建能力？使用 createFullEndpoint。',
+                  '你能明确列出要公开哪些 Feature，并且要限制权限或 bundle？使用 createComposedEndpoint。',
+                  '仍在迁移，暂时无法回答上述问题？先保留 createEndpoint，并把缩窄入口列为迁移任务。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'preset-features',
+            heading: '每个预设实际内置哪些 Feature',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['预设', '工厂直接选择', '依赖展开后实际安装', '公开到根对象'],
+                rows: [
+                  [
+                    'createClientEndpoint',
+                    'outbound()',
+                    'outbound',
+                    'send、sendAll、dispatch、dispatchAll'
+                  ],
+                  [
+                    'createProviderEndpoint',
+                    'provider()',
+                    'outbound → provider',
+                    'outbound 的四个方法 + provide'
+                  ],
+                  [
+                    'createFullEndpoint / createEndpoint',
+                    'provider()、discovery()、control()',
+                    'outbound → provider + discovery → control',
+                    '调用、provide、connect、discovery，以及由 middleware 启用的 ping/pingAll'
+                  ]
+                ]
+              },
+              {
+                type: 'list',
+                items: [
+                  'outbound 是远端调用出口，负责 send、sendAll、dispatch、dispatchAll。',
+                  'provider 依赖 outbound：它在同一宿主上增加 provide，而不是创建一个只能接收请求的端点。',
+                  'discovery 也依赖 outbound：它增加 connect 与 discovery 控制对象，用来维护和选择远端实例。',
+                  'control 依赖 outbound 与 discovery：它承载 ping/pingAll 控制面，但只有同时安装 ping middleware 时，这两个方法才成为可用能力。',
+                  '依赖 Feature 会由组合器自动安装并去重；开发者不应在 provider 或 full 预设外再手动重复加入 outbound。'
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '因此，“内置 Feature”描述的是能力模块的安装闭包；middleware 描述的是运行策略。比如 full 内置 control Feature，但没有 ping middleware 时，不能把它理解为已经配置好了心跳。'
+              }
+            ]
+          },
+          {
+            id: 'preset-examples',
+            heading: '同一个业务，三种宿主角色分别怎么写',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createProviderEndpoint } from '@migaia/web-rpc/provider'\nimport { createFullEndpoint } from '@migaia/web-rpc/full'\n\n// 只调用库存服务：根对象没有 provide。\nconst storefront = await createClientEndpoint({\n  id: 'storefront',\n  targetIds: ['inventory'],\n  transport: storefrontTransport,\n  middlewares: [connect({ transport: storefrontTransport })] as const\n})\nconst stock = await storefront.send<number>('inventory', 'getStock', 'sku-42')\n\n// 提供库存方法：同时保留主动调用其他宿主的能力。\nconst inventory = await createProviderEndpoint({\n  id: 'inventory',\n  transport: inventoryTransport,\n  middlewares: [connect({ transport: inventoryTransport })] as const\n})\ninventory.provide('getStock', ({ success }) => success(12))\n\n// 运维宿主明确需要完整的发现与控制表面。\nconst operations = await createFullEndpoint({\n  id: 'operations',\n  transport: operationsTransport,\n  middlewares: [connect({ transport: operationsTransport })] as const\n})\nconst peers = operations.discovery.getServerList()"
+              },
+              {
+                type: 'paragraph',
+                text: '工厂负责决定宿主根对象上能做什么；connect 负责把 transport 接入运行时。换成 Window、MessagePort、Worker、BroadcastChannel 或 WebTransport 时，选择工厂的规则不变，变化的是 transport 的创建方式与信任边界。'
               }
             ]
           },
           {
             id: 'compose',
-            heading: '把 Feature 与 middleware 分开组合',
+            heading: '什么时候才需要 createComposedEndpoint',
             blocks: [
               {
                 type: 'code',
@@ -13735,9 +13851,24 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 type: 'list',
                 items: [
                   'Feature 决定根对象公开什么；middleware 配置协议、连接与策略。',
+                  '它不是比 createEndpoint 更强的“超级入口”，而是让公开能力更少、更精确的底层组合器。',
                   '私有 Feature 依赖会安装并去重，但不会偷偷扩大根对象类型。',
                   'Feature tuple 不能为空且不能重复；冲突在构造期失败。',
                   '使用 as const 保留 ping 和手动发现等条件能力的精确类型。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'mistakes',
+            heading: '三个最常见的误区',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '误区一：用了 createFullEndpoint 就不必配置 middleware。实际仍需 connect，并按业务加入 contract、protocol、ping、chunk 等策略。',
+                  '误区二：provider 只能被调用。实际 provider Feature 依赖 outbound，所以它也能 send 或 dispatch。',
+                  '误区三：createComposedEndpoint 一定更好。只有边界、权限或 bundle 收益值得额外组合成本时才使用；普通业务优先选择预设。'
                 ]
               }
             ]
@@ -13755,54 +13886,164 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
+        { label: '扩展 Feature 与编写 Middleware', path: 'extension-authoring' },
         { label: '调用与取消', path: 'calls-and-cancellation' },
         { label: 'createComposedEndpoint API', path: 'docs/web-rpc/core/createComposedEndpoint' }
       ]
     },
     en: {
-      title: 'Choose a preset or compose the smallest endpoint',
-      lede: 'Derive the entry point from the root methods the product actually needs. Use Feature composition only when the public surface must be customized.',
+      title: 'Five endpoint factories: differences and selection',
+      lede: 'createEndpoint is the full compatibility entry, but it is not the right default for every application. Choose a preset by host role and compose Features only when the public surface must be exact.',
       document: {
         sections: [
           {
-            id: 'presets',
-            heading: 'Prefer the narrowest preset',
+            id: 'direct-answer',
+            heading: 'Direct answer: which API is universal?',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'createEndpoint is the universal API. It is the same function reference as createFullEndpoint, so their runtime behavior is identical. createEndpoint preserves the root compatibility entry; createFullEndpoint states explicitly that this host needs the complete preset.'
+              },
+              {
+                type: 'list',
+                items: [
+                  'Use createFullEndpoint when new code genuinely needs calls, providers, discovery, and control.',
+                  'Keep createEndpoint for existing code, migrations, or a temporarily unknown host role.',
+                  'Do not select the universal entry for a caller-only host just in case; createClientEndpoint makes authority and intent easier to review.',
+                  'A full preset does not configure transport, protocol, heartbeat, contracts, or chunking automatically; transport and middleware still do that work.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'comparison',
+            heading: 'What each factory gives the host',
             blocks: [
               {
                 type: 'table',
-                headers: ['Need', 'Entry', 'Root methods'],
+                headers: ['API', 'Host capability', 'Best fit', 'Default?'],
                 rows: [
                   [
-                    'Only call or notify remote peers',
-                    '@migaia/web-rpc/client',
-                    'send, sendAll, dispatch, dispatchAll'
+                    'createClientEndpoint',
+                    'send, sendAll, dispatch, dispatchAll',
+                    'A host that only calls other hosts',
+                    'Best caller preset'
                   ],
                   [
-                    'Also expose local methods',
-                    '@migaia/web-rpc/provider',
-                    'Outbound methods plus provide'
+                    'createProviderEndpoint',
+                    'Outbound methods plus provide',
+                    'A service that exposes methods and may call back',
+                    'Best provider preset'
                   ],
                   [
-                    'Need discovery, control, and chunking',
-                    '@migaia/web-rpc/full',
-                    'Complete public surface'
+                    'createFullEndpoint',
+                    'provider + discovery + control preset',
+                    'A host that explicitly needs the complete built-in surface',
+                    'Best full preset'
                   ],
                   [
-                    'Control capability and bundle precisely',
-                    '@migaia/web-rpc/core',
-                    'Only selected Feature projections'
+                    'createEndpoint',
+                    'Exactly the same as createFullEndpoint',
+                    'Compatibility, migration, and generic examples',
+                    'Not the narrow-role default'
+                  ],
+                  [
+                    'createComposedEndpoint',
+                    'Only the supplied Feature projections',
+                    'Least authority, bundle boundaries, custom composition',
+                    'Advanced entry'
                   ]
                 ]
               },
               {
                 type: 'paragraph',
-                text: 'The root createEndpoint export is the same function reference as createFullEndpoint. It is a compatibility entry, not the smallest default for every consumer.'
+                text: 'provider, discovery, and control describe the root surface. Provider carries its inseparable outbound dependency, so a provider can also call peers. ping, contract, protocol, and chunk are middleware rather than endpoint factories.'
+              }
+            ]
+          },
+          {
+            id: 'decision',
+            heading: 'Choose by four questions',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Does the host only initiate calls or notifications? Use createClientEndpoint.',
+                  'Must it register provide(...) handlers? Use createProviderEndpoint.',
+                  'Does it also need the complete discovery and control surface? Use createFullEndpoint.',
+                  'Can you name the exact Features and need to constrain authority or bundle size? Use createComposedEndpoint.',
+                  'Still migrating and unable to answer yet? Keep createEndpoint temporarily and record narrowing as migration work.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'preset-features',
+            heading: 'Features installed by each preset',
+            blocks: [
+              {
+                type: 'table',
+                headers: [
+                  'Preset',
+                  'Direct selection',
+                  'Installed dependency closure',
+                  'Exposed on the root'
+                ],
+                rows: [
+                  [
+                    'createClientEndpoint',
+                    'outbound()',
+                    'outbound',
+                    'send, sendAll, dispatch, dispatchAll'
+                  ],
+                  [
+                    'createProviderEndpoint',
+                    'provider()',
+                    'outbound → provider',
+                    'The four outbound methods plus provide'
+                  ],
+                  [
+                    'createFullEndpoint / createEndpoint',
+                    'provider(), discovery(), control()',
+                    'outbound → provider + discovery → control',
+                    'Calls, provide, connect, discovery, and middleware-enabled ping/pingAll'
+                  ]
+                ]
+              },
+              {
+                type: 'list',
+                items: [
+                  'outbound owns remote calls through send, sendAll, dispatch, and dispatchAll.',
+                  'provider depends on outbound. It adds provide to the same host rather than creating a receive-only endpoint.',
+                  'discovery also depends on outbound. It adds connect and discovery controls for maintaining and selecting remote instances.',
+                  'control depends on outbound and discovery. It owns ping/pingAll, but those methods become usable only when ping middleware is also installed.',
+                  'The composer installs and deduplicates dependency Features automatically; do not add outbound again around provider or full presets.'
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '“Built-in Features” therefore means the installed capability closure, while middleware defines runtime policy. Full includes the control Feature, but without ping middleware it does not mean heartbeat behavior has been configured.'
+              }
+            ]
+          },
+          {
+            id: 'preset-examples',
+            heading: 'One business flow, three host roles',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createProviderEndpoint } from '@migaia/web-rpc/provider'\nimport { createFullEndpoint } from '@migaia/web-rpc/full'\n\nconst storefront = await createClientEndpoint({\n  id: 'storefront', targetIds: ['inventory'], transport: storefrontTransport,\n  middlewares: [connect({ transport: storefrontTransport })] as const\n})\nconst stock = await storefront.send<number>('inventory', 'getStock', 'sku-42')\n\nconst inventory = await createProviderEndpoint({\n  id: 'inventory', transport: inventoryTransport,\n  middlewares: [connect({ transport: inventoryTransport })] as const\n})\ninventory.provide('getStock', ({ success }) => success(12))\n\nconst operations = await createFullEndpoint({\n  id: 'operations', transport: operationsTransport,\n  middlewares: [connect({ transport: operationsTransport })] as const\n})\nconst peers = operations.discovery.getServerList()"
+              },
+              {
+                type: 'paragraph',
+                text: 'The factory decides what the host can do on its root object; connect attaches a transport to the runtime. Window, MessagePort, Worker, BroadcastChannel, and WebTransport change transport construction and trust boundaries, not this factory-selection rule.'
               }
             ]
           },
           {
             id: 'compose',
-            heading: 'Compose Features separately from middleware',
+            heading: 'When createComposedEndpoint is appropriate',
             blocks: [
               {
                 type: 'code',
@@ -13813,9 +14054,24 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 type: 'list',
                 items: [
                   'Features decide what appears on the root; middleware configures protocol, connection, and policy.',
+                  'It is not a stronger super-factory; it is a lower-level composer that makes the public surface smaller and exact.',
                   'Private Feature dependencies are installed and deduplicated without silently widening the root type.',
                   'The Feature tuple cannot be empty or contain duplicates; conflicts fail during construction.',
                   'Keep tuples as const to preserve conditional ping and manual-discovery capabilities.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'mistakes',
+            heading: 'Three common mistakes',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'createFullEndpoint does not replace middleware. You still need connect and any contract, protocol, ping, or chunk policies required by the application.',
+                  'A provider is not receive-only. Its Feature depends on outbound, so it can send and dispatch too.',
+                  'createComposedEndpoint is not automatically better. Prefer a preset unless boundary, authority, or bundle gains justify composition cost.'
                 ]
               }
             ]
@@ -13833,8 +14089,199 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
+        { label: 'Extend Features and author middleware', path: 'extension-authoring' },
         { label: 'Calls and cancellation', path: 'calls-and-cancellation' },
         { label: 'createComposedEndpoint API', path: 'docs/web-rpc/core/createComposedEndpoint' }
+      ]
+    }
+  },
+  'web-rpc:extension-authoring': {
+    zh: {
+      title: '扩展 WebRPC：Feature 边界与自定义 Middleware',
+      lede: 'Feature 改变 Endpoint 的根能力，middleware 改变运行策略。当前公开扩展点允许编写 middleware，但 Feature token 仍由 WebRPC 包拥有。',
+      document: {
+        sections: [
+          {
+            id: 'boundary',
+            heading: '先判断你要扩展的是能力还是策略',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['需求', '正确入口', '原因'],
+                rows: [
+                  [
+                    '选择已有根方法',
+                    'createComposedEndpoint + 官方 Feature',
+                    '只投影需要的 outbound、provider、discovery、control'
+                  ],
+                  [
+                    '日志、诊断、连接策略、资源管理',
+                    '自定义 IWebRpcPlugin middleware',
+                    '不改变 Endpoint 的核心所有权与路由协议'
+                  ],
+                  [
+                    '增加新的根方法或协议路由',
+                    '暂不属于公开扩展面',
+                    'Feature token 是不可构造的 opaque 类型，defineEndpointModule 未公开'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '不要用类型断言伪造 IWebRpcEndpointModule，也不要从 internal 路径导入 defineEndpointModule。这样会绕过依赖闭包、声明校验、回滚和公开表面投影，并且可能在任意小版本失效。需要新的根能力时，应在 WebRPC 包内新增一等 Feature，完成依赖、路由、公开键与生命周期验证后再公开。'
+              }
+            ]
+          },
+          {
+            id: 'custom-middleware',
+            heading: '编写一个可释放的自定义 Middleware',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IWebRpcPlugin } from '@migaia/web-rpc'\n\nconst emptyClaims = Object.freeze({\n  routes: [],\n  provides: [],\n  consumes: [],\n  publicKeys: [],\n  exposedKeys: [],\n  activator: false\n})\n\nexport function reportTransportErrors(\n  report: (error: unknown) => void\n): IWebRpcPlugin {\n  return Object.freeze({\n    name: 'app:report-transport-errors',\n    metadata: Object.freeze({ claims: emptyClaims }),\n    install(scope) {\n      const unsubscribe = scope.transport.onTransportError?.(report)\n\n      if (unsubscribe) {\n        // scope owns cleanup; endpoint.dispose() and construction rollback both call it.\n        scope.own(unsubscribe, () => unsubscribe())\n      }\n\n      return {\n        extension: Object.freeze({}),\n        shared: Object.freeze({})\n      }\n    }\n  })\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'name 必须稳定且可诊断；同一批次不要安装重名插件。',
+                  'metadata.claims 必须如实声明 routes、provides、consumes、publicKeys、exposedKeys 与 activator；空声明代表该插件只管理旁路行为。',
+                  'install 只能使用 scope 提供的 id、transport、signal、hooks、getShared 与 own，不应捕获另一个 Endpoint 的内部状态。',
+                  '所有订阅、计时器和外部句柄都交给 scope.own；构造失败会回滚，dispose 会按生命周期释放。',
+                  'extension 和 shared 即使为空也必须返回冻结对象，避免安装后偷偷改变声明。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'install-middleware',
+            heading: '把 Middleware 安装到宿主',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { reportTransportErrors } from './report-transport-errors.js'\n\nconst client = await createClientEndpoint({\n  id: 'storefront',\n  targetIds: ['catalog'],\n  transport,\n  middlewares: [\n    connect({ transport }),\n    reportTransportErrors((error) => diagnostics.capture(error))\n  ] as const\n})\n\ntry {\n  await client.send('catalog', 'findProduct', { id: 'sku-42' })\n} finally {\n  await client.dispose() // 同时解除 transport error 订阅\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'middleware 跟随每个 Endpoint 实例安装。不要创建一个插件实例后跨多个宿主共享可变状态；如果确实需要共享诊断后端，把后端作为无状态依赖传入 factory，每个宿主仍创建自己的 middleware 实例。'
+              }
+            ]
+          },
+          {
+            id: 'feature-path',
+            heading: '如果确实需要新的 Feature',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '先确认需求不能由现有 Feature + middleware 完成；协议、认证、超时、分片和诊断通常都是 middleware。',
+                  '明确新增根方法、消息路由、依赖 Feature、共享端口、公开键与释放顺序。',
+                  '在 packages/web-rpc 内实现并注册 Feature，由包级测试验证重复安装、依赖去重、构造回滚、dispose 幂等与类型投影。',
+                  '只有形成稳定公共契约后才新增公开 features/<name> 子路径；在此之前应用代码不要依赖 internal 文件。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '返回 Endpoint 选择指南', path: 'endpoint-composition' },
+        { label: 'Hooks 与生命周期 API', path: 'docs/web-rpc/hooks' }
+      ]
+    },
+    en: {
+      title: 'Extend WebRPC: Feature boundaries and custom middleware',
+      lede: 'Features change root capabilities while middleware changes runtime policy. The public extension point supports custom middleware; Feature tokens remain owned by the WebRPC package.',
+      document: {
+        sections: [
+          {
+            id: 'boundary',
+            heading: 'Decide whether the extension is capability or policy',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Need', 'Supported entry', 'Why'],
+                rows: [
+                  [
+                    'Select existing root methods',
+                    'createComposedEndpoint + first-party Features',
+                    'Project only outbound, provider, discovery, and control as needed'
+                  ],
+                  [
+                    'Logging, diagnostics, connection policy, resource ownership',
+                    'Custom IWebRpcPlugin middleware',
+                    'Preserves endpoint ownership and routing contracts'
+                  ],
+                  [
+                    'Add a new root method or protocol route',
+                    'Not a public extension surface yet',
+                    'Feature tokens are opaque and defineEndpointModule is internal'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Do not cast an object to IWebRpcEndpointModule or import defineEndpointModule from an internal path. That bypasses dependency closure, claim validation, rollback, and public projection, and may break in any minor release. A new root capability must become a first-class package-owned Feature with dependency, routing, surface, and lifecycle verification.'
+              }
+            ]
+          },
+          {
+            id: 'custom-middleware',
+            heading: 'Author disposable custom middleware',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type { IWebRpcPlugin } from '@migaia/web-rpc'\n\nconst emptyClaims = Object.freeze({\n  routes: [], provides: [], consumes: [],\n  publicKeys: [], exposedKeys: [], activator: false\n})\n\nexport function reportTransportErrors(\n  report: (error: unknown) => void\n): IWebRpcPlugin {\n  return Object.freeze({\n    name: 'app:report-transport-errors',\n    metadata: Object.freeze({ claims: emptyClaims }),\n    install(scope) {\n      const unsubscribe = scope.transport.onTransportError?.(report)\n      if (unsubscribe) scope.own(unsubscribe, () => unsubscribe())\n\n      return {\n        extension: Object.freeze({}),\n        shared: Object.freeze({})\n      }\n    }\n  })\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'Use a stable diagnostic name and never install duplicate names in one batch.',
+                  'metadata.claims must truthfully declare routes, provides, consumes, publicKeys, exposedKeys, and activator. Empty claims mean side-channel behavior only.',
+                  'install should use only the scope-owned id, transport, signal, hooks, getShared, and own capabilities.',
+                  'Hand every subscription, timer, and external handle to scope.own so construction rollback and dispose both release it.',
+                  'Return frozen extension and shared objects even when empty.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'install-middleware',
+            heading: 'Install middleware on a host',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { reportTransportErrors } from './report-transport-errors.js'\n\nconst client = await createClientEndpoint({\n  id: 'storefront',\n  targetIds: ['catalog'],\n  transport,\n  middlewares: [\n    connect({ transport }),\n    reportTransportErrors((error) => diagnostics.capture(error))\n  ] as const\n})\n\ntry {\n  await client.send('catalog', 'findProduct', { id: 'sku-42' })\n} finally {\n  await client.dispose() // also removes the transport-error subscription\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'Middleware installs per endpoint instance. Do not reuse one mutable plugin instance across hosts. If hosts share a diagnostic backend, pass that stateless backend into a factory and create one middleware instance per host.'
+              }
+            ]
+          },
+          {
+            id: 'feature-path',
+            heading: 'When a new Feature is genuinely required',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'First prove existing Features plus middleware cannot satisfy the requirement. Protocol, authentication, timeout, chunking, and diagnostics are normally middleware.',
+                  'Specify new root methods, message routes, Feature dependencies, shared ports, public keys, and disposal order.',
+                  'Implement and register it inside packages/web-rpc with package tests for duplicates, dependency deduplication, construction rollback, idempotent disposal, and type projection.',
+                  'Add a public features/<name> subpath only after the contract is stable; application code must not depend on internal files meanwhile.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Back to Endpoint selection', path: 'endpoint-composition' },
+        { label: 'Hooks and lifecycle API', path: 'docs/web-rpc/hooks' }
       ]
     }
   },
@@ -17290,6 +17737,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ['输出第一条可观察日志', '快速开始', 'console 与 failure observer 闭环'],
                   ['控制 entry 经过哪些处理', 'Entry、hook 与 sink', '明确 mutation 与输出边界'],
                   ['组合 level、color、batch、http', '插件与批处理', '正确顺序和有界队列'],
+                  ['给 Logger 增加业务能力', '编写自定义插件', '扩展方法、流水线与资源清理'],
                   ['拦截或异步包围日志', 'Pipelines', '选择固定执行模型'],
                   ['确保退出前完成输出', 'Flush 与 shutdown', '有界 drain 与终态'],
                   ['跨环境或多 Logger 转发', 'Runtime 与 forwarding', '宿主适配和防环转发']
@@ -17302,6 +17750,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       next: [
         { label: '快速开始', path: 'getting-started' },
         { label: '插件与批处理', path: 'plugins-and-batching' },
+        { label: '编写自定义插件', path: 'custom-plugin' },
         { label: 'Logger API', path: 'docs/logger/Logger' }
       ]
     },
@@ -17334,6 +17783,11 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Correct ordering and bounded queues'
                   ],
                   [
+                    'Add domain capabilities to Logger',
+                    'Author a custom plugin',
+                    'Extension methods, pipelines, and cleanup'
+                  ],
+                  [
                     'Intercept or wrap logging asynchronously',
                     'Pipelines',
                     'One explicit execution model'
@@ -17357,6 +17811,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       next: [
         { label: 'Getting started', path: 'getting-started' },
         { label: 'Plugins and batching', path: 'plugins-and-batching' },
+        { label: 'Author a custom plugin', path: 'custom-plugin' },
         { label: 'Logger API', path: 'docs/logger/Logger' }
       ]
     }
@@ -17726,6 +18181,202 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       next: [
         { label: 'HTTP configuration reference', path: 'docs/logger/plugins/http' },
         { label: 'Flush and shutdown', path: 'flush-and-shutdown' }
+      ]
+    }
+  },
+  'logger:custom-plugin': {
+    zh: {
+      title: '编写一个可安装、可释放的 Logger 插件',
+      lede: '自定义插件不是一段孤立回调：它声明配置和宿主扩展，在 install 中连接 Logger 流水线，并把所有资源交还给 Logger 生命周期。',
+      document: {
+        sections: [
+          {
+            id: 'choose-capability',
+            heading: '先决定插件要给宿主增加什么',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['目标', '使用的契约', '安装后宿主的变化'],
+                rows: [
+                  ['新增业务方法', 'install 返回 extension object', 'Logger 实例获得有类型的方法'],
+                  ['修改或拦截日志', 'usePipeline / useAsyncPipeline', '已有 log 调用经过新规则'],
+                  ['增加输出目的地', 'useSink', '通过流水线的 entry 送到新 sink'],
+                  ['提供插件间能力', 'shared + getShared', '后装的消费插件可以读取能力'],
+                  ['等待异步输出', 'defer / onFlush', 'flush 与 shutdown 能观察完成'],
+                  ['释放监听器或连接', 'onDispose', '卸载或 shutdown 时不会泄漏资源']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '只改变现有日志行为时，插件可以返回空对象；只有业务确实需要从 Logger 主动调用新操作时才增加 extension 方法。插件不得绕过 core 私自保存全局 Logger，也不要让 sink 中的异步任务脱离 flush 与 shutdown。'
+              }
+            ]
+          },
+          {
+            id: 'complete-plugin',
+            heading: '完整示例：给宿主增加 audit() 并投递审计 entry',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type {\n  ILogEntry,\n  ILoggerPlugin,\n  ILoggerPluginCore\n} from '@migaia/logger'\n\ntype IAuditPluginConfig = {\n  service: string\n  deliver(entry: Readonly<ILogEntry>): void | Promise<void>\n}\n\ntype IAuditPluginExtension = {\n  audit(event: string, data: Record<string, unknown>): void\n}\n\nconst AUDIT_PLUGIN_NAME = 'audit' as const\n\nfunction auditPlugin(\n  config: IAuditPluginConfig\n): ILoggerPlugin<IAuditPluginExtension, IAuditPluginConfig> {\n  return {\n    name: AUDIT_PLUGIN_NAME,\n    config,\n    install(core: ILoggerPluginCore) {\n      // 读取 Host 接纳后的不可变配置快照。\n      const resolved = core.config.get<IAuditPluginConfig>()\n\n      // sink 返回 Promise；Logger 会让 flush() 和 shutdown() 等待它。\n      const stopSink = core.useSink((entry) => resolved.deliver(entry))\n      core.onDispose(stopSink)\n\n      // 返回值会按类型安全地投影到安装后的 Logger 实例。\n      return {\n        audit(event, data) {\n          core.dispatchRaw({\n            tag: 'audit',\n            message: event,\n            data: { ...data, service: resolved.service }\n          })\n        }\n      }\n    }\n  }\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'name 是同一 Logger 内的唯一插件身份；重复 name 会在安装阶段失败，不会静默覆盖。',
+                  'config 是调用方输入；install 内统一通过 core.config.get() 读取 Host 接纳后的快照。',
+                  'install 返回的 audit 是宿主新能力；它使用 dispatchRaw 进入正常 pipeline、hook 与 sink。',
+                  'useSink 返回的撤销函数交给 onDispose，因此动态移除和 shutdown 都能清理它。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'install-and-use',
+            heading: '安装后从宿主调用真实能力',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Logger, type ILogEntry } from '@migaia/logger'\nimport { color } from '@migaia/logger/plugins'\n\nconst deliveredEntries: ILogEntry[] = []\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    auditPlugin({\n      service: 'checkout',\n      deliver: async (entry) => {\n        deliveredEntries.push(entry)\n      }\n    }),\n    color()\n  ] as const\n})\n\n// audit() 由插件增加；普通 Logger 没有这个方法。\nlogger.audit('refund-approved', { orderId: 'order-42', amount: 1200 })\n\n// flush 确认 sink 已处理审计日志，再向业务调用方确认操作完成。\nawait logger.flush()\nconsole.assert(deliveredEntries[0]?.tag === 'audit')\nconsole.assert(deliveredEntries[0]?.data.service === 'checkout')\nawait logger.shutdown('manual')"
+              },
+              {
+                type: 'paragraph',
+                text: '构造期把 plugins 写成 as const，TypeScript 才能保留每个插件贡献的 extension 类型。动态安装时使用 const extended = logger.use(auditPlugin(...)) 并从 extended 调用新方法；原变量的静态类型不会自动变宽。'
+              }
+            ]
+          },
+          {
+            id: 'production-boundaries',
+            heading: '生产插件必须处理的边界',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  '流水线模式：sync 插件用 usePipeline；需要 await next(entry) 时，宿主选择 async mode 并使用 useAsyncPipeline。',
+                  '失败：异步 sink 直接返回 Promise，让 Logger 通过 onFailure 报告，并让 flush 观察；不要 catch 后静默吞掉。',
+                  '资源：事件监听器、timer、socket 和订阅都通过 onDispose 登记；清理函数应可重复调用。',
+                  '共享能力：provider 的 shared 必须先于 consumer 安装；共享 key 冲突会使装配失败。',
+                  '实例所有权：有状态插件工厂每次返回新实例；不要把同一个插件对象安装到多个 Logger。',
+                  '验证：至少测试扩展方法、pipeline 顺序、sink 失败、flush 等待、移除与 shutdown 清理。'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: '内置插件与批处理', path: 'plugins-and-batching' },
+        { label: '选择 pipeline 模式', path: 'pipelines' },
+        { label: 'ILoggerPlugin 类型参考', path: 'docs/logger/ILoggerPlugin' }
+      ]
+    },
+    en: {
+      title: 'Author an installable and disposable Logger plugin',
+      lede: 'A custom plugin declares configuration and Host extensions, connects to the Logger flow during install, and returns every resource to the Logger lifecycle.',
+      document: {
+        sections: [
+          {
+            id: 'choose-capability',
+            heading: 'First decide what the plugin adds to its Host',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Goal', 'Contract', 'Change to the installed Host'],
+                rows: [
+                  [
+                    'Add a domain method',
+                    'extension object returned by install',
+                    'The Logger instance gains typed methods'
+                  ],
+                  [
+                    'Change or reject logs',
+                    'usePipeline / useAsyncPipeline',
+                    'Existing log calls pass through a new rule'
+                  ],
+                  ['Add an output destination', 'useSink', 'Accepted entries reach another sink'],
+                  [
+                    'Provide plugin-to-plugin capability',
+                    'shared + getShared',
+                    'A later consumer can read it'
+                  ],
+                  [
+                    'Track asynchronous output',
+                    'defer / onFlush',
+                    'flush and shutdown await completion'
+                  ],
+                  [
+                    'Release listeners or connections',
+                    'onDispose',
+                    'Uninstall and shutdown leak no resources'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'A behavior-only plugin may return an empty object. Add extension methods only when application code genuinely needs a new Logger operation. Never retain a global Logger behind core or start sink work that flush and shutdown cannot observe.'
+              }
+            ]
+          },
+          {
+            id: 'complete-plugin',
+            heading: 'Complete example: add audit() and deliver audit entries',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import type {\n  ILogEntry,\n  ILoggerPlugin,\n  ILoggerPluginCore\n} from '@migaia/logger'\n\ntype IAuditPluginConfig = {\n  service: string\n  deliver(entry: Readonly<ILogEntry>): void | Promise<void>\n}\n\ntype IAuditPluginExtension = {\n  audit(event: string, data: Record<string, unknown>): void\n}\n\nconst AUDIT_PLUGIN_NAME = 'audit' as const\n\nfunction auditPlugin(\n  config: IAuditPluginConfig\n): ILoggerPlugin<IAuditPluginExtension, IAuditPluginConfig> {\n  return {\n    name: AUDIT_PLUGIN_NAME,\n    config,\n    install(core: ILoggerPluginCore) {\n      const resolved = core.config.get<IAuditPluginConfig>()\n      const stopSink = core.useSink((entry) => resolved.deliver(entry))\n      core.onDispose(stopSink)\n      return {\n        audit(event, data) {\n          core.dispatchRaw({\n            tag: 'audit',\n            message: event,\n            data: { ...data, service: resolved.service }\n          })\n        }\n      }\n    }\n  }\n}"
+              },
+              {
+                type: 'list',
+                items: [
+                  'name is the unique plugin identity within one Logger; duplicates fail during installation.',
+                  'install reads the Host-admitted configuration snapshot through core.config.get().',
+                  'The returned audit function is the new Host capability and dispatches through normal pipelines, hooks, and sinks.',
+                  'The sink disposer is registered with onDispose, so dynamic removal and shutdown both clean it up.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'install-and-use',
+            heading: 'Invoke the real capability from the installed Host',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { Logger, type ILogEntry } from '@migaia/logger'\nimport { color } from '@migaia/logger/plugins'\n\nconst deliveredEntries: ILogEntry[] = []\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    auditPlugin({\n      service: 'checkout',\n      deliver: async (entry) => {\n        deliveredEntries.push(entry)\n      }\n    }),\n    color()\n  ] as const\n})\n\nlogger.audit('refund-approved', { orderId: 'order-42', amount: 1200 })\nawait logger.flush()\nconsole.assert(deliveredEntries[0]?.tag === 'audit')\nconsole.assert(deliveredEntries[0]?.data.service === 'checkout')\nawait logger.shutdown('manual')"
+              },
+              {
+                type: 'paragraph',
+                text: 'Keep plugins as a const tuple so TypeScript preserves every contributed extension. For dynamic installation, capture const extended = logger.use(auditPlugin(...)); the original variable does not widen automatically.'
+              }
+            ]
+          },
+          {
+            id: 'production-boundaries',
+            heading: 'Production boundaries every plugin must cover',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Pipeline mode: usePipeline belongs to sync Hosts; await next(entry) requires an async Host and useAsyncPipeline.',
+                  'Failure: return sink Promises so onFailure reports them and flush observes them; never catch and silently swallow.',
+                  'Resources: register listeners, timers, sockets, and subscriptions with onDispose using idempotent cleanup.',
+                  'Shared capability: install the provider before its consumer; duplicate shared keys fail composition.',
+                  'Instance ownership: create a fresh stateful plugin instance for every Logger.',
+                  'Verification: test extension methods, pipeline order, sink failure, flush waiting, removal, and shutdown cleanup.'
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        { label: 'Built-in plugins and batching', path: 'plugins-and-batching' },
+        { label: 'Choose a pipeline mode', path: 'pipelines' },
+        { label: 'ILoggerPlugin type reference', path: 'docs/logger/ILoggerPlugin' }
       ]
     }
   },

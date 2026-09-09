@@ -69,10 +69,27 @@
       "exports": ["."]
     },
     {
+      "slug": "rpc-contract",
+      "description": "Runtime-neutral RPC semantic and framing contracts.",
+      "version": "0.0.1",
+      "exports": [".", "./framing"]
+    },
+    {
       "slug": "serialize",
       "description": "Store-neutral chunked serialization and codec registry.",
       "version": "0.0.4",
-      "exports": [".", "./core", "./plugins", "./registry"]
+      "exports": [
+        ".",
+        "./codec",
+        "./codecs/cbor",
+        "./codecs/identity",
+        "./codecs/json",
+        "./codecs/message-pack",
+        "./codecs/protobuf",
+        "./core",
+        "./plugins",
+        "./registry"
+      ]
     },
     {
       "slug": "storage-contract",
@@ -222,15 +239,15 @@
         "./adapters/web-worker",
         "./adapters/window",
         "./client",
+        "./contract-endpoint",
         "./core",
-        "./features/chunk",
         "./features/control",
         "./features/discovery",
         "./features/outbound",
         "./features/provider",
         "./full",
-        "./protocol-constants",
-        "./provider"
+        "./provider",
+        "./transport-constants"
       ]
     }
   ]

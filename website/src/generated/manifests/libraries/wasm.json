@@ -276,6 +276,7 @@
             "const wasm = await init()\nconst input = alloc_bytes(json.length)\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json)\n\nconst result = json_to_msgpack(input, json.length)\nif (result.id === 0) throw new Error(result.error)\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n\ndealloc_bytes(input)\ndealloc_bytes(result.id)",
             "import init, { alloc_bytes, dealloc_bytes, json_to_msgpack, ptr_of } from '@migaia/wasm'\n\nconst wasm = await init()\n\nfunction writeJson(value: unknown): { id: number; length: number } {\n  const bytes = new TextEncoder().encode(JSON.stringify(value))\n  const id = alloc_bytes(bytes.length)\n  if (id === 0) throw new Error('WASM arena allocation failed')\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  return { id, length: bytes.length }\n}\n\nconst firstInput = writeJson({ id: 1, status: 'ready' })\nconst secondInput = writeJson({ id: 2, status: 'queued' })\nconst outputIds: number[] = []\n\ntry {\n  const first = json_to_msgpack(firstInput.id, firstInput.length)\n  const second = json_to_msgpack(secondInput.id, secondInput.length)\n  for (const result of [first, second]) {\n    if (result.id === 0) throw new Error(result.error)\n    outputIds.push(result.id)\n    const ownedCopy = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log(ownedCopy.byteLength)\n  }\n} finally {\n  dealloc_bytes(firstInput.id)\n  dealloc_bytes(secondInput.id)\n  for (const id of outputIds) dealloc_bytes(id)\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": ["export function alloc_bytes(byte_len: number): number;"],
           "overloadParameterDetails": [
@@ -350,6 +351,7 @@
           "errors": ["No documented errors are declared for byte_len_of."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for byte_len_of.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": ["export function byte_len_of(id: number): number;"],
           "overloadParameterDetails": [
@@ -418,6 +420,40 @@
           "errors": ["No documented errors are declared for ConversionResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ConversionResult.",
           "examples": [],
+          "members": [
+            {
+              "name": "free",
+              "kind": "method",
+              "signature": "free(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "signature": "readonly error: string;",
+              "description": "Empty on success, otherwise the operation-specific failure reason.",
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "id",
+              "kind": "property",
+              "signature": "readonly id: number;",
+              "description": "Allocation id containing the conversion output, or zero on failure.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "len",
+              "kind": "property",
+              "signature": "readonly len: number;",
+              "description": "Exact output byte length; zero on failure.",
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
           "exportPath": ".",
           "overloadSignatures": [
             "export class ConversionResult { private constructor(); free(): void; [Symbol.dispose](): void; /** * Empty on success, otherwise the operation-specific failure reason. */ readonly error: string; /** * Allocation id containing the conversion output, or zero on failure. */ readonly id: number; /** * Exact output byte length; zero on failure. */ readonly len: number; }"
@@ -490,6 +526,7 @@
             "const wasm = await init()\nconst input = alloc_bytes(json.length)\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json)\n\nconst result = json_to_msgpack(input, json.length)\nif (result.id === 0) throw new Error(result.error)\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n\ndealloc_bytes(input)\ndealloc_bytes(result.id)",
             "import init, { alloc_bytes, dealloc_bytes, json_to_msgpack, ptr_of } from '@migaia/wasm'\n\nconst wasm = await init()\n\nfunction writeJson(value: unknown): { id: number; length: number } {\n  const bytes = new TextEncoder().encode(JSON.stringify(value))\n  const id = alloc_bytes(bytes.length)\n  if (id === 0) throw new Error('WASM arena allocation failed')\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  return { id, length: bytes.length }\n}\n\nconst firstInput = writeJson({ id: 1, status: 'ready' })\nconst secondInput = writeJson({ id: 2, status: 'queued' })\nconst outputIds: number[] = []\n\ntry {\n  const first = json_to_msgpack(firstInput.id, firstInput.length)\n  const second = json_to_msgpack(secondInput.id, secondInput.length)\n  for (const result of [first, second]) {\n    if (result.id === 0) throw new Error(result.error)\n    outputIds.push(result.id)\n    const ownedCopy = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log(ownedCopy.byteLength)\n  }\n} finally {\n  dealloc_bytes(firstInput.id)\n  dealloc_bytes(secondInput.id)\n  for (const id of outputIds) dealloc_bytes(id)\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": ["export function dealloc_bytes(id: number): boolean;"],
           "overloadParameterDetails": [
@@ -558,6 +595,7 @@
           "errors": ["No documented errors are declared for InitInput."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for InitInput.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;"
@@ -620,6 +658,7 @@
           "errors": ["No documented errors are declared for InitOutput."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for InitOutput.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export interface InitOutput { readonly memory: WebAssembly.Memory; readonly __wbg_conversionresult_free: (a: number, b: number) => void; readonly alloc_bytes: (a: number) => number; readonly byte_len_of: (a: number) => number; readonly conversionresult_error: (a: number) => [number, number]; readonly conversionresult_id: (a: number) => number; readonly conversionresult_len: (a: number) => number; readonly dealloc_bytes: (a: number) => number; readonly json_to_msgpack: (a: number, b: number) => number; readonly msgpack_to_json: (a: number, b: number) => number; readonly ptr_of: (a: number) => number; readonly __wbindgen_externrefs: WebAssembly.Table; readonly __wbindgen_free: (a: number, b: number, c: number) => void; readonly __wbindgen_start: () => void; }"
@@ -690,6 +729,7 @@
           "examples": [
             "import init, { initSync } from '@migaia/wasm'\n\nconst wasm = await init()\n// 或：const wasm = initSync(moduleOrBytes);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export function initSync(module: { module: SyncInitInput } | SyncInitInput): InitOutput;"
@@ -776,6 +816,7 @@
             "const wasm = await init()\nconst input = alloc_bytes(json.length)\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json)\n\nconst result = json_to_msgpack(input, json.length)\nif (result.id === 0) throw new Error(result.error)\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n\ndealloc_bytes(input)\ndealloc_bytes(result.id)",
             "import init, { alloc_bytes, dealloc_bytes, json_to_msgpack, ptr_of } from '@migaia/wasm'\n\nconst wasm = await init()\n\nfunction writeJson(value: unknown): { id: number; length: number } {\n  const bytes = new TextEncoder().encode(JSON.stringify(value))\n  const id = alloc_bytes(bytes.length)\n  if (id === 0) throw new Error('WASM arena allocation failed')\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  return { id, length: bytes.length }\n}\n\nconst firstInput = writeJson({ id: 1, status: 'ready' })\nconst secondInput = writeJson({ id: 2, status: 'queued' })\nconst outputIds: number[] = []\n\ntry {\n  const first = json_to_msgpack(firstInput.id, firstInput.length)\n  const second = json_to_msgpack(secondInput.id, secondInput.length)\n  for (const result of [first, second]) {\n    if (result.id === 0) throw new Error(result.error)\n    outputIds.push(result.id)\n    const ownedCopy = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log(ownedCopy.byteLength)\n  }\n} finally {\n  dealloc_bytes(firstInput.id)\n  dealloc_bytes(secondInput.id)\n  for (const id of outputIds) dealloc_bytes(id)\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export function json_to_msgpack(id: number, len: number): ConversionResult;"
@@ -864,6 +905,7 @@
           "examples": [
             "type ConversionResult = {\n  readonly id: number;\n  readonly len: number;\n  readonly error: string;\n};\n\njson_to_msgpack(id: number, len: number): ConversionResult;\nmsgpack_to_json(id: number, len: number): ConversionResult;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export function msgpack_to_json(id: number, len: number): ConversionResult;"
@@ -949,6 +991,7 @@
             "const wasm = await init()\nconst input = alloc_bytes(json.length)\nnew Uint8Array(wasm.memory.buffer, ptr_of(input), json.length).set(json)\n\nconst result = json_to_msgpack(input, json.length)\nif (result.id === 0) throw new Error(result.error)\nconst packed = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n\ndealloc_bytes(input)\ndealloc_bytes(result.id)",
             "import init, { alloc_bytes, dealloc_bytes, json_to_msgpack, ptr_of } from '@migaia/wasm'\n\nconst wasm = await init()\n\nfunction writeJson(value: unknown): { id: number; length: number } {\n  const bytes = new TextEncoder().encode(JSON.stringify(value))\n  const id = alloc_bytes(bytes.length)\n  if (id === 0) throw new Error('WASM arena allocation failed')\n  new Uint8Array(wasm.memory.buffer, ptr_of(id), bytes.length).set(bytes)\n  return { id, length: bytes.length }\n}\n\nconst firstInput = writeJson({ id: 1, status: 'ready' })\nconst secondInput = writeJson({ id: 2, status: 'queued' })\nconst outputIds: number[] = []\n\ntry {\n  const first = json_to_msgpack(firstInput.id, firstInput.length)\n  const second = json_to_msgpack(secondInput.id, secondInput.length)\n  for (const result of [first, second]) {\n    if (result.id === 0) throw new Error(result.error)\n    outputIds.push(result.id)\n    const ownedCopy = new Uint8Array(wasm.memory.buffer, ptr_of(result.id), result.len).slice()\n    console.log(ownedCopy.byteLength)\n  }\n} finally {\n  dealloc_bytes(firstInput.id)\n  dealloc_bytes(secondInput.id)\n  for (const id of outputIds) dealloc_bytes(id)\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": ["export function ptr_of(id: number): number;"],
           "overloadParameterDetails": [
@@ -1017,6 +1060,7 @@
           "errors": ["No documented errors are declared for SyncInitInput."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for SyncInitInput.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": ["export type SyncInitInput = BufferSource | WebAssembly.Module;"],
           "overloadParameterDetails": [[]],

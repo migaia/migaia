@@ -1,26 +1,79 @@
 ---
 title: resource
-description: 资源生命周期管理
+description: 响应式、可取消、可缓存的异步资源状态机
 ---
 
 # resource
 
-资源生命周期管理
+把一次异步请求变成可被响应式依赖驱动、可取消、可重试、可过期刷新的状态机。`Resource<T>` 不绑定 HTTP、UI 框架或 DOM；`fetcher` 可以调用 `fetch`、RPC、Worker 或数据库客户端。
 
-## 设计思想
+## 你会得到什么
 
-核心设计原则和使用哲学。
+- `idle / pending / success / error / cancelled` 五态状态机，而不是分散的 loading/error 布尔值。
+- 自动跟踪 `fetcher` 在首次 `await` 前读取的 Signal/Computed，依赖改变后合并重新请求。
+- generation 隔离：旧请求即使更晚成功，也不能覆盖新数据。
+- `ttl` 过期、`staleWhileRevalidate` 后台刷新、`retry` 与 `retryDelay` 退避。
+- `read()` 的 Suspense 语义，以及 `dehydrate()` / `hydrate()` 的 SSR 快照传递。
+- `cancel()` 只中止当前请求；`dispose()` 终结实例并清理订阅。
 
 ## 适用场景
 
-- 场景 1
-- 场景 2
-- 场景 3
+- 用户详情、搜索结果等数据需要随响应式输入自动更新。
+- 界面要在刷新时继续展示旧数据，并防止旧请求竞态回写。
+- React Suspense / Error Boundary 需要 pending 抛 Promise、失败抛 Error 的读取原语。
+- SSR、持久化或跨宿主场景需要恢复带 TTL 的成功快照。
 
 ## 不适用场景
 
-- 超出范围的场景
+- 只执行一次、不需要取消、缓存、重试或响应式刷新的任务：直接 `await` 更简单。
+- WebSocket 消息流、事件总线或无限流：`Resource` 表达的是“一代请求最终产生一个值”。
+- 需要更改服务端数据的 mutation：应单独建模提交、乐观更新和回滚。
 
-## 与同类方案对比
+## 最小生产示例
 
-相比其他方案的优势。
+```ts
+import { Resource, ResourceStatus } from '@migaia/resource'
+import { createRuntime } from '@migaia/reactive'
+
+type IUser = { id: string; name: string }
+
+const runtime = createRuntime()
+const userId = runtime.signal('user-1')
+
+const user = new Resource<IUser>(
+  async ({ signal }) => {
+    // 必须在首次 await 之前读取，Resource 才能跟踪这个依赖。
+    const id = userId.value
+    const response = await fetch(`/api/users/${id}`, { signal })
+    if (!response.ok) throw new Error(`GET user failed: ${response.status}`)
+    return (await response.json()) as IUser
+  },
+  runtime,
+  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }
+)
+
+const stop = runtime.effect(() => {
+  const state = user.state
+  if (state.status === ResourceStatus.pending) console.log('loading')
+  if (state.status === ResourceStatus.success) console.log(state.data, user.refreshing)
+  if (state.status === ResourceStatus.error) console.error(state.error)
+})
+
+userId.value = 'user-2' // 取消旧 generation，自动获取新用户。
+
+stop()
+user.dispose()
+userId.dispose()
+```
+
+## 关键边界
+
+1. 把 `signal` 传给真正的 I/O；否则 Resource 只能忽略旧结果，不能停止底层工作。
+2. `refetch()` 总是强制新请求；被动读取只在 idle 或过期时启动请求。
+3. `cancel()` 后资源可复用；`dispose()` 后除 `disposed` 外不再可用。
+4. `keepAlive` 默认为 `false`；无人观察时允许资源休眠。
+
+## 下一步
+
+- 在根包 API 页选择 `Resource`，查看完整实例 API、配置、状态与错误语义。
+- 需要界面整合时，继续阅读 resource 任务指南与 Reactive 依赖追踪文档。

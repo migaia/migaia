@@ -1314,6 +1314,7 @@
           "errors": ["No documented errors are declared for assertStoreFeature."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertStoreFeature.",
           "examples": [],
+          "members": [],
           "aliasOf": "assertStoreFeature",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1571,6 +1572,7 @@
           "errors": ["No documented errors are declared for createStoreReactAggregateError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreReactAggregateError.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreReactAggregateError(code: IStoreReactErrorCode, errors: readonly unknown[], message: string): AggregateError;"
@@ -1804,6 +1806,7 @@
           "errors": ["No documented errors are declared for createStoreReactError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreReactError.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreReactError(code: IStoreReactErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
@@ -2026,6 +2029,7 @@
             "const registry = createStoreRegistry(); // runtime 不传则内部 createRuntime()\nconst unregister = registry.register(sessionToken, sessionStore, { owned: true });\nregistry.dispose(); // 同步、幂等；owned 实体按注册顺序的逆序释放",
             "import { StoreProvider, createStoreRegistry } from '@migaia/store-react';\nimport { createRuntime } from '@migaia/reactive';\n\nasync function renderForRequest(children: React.ReactNode) {\n  const registry = createStoreRegistry(createRuntime()); // 每个请求独立一份\n  const html = renderToString(<StoreProvider registry={registry}>{children}</StoreProvider>); // disposeOnUnmount 默认 false：手动负责释放\n  await registry.disposeAsync();\n  return html;\n}"
           ],
+          "members": [],
           "aliasOf": "createStoreRegistry",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2105,6 +2109,7 @@
           "examples": [
             "import { Suspense, useEffect, useMemo } from 'react';\nimport {\n  StoreProvider,\n  createStoreToken,\n  useProvidedStore,\n  useResourceValue,\n  useStoreFeature,\n  useStoreRegistry,\n  useStoreRuntime\n} from '@migaia/store-react';\nimport { createStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\n\nconst sessionToken = createStoreToken('session');\n\nfunction App() {\n  const ready = useMemo(() => [() => Promise.resolve()], []); // 引用必须稳定\n  const sessionStore = useMemo(() => createStore({ userId: '' }), []);\n\n  return (\n    <StoreProvider config={{ ready, fallback: <div>加载中…</div> }}>\n      <SessionInjector store={sessionStore}>\n        <Suspense fallback={<div>加载中…</div>}>\n          <Dashboard />\n        </Suspense>\n      </SessionInjector>\n    </StoreProvider>\n  );\n}\n\nfunction SessionInjector({ store, children }) {\n  const registry = useStoreRegistry();\n  useEffect(() => registry.register(sessionToken, store, { owned: false }), [registry, store]);\n  return children;\n}\n\nfunction Dashboard() {\n  const userId = useProvidedStore(sessionToken, (s) => s.userId);\n  const runtime = useStoreRuntime();\n  const showCharts = useStoreFeature('experimental.charts');\n  const profile = useResourceValue(new Resource(async () => ({ name: userId }), runtime));\n  return (\n    <p>\n      {profile.name}\n      {showCharts ? ' · 图表已开启' : ''}\n    </p>\n  );\n}"
           ],
+          "members": [],
           "aliasOf": "createStoreToken",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2311,6 +2316,7 @@
           "examples": [
             "type IStableNode<T> = { readonly value: T; peek(): T };\nfunction useNodeValue<T>(node: IStableNode<T>, runtime: IRuntime, enabled?: boolean): T;"
           ],
+          "members": [],
           "aliasOf": "IStableNode",
           "exportPath": ".",
           "overloadSignatures": ["export type IStableNode<T> = { readonly value: T; peek(): T; };"],
@@ -2375,6 +2381,7 @@
             "function readStoreFeature(\n  config: IStoreConfigValue,\n  path: 'wasm' | `experimental.${string}`\n): boolean;\nfunction assertStoreFeature(\n  config: IStoreConfigValue | null,\n  path: 'wasm' | `experimental.${string}`,\n  apiName?: string // 默认 'this API'，出现在错误信息里\n): void;\nfunction normalizeStoreConfig(\n  config?: IStoreProviderConfig,\n  barrierScope?: object // 默认 {}；用于隔离不同调用方各自的 ready-barrier 缓存\n): IStoreConfigValue;",
             "function useStoreConfig(): IStoreConfigValue | null;\nfunction useStoreFeature(path: 'wasm' | `experimental.${string}`): boolean;\nfunction useAssertStoreFeature(path: 'wasm' | `experimental.${string}`, apiName?: string): void;"
           ],
+          "members": [],
           "aliasOf": "IStoreConfigValue",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2481,6 +2488,7 @@
           "errors": ["No documented errors are declared for IStoreFeatureExperimental."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreFeatureExperimental.",
           "examples": [],
+          "members": [],
           "aliasOf": "IStoreFeatureExperimental",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2544,6 +2552,7 @@
           "errors": ["No documented errors are declared for IStoreFeaturePath."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreFeaturePath.",
           "examples": [],
+          "members": [],
           "aliasOf": "IStoreFeaturePath",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2607,6 +2616,7 @@
           "errors": ["No documented errors are declared for IStoreFeatures."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreFeatures.",
           "examples": [],
+          "members": [],
           "aliasOf": "IStoreFeatures",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2674,6 +2684,7 @@
             "type IStoreProviderConfig = {\n  readonly features?: {\n    readonly wasm?: boolean;\n    readonly experimental?: Readonly<Record<string, boolean>>;\n  };\n  readonly ready?: readonly (Promise<unknown> | (() => Promise<unknown> | unknown))[];\n  readonly fallback?: ReactNode;\n  readonly defaults?: { readonly warnAsyncActions?: boolean };\n};",
             "function readStoreFeature(\n  config: IStoreConfigValue,\n  path: 'wasm' | `experimental.${string}`\n): boolean;\nfunction assertStoreFeature(\n  config: IStoreConfigValue | null,\n  path: 'wasm' | `experimental.${string}`,\n  apiName?: string // 默认 'this API'，出现在错误信息里\n): void;\nfunction normalizeStoreConfig(\n  config?: IStoreProviderConfig,\n  barrierScope?: object // 默认 {}；用于隔离不同调用方各自的 ready-barrier 缓存\n): IStoreConfigValue;"
           ],
+          "members": [],
           "aliasOf": "IStoreProviderConfig",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2782,6 +2793,7 @@
           "errors": ["No documented errors are declared for IStoreProviderDefaults."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreProviderDefaults.",
           "examples": [],
+          "members": [],
           "aliasOf": "IStoreProviderDefaults",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2847,6 +2859,7 @@
           "examples": [
             "type IStoreProviderProps = {\n  readonly children: ReactNode;\n  readonly registry?: StoreRegistry;\n  readonly runtime?: IRuntime;\n  readonly disposeOnUnmount?: boolean;\n  readonly config?: IStoreProviderConfig;\n};"
           ],
+          "members": [],
           "aliasOf": "IStoreProviderProps",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2912,6 +2925,7 @@
           "examples": [
             "const StoreProviderState = { pending: 'pending', ready: 'ready', error: 'error' } as const;\ntype IStoreProviderState = 'pending' | 'ready' | 'error';"
           ],
+          "members": [],
           "aliasOf": "IStoreProviderState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2975,6 +2989,7 @@
           "errors": ["No documented errors are declared for IStoreReadyBarrier."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreReadyBarrier.",
           "examples": [],
+          "members": [],
           "aliasOf": "IStoreReadyBarrier",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3049,6 +3064,7 @@
           "errors": ["No documented errors are declared for IStoreRegistrationOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreRegistrationOptions.",
           "examples": [],
+          "members": [],
           "aliasOf": "IStoreRegistrationOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3112,6 +3128,7 @@
           "errors": ["No documented errors are declared for IStoreToken."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreToken.",
           "examples": [],
+          "members": [],
           "aliasOf": "IStoreToken",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3189,6 +3206,7 @@
           "errors": ["No documented errors are declared for normalizeStoreConfig."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for normalizeStoreConfig.",
           "examples": [],
+          "members": [],
           "aliasOf": "normalizeStoreConfig",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3358,6 +3376,7 @@
           "errors": ["No documented errors are declared for readStoreFeature."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for readStoreFeature.",
           "examples": [],
+          "members": [],
           "aliasOf": "readStoreFeature",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3458,6 +3477,7 @@
           "errors": ["No documented errors are declared for STORE_REACT_SOURCE."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for STORE_REACT_SOURCE.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const STORE_REACT_SOURCE = \"@migaia/store-react\";"
@@ -3661,6 +3681,7 @@
           "errors": ["No documented errors are declared for StoreProvider."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreProvider.",
           "examples": [],
+          "members": [],
           "aliasOf": "StoreProvider",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4011,6 +4032,7 @@
             "import {\n  useStoreConfig,\n  useStoreFeature,\n  useAssertStoreFeature,\n  StoreProviderState\n} from '@migaia/store-react';",
             "StoreProviderState.pending; // 'pending' | 'ready' | 'error' 之一"
           ],
+          "members": [],
           "aliasOf": "StoreProviderState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4131,6 +4153,206 @@
           "errors": ["No documented errors are declared for StoreRegistry."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreRegistry.",
           "examples": [],
+          "members": [
+            {
+              "name": "runtime",
+              "kind": "property",
+              "signature": "readonly runtime: IRuntime;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "atomStore",
+              "kind": "property",
+              "signature": "readonly atomStore: IAtomStore;",
+              "description": "Provider-local atom state/override boundary. Same Runtime may host many registries.",
+              "parameterDetails": [],
+              "returns": "IAtomStore"
+            },
+            {
+              "name": "lifecycle",
+              "kind": "get",
+              "signature": "get lifecycle(): ILifecycleState;",
+              "description": "Part of the project's unified lifecycle shape (see `@migaia/lifecycle`'s `ILifecycleState`).",
+              "parameterDetails": [],
+              "returns": "ILifecycleState"
+            },
+            {
+              "name": "whenTerminal",
+              "kind": "method",
+              "signature": "whenTerminal(): Promise<void>;",
+              "description": "Resolves once this registry (and any thenable disposer results) has actually finished tearing down.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "disposed",
+              "kind": "get",
+              "signature": "get disposed(): boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "register",
+              "kind": "method",
+              "signature": "register<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): IDisposer;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "token",
+                  "type": "IStoreToken<T>",
+                  "optional": false
+                },
+                {
+                  "name": "value",
+                  "type": "T",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IStoreRegistrationOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "IDisposer"
+            },
+            {
+              "name": "replace",
+              "kind": "method",
+              "signature": "replace<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "token",
+                  "type": "IStoreToken<T>",
+                  "optional": false
+                },
+                {
+                  "name": "value",
+                  "type": "T",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IStoreRegistrationOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "get",
+              "kind": "method",
+              "signature": "get<T>(token: IStoreToken<T>): T | undefined;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "token",
+                  "type": "IStoreToken<T>",
+                  "optional": false
+                }
+              ],
+              "returns": "T | undefined"
+            },
+            {
+              "name": "require",
+              "kind": "method",
+              "signature": "require<T>(token: IStoreToken<T>): T;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "token",
+                  "type": "IStoreToken<T>",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            },
+            {
+              "name": "has",
+              "kind": "method",
+              "signature": "has<T>(token: IStoreToken<T>): boolean;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "token",
+                  "type": "IStoreToken<T>",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "remove",
+              "kind": "method",
+              "signature": "remove<T>(token: IStoreToken<T>, disposeOwned?: boolean): boolean;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "token",
+                  "type": "IStoreToken<T>",
+                  "optional": false
+                },
+                {
+                  "name": "disposeOwned",
+                  "type": "boolean",
+                  "optional": true
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "retain",
+              "kind": "method",
+              "signature": "retain(disposeOnRelease: boolean, _deferTask?: boolean): IDisposer;",
+              "description": "React StrictMode probes effect cleanup/setup. Delayed release avoids disposing an internally-owned registry between those two phases.",
+              "parameterDetails": [
+                {
+                  "name": "disposeOnRelease",
+                  "type": "boolean",
+                  "optional": false
+                },
+                {
+                  "name": "_deferTask",
+                  "type": "boolean",
+                  "optional": true
+                }
+              ],
+              "returns": "IDisposer"
+            },
+            {
+              "name": "prepareForRender",
+              "kind": "method",
+              "signature": "prepareForRender(after?: Promise<void>): void;",
+              "description": "Retained for source compatibility, but deliberately does not reclaim a render candidate. React exposes no reliable abandoned-render signal; any timer, including one armed after a readiness promise settles, can dispose a valid render before its effect commits. Candidate reclamation belongs to an observable owner or a future GC-backed mechanism.",
+              "parameterDetails": [
+                {
+                  "name": "after",
+                  "type": "Promise<void>",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "signature": "dispose(): void;",
+              "description": "Idempotent, immediately enters `closing`. If an owned value's disposer returns a thenable, this cannot block on it (it's sync) — the thenable is tracked and observed (never left as an unhandled rejection) so a later `disposeAsync()` call still waits for it instead of resolving early just because `dispose()` already ran (see `disposeAsync()`). `lifecycle` only reaches `terminal` once every tracked thenable has actually settled.",
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "disposeAsync",
+              "kind": "method",
+              "signature": "disposeAsync(): Promise<void>;",
+              "description": "Awaitable counterpart. Single-flight: concurrent calls share one completion instead of each racing their own pass over `#entries`. Calling this after a prior synchronous `dispose()` does not resolve early — it waits for whatever thenable disposer results that `dispose()` started but could not block on (tracked by the lifecycle disposal ledger).",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            }
+          ],
           "aliasOf": "StoreRegistry",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4367,6 +4589,7 @@
           "examples": [
             "if (useStoreFeature('experimental.charts')) {\n  /* 渲染实验特性 */\n}\nuseAssertStoreFeature('wasm', 'myWasmApi'); // 未开启（含无 Provider）直接抛错"
           ],
+          "members": [],
           "aliasOf": "useAssertStoreFeature",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4676,6 +4899,7 @@
           "examples": [
             "const value = useAsyncAtomValue(asyncAtom); // 内部即 useResourceValue(atom.resource)"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useAsyncAtomValue<T>(atom: IAsyncAtom<T>): T;"
@@ -4754,6 +4978,7 @@
           "examples": [
             "const value = useAtomValue(myAtom);\nconst write = useSetAtom(myWritableAtom);\nconst [value2, write2] = useAtom(myWritableAtom);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useAtom<T, Args extends readonly unknown[], Result>(atom: IWritableAtom<T, Args, Result>): readonly [T, (...args: Args) => Result];"
@@ -4966,6 +5191,7 @@
             "const value = useAtomDefinition(countDef);\nconst increment = useSetAtomDefinition(incrementDef);",
             "import { StoreProvider, useAtomDefinition, useSetAtomDefinition } from '@migaia/store-react';\nimport { atomDef, writableDef } from '@migaia/store-keyed/atom/definition';\n\nconst countDef = atomDef(0);\nconst incrementDef = writableDef(\n  (get) => get(countDef),\n  (get, set) => set(countDef, get(countDef) + 1)\n);\n\nfunction Counter() {\n  const count = useAtomDefinition(countDef);\n  const increment = useSetAtomDefinition(incrementDef);\n  return <button onClick={() => increment()}>count: {count}</button>;\n}\n\nfunction App() {\n  return (\n    <StoreProvider>\n      <Counter />\n    </StoreProvider>\n  );\n}"
           ],
+          "members": [],
           "aliasOf": "useAtomDefinition",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5178,6 +5404,7 @@
           "examples": [
             "const value = useAtomValue(myAtom);\nconst write = useSetAtom(myWritableAtom);\nconst [value2, write2] = useAtom(myWritableAtom);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useAtomValue<T>(atom: IReadableAtom<T>): T;"
@@ -5268,6 +5495,7 @@
           "errors": ["No documented errors are declared for useNodeValue."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for useNodeValue.",
           "examples": ["const value = useNodeValue(mySignal, runtime);"],
+          "members": [],
           "aliasOf": "useNodeValue",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5373,6 +5601,7 @@
             "const sessionStore = useStoreFromProvider(sessionToken);\nconst userId = useProvidedStore(sessionToken, (s) => s.userId);",
             "import { Suspense, useEffect, useMemo } from 'react';\nimport {\n  StoreProvider,\n  createStoreToken,\n  useProvidedStore,\n  useResourceValue,\n  useStoreFeature,\n  useStoreRegistry,\n  useStoreRuntime\n} from '@migaia/store-react';\nimport { createStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\n\nconst sessionToken = createStoreToken('session');\n\nfunction App() {\n  const ready = useMemo(() => [() => Promise.resolve()], []); // 引用必须稳定\n  const sessionStore = useMemo(() => createStore({ userId: '' }), []);\n\n  return (\n    <StoreProvider config={{ ready, fallback: <div>加载中…</div> }}>\n      <SessionInjector store={sessionStore}>\n        <Suspense fallback={<div>加载中…</div>}>\n          <Dashboard />\n        </Suspense>\n      </SessionInjector>\n    </StoreProvider>\n  );\n}\n\nfunction SessionInjector({ store, children }) {\n  const registry = useStoreRegistry();\n  useEffect(() => registry.register(sessionToken, store, { owned: false }), [registry, store]);\n  return children;\n}\n\nfunction Dashboard() {\n  const userId = useProvidedStore(sessionToken, (s) => s.userId);\n  const runtime = useStoreRuntime();\n  const showCharts = useStoreFeature('experimental.charts');\n  const profile = useResourceValue(new Resource(async () => ({ name: userId }), runtime));\n  return (\n    <p>\n      {profile.name}\n      {showCharts ? ' · 图表已开启' : ''}\n    </p>\n  );\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useProvidedStore<S extends Record<string, unknown>, Result>(token: IStoreToken<IReactiveStore<S>>, selector: (state: IStoreShape<S>) => Result, isEqual?: (left: Result, right: Result) => boolean): Result;"
@@ -5594,6 +5823,7 @@
           "examples": [
             "const state = useResource(profileResource); // { status: 'idle'|'pending'|'success'|'error'|'cancelled', ... }\nconst profile = useResourceValue(profileResource); // 成功返回 data；pending/idle 时 throw promise；error/cancelled 时 throw error"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useResource<T>(res: Resource<T>): IResourceState<T>;"
@@ -5675,6 +5905,7 @@
             "const value = useAsyncAtomValue(asyncAtom); // 内部即 useResourceValue(atom.resource)",
             "import { Suspense, useEffect, useMemo } from 'react';\nimport {\n  StoreProvider,\n  createStoreToken,\n  useProvidedStore,\n  useResourceValue,\n  useStoreFeature,\n  useStoreRegistry,\n  useStoreRuntime\n} from '@migaia/store-react';\nimport { createStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\n\nconst sessionToken = createStoreToken('session');\n\nfunction App() {\n  const ready = useMemo(() => [() => Promise.resolve()], []); // 引用必须稳定\n  const sessionStore = useMemo(() => createStore({ userId: '' }), []);\n\n  return (\n    <StoreProvider config={{ ready, fallback: <div>加载中…</div> }}>\n      <SessionInjector store={sessionStore}>\n        <Suspense fallback={<div>加载中…</div>}>\n          <Dashboard />\n        </Suspense>\n      </SessionInjector>\n    </StoreProvider>\n  );\n}\n\nfunction SessionInjector({ store, children }) {\n  const registry = useStoreRegistry();\n  useEffect(() => registry.register(sessionToken, store, { owned: false }), [registry, store]);\n  return children;\n}\n\nfunction Dashboard() {\n  const userId = useProvidedStore(sessionToken, (s) => s.userId);\n  const runtime = useStoreRuntime();\n  const showCharts = useStoreFeature('experimental.charts');\n  const profile = useResourceValue(new Resource(async () => ({ name: userId }), runtime));\n  return (\n    <p>\n      {profile.name}\n      {showCharts ? ' · 图表已开启' : ''}\n    </p>\n  );\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useResourceValue<T>(resource: Resource<T>): T;"
@@ -5753,6 +5984,7 @@
           "examples": [
             "const value = useAtomValue(myAtom);\nconst write = useSetAtom(myWritableAtom);\nconst [value2, write2] = useAtom(myWritableAtom);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useSetAtom<T, Args extends readonly unknown[], Result>(atom: IWritableAtom<T, Args, Result>): (...args: Args) => Result;"
@@ -5965,6 +6197,7 @@
             "const value = useAtomDefinition(countDef);\nconst increment = useSetAtomDefinition(incrementDef);",
             "import { StoreProvider, useAtomDefinition, useSetAtomDefinition } from '@migaia/store-react';\nimport { atomDef, writableDef } from '@migaia/store-keyed/atom/definition';\n\nconst countDef = atomDef(0);\nconst incrementDef = writableDef(\n  (get) => get(countDef),\n  (get, set) => set(countDef, get(countDef) + 1)\n);\n\nfunction Counter() {\n  const count = useAtomDefinition(countDef);\n  const increment = useSetAtomDefinition(incrementDef);\n  return <button onClick={() => increment()}>count: {count}</button>;\n}\n\nfunction App() {\n  return (\n    <StoreProvider>\n      <Counter />\n    </StoreProvider>\n  );\n}"
           ],
+          "members": [],
           "aliasOf": "useSetAtomDefinition",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6175,6 +6408,7 @@
           "errors": ["No documented errors are declared for useSignal."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for useSignal.",
           "examples": ["const [name, setName] = useSignal(nameSignal);"],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useSignal<T>(s: ISignal<T>): readonly [T, (next: T) => void];"
@@ -6268,6 +6502,7 @@
             "const counterStore = createStore({\n  count: 0,\n  increment() {\n    this.count += 1;\n  }\n});\n\nfunction Counter() {\n  const count = useStore(counterStore, (state) => state.count);\n  return <button onClick={() => counterStore.increment()}>count: {count}</button>;\n}\n\nfunction App() {\n  return (\n    <StoreProvider>\n      <Counter />\n    </StoreProvider>\n  );\n}",
             "const count = useStore(counterStore, (state) => state.count);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useStore<S extends Record<string, unknown>, R>(store: IReactiveStore<S>, selector: (state: IStoreShape<S>) => R, isEqual?: (a: R, b: R) => boolean): R;"
@@ -6594,6 +6829,7 @@
           "errors": ["No documented errors are declared for useStoreConfig."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for useStoreConfig.",
           "examples": ["const config = useStoreConfig(); // 无 Provider 时返回 null"],
+          "members": [],
           "aliasOf": "useStoreConfig",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6781,6 +7017,7 @@
             "if (useStoreFeature('experimental.charts')) {\n  /* 渲染实验特性 */\n}\nuseAssertStoreFeature('wasm', 'myWasmApi'); // 未开启（含无 Provider）直接抛错",
             "import { Suspense, useEffect, useMemo } from 'react';\nimport {\n  StoreProvider,\n  createStoreToken,\n  useProvidedStore,\n  useResourceValue,\n  useStoreFeature,\n  useStoreRegistry,\n  useStoreRuntime\n} from '@migaia/store-react';\nimport { createStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\n\nconst sessionToken = createStoreToken('session');\n\nfunction App() {\n  const ready = useMemo(() => [() => Promise.resolve()], []); // 引用必须稳定\n  const sessionStore = useMemo(() => createStore({ userId: '' }), []);\n\n  return (\n    <StoreProvider config={{ ready, fallback: <div>加载中…</div> }}>\n      <SessionInjector store={sessionStore}>\n        <Suspense fallback={<div>加载中…</div>}>\n          <Dashboard />\n        </Suspense>\n      </SessionInjector>\n    </StoreProvider>\n  );\n}\n\nfunction SessionInjector({ store, children }) {\n  const registry = useStoreRegistry();\n  useEffect(() => registry.register(sessionToken, store, { owned: false }), [registry, store]);\n  return children;\n}\n\nfunction Dashboard() {\n  const userId = useProvidedStore(sessionToken, (s) => s.userId);\n  const runtime = useStoreRuntime();\n  const showCharts = useStoreFeature('experimental.charts');\n  const profile = useResourceValue(new Resource(async () => ({ name: userId }), runtime));\n  return (\n    <p>\n      {profile.name}\n      {showCharts ? ' · 图表已开启' : ''}\n    </p>\n  );\n}"
           ],
+          "members": [],
           "aliasOf": "useStoreFeature",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6953,6 +7190,7 @@
           "examples": [
             "const sessionStore = useStoreFromProvider(sessionToken);\nconst userId = useProvidedStore(sessionToken, (s) => s.userId);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useStoreFromProvider<T>(token: IStoreToken<T>): T;"
@@ -7161,6 +7399,7 @@
             "const registry = useStoreRegistry();\nconst runtime = useStoreRuntime(); // = useStoreRegistry().runtime",
             "import { Suspense, useEffect, useMemo } from 'react';\nimport {\n  StoreProvider,\n  createStoreToken,\n  useProvidedStore,\n  useResourceValue,\n  useStoreFeature,\n  useStoreRegistry,\n  useStoreRuntime\n} from '@migaia/store-react';\nimport { createStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\n\nconst sessionToken = createStoreToken('session');\n\nfunction App() {\n  const ready = useMemo(() => [() => Promise.resolve()], []); // 引用必须稳定\n  const sessionStore = useMemo(() => createStore({ userId: '' }), []);\n\n  return (\n    <StoreProvider config={{ ready, fallback: <div>加载中…</div> }}>\n      <SessionInjector store={sessionStore}>\n        <Suspense fallback={<div>加载中…</div>}>\n          <Dashboard />\n        </Suspense>\n      </SessionInjector>\n    </StoreProvider>\n  );\n}\n\nfunction SessionInjector({ store, children }) {\n  const registry = useStoreRegistry();\n  useEffect(() => registry.register(sessionToken, store, { owned: false }), [registry, store]);\n  return children;\n}\n\nfunction Dashboard() {\n  const userId = useProvidedStore(sessionToken, (s) => s.userId);\n  const runtime = useStoreRuntime();\n  const showCharts = useStoreFeature('experimental.charts');\n  const profile = useResourceValue(new Resource(async () => ({ name: userId }), runtime));\n  return (\n    <p>\n      {profile.name}\n      {showCharts ? ' · 图表已开启' : ''}\n    </p>\n  );\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useStoreRegistry(): import(\"./provider-registry.js\").StoreRegistry;"
@@ -7381,6 +7620,7 @@
           "errors": ["No documented errors are declared for useStoreResource."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for useStoreResource.",
           "examples": ["const value = useStoreResource(store.someAsyncField);"],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useStoreResource<T>(resource: IStoreResource<T>): T;"
@@ -7455,6 +7695,7 @@
             "const registry = useStoreRegistry();\nconst runtime = useStoreRuntime(); // = useStoreRegistry().runtime",
             "import { Suspense, useEffect, useMemo } from 'react';\nimport {\n  StoreProvider,\n  createStoreToken,\n  useProvidedStore,\n  useResourceValue,\n  useStoreFeature,\n  useStoreRegistry,\n  useStoreRuntime\n} from '@migaia/store-react';\nimport { createStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\n\nconst sessionToken = createStoreToken('session');\n\nfunction App() {\n  const ready = useMemo(() => [() => Promise.resolve()], []); // 引用必须稳定\n  const sessionStore = useMemo(() => createStore({ userId: '' }), []);\n\n  return (\n    <StoreProvider config={{ ready, fallback: <div>加载中…</div> }}>\n      <SessionInjector store={sessionStore}>\n        <Suspense fallback={<div>加载中…</div>}>\n          <Dashboard />\n        </Suspense>\n      </SessionInjector>\n    </StoreProvider>\n  );\n}\n\nfunction SessionInjector({ store, children }) {\n  const registry = useStoreRegistry();\n  useEffect(() => registry.register(sessionToken, store, { owned: false }), [registry, store]);\n  return children;\n}\n\nfunction Dashboard() {\n  const userId = useProvidedStore(sessionToken, (s) => s.userId);\n  const runtime = useStoreRuntime();\n  const showCharts = useStoreFeature('experimental.charts');\n  const profile = useResourceValue(new Resource(async () => ({ name: userId }), runtime));\n  return (\n    <p>\n      {profile.name}\n      {showCharts ? ' · 图表已开启' : ''}\n    </p>\n  );\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": ["export declare function useStoreRuntime(): IRuntime;"],
           "overloadParameterDetails": [[]],
@@ -7671,6 +7912,7 @@
             "const total = useTracked(() => priceSignal.value + taxSignal.value);",
             "import { useTracked } from '@migaia/store-react';\nimport { Signal } from '@migaia/reactive';\n\nconst priceSignal = new Signal(10);\nconst qtySignal = new Signal(2);\n\nfunction Total() {\n  const total = useTracked(() => priceSignal.value * qtySignal.value);\n  return <span>合计：{total}</span>;\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useTracked<T>(read: () => T, isEqual?: (a: T, b: T) => boolean, runtime?: IRuntime): T;"

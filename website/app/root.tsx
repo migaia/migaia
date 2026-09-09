@@ -7,6 +7,7 @@ import {
   Scripts,
   ScrollRestoration,
   useLocation,
+  useNavigation,
   useNavigationType
 } from 'react-router'
 import './app.css'
@@ -30,6 +31,9 @@ type IThemeChoice = IThemeMode | ITimePhase
 
 /** Persistent browser key for the reader-selected color mode. */
 const THEME_STORAGE_KEY = 'migaia-theme'
+
+/** Applies the saved theme before styles paint so hydration never exposes the light fallback. */
+const THEME_BOOT_SCRIPT = `(()=>{try{const r=document.documentElement;const t=localStorage.getItem('migaia-theme');const a=['light','dark','time','sunrise','sunset','night','midnight'];const c=a.includes(t)?t:'light';const f=['sunrise','sunset','night','midnight'].includes(c)?c:null;const h=new Date().getHours();const p=h>=5&&h<12?'sunrise':h>=12&&h<19?'sunset':h>=19&&h<23?'night':'midnight';r.dataset.theme=c==='time'||f?'time':c;if(c==='time'||f)r.dataset.timePhase=f||p;else delete r.dataset.timePhase;r.style.colorScheme=c==='dark'||(r.dataset.theme==='time'&&(r.dataset.timePhase==='night'||r.dataset.timePhase==='midnight'))?'dark':'light'}catch{}})()`
 
 /** Resolves the local-clock phase used by the time-gradient theme. */
 function timePhase(date: Date): ITimePhase {
@@ -61,17 +65,24 @@ function applyTheme(choice: IThemeChoice, date = new Date()) {
   root.dataset.theme = choice === 'time' || fixedPhase ? 'time' : choice
   if (choice === 'time' || fixedPhase) root.dataset.timePhase = fixedPhase ?? timePhase(date)
   else delete root.dataset.timePhase
+  /** Native-control palette that matches the resolved canvas rather than the stored mode name. */
+  const darkCanvas =
+    root.dataset.theme === 'dark' ||
+    (root.dataset.theme === 'time' &&
+      (root.dataset.timePhase === 'night' || root.dataset.timePhase === 'midnight'))
+  root.style.colorScheme = darkCanvas ? 'dark' : 'light'
 }
 
 /** Supplies the shared static document shell and its keyboard-first orientation controls. */
 export function Layout({ children }: { children: React.ReactNode }) {
   const locale = localeFromPath(useLocation().pathname)
   return (
-    <html lang={locale}>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <Links />
       </head>
       <body>
@@ -104,7 +115,11 @@ function ShellHeader() {
   /** Client-routable pathname without the static preview server's file suffix. */
   const canonicalPathname = location.pathname.replace(/\/index\.html$/, '').replace(/\/$/, '')
   /** Equivalent localized route, including the active query string and document anchor. */
-  const alternateLocalePath = `${canonicalPathname.replace(/^\/(?:en|zh)(?=\/|$)/, `/${alternateLocale}`)}${location.search}${location.hash}`
+  const alternateLocalePath = `${
+    /^\/(?:en|zh)(?=\/|$)/.test(canonicalPathname)
+      ? canonicalPathname.replace(/^\/(?:en|zh)(?=\/|$)/, `/${alternateLocale}`)
+      : `/${alternateLocale}${canonicalPathname}`
+  }${location.search}${location.hash}`
   const copy = copyFor(locale)
 
   /** Loads Pagefind only after the user opens search. */
@@ -305,9 +320,26 @@ function App() {
   return (
     <>
       <ShellHeader />
+      <RouteTransition />
       <RouteScrollReset />
       <Outlet />
     </>
+  )
+}
+
+/** Keeps the previous page visually covered by a theme-aware particle veil while data routes load. */
+function RouteTransition() {
+  const navigation = useNavigation()
+  return (
+    <div
+      className="route-transition"
+      data-active={navigation.state === 'idle' ? 'false' : 'true'}
+      aria-hidden="true"
+    >
+      <i />
+      <i />
+      <i />
+    </div>
   )
 }
 

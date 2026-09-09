@@ -980,6 +980,7 @@
             "import { createStore } from '@migaia/store-light';\nimport {\n  bindStoreMiddleware,\n  createMutationPolicy,\n  loggerMiddleware,\n  createReduxDevToolsAdapter\n} from '@migaia/store-middleware';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count++;\n    }\n  },\n  { mutationPolicy }\n);\n\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n});\nawait host.use(loggerMiddleware());\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\n\nstore.increment(); // 允许：action 内\n// store.count = 1;  // 抛 ACTION_SCOPE_REQUIRED：actions-only 下不允许 action 外直接写\n\n// 应用退出、组件卸载或请求结束时\nawait host.dispose();",
             "import { bindStoreMiddleware, ClonePolicy } from '@migaia/store-middleware';\n\n// 默认 clone 是 ClonePolicy.diagnostic（尽力而为、逐层深拷贝）；\n// 状态树很大或事件很密集时，改成零拷贝的 opaque 换取性能，\n// 代价是中间件之间、以及和 Store 本身共享同一份引用。\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  clone: ClonePolicy.opaque\n});"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function bindStoreMiddleware<S extends Record<string, unknown>>(store: IReactiveStore<S>, options: IStoreMiddlewareBindingOptions): IStoreMiddlewareBinding<S>;"
@@ -1143,6 +1144,7 @@
             "import { createStore } from '@migaia/store-light';\nimport {\n  bindStoreMiddleware,\n  createMutationPolicy,\n  loggerMiddleware,\n  createReduxDevToolsAdapter\n} from '@migaia/store-middleware';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count++;\n    }\n  },\n  { mutationPolicy }\n);\n\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n});\nawait host.use(loggerMiddleware());\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\n\nstore.increment(); // 允许：action 内\n// store.count = 1;  // 抛 ACTION_SCOPE_REQUIRED：actions-only 下不允许 action 外直接写\n\n// 应用退出、组件卸载或请求结束时\nawait host.dispose();",
             "import { createMutationPolicy, StoreMiddlewareErrorCode } from '@migaia/store-middleware';\n\nconst policy = createMutationPolicy('actions-only');\n\ntry {\n  policy.assertMutationAllowed('settings.theme'); // 不在 action 内，抛错\n} catch (error) {\n  if ((error as { code?: string }).code === StoreMiddlewareErrorCode.actionScopeRequired) {\n    console.warn('write attempted outside an action');\n  }\n}\n\npolicy.runInAction(() => {\n  policy.assertMutationAllowed('settings.theme'); // 处于 action 内，放行\n});"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createMutationPolicy(mode?: IMutationPolicyMode): MutationPolicy;"
@@ -1236,6 +1238,7 @@
             "import { createStore } from '@migaia/store-light';\nimport {\n  bindStoreMiddleware,\n  createMutationPolicy,\n  loggerMiddleware,\n  createReduxDevToolsAdapter\n} from '@migaia/store-middleware';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count++;\n    }\n  },\n  { mutationPolicy }\n);\n\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n});\nawait host.use(loggerMiddleware());\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\n\nstore.increment(); // 允许：action 内\n// store.count = 1;  // 抛 ACTION_SCOPE_REQUIRED：actions-only 下不允许 action 外直接写\n\n// 应用退出、组件卸载或请求结束时\nawait host.dispose();",
             "import { createStoreMiddlewareHost, createReduxDevToolsAdapter } from '@migaia/store-middleware';\n\nlet state = { count: 0 };\nconst host = createStoreMiddlewareHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  runtime,\n  getState: () => state,\n  applyState: (next) => {\n    state = next;\n  } // 缺省时 connectDevTools 的 jump/reset 会抛 DEVTOOLS_CAPABILITY\n});\n\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\nhost.runAction('increment', () => {\n  state = { count: state.count + 1 };\n});"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createReduxDevToolsAdapter<S>(connection: IReduxDevToolsConnection<S>): IDevToolsAdapter<S>;"
@@ -1328,6 +1331,7 @@
           "examples": [
             "throw createStoreMiddlewareAggregateError(\n  StoreMiddlewareErrorCode.cleanupFailed,\n  [err1, err2],\n  '[store] middleware host cleanup failed'\n);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreMiddlewareAggregateError(code: IStoreMiddlewareErrorCode, errors: readonly unknown[], message: string): AggregateError;"
@@ -1430,6 +1434,7 @@
           "examples": [
             "throw createStoreMiddlewareError(\n  StoreMiddlewareErrorCode.invalidOption,\n  '[store] middleware host options must be an object'\n);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreMiddlewareError(code: IStoreMiddlewareErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
@@ -1519,6 +1524,7 @@
             "const host = createStoreMiddlewareHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  runtime,\n  getState: () => currentState\n});",
             "import { createStoreMiddlewareHost, createReduxDevToolsAdapter } from '@migaia/store-middleware';\n\nlet state = { count: 0 };\nconst host = createStoreMiddlewareHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  runtime,\n  getState: () => state,\n  applyState: (next) => {\n    state = next;\n  } // 缺省时 connectDevTools 的 jump/reset 会抛 DEVTOOLS_CAPABILITY\n});\n\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\nhost.runAction('increment', () => {\n  state = { count: state.count + 1 };\n});"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreMiddlewareHost<S>(options: IStoreMiddlewareHostOptions<S>): StoreMiddlewareHost<S>;"
@@ -1650,6 +1656,7 @@
             "class StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>> {\n  readonly mutationPolicy: MutationPolicy;\n  constructor(options: IStoreMiddlewareHostOptions<S>);\n  emit(event: IMiddlewareEvent<S>): void;\n  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;\n  recordState(\n    name: string,\n    previous: S,\n    next: S,\n    metadata?: Readonly<Record<string, unknown>>\n  ): void;\n  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;\n  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'\n  attachBindingDisposer(disposer: IDisposer): void;\n  override dispose(): Promise<void>;\n}\n\ntype IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {\n  runtime: IRuntime;\n  getState: () => S;\n  applyState?: (state: S) => void;\n  mutationPolicy?: MutationPolicy; // 缺省时内部新建一个 mode: 'off' 的实例\n};",
             "type IDevToolsCommand<S> =\n  { type: 'jump'; state: S } | { type: 'reset'; state: S } | { type: 'commit' };\n\ntype IDevToolsAdapter<S> = {\n  init(state: S): void;\n  send(event: IMiddlewareEvent<S>, state: S): void;\n  subscribe?(listener: (command: IDevToolsCommand<S>) => void): IDisposer;\n};\n\nfunction createReduxDevToolsAdapter<S>(\n  connection: IReduxDevToolsConnection<S>\n): IDevToolsAdapter<S>;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IDevToolsAdapter<S> = { init(state: S): void; send(event: IMiddlewareEvent<S>, state: S): void; subscribe?(listener: (command: IDevToolsCommand<S>) => void): IDisposer; };"
@@ -1714,6 +1721,7 @@
           "examples": [
             "type IDevToolsCommand<S> =\n  { type: 'jump'; state: S } | { type: 'reset'; state: S } | { type: 'commit' };\n\ntype IDevToolsAdapter<S> = {\n  init(state: S): void;\n  send(event: IMiddlewareEvent<S>, state: S): void;\n  subscribe?(listener: (command: IDevToolsCommand<S>) => void): IDisposer;\n};\n\nfunction createReduxDevToolsAdapter<S>(\n  connection: IReduxDevToolsConnection<S>\n): IDevToolsAdapter<S>;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IDevToolsCommand<S> = { readonly type: typeof MiddlewareCommandType.jump; readonly state: S; } | { readonly type: typeof MiddlewareCommandType.reset; readonly state: S; } | { readonly type: typeof MiddlewareCommandType.commit; };"
@@ -1778,6 +1786,7 @@
           "examples": [
             "type IMiddlewareActionEvent =\n  | {\n      type: 'action';\n      phase: 'start';\n      name: string;\n      timestamp: number;\n      metadata?: Readonly<Record<string, unknown>>;\n    }\n  | {\n      type: 'action';\n      phase: 'end';\n      name: string;\n      timestamp: number;\n      durationMs: number;\n      metadata?: Readonly<Record<string, unknown>>;\n    }\n  | {\n      type: 'action';\n      phase: 'error';\n      name: string;\n      timestamp: number;\n      durationMs: number;\n      error: unknown;\n      metadata?: Readonly<Record<string, unknown>>;\n    };\n\ntype IMiddlewareStateEvent<S> = {\n  type: 'state';\n  name: string;\n  timestamp: number;\n  previous: S;\n  next: S;\n  metadata?: Readonly<Record<string, unknown>>;\n};\n\ntype IMiddlewareErrorEvent = {\n  type: 'error';\n  phase: string;\n  timestamp: number;\n  error: unknown;\n  metadata?: Readonly<Record<string, unknown>>;\n};"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IMiddlewareActionEvent = { readonly type: typeof MiddlewareEventType.action; readonly phase: typeof MiddlewareEventPhase.start; readonly name: string; readonly timestamp: number; readonly metadata?: Readonly<Record<string, unknown>>; } | { readonly type: typeof MiddlewareEventType.action; readonly phase: typeof MiddlewareEventPhase.end; readonly name: string; readonly timestamp: number; readonly durationMs: number; readonly metadata?: Readonly<Record<string, unknown>>; } | { readonly type: typeof MiddlewareEventType.action; readonly phase: typeof MiddlewareEventPhase.error; readonly name: string; readonly timestamp: number; readonly durationMs: number; readonly error: unknown; readonly metadata?: Readonly<Record<string, unknown>>; };"
@@ -1840,6 +1849,7 @@
           "errors": ["No documented errors are declared for IMiddlewareCommandType."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewareCommandType.",
           "examples": [],
+          "members": [],
           "aliasOf": "IMiddlewareCommandType",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1903,6 +1913,7 @@
           "errors": ["No documented errors are declared for IMiddlewareContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewareContext.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IMiddlewareContext<S> = { readonly runtime: IRuntime; readonly getState: () => S; };"
@@ -1967,6 +1978,7 @@
           "examples": [
             "type IMiddlewareActionEvent =\n  | {\n      type: 'action';\n      phase: 'start';\n      name: string;\n      timestamp: number;\n      metadata?: Readonly<Record<string, unknown>>;\n    }\n  | {\n      type: 'action';\n      phase: 'end';\n      name: string;\n      timestamp: number;\n      durationMs: number;\n      metadata?: Readonly<Record<string, unknown>>;\n    }\n  | {\n      type: 'action';\n      phase: 'error';\n      name: string;\n      timestamp: number;\n      durationMs: number;\n      error: unknown;\n      metadata?: Readonly<Record<string, unknown>>;\n    };\n\ntype IMiddlewareStateEvent<S> = {\n  type: 'state';\n  name: string;\n  timestamp: number;\n  previous: S;\n  next: S;\n  metadata?: Readonly<Record<string, unknown>>;\n};\n\ntype IMiddlewareErrorEvent = {\n  type: 'error';\n  phase: string;\n  timestamp: number;\n  error: unknown;\n  metadata?: Readonly<Record<string, unknown>>;\n};"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IMiddlewareErrorEvent = { readonly type: typeof MiddlewareEventType.error; readonly phase: string; readonly timestamp: number; readonly error: unknown; readonly metadata?: Readonly<Record<string, unknown>>; };"
@@ -2034,6 +2046,7 @@
             "function loggerMiddleware<S>(\n  sink?: (event: IMiddlewareEvent<unknown>, state: unknown) => void\n): IStoreMiddlewarePlugin<S>;",
             "type IDevToolsCommand<S> =\n  { type: 'jump'; state: S } | { type: 'reset'; state: S } | { type: 'commit' };\n\ntype IDevToolsAdapter<S> = {\n  init(state: S): void;\n  send(event: IMiddlewareEvent<S>, state: S): void;\n  subscribe?(listener: (command: IDevToolsCommand<S>) => void): IDisposer;\n};\n\nfunction createReduxDevToolsAdapter<S>(\n  connection: IReduxDevToolsConnection<S>\n): IDevToolsAdapter<S>;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IMiddlewareEvent<S> = IMiddlewareActionEvent | IMiddlewareStateEvent<S> | IMiddlewareErrorEvent;"
@@ -2096,6 +2109,7 @@
           "errors": ["No documented errors are declared for IMiddlewareEventPhase."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewareEventPhase.",
           "examples": [],
+          "members": [],
           "aliasOf": "IMiddlewareEventPhase",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2159,6 +2173,7 @@
           "errors": ["No documented errors are declared for IMiddlewareEventType."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewareEventType.",
           "examples": [],
+          "members": [],
           "aliasOf": "IMiddlewareEventType",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2224,6 +2239,7 @@
           "examples": [
             "type IMiddlewareActionEvent =\n  | {\n      type: 'action';\n      phase: 'start';\n      name: string;\n      timestamp: number;\n      metadata?: Readonly<Record<string, unknown>>;\n    }\n  | {\n      type: 'action';\n      phase: 'end';\n      name: string;\n      timestamp: number;\n      durationMs: number;\n      metadata?: Readonly<Record<string, unknown>>;\n    }\n  | {\n      type: 'action';\n      phase: 'error';\n      name: string;\n      timestamp: number;\n      durationMs: number;\n      error: unknown;\n      metadata?: Readonly<Record<string, unknown>>;\n    };\n\ntype IMiddlewareStateEvent<S> = {\n  type: 'state';\n  name: string;\n  timestamp: number;\n  previous: S;\n  next: S;\n  metadata?: Readonly<Record<string, unknown>>;\n};\n\ntype IMiddlewareErrorEvent = {\n  type: 'error';\n  phase: string;\n  timestamp: number;\n  error: unknown;\n  metadata?: Readonly<Record<string, unknown>>;\n};"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IMiddlewareStateEvent<S> = { readonly type: typeof MiddlewareEventType.state; readonly name: string; readonly timestamp: number; readonly previous: S; readonly next: S; readonly metadata?: Readonly<Record<string, unknown>>; };"
@@ -2288,6 +2304,7 @@
           "examples": [
             "type IMutationPolicyMode = 'off' | 'actions-only';\n\nclass MutationPolicy implements IMutationGuard {\n  constructor(mode?: IMutationPolicyMode); // 默认 'off'\n  get insideAction(): boolean;\n  assertMutationAllowed(operation?: string): void; // 默认 operation = 'mutation'\n  runInAction<T>(fn: () => T): T;\n}\n\nfunction createMutationPolicy(mode?: IMutationPolicyMode): MutationPolicy;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": ["export type IMutationPolicyMode = 'off' | 'actions-only';"],
           "overloadParameterDetails": [[]],
@@ -2350,6 +2367,7 @@
           "examples": [
             "type IDevToolsCommand<S> =\n  { type: 'jump'; state: S } | { type: 'reset'; state: S } | { type: 'commit' };\n\ntype IDevToolsAdapter<S> = {\n  init(state: S): void;\n  send(event: IMiddlewareEvent<S>, state: S): void;\n  subscribe?(listener: (command: IDevToolsCommand<S>) => void): IDisposer;\n};\n\nfunction createReduxDevToolsAdapter<S>(\n  connection: IReduxDevToolsConnection<S>\n): IDevToolsAdapter<S>;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IReduxDevToolsConnection<S> = { init(state: S): void; send(action: unknown, state: S): void; subscribe(listener: (message: IReduxDevToolsMessage) => void): IDisposer; };"
@@ -2412,6 +2430,7 @@
           "errors": ["No documented errors are declared for IReduxDevToolsMessage."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReduxDevToolsMessage.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IReduxDevToolsMessage = { readonly type?: string; readonly payload?: { readonly type?: string; }; readonly state?: string; };"
@@ -2474,6 +2493,7 @@
           "errors": ["No documented errors are declared for IStoreMiddleware."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreMiddleware.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IStoreMiddleware<S> = (event: IMiddlewareEvent<S>, context: IMiddlewareContext<S>, next: () => void) => void;"
@@ -2538,6 +2558,7 @@
           "examples": [
             "type IStoreMiddlewareBindingOptions = {\n  execution: {\n    mutationTimeoutMs: number | false;\n    pipelineDrainTimeoutMs: number | false;\n  };\n  mutationPolicy?: MutationPolicy;\n  actionPrefix?: string;\n  clone?: (state: Record<string, unknown>) => Record<string, unknown>; // 默认 structuredClone\n};\n\ntype IStoreMiddlewareBinding<S extends Record<string, unknown>> = StoreMiddlewareHost<\n  Record<string, unknown>\n> & { readonly store: IReactiveStore<S> };\n\nfunction bindStoreMiddleware<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options: IStoreMiddlewareBindingOptions\n): IStoreMiddlewareBinding<S>;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IStoreMiddlewareBinding<S extends Record<string, unknown>> = StoreMiddlewareHost<Record<string, unknown>> & { readonly store: IReactiveStore<S>; };"
@@ -2602,6 +2623,7 @@
           "examples": [
             "type IStoreMiddlewareBindingOptions = {\n  execution: {\n    mutationTimeoutMs: number | false;\n    pipelineDrainTimeoutMs: number | false;\n  };\n  mutationPolicy?: MutationPolicy;\n  actionPrefix?: string;\n  clone?: (state: Record<string, unknown>) => Record<string, unknown>; // 默认 structuredClone\n};\n\ntype IStoreMiddlewareBinding<S extends Record<string, unknown>> = StoreMiddlewareHost<\n  Record<string, unknown>\n> & { readonly store: IReactiveStore<S> };\n\nfunction bindStoreMiddleware<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options: IStoreMiddlewareBindingOptions\n): IStoreMiddlewareBinding<S>;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IStoreMiddlewareBindingOptions = { readonly execution: IPluginHostOptions['execution']; readonly mutationPolicy?: MutationPolicy; readonly actionPrefix?: string; readonly clone?: (state: Record<string, unknown>) => Record<string, unknown>; };"
@@ -2668,6 +2690,7 @@
             "class StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>> {\n  readonly mutationPolicy: MutationPolicy;\n  constructor(options: IStoreMiddlewareHostOptions<S>);\n  emit(event: IMiddlewareEvent<S>): void;\n  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;\n  recordState(\n    name: string,\n    previous: S,\n    next: S,\n    metadata?: Readonly<Record<string, unknown>>\n  ): void;\n  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;\n  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'\n  attachBindingDisposer(disposer: IDisposer): void;\n  override dispose(): Promise<void>;\n}\n\ntype IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {\n  runtime: IRuntime;\n  getState: () => S;\n  applyState?: (state: S) => void;\n  mutationPolicy?: MutationPolicy; // 缺省时内部新建一个 mode: 'off' 的实例\n};",
             "type IStoreMiddlewareCore<S> = {\n  runtime: IRuntime;\n  getState(): S;\n  applyState(state: S): void; // 未提供 options.applyState 时调用会抛错\n  reportError(error: unknown, phase: string): void; // 透传到 runtime.reportError\n};"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IStoreMiddlewareCore<S> = { readonly runtime: IRuntime; getState(): S; applyState(state: S): void; reportError(error: unknown, phase: string): void; };"
@@ -2732,6 +2755,7 @@
           "examples": [
             "class StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>> {\n  readonly mutationPolicy: MutationPolicy;\n  constructor(options: IStoreMiddlewareHostOptions<S>);\n  emit(event: IMiddlewareEvent<S>): void;\n  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;\n  recordState(\n    name: string,\n    previous: S,\n    next: S,\n    metadata?: Readonly<Record<string, unknown>>\n  ): void;\n  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;\n  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'\n  attachBindingDisposer(disposer: IDisposer): void;\n  override dispose(): Promise<void>;\n}\n\ntype IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {\n  runtime: IRuntime;\n  getState: () => S;\n  applyState?: (state: S) => void;\n  mutationPolicy?: MutationPolicy; // 缺省时内部新建一个 mode: 'off' 的实例\n};"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IStoreMiddlewareHostOptions<S> = IPluginHostOptions & { readonly runtime: IRuntime; readonly getState: () => S; readonly applyState?: (state: S) => void; readonly mutationPolicy?: MutationPolicy; };"
@@ -2797,6 +2821,7 @@
             "import type { IStoreMiddlewarePlugin } from '@migaia/store-middleware';\n\nconst audit: IStoreMiddlewarePlugin<AppState> = {\n  name: 'audit',\n  install: (core) => {\n    core.usePipeline((event, next) => {\n      next(event);\n      if (event.type === 'action' && event.phase === 'end') {\n        auditSink({ action: event.name, state: core.getState() });\n      }\n    });\n    return {};\n  }\n};\n\nawait host.use(audit);\nawait host.unUse('audit');",
             "function loggerMiddleware<S>(\n  sink?: (event: IMiddlewareEvent<unknown>, state: unknown) => void\n): IStoreMiddlewarePlugin<S>;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IStoreMiddlewarePlugin<S, TExt extends Record<string, unknown> = Record<string, never>, TConfig extends Record<string, unknown> = Record<string, unknown>, TShared extends object = Record<string, never>> = IPlugin<IStoreMiddlewareCore<S> & import('@migaia/plugin-host').IPluginHostCore<IMiddlewareEvent<S>>, TExt, TConfig, TShared>;"
@@ -2870,6 +2895,7 @@
             "await host.use(loggerMiddleware()); // 默认 console.log('[store]', event, state)\nawait host.use(loggerMiddleware((event, state) => myLogger(event, state)));",
             "import { createStore } from '@migaia/store-light';\nimport {\n  bindStoreMiddleware,\n  createMutationPolicy,\n  loggerMiddleware,\n  createReduxDevToolsAdapter\n} from '@migaia/store-middleware';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count++;\n    }\n  },\n  { mutationPolicy }\n);\n\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n});\nawait host.use(loggerMiddleware());\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\n\nstore.increment(); // 允许：action 内\n// store.count = 1;  // 抛 ACTION_SCOPE_REQUIRED：actions-only 下不允许 action 外直接写\n\n// 应用退出、组件卸载或请求结束时\nawait host.dispose();"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function loggerMiddleware<S>(sink?: (event: IMiddlewareEvent<unknown>, state: unknown) => void): IStoreMiddlewarePlugin<S>;"
@@ -2943,6 +2969,7 @@
             "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  StoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';",
             "MiddlewareEventType.action; // 'action' | 'state' | 'error' 之一\nMiddlewareEventPhase.start; // 'start' | 'end' | 'error'\nMiddlewareCommandType.commit; // 'commit' | 'jump' | 'reset'"
           ],
+          "members": [],
           "aliasOf": "MiddlewareCommandType",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3009,6 +3036,7 @@
             "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  StoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';",
             "MiddlewareEventType.action; // 'action' | 'state' | 'error' 之一\nMiddlewareEventPhase.start; // 'start' | 'end' | 'error'\nMiddlewareCommandType.commit; // 'commit' | 'jump' | 'reset'"
           ],
+          "members": [],
           "aliasOf": "MiddlewareEventPhase",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3075,6 +3103,7 @@
             "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  StoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';",
             "MiddlewareEventType.action; // 'action' | 'state' | 'error' 之一\nMiddlewareEventPhase.start; // 'start' | 'end' | 'error'\nMiddlewareCommandType.commit; // 'commit' | 'jump' | 'reset'"
           ],
+          "members": [],
           "aliasOf": "MiddlewareEventType",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3152,6 +3181,7 @@
             "import { middlewarePlugin } from '@migaia/store-middleware';\n\nconst audit = middlewarePlugin<AppState>('audit', (event, context, next) => {\n  next();\n  auditSink({ event, state: context.getState() });\n});\n\nawait host.use(audit);",
             "const audit = middlewarePlugin('audit', (event, context, next) => {\n  next();\n  auditSink({ event, state: context.getState() });\n});\nawait host.use(audit);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function middlewarePlugin<S>(name: string, middleware: IStoreMiddleware<S>): IStoreMiddlewarePlugin<S>;"
@@ -3234,6 +3264,44 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for MutationPolicy.",
           "examples": [
             "const policy = new MutationPolicy('actions-only'); // 构造参数同 createMutationPolicy\npolicy.runInAction(() => {\n  policy.assertMutationAllowed('settings.theme'); // 处于 action 内，不抛错\n});"
+          ],
+          "members": [
+            {
+              "name": "insideAction",
+              "kind": "get",
+              "signature": "get insideAction(): boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "assertMutationAllowed",
+              "kind": "method",
+              "signature": "assertMutationAllowed(operation?: string): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "operation",
+                  "type": "string",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "runInAction",
+              "kind": "method",
+              "signature": "runInAction<T>(fn: () => T): T;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "() => T",
+                  "optional": false
+                }
+              ],
+              "returns": "T"
+            }
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -3320,6 +3388,7 @@
             "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  StoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';",
             "STORE_MIDDLEWARE_SOURCE; // '@migaia/store-middleware'"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const STORE_MIDDLEWARE_SOURCE = \"@migaia/store-middleware\";"
@@ -3389,6 +3458,148 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreMiddlewareHost.",
           "examples": [
             "const host = new StoreMiddlewareHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  runtime,\n  getState: () => state\n});\nhost.runAction('increment', () => {\n  state = { ...state, count: state.count + 1 };\n});\n  await host.dispose(); // returns the structured PluginHost disposal result"
+          ],
+          "members": [
+            {
+              "name": "mutationPolicy",
+              "kind": "property",
+              "signature": "readonly mutationPolicy: MutationPolicy;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "MutationPolicy"
+            },
+            {
+              "name": "emit",
+              "kind": "method",
+              "signature": "emit(event: IMiddlewareEvent<S>): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "event",
+                  "type": "IMiddlewareEvent<S>",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "runAction",
+              "kind": "method",
+              "signature": "runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "fn",
+                  "type": "() => T",
+                  "optional": false
+                },
+                {
+                  "name": "metadata",
+                  "type": "Readonly<Record<string, unknown>>",
+                  "optional": true
+                }
+              ],
+              "returns": "T"
+            },
+            {
+              "name": "recordState",
+              "kind": "method",
+              "signature": "recordState(name: string, previous: S, next: S, metadata?: Readonly<Record<string, unknown>>): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "previous",
+                  "type": "S",
+                  "optional": false
+                },
+                {
+                  "name": "next",
+                  "type": "S",
+                  "optional": false
+                },
+                {
+                  "name": "metadata",
+                  "type": "Readonly<Record<string, unknown>>",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "recordError",
+              "kind": "method",
+              "signature": "recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "phase",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "error",
+                  "type": "unknown",
+                  "optional": false
+                },
+                {
+                  "name": "metadata",
+                  "type": "Readonly<Record<string, unknown>>",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "connectDevTools",
+              "kind": "method",
+              "signature": "connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "adapter",
+                  "type": "IDevToolsAdapter<S>",
+                  "optional": false
+                },
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "attachBindingDisposer",
+              "kind": "method",
+              "signature": "attachBindingDisposer(disposer: IDisposer): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "disposer",
+                  "type": "IDisposer",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "signature": "dispose(): Promise<IPluginHostDisposalResult>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<IPluginHostDisposalResult>"
+            }
           ],
           "exportPath": ".",
           "overloadSignatures": [
@@ -3648,6 +3859,7 @@
             "import {\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone\n} from '@migaia/store-middleware/tolerant-clone';",
             "import { bindStoreMiddleware, ClonePolicy } from '@migaia/store-middleware';\n\n// 默认 clone 是 ClonePolicy.diagnostic（尽力而为、逐层深拷贝）；\n// 状态树很大或事件很密集时，改成零拷贝的 opaque 换取性能，\n// 代价是中间件之间、以及和 Store 本身共享同一份引用。\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  clone: ClonePolicy.opaque\n});"
           ],
+          "members": [],
           "exportPath": "./tolerant-clone",
           "overloadSignatures": [
             "export declare const ClonePolicy: { readonly immutable: typeof immutableSnapshotClone; readonly opaque: typeof opaqueReferenceClone; readonly diagnostic: typeof diagnosticClone; };"
@@ -3718,6 +3930,7 @@
           "examples": [
             "diagnosticClone({ a: 1, fn: () => 1 }); // { a: 1, fn: <同一个函数引用> }，永不抛错"
           ],
+          "members": [],
           "exportPath": "./tolerant-clone",
           "overloadSignatures": ["export declare function diagnosticClone<T>(value: T): T;"],
           "overloadParameterDetails": [
@@ -3788,6 +4001,7 @@
           "examples": [
             "type IClonePolicyMode = 'immutable' | 'opaque' | 'diagnostic';\n\nfunction immutableSnapshotClone<T>(value: T): T; // 真独立深拷贝，做不到就抛错\nfunction opaqueReferenceClone<T>(value: T): T; // 完全不拷贝，原样返回引用\nfunction diagnosticClone<T>(value: T): T; // 尽力而为，永不抛错\n\nconst ClonePolicy: {\n  immutable: typeof immutableSnapshotClone;\n  opaque: typeof opaqueReferenceClone;\n  diagnostic: typeof diagnosticClone;\n};\n\n/** @deprecated 用 ClonePolicy.diagnostic（或 diagnosticClone），行为相同，名字更明确 */\nconst tolerantClone: typeof diagnosticClone;"
           ],
+          "members": [],
           "exportPath": "./tolerant-clone",
           "overloadSignatures": [
             "export type IClonePolicyMode = 'immutable' | 'opaque' | 'diagnostic';"
@@ -3856,6 +4070,7 @@
           "errors": ["No documented errors are declared for immutableSnapshotClone."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for immutableSnapshotClone.",
           "examples": ["immutableSnapshotClone({ a: 1, date: new Date() });"],
+          "members": [],
           "exportPath": "./tolerant-clone",
           "overloadSignatures": ["export declare function immutableSnapshotClone<T>(value: T): T;"],
           "overloadParameterDetails": [
@@ -3930,6 +4145,7 @@
           "errors": ["No documented errors are declared for opaqueReferenceClone."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for opaqueReferenceClone.",
           "examples": ["opaqueReferenceClone(value) === value; // true，零拷贝"],
+          "members": [],
           "exportPath": "./tolerant-clone",
           "overloadSignatures": ["export declare function opaqueReferenceClone<T>(value: T): T;"],
           "overloadParameterDetails": [
@@ -4003,6 +4219,7 @@
             "tolerantClone === diagnosticClone; // true",
             "import {\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone\n} from '@migaia/store-middleware/tolerant-clone';"
           ],
+          "members": [],
           "exportPath": "./tolerant-clone",
           "overloadSignatures": ["export declare const tolerantClone: typeof diagnosticClone;"],
           "overloadParameterDetails": [[]],

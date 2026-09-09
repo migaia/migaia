@@ -54,7 +54,8 @@ const browserMatrix = [
   ['WEB-A27', 'anchor visibility'],
   ['WEB-A28', '72ch reading line'],
   ['WEB-A29', 'immutable fragment inventory'],
-  ['WEB-A33', 'derived navigation state']
+  ['WEB-A33', 'derived navigation state'],
+  ['WEB-A34', 'pre-paint theme and route transition veil']
 ]
 
 /** Returns a canonical trailing-slash URL for the static preview server. */
@@ -126,6 +127,12 @@ test(
   async () => {
     await withChrome((browser) =>
       withPage(browser, { width: 320, height: 844 }, async (page) => {
+        await visit(page, '/')
+        const rootLanguage = page.getByRole('link', { name: 'Switch to Chinese' })
+        assert.equal(await rootLanguage.getAttribute('href'), '/zh')
+        await rootLanguage.focus()
+        await page.keyboard.press('Enter')
+        await page.waitForFunction(() => /^\/zh\/?$/.test(window.location.pathname))
         await visit(page, '/en')
         await page.keyboard.press('Tab')
         assert.equal(
@@ -241,6 +248,58 @@ test(
         }
       }
     })
+  }
+)
+
+test(
+  'WEB-A34 restores theme before hydration and keeps the particle veil layout-neutral',
+  { timeout: 90_000 },
+  async () => {
+    await withChrome((browser) =>
+      withPage(browser, { width: 768, height: 900 }, async (page) => {
+        await page.addInitScript(() => localStorage.setItem('migaia-theme', 'dark'))
+        await page.goto(pageUrl('/en/docs'), { waitUntil: 'domcontentloaded' })
+        assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark')
+
+        const transition = page.locator('.route-transition')
+        assert.equal(await transition.getAttribute('data-active'), 'false')
+        const before = await page.evaluate(() => ({
+          height: document.documentElement.scrollHeight,
+          width: document.documentElement.scrollWidth
+        }))
+        await transition.evaluate((element) => element.setAttribute('data-active', 'true'))
+        assert.equal(
+          await transition.evaluate((element) => getComputedStyle(element).position),
+          'fixed'
+        )
+        assert.equal(
+          await transition.evaluate((element) => getComputedStyle(element).pointerEvents),
+          'none'
+        )
+        assert.equal(await transition.locator('i').count(), 3)
+        assert.deepEqual(
+          await page.evaluate(() => ({
+            height: document.documentElement.scrollHeight,
+            width: document.documentElement.scrollWidth
+          })),
+          before
+        )
+
+        await transition.evaluate((element) => element.setAttribute('data-active', 'false'))
+        await page.route('**/*.data', async (route) => {
+          await new Promise((resolve) => setTimeout(resolve, 250))
+          await route.continue()
+        })
+        await page.getByRole('link', { name: 'Guides' }).click()
+        await page.waitForFunction(
+          () => document.querySelector('.route-transition')?.getAttribute('data-active') === 'true'
+        )
+        await page.waitForURL(/\/en\/guides\/?$/)
+        await page.waitForFunction(
+          () => document.querySelector('.route-transition')?.getAttribute('data-active') === 'false'
+        )
+      })
+    )
   }
 )
 

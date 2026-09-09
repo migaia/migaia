@@ -56,6 +56,20 @@ export type IApiAlias = {
   readonly ownerFragment: string
 }
 
+/** Public instance member extracted from a class declaration. */
+export type IApiMember = {
+  readonly name: string
+  readonly kind: string
+  readonly signature: string
+  readonly description: string | null
+  readonly parameterDetails: readonly {
+    readonly name: string
+    readonly type: string
+    readonly optional: boolean
+  }[]
+  readonly returns: string
+}
+
 /** Source-backed public symbol projection shown under its owning module. */
 export type IApiSymbol = {
   readonly name: string
@@ -75,6 +89,7 @@ export type IApiSymbol = {
     readonly type: string
     readonly optional: boolean
   }[]
+  readonly members: readonly IApiMember[]
   readonly examples: readonly string[]
   /** Maintained task/configuration guidance directly bound to this public API. */
   readonly guidance: readonly {
@@ -120,7 +135,7 @@ export function findLibraryApis(slug: string): readonly IApi[] {
 
 /** Converts an export path into a readable module slug without exposing repository terms. */
 export function moduleSlug(exportPath: string): string {
-  return exportPath === '.' ? 'index' : exportPath.replace(/^\.\//, '').replaceAll('/', '-')
+  return exportPath === '.' ? 'index' : exportPath.replace(/^\.\//, '')
 }
 
 /** Produces a stable semantic path, adding a readable kind only for case-folding collisions. */
@@ -129,7 +144,8 @@ export function symbolSlug(
   siblings: readonly Pick<IApiSymbol, 'kind' | 'name'>[]
 ): string {
   const collisions = siblings.filter(
-    (candidate) => candidate.name.toLocaleLowerCase('en-US') === symbol.name.toLocaleLowerCase('en-US')
+    (candidate) =>
+      candidate.name.toLocaleLowerCase('en-US') === symbol.name.toLocaleLowerCase('en-US')
   )
   return `${encodeURIComponent(symbol.name)}${collisions.length > 1 ? `-${symbol.kind}` : ''}`
 }

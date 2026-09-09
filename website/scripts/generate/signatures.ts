@@ -190,12 +190,14 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
   logger: [
     'entries-hooks-and-sinks',
     'plugins-and-batching',
+    'custom-plugin',
     'pipelines',
     'flush-and-shutdown',
     'runtime-and-forwarding'
   ],
   'web-rpc': [
     'endpoint-composition',
+    'extension-authoring',
     'calls-and-cancellation',
     'providers-and-contracts',
     'transports-and-security',
@@ -744,18 +746,20 @@ function sanitizePublicText(value: string): string {
     .replace(/\bzh-cn\b/gi, 'zh')
 }
 
-/** Converts an export subpath into a URL-safe stable module fragment. */
+/** Preserves public export hierarchy while sanitizing each URL segment. */
 function moduleRouteSlug(exportPath: string): string {
   if (exportPath === '.') return 'index'
-  return (
-    exportPath
-      .replace(/^\.\//, '')
-      .split('/')
-      .join('-')
-      .replace(/[^a-zA-Z0-9_-]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '') || 'index'
-  )
+  return exportPath
+    .replace(/^\.\//, '')
+    .split('/')
+    .map((segment) =>
+      segment
+        .replace(/[^a-zA-Z0-9_-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+    )
+    .filter(Boolean)
+    .join('/')
 }
 
 /** Produces a stable semantic URL segment, adding kind only for case-folding collisions. */
@@ -789,6 +793,21 @@ function declarationDoc(source: string, offset: number): string | null {
     .split('\n')
     .map((line) => line.replace(/^\s*\* ?/, '').trim())
     .filter(Boolean)
+    .join(' ')
+}
+
+/** Extracts JSDoc immediately preceding one class member declaration. */
+function classMemberDoc(source: string, offset: number): string | null {
+  const prefix = source.slice(0, offset)
+  const start = prefix.lastIndexOf('/**')
+  if (start < 0) return null
+  const end = prefix.indexOf('*/', start)
+  if (end < 0 || prefix.slice(end + 2).trim()) return null
+  return prefix
+    .slice(start + 3, end)
+    .split('\n')
+    .map((line) => line.replace(/^\s*\* ?/, '').trim())
+    .filter((line) => line && !line.startsWith('@'))
     .join(' ')
 }
 
@@ -861,6 +880,77 @@ function closingParenthesis(signature: string, open: number): number {
     }
   }
   return -1
+}
+
+/** Projects public methods and properties from a declaration class body. */
+function classMembers(declaration: string) {
+  const bodyStart = declaration.indexOf('{')
+  const bodyEnd = declaration.lastIndexOf('}')
+  if (bodyStart < 0 || bodyEnd <= bodyStart) return []
+  const body = declaration.slice(bodyStart + 1, bodyEnd)
+  const members: Array<Record<string, unknown>> = []
+  let cursor = 0
+  while (cursor < body.length) {
+    while (/\s/.test(body[cursor] ?? '')) cursor += 1
+    if (body.startsWith('/**', cursor) || body.startsWith('/*', cursor)) {
+      const commentEnd = body.indexOf('*/', cursor + 2)
+      if (commentEnd < 0) break
+      cursor = commentEnd + 2
+      continue
+    }
+    if (body.startsWith('//', cursor)) {
+      const commentEnd = body.indexOf('\n', cursor + 2)
+      cursor = commentEnd < 0 ? body.length : commentEnd + 1
+      continue
+    }
+    if (cursor >= body.length) break
+    const start = cursor
+    const end = declarationEnd(body, start, 'member')
+    if (end <= start) break
+    cursor = end
+    const signature = body.slice(start, end).trim().replace(/\s+/g, ' ')
+    if (
+      !signature ||
+      signature.startsWith('#') ||
+      /^(?:private|protected)\b/.test(signature) ||
+      /^(?:public\s+)?constructor\b/.test(signature)
+    ) {
+      continue
+    }
+    const normalized = signature.replace(
+      /^(?:(?:public|static|abstract|override|readonly)\s+)*/,
+      ''
+    )
+    const accessor = normalized.match(/^(get|set)\s+([A-Za-z_$][\w$]*)\s*\(/)
+    const method = normalized.match(/^([A-Za-z_$][\w$]*)\??(?:<[^;]*?>)?\s*\(/)
+    const property = normalized.match(/^([A-Za-z_$][\w$]*)[!?]?\s*:\s*([^;]+);?$/)
+    const name = accessor?.[2] ?? method?.[1] ?? property?.[1]
+    if (!name) continue
+    const kind = accessor?.[1] ?? (method ? 'method' : 'property')
+    const open = signature.indexOf('(')
+    const close = open < 0 ? -1 : closingParenthesis(signature, open)
+    const parameterDetails = method || accessor ? declarationParameters(signature) : []
+    const returns = property
+      ? property[2].trim()
+      : accessor?.[1] === 'set'
+        ? 'void'
+        : close < 0
+          ? 'unknown'
+          : signature
+              .slice(close + 1)
+              .replace(/^\s*:\s*/, '')
+              .replace(/;\s*$/, '')
+              .trim() || 'unknown'
+    members.push({
+      name,
+      kind,
+      signature,
+      description: classMemberDoc(body, start),
+      parameterDetails,
+      returns
+    })
+  }
+  return members
 }
 
 /** Finds the end of one declaration while respecting nested syntax and comments. */
@@ -943,7 +1033,8 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
     const declarationStart = match.index ?? 0
     const lineStart = source.lastIndexOf('\n', declarationStart) + 1
     const end = declarationEnd(source, declarationStart, kind)
-    const signature = source.slice(declarationStart, end).trim().replace(/\s+/g, ' ')
+    const rawDeclaration = source.slice(declarationStart, end).trim()
+    const signature = rawDeclaration.replace(/\s+/g, ' ')
     const parameterDetails =
       kind === 'function'
         ? declarationParameters(signature)
@@ -975,7 +1066,8 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
       returns: returnText || null,
       errors: [],
       lifecycleConcurrency: null,
-      examples: []
+      examples: [],
+      members: kind === 'class' ? classMembers(rawDeclaration) : []
     })
   }
   const reexports = [

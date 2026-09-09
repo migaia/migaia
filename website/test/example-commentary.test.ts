@@ -137,6 +137,47 @@ merged.dispose()`,
     expect(example.notes).toEqual([])
   })
 
+  it('uses maintained API context to explain the exact result and its later methods', () => {
+    const example = commentExample(
+      "import { openSession } from '@migaia/session'\n\nconst session = openSession(options)\nawait session.run(job)\nawait session.dispose()",
+      'ts',
+      'zh',
+      {
+        apiName: 'openSession',
+        purpose: '创建隔离的任务会话，并统一拥有本次任务申请的资源。',
+        scenario: '一个请求需要在结束时释放连接和监听器。'
+      }
+    )
+
+    expect(example.notes).toHaveLength(1)
+    expect(example.notes[0]).toContain('session 保存 openSession() 返回的本次实例')
+    expect(example.notes[0]).toContain('run()、dispose()')
+    expect(example.notes[0]).toContain('创建隔离的任务会话')
+    expect(example.notes[0]).toContain('一个请求需要在结束时释放连接和监听器')
+  })
+
+  it('explains construction, lazy activation, consumption, and cleanup for Capability Host', () => {
+    const example = commentExample(
+      "const host = createCapabilityHost({ tenantId }, {\n  flags: { persistence: true },\n  onError: (name, error) => diagnostics.report(name, error)\n})\n\nhost.register({\n  name: 'persistence',\n  async activate(context) {\n    const { openPersistence } = await import('./persistence.js')\n    return openPersistence(context.tenantId)\n  }\n})\n\ntry {\n  const result = await host.enable('persistence')\n  if (result.status === CapabilityEnableStatus.enabled) {\n    await host.handle('persistence')?.sync()\n  }\n} finally {\n  await host.dispose()\n}",
+      'ts',
+      'zh',
+      {
+        apiName: 'createCapabilityHost',
+        purpose: '创建租户隔离的运行时闸门。',
+        scenario: '按租户启停能力。'
+      }
+    )
+
+    expect(example.notes).toHaveLength(3)
+    expect(example.notes[0]).toContain('tenantId')
+    expect(example.notes[0]).toContain('flags.persistence')
+    expect(example.notes[1]).toContain("enable('persistence')")
+    expect(example.notes[1]).toContain('动态导入')
+    expect(example.notes[2]).toContain("handle('persistence')")
+    expect(example.notes[2]).toContain('作废在途激活')
+    expect(example.code.match(/\/\//g)).toHaveLength(3)
+  })
+
   it('does not invent storage ownership when the example omits concrete configuration', () => {
     const example = commentExample('localStorage(options)', 'ts', 'zh')
 
@@ -156,14 +197,39 @@ console.log(count.value)`,
     expect(example.notes.join('\n')).not.toContain('signal 会变为 aborted')
   })
 
-  it('routes every reader example through commentary without altering type signatures', () => {
+  it('explains overload sets using extracted parameters instead of generic filler', () => {
+    const example = commentExample(
+      'export declare function createEventChannel<T>(options: IOptions): IChannel<T>\nexport declare function createEventChannel<T, R>(options: IOptions, projectionPlan: IPlan<R>): IChannel<T, R>',
+      'ts',
+      'zh',
+      {
+        apiName: 'createEventChannel',
+        kind: 'signature',
+        parameterNames: ['options', 'projectionPlan'],
+        purpose: '创建事件通道。'
+      }
+    )
+
+    expect(example.notes).toHaveLength(1)
+    expect(example.notes[0]).toContain('createEventChannel 共有 2 个公开重载')
+    expect(example.notes[0]).toContain('`options`、`projectionPlan`')
+    expect(example.notes[0]).toContain('TypeScript 会根据调用时传入')
+    expect(example.notes[0]).toContain('不需要手动选择某一行')
+  })
+
+  it('routes executable examples and public signatures through commentary', () => {
     const routeSource = readFileSync(new URL('../app/routes/docs.tsx', import.meta.url), 'utf8')
     const explainedCalls = routeSource.match(/^\s+explain$/gm) ?? []
-    const signatureCall = routeSource.match(/<CodeBlock\s+code=\{symbol\.signature\}[^>]*\/>/)?.[0]
+    const signatureCall = [...routeSource.matchAll(/<CodeBlock[\s\S]*?\/>/g)]
+      .map((match) => match[0])
+      .find(
+        (call) => call.includes('code={symbol.signature}') && call.includes("kind: 'signature'")
+      )
 
-    expect(explainedCalls).toHaveLength(4)
+    expect(explainedCalls).toHaveLength(5)
     expect(routeSource).toMatch(/code=\{symbol\.signature\}[\s\S]*?公开类型签名/)
-    expect(signatureCall).not.toContain('explain')
+    expect(signatureCall).toContain('explain')
+    expect(signatureCall).toContain("kind: 'signature'")
     expect(routeSource).not.toContain('代码旁白')
   })
 })

@@ -987,6 +987,7 @@
             "function adaptGeneratorStageToAsyncGenerator<TValue>(\n  stage: IGeneratorMiddlewareStage<TValue>\n): IAsyncGeneratorMiddlewareStage<TValue>;\n\nfunction adaptSyncStageToAsyncGenerator<TValue>(\n  stage: ISyncMiddlewareStage<TValue>,\n  onViolation: IMiddlewarePipelineViolationHandler\n): IAsyncGeneratorMiddlewareStage<TValue>;",
             "import {\n  adaptGeneratorStageToAsyncGenerator,\n  adaptSyncStageToAsync,\n  adaptSyncStageToAsyncGenerator,\n  adaptSyncStageToGenerator\n} from '@migaia/middleware-pipeline';"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const adaptGeneratorStageToAsyncGenerator: <TValue>(stage: IGeneratorMiddlewareStage<TValue>) => IAsyncGeneratorMiddlewareStage<TValue>;"
@@ -1056,6 +1057,7 @@
             "const asyncStage = adaptSyncStageToAsync((value: string, next) => next(value.trim()));\nawait runAsyncMiddleware([asyncStage], ' hi ', (v) => console.log(v), {\n  onViolation: () => undefined\n});",
             "import {\n  adaptSyncStageToAsync,\n  runAsyncMiddleware,\n  type IAsyncMiddlewareStage\n} from '@migaia/middleware-pipeline';\n\nconst trimStage = adaptSyncStageToAsync((value: string, next) => next(value.trim()));\nconst upperStage: IAsyncMiddlewareStage<string> = async (value, next) => {\n  await next(value.toUpperCase());\n};\n\nawait runAsyncMiddleware(\n  [trimStage, upperStage],\n  '  migaia  ',\n  (value) => console.log(value), // 'MIGAIA'\n  { onViolation: (kind) => console.warn('violation:', kind) }\n);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const adaptSyncStageToAsync: <TValue>(stage: ISyncMiddlewareStage<TValue>, onViolation?: IMiddlewarePipelineViolationHandler) => IAsyncMiddlewareStage<TValue>;"
@@ -1158,6 +1160,7 @@
             "function adaptGeneratorStageToAsyncGenerator<TValue>(\n  stage: IGeneratorMiddlewareStage<TValue>\n): IAsyncGeneratorMiddlewareStage<TValue>;\n\nfunction adaptSyncStageToAsyncGenerator<TValue>(\n  stage: ISyncMiddlewareStage<TValue>,\n  onViolation: IMiddlewarePipelineViolationHandler\n): IAsyncGeneratorMiddlewareStage<TValue>;",
             "import {\n  adaptGeneratorStageToAsyncGenerator,\n  adaptSyncStageToAsync,\n  adaptSyncStageToAsyncGenerator,\n  adaptSyncStageToGenerator\n} from '@migaia/middleware-pipeline';"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const adaptSyncStageToAsyncGenerator: <TValue>(stage: ISyncMiddlewareStage<TValue>, onViolation: IMiddlewarePipelineViolationHandler) => IAsyncGeneratorMiddlewareStage<TValue>;"
@@ -1225,6 +1228,7 @@
             "import {\n  adaptGeneratorStageToAsyncGenerator,\n  adaptSyncStageToAsync,\n  adaptSyncStageToAsyncGenerator,\n  adaptSyncStageToGenerator\n} from '@migaia/middleware-pipeline';",
             "const genStage = adaptSyncStageToGenerator(\n  (value: string, next) => next(value.trim()),\n  (violation) => console.warn(violation)\n);\nrunGeneratorMiddleware([genStage], ' hi ', (v) => console.log(v));"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const adaptSyncStageToGenerator: <TValue>(stage: ISyncMiddlewareStage<TValue>, onViolation: IMiddlewarePipelineViolationHandler) => IGeneratorMiddlewareStage<TValue>;"
@@ -1330,6 +1334,7 @@
             "import {\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  runGeneratorMiddleware\n} from '@migaia/middleware-pipeline';\n\nrunGeneratorMiddleware(\n  [\n    function* (value: number) {\n      yield value + 1;\n      yield value + 2; // 最终采用这一次\n      return GENERATOR_CONTINUE;\n    },\n    function* (value: number) {\n      if (value > 10) return GENERATOR_HALT; // 终止整条链\n      return value * 2;\n    }\n  ],\n  3,\n  (value) => console.log(value) // 10\n);",
             "import {\n  GENERATOR_CONTINUE,\n  runAsyncGeneratorMiddleware,\n  type IAsyncGeneratorMiddlewareStage\n} from '@migaia/middleware-pipeline';\n\nconst fetchStage: IAsyncGeneratorMiddlewareStage<string> = async function* (url, context) {\n  yield url; // 中间 yield 仅用于观测/调试，不会提前送到下一 stage\n  const response = await fetch(url, { signal: context?.signal as AbortSignal | undefined });\n  return await response.text();\n};\n\nconst controller = new AbortController();\nsetTimeout(() => controller.abort(new Error('超时')), 3000);\n\ntry {\n  await runAsyncGeneratorMiddleware(\n    [fetchStage],\n    'https://example.com/data',\n    (text) => console.log('done:', text),\n    undefined,\n    { signal: controller.signal }\n  );\n} catch (error) {\n  // 3 秒内 controller.abort() 触发：runner 在下一个协作检查点抛出 '超时'（reason 已是 Error，原样抛出）\n  // fetch 本身也收到同一个 signal，会独立中止网络请求\n  console.error(error);\n}"
           ],
+          "members": [],
           "aliasOf": "GENERATOR_CONTINUE",
           "exportPath": ".",
           "overloadSignatures": ["export declare const GENERATOR_CONTINUE: unique symbol;"],
@@ -1400,6 +1405,7 @@
             "MiddlewarePipelineGeneratorSignals; // { undefined: GENERATOR_UNDEFINED, halt: GENERATOR_HALT, continue: GENERATOR_CONTINUE }",
             "import {\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  runGeneratorMiddleware\n} from '@migaia/middleware-pipeline';\n\nrunGeneratorMiddleware(\n  [\n    function* (value: number) {\n      yield value + 1;\n      yield value + 2; // 最终采用这一次\n      return GENERATOR_CONTINUE;\n    },\n    function* (value: number) {\n      if (value > 10) return GENERATOR_HALT; // 终止整条链\n      return value * 2;\n    }\n  ],\n  3,\n  (value) => console.log(value) // 10\n);"
           ],
+          "members": [],
           "aliasOf": "GENERATOR_HALT",
           "exportPath": ".",
           "overloadSignatures": ["export declare const GENERATOR_HALT: unique symbol;"],
@@ -1467,6 +1473,7 @@
             "function* stage(value: number) {\n  yield value;\n  return GENERATOR_CONTINUE; // 或 GENERATOR_HALT / GENERATOR_UNDEFINED\n}",
             "MiddlewarePipelineGeneratorSignals; // { undefined: GENERATOR_UNDEFINED, halt: GENERATOR_HALT, continue: GENERATOR_CONTINUE }"
           ],
+          "members": [],
           "aliasOf": "GENERATOR_UNDEFINED",
           "exportPath": ".",
           "overloadSignatures": ["export declare const GENERATOR_UNDEFINED: unique symbol;"],
@@ -1533,6 +1540,7 @@
             "type ISyncMiddlewareStage<TValue> = (\n  value: TValue,\n  next: (value: TValue) => void,\n  context?: IMiddlewarePipelineContext\n) => void;\n\ntype IAsyncMiddlewareStage<TValue> = (\n  value: TValue,\n  next: (value: TValue) => Promise<void>,\n  context?: IMiddlewarePipelineContext\n) => void | Promise<void>;\n\n// TValue 的类型允许 undefined 时，生成器 return 类型里额外接受 GENERATOR_UNDEFINED 作为\n// \"显式传播 undefined\" 的信号；TValue 不允许 undefined 时该分支类型上不存在。\ntype IGeneratorMiddlewareStage<TValue> = (\n  value: TValue,\n  context?: IMiddlewarePipelineContext\n) => Generator<\n  TValue,\n  | TValue\n  | (undefined extends TValue ? typeof GENERATOR_UNDEFINED : never)\n  | typeof GENERATOR_HALT\n  | typeof GENERATOR_CONTINUE\n  | undefined,\n  void\n>;\n\ntype IAsyncGeneratorMiddlewareStage<TValue> = (\n  value: TValue,\n  context?: IMiddlewarePipelineContext\n) => AsyncGenerator<\n  TValue,\n  | TValue\n  | (undefined extends TValue ? typeof GENERATOR_UNDEFINED : never)\n  | typeof GENERATOR_HALT\n  | typeof GENERATOR_CONTINUE\n  | undefined,\n  void\n>;",
             "import {\n  GENERATOR_CONTINUE,\n  runAsyncGeneratorMiddleware,\n  type IAsyncGeneratorMiddlewareStage\n} from '@migaia/middleware-pipeline';\n\nconst fetchStage: IAsyncGeneratorMiddlewareStage<string> = async function* (url, context) {\n  yield url; // 中间 yield 仅用于观测/调试，不会提前送到下一 stage\n  const response = await fetch(url, { signal: context?.signal as AbortSignal | undefined });\n  return await response.text();\n};\n\nconst controller = new AbortController();\nsetTimeout(() => controller.abort(new Error('超时')), 3000);\n\ntry {\n  await runAsyncGeneratorMiddleware(\n    [fetchStage],\n    'https://example.com/data',\n    (text) => console.log('done:', text),\n    undefined,\n    { signal: controller.signal }\n  );\n} catch (error) {\n  // 3 秒内 controller.abort() 触发：runner 在下一个协作检查点抛出 '超时'（reason 已是 Error，原样抛出）\n  // fetch 本身也收到同一个 signal，会独立中止网络请求\n  console.error(error);\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IAsyncGeneratorMiddlewareStage<TValue> = (value: TValue, context?: IMiddlewarePipelineContext) => AsyncGenerator<TValue, TValue | IGeneratorUndefinedSignal<TValue> | typeof GENERATOR_HALT | typeof GENERATOR_CONTINUE | undefined, void>;"
@@ -1602,6 +1610,7 @@
             "import { runAsyncMiddleware, type IAsyncMiddlewareStage } from '@migaia/middleware-pipeline';\n\ntype IRequest = { readonly path: string; readonly trace: readonly string[] };\n\nconst stages: readonly IAsyncMiddlewareStage<IRequest>[] = [\n  async (request, next) => {\n    await next({ ...request, trace: [...request.trace, 'auth'] });\n  },\n  async (request, next) => {\n    if (request.path === '/health') return; // 短路，done 不执行\n    await next({ ...request, trace: [...request.trace, 'route'] });\n  }\n];\n\nawait runAsyncMiddleware(\n  stages,\n  { path: '/users', trace: [] },\n  (request) => console.log(request.trace), // ['auth', 'route']\n  { onViolation: () => undefined }\n);",
             "import {\n  adaptSyncStageToAsync,\n  runAsyncMiddleware,\n  type IAsyncMiddlewareStage\n} from '@migaia/middleware-pipeline';\n\nconst trimStage = adaptSyncStageToAsync((value: string, next) => next(value.trim()));\nconst upperStage: IAsyncMiddlewareStage<string> = async (value, next) => {\n  await next(value.toUpperCase());\n};\n\nawait runAsyncMiddleware(\n  [trimStage, upperStage],\n  '  migaia  ',\n  (value) => console.log(value), // 'MIGAIA'\n  { onViolation: (kind) => console.warn('violation:', kind) }\n);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IAsyncMiddlewareStage<TValue> = (value: TValue, next: (value: TValue) => Promise<void>, context?: IMiddlewarePipelineContext) => void | Promise<void>;"
@@ -1668,6 +1677,7 @@
             "function runAsyncGeneratorMiddleware<TValue>(\n  stages: readonly IAsyncGeneratorMiddlewareStage<TValue>[],\n  value: TValue,\n  done: (value: TValue) => void | Promise<void>,\n  signals?: IGeneratorMiddlewareSignals,\n  control?: IMiddlewarePipelineControlOptions\n): Promise<void>;",
             "const GENERATOR_UNDEFINED: unique symbol;\nconst GENERATOR_HALT: unique symbol;\nconst GENERATOR_CONTINUE: unique symbol;\n\ntype IGeneratorMiddlewareSignals = {\n  readonly undefined: symbol;\n  readonly halt: symbol;\n  readonly continue: symbol;\n};\nconst MiddlewarePipelineGeneratorSignals: IGeneratorMiddlewareSignals;"
           ],
+          "members": [],
           "aliasOf": "IGeneratorMiddlewareSignals",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1736,6 +1746,7 @@
             "function adaptGeneratorStageToAsyncGenerator<TValue>(\n  stage: IGeneratorMiddlewareStage<TValue>\n): IAsyncGeneratorMiddlewareStage<TValue>;\n\nfunction adaptSyncStageToAsyncGenerator<TValue>(\n  stage: ISyncMiddlewareStage<TValue>,\n  onViolation: IMiddlewarePipelineViolationHandler\n): IAsyncGeneratorMiddlewareStage<TValue>;",
             "type ISyncMiddlewareStage<TValue> = (\n  value: TValue,\n  next: (value: TValue) => void,\n  context?: IMiddlewarePipelineContext\n) => void;\n\ntype IAsyncMiddlewareStage<TValue> = (\n  value: TValue,\n  next: (value: TValue) => Promise<void>,\n  context?: IMiddlewarePipelineContext\n) => void | Promise<void>;\n\n// TValue 的类型允许 undefined 时，生成器 return 类型里额外接受 GENERATOR_UNDEFINED 作为\n// \"显式传播 undefined\" 的信号；TValue 不允许 undefined 时该分支类型上不存在。\ntype IGeneratorMiddlewareStage<TValue> = (\n  value: TValue,\n  context?: IMiddlewarePipelineContext\n) => Generator<\n  TValue,\n  | TValue\n  | (undefined extends TValue ? typeof GENERATOR_UNDEFINED : never)\n  | typeof GENERATOR_HALT\n  | typeof GENERATOR_CONTINUE\n  | undefined,\n  void\n>;\n\ntype IAsyncGeneratorMiddlewareStage<TValue> = (\n  value: TValue,\n  context?: IMiddlewarePipelineContext\n) => AsyncGenerator<\n  TValue,\n  | TValue\n  | (undefined extends TValue ? typeof GENERATOR_UNDEFINED : never)\n  | typeof GENERATOR_HALT\n  | typeof GENERATOR_CONTINUE\n  | undefined,\n  void\n>;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IGeneratorMiddlewareStage<TValue> = (value: TValue, context?: IMiddlewarePipelineContext) => Generator<TValue, TValue | IGeneratorUndefinedSignal<TValue> | typeof GENERATOR_HALT | typeof GENERATOR_CONTINUE | undefined, void>;"
@@ -1806,6 +1817,7 @@
             "type IMiddlewarePipelineContext = { readonly signal: IMiddlewarePipelineAbortSignal };",
             "type IMiddlewarePipelineControlOptions = { readonly signal?: IMiddlewarePipelineAbortSignal };"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IMiddlewarePipelineAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean; }): void; removeEventListener(type: 'abort', listener: () => void): void; };"
@@ -1876,6 +1888,7 @@
             "import type {\n  IMiddlewarePipelineAbortSignal,\n  IMiddlewarePipelineContext,\n  IMiddlewarePipelineControlOptions\n} from '@migaia/middleware-pipeline';",
             "type IMiddlewarePipelineContext = { readonly signal: IMiddlewarePipelineAbortSignal };"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IMiddlewarePipelineContext = { readonly signal: IMiddlewarePipelineAbortSignal; };"
@@ -1945,6 +1958,7 @@
             "import type {\n  IMiddlewarePipelineAbortSignal,\n  IMiddlewarePipelineContext,\n  IMiddlewarePipelineControlOptions\n} from '@migaia/middleware-pipeline';",
             "type IMiddlewarePipelineControlOptions = { readonly signal?: IMiddlewarePipelineAbortSignal };"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IMiddlewarePipelineControlOptions = { readonly signal?: IMiddlewarePipelineAbortSignal; };"
@@ -2010,6 +2024,7 @@
             "const MIDDLEWARE_PIPELINE_SOURCE: '@migaia/middleware-pipeline';\n\nconst MiddlewarePipelineErrorCode = {\n  executionFailed: 'EXECUTION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  aborted: 'ABORTED',\n  abortCleanupFailed: 'ABORT_CLEANUP_FAILED'\n} as const;\ntype IMiddlewarePipelineErrorCode =\n  (typeof MiddlewarePipelineErrorCode)[keyof typeof MiddlewarePipelineErrorCode];",
             "function createMiddlewarePipelineExecutionError(\n  stageError: unknown,\n  downstreamError: unknown\n): AggregateError & {\n  readonly source: typeof MIDDLEWARE_PIPELINE_SOURCE;\n  readonly code: IMiddlewarePipelineErrorCode;\n};"
           ],
+          "members": [],
           "aliasOf": "IMiddlewarePipelineErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2140,6 +2155,7 @@
           "examples": [
             "const MiddlewarePipelineMode = {\n  sync: 'sync',\n  async: 'async',\n  generator: 'generator',\n  asyncGenerator: 'async-generator'\n} as const;\ntype IMiddlewarePipelineMode = (typeof MiddlewarePipelineMode)[keyof typeof MiddlewarePipelineMode];"
           ],
+          "members": [],
           "aliasOf": "IMiddlewarePipelineMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2331,6 +2347,7 @@
             "type IAsyncMiddlewareStage<TValue> = (\n  value: TValue,\n  next: (value: TValue) => Promise<void>, context?: IMiddlewarePipelineContext\n) => void | Promise<void>;\n\ntype IMiddlewarePipelineOptions = {\n  readonly onViolation: IMiddlewarePipelineViolationHandler;\n  readonly assertActive?: () => void;\n  readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown;\n  readonly signal?: IMiddlewarePipelineAbortSignal;\n};\n\nfunction runAsyncMiddleware<TValue>(\n  stages: readonly IAsyncMiddlewareStage<TValue>[],\n  value: TValue,\n  done: (value: TValue, context?: IMiddlewarePipelineContext) => void | Promise<void>,\n  options: IMiddlewarePipelineOptions\n): Promise<void>;",
             "type IMiddlewarePipelineOptions = {\n  readonly onViolation: IMiddlewarePipelineViolationHandler;\n  readonly assertActive?: () => void;\n  readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown;\n  readonly signal?: IMiddlewarePipelineAbortSignal;\n};"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IMiddlewarePipelineOptions = { readonly onViolation: IMiddlewarePipelineViolationHandler; readonly assertActive?: () => void; /** Host-owned error construction for the stage+downstream failure case. */ readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown; readonly signal?: IMiddlewarePipelineAbortSignal; };"
@@ -2395,6 +2412,7 @@
           "examples": [
             "const MiddlewarePipelineViolation = { late: 'late', duplicate: 'duplicate' } as const;\ntype IMiddlewarePipelineViolation =\n  (typeof MiddlewarePipelineViolation)[keyof typeof MiddlewarePipelineViolation];\ntype IMiddlewarePipelineViolationHandler = (kind: IMiddlewarePipelineViolation) => void;"
           ],
+          "members": [],
           "aliasOf": "IMiddlewarePipelineViolation",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2531,6 +2549,7 @@
             "type IMiddlewarePipelineOptions = {\n  readonly onViolation: IMiddlewarePipelineViolationHandler;\n  readonly assertActive?: () => void;\n  readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown;\n  readonly signal?: IMiddlewarePipelineAbortSignal;\n};",
             "const MiddlewarePipelineViolation = { late: 'late', duplicate: 'duplicate' } as const;\ntype IMiddlewarePipelineViolation =\n  (typeof MiddlewarePipelineViolation)[keyof typeof MiddlewarePipelineViolation];\ntype IMiddlewarePipelineViolationHandler = (kind: IMiddlewarePipelineViolation) => void;"
           ],
+          "members": [],
           "aliasOf": "IMiddlewarePipelineViolationHandler",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2665,6 +2684,7 @@
             "function adaptGeneratorStageToAsyncGenerator<TValue>(\n  stage: IGeneratorMiddlewareStage<TValue>\n): IAsyncGeneratorMiddlewareStage<TValue>;\n\nfunction adaptSyncStageToAsyncGenerator<TValue>(\n  stage: ISyncMiddlewareStage<TValue>,\n  onViolation: IMiddlewarePipelineViolationHandler\n): IAsyncGeneratorMiddlewareStage<TValue>;",
             "type ISyncMiddlewareStage<TValue> = (\n  value: TValue,\n  next: (value: TValue) => void,\n  context?: IMiddlewarePipelineContext\n) => void;\n\ntype IAsyncMiddlewareStage<TValue> = (\n  value: TValue,\n  next: (value: TValue) => Promise<void>,\n  context?: IMiddlewarePipelineContext\n) => void | Promise<void>;\n\n// TValue 的类型允许 undefined 时，生成器 return 类型里额外接受 GENERATOR_UNDEFINED 作为\n// \"显式传播 undefined\" 的信号；TValue 不允许 undefined 时该分支类型上不存在。\ntype IGeneratorMiddlewareStage<TValue> = (\n  value: TValue,\n  context?: IMiddlewarePipelineContext\n) => Generator<\n  TValue,\n  | TValue\n  | (undefined extends TValue ? typeof GENERATOR_UNDEFINED : never)\n  | typeof GENERATOR_HALT\n  | typeof GENERATOR_CONTINUE\n  | undefined,\n  void\n>;\n\ntype IAsyncGeneratorMiddlewareStage<TValue> = (\n  value: TValue,\n  context?: IMiddlewarePipelineContext\n) => AsyncGenerator<\n  TValue,\n  | TValue\n  | (undefined extends TValue ? typeof GENERATOR_UNDEFINED : never)\n  | typeof GENERATOR_HALT\n  | typeof GENERATOR_CONTINUE\n  | undefined,\n  void\n>;"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export type ISyncMiddlewareStage<TValue> = (value: TValue, next: (value: TValue) => void, context?: IMiddlewarePipelineContext) => void;"
@@ -2732,6 +2752,7 @@
             "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation,\n  MIDDLEWARE_PIPELINE_SOURCE,\n  MiddlewarePipelineErrorCode\n} from '@migaia/middleware-pipeline';",
             "MIDDLEWARE_PIPELINE_SOURCE; // '@migaia/middleware-pipeline'"
           ],
+          "members": [],
           "aliasOf": "MIDDLEWARE_PIPELINE_SOURCE",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2926,6 +2947,7 @@
             "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation,\n  MIDDLEWARE_PIPELINE_SOURCE,\n  MiddlewarePipelineErrorCode\n} from '@migaia/middleware-pipeline';",
             "MiddlewarePipelineErrorCode;\n// {\n//   executionFailed: 'EXECUTION_FAILED',\n//   invalidOption: 'INVALID_OPTION',\n//   aborted: 'ABORTED',\n//   abortCleanupFailed: 'ABORT_CLEANUP_FAILED'\n// }"
           ],
+          "members": [],
           "aliasOf": "MiddlewarePipelineErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3118,6 +3140,7 @@
             "import {\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  MiddlewarePipelineGeneratorSignals\n} from '@migaia/middleware-pipeline';",
             "MiddlewarePipelineGeneratorSignals; // { undefined: GENERATOR_UNDEFINED, halt: GENERATOR_HALT, continue: GENERATOR_CONTINUE }"
           ],
+          "members": [],
           "aliasOf": "MiddlewarePipelineGeneratorSignals",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3185,6 +3208,7 @@
             "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation,\n  MIDDLEWARE_PIPELINE_SOURCE,\n  MiddlewarePipelineErrorCode\n} from '@migaia/middleware-pipeline';",
             "MiddlewarePipelineMode;\n// { sync: 'sync', async: 'async', generator: 'generator', asyncGenerator: 'async-generator' }"
           ],
+          "members": [],
           "aliasOf": "MiddlewarePipelineMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3379,6 +3403,7 @@
             "MiddlewarePipelineViolation; // { late: 'late', duplicate: 'duplicate' }",
             "import { MiddlewarePipelineViolation, runSyncMiddleware } from '@migaia/middleware-pipeline';\n\nconst violations: string[] = [];\n\nrunSyncMiddleware(\n  [\n    (value: string, next) => next(value.trim()),\n    (value: string, next) => {\n      if (value.length === 0) return; // 空字符串直接短路\n      next(value.toUpperCase());\n      next('ignored'); // 触发 duplicate，只有第一次生效\n    }\n  ],\n  '  hi  ',\n  (value) => console.log('done:', value), // 'done: HI'\n  (violation) => violations.push(violation) // ['duplicate']\n);"
           ],
+          "members": [],
           "aliasOf": "MiddlewarePipelineViolation",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3572,6 +3597,7 @@
             "await runAsyncGeneratorMiddleware(\n  [\n    async function* (value: number) {\n      yield await Promise.resolve(value + 1);\n      yield await Promise.resolve(value + 2);\n      return GENERATOR_CONTINUE;\n    },\n    async function* (value: number) {\n      return value * 2;\n    }\n  ],\n  3,\n  async (value) => console.log(value) // 10\n);",
             "import {\n  GENERATOR_CONTINUE,\n  runAsyncGeneratorMiddleware,\n  type IAsyncGeneratorMiddlewareStage\n} from '@migaia/middleware-pipeline';\n\nconst fetchStage: IAsyncGeneratorMiddlewareStage<string> = async function* (url, context) {\n  yield url; // 中间 yield 仅用于观测/调试，不会提前送到下一 stage\n  const response = await fetch(url, { signal: context?.signal as AbortSignal | undefined });\n  return await response.text();\n};\n\nconst controller = new AbortController();\nsetTimeout(() => controller.abort(new Error('超时')), 3000);\n\ntry {\n  await runAsyncGeneratorMiddleware(\n    [fetchStage],\n    'https://example.com/data',\n    (text) => console.log('done:', text),\n    undefined,\n    { signal: controller.signal }\n  );\n} catch (error) {\n  // 3 秒内 controller.abort() 触发：runner 在下一个协作检查点抛出 '超时'（reason 已是 Error，原样抛出）\n  // fetch 本身也收到同一个 signal，会独立中止网络请求\n  console.error(error);\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const runAsyncGeneratorMiddleware: <TValue>(stages: readonly IAsyncGeneratorMiddlewareStage<TValue>[], value: TValue, done: (value: TValue, context?: IMiddlewarePipelineContext) => void | Promise<void>, signals?: IGeneratorMiddlewareSignals, control?: IMiddlewarePipelineControlOptions) => Promise<void>;"
@@ -3817,6 +3843,7 @@
             "import { runAsyncMiddleware } from '@migaia/middleware-pipeline';\n\nclass MyPipelineError extends Error {\n  constructor(\n    readonly stageError: unknown,\n    readonly downstreamError: unknown\n  ) {\n    super('pipeline stage and downstream both failed');\n  }\n}\n\nawait runAsyncMiddleware(\n  [\n    async (value: number, next) => {\n      try {\n        await next(value);\n      } finally {\n        throw new Error('stage cleanup failed');\n      }\n    },\n    async () => {\n      throw new Error('downstream failed');\n    }\n  ],\n  1,\n  () => undefined,\n  {\n    onViolation: () => undefined,\n    combineStageAndDownstreamError: (stageError, downstreamError) =>\n      new MyPipelineError(stageError, downstreamError)\n  }\n).catch((error) => console.error(error instanceof MyPipelineError)); // true",
             "import {\n  adaptSyncStageToAsync,\n  runAsyncMiddleware,\n  type IAsyncMiddlewareStage\n} from '@migaia/middleware-pipeline';\n\nconst trimStage = adaptSyncStageToAsync((value: string, next) => next(value.trim()));\nconst upperStage: IAsyncMiddlewareStage<string> = async (value, next) => {\n  await next(value.toUpperCase());\n};\n\nawait runAsyncMiddleware(\n  [trimStage, upperStage],\n  '  migaia  ',\n  (value) => console.log(value), // 'MIGAIA'\n  { onViolation: (kind) => console.warn('violation:', kind) }\n);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const runAsyncMiddleware: <TValue>(stages: readonly IAsyncMiddlewareStage<TValue>[], value: TValue, done: (value: TValue, context?: IMiddlewarePipelineContext) => void | Promise<void>, options: IMiddlewarePipelineOptions) => Promise<void>;"
@@ -4139,6 +4166,7 @@
             "const genStage = adaptSyncStageToGenerator(\n  (value: string, next) => next(value.trim()),\n  (violation) => console.warn(violation)\n);\nrunGeneratorMiddleware([genStage], ' hi ', (v) => console.log(v));",
             "import {\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  runGeneratorMiddleware\n} from '@migaia/middleware-pipeline';\n\nrunGeneratorMiddleware(\n  [\n    function* (value: number) {\n      yield value + 1;\n      yield value + 2; // 最终采用这一次\n      return GENERATOR_CONTINUE;\n    },\n    function* (value: number) {\n      if (value > 10) return GENERATOR_HALT; // 终止整条链\n      return value * 2;\n    }\n  ],\n  3,\n  (value) => console.log(value) // 10\n);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const runGeneratorMiddleware: <TValue>(stages: readonly IGeneratorMiddlewareStage<TValue>[], value: TValue, done: (value: TValue, context?: IMiddlewarePipelineContext) => void, signals?: IGeneratorMiddlewareSignals, control?: IMiddlewarePipelineControlOptions) => void;"
@@ -4389,6 +4417,7 @@
             "const controller = new AbortController();\nrunSyncMiddleware([stage], value, done, onViolation, { signal: controller.signal });\ncontroller.abort('user cancelled');",
             "import { MiddlewarePipelineViolation, runSyncMiddleware } from '@migaia/middleware-pipeline';\n\nconst violations: string[] = [];\n\nrunSyncMiddleware(\n  [\n    (value: string, next) => next(value.trim()),\n    (value: string, next) => {\n      if (value.length === 0) return; // 空字符串直接短路\n      next(value.toUpperCase());\n      next('ignored'); // 触发 duplicate，只有第一次生效\n    }\n  ],\n  '  hi  ',\n  (value) => console.log('done:', value), // 'done: HI'\n  (violation) => violations.push(violation) // ['duplicate']\n);"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const runSyncMiddleware: <TValue>(stages: readonly ISyncMiddlewareStage<TValue>[], value: TValue, done: (value: TValue, context?: IMiddlewarePipelineContext) => void, onViolation: IMiddlewarePipelineViolationHandler, control?: IMiddlewarePipelineControlOptions) => void;"

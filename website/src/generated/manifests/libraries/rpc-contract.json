@@ -1,0 +1,2415 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "rpc-contract",
+    "description": "Runtime-neutral RPC semantic and framing contracts.",
+    "version": "0.0.1",
+    "exports": [".", "./framing"],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "migaia-rpc-contract",
+            "heading": "@migaia/rpc-contract",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Runtime-neutral semantic RPC descriptors, portable values, hostile-safe envelope normalization, and whole-message framing contracts."
+              },
+              {
+                "type": "paragraph",
+                "text": "The module has no dependency on transports, runtimes, codecs, workers, or Store. Format codecs live in `@migaia/serialize`."
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "usage",
+            "heading": "Usage",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { rpcProtocolV1 } from '@migaia/rpc-contract'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'"
+              },
+              {
+                "type": "paragraph",
+                "text": "`rpcProtocolV1.normalize()` validates untrusted semantic envelopes. `messageFramerV1` accepts whole string or binary frames and does not place chunk metadata in semantic messages."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "rpc-contract:index",
+      "library": "rpc-contract",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-contract/getting-started",
+      "architecturePath": "/en/architecture/rpc-contract",
+      "symbols": [
+        {
+          "name": "createDescriptor",
+          "kind": "function",
+          "signature": "export declare function createDescriptor<const TId extends string, const TVersion extends number>(id: TId, version: TVersion): IRpcDescriptor<TId, TVersion>;",
+          "declarationLine": 3,
+          "source": "packages/rpc-contract/dist/protocol.d.ts",
+          "purpose": "Construct a frozen descriptor after validating stable lowercase token identity.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createDescriptor.",
+          "advanced": "No additional advanced behavior is declared for createDescriptor.",
+          "parameters": ["id: TId", "version: TVersion"],
+          "parameterDetails": [
+            {
+              "name": "id",
+              "type": "TId",
+              "optional": false
+            },
+            {
+              "name": "version",
+              "type": "TVersion",
+              "optional": false
+            }
+          ],
+          "returns": "IRpcDescriptor<TId, TVersion>",
+          "errors": ["No documented errors are declared for createDescriptor."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createDescriptor.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "createDescriptor",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createDescriptor<const TId extends string, const TVersion extends number>(id: TId, version: TVersion): IRpcDescriptor<TId, TVersion>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "id",
+                "type": "TId",
+                "optional": false
+              },
+              {
+                "name": "version",
+                "type": "TVersion",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcDescriptor<TId, TVersion>"],
+          "whenToUse": "Use createDescriptor when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createDescriptor does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Construct a frozen descriptor after validating stable lowercase token identity."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createDescriptor from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createDescriptor when its function contract and declared inputs match the result you need. Choose a different public symbol when createDescriptor does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createDescriptor."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createDescriptor."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/protocol.d.ts:createDescriptor:export declare function createDescriptor<const TId extends string, const TVersion extends number>(id: TId, version: TVersion): IRpcDescriptor<TId, TVersion>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--createDescriptor"
+        },
+        {
+          "name": "deserializeRpcError",
+          "kind": "function",
+          "signature": "export declare function deserializeRpcError(value: IRpcSerializedError, depth?: number): Error;",
+          "declarationLine": 5,
+          "source": "packages/rpc-contract/dist/error.d.ts",
+          "purpose": "Rebuilds a native error graph while restoring the remote stack rather than generating one.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for deserializeRpcError.",
+          "advanced": "No additional advanced behavior is declared for deserializeRpcError.",
+          "parameters": ["value: IRpcSerializedError", "depth: number (optional)"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "IRpcSerializedError",
+              "optional": false
+            },
+            {
+              "name": "depth",
+              "type": "number",
+              "optional": true
+            }
+          ],
+          "returns": "Error",
+          "errors": ["No documented errors are declared for deserializeRpcError."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for deserializeRpcError.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "deserializeRpcError",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function deserializeRpcError(value: IRpcSerializedError, depth?: number): Error;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "IRpcSerializedError",
+                "optional": false
+              },
+              {
+                "name": "depth",
+                "type": "number",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["Error"],
+          "whenToUse": "Use deserializeRpcError when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when deserializeRpcError does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Rebuilds a native error graph while restoring the remote stack rather than generating one."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import deserializeRpcError from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use deserializeRpcError when its function contract and declared inputs match the result you need. Choose a different public symbol when deserializeRpcError does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for deserializeRpcError."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for deserializeRpcError."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/error.d.ts:deserializeRpcError:export declare function deserializeRpcError(value: IRpcSerializedError, depth?: number): Error;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--deserializeRpcError"
+        },
+        {
+          "name": "IRpcBinaryFrame",
+          "kind": "type",
+          "signature": "export type IRpcBinaryFrame = Readonly<{ kind: 'rpc.frame.v1'; messageId: string; index: number; count: number; length: number; data: Uint8Array; }>;",
+          "declarationLine": 99,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "Stable binary fragment wire shape used by binary transports.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcBinaryFrame.",
+          "advanced": "No additional advanced behavior is declared for IRpcBinaryFrame.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcBinaryFrame."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcBinaryFrame.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcBinaryFrame",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcBinaryFrame = Readonly<{ kind: 'rpc.frame.v1'; messageId: string; index: number; count: number; length: number; data: Uint8Array; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcBinaryFrame when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcBinaryFrame does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Stable binary fragment wire shape used by binary transports."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcBinaryFrame from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcBinaryFrame when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcBinaryFrame does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcBinaryFrame."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcBinaryFrame."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcBinaryFrame:export type IRpcBinaryFrame = Readonly<{ kind: 'rpc.frame.v1'; messageId: string; index: number; count: number; length: number; data: Uint8Array; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--IRpcBinaryFrame"
+        },
+        {
+          "name": "IRpcContractError",
+          "kind": "type",
+          "signature": "export type IRpcContractError = Error & Readonly<{ source: '@migaia/rpc-contract'; code: IRpcContractErrorCode; }>;",
+          "declarationLine": 120,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "Error shape used by callers that need a module code without replacing native Error.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcContractError.",
+          "advanced": "No additional advanced behavior is declared for IRpcContractError.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcContractError."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcContractError.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcContractError",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcContractError = Error & Readonly<{ source: '@migaia/rpc-contract'; code: IRpcContractErrorCode; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcContractError when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcContractError does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Error shape used by callers that need a module code without replacing native Error."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcContractError from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcContractError when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcContractError does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcContractError."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcContractError."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcContractError:export type IRpcContractError = Error & Readonly<{ source: '@migaia/rpc-contract'; code: IRpcContractErrorCode; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--IRpcContractError"
+        },
+        {
+          "name": "IRpcContractErrorCode",
+          "kind": "type",
+          "signature": "export type IRpcContractErrorCode = (typeof RpcContractErrorCode)[keyof typeof RpcContractErrorCode];",
+          "declarationLine": 14,
+          "source": "packages/rpc-contract/dist/error-code.d.ts",
+          "purpose": "IRpcContractErrorCode is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcContractErrorCode.",
+          "advanced": "No additional advanced behavior is declared for IRpcContractErrorCode.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcContractErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcContractErrorCode.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcContractErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcContractErrorCode = (typeof RpcContractErrorCode)[keyof typeof RpcContractErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcContractErrorCode when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcContractErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IRpcContractErrorCode is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcContractErrorCode from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcContractErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcContractErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcContractErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcContractErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/error-code.d.ts:IRpcContractErrorCode:export type IRpcContractErrorCode = (typeof RpcContractErrorCode)[keyof typeof RpcContractErrorCode];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--IRpcContractErrorCode"
+        },
+        {
+          "name": "IRpcDescriptor",
+          "kind": "type",
+          "signature": "export type IRpcDescriptor<TId extends string, TVersion extends number> = Readonly<{ id: TId; version: TVersion; }>;",
+          "declarationLine": 3,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "Stable component descriptor shared by protocol, codec, and framer identities.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDescriptor.",
+          "advanced": "No additional advanced behavior is declared for IRpcDescriptor.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDescriptor."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDescriptor.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcDescriptor",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcDescriptor<TId extends string, TVersion extends number> = Readonly<{ id: TId; version: TVersion; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDescriptor when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDescriptor does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Stable component descriptor shared by protocol, codec, and framer identities."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDescriptor from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDescriptor when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDescriptor does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDescriptor."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDescriptor."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcDescriptor:export type IRpcDescriptor<TId extends string, TVersion extends number> = Readonly<{ id: TId; version: TVersion; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--IRpcDescriptor"
+        },
+        {
+          "name": "IRpcDiscoveryEnvelope",
+          "kind": "type",
+          "signature": "export type IRpcDiscoveryEnvelope = IRpcPortableRecord & Readonly<{ kind: 'discovery'; id: string; version: string; acceptVersions: readonly string[]; data?: IRpcPortableValue; }>;",
+          "declarationLine": 50,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "IRpcDiscoveryEnvelope is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDiscoveryEnvelope.",
+          "advanced": "No additional advanced behavior is declared for IRpcDiscoveryEnvelope.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcDiscoveryEnvelope."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDiscoveryEnvelope.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcDiscoveryEnvelope",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcDiscoveryEnvelope = IRpcPortableRecord & Readonly<{ kind: 'discovery'; id: string; version: string; acceptVersions: readonly string[]; data?: IRpcPortableValue; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcDiscoveryEnvelope when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcDiscoveryEnvelope does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IRpcDiscoveryEnvelope is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcDiscoveryEnvelope from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcDiscoveryEnvelope when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcDiscoveryEnvelope does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcDiscoveryEnvelope."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcDiscoveryEnvelope."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcDiscoveryEnvelope:export type IRpcDiscoveryEnvelope = IRpcPortableRecord & Readonly<{ kind: 'discovery'; id: string; version: string; acceptVersions: readonly string[]; data?: IRpcPortableValue; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--IRpcDiscoveryEnvelope"
+        },
+        {
+          "name": "IRpcEncodedType",
+          "kind": "type",
+          "signature": "export type IRpcEncodedType = 'unknown' | 'string' | 'uint8array';",
+          "declarationLine": 67,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "IRpcEncodedType is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcEncodedType.",
+          "advanced": "No additional advanced behavior is declared for IRpcEncodedType.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcEncodedType."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcEncodedType.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcEncodedType",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcEncodedType = 'unknown' | 'string' | 'uint8array';"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcEncodedType when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcEncodedType does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IRpcEncodedType is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcEncodedType from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcEncodedType when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcEncodedType does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcEncodedType."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcEncodedType."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcEncodedType:export type IRpcEncodedType = 'unknown' | 'string' | 'uint8array';",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--IRpcEncodedType"
+        },
+        {
+          "name": "IRpcEnvelope",
+          "kind": "type",
+          "signature": "export type IRpcEnvelope = IRpcRequestEnvelope | IRpcResponseSuccess | IRpcResponseFailure<IRpcPortableValue> | IRpcDiscoveryEnvelope | IRpcVariationEnvelope;",
+          "declarationLine": 62,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "IRpcEnvelope is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcEnvelope.",
+          "advanced": "No additional advanced behavior is declared for IRpcEnvelope.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcEnvelope."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcEnvelope.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcEnvelope",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcEnvelope = IRpcRequestEnvelope | IRpcResponseSuccess | IRpcResponseFailure<IRpcPortableValue> | IRpcDiscoveryEnvelope | IRpcVariationEnvelope;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcEnvelope when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcEnvelope does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IRpcEnvelope is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcEnvelope from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcEnvelope when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcEnvelope does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcEnvelope."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcEnvelope."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcEnvelope:export type IRpcEnvelope = IRpcRequestEnvelope | IRpcResponseSuccess | IRpcResponseFailure<IRpcPortableValue> | IRpcDiscoveryEnvelope | IRpcVariationEnvelope;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--IRpcEnvelope"
+        },
+        {
+          "name": "IRpcFramerOptions",
+          "kind": "type",
+          "signature": "export type IRpcFramerOptions = Readonly<{ chunkBytes?: number; maxMessageBytes?: number; maxChunks?: number; maxBufferedBytes?: number; maxConcurrentMessages?: number; assemblyTimeoutMs?: number; now?: () => number; schedule?: (callback: () => void, delayMs: number) => unknown; cancel?: (handle: unknown) => void; }>;",
+          "declarationLine": 108,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "Resource limits applied before a framer allocates or retains fragment state.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcFramerOptions.",
+          "advanced": "No additional advanced behavior is declared for IRpcFramerOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcFramerOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcFramerOptions.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcFramerOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcFramerOptions = Readonly<{ chunkBytes?: number; maxMessageBytes?: number; maxChunks?: number; maxBufferedBytes?: number; maxConcurrentMessages?: number; assemblyTimeoutMs?: number; now?: () => number; schedule?: (callback: () => void, delayMs: number) => unknown; cancel?: (handle: unknown) => void; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcFramerOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcFramerOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Resource limits applied before a framer allocates or retains fragment state."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcFramerOptions from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcFramerOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcFramerOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcFramerOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcFramerOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcFramerOptions:export type IRpcFramerOptions = Readonly<{ chunkBytes?: number; maxMessageBytes?: number; maxChunks?: number; maxBufferedBytes?: number; maxConcurrentMessages?: number; assemblyTimeoutMs?: number; now?: () => number; schedule?: (callback: () => void, delayMs: number) => unknown; cancel?: (handle: unknown) => void; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--IRpcFramerOptions"
+        },
+        {
+          "name": "IRpcPortableBytes",
+          "kind": "type",
+          "signature": "export type IRpcPortableBytes = Readonly<{ $rpc: 'bytes'; base64url: string; }>;",
+          "declarationLine": 8,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "Portable binary value represented without runtime-specific typed arrays.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcPortableBytes.",
+          "advanced": "No additional advanced behavior is declared for IRpcPortableBytes.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcPortableBytes."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcPortableBytes.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcPortableBytes",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcPortableBytes = Readonly<{ $rpc: 'bytes'; base64url: string; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcPortableBytes when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcPortableBytes does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Portable binary value represented without runtime-specific typed arrays."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcPortableBytes from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcPortableBytes when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcPortableBytes does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcPortableBytes."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcPortableBytes."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcPortableBytes:export type IRpcPortableBytes = Readonly<{ $rpc: 'bytes'; base64url: string; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--IRpcPortableBytes"
+        },
+        {
+          "name": "IRpcPortableRecord",
+          "kind": "type",
+          "signature": "export type IRpcPortableRecord = Readonly<{ [key: string]: IRpcPortableValue; }>;",
+          "declarationLine": 12,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "IRpcPortableRecord is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcPortableRecord.",
+          "advanced": "No additional advanced behavior is declared for IRpcPortableRecord.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcPortableRecord."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcPortableRecord.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcPortableRecord",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcPortableRecord = Readonly<{ [key: string]: IRpcPortableValue; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcPortableRecord when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcPortableRecord does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IRpcPortableRecord is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcPortableRecord from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcPortableRecord when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcPortableRecord does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcPortableRecord."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcPortableRecord."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcPortableRecord:export type IRpcPortableRecord = Readonly<{ [key: string]: IRpcPortableValue; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--IRpcPortableRecord"
+        },
+        {
+          "name": "IRpcPortableValue",
+          "kind": "type",
+          "signature": "export type IRpcPortableValue = null | boolean | number | string | IRpcPortableBytes | readonly IRpcPortableValue[] | IRpcPortableRecord;",
+          "declarationLine": 15,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "IRpcPortableValue is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcPortableValue.",
+          "advanced": "No additional advanced behavior is declared for IRpcPortableValue.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcPortableValue."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcPortableValue.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcPortableValue",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcPortableValue = null | boolean | number | string | IRpcPortableBytes | readonly IRpcPortableValue[] | IRpcPortableRecord;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcPortableValue when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcPortableValue does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IRpcPortableValue is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcPortableValue from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcPortableValue when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcPortableValue does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcPortableValue."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcPortableValue."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcPortableValue:export type IRpcPortableValue = null | boolean | number | string | IRpcPortableBytes | readonly IRpcPortableValue[] | IRpcPortableRecord;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--IRpcPortableValue"
+        },
+        {
+          "name": "IRpcProtocol",
+          "kind": "type",
+          "signature": "export type IRpcProtocol<TEnvelope extends IRpcPortableValue, TId extends string, TVersion extends number> = IRpcDescriptor<TId, TVersion> & Readonly<{ normalize: (value: unknown) => TEnvelope; }>;",
+          "declarationLine": 64,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "Runtime protocol descriptor that normalizes untrusted semantic input.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcProtocol.",
+          "advanced": "No additional advanced behavior is declared for IRpcProtocol.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcProtocol."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcProtocol.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcProtocol",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcProtocol<TEnvelope extends IRpcPortableValue, TId extends string, TVersion extends number> = IRpcDescriptor<TId, TVersion> & Readonly<{ normalize: (value: unknown) => TEnvelope; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcProtocol when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcProtocol does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Runtime protocol descriptor that normalizes untrusted semantic input."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcProtocol from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcProtocol when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcProtocol does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcProtocol."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcProtocol."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcProtocol:export type IRpcProtocol<TEnvelope extends IRpcPortableValue, TId extends string, TVersion extends number> = IRpcDescriptor<TId, TVersion> & Readonly<{ normalize: (value: unknown) => TEnvelope; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--IRpcProtocol"
+        },
+        {
+          "name": "IRpcRequestEnvelope",
+          "kind": "type",
+          "signature": "export type IRpcRequestEnvelope = IRpcPortableRecord & Readonly<{ kind: 'request'; id: string; method: string; data: IRpcPortableValue; }>;",
+          "declarationLine": 26,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "IRpcRequestEnvelope is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcRequestEnvelope.",
+          "advanced": "No additional advanced behavior is declared for IRpcRequestEnvelope.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcRequestEnvelope."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcRequestEnvelope.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcRequestEnvelope",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcRequestEnvelope = IRpcPortableRecord & Readonly<{ kind: 'request'; id: string; method: string; data: IRpcPortableValue; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcRequestEnvelope when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcRequestEnvelope does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IRpcRequestEnvelope is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcRequestEnvelope from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcRequestEnvelope when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcRequestEnvelope does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcRequestEnvelope."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcRequestEnvelope."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcRequestEnvelope:export type IRpcRequestEnvelope = IRpcPortableRecord & Readonly<{ kind: 'request'; id: string; method: string; data: IRpcPortableValue; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--IRpcRequestEnvelope"
+        },
+        {
+          "name": "IRpcResponseFailure",
+          "kind": "type",
+          "signature": "export type IRpcResponseFailure<TData extends IRpcPortableValue = never> = IRpcPortableRecord & Readonly<{ kind: 'response'; ok: false; id: string; code: string; message: string; data?: TData; error?: IRpcSerializedError; }>;",
+          "declarationLine": 41,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "IRpcResponseFailure is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcResponseFailure.",
+          "advanced": "No additional advanced behavior is declared for IRpcResponseFailure.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcResponseFailure."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcResponseFailure.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcResponseFailure",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcResponseFailure<TData extends IRpcPortableValue = never> = IRpcPortableRecord & Readonly<{ kind: 'response'; ok: false; id: string; code: string; message: string; data?: TData; error?: IRpcSerializedError; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcResponseFailure when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcResponseFailure does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IRpcResponseFailure is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcResponseFailure from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcResponseFailure when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcResponseFailure does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcResponseFailure."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcResponseFailure."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcResponseFailure:export type IRpcResponseFailure<TData extends IRpcPortableValue = never> = IRpcPortableRecord & Readonly<{ kind: 'response'; ok: false; id: string; code: string; message: string; data?: TData; error?: IRpcSerializedError; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--IRpcResponseFailure"
+        },
+        {
+          "name": "IRpcResponseSuccess",
+          "kind": "type",
+          "signature": "export type IRpcResponseSuccess<TData extends IRpcPortableValue = IRpcPortableValue> = IRpcPortableRecord & Readonly<{ kind: 'response'; ok: true; id: string; data: TData; code?: never; message?: never; error?: never; }>;",
+          "declarationLine": 32,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "IRpcResponseSuccess is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcResponseSuccess.",
+          "advanced": "No additional advanced behavior is declared for IRpcResponseSuccess.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcResponseSuccess."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcResponseSuccess.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcResponseSuccess",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcResponseSuccess<TData extends IRpcPortableValue = IRpcPortableValue> = IRpcPortableRecord & Readonly<{ kind: 'response'; ok: true; id: string; data: TData; code?: never; message?: never; error?: never; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcResponseSuccess when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcResponseSuccess does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IRpcResponseSuccess is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcResponseSuccess from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcResponseSuccess when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcResponseSuccess does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcResponseSuccess."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcResponseSuccess."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcResponseSuccess:export type IRpcResponseSuccess<TData extends IRpcPortableValue = IRpcPortableValue> = IRpcPortableRecord & Readonly<{ kind: 'response'; ok: true; id: string; data: TData; code?: never; message?: never; error?: never; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--IRpcResponseSuccess"
+        },
+        {
+          "name": "IRpcSerializedError",
+          "kind": "type",
+          "signature": "export type IRpcSerializedError = Readonly<{ source: string; code: string; name: string; message: string; stack: string; cause?: IRpcSerializedError; errors?: readonly IRpcSerializedError[]; }>;",
+          "declarationLine": 17,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "Serialized error graph retained across realm and transport boundaries.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcSerializedError.",
+          "advanced": "No additional advanced behavior is declared for IRpcSerializedError.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcSerializedError."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcSerializedError.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcSerializedError",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcSerializedError = Readonly<{ source: string; code: string; name: string; message: string; stack: string; cause?: IRpcSerializedError; errors?: readonly IRpcSerializedError[]; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcSerializedError when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcSerializedError does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Serialized error graph retained across realm and transport boundaries."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcSerializedError from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcSerializedError when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcSerializedError does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcSerializedError."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcSerializedError."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcSerializedError:export type IRpcSerializedError = Readonly<{ source: string; code: string; name: string; message: string; stack: string; cause?: IRpcSerializedError; errors?: readonly IRpcSerializedError[]; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--IRpcSerializedError"
+        },
+        {
+          "name": "IRpcStringFrame",
+          "kind": "type",
+          "signature": "export type IRpcStringFrame = Readonly<{ kind: 'rpc.frame.v1'; messageId: string; index: number; count: number; length: number; data: string; }>;",
+          "declarationLine": 90,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "Stable string fragment wire shape; `source` is supplied by the transport boundary.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcStringFrame.",
+          "advanced": "No additional advanced behavior is declared for IRpcStringFrame.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcStringFrame."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcStringFrame.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcStringFrame",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcStringFrame = Readonly<{ kind: 'rpc.frame.v1'; messageId: string; index: number; count: number; length: number; data: string; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcStringFrame when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcStringFrame does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Stable string fragment wire shape; `source` is supplied by the transport boundary."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcStringFrame from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcStringFrame when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcStringFrame does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcStringFrame."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcStringFrame."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcStringFrame:export type IRpcStringFrame = Readonly<{ kind: 'rpc.frame.v1'; messageId: string; index: number; count: number; length: number; data: string; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--IRpcStringFrame"
+        },
+        {
+          "name": "IRpcVariationEnvelope",
+          "kind": "type",
+          "signature": "export type IRpcVariationEnvelope = IRpcPortableRecord & Readonly<{ kind: 'variation'; id: string; data: IRpcPortableValue; }>;",
+          "declarationLine": 57,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "IRpcVariationEnvelope is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcVariationEnvelope.",
+          "advanced": "No additional advanced behavior is declared for IRpcVariationEnvelope.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcVariationEnvelope."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcVariationEnvelope.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcVariationEnvelope",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcVariationEnvelope = IRpcPortableRecord & Readonly<{ kind: 'variation'; id: string; data: IRpcPortableValue; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcVariationEnvelope when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcVariationEnvelope does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IRpcVariationEnvelope is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcVariationEnvelope from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcVariationEnvelope when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcVariationEnvelope does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcVariationEnvelope."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcVariationEnvelope."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcVariationEnvelope:export type IRpcVariationEnvelope = IRpcPortableRecord & Readonly<{ kind: 'variation'; id: string; data: IRpcPortableValue; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--IRpcVariationEnvelope"
+        },
+        {
+          "name": "normalizePortable",
+          "kind": "function",
+          "signature": "export declare function normalizePortable(value: unknown, depth?: number, active?: Set<object>): IRpcPortableValue;",
+          "declarationLine": 3,
+          "source": "packages/rpc-contract/dist/normalize.d.ts",
+          "purpose": "Validate and snapshot a portable value, reading each ordinary object field once.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizePortable.",
+          "advanced": "No additional advanced behavior is declared for normalizePortable.",
+          "parameters": [
+            "value: unknown",
+            "depth: number (optional)",
+            "active: Set<object> (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "unknown",
+              "optional": false
+            },
+            {
+              "name": "depth",
+              "type": "number",
+              "optional": true
+            },
+            {
+              "name": "active",
+              "type": "Set<object>",
+              "optional": true
+            }
+          ],
+          "returns": "IRpcPortableValue",
+          "errors": ["No documented errors are declared for normalizePortable."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for normalizePortable.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "normalizePortable",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function normalizePortable(value: unknown, depth?: number, active?: Set<object>): IRpcPortableValue;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "unknown",
+                "optional": false
+              },
+              {
+                "name": "depth",
+                "type": "number",
+                "optional": true
+              },
+              {
+                "name": "active",
+                "type": "Set<object>",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcPortableValue"],
+          "whenToUse": "Use normalizePortable when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when normalizePortable does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Validate and snapshot a portable value, reading each ordinary object field once."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import normalizePortable from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use normalizePortable when its function contract and declared inputs match the result you need. Choose a different public symbol when normalizePortable does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizePortable."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for normalizePortable."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/normalize.d.ts:normalizePortable:export declare function normalizePortable(value: unknown, depth?: number, active?: Set<object>): IRpcPortableValue;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--normalizePortable"
+        },
+        {
+          "name": "normalizeRpcEnvelope",
+          "kind": "function",
+          "signature": "export declare function normalizeRpcEnvelope(value: unknown): IRpcEnvelope;",
+          "declarationLine": 5,
+          "source": "packages/rpc-contract/dist/normalize.d.ts",
+          "purpose": "Normalize an untrusted semantic envelope with exact discriminator checks.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizeRpcEnvelope.",
+          "advanced": "No additional advanced behavior is declared for normalizeRpcEnvelope.",
+          "parameters": ["value: unknown"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "unknown",
+              "optional": false
+            }
+          ],
+          "returns": "IRpcEnvelope",
+          "errors": ["No documented errors are declared for normalizeRpcEnvelope."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for normalizeRpcEnvelope.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "normalizeRpcEnvelope",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function normalizeRpcEnvelope(value: unknown): IRpcEnvelope;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "unknown",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcEnvelope"],
+          "whenToUse": "Use normalizeRpcEnvelope when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when normalizeRpcEnvelope does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Normalize an untrusted semantic envelope with exact discriminator checks."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import normalizeRpcEnvelope from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use normalizeRpcEnvelope when its function contract and declared inputs match the result you need. Choose a different public symbol when normalizeRpcEnvelope does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizeRpcEnvelope."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for normalizeRpcEnvelope."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/normalize.d.ts:normalizeRpcEnvelope:export declare function normalizeRpcEnvelope(value: unknown): IRpcEnvelope;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--normalizeRpcEnvelope"
+        },
+        {
+          "name": "RpcContractErrorCode",
+          "kind": "const",
+          "signature": "export declare const RpcContractErrorCode: { /** Invalid descriptor identity or shape; caller must correct the component configuration. */ readonly invalidDescriptor: \"INVALID_DESCRIPTOR\"; /** Invalid semantic envelope; caller must reject the untrusted message. */ readonly invalidEnvelope: \"INVALID_ENVELOPE\"; /** Invalid frame grammar; caller must discard the frame sequence. */ readonly invalidFrame: \"INVALID_FRAME\"; /** Reassembly exceeded a declared message/source/global budget. */ readonly frameLimitExceeded: \"FRAME_LIMIT_EXCEEDED\"; /** Reassembly expired before all fragments arrived. */ readonly frameAssemblyExpired: \"FRAME_ASSEMBLY_EXPIRED\"; };",
+          "declarationLine": 2,
+          "source": "packages/rpc-contract/dist/error-code.d.ts",
+          "purpose": "Public error codes owned by the runtime-neutral RPC contract module.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RpcContractErrorCode.",
+          "advanced": "No additional advanced behavior is declared for RpcContractErrorCode.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for RpcContractErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcContractErrorCode.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "RpcContractErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const RpcContractErrorCode: { /** Invalid descriptor identity or shape; caller must correct the component configuration. */ readonly invalidDescriptor: \"INVALID_DESCRIPTOR\"; /** Invalid semantic envelope; caller must reject the untrusted message. */ readonly invalidEnvelope: \"INVALID_ENVELOPE\"; /** Invalid frame grammar; caller must discard the frame sequence. */ readonly invalidFrame: \"INVALID_FRAME\"; /** Reassembly exceeded a declared message/source/global budget. */ readonly frameLimitExceeded: \"FRAME_LIMIT_EXCEEDED\"; /** Reassembly expired before all fragments arrived. */ readonly frameAssemblyExpired: \"FRAME_ASSEMBLY_EXPIRED\"; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use RpcContractErrorCode when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when RpcContractErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Public error codes owned by the runtime-neutral RPC contract module."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import RpcContractErrorCode from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use RpcContractErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when RpcContractErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for RpcContractErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for RpcContractErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/error-code.d.ts:RpcContractErrorCode:export declare const RpcContractErrorCode: { /** Invalid descriptor identity or shape; caller must correct the component configuration. */ readonly invalidDescriptor: \"INVALID_DESCRIPTOR\"; /** Invalid semantic envelope; caller must reject the untrusted message. */ readonly invalidEnvelope: \"INVALID_ENVELOPE\"; /** Invalid frame grammar; caller must discard the frame sequence. */ readonly invalidFrame: \"INVALID_FRAME\"; /** Reassembly exceeded a declared message/source/global budget. */ readonly frameLimitExceeded: \"FRAME_LIMIT_EXCEEDED\"; /** Reassembly expired before all fragments arrived. */ readonly frameAssemblyExpired: \"FRAME_ASSEMBLY_EXPIRED\"; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--RpcContractErrorCode"
+        },
+        {
+          "name": "rpcProtocolV1",
+          "kind": "const",
+          "signature": "export declare const rpcProtocolV1: IRpcProtocol<IRpcEnvelope, 'migaia.rpc', 1>;",
+          "declarationLine": 5,
+          "source": "packages/rpc-contract/dist/protocol.d.ts",
+          "purpose": "Canonical V1 semantic protocol descriptor and hostile-safe normalizer.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for rpcProtocolV1.",
+          "advanced": "No additional advanced behavior is declared for rpcProtocolV1.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for rpcProtocolV1."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for rpcProtocolV1.",
+          "examples": [
+            "import { rpcProtocolV1 } from '@migaia/rpc-contract'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'"
+          ],
+          "members": [],
+          "aliasOf": "rpcProtocolV1",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const rpcProtocolV1: IRpcProtocol<IRpcEnvelope, 'migaia.rpc', 1>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use rpcProtocolV1 when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when rpcProtocolV1 does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Canonical V1 semantic protocol descriptor and hostile-safe normalizer."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import rpcProtocolV1 from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use rpcProtocolV1 when its const contract and declared inputs match the result you need. Choose a different public symbol when rpcProtocolV1 does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for rpcProtocolV1."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for rpcProtocolV1."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/protocol.d.ts:rpcProtocolV1:export declare const rpcProtocolV1: IRpcProtocol<IRpcEnvelope, 'migaia.rpc', 1>;",
+          "guidance": [],
+          "usageScore": 14,
+          "configuration": [],
+          "fragment": "rpc-contract-index--rpcProtocolV1"
+        },
+        {
+          "name": "serializeRpcError",
+          "kind": "function",
+          "signature": "export declare function serializeRpcError(value: unknown, depth?: number, active?: Set<object>): IRpcSerializedError;",
+          "declarationLine": 3,
+          "source": "packages/rpc-contract/dist/error.d.ts",
+          "purpose": "Projects an error graph to the portable RPC shape without replacing native errors.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for serializeRpcError.",
+          "advanced": "No additional advanced behavior is declared for serializeRpcError.",
+          "parameters": [
+            "value: unknown",
+            "depth: number (optional)",
+            "active: Set<object> (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "unknown",
+              "optional": false
+            },
+            {
+              "name": "depth",
+              "type": "number",
+              "optional": true
+            },
+            {
+              "name": "active",
+              "type": "Set<object>",
+              "optional": true
+            }
+          ],
+          "returns": "IRpcSerializedError",
+          "errors": ["No documented errors are declared for serializeRpcError."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for serializeRpcError.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "serializeRpcError",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function serializeRpcError(value: unknown, depth?: number, active?: Set<object>): IRpcSerializedError;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "unknown",
+                "optional": false
+              },
+              {
+                "name": "depth",
+                "type": "number",
+                "optional": true
+              },
+              {
+                "name": "active",
+                "type": "Set<object>",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcSerializedError"],
+          "whenToUse": "Use serializeRpcError when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when serializeRpcError does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Projects an error graph to the portable RPC shape without replacing native errors."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import serializeRpcError from @migaia/rpc-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use serializeRpcError when its function contract and declared inputs match the result you need. Choose a different public symbol when serializeRpcError does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for serializeRpcError."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for serializeRpcError."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/error.d.ts:serializeRpcError:export declare function serializeRpcError(value: unknown, depth?: number, active?: Set<object>): IRpcSerializedError;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-index--serializeRpcError"
+        }
+      ],
+      "aliases": [
+        {
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcFrameAcceptResult:export type IRpcFrameAcceptResult<TEncoded> = Readonly<{ status: 'pending'; }> | Readonly<{ status: 'complete'; value: TEncoded; }> | Readonly<{ status: 'rejected'; error: Error; }>;",
+          "name": "IRpcFrameAcceptResult",
+          "signature": "export type IRpcFrameAcceptResult<TEncoded> = Readonly<{ status: 'pending'; }> | Readonly<{ status: 'complete'; value: TEncoded; }> | Readonly<{ status: 'rejected'; error: Error; }>;",
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./framing",
+          "ownerModule": "framing",
+          "ownerFragment": "rpc-contract-framing--IRpcFrameAcceptResult"
+        },
+        {
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcFrameContext:export type IRpcFrameContext = Readonly<{ source: string; messageId: string; }>;",
+          "name": "IRpcFrameContext",
+          "signature": "export type IRpcFrameContext = Readonly<{ source: string; messageId: string; }>;",
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./framing",
+          "ownerModule": "framing",
+          "ownerFragment": "rpc-contract-framing--IRpcFrameContext"
+        },
+        {
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcFramer:export type IRpcFramer<TEncoded, TFrame, TId extends string, TVersion extends number> = IRpcDescriptor<TId, TVersion> & Readonly<{ inputEncodedType: IRpcEncodedType; outputEncodedType: IRpcEncodedType; frame: (value: TEncoded, context: IRpcFrameContext) => readonly TFrame[]; accept: (frame: TFrame, context: IRpcFrameContext) => IRpcFrameAcceptResult<TEncoded>; close: (reason?: unknown) => void; }>;",
+          "name": "IRpcFramer",
+          "signature": "export type IRpcFramer<TEncoded, TFrame, TId extends string, TVersion extends number> = IRpcDescriptor<TId, TVersion> & Readonly<{ inputEncodedType: IRpcEncodedType; outputEncodedType: IRpcEncodedType; frame: (value: TEncoded, context: IRpcFrameContext) => readonly TFrame[]; accept: (frame: TFrame, context: IRpcFrameContext) => IRpcFrameAcceptResult<TEncoded>; close: (reason?: unknown) => void; }>;",
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./framing",
+          "ownerModule": "framing",
+          "ownerFragment": "rpc-contract-framing--IRpcFramer"
+        }
+      ]
+    },
+    {
+      "id": "rpc-contract:framing",
+      "library": "rpc-contract",
+      "module": "framing",
+      "exportPath": "./framing",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/guides/rpc-contract/getting-started",
+      "architecturePath": "/en/architecture/rpc-contract",
+      "symbols": [
+        {
+          "name": "createBinaryFramer",
+          "kind": "function",
+          "signature": "export declare function createBinaryFramer<const TOptions extends IRpcFramerOptions = IRpcFramerOptions>(options?: TOptions): IRpcFramer<Uint8Array, Uint8Array | IRpcBinaryFrame, 'message', 1>;",
+          "declarationLine": 5,
+          "source": "packages/rpc-contract/dist/framing/message-framer.d.ts",
+          "purpose": "Creates a codec-independent binary framer with strict ordered bounded reassembly.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBinaryFramer.",
+          "advanced": "No additional advanced behavior is declared for createBinaryFramer.",
+          "parameters": ["options: TOptions (optional)"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "TOptions",
+              "optional": true
+            }
+          ],
+          "returns": "IRpcFramer<Uint8Array, Uint8Array | IRpcBinaryFrame, 'message', 1>",
+          "errors": ["No documented errors are declared for createBinaryFramer."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBinaryFramer.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "createBinaryFramer",
+          "exportPath": "./framing",
+          "overloadSignatures": [
+            "export declare function createBinaryFramer<const TOptions extends IRpcFramerOptions = IRpcFramerOptions>(options?: TOptions): IRpcFramer<Uint8Array, Uint8Array | IRpcBinaryFrame, 'message', 1>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "TOptions",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcFramer<Uint8Array, Uint8Array | IRpcBinaryFrame, 'message', 1>"],
+          "whenToUse": "Use createBinaryFramer when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createBinaryFramer does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Creates a codec-independent binary framer with strict ordered bounded reassembly."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createBinaryFramer from @migaia/rpc-contract/framing, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createBinaryFramer when its function contract and declared inputs match the result you need. Choose a different public symbol when createBinaryFramer does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createBinaryFramer."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createBinaryFramer."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/framing/message-framer.d.ts:createBinaryFramer:export declare function createBinaryFramer<const TOptions extends IRpcFramerOptions = IRpcFramerOptions>(options?: TOptions): IRpcFramer<Uint8Array, Uint8Array | IRpcBinaryFrame, 'message', 1>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-framing--createBinaryFramer"
+        },
+        {
+          "name": "createReassembler",
+          "kind": "function",
+          "signature": "export declare function createReassembler<TEncoded, TFrame, TId extends string, TVersion extends number>(framer: IRpcFramer<TEncoded, TFrame, TId, TVersion>): IRpcReassembler<TFrame, TEncoded>;",
+          "declarationLine": 8,
+          "source": "packages/rpc-contract/dist/framing/reassembler.d.ts",
+          "purpose": "Projects the reassembly methods of a framer without introducing a second state owner.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createReassembler.",
+          "advanced": "No additional advanced behavior is declared for createReassembler.",
+          "parameters": ["framer: IRpcFramer<TEncoded, TFrame, TId, TVersion>"],
+          "parameterDetails": [
+            {
+              "name": "framer",
+              "type": "IRpcFramer<TEncoded, TFrame, TId, TVersion>",
+              "optional": false
+            }
+          ],
+          "returns": "IRpcReassembler<TFrame, TEncoded>",
+          "errors": ["No documented errors are declared for createReassembler."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createReassembler.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "createReassembler",
+          "exportPath": "./framing",
+          "overloadSignatures": [
+            "export declare function createReassembler<TEncoded, TFrame, TId extends string, TVersion extends number>(framer: IRpcFramer<TEncoded, TFrame, TId, TVersion>): IRpcReassembler<TFrame, TEncoded>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "framer",
+                "type": "IRpcFramer<TEncoded, TFrame, TId, TVersion>",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcReassembler<TFrame, TEncoded>"],
+          "whenToUse": "Use createReassembler when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createReassembler does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Projects the reassembly methods of a framer without introducing a second state owner."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createReassembler from @migaia/rpc-contract/framing, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createReassembler when its function contract and declared inputs match the result you need. Choose a different public symbol when createReassembler does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createReassembler."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createReassembler."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/framing/reassembler.d.ts:createReassembler:export declare function createReassembler<TEncoded, TFrame, TId extends string, TVersion extends number>(framer: IRpcFramer<TEncoded, TFrame, TId, TVersion>): IRpcReassembler<TFrame, TEncoded>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-framing--createReassembler"
+        },
+        {
+          "name": "createStringFramer",
+          "kind": "function",
+          "signature": "export declare function createStringFramer<const TOptions extends IRpcFramerOptions = IRpcFramerOptions>(options?: TOptions): IRpcFramer<string, string | IRpcStringFrame, 'message', 1>;",
+          "declarationLine": 3,
+          "source": "packages/rpc-contract/dist/framing/message-framer.d.ts",
+          "purpose": "Creates a codec-independent string framer with strict ordered bounded reassembly.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStringFramer.",
+          "advanced": "No additional advanced behavior is declared for createStringFramer.",
+          "parameters": ["options: TOptions (optional)"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "TOptions",
+              "optional": true
+            }
+          ],
+          "returns": "IRpcFramer<string, string | IRpcStringFrame, 'message', 1>",
+          "errors": ["No documented errors are declared for createStringFramer."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStringFramer.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "createStringFramer",
+          "exportPath": "./framing",
+          "overloadSignatures": [
+            "export declare function createStringFramer<const TOptions extends IRpcFramerOptions = IRpcFramerOptions>(options?: TOptions): IRpcFramer<string, string | IRpcStringFrame, 'message', 1>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "TOptions",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcFramer<string, string | IRpcStringFrame, 'message', 1>"],
+          "whenToUse": "Use createStringFramer when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createStringFramer does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Creates a codec-independent string framer with strict ordered bounded reassembly."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createStringFramer from @migaia/rpc-contract/framing, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createStringFramer when its function contract and declared inputs match the result you need. Choose a different public symbol when createStringFramer does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStringFramer."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createStringFramer."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/framing/message-framer.d.ts:createStringFramer:export declare function createStringFramer<const TOptions extends IRpcFramerOptions = IRpcFramerOptions>(options?: TOptions): IRpcFramer<string, string | IRpcStringFrame, 'message', 1>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-framing--createStringFramer"
+        },
+        {
+          "name": "IRpcFrameAcceptResult",
+          "kind": "type",
+          "signature": "export type IRpcFrameAcceptResult<TEncoded> = Readonly<{ status: 'pending'; }> | Readonly<{ status: 'complete'; value: TEncoded; }> | Readonly<{ status: 'rejected'; error: Error; }>;",
+          "declarationLine": 80,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "IRpcFrameAcceptResult is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcFrameAcceptResult.",
+          "advanced": "No additional advanced behavior is declared for IRpcFrameAcceptResult.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcFrameAcceptResult."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcFrameAcceptResult.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcFrameAcceptResult",
+          "exportPath": "./framing",
+          "overloadSignatures": [
+            "export type IRpcFrameAcceptResult<TEncoded> = Readonly<{ status: 'pending'; }> | Readonly<{ status: 'complete'; value: TEncoded; }> | Readonly<{ status: 'rejected'; error: Error; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcFrameAcceptResult when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcFrameAcceptResult does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IRpcFrameAcceptResult is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcFrameAcceptResult from @migaia/rpc-contract/framing, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcFrameAcceptResult when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcFrameAcceptResult does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcFrameAcceptResult."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcFrameAcceptResult."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcFrameAcceptResult:export type IRpcFrameAcceptResult<TEncoded> = Readonly<{ status: 'pending'; }> | Readonly<{ status: 'complete'; value: TEncoded; }> | Readonly<{ status: 'rejected'; error: Error; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-framing--IRpcFrameAcceptResult"
+        },
+        {
+          "name": "IRpcFrameContext",
+          "kind": "type",
+          "signature": "export type IRpcFrameContext = Readonly<{ source: string; messageId: string; }>;",
+          "declarationLine": 76,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "IRpcFrameContext is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcFrameContext.",
+          "advanced": "No additional advanced behavior is declared for IRpcFrameContext.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcFrameContext."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcFrameContext.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcFrameContext",
+          "exportPath": "./framing",
+          "overloadSignatures": [
+            "export type IRpcFrameContext = Readonly<{ source: string; messageId: string; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcFrameContext when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcFrameContext does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IRpcFrameContext is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcFrameContext from @migaia/rpc-contract/framing, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcFrameContext when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcFrameContext does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcFrameContext."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcFrameContext."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcFrameContext:export type IRpcFrameContext = Readonly<{ source: string; messageId: string; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-framing--IRpcFrameContext"
+        },
+        {
+          "name": "IRpcFramer",
+          "kind": "type",
+          "signature": "export type IRpcFramer<TEncoded, TFrame, TId extends string, TVersion extends number> = IRpcDescriptor<TId, TVersion> & Readonly<{ inputEncodedType: IRpcEncodedType; outputEncodedType: IRpcEncodedType; frame: (value: TEncoded, context: IRpcFrameContext) => readonly TFrame[]; accept: (frame: TFrame, context: IRpcFrameContext) => IRpcFrameAcceptResult<TEncoded>; close: (reason?: unknown) => void; }>;",
+          "declarationLine": 69,
+          "source": "packages/rpc-contract/dist/types.d.ts",
+          "purpose": "Generic framing boundary; semantic contracts do not depend on a transport.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcFramer.",
+          "advanced": "No additional advanced behavior is declared for IRpcFramer.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcFramer."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcFramer.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcFramer",
+          "exportPath": "./framing",
+          "overloadSignatures": [
+            "export type IRpcFramer<TEncoded, TFrame, TId extends string, TVersion extends number> = IRpcDescriptor<TId, TVersion> & Readonly<{ inputEncodedType: IRpcEncodedType; outputEncodedType: IRpcEncodedType; frame: (value: TEncoded, context: IRpcFrameContext) => readonly TFrame[]; accept: (frame: TFrame, context: IRpcFrameContext) => IRpcFrameAcceptResult<TEncoded>; close: (reason?: unknown) => void; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcFramer when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcFramer does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Generic framing boundary; semantic contracts do not depend on a transport."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcFramer from @migaia/rpc-contract/framing, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcFramer when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcFramer does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcFramer."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcFramer."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/types.d.ts:IRpcFramer:export type IRpcFramer<TEncoded, TFrame, TId extends string, TVersion extends number> = IRpcDescriptor<TId, TVersion> & Readonly<{ inputEncodedType: IRpcEncodedType; outputEncodedType: IRpcEncodedType; frame: (value: TEncoded, context: IRpcFrameContext) => readonly TFrame[]; accept: (frame: TFrame, context: IRpcFrameContext) => IRpcFrameAcceptResult<TEncoded>; close: (reason?: unknown) => void; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-framing--IRpcFramer"
+        },
+        {
+          "name": "IRpcReassembler",
+          "kind": "type",
+          "signature": "export type IRpcReassembler<TFrame, TEncoded> = Readonly<{ accept: (frame: TFrame, context: IRpcFrameContext) => IRpcFrameAcceptResult<TEncoded>; close: (reason?: unknown) => void; }>;",
+          "declarationLine": 3,
+          "source": "packages/rpc-contract/dist/framing/reassembler.d.ts",
+          "purpose": "Thin named facade for callers that need to document a reassembly boundary explicitly.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcReassembler.",
+          "advanced": "No additional advanced behavior is declared for IRpcReassembler.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRpcReassembler."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcReassembler.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IRpcReassembler",
+          "exportPath": "./framing",
+          "overloadSignatures": [
+            "export type IRpcReassembler<TFrame, TEncoded> = Readonly<{ accept: (frame: TFrame, context: IRpcFrameContext) => IRpcFrameAcceptResult<TEncoded>; close: (reason?: unknown) => void; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRpcReassembler when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRpcReassembler does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Thin named facade for callers that need to document a reassembly boundary explicitly."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcReassembler from @migaia/rpc-contract/framing, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcReassembler when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcReassembler does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcReassembler."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRpcReassembler."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/framing/reassembler.d.ts:IRpcReassembler:export type IRpcReassembler<TFrame, TEncoded> = Readonly<{ accept: (frame: TFrame, context: IRpcFrameContext) => IRpcFrameAcceptResult<TEncoded>; close: (reason?: unknown) => void; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-contract-framing--IRpcReassembler"
+        },
+        {
+          "name": "messageFramerV1",
+          "kind": "const",
+          "signature": "export declare const messageFramerV1: IRpcFramer<string | Uint8Array, string | Uint8Array, 'message', 1>;",
+          "declarationLine": 7,
+          "source": "packages/rpc-contract/dist/framing/message-framer.d.ts",
+          "purpose": "Canonical V1 whole-frame identity framer; it never fragments or allocates buffers.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for messageFramerV1.",
+          "advanced": "No additional advanced behavior is declared for messageFramerV1.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for messageFramerV1."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for messageFramerV1.",
+          "examples": [
+            "import { rpcProtocolV1 } from '@migaia/rpc-contract'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'"
+          ],
+          "members": [],
+          "aliasOf": "messageFramerV1",
+          "exportPath": "./framing",
+          "overloadSignatures": [
+            "export declare const messageFramerV1: IRpcFramer<string | Uint8Array, string | Uint8Array, 'message', 1>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use messageFramerV1 when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when messageFramerV1 does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Canonical V1 whole-frame identity framer; it never fragments or allocates buffers."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import messageFramerV1 from @migaia/rpc-contract/framing, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use messageFramerV1 when its const contract and declared inputs match the result you need. Choose a different public symbol when messageFramerV1 does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for messageFramerV1."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for messageFramerV1."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-contract/dist/framing/message-framer.d.ts:messageFramerV1:export declare const messageFramerV1: IRpcFramer<string | Uint8Array, string | Uint8Array, 'message', 1>;",
+          "guidance": [],
+          "usageScore": 14,
+          "configuration": [],
+          "fragment": "rpc-contract-framing--messageFramerV1"
+        }
+      ],
+      "aliases": []
+    }
+  ]
+}

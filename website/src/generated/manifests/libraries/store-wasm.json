@@ -1018,6 +1018,7 @@
             "import { StoreProvider } from '@migaia/store-react';\nimport { ensureWasm, number, array } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';\n\nfunction Game() {\n  // 挂载时 ensureWasm() 已经 settle，可以直接同步构造\n  const store = createStore({ hp: number(), hits: array(number(), 1000) });\n  return null;\n}\n\nfunction App() {\n  return (\n    <StoreProvider config={{ features: { wasm: true }, ready: [ensureWasm] }}>\n      <Game />\n    </StoreProvider>\n  );\n}",
             "import { array, number } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';\n\nawait import('@migaia/store-wasm').then((m) => m.ensureWasm());\n\n// 6 万个粒子，默认 granularity=64：约 940 个 Source，批量写入时通知合并\nconst particles = array(number(), 60_000);\nconst store = createStore({ particles });\n\nconst dx = new Float64Array(1000).fill(0.1);\nstore.particles.setRange(0, 1000, dx); // 落进同一批桶的写入合并到一次 commit"
           ],
+          "members": [],
           "aliasOf": "array",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1224,6 +1225,7 @@
             "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n});\nstore.$dispose(); // 递归释放全部五个字段各自持有的 WASM 分配",
             "const field = boolean();\nfield.value = true;"
           ],
+          "members": [],
           "aliasOf": "boolean",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1405,6 +1407,7 @@
           "errors": ["No documented errors are declared for createStoreWasmAggregateError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreWasmAggregateError.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreWasmAggregateError(code: IStoreWasmErrorCode, errors: readonly unknown[], message: string): AggregateError;"
@@ -1645,6 +1648,7 @@
           "examples": [
             "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value');"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreWasmError(code: IStoreWasmErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
@@ -1874,6 +1878,7 @@
           "errors": ["No documented errors are declared for createStoreWasmRangeError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreWasmRangeError.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError;"
@@ -2107,6 +2112,7 @@
           "errors": ["No documented errors are declared for createStoreWasmTypeError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreWasmTypeError.",
           "examples": [],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreWasmTypeError(code: IStoreWasmErrorCode, message: string, options?: { readonly cause?: unknown; }): TypeError;"
@@ -2331,6 +2337,7 @@
             "import { StoreProvider } from '@migaia/store-react';\nimport { ensureWasm, number, array } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';\n\nfunction Game() {\n  // 挂载时 ensureWasm() 已经 settle，可以直接同步构造\n  const store = createStore({ hp: number(), hits: array(number(), 1000) });\n  return null;\n}\n\nfunction App() {\n  return (\n    <StoreProvider config={{ features: { wasm: true }, ready: [ensureWasm] }}>\n      <Game />\n    </StoreProvider>\n  );\n}",
             "import { array, number } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';\n\nawait import('@migaia/store-wasm').then((m) => m.ensureWasm());\n\n// 6 万个粒子，默认 granularity=64：约 940 个 Source，批量写入时通知合并\nconst particles = array(number(), 60_000);\nconst store = createStore({ particles });\n\nconst dx = new Float64Array(1000).fill(0.1);\nstore.particles.setRange(0, 1000, dx); // 落进同一批桶的写入合并到一次 commit"
           ],
+          "members": [],
           "aliasOf": "ensureWasm",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2604,6 +2611,7 @@
             "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';",
             "const WasmFieldMode = { sync: 'sync' } as const;\ntype IWasmFieldMode = 'sync';"
           ],
+          "members": [],
           "aliasOf": "IWasmFieldMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2758,6 +2766,7 @@
             "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';",
             "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const;\ntype IWasmReservedKey = 'dispose' | 'disposed';"
           ],
+          "members": [],
           "aliasOf": "IWasmReservedKey",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2922,6 +2931,7 @@
             "import { array, number } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';\n\nawait import('@migaia/store-wasm').then((m) => m.ensureWasm());\n\n// 6 万个粒子，默认 granularity=64：约 940 个 Source，批量写入时通知合并\nconst particles = array(number(), 60_000);\nconst store = createStore({ particles });\n\nconst dx = new Float64Array(1000).fill(0.1);\nstore.particles.setRange(0, 1000, dx); // 落进同一批桶的写入合并到一次 commit",
             "import { record, number } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';\n\nconst store = createStore({ pos: record({ x: number(), y: number(), z: number() }) });\n\n// 只订阅 x 的观察者不会因为 y/z 的写入而重渲染——三个字段各自独立 Source\nstore.pos.x = 1;\nstore.pos.y = 2;"
           ],
+          "members": [],
           "aliasOf": "number",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3096,6 +3106,7 @@
             "WasmFieldMode.sync; // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose; // 'dispose'，record() 禁用的 key 之一",
             "import { record, number } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';\n\nconst store = createStore({ pos: record({ x: number(), y: number(), z: number() }) });\n\n// 只订阅 x 的观察者不会因为 y/z 的写入而重渲染——三个字段各自独立 Source\nstore.pos.x = 1;\nstore.pos.y = 2;"
           ],
+          "members": [],
           "aliasOf": "record",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3430,6 +3441,7 @@
             "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm';",
             "import { StoreWasmErrorCode, STORE_WASM_SOURCE } from '@migaia/store-wasm';\n\ntry {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放：新建字段而不是复用已释放实例\n  } else {\n    throw error;\n  }\n}"
           ],
+          "members": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const STORE_WASM_SOURCE = \"@migaia/store-wasm\";"
@@ -3652,6 +3664,7 @@
             "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n});\nstore.$dispose(); // 递归释放全部五个字段各自持有的 WASM 分配",
             "const field = string(64); // 最多 64 字节\nfield.value = 'hello';"
           ],
+          "members": [],
           "aliasOf": "string",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3974,6 +3987,7 @@
             "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm';",
             "WasmFieldMode.sync; // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose; // 'dispose'，record() 禁用的 key 之一"
           ],
+          "members": [],
           "aliasOf": "WasmFieldMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4180,6 +4194,7 @@
             "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm';",
             "WasmFieldMode.sync; // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose; // 'dispose'，record() 禁用的 key 之一"
           ],
+          "members": [],
           "aliasOf": "WasmReservedKey",
           "exportPath": ".",
           "overloadSignatures": [

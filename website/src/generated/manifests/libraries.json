@@ -9969,10 +9969,66 @@
       }
     },
     {
+      "slug": "rpc-contract",
+      "description": "Runtime-neutral RPC semantic and framing contracts.",
+      "version": "0.0.1",
+      "exports": [".", "./framing"],
+      "documentation": {
+        "readme": {
+          "sections": [
+            {
+              "id": "migaia-rpc-contract",
+              "heading": "@migaia/rpc-contract",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Runtime-neutral semantic RPC descriptors, portable values, hostile-safe envelope normalization, and whole-message framing contracts."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The module has no dependency on transports, runtimes, codecs, workers, or Store. Format codecs live in `@migaia/serialize`."
+                }
+              ]
+            }
+          ]
+        },
+        "guide": {
+          "sections": [
+            {
+              "id": "usage",
+              "heading": "Usage",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { rpcProtocolV1 } from '@migaia/rpc-contract'\nimport { messageFramerV1 } from '@migaia/rpc-contract/framing'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`rpcProtocolV1.normalize()` validates untrusted semantic envelopes. `messageFramerV1` accepts whole string or binary frames and does not place chunk metadata in semantic messages."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
       "slug": "serialize",
       "description": "Store-neutral chunked serialization and codec registry.",
       "version": "0.0.4",
-      "exports": [".", "./core", "./plugins", "./registry"],
+      "exports": [
+        ".",
+        "./codec",
+        "./codecs/cbor",
+        "./codecs/identity",
+        "./codecs/json",
+        "./codecs/message-pack",
+        "./codecs/protobuf",
+        "./core",
+        "./plugins",
+        "./registry"
+      ],
       "documentation": {
         "readme": {
           "sections": [
@@ -11442,6 +11498,16 @@
                 {
                   "type": "paragraph",
                   "text": "Q：`base64ToBytes` 抛错时 `error.cause` 是 `undefined`，看不到底层失败原因。 这是刻意行为：`base64ToBytes` 捕获任意底层解析失败后统一抛出一个不带 `cause` 的 `TypeError`／`INVALID_OPTION`（\"invalid base64 input\"），不透传底层实现细节。"
+                }
+              ]
+            },
+            {
+              "id": "versioned-codec-boundaries",
+              "heading": "Versioned codec boundaries",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/serialize/codec` defines the generic `ICodec<TValue, TEncoded, TId, TVersion>` shape and its identity implementation. Format implementations are intentionally split: `codecs/json`, `codecs/message-pack`, `codecs/cbor`, and `codecs/protobuf`. Importing the generic or identity path does not load binary format runtimes."
                 }
               ]
             }
@@ -30413,15 +30479,15 @@
         "./adapters/web-worker",
         "./adapters/window",
         "./client",
+        "./contract-endpoint",
         "./core",
-        "./features/chunk",
         "./features/control",
         "./features/discovery",
         "./features/outbound",
         "./features/provider",
         "./full",
-        "./protocol-constants",
-        "./provider"
+        "./provider",
+        "./transport-constants"
       ],
       "documentation": {
         "readme": {
@@ -30497,7 +30563,7 @@
                     "双向调用：不是\"客户端发请求、服务端只能回响应\"的单向模型——每一端既可以是调用方也可以是被调用方，`provide()` 和 `send()` 在同一个 `endpoint` 上共存。",
                     "请求超时：`timeout()` 中间件统一管理请求 deadline；每个请求只发送一次，避免隐含的 at-least-once 语义。",
                     "鉴权与加密：`authentication()` 中间件对每一帧（包括分片帧、控制帧）做签名/验签、加解密，`connect()` 中间件对\"这条消息真的来自我认识的那个 peer 吗\"做验证，不是只信任 `senderId` 这个可以被伪造的字符串字段。",
-                    "大消息自动分片：`chunk()` 中间件在发送侧按字节预算自动切分、接收侧自动重组，并从并发消息数、单 peer 消息数、分片数、分片大小、缓冲区总量、重组超时六个维度限制资源占用，防止恶意/异常大消息把内存打爆。",
+                    "大消息自动分片：`framer()` 层在发送侧按字节预算自动切分、接收侧自动重组，并从并发消息数、单 peer 消息数、分片数、分片大小、缓冲区总量、重组超时六个维度限制资源占用，防止恶意/异常大消息把内存打爆。",
                     "多接收端的服务发现与负载均衡：同一个 `targetId` 背后可以有多个存活的接收端（比如多个 SharedWorker tab），框架自动维护\"谁还活着\"的路由表，未指定接收端时对活跃接收端做首次成功即返回的竞速调用；也支持手动模式精确控制发现/注册/固定路由。",
                     "统一的错误处理：跨包错误都带稳定的 `(source, code)`；原生 `TypeError`/`RangeError`/`AggregateError` 和远端 `WebRpcRemoteError` 保留自己的运行时类型，调用方可先用 `isWebRpcError()`/结构化 `code` 分支，再按需检查原生类型。",
                     "可控的生命周期：`dispose()` 保证按预期顺序清理中间件、传输连接、进行中的请求，任何一步清理失败都会被收集而不是让后续清理步骤中断。"
@@ -30660,7 +30726,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`connect()` 是唯一必需 middleware。`contract()`、`protocol()`、`timeout()` 等按需要添加；不应为了“凑齐默认栈”机械安装。"
+                  "text": "`connect()` 是唯一必需 middleware。`contract()`、`codec()`、`timeout()` 等按需要添加；不应为了“凑齐默认栈”机械安装。"
                 }
               ]
             },
@@ -30671,7 +30737,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createEndpoint, contract, protocol, connect } from '@migaia/web-rpc'"
+                  "code": "import { createEndpoint, contract, codec, connect } from '@migaia/web-rpc'"
                 },
                 {
                   "type": "paragraph",
@@ -30680,7 +30746,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const endpoint = await createEndpoint({\n  id: 'server',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nendpoint.provide('add', (ctx) => {\n  const { a, b } = ctx.data as { a: number; b: number }\n  return ctx.success(a + b)\n})"
+                  "code": "const endpoint = await createEndpoint({\n  id: 'server',\n  transport,\nmiddlewares: [contract({ version: '1' }), codec(identityCodecV1), connect({ transport })]\n})\nendpoint.provide('add', (ctx) => {\n  const { a, b } = ctx.data as { a: number; b: number }\n  return ctx.success(a + b)\n})"
                 },
                 {
                   "type": "paragraph",
@@ -30729,12 +30795,12 @@
                     "`provider()`：`provide`，并把 inseparable outbound closure 投影到根对象。",
                     "`discovery()`：`connect` / `discovery`；内部依赖 outbound，但单独选择时不暴露发送方法。",
                     "`control()`：ping/pong 控制面；公开 `ping` / `pingAll` 还要求 middleware tuple 包含 `ping()`。",
-                    "`chunk()`：分片 framing，没有独立公开方法；具体限制来自 middleware `chunk(config)`。"
+                    "`framer()`：分片 framing，没有独立公开方法；具体限制来自 framing descriptor 配置。"
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "`Feature` 和同名 `middleware` 不是重复实现：前者决定运行时模块与公开 surface，后者只提供配置/capability。例如完整预设选择 `features/chunk`，而 `middleware/chunk` 决定 chunk size 和容量限制。"
+                  "text": "`Feature` 和 layer descriptor 不是重复实现：前者决定运行时模块与公开 surface，后者只提供配置/capability。分片能力由 framing layer 负责，策略由 framer descriptor 决定。"
                 }
               ]
             },
@@ -30859,12 +30925,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`protocol(config?)`｜3 秒上手 —— 定义消息信封的编码/解码方式："
+                  "text": "`codec(descriptor)`｜3 秒上手 —— 定义消息信封的编码/解码方式："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "protocol({ encode: (v) => msgpackEncode(v), decode: (v) => msgpackDecode(v) })"
+                  "code": "codec({ encode: (v) => msgpackEncode(v), decode: (v) => msgpackDecode(v) })"
                 },
                 {
                   "type": "paragraph",
@@ -30902,12 +30968,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`chunk(config?)`｜10 秒上手 —— 大消息自动分片与重组："
+                  "text": "`framer(descriptor?)`｜10 秒上手 —— 大消息自动分片与重组："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "chunk({ chunkSize: 16_384, maxMessageBytes: 50 * 1024 * 1024, assemblyTimeoutMs: 30_000 })"
+                  "code": "framer({ chunkSize: 16_384, maxMessageBytes: 50 * 1024 * 1024, assemblyTimeoutMs: 30_000 })"
                 },
                 {
                   "type": "paragraph",
@@ -31107,7 +31173,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "单参数 `{ writable: WritableStream<Uint8Array>; readable: ReadableStream<Uint8Array> }`，无其他选项。datagram 无内建分帧，`protocol()` 需自行处理帧边界；`close()` 才会真正取消内部持久 reader，取消订阅不会。"
+                  "text": "单参数 `{ writable: WritableStream<Uint8Array>; readable: ReadableStream<Uint8Array> }`，无其他选项。datagram 无内建分帧，codec/framer descriptors 需自行处理帧边界；`close()` 才会真正取消内部持久 reader，取消订阅不会。"
                 },
                 {
                   "type": "paragraph",
@@ -31174,7 +31240,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "单参数 `error: unknown`，无选项；和序列化使用同一安全预算，图超过 64 层或 1024 个节点、或 hostile getter 读取失败时会抛带 `PAYLOAD_INVALID` 的 `WebRpcSerializationError`，不会返回不完整遍历。完整字段与类型定义见 USEGUIDE §16。此外主入口还整体导出 `protocol-constants` 里的全部枚举常量（`WebRpcPlatform`/`WebRpcTransportTopology`/`WebRpcMessageKind` 等），用于替代手写字符串字面量，完整清单见 USEGUIDE §15。"
+                  "text": "单参数 `error: unknown`，无选项；和序列化使用同一安全预算，图超过 64 层或 1024 个节点、或 hostile getter 读取失败时会抛带 `PAYLOAD_INVALID` 的 `WebRpcSerializationError`，不会返回不完整遍历。完整字段与类型定义见 USEGUIDE §16。此外主入口还整体导出传输与契约常量，用于替代手写字符串字面量，完整清单见 USEGUIDE §15。"
                 }
               ]
             },
@@ -31185,12 +31251,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// worker.ts\nimport { contract, protocol, connect } from '@migaia/web-rpc'\nimport { createProviderEndpoint } from '@migaia/web-rpc/provider'\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst transport = createWebWorkerTransport(self as unknown as Worker)\nconst endpoint = await createProviderEndpoint({\n  id: 'worker',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nendpoint.provide('heavyCompute', (ctx) => ctx.success(doHeavyWork(ctx.data as number[])))"
+                  "code": "// worker.ts\nimport { contract, codec, connect } from '@migaia/web-rpc'\nimport { createProviderEndpoint } from '@migaia/web-rpc/provider'\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst transport = createWebWorkerTransport(self as unknown as Worker)\nconst endpoint = await createProviderEndpoint({\n  id: 'worker',\n  transport,\n  middlewares: [contract({ version: '1' }), codec({ encode: (value) => value, decode: (value) => value }), connect({ transport })]\n})\nendpoint.provide('heavyCompute', (ctx) => ctx.success(doHeavyWork(ctx.data as number[])))"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// main.ts\nimport { contract, protocol, connect, timeout } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url))\nconst transport = createWebWorkerTransport(worker)\nconst endpoint = await createClientEndpoint({\n  id: 'main',\n  transport,\n  targetIds: ['worker'],\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport }),\n    timeout({ timeoutMs: 30_000 })\n  ]\n})\n\nconst result = await endpoint.send<number[]>('worker', 'heavyCompute', [1, 2, 3])"
+                  "code": "// main.ts\nimport { contract, codec, connect, timeout } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url))\nconst transport = createWebWorkerTransport(worker)\nconst endpoint = await createClientEndpoint({\n  id: 'main',\n  transport,\n  targetIds: ['worker'],\n  middlewares: [\n    contract({ version: '1' }),\n    codec({ encode: (value) => value, decode: (value) => value }),\n    connect({ transport }),\n    timeout({ timeoutMs: 30_000 })\n  ]\n})\n\nconst result = await endpoint.send<number[]>('worker', 'heavyCompute', [1, 2, 3])"
                 }
               ]
             },
@@ -31201,7 +31267,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { contract, protocol, connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createWindowMessageTransport } from '@migaia/web-rpc/adapters/window'\n\nconst ALLOWED_ORIGINS = new Set(['https://trusted-partner.example'])\nconst iframe = document.querySelector('iframe')!\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: 'https://trusted-partner.example'\n})\n\nconst endpoint = await createClientEndpoint({\n  id: 'host',\n  transport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({\n      transport,\n      useBaseIdVerifyOnly: false,\n      identifier: (ctx) => Boolean(ctx.origin && ALLOWED_ORIGINS.has(ctx.origin))\n    })\n  ]\n})"
+                  "code": "import { contract, codec, connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createWindowMessageTransport } from '@migaia/web-rpc/adapters/window'\n\nconst ALLOWED_ORIGINS = new Set(['https://trusted-partner.example'])\nconst iframe = document.querySelector('iframe')!\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: 'https://trusted-partner.example'\n})\n\nconst endpoint = await createClientEndpoint({\n  id: 'host',\n  transport,\n  middlewares: [\n    contract({ version: '1' }),\n    codec({ encode: (value) => value, decode: (value) => value }),\n    connect({\n      transport,\n      useBaseIdVerifyOnly: false,\n      identifier: (ctx) => Boolean(ctx.origin && ALLOWED_ORIGINS.has(ctx.origin))\n    })\n  ]\n})"
                 }
               ]
             },
@@ -31212,7 +31278,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { contract, protocol, connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createBroadcastChannelTransport } from '@migaia/web-rpc/adapters/broadcast-channel'\n\nconst transport = createBroadcastChannelTransport(new BroadcastChannel('app-sync'))\nconst endpoint = await createClientEndpoint({\n  id: `tab-${crypto.randomUUID()}`,\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nendpoint.on('cache-invalidated', (ctx) => console.log('缓存失效通知：', ctx.data))\nendpoint.dispatchAll('cache-invalidated', { key: 'user-profile' }) // 其余标签页都会收到"
+                  "code": "import { contract, codec, connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createBroadcastChannelTransport } from '@migaia/web-rpc/adapters/broadcast-channel'\n\nconst transport = createBroadcastChannelTransport(new BroadcastChannel('app-sync'))\nconst endpoint = await createClientEndpoint({\n  id: `tab-${crypto.randomUUID()}`,\n  transport,\n  middlewares: [contract({ version: '1' }), codec({ encode: (value) => value, decode: (value) => value }), connect({ transport })]\n})\n\nendpoint.on('cache-invalidated', (ctx) => console.log('缓存失效通知：', ctx.data))\nendpoint.dispatchAll('cache-invalidated', { key: 'user-profile' }) // 其余标签页都会收到"
                 }
               ]
             },
@@ -31223,7 +31289,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { contract, protocol, connect, chunk } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { outbound } from '@migaia/web-rpc/features/outbound'\nimport { chunk as chunkFeature } from '@migaia/web-rpc/features/chunk'\n\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'sender',\n    transport,\n    middlewares: [\n      contract({ version: '1' }),\n      protocol(),\n      connect({ transport }),\n      chunk({\n        chunkSize: 16_384,\n        maxMessageBytes: 50 * 1024 * 1024,\n        assemblyTimeoutMs: 30_000\n      })\n    ]\n  },\n  [outbound(), chunkFeature()] as const\n)\n\n// 业务代码完全不用关心分片，正常发一个大 payload 即可\nawait endpoint.send('receiver', 'uploadFile', { name: 'video.mp4', bytes: largeUint8Array })"
+                  "code": "import { contract, codec, connect, framer } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { outbound } from '@migaia/web-rpc/features/outbound'\n\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'sender',\n    transport,\n    middlewares: [\n      contract({ version: '1' }),\n      codec({ encode: (value) => value, decode: (value) => value }),\n      connect({ transport }),\n      framer({\n        chunkSize: 16_384,\n        maxMessageBytes: 50 * 1024 * 1024,\n        assemblyTimeoutMs: 30_000\n      })\n    ]\n  },\n  [outbound()] as const\n)\n\n// 业务代码完全不用关心分片，正常发一个大 payload 即可\nawait endpoint.send('receiver', 'uploadFile', { name: 'video.mp4', bytes: largeUint8Array })"
                 }
               ]
             },
@@ -31234,7 +31300,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { contract, protocol, connect, timeout, abort } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\n\nconst endpoint = await createClientEndpoint({\n  id: 'client',\n  transport,\n  targetIds: ['server'],\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport }),\n    timeout({\n      timeoutMs: 5000,\n      timeoutMs: 5000\n    }),\n    abort()\n  ]\n})\n\nconst controller = new AbortController()\nconst resultPromise = endpoint.send('server', 'flaky', {}, { signal: controller.signal })\n// 需要时可随时 controller.abort() 主动取消\nconst result = await resultPromise"
+                  "code": "import { contract, codec, connect, timeout, abort } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\n\nconst endpoint = await createClientEndpoint({\n  id: 'client',\n  transport,\n  targetIds: ['server'],\n  middlewares: [\n    contract({ version: '1' }),\n    codec({ encode: (value) => value, decode: (value) => value }),\n    connect({ transport }),\n    timeout({\n      timeoutMs: 5000,\n      timeoutMs: 5000\n    }),\n    abort()\n  ]\n})\n\nconst controller = new AbortController()\nconst resultPromise = endpoint.send('server', 'flaky', {}, { signal: controller.signal })\n// 需要时可随时 controller.abort() 主动取消\nconst result = await resultPromise"
                 }
               ]
             },
@@ -31256,11 +31322,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`chunk()` 的容量限制不是\"不设置就不限\"——六个维度里有五个（并发消息数、单 peer 消息数、分片数、分片字节、重组超时）自带内置默认值，只有 `chunkSize`/`maxMessageBytes` 才是真正的\"未设不限\"。 10. Feature 决定“有没有这个公开方法”，middleware 决定“这个能力怎样工作”。不要把 `features/chunk` 与 middleware `chunk()`、`features/control` 与 middleware `ping()` 当作二选一；需要对应行为时两层都要满足，类型会对缺失的条件能力 fail closed。 11. 优先从最窄子路径导入。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "只调用远端用 `@migaia/web-rpc/client`，只提供服务用 `@migaia/web-rpc/provider`；根 `createEndpoint` 是 full preset，不是零成本门面。"
+                  "text": "framer descriptor 的容量限制不是\"不设置就不限\"——六个维度里有五个（并发消息数、单 peer 消息数、分片数、分片字节、重组超时）自带内置默认值，只有 `chunkSize`/`maxMessageBytes` 才是真正的\"未设不限\"。 10. Feature 决定“有没有这个公开方法”，layer descriptor 决定“这个能力怎样工作”。分片由 framing layer 负责，控制面由 control Feature 与 `ping()` middleware 共同提供；类型会对缺失的条件能力 fail closed。 11. 优先从最窄子路径导入。只调用远端用 `@migaia/web-rpc/client`，只提供服务用 `@migaia/web-rpc/provider`；根 `createEndpoint` 是 full preset，不是零成本门面。"
                 }
               ]
             },
@@ -31376,7 +31438,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Feature 决定 endpoint 运行时安装哪些领域能力、根对象公开哪些方法。当前可组合 Feature 为 `outbound()`、`provider()`、`discovery()`、`control()`、`chunk()`，分别从 `@migaia/web-rpc/features/*` 导入。"
+                  "text": "Feature 决定 endpoint 运行时安装哪些领域能力、根对象公开哪些方法。当前可组合 Feature 为 `outbound()`、`provider()`、`discovery()`、`control()`，分片由 framing layer 负责。"
                 },
                 {
                   "type": "paragraph",
@@ -31394,7 +31456,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Feature 与 Middleware 必须分开理解：`features/chunk` 选择分片帧处理能力，根入口导出的 middleware `chunk({.})` 配置分片策略；`features/control` 选择控制帧能力，middleware `ping()` 才让 `ping` / `pingAll` 出现在精确推导出的类型上。完整参考见 §3。"
+                  "text": "Feature 与 Middleware 必须分开理解：framing layer 选择分片帧处理能力，根入口导出的 `framer({.})` descriptor 配置分片策略；`features/control` 选择控制帧能力，middleware `ping()` 才让 `ping` / `pingAll` 出现在精确推导出的类型上。完整参考见 §3。"
                 }
               ]
             },
@@ -31540,8 +31602,8 @@
                   "items": [
                     "Feature tuple 不能为空，重复 token 会以 `CAPABILITY_CONFLICT` 拒绝。",
                     "Feature 的运行时依赖由组合器安装并去重；依赖是私有安装关系，不等于公开根投影。",
-                    "`provider()` 的公开闭包特意包含 outbound，因此选择 provider 后可以 `send()`；`discovery()` 和 `chunk()` 的私有 outbound 依赖不会公开 `send()`。",
-                    "`chunk()` Feature 不增加独立方法，只安装分片帧所有者；它通常与根入口导出的 `chunk({...})` middleware 一起使用。",
+                    "`provider()` 的公开闭包特意包含 outbound，因此选择 provider 后可以 `send()`；framing layer 的私有 outbound 依赖不会公开 `send()`。",
+                    "framing layer 不增加独立方法，只安装分片帧所有者；它与 `framer({...})` descriptor 一起使用。",
                     "middleware tuple 使用 `as const`，TypeScript 才能精确推断手动发现模式和 `ping()` 带来的条件方法。",
                     "构造是异步、原子的：任何 Feature 或 middleware 安装失败时，已安装项会逆序清理，原始失败保留在 `cause` / `AggregateError.errors` 链中。"
                   ]
@@ -31601,13 +31663,13 @@
               ]
             },
             {
-              "id": "3-2-protocol-config",
-              "heading": "3.2 protocol(config?)",
+              "id": "3-2-codec-descriptor",
+              "heading": "3.2 codec(descriptor)",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "protocol({\n  encode?: (value: unknown) => unknown;   // 默认恒等\n  decode?: (value: unknown) => unknown;   // 默认恒等\n  encodedType?: 'any' | 'string' | 'uint8array';\n})"
+                  "code": "codec({\n  encode?: (value: unknown) => unknown;   // 默认恒等\n  decode?: (value: unknown) => unknown;   // 默认恒等\n  encodedType?: 'any' | 'string' | 'uint8array';\n})"
                 },
                 {
                   "type": "paragraph",
@@ -31659,13 +31721,13 @@
               ]
             },
             {
-              "id": "3-5-chunk-config",
-              "heading": "3.5 chunk(config?)",
+              "id": "3-5-framer-descriptor",
+              "heading": "3.5 framer(descriptor?)",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "chunk({\n  chunkSize?: number;                 // 单帧最大字节数，超过则自动分片；未设不主动分片\n  maxMessageBytes?: number;           // 单条消息（分片前）允许的最大总字节数；未设不检查\n  maxConcurrentMessages?: number;     // 端点级别同时进行中的分片重组数量上限，默认 128\n  maxConcurrentMessagesPerPeer?: number; // 单个 peer 的重组数量上限，默认 32\n  maxBufferedBytes?: number;          // 分片重组缓冲区总字节上限，默认 16MiB（16 * 1024 * 1024）\n  maxChunksPerMessage?: number;       // 单条消息允许的最大分片数，默认 4096\n  maxChunkBytes?: number;             // 单个分片帧允许的最大字节数，默认 4MiB（4 * 1024 * 1024）\n  assemblyTimeoutMs?: number;         // 重组超时，超时未收全则丢弃并报错，默认 30000（30 秒）\n  byteLength?: (value: string) => number; // 自定义字节长度测量（默认按 UTF-8）\n  split?: (value: string, maxBytes: number) => readonly string[]; // 自定义切分算法\n})"
+                  "code": "framer({\n  chunkSize?: number;                 // 单帧最大字节数，超过则自动分片；未设不主动分片\n  maxMessageBytes?: number;           // 单条消息（分片前）允许的最大总字节数；未设不检查\n  maxConcurrentMessages?: number;     // 端点级别同时进行中的分片重组数量上限，默认 128\n  maxConcurrentMessagesPerPeer?: number; // 单个 peer 的重组数量上限，默认 32\n  maxBufferedBytes?: number;          // 分片重组缓冲区总字节上限，默认 16MiB（16 * 1024 * 1024）\n  maxChunksPerMessage?: number;       // 单条消息允许的最大分片数，默认 4096\n  maxChunkBytes?: number;             // 单个分片帧允许的最大字节数，默认 4MiB（4 * 1024 * 1024）\n  assemblyTimeoutMs?: number;         // 重组超时，超时未收全则丢弃并报错，默认 30000（30 秒）\n  byteLength?: (value: string) => number; // 自定义字节长度测量（默认按 UTF-8）\n  split?: (value: string, maxBytes: number) => readonly string[]; // 自定义切分算法\n})"
                 },
                 {
                   "type": "paragraph",
@@ -31841,7 +31903,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "包装 HTTP/3 WebTransport 的 datagram 读写流。datagram 是无连接、无内建分帧的字节流，协议编解码（`protocol()` 中间件）需要自行处理好帧边界；适配器内部维护一个贯穿整个传输生命周期的持久 reader——取消订阅（移除所有 RPC 监听器）不会连带取消这个 reader，只有调用 `close()` 才会真正取消 reader、释放读锁、关闭 writer；第二次调用 `close()` 会复用第一次的 close 结果，不会重复执行清理。"
+                  "text": "包装 HTTP/3 WebTransport 的 datagram 读写流。datagram 是无连接、无内建分帧的字节流，codec/framer descriptors 需要自行处理好帧边界；适配器内部维护一个贯穿整个传输生命周期的持久 reader——取消订阅（移除所有 RPC 监听器）不会连带取消这个 reader，只有调用 `close()` 才会真正取消 reader、释放读锁、关闭 writer；第二次调用 `close()` 会复用第一次的 close 结果，不会重复执行清理。"
                 }
               ]
             },
@@ -32110,12 +32172,12 @@
                     [
                       "`PROTOCOL_INVALID`",
                       "协议编解码失败",
-                      "检查 `protocol()` 的 `encode`/`decode` 实现或对端协议是否一致"
+                      "检查 codec descriptor 的 `encode`/`decode` 实现或对端协议是否一致"
                     ],
                     [
                       "`PROTOCOL_UNSUPPORTED`",
                       "协议输出类型和传输要求的 `encodedType` 不匹配",
-                      "调整 `protocol()`/`encodedType` 配置"
+                      "调整 codec descriptor/`encodedType` 配置"
                     ],
                     [
                       "`PROTOCOL_DECRYPT_FAILED`",
@@ -32135,7 +32197,7 @@
                     ],
                     [
                       "`PAYLOAD_TOO_LARGE`",
-                      "消息超过 `chunk()` 配置的大小上限",
+                      "消息超过 framer descriptor 配置的大小上限",
                       "调大限制或减小消息体积"
                     ],
                     [
@@ -32206,9 +32268,13 @@
                     [
                       "`CHUNK_INVALID`",
                       "分片帧不合法",
-                      "检查 `chunk()` 自定义 `split`/`byteLength` 实现"
+                      "检查 framer descriptor 自定义 `split`/`byteLength` 实现"
                     ],
-                    ["`CHUNK_TOO_LARGE`", "单条消息或单个分片超过配置上限", "调整 `chunk()` 限制"],
+                    [
+                      "`CHUNK_TOO_LARGE`",
+                      "单条消息或单个分片超过配置上限",
+                      "调整 framer descriptor 限制"
+                    ],
                     [
                       "`CHUNK_CAPACITY_EXCEEDED`",
                       "并发重组数量/缓冲区超限",
@@ -32222,7 +32288,7 @@
                     [
                       "`CHUNK_ACK_TIMEOUT`",
                       "分片确认超时（预留字段，当前分片层不做确认应答）",
-                      "见 `chunk()` 说明——分片层是尽力而为传递"
+                      "见 framer descriptor 说明——分片层是尽力而为传递"
                     ]
                   ]
                 },
@@ -32373,12 +32439,12 @@
                   "rows": [
                     ["出站请求 id 重放窗口容量", "`replay.maxEntries`", "4096"],
                     ["出站请求 id 重放窗口 TTL", "`replay.ttlMs`", "310 秒"],
-                    ["分片并发消息数（端点级）", "`chunk()`", "按配置，未设默认不限"],
-                    ["分片并发消息数（单 peer）", "`chunk()`", "按配置"],
-                    ["单条消息最大分片数", "`chunk()`", "按配置"],
-                    ["单个分片最大字节数", "`chunk()`", "按配置"],
-                    ["分片重组总缓冲字节数", "`chunk()`", "按配置"],
-                    ["分片重组超时", "`chunk()`", "按配置"],
+                    ["分片并发消息数（端点级）", "framer descriptor", "按配置，未设默认不限"],
+                    ["分片并发消息数（单 peer）", "framer descriptor", "按配置"],
+                    ["单条消息最大分片数", "framer descriptor", "按配置"],
+                    ["单个分片最大字节数", "framer descriptor", "按配置"],
+                    ["分片重组总缓冲字节数", "framer descriptor", "按配置"],
+                    ["分片重组超时", "framer descriptor", "按配置"],
                     [
                       "自动发现的入站查询并发/单 peer 限制",
                       "`connect()` 自动模式内部",
@@ -32408,12 +32474,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// worker.ts\nimport { contract, protocol, connect } from '@migaia/web-rpc'\nimport { createProviderEndpoint } from '@migaia/web-rpc/provider'\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst transport = createWebWorkerTransport(self as unknown as Worker)\nconst endpoint = await createProviderEndpoint({\n  id: 'worker',\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\nendpoint.provide('heavyCompute', (ctx) => {\n  const result = doHeavyWork(ctx.data as number[])\n  return ctx.success(result)\n})"
+                  "code": "// worker.ts\nimport { contract, codec, connect } from '@migaia/web-rpc'\nimport { createProviderEndpoint } from '@migaia/web-rpc/provider'\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst transport = createWebWorkerTransport(self as unknown as Worker)\nconst endpoint = await createProviderEndpoint({\n  id: 'worker',\n  transport,\n  middlewares: [contract({ version: '1' }), codec({ encode: (value) => value, decode: (value) => value }), connect({ transport })]\n})\nendpoint.provide('heavyCompute', (ctx) => {\n  const result = doHeavyWork(ctx.data as number[])\n  return ctx.success(result)\n})"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// main.ts\nimport { contract, protocol, connect, timeout } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url))\nconst transport = createWebWorkerTransport(worker)\nconst endpoint = await createClientEndpoint({\n  id: 'main',\n  transport,\n  targetIds: ['worker'],\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({ transport }),\n    timeout({ timeoutMs: 30_000 })\n  ]\n})\n\nconst result = await endpoint.send<number[]>('worker', 'heavyCompute', [1, 2, 3])"
+                  "code": "// main.ts\nimport { contract, codec, connect, timeout } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createWebWorkerTransport } from '@migaia/web-rpc/adapters/web-worker'\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url))\nconst transport = createWebWorkerTransport(worker)\nconst endpoint = await createClientEndpoint({\n  id: 'main',\n  transport,\n  targetIds: ['worker'],\n  middlewares: [\n    contract({ version: '1' }),\n    codec({ encode: (value) => value, decode: (value) => value }),\n    connect({ transport }),\n    timeout({ timeoutMs: 30_000 })\n  ]\n})\n\nconst result = await endpoint.send<number[]>('worker', 'heavyCompute', [1, 2, 3])"
                 }
               ]
             },
@@ -32424,7 +32490,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { contract, protocol, connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createWindowMessageTransport } from '@migaia/web-rpc/adapters/window'\n\nconst ALLOWED_ORIGINS = new Set(['https://trusted-partner.example'])\n\nconst iframe = document.querySelector('iframe')!\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: 'https://trusted-partner.example'\n})\n\nconst endpoint = await createClientEndpoint({\n  id: 'host',\n  transport,\n  middlewares: [\n    contract({ version: '1' }),\n    protocol(),\n    connect({\n      transport,\n      useBaseIdVerifyOnly: false,\n      identifier: (ctx) => Boolean(ctx.origin && ALLOWED_ORIGINS.has(ctx.origin))\n    })\n  ]\n})"
+                  "code": "import { contract, codec, connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createWindowMessageTransport } from '@migaia/web-rpc/adapters/window'\n\nconst ALLOWED_ORIGINS = new Set(['https://trusted-partner.example'])\n\nconst iframe = document.querySelector('iframe')!\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: 'https://trusted-partner.example'\n})\n\nconst endpoint = await createClientEndpoint({\n  id: 'host',\n  transport,\n  middlewares: [\n    contract({ version: '1' }),\n    codec({ encode: (value) => value, decode: (value) => value }),\n    connect({\n      transport,\n      useBaseIdVerifyOnly: false,\n      identifier: (ctx) => Boolean(ctx.origin && ALLOWED_ORIGINS.has(ctx.origin))\n    })\n  ]\n})"
                 }
               ]
             },
@@ -32435,7 +32501,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { contract, protocol, connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createBroadcastChannelTransport } from '@migaia/web-rpc/adapters/broadcast-channel'\n\nconst transport = createBroadcastChannelTransport(new BroadcastChannel('app-sync'))\nconst endpoint = await createClientEndpoint({\n  id: `tab-${crypto.randomUUID()}`,\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nendpoint.on('cache-invalidated', (ctx) => {\n  console.log('缓存失效通知：', ctx.data)\n})\n\n// 任意一个标签页广播，其余全部标签页都会收到\nendpoint.dispatchAll('cache-invalidated', { key: 'user-profile' })"
+                  "code": "import { contract, codec, connect } from '@migaia/web-rpc'\nimport { createClientEndpoint } from '@migaia/web-rpc/client'\nimport { createBroadcastChannelTransport } from '@migaia/web-rpc/adapters/broadcast-channel'\n\nconst transport = createBroadcastChannelTransport(new BroadcastChannel('app-sync'))\nconst endpoint = await createClientEndpoint({\n  id: `tab-${crypto.randomUUID()}`,\n  transport,\n  middlewares: [contract({ version: '1' }), codec({ encode: (value) => value, decode: (value) => value }), connect({ transport })]\n})\n\nendpoint.on('cache-invalidated', (ctx) => {\n  console.log('缓存失效通知：', ctx.data)\n})\n\n// 任意一个标签页广播，其余全部标签页都会收到\nendpoint.dispatchAll('cache-invalidated', { key: 'user-profile' })"
                 }
               ]
             },
@@ -32446,7 +32512,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { contract, protocol, connect, chunk } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { outbound } from '@migaia/web-rpc/features/outbound'\nimport { chunk as chunkFeature } from '@migaia/web-rpc/features/chunk'\n\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'sender',\n    transport,\n    middlewares: [\n      contract({ version: '1' }),\n      protocol(),\n      connect({ transport }),\n      chunk({\n        chunkSize: 16_384, // 单帧 16KB\n        maxMessageBytes: 50 * 1024 * 1024, // 单条消息最大 50MB\n        assemblyTimeoutMs: 30_000\n      })\n    ]\n  },\n  [outbound(), chunkFeature()] as const\n)\n\n// 业务代码完全不用关心分片，正常发一个大 payload 即可\nawait endpoint.send('receiver', 'uploadFile', { name: 'video.mp4', bytes: largeUint8Array })"
+                  "code": "import { contract, codec, connect, framer } from '@migaia/web-rpc'\nimport { createComposedEndpoint } from '@migaia/web-rpc/core'\nimport { outbound } from '@migaia/web-rpc/features/outbound'\n\nconst endpoint = await createComposedEndpoint(\n  {\n    id: 'sender',\n    transport,\n    middlewares: [\n      contract({ version: '1' }),\n      codec({ encode: (value) => value, decode: (value) => value }),\n      connect({ transport }),\n      framer({\n        chunkSize: 16_384, // 单帧 16KB\n        maxMessageBytes: 50 * 1024 * 1024, // 单条消息最大 50MB\n        assemblyTimeoutMs: 30_000\n      })\n    ]\n  },\n  [outbound()] as const\n)\n\n// 业务代码完全不用关心分片，正常发一个大 payload 即可\nawait endpoint.send('receiver', 'uploadFile', { name: 'video.mp4', bytes: largeUint8Array })"
                 }
               ]
             },
@@ -32464,7 +32530,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q：`features/chunk` 和根入口的 `chunk()` 为什么同名？ 前者是 Feature token，决定是否安装分片帧运行时所有者；后者是 middleware，提供 `chunkSize`、容量和超时等策略。自定义组合通常两者都要，建议导入时把 Feature 改名为 `chunkFeature`。`control()` Feature 与 `ping()` middleware 也是同样的分层关系。"
+                  "text": "Q：framing layer 和 `framer()` descriptor 如何配合？ framing layer 决定是否安装分片帧运行时所有者；`framer()` descriptor 提供 `chunkSize`、容量和超时等策略。`control()` Feature 与 `ping()` middleware 也是同样的分层关系。"
                 },
                 {
                   "type": "paragraph",
@@ -32476,7 +32542,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q：大消息发送失败，报 `PAYLOAD_TOO_LARGE` 或 `CHUNK_TOO_LARGE`。 检查是否装了 `chunk()` 中间件，以及 `chunkSize`/`maxMessageBytes` 是否够用；已经是 `Uint8Array` 的消息不支持自动分片，需要传输通道本身能处理大二进制，或者在业务层手动切分。"
+                  "text": "Q：大消息发送失败，报 `PAYLOAD_TOO_LARGE` 或 `CHUNK_TOO_LARGE`。 检查 framer descriptor 的 `chunkSize`/`maxMessageBytes` 是否够用；已经是 `Uint8Array` 的消息不支持自动分片，需要传输通道本身能处理大二进制，或者在业务层手动切分。"
                 },
                 {
                   "type": "paragraph",
@@ -32507,7 +32573,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  type IWebRpcTransport,\n  WebRpcPlatform,\n  WebRpcTransportTopology,\n  WebRpcTransportOwnership,\n  WebRpcTransportEncoding,\n  WebRpcMessageKind,\n  WebRpcVariation,\n  WebRpcEndpointStatus,\n  WebRpcDebugPhase\n} from '@migaia/web-rpc'\n\nconst transport = {\n  platform: WebRpcPlatform.worker,\n  topology: WebRpcTransportTopology.exclusive,\n  ownership: WebRpcTransportOwnership.borrowed,\n  encodedType: WebRpcTransportEncoding.any,\n  send,\n  subscribe\n} satisfies IWebRpcTransport"
+                  "code": "import {\n  type IWebRpcTransport,\n  WebRpcPlatform,\n  WebRpcTransportTopology,\n  WebRpcTransportOwnership,\n  WebRpcTransportEncoding,\n  WebRpcEndpointStatus,\n  WebRpcDebugPhase\n} from '@migaia/web-rpc'\n\nconst transport = {\n  platform: WebRpcPlatform.worker,\n  topology: WebRpcTransportTopology.exclusive,\n  ownership: WebRpcTransportOwnership.borrowed,\n  encodedType: WebRpcTransportEncoding.any,\n  send,\n  subscribe\n} satisfies IWebRpcTransport"
                 },
                 {
                   "type": "paragraph",
@@ -32517,8 +32583,6 @@
                   "type": "table",
                   "headers": ["常量", "用途"],
                   "rows": [
-                    ["`WebRpcMessageKind`", "discovery/request/response/variation/chunk wire 类型"],
-                    ["`WebRpcVariation`", "abort/ping/pong 控制变化"],
                     ["`WebRpcPlatform`", "adapter 平台标签"],
                     ["`WebRpcTransportTopology`", "exclusive/multiplexed/broadcast 信任拓扑"],
                     ["`WebRpcTransportOwnership`", "owned/borrowed 资源释放契约"],
